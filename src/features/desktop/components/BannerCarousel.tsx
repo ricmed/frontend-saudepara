@@ -1,0 +1,258 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+interface CampanhaItem {
+  imagem: string;
+  titulo: string;
+  descricao: string;
+  link: string;
+}
+
+interface BannerCarouselProps {
+  campanhas?: CampanhaItem[];
+}
+
+export const BannerCarousel: React.FC<BannerCarouselProps> = ({ campanhas }) => {
+  const navigate = useNavigate();
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [startX, setStartX] = useState<number | null>(null);
+  const [currentX, setCurrentX] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [autoplayPaused, setAutoplayPaused] = useState(false);
+  const carouselRef = useRef<HTMLDivElement>(null);
+  
+  // Dados padrão de campanhas
+  const defaultCampanhas: CampanhaItem[] = [
+    {
+      imagem: "./images/campaigns/Dezembro Vermelho.png",
+      titulo: "Campanha Dezembro Vermelho 2024",
+      descricao: "Conscientização e combate ao HIV/AIDS em todo o Pará",
+      link: "/campanha-dezembro-vermelho"
+    },
+    {
+      imagem: "./images/campaigns/Novembro Azul.png",
+      titulo: "Novembro Azul",
+      descricao: "Conscientização sobre a saúde do homem e prevenção ao câncer de próstata",
+      link: "/campanha-novembro-azul"
+    },
+    {
+      imagem: "./images/campaigns/Setembro Verde.png",
+      titulo: "Setembro Verde",
+      descricao: "Mês de conscientização sobre a doação de órgãos",
+      link: "/setembro-verde"
+    },
+    {
+      imagem: "./images/campaigns/Malária Zero.png",
+      titulo: "Malária Zero",
+      descricao: "Iniciativa para erradicação da malária na região amazônica",
+      link: "/malaria-zero"
+    },
+    {
+      imagem: "./images/campaigns/Amamentação.png",
+      titulo: "Amamentação",
+      descricao: "Incentivo ao aleitamento materno e seus benefícios",
+      link: "/amamentacao"
+    }
+  ];
+
+  const items = campanhas || defaultCampanhas;
+
+  // Gerencia o autoplay do carrossel
+  useEffect(() => {
+    if (autoplayPaused) return;
+    
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev === items.length - 1 ? 0 : prev + 1));
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [items.length, autoplayPaused]);
+
+  // Funções para navegar entre slides
+  const goToSlide = (index: number) => {
+    setCurrentIndex(index);
+  };
+
+  const goToNextSlide = () => {
+    setCurrentIndex((prev) => (prev === items.length - 1 ? 0 : prev + 1));
+  };
+
+  const goToPrevSlide = () => {
+    setCurrentIndex((prev) => (prev === 0 ? items.length - 1 : prev - 1));
+  };
+
+  // Handlers para eventos de mouse
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    setStartX(e.clientX);
+    setCurrentX(e.clientX);
+    setAutoplayPaused(true);
+    e.preventDefault(); // Evita seleção de texto
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setCurrentX(e.clientX);
+  };
+
+  const handleMouseUp = () => {
+    if (!isDragging || startX === null || currentX === null) return;
+    
+    const diff = startX - currentX;
+    
+    // Se o movimento foi significativo (mais de 50px), mude o slide
+    if (Math.abs(diff) > 50) {
+      if (diff > 0) {
+        goToNextSlide();
+      } else {
+        goToPrevSlide();
+      }
+    }
+    
+    setIsDragging(false);
+    setStartX(null);
+    setCurrentX(null);
+    
+    // Retoma o autoplay após um período
+    setTimeout(() => setAutoplayPaused(false), 1000);
+  };
+
+  const handleMouseLeave = () => {
+    if (isDragging) {
+      handleMouseUp();
+    }
+  };
+
+  // Handlers para eventos de toque
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setStartX(e.touches[0].clientX);
+    setCurrentX(e.touches[0].clientX);
+    setAutoplayPaused(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setCurrentX(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (startX === null || currentX === null) return;
+    
+    const diff = startX - currentX;
+    
+    if (Math.abs(diff) > 50) {
+      if (diff > 0) {
+        goToNextSlide();
+      } else {
+        goToPrevSlide();
+      }
+    }
+    
+    setStartX(null);
+    setCurrentX(null);
+    
+    // Retoma o autoplay após um período
+    setTimeout(() => setAutoplayPaused(false), 1000);
+  };
+
+  // Estilo para o cursor quando estiver arrastando
+  const cursorStyle = isDragging ? { cursor: 'grabbing' } : { cursor: 'grab' };
+
+  return (
+    <div className="bg-blue-600 pb-12">
+      <div className="max-w-6xl mx-auto px-6">
+        <div 
+          className="bg-white/10 rounded-xl overflow-hidden relative" 
+          ref={carouselRef}
+          style={cursorStyle}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div
+            className="flex transition-transform duration-500 ease-in-out"
+            style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+          >
+            {items.map((item, index) => (
+              <div key={index} className="w-full flex-shrink-0">
+                <div className="relative aspect-[21/9]">
+                  <img
+                    src={item.imagem}
+                    alt={item.titulo}
+                    className="w-full h-full object-cover"
+                    draggable="false"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-transparent" />
+                  <div className="absolute bottom-0 left-0 p-8 max-w-lg">
+                    <h2 className="text-3xl font-bold text-white mb-2">{item.titulo}</h2>
+                    <p className="text-lg text-white/90">{item.descricao}</p>
+                    <button 
+                      className="mt-4 bg-white text-[#3B5FFF] px-6 py-2 rounded-md font-medium hover:bg-blue-50"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!isDragging) {
+                          navigate(item.link);
+                        }
+                      }}
+                    >
+                      Saiba mais
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Controls for larger screens */}
+          <button 
+            className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white/20 hover:bg-white/30 p-2 rounded-full text-white hidden md:block"
+            onClick={(e) => {
+              e.stopPropagation();
+              goToPrevSlide();
+            }}
+            aria-label="Slide anterior"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-6 h-6">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          
+          <button 
+            className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white/20 hover:bg-white/30 p-2 rounded-full text-white hidden md:block"
+            onClick={(e) => {
+              e.stopPropagation();
+              goToNextSlide();
+            }}
+            aria-label="Próximo slide"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-6 h-6">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+
+          {/* Indicadores */}
+          <div className="absolute bottom-4 right-4 flex space-x-2">
+            {items.map((_, index) => (
+              <button
+                key={index}
+                className={`w-2 h-2 rounded-full transition-colors ${
+                  currentIndex === index ? 'bg-white' : 'bg-white/50'
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  goToSlide(index);
+                }}
+                aria-label={`Ir para slide ${index + 1}`}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default BannerCarousel;
