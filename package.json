@@ -16,6 +16,7 @@
     "@types/uuid": "^10.0.0",
     "axios": "^1.6.2",
     "dotenv": "^16.4.7",
+    "html2canvas": "^1.4.1",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",
     "lucide-react": "^0.468.0",
@@ -28,6 +29,7 @@
     "react-flags-select": "^2.2.3",
     "react-google-charts": "^5.2.1",
     "react-router-dom": "^6.21.1",
+    "recharts": "^2.15.1",
     "uuid": "^11.0.3",
     "xlsx": "^0.18.5"
   },

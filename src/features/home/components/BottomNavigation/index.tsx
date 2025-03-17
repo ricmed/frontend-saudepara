@@ -66,7 +66,12 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 
         {/* FAB Button */}
         <div className="w-12"></div>
-        <button className="absolute -top-6 left-1/2 -translate-x-1/2 w-14 h-14 bg-blue-600 rounded-full flex flex-col items-center justify-center shadow-lg">
+        <button 
+          className="absolute -top-6 left-1/2 -translate-x-1/2 w-14 h-14 bg-blue-600 rounded-full flex flex-col items-center justify-center shadow-lg"
+          onClick={() => {
+            navigate("/ficha-comunicacao");
+          }}
+        >
           <FileText className="w-6 h-6 text-white" />
         </button>
 

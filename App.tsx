@@ -4,6 +4,8 @@ import HealthCampaignsPage from "@/features/campaigns/pages/HealthCampaignsPage"
 
 import DesktopPage from "@/features/desktop/DesktopPage";
 
+import NotificationDashboard from "@/features/dashboard/NotificationDashboard";
+
 // Features - Campanhas
 import DezembroVermelho from "@/features/campaigns/pages/details/RedDecemberPage";
 import SetembroVerde from "@/features/campaigns/pages/details/GreenSeptemberPage";
@@ -252,7 +254,7 @@ function App() {
           <Route path="/malaria-zero" element={<MalariaZero />} />
           <Route path="/campanha-novembro-azul" element={<NovembroAzul />} />
           {/* Rotas de Componentes */}
-          <Route path="/componente-1" element={<NotificationForm />} />
+          <Route path="/ficha-comunicacao" element={<NotificationForm />} />
           <Route path="/lista-componentes" element={<ListaComponentes />} />
           <Route
             path="/cadastrar-componente"
@@ -292,6 +294,9 @@ function App() {
             path="/notificacoes/editar/:id"
             element={<NotificationForm />}
           />
+
+          {/* Rotas de Dashboard */}
+          <Route path="/dashboard" element={<NotificationDashboard />} />
         </Routes>
       </Router>
     </LanguageProvider>
