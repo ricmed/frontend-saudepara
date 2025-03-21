@@ -93,10 +93,6 @@ import CadastroPais from "@/features/apps/components/CadastroPais";
 import ListaGeneros from "@/features/apps/list/ListaGenero";
 import CadastroGenero from "@/features/apps/components/CadastroGenero";
 
-// Features - Orientação Sexual
-import ListaOrientacoesSexuais from "@/features/apps/list/ListaOrientacaoSexual";
-import CadastroOrientacaoSexual from "@/features/apps/components/CadastroOrientacaoSexual";
-
 // Páginas
 // import PaginaNotificacoes from "@/features/notifications/HomePage";
 import LoginPage from "@/paginas/LoginPage";
@@ -201,13 +197,6 @@ function App() {
           <Route path="/genero/lista" element={<ListaGeneros />} />
           <Route path="/genero/cadastro" element={<CadastroGenero />} />
           <Route path="/genero/editar/:id" element={<CadastroGenero />} />
-
-          {/*
-          Rotas de Orientações Sexuais
-          */}
-          <Route path="/orientacao-sexual/lista" element={<ListaOrientacoesSexuais />}/>
-          <Route path="/orientacao-sexual/cadastro" element={<CadastroOrientacaoSexual />}/>
-          <Route path="/orientacao-sexual/editar/:id" element={<CadastroOrientacaoSexual />}/>
 
           {/* Rotas de Tipos de Encerramento */}
           <Route path="/lista-tipos-encerramento" element={<ListaTiposEncerramento />} />

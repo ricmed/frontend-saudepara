@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import PhoneInput from "@/features/notificationForms/components/PhoneInput";
 import CboInput from "@/features/notificationForms/components/CboInput";
+import UnidadeNotificadoraField from "@/features/notificationForms/components/UnidadeNotificadoraField";
+import BrazilianPhoneInput from "@/features/notificationForms/components/BrazilianPhoneInput";
 import {
   Search,
   Save,
@@ -24,6 +26,13 @@ import {
   Globe,
   ListChecks,
 } from "lucide-react";
+// Import the export utilities
+import { 
+  exportToExcel, 
+  exportToCSV, 
+  exportToWord, 
+  exportToPDF 
+} from "./exportUtilities";
 
 // Interface FormData atualizada
 export interface FormData {
@@ -127,6 +136,38 @@ const bairrosBelemOptions = [
   "Icoaraci",
   "Outeiro",
   "Mosqueiro",
+  "Pratinha",
+  "Benguí",
+  "Val-de-Cães",
+  "Mangueirão",
+  "Parque Verde",
+  "Coqueiro",
+  "Cabanagem",
+  "Maracangalha",
+  "Barreiro",
+  "Miramar",
+  "Souza",
+  "Fátima",
+  "Tenoné",
+  "Una",
+  "Agulha",
+  "Ponta Grossa",
+  "Cruzeiro",
+  "São Clemente",
+  "Paracuri",
+  "Sideral",
+  "Aurá",
+  "Guanabara",
+  "Jaderlândia",
+  "Levilândia",
+  "Castanheira",
+  "Nova Marambaia",
+  "Maguari",
+  "Maracacuera",
+  "Parque Guajará",
+  "Bengui",
+  "Curuçambá",
+  "Paar",
 ];
 
 const estadoOptions = [
@@ -193,7 +234,117 @@ const municipioParaOptions = [
   "Cachoeira do Piriá",
   "Cametá",
   "Canaã dos Carajás",
-  // Lista reduzida para brevidade
+  "Capanema",
+  "Capitão Poço",
+  "Castanhal",
+  "Chaves",
+  "Colares",
+  "Conceição do Araguaia",
+  "Concórdia do Pará",
+  "Cumaru do Norte",
+  "Curionópolis",
+  "Curralinho",
+  "Curuá",
+  "Curuçá",
+  "Dom Eliseu",
+  "Eldorado do Carajás",
+  "Faro",
+  "Floresta do Araguaia",
+  "Garrafão do Norte",
+  "Goianésia do Pará",
+  "Gurupá",
+  "Igarapé-Açu",
+  "Igarapé-Miri",
+  "Inhangapi",
+  "Ipixuna do Pará",
+  "Irituia",
+  "Itaituba",
+  "Itupiranga",
+  "Jacareacanga",
+  "Jacundá",
+  "Juruti",
+  "Limoeiro do Ajuru",
+  "Mãe do Rio",
+  "Magalhães Barata",
+  "Marabá",
+  "Maracanã",
+  "Marapanim",
+  "Marituba",
+  "Medicilândia",
+  "Melgaço",
+  "Mocajuba",
+  "Moju",
+  "Mojuí dos Campos",
+  "Monte Alegre",
+  "Muaná",
+  "Nova Esperança do Piriá",
+  "Nova Ipixuna",
+  "Nova Timboteua",
+  "Novo Progresso",
+  "Novo Repartimento",
+  "Óbidos",
+  "Oeiras do Pará",
+  "Oriximiná",
+  "Ourém",
+  "Ourilândia do Norte",
+  "Pacajá",
+  "Palestina do Pará",
+  "Paragominas",
+  "Parauapebas",
+  "Pau D'Arco",
+  "Peixe-Boi",
+  "Piçarra",
+  "Placas",
+  "Ponta de Pedras",
+  "Portel",
+  "Porto de Moz",
+  "Prainha",
+  "Primavera",
+  "Quatipuru",
+  "Redenção",
+  "Rio Maria",
+  "Rondon do Pará",
+  "Rurópolis",
+  "Salinópolis",
+  "Salvaterra",
+  "Santa Bárbara do Pará",
+  "Santa Cruz do Arari",
+  "Santa Izabel do Pará",
+  "Santa Luzia do Pará",
+  "Santa Maria das Barreiras",
+  "Santa Maria do Pará",
+  "Santana do Araguaia",
+  "Santarém",
+  "Santarém Novo",
+  "Santo Antônio do Tauá",
+  "São Caetano de Odivelas",
+  "São Domingos do Araguaia",
+  "São Domingos do Capim",
+  "São Félix do Xingu",
+  "São Francisco do Pará",
+  "São Geraldo do Araguaia",
+  "São João da Ponta",
+  "São João de Pirabas",
+  "São João do Araguaia",
+  "São Miguel do Guamá",
+  "São Sebastião da Boa Vista",
+  "Sapucaia",
+  "Senador José Porfírio",
+  "Soure",
+  "Tailândia",
+  "Terra Alta",
+  "Terra Santa",
+  "Tomé-Açu",
+  "Tracuateua",
+  "Trairão",
+  "Tucumã",
+  "Tucuruí",
+  "Ulianópolis",
+  "Uruará",
+  "Vigia",
+  "Viseu",
+  "Vitória do Xingu",
+  "Xinguara",
 ];
 
 const paisOptions = [
@@ -276,7 +427,10 @@ const tipoAtendimentoOptions = [
 
 const sinaisESintomasOptions = [
   { value: "AbrasaoLaceracao", label: "ABRASAO/LACERACAO" },
-  { value: "Adenomegalia", label: "ADENOMEGALIA (AUMENTO DAS GLANDULAS / LINFONODO)" },
+  {
+    value: "Adenomegalia",
+    label: "ADENOMEGALIA (AUMENTO DAS GLANDULAS / LINFONODO)",
+  },
   { value: "AgulhadaIntencional", label: "AGULHADA INTENCIONAL" },
   { value: "Anorexia", label: "ANOREXIA (PERDA DE APETITE)" },
   { value: "Calafrios", label: "CALAFRIOS" },
@@ -287,7 +441,10 @@ const sinaisESintomasOptions = [
   { value: "Coriza", label: "CORIZA" },
   { value: "CorteIncisaoPerfuracao", label: "CORTE/INCISAO/PERFURACAO" },
   { value: "Desidratacao", label: "DESIDRATACAO" },
-  { value: "Desorientacao", label: "DESORIENTACAO (CONFUSAO MENTAL) OU SONOLENCIA" },
+  {
+    value: "Desorientacao",
+    label: "DESORIENTACAO (CONFUSAO MENTAL) OU SONOLENCIA",
+  },
   { value: "Diarreia", label: "DIARREIA" },
   { value: "Dispneia", label: "DIFICULDADE DE RESPIRAR (DISPNEIA)" },
   { value: "DorAbdominal", label: "DOR ABDOMINAL" },
@@ -299,7 +456,10 @@ const sinaisESintomasOptions = [
   { value: "DorRetroorbital", label: "DOR RETROORBITAL" },
   { value: "EntorseLuxacao", label: "ENTORSE/LUXACAO" },
   { value: "LesaoArmaFogo", label: "LESAO DECORRENTE DE ARMA DE FOGO" },
-  { value: "EstresseTermico", label: "ESTRESSE TERMICO / INSOLACAO / QUEIMADURAS SOLAR" },
+  {
+    value: "EstresseTermico",
+    label: "ESTRESSE TERMICO / INSOLACAO / QUEIMADURAS SOLAR",
+  },
   { value: "EventoDiabetes", label: "EVENTO RELACIONADO A DIABETES" },
   { value: "EventoHipertensao", label: "EVENTO RELACIONADO A HIPERTENSAO" },
   { value: "ReacaoAlergica", label: "EVENTO RELACIONADO A REACAO ALERGICA" },
@@ -308,45 +468,96 @@ const sinaisESintomasOptions = [
   { value: "Febre", label: "FEBRE" },
   { value: "Fratura", label: "FRATURA" },
   { value: "Hematoma", label: "HEMATOMA" },
-  { value: "HemorragiaCutanea", label: "HEMORRAGIA CUTANEA (PETEQUIAS OU PROVA DO LACO)" },
+  {
+    value: "HemorragiaCutanea",
+    label: "HEMORRAGIA CUTANEA (PETEQUIAS OU PROVA DO LACO)",
+  },
   { value: "HemorragiaOutrosLocais", label: "HEMORRAGIA EM OUTROS LOCAIS" },
   { value: "HemorragiaMucosa", label: "HEMORRAGIA MUCOSA (NASAL OU GENGIVAL)" },
   { value: "Ictericia", label: "ICTERICIA" },
   { value: "IntoxicacaoMedicamento", label: "INTOXICACAO (MEDICAMENTO)" },
   { value: "IntoxicacaoAlimentar", label: "INTOXICACAO ALIMENTAR" },
-  { value: "IntoxicacaoAlcool", label: "INTOXICACAO OU USO EXCESSIVO POR ALCOOL" },
-  { value: "IntoxicacaoOutras", label: "INTOXICACAO OUTRAS (VENENOS/AGROTOXICOS/SANEANTES)" },
-  { value: "IntoxicacaoDrogasIlicitas", label: "INTOXICACAO POR USO DE DROGAS ILICITAS" },
-  { value: "LesaoViolenciaDomestica", label: "LESAO DECORRENTE DE VIOLENCIA DOMESTICA" },
-  { value: "LesaoAutomovel", label: "LESAO DECORRENTE DE ACIDENTE COM AUTOMOVEL" },
-  { value: "LesaoBicicleta", label: "LESAO DECORRENTE DE ACIDENTE COM BICICLETA" },
+  {
+    value: "IntoxicacaoAlcool",
+    label: "INTOXICACAO OU USO EXCESSIVO POR ALCOOL",
+  },
+  {
+    value: "IntoxicacaoOutras",
+    label: "INTOXICACAO OUTRAS (VENENOS/AGROTOXICOS/SANEANTES)",
+  },
+  {
+    value: "IntoxicacaoDrogasIlicitas",
+    label: "INTOXICACAO POR USO DE DROGAS ILICITAS",
+  },
+  {
+    value: "LesaoViolenciaDomestica",
+    label: "LESAO DECORRENTE DE VIOLENCIA DOMESTICA",
+  },
+  {
+    value: "LesaoAutomovel",
+    label: "LESAO DECORRENTE DE ACIDENTE COM AUTOMOVEL",
+  },
+  {
+    value: "LesaoBicicleta",
+    label: "LESAO DECORRENTE DE ACIDENTE COM BICICLETA",
+  },
   { value: "LesaoMoto", label: "LESAO DECORRENTE DE ACIDENTE COM MOTO" },
-  { value: "LesaoMultiplasVitimas", label: "LESAO DECORRENTE DE ACIDENTE COM MULTIPLAS VITIMAS" },
-  { value: "LesaoOutroVeiculoMotor", label: "LESAO DECORRENTE DE ACIDENTE COM OUTRO VEICULO" },
-  { value: "LesaoAglomeracao", label: "LESAO DECORRENTE DE AGLOMERACAO (PISOTEAMENTO)" },
+  {
+    value: "LesaoMultiplasVitimas",
+    label: "LESAO DECORRENTE DE ACIDENTE COM MULTIPLAS VITIMAS",
+  },
+  {
+    value: "LesaoOutroVeiculoMotor",
+    label: "LESAO DECORRENTE DE ACIDENTE COM OUTRO VEICULO",
+  },
+  {
+    value: "LesaoAglomeracao",
+    label: "LESAO DECORRENTE DE AGLOMERACAO (PISOTEAMENTO)",
+  },
   { value: "LesaoArmaBranca", label: "LESAO DECORRENTE DE ARMA BRANCA" },
   { value: "LesaoDesastre", label: "LESAO DECORRENTE DE DESASTRE" },
   { value: "LesaoQueda", label: "LESAO DECORRENTE DE QUEDA" },
-  { value: "LesaoViolenciaFisica", label: "LESAO DECORRENTE DE VIOLENCIA FISICA INTERPESSOAL" },
-  { value: "LesaoAssedioSexual", label: "LESAO DECORRENTE DE VIOLENCIA/ASSEDIO SEXUAL" },
+  {
+    value: "LesaoViolenciaFisica",
+    label: "LESAO DECORRENTE DE VIOLENCIA FISICA INTERPESSOAL",
+  },
+  {
+    value: "LesaoAssedioSexual",
+    label: "LESAO DECORRENTE DE VIOLENCIA/ASSEDIO SEXUAL",
+  },
   { value: "LesaoNegligencia", label: "LESAO DECORRENTE NEGLIGENCIA/ABANDONO" },
-  { value: "LesaoAutoprovocada", label: "LESAO POR VIOLENCIA FISICA AUTOPROVOCADA" },
+  {
+    value: "LesaoAutoprovocada",
+    label: "LESAO POR VIOLENCIA FISICA AUTOPROVOCADA",
+  },
   { value: "LesoesCutaneasMpox", label: "LESOES CUTANEAS - MPOX" },
   { value: "LesoesCutaneas", label: "LESOES CUTANEAS/VESICULAS/BOLHAS" },
   { value: "Linfadenopatia", label: "LINFADENOPATIA" },
   { value: "Nauseas", label: "NAUSEAS E OU VOMITO" },
-  { value: "Paralisia", label: "PARALISIA OU FLACIDEZ MUSCULAR (MEMBROS INFERIORES)" },
+  {
+    value: "Paralisia",
+    label: "PARALISIA OU FLACIDEZ MUSCULAR (MEMBROS INFERIORES)",
+  },
   { value: "Petequias", label: "PETÉQUIAS" },
-  { value: "PrescricaoPEP", label: "PRESCRICAO DE PROFILAXIA POS-EXPOSICAO (PEP)" },
+  {
+    value: "PrescricaoPEP",
+    label: "PRESCRICAO DE PROFILAXIA POS-EXPOSICAO (PEP)",
+  },
   { value: "Prurido", label: "PRURIDO/COCEIRA" },
   { value: "Queimadura", label: "QUEIMADURA" },
   { value: "RigidezNuca", label: "RIGIDEZ DE NUCA" },
   { value: "Taquicardia", label: "TAQUICARDIA" },
   { value: "Tontura", label: "TONTURA/DESMAIO" },
   { value: "Tosse", label: "TOSSE" },
-  { value: "VitimaOutrosDiscriminacao", label: "VITIMA DE OUTROS TIPOS DE DISCRIMINACAO" },
+  {
+    value: "VitimaOutrosDiscriminacao",
+    label: "VITIMA DE OUTROS TIPOS DE DISCRIMINACAO",
+  },
   { value: "VitimaRacismo", label: "VITIMA DE RACISMO" },
-  { value: "VitimaViolenciaPsicologica", label: "VITIMA DE VIOLENCIA PSICOLOGICA" },
+  {
+    value: "VitimaViolenciaPsicologica",
+    label: "VITIMA DE VIOLENCIA PSICOLOGICA",
+  },
 ];
 
 const hipoteseDiagnosticaOptions = [
@@ -382,28 +593,64 @@ const tipoTraumaOptions = [
   { value: "Esmagamento", label: "ESMAGAMENTO" },
   { value: "Fratura", label: "FRATURA" },
   { value: "LesaoArmaFogo", label: "LESAO DECORRENTE DE ARMA DE FOGO" },
-  { value: "LesaoViolenciaDomestica", label: "LESAO DECORRENTE DE VIOLENCIA DOMESTICA" },
-  { value: "LesaoAutomovel", label: "LESAO DECORRENTE DE ACIDENTE COM AUTOMOVEL" },
-  { value: "LesaoEmbarcacao", label: "LESAO DECORRENTE DE ACIDENTE COM EMBARCAÇÃO" },
-  { value: "LesaoBicicleta", label: "LESAO DECORRENTE DE ACIDENTE COM BICICLETA" },
+  {
+    value: "LesaoViolenciaDomestica",
+    label: "LESAO DECORRENTE DE VIOLENCIA DOMESTICA",
+  },
+  {
+    value: "LesaoAutomovel",
+    label: "LESAO DECORRENTE DE ACIDENTE COM AUTOMOVEL",
+  },
+  {
+    value: "LesaoEmbarcacao",
+    label: "LESAO DECORRENTE DE ACIDENTE COM EMBARCAÇÃO",
+  },
+  {
+    value: "LesaoBicicleta",
+    label: "LESAO DECORRENTE DE ACIDENTE COM BICICLETA",
+  },
   { value: "LesaoMoto", label: "LESAO DECORRENTE DE ACIDENTE COM MOTO" },
-  { value: "LesaoMultiplasVitimas", label: "LESAO DECORRENTE DE ACIDENTE COM MULTIPLAS VITIMAS" },
-  { value: "LesaoOutroVeiculoMotor", label: "LESAO DECORRENTE DE ACIDENTE COM OUTRO VEICULO" },
-  { value: "LesaoAglomeracao", label: "LESAO DECORRENTE DE AGLOMERACAO (PISOTEAMENTO)" },
+  {
+    value: "LesaoMultiplasVitimas",
+    label: "LESAO DECORRENTE DE ACIDENTE COM MULTIPLAS VITIMAS",
+  },
+  {
+    value: "LesaoOutroVeiculoMotor",
+    label: "LESAO DECORRENTE DE ACIDENTE COM OUTRO VEICULO",
+  },
+  {
+    value: "LesaoAglomeracao",
+    label: "LESAO DECORRENTE DE AGLOMERACAO (PISOTEAMENTO)",
+  },
   { value: "LesaoArmaBranca", label: "LESAO DECORRENTE DE ARMA BRANCA" },
   { value: "LesaoDesastre", label: "LESAO DECORRENTE DE DESASTRE" },
   { value: "LesaoQueda", label: "LESAO DECORRENTE DE QUEDA" },
-  { value: "LesaoViolenciaFisica", label: "LESAO DECORRENTE DE VIOLENCIA FISICA INTERPESSOAL" },
-  { value: "LesaoAssedioSexual", label: "LESAO DECORRENTE DE VIOLENCIA/ASSEDIO SEXUAL" },
+  {
+    value: "LesaoViolenciaFisica",
+    label: "LESAO DECORRENTE DE VIOLENCIA FISICA INTERPESSOAL",
+  },
+  {
+    value: "LesaoAssedioSexual",
+    label: "LESAO DECORRENTE DE VIOLENCIA/ASSEDIO SEXUAL",
+  },
   { value: "LesaoNegligencia", label: "LESAO DECORRENTE NEGLIGENCIA/ABANDONO" },
-  { value: "LesaoAutoprovocada", label: "LESAO POR VIOLENCIA FISICA AUTOPROVOCADA" },
+  {
+    value: "LesaoAutoprovocada",
+    label: "LESAO POR VIOLENCIA FISICA AUTOPROVOCADA",
+  },
   { value: "Pisoteamento", label: "PISOTEAMENTO" },
   { value: "Queda", label: "QUEDA" },
   { value: "QueimaduraLesaoCutanea", label: "QUEIMADURA/ LESÃO CUTÂNEA" },
   { value: "Tontura", label: "TONTURA/DESMAIO" },
-  { value: "VitimaOutrosDiscriminacao", label: "VITIMA DE OUTROS TIPOS DE DISCRIMINACAO" },
+  {
+    value: "VitimaOutrosDiscriminacao",
+    label: "VITIMA DE OUTROS TIPOS DE DISCRIMINACAO",
+  },
   { value: "VitimaRacismo", label: "VITIMA DE RACISMO" },
-  { value: "VitimaViolenciaPsicologica", label: "VITIMA DE VIOLENCIA PSICOLOGICA" },
+  {
+    value: "VitimaViolenciaPsicologica",
+    label: "VITIMA DE VIOLENCIA PSICOLOGICA",
+  },
 ];
 
 const tipoEncerramentoOptions = [
@@ -490,6 +737,8 @@ const NotificationForm = () => {
 
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+  const [searchSintomas, setSearchSintomas] = useState("");
+  const [searchTrauma, setSearchTrauma] = useState("");
 
   // Estado para controlar seções expandidas
   const [expandedSections, setExpandedSections] = useState({
@@ -587,8 +836,30 @@ const NotificationForm = () => {
     setFormData(initialFormData);
   };
 
+  // Update the handleExport function to use the export utilities
   const handleExport = (format: string) => {
-    alert(`Exportar para ${format} (funcionalidade não implementada)`);
+    try {
+      switch (format) {
+        case "Excel":
+          exportToExcel(formData);
+          break;
+        case "Word":
+          exportToWord(formData);
+          break;
+        case "CSV":
+          exportToCSV(formData);
+          break;
+        case "PDF":
+          exportToPDF(formData);
+          break;
+        default:
+          alert(`Export to ${format} is not supported`);
+      }
+    } catch (error) {
+      console.error(`Error exporting to ${format}:`, error);
+      alert(`Failed to export to ${format}. Please try again.`);
+    }
+    
     setIsExportDropdownOpen(false);
   };
 
@@ -809,24 +1080,6 @@ const NotificationForm = () => {
                     <>
                       <div>
                         <label className="block mb-2 font-medium text-gray-700">
-                          Município
-                        </label>
-                        <select
-                          name="municipio"
-                          className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
-                          value={formData.municipio}
-                          onChange={handleChange}
-                        >
-                          <option value="">Selecione</option>
-                          {municipioParaOptions.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block mb-2 font-medium text-gray-700">
                           UF
                         </label>
                         <select
@@ -837,6 +1090,24 @@ const NotificationForm = () => {
                         >
                           <option value="">Selecione</option>
                           {estadoOptions.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block mb-2 font-medium text-gray-700">
+                          Município
+                        </label>
+                        <select
+                          name="municipio"
+                          className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                          value={formData.municipio}
+                          onChange={handleChange}
+                        >
+                          <option value="">Selecione</option>
+                          {municipioParaOptions.map((option) => (
                             <option key={option} value={option}>
                               {option}
                             </option>
@@ -1145,36 +1416,77 @@ const NotificationForm = () => {
                   {/* Campos condicionais baseados no tipo de atendimento */}
                   {formData.tipoAtendimento === "1" && ( // Clínico
                     <>
-                      {/* Sinais e Sintomas */}
+                      {/* Sinais e Sintomas com campo de pesquisa */}
                       <div className="md:col-span-2">
-                        <label className="block mb-2 font-medium text-gray-700">
-                          Sinais e Sintomas
-                        </label>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                          {sinaisESintomasOptions.map((option) => (
-                            <label
-                              key={option.value}
-                              className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer transition-all duration-200 hover:border-blue-400 hover:bg-blue-50/50 group"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={formData.sinaisESintomas.includes(
-                                  option.value
-                                )}
-                                onChange={() =>
-                                  handleCheckboxChange(
-                                    "sinaisESintomas",
-                                    option.value
-                                  )
-                                }
-                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 transition-all duration-200 group-hover:border-blue-400"
-                              />
-                              <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors duration-200">
-                                {option.label}
-                              </span>
-                            </label>
-                          ))}
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="font-medium text-gray-700">
+                            Sinais e Sintomas
+                          </label>
+                          <div className="relative w-64">
+                            <input
+                              type="text"
+                              placeholder="Pesquisar sintomas..."
+                              value={searchSintomas}
+                              onChange={(e) =>
+                                setSearchSintomas(e.target.value)
+                              }
+                              className="w-full p-2 pl-8 text-sm border border-gray-200 rounded-lg hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                            />
+                            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            {searchSintomas && (
+                              <button
+                                type="button"
+                                onClick={() => setSearchSintomas("")}
+                                className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                              >
+                                <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                              </button>
+                            )}
+                          </div>
                         </div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
+                          {sinaisESintomasOptions
+                            .filter(
+                              (option) =>
+                                searchSintomas === "" ||
+                                option.label
+                                  .toLowerCase()
+                                  .includes(searchSintomas.toLowerCase())
+                            )
+                            .map((option) => (
+                              <label
+                                key={option.value}
+                                className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer transition-all duration-200 hover:border-blue-400 hover:bg-blue-50/50 group"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={formData.sinaisESintomas.includes(
+                                    option.value
+                                  )}
+                                  onChange={() =>
+                                    handleCheckboxChange(
+                                      "sinaisESintomas",
+                                      option.value
+                                    )
+                                  }
+                                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 transition-all duration-200 group-hover:border-blue-400"
+                                />
+                                <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors duration-200">
+                                  {option.label}
+                                </span>
+                              </label>
+                            ))}
+                        </div>
+                        {searchSintomas &&
+                          sinaisESintomasOptions.filter((option) =>
+                            option.label
+                              .toLowerCase()
+                              .includes(searchSintomas.toLowerCase())
+                          ).length === 0 && (
+                            <div className="text-center py-4 text-gray-500">
+                              Nenhum sintoma encontrado para "{searchSintomas}"
+                            </div>
+                          )}
                       </div>
 
                       {/* Data de Início dos Sintomas */}
@@ -1257,36 +1569,75 @@ const NotificationForm = () => {
 
                   {formData.tipoAtendimento === "2" && ( // Trauma
                     <>
-                      {/* Tipo de Trauma */}
+                      {/* Tipo de Trauma com campo de pesquisa */}
                       <div className="md:col-span-2">
-                        <label className="block mb-2 font-medium text-gray-700">
-                          Tipo de Trauma
-                        </label>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                          {tipoTraumaOptions.map((option) => (
-                            <label
-                              key={option.value}
-                              className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer transition-all duration-200 hover:border-blue-400 hover:bg-blue-50/50 group"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={formData.tipoTrauma.includes(
-                                  option.value
-                                )}
-                                onChange={() =>
-                                  handleCheckboxChange(
-                                    "tipoTrauma",
-                                    option.value
-                                  )
-                                }
-                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 transition-all duration-200 group-hover:border-blue-400"
-                              />
-                              <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors duration-200">
-                                {option.label}
-                              </span>
-                            </label>
-                          ))}
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="font-medium text-gray-700">
+                            Tipo de Trauma
+                          </label>
+                          <div className="relative w-64">
+                            <input
+                              type="text"
+                              placeholder="Pesquisar traumas..."
+                              value={searchTrauma}
+                              onChange={(e) => setSearchTrauma(e.target.value)}
+                              className="w-full p-2 pl-8 text-sm border border-gray-200 rounded-lg hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                            />
+                            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            {searchTrauma && (
+                              <button
+                                type="button"
+                                onClick={() => setSearchTrauma("")}
+                                className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                              >
+                                <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                              </button>
+                            )}
+                          </div>
                         </div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
+                          {tipoTraumaOptions
+                            .filter(
+                              (option) =>
+                                searchTrauma === "" ||
+                                option.label
+                                  .toLowerCase()
+                                  .includes(searchTrauma.toLowerCase())
+                            )
+                            .map((option) => (
+                              <label
+                                key={option.value}
+                                className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer transition-all duration-200 hover:border-blue-400 hover:bg-blue-50/50 group"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={formData.tipoTrauma.includes(
+                                    option.value
+                                  )}
+                                  onChange={() =>
+                                    handleCheckboxChange(
+                                      "tipoTrauma",
+                                      option.value
+                                    )
+                                  }
+                                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 transition-all duration-200 group-hover:border-blue-400"
+                                />
+                                <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors duration-200">
+                                  {option.label}
+                                </span>
+                              </label>
+                            ))}
+                        </div>
+                        {searchTrauma &&
+                          tipoTraumaOptions.filter((option) =>
+                            option.label
+                              .toLowerCase()
+                              .includes(searchTrauma.toLowerCase())
+                          ).length === 0 && (
+                            <div className="text-center py-4 text-gray-500">
+                              Nenhum trauma encontrado para "{searchTrauma}"
+                            </div>
+                          )}
                       </div>
 
                       {/* Data da Ocorrência */}
@@ -1386,18 +1737,18 @@ const NotificationForm = () => {
                     />
                   </div>
 
-                  {/* Unidade Notificadora */}
+                  {/* Unidade Notificadora - Componente separado */}
                   <div>
-                    <label className="block mb-2 font-medium text-gray-700">
-                      Unidade Notificadora
-                    </label>
-                    <input
-                      type="text"
-                      name="unidadeNotificadora"
-                      placeholder="Lista de unidades"
-                      className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                    <UnidadeNotificadoraField
                       value={formData.unidadeNotificadora}
-                      onChange={handleChange}
+                      onChange={(value) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          unidadeNotificadora: value,
+                        }))
+                      }
+                      label="Unidade Notificadora"
+                      placeholder="Buscar unidade notificadora..."
                     />
                   </div>
 
@@ -1418,7 +1769,7 @@ const NotificationForm = () => {
 
                   {/* Contato do Notificador */}
                   <div>
-                    <PhoneInput
+                    <BrazilianPhoneInput
                       name="contatoNotificador"
                       value={formData.contatoNotificador}
                       onChange={(value) =>

@@ -103,7 +103,8 @@ export const TableBody = ({
     }
     
     if (colKey === "ativo") {
-      return estab.ativo === "S" ? "Sim" : "Não";
+      // O valor já chega como "Sim" ou "Não", então vamos apenas retorná-lo
+      return estab.ativo;
     }
     
     if (colKey === "natureza") {

@@ -124,11 +124,6 @@ const PaginaAppsAuxiliares = () => {
       icon: <MapPin className="h-8 w-8 text-white" />,
       nome: "Gênero Sexual",
       link: "/genero/lista",
-    },
-    {
-      icon: <MapPin className="h-8 w-8 text-white" />,
-      nome: "Orientação Sexual",
-      link: "/orientacao-sexual/lista",
     }
   ];
 

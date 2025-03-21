@@ -1,0 +1,64 @@
+// types.ts - Define FormData interface and other type definitions
+
+export interface FormData {
+    // Seção 1: Dados Gerais
+    evento: string;
+    publicoAtendido: string;
+  
+    // Seção 2: Procedência do indivíduo
+    residenteBelem: string;
+    bairro: string;
+    municipio: string;
+    uf: string;
+    paisProcedencia: string;
+    localHospedagem: string;
+    contatoLocal: string;
+  
+    // Seção 3: Identificação do indivíduo
+    paciente: string;
+    nomeMae: string;
+    dataNascimento: string;
+    idade: string;
+    cpf: string;
+    identidadeGenero: string;
+    gestante: string;
+    raca: string;
+    escolaridade: string;
+    profissao: string;
+    profissaoSearch?: string;
+    showProfissaoOptions?: boolean;
+    contatoTelefonico: string;
+  
+    // Seção 4: Informações do atendimento
+    tipoAtendimento: string;
+    sinaisESintomas: string[];
+    dataInicioSintomas: string;
+    observacaoSintomas: string;
+    hipoteseDiagnostica: string[];
+    observacaoHipotese: string;
+    tipoTrauma: string[];
+    dataOcorrencia: string;
+    observacaoTrauma: string;
+    relacionadoSurto: string;
+    observacaoIncidente: string;
+  
+    // Seção 5: Informações da unidade notificadora
+    dataAtendimento: string;
+    unidadeNotificadora: string;
+    nomeNotificador: string;
+    contatoNotificador: string;
+  
+    // Seção 6: Encerramento do Caso
+    dataEncerramento: string;
+    tipoEncerramento: string;
+    localEncaminhamento: string;
+  }
+  
+  // Option item type for dropdowns
+  export interface OptionItem {
+    value: string;
+    label: string;
+  }
+  
+  // Export format type
+  export type ExportFormat = "Excel" | "Word" | "CSV" | "PDF";

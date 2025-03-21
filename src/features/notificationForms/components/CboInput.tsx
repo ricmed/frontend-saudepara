@@ -425,23 +425,27 @@ const CboInput: React.FC<CboInputProps> = ({
             value={searchQuery}
             onChange={handleInputChange}
             onClick={(e) => e.stopPropagation()}
-            // Removi o autoFocus para evitar problemas de scroll
           />
         </div>
-        <div className="max-h-60 overflow-y-auto py-1">
+        <div 
+          className="max-h-60 overflow-y-auto py-1"
+          style={{
+            overflowY: 'auto',    // Garantir que o scroll vertical esteja sempre habilitado
+            overflowX: 'hidden',  // Evitar scroll horizontal
+            WebkitOverflowScrolling: 'touch', // Melhor desempenho em dispositivos móveis
+          }}
+        >
           {filteredProfessions.length > 0 ? (
-            filteredProfessions
-              .slice(0, 50) // Limitar resultados para performance
-              .map((profession, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 text-gray-700"
-                  onClick={() => handleProfessionSelect(profession)}
-                >
-                  {profession}
-                </button>
-              ))
+            filteredProfessions.map((profession, index) => (
+              <button
+                key={index}
+                type="button"
+                className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 text-gray-700"
+                onClick={() => handleProfessionSelect(profession)}
+              >
+                {profession}
+              </button>
+            ))
           ) : (
             <div className="px-4 py-2 text-sm text-gray-500">
               Nenhuma profissão encontrada
