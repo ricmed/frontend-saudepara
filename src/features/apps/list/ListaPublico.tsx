@@ -140,8 +140,21 @@ const ListaTiposPublico = () => {
                 placeholder="Pesquisar tipos de público..."
                 value={inputValue}
                 onChange={(e) => {
-                  setInputValue(e.target.value);
-                  setSearchTerm(e.target.value);
+                  const value = e.target.value;
+                  setInputValue(value);
+                  
+                  // Verificações para decidir se dispara a busca:
+                  // Se o termo estiver vazio, permitir (para limpar filtros)
+                  if (value === "") {
+                    setSearchTerm(value);
+                    return;
+                  }
+                  
+                  // Para qualquer outro caso, exigir pelo menos 3 caracteres
+                  if (value.length >= 3) {
+                    setSearchTerm(value);
+                  }
+                  // Não dispara a busca se não atingiu o mínimo de caracteres
                 }}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-800"
                 autoComplete="off"
