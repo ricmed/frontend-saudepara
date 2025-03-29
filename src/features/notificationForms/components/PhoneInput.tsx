@@ -276,22 +276,31 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
   // Inicializar com valor existente, se houver
   useEffect(() => {
     if (value) {
+      // Extrair o código do país e o número
+      // Suporta formatos como "+55 12345678" ou "+55 123-4567" ou "+5512345678"
       const match = value.match(/^(\+\d+)[-\s]?(.*)$/);
       if (match) {
         const dialCode = match[1];
         const number = match[2];
+        
+        // Procurar o país correspondente ao código
         const country = countryCodes.find(c => c.dial_code === dialCode);
         if (country) {
           setSelectedCountry(country);
           setPhoneNumber(number);
         } else {
+          // Caso não encontre o país, mantém o número completo
           setPhoneNumber(value);
         }
       } else {
+        // Se não conseguir extrair o código do país, mantém o número completo
         setPhoneNumber(value);
       }
+    } else {
+      // Se o valor for vazio, limpa o número de telefone
+      setPhoneNumber("");
     }
-  }, []);
+  }, [value]);
 
   // Atualiza o valor completo quando o país ou número mudam
   useEffect(() => {

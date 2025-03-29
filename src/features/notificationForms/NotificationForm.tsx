@@ -3,6 +3,9 @@ import PhoneInput from "@/features/notificationForms/components/PhoneInput";
 import CboInput from "@/features/notificationForms/components/CboInput";
 import UnidadeNotificadoraField from "@/features/notificationForms/components/UnidadeNotificadoraField";
 import BrazilianPhoneInput from "@/features/notificationForms/components/BrazilianPhoneInput";
+import ModalBuscaPaciente from "@/features/paginaPacientesComu/components/ModalBuscaPaciente";
+import FormularioPaciente from "@/features/paginaPacientesComu/components/FormularioPaciente";
+import { Paciente } from "@/services/PacienteService";
 import {
   Search,
   Save,
@@ -27,11 +30,11 @@ import {
   ListChecks,
 } from "lucide-react";
 // Import the export utilities
-import { 
-  exportToExcel, 
-  exportToCSV, 
-  exportToWord, 
-  exportToPDF 
+import {
+  exportToExcel,
+  exportToCSV,
+  exportToWord,
+  exportToPDF,
 } from "./exportUtilities";
 
 // Interface FormData atualizada
@@ -739,6 +742,87 @@ const NotificationForm = () => {
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const [searchSintomas, setSearchSintomas] = useState("");
   const [searchTrauma, setSearchTrauma] = useState("");
+  const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
+  // Interface para o paciente esperado por ModalBuscaPaciente
+  const handleSelectPaciente = (paciente: Paciente) => {
+    // Log detalhado para debug
+    console.log("Paciente recebido:", JSON.stringify(paciente, null, 2));
+    
+    // Formatar a data corretamente
+    let formattedDate = "";
+    if (paciente.data_nascimento) {
+      const date = new Date(paciente.data_nascimento);
+      formattedDate = date.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+    }
+    
+    // Verificar explicitamente se o nome_mae não é um CPF
+    let nomeDaMae = paciente.nome_mae || "";
+    // Se o nome_mae parece ser um CPF (apenas dígitos e tem entre 11 a 14 caracteres)
+    if (/^\d{11,14}$/.test(nomeDaMae)) {
+      nomeDaMae = ""; // Limpar se parecer um CPF
+      console.warn("Nome da mãe parece ser um CPF, limpando o campo");
+    }
+    
+    // Mapeamento de escolaridade com correção específica
+    let escolaridadeValue = "";
+    if (paciente.escolaridade_idescolaridade !== null && 
+        paciente.escolaridade_idescolaridade !== undefined) {
+      
+      // AQUI ESTÁ A MUDANÇA: Mapear especificamente o valor 7 para 8
+      if (paciente.escolaridade_idescolaridade === 7) {
+        escolaridadeValue = "8"; // Corrigindo o mapeamento específico
+        console.log("Escolaridade mapeada: 7 -> 8 (Ensino superior completo)");
+      } else {
+        escolaridadeValue = String(paciente.escolaridade_idescolaridade);
+        console.log("Escolaridade mantida:", escolaridadeValue);
+      }
+    } else if (paciente.tipo_escolaridade && paciente.tipo_escolaridade.idtipo_escolaridade) {
+      // Aplicar o mesmo mapeamento para a estrutura alternativa
+      if (paciente.tipo_escolaridade.idtipo_escolaridade === 7) {
+        escolaridadeValue = "8";
+        console.log("Escolaridade alternativa mapeada: 7 -> 8");
+      } else {
+        escolaridadeValue = String(paciente.tipo_escolaridade.idtipo_escolaridade);
+        console.log("Escolaridade alternativa mantida:", escolaridadeValue);
+      }
+    }
+    
+    setFormData((prev) => ({
+      ...prev,
+      paciente: paciente.nome || "",
+      nomeMae: nomeDaMae,
+      dataNascimento: formattedDate,
+      idade: calculateAge(paciente.data_nascimento).toString(),
+      cpf: paciente.cpf || "",
+      identidadeGenero: paciente.tipo_genero_idtipo_genero.toString(),
+      raca: paciente.tipo_raca_idtipo_raca.toString(),
+      escolaridade: escolaridadeValue,
+      profissao: paciente.cbo_idcbo 
+        ? paciente.cbo_idcbo.toString() 
+        : "",
+      contatoTelefonico: paciente.contato || ""
+    }));
+  };
+
+  // Função auxiliar para calcular idade
+  const calculateAge = (birthdate: string): number => {
+    if (!birthdate) return 0;
+
+    const birthDate = new Date(birthdate);
+    const today = new Date();
+
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDifference = today.getMonth() - birthDate.getMonth();
+
+    if (
+      monthDifference < 0 ||
+      (monthDifference === 0 && today.getDate() < birthDate.getDate())
+    ) {
+      age--;
+    }
+
+    return age;
+  };
 
   // Estado para controlar seções expandidas
   const [expandedSections, setExpandedSections] = useState({
@@ -859,7 +943,7 @@ const NotificationForm = () => {
       console.error(`Error exporting to ${format}:`, error);
       alert(`Failed to export to ${format}. Please try again.`);
     }
-    
+
     setIsExportDropdownOpen(false);
   };
 
@@ -1197,6 +1281,7 @@ const NotificationForm = () => {
                       />
                       <button
                         type="button"
+                        onClick={() => setIsPatientModalOpen(true)}
                         className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
                       >
                         <Search className="h-4 w-4" />
@@ -1908,6 +1993,12 @@ const NotificationForm = () => {
           </div>
         </form>
       </main>
+      {/* Modal de busca de pacientes */}
+      <ModalBuscaPaciente
+        isOpen={isPatientModalOpen}
+        onClose={() => setIsPatientModalOpen(false)}
+        onSelectPaciente={handleSelectPaciente}
+      />
     </div>
   );
 };

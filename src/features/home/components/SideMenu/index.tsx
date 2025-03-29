@@ -41,7 +41,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     {
       icon: <FileText />,
       label: t("menu.notification"),
-      onClick: () => navigate("/ficha-comunicacao"),
+      onClick: () => navigate("/modulo-pacientes-ficha"),
     },
     {
       icon: <ChartSpline />,

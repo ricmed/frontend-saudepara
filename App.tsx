@@ -93,10 +93,14 @@ import CadastroPais from "@/features/apps/components/CadastroPais";
 import ListaGeneros from "@/features/apps/list/ListaGenero";
 import CadastroGenero from "@/features/apps/components/CadastroGenero";
 
+// Features - Pacientes
+import FormularioPaciente from "@/features/paginaPacientesComu/components/FormularioPaciente";
+import ListaPacientes from "@/features/paginaPacientesComu/components/ListaPacientes";
+
 // Páginas
-// import PaginaNotificacoes from "@/features/notifications/HomePage";
 import LoginPage from "@/paginas/LoginPage";
 import QualificarEstabelecimentos from "@/features/forms/EstablishmentForm";
+import PaginaPacientesFicha from "@/features/paginaPacientesComu/components/PaginaPacientesFicha";
 
 import { LanguageProvider } from "@/contexts/LanguageContext";
 
@@ -192,47 +196,89 @@ function App() {
           <Route path="/pais/lista" element={<ListaPaises />} />
           <Route path="/pais/cadastro" element={<CadastroPais />} />
           <Route path="/pais/editar/:id" element={<CadastroPais />} />
-
           {/* Rotas de Generos */}
           <Route path="/genero/lista" element={<ListaGeneros />} />
           <Route path="/genero/cadastro" element={<CadastroGenero />} />
           <Route path="/genero/editar/:id" element={<CadastroGenero />} />
-
           {/* Rotas de Tipos de Encerramento */}
-          <Route path="/lista-tipos-encerramento" element={<ListaTiposEncerramento />} />
-          <Route path="/cadastrar-tipo-encerramento" element={<CadastroTipoEncerramento />} />
-          <Route path="/editar-tipo-encerramento/:id" element={<CadastroTipoEncerramento />} />
-
+          <Route
+            path="/lista-tipos-encerramento"
+            element={<ListaTiposEncerramento />}
+          />
+          <Route
+            path="/cadastrar-tipo-encerramento"
+            element={<CadastroTipoEncerramento />}
+          />
+          <Route
+            path="/editar-tipo-encerramento/:id"
+            element={<CadastroTipoEncerramento />}
+          />
           {/* Rotas de Tipos de Público */}
           <Route path="/lista-tipos-publico" element={<ListaTiposPublico />} />
-          <Route path="/cadastrar-tipo-publico" element={<CadastroTipoPublico />} />
-          <Route path="/editar-tipo-publico/:id" element={<CadastroTipoPublico />} />
-
+          <Route
+            path="/cadastrar-tipo-publico"
+            element={<CadastroTipoPublico />}
+          />
+          <Route
+            path="/editar-tipo-publico/:id"
+            element={<CadastroTipoPublico />}
+          />
           {/* Rotas de Tipos de Evento */}
           <Route path="/lista-tipos-evento" element={<ListaTiposEvento />} />
-          <Route path="/cadastrar-tipo-evento" element={<CadastroTipoEvento />} />
-          <Route path="/editar-tipo-evento/:id" element={<CadastroTipoEvento />} />
-
+          <Route
+            path="/cadastrar-tipo-evento"
+            element={<CadastroTipoEvento />}
+          />
+          <Route
+            path="/editar-tipo-evento/:id"
+            element={<CadastroTipoEvento />}
+          />
           {/* Rotas de Tipos de Trauma */}
           <Route path="/lista-tipos-trauma" element={<ListaTiposTrauma />} />
-          <Route path="/cadastrar-tipo-trauma" element={<CadastroTipoTrauma />} />
-          <Route path="/editar-tipo-trauma/:id" element={<CadastroTipoTrauma />} />
-
+          <Route
+            path="/cadastrar-tipo-trauma"
+            element={<CadastroTipoTrauma />}
+          />
+          <Route
+            path="/editar-tipo-trauma/:id"
+            element={<CadastroTipoTrauma />}
+          />
           {/* Rotas de Tipos de Atendimento */}
-          <Route path="/lista-tipos-atendimento" element={<ListaTiposAtendimento />} />
-          <Route path="/cadastrar-tipo-atendimento" element={<CadastroTipoAtendimento />} />
-          <Route path="/editar-tipo-atendimento/:id" element={<CadastroTipoAtendimento />} />
-
+          <Route
+            path="/lista-tipos-atendimento"
+            element={<ListaTiposAtendimento />}
+          />
+          <Route
+            path="/cadastrar-tipo-atendimento"
+            element={<CadastroTipoAtendimento />}
+          />
+          <Route
+            path="/editar-tipo-atendimento/:id"
+            element={<CadastroTipoAtendimento />}
+          />
           {/* Rotas de Tipos de Hipótese Diagnóstica */}
-          <Route path="/lista-tipos-hipotese-diag" element={<ListaTiposHipoteseDiag />} />
-          <Route path="/cadastrar-tipo-hipotese-diag" element={<CadastroTipoHipoteseDiag />} />
-          <Route path="/editar-tipo-hipotese-diag/:id" element={<CadastroTipoHipoteseDiag />} />
-
+          <Route
+            path="/lista-tipos-hipotese-diag"
+            element={<ListaTiposHipoteseDiag />}
+          />
+          <Route
+            path="/cadastrar-tipo-hipotese-diag"
+            element={<CadastroTipoHipoteseDiag />}
+          />
+          <Route
+            path="/editar-tipo-hipotese-diag/:id"
+            element={<CadastroTipoHipoteseDiag />}
+          />
           {/* Rotas de Tipos de Sintoma */}
           <Route path="/lista-tipos-sintoma" element={<ListaTiposSintoma />} />
-          <Route path="/cadastrar-tipo-sintoma" element={<CadastroTipoSintoma />} />
-          <Route path="/editar-tipo-sintoma/:id" element={<CadastroTipoSintoma />} />
-
+          <Route
+            path="/cadastrar-tipo-sintoma"
+            element={<CadastroTipoSintoma />}
+          />
+          <Route
+            path="/editar-tipo-sintoma/:id"
+            element={<CadastroTipoSintoma />}
+          />
           {/* Rotas de Campanhas */}
           <Route path="/amamentacao" element={<BirthfeedingPage />} />
           <Route
@@ -254,7 +300,10 @@ function App() {
             element={<CadastroComponente />}
           />
           {/* Rotas de Estabelecimentos */}
-          <Route path="/estabelecimentos/lista" element={<ListaEstabelecimentos />} />
+          <Route
+            path="/estabelecimentos/lista"
+            element={<ListaEstabelecimentos />}
+          />
           <Route
             path="/cadastrar-estabelecimento"
             element={<CadastroEstabelecimento />}
@@ -276,14 +325,25 @@ function App() {
             path="/editar-o-estabelecimento/:id"
             element={<QualificarEstabelecimentos />}
           />
+          {/* Rotas de Pacientes - Atualizado */}
+          <Route path="/pacientes" element={<ListaPacientes />} />
+          <Route path="/pacientes/lista" element={<ListaPacientes />} />
+          <Route path="/pacientes/cadastro" element={<FormularioPaciente />} />
+          <Route
+            path="/pacientes/editar/:id"
+            element={<FormularioPaciente />}
+          />
+          <Route
+            path="/modulo-pacientes-ficha"
+            element={<PaginaPacientesFicha />}
+          />
           {/* Rotas de Notificações */}
-          <Route path="/notificacoes" element={<NotificationForm />} />
+          <Route path="/modulo-comunicacao" element={<NotificationForm />} />
           <Route path="/notificacoes/nova" element={<NotificationForm />} />
           <Route
             path="/notificacoes/editar/:id"
             element={<NotificationForm />}
           />
-
           {/* Rotas de Dashboard */}
           <Route path="/dashboard" element={<NotificationDashboard />} />
         </Routes>
