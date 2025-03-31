@@ -153,6 +153,9 @@ const handleApiError = (error: any): never => {
 };
 
 export const NotificacaoService = {
+  // Property to track active município fetch requests
+  municipioAbortController: null as AbortController | null,
+  
   // Método genérico para buscar opções de dropdown
   async fetchOptions<T>(endpoint: string): Promise<T[]> {
     try {
@@ -225,15 +228,68 @@ export const NotificacaoService = {
     }
     
     try {
-      // Usar o parâmetro correto
-      const endpoint = `${TIPO_ENDPOINTS.MUNICIPIO}?tipo_estado_idtipo_estado=${estadoId}`;
+      // Implementar um timeout e cancelamento de requisições anteriores
+      // para evitar race conditions
+      if (this.municipioAbortController) {
+        this.municipioAbortController.abort();
+      }
       
-      console.log(`Buscando municípios para o estado ID: ${estadoId}`);
+      this.municipioAbortController = new AbortController();
+      const signal = this.municipioAbortController.signal;
       
-      return this.fetchOptions<MunicipioOption>(endpoint);
+      // Garantir que o estadoId seja um número
+      const idEstado = Number(estadoId);
+      
+      // Usar o parâmetro correto e garantir que seja passado como número
+      const endpoint = `${TIPO_ENDPOINTS.MUNICIPIO}?tipo_estado_idtipo_estado=${idEstado}`;
+      
+      console.log(`Buscando municípios para o estado ID: ${idEstado} (${typeof idEstado})`);
+      
+      // Usar axios diretamente em vez do método genérico fetchOptions para ter mais controle
+      const response = await axios.get(endpoint, { signal });
+      
+      // Validar a resposta e garantir que estamos retornando apenas dados válidos
+      let municipios = [];
+      
+      if (Array.isArray(response.data)) {
+        municipios = response.data;
+      } else if (response.data?.data && Array.isArray(response.data.data)) {
+        municipios = response.data.data;
+      } else if (response.data) {
+        const possibleData = response.data.data || response.data.items;
+        if (Array.isArray(possibleData)) {
+          municipios = possibleData;
+        }
+      }
+      
+      console.log(`Encontrados ${municipios.length} municípios para o estado ${idEstado}`);
+      
+      // Verificar se os municípios retornados realmente pertencem ao estado selecionado
+      // Isso pode ajudar a identificar problemas na API
+      if (municipios.length > 0 && 'tipo_estado_idtipo_estado' in municipios[0]) {
+        const municipiosDoEstado = municipios.filter((m: { tipo_estado_idtipo_estado: number | string }) => 
+          Number(m.tipo_estado_idtipo_estado) === idEstado
+        );
+        
+        if (municipiosDoEstado.length !== municipios.length) {
+          console.warn(`API retornou ${municipios.length} municípios, mas apenas ${municipiosDoEstado.length} são do estado ${idEstado}`);
+          return municipiosDoEstado;
+        }
+      }
+      
+      return municipios;
     } catch (error) {
+      // Não tratar erros de abort como erros reais
+      if (error && typeof error === 'object' && 'name' in error && error.name === 'AbortError') {
+        console.log('Requisição de municípios cancelada devido a nova seleção de UF');
+        return [];
+      }
+      
       console.error(`Erro ao buscar municípios para o estado ${estadoId}:`, error);
       return [];
+    } finally {
+      // Limpar o controlador após a conclusão
+      this.municipioAbortController = null;
     }
   },
 

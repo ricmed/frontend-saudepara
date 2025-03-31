@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
-import { Search, X, MapPin } from "lucide-react";
+import { Search, X } from "lucide-react";
 import EstabelecimentoDropdown from "./EstabelecimentoDropdown";
 
 interface Estabelecimento {
@@ -78,7 +78,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
       console.log('Buscando estabelecimentos com params:', params);
       
       // URL completa da API - AJUSTE PARA SEU AMBIENTE
-      const apiUrl = 'http://localhost:3000/api/estabelecimentos';
+      const apiUrl = 'https://marcioreis.uk:5544/api/estabelecimentos';
       
       try {
         // Fazer a requisição à API com a URL completa

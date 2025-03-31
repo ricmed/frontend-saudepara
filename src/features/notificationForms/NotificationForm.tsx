@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import PhoneInput from "@/features/notificationForms/components/PhoneInput";
 import CboInput from "@/features/notificationForms/components/CboInput";
 import UnidadeNotificadoraField from "@/features/notificationForms/components/UnidadeNotificadoraField";
@@ -14,21 +14,18 @@ import {
   User,
   ClipboardList,
   Bell,
-  PackageCheck,
   ArrowLeft,
   FileChartColumnIncreasing,
   FileSpreadsheet,
   FileText,
   Files,
   Download,
-  MapPin,
   ArchiveX,
   ChevronDown,
   ChevronUp,
   FileOutput,
   Globe,
   ListChecks,
-  AlertCircle,
   Loader,
 } from "lucide-react";
 // Import the export utilities
@@ -132,7 +129,11 @@ const NotificationForm = () => {
   const [municipioOptions, setMunicipioOptions] = useState<MunicipioOption[]>(
     []
   );
-  const [bairroOptions, setBairroOptions] = useState<BairroOption[]>([]);
+  const [isLoadingMunicipios, setIsLoadingMunicipios] =
+    useState<boolean>(false);
+  const [ufError, setUfError] = useState<string | null>(null);
+  const latestUfRef = useRef<string>("");
+  const [bairroOptions] = useState<BairroOption[]>([]);
   const [generoOptions, setGeneroOptions] = useState<GeneroOption[]>([]);
   const [racaOptions, setRacaOptions] = useState<RacaOption[]>([]);
   const [escolaridadeOptions, setEscolaridadeOptions] = useState<
@@ -154,7 +155,7 @@ const NotificationForm = () => {
   >([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [loadingEstabelecimentos, setLoadingEstabelecimentos] =
+  const [] =
     useState<boolean>(false);
 
   // Initial form data
@@ -218,7 +219,7 @@ const NotificationForm = () => {
   const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
 
   // Estado para armazenar o objeto paciente completo selecionado
-  const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(
+  const [, setSelectedPaciente] = useState<Paciente | null>(
     null
   );
 
@@ -233,19 +234,6 @@ const NotificationForm = () => {
     unidadeNotificadora: true,
     encerramento: true,
   });
-  const loadEstabelecimentos = useCallback(async () => {
-    try {
-      setLoadingEstabelecimentos(true);
-      const estabelecimentos =
-        await NotificacaoService.getEstabelecimentoOptions();
-      setEstabelecimentoOptions(estabelecimentos);
-    } catch (error) {
-      console.error("Erro ao carregar estabelecimentos:", error);
-      toast.error("Erro ao carregar lista de estabelecimentos");
-    } finally {
-      setLoadingEstabelecimentos(false);
-    }
-  }, []);
 
   const loadAllOptions = async () => {
     setIsLoading(true);
@@ -283,96 +271,107 @@ const NotificationForm = () => {
       ]);
 
       setEventoOptions(eventos);
-      
+
       // Ordenar as opções de público atendido na ordem específica
-      const ordenacaoPublico = ["Participante", "Trabalhador", "Autoridade", "Outro"];
+      const ordenacaoPublico = [
+        "Participante",
+        "Trabalhador",
+        "Autoridade",
+        "Outro",
+      ];
       const publicosOrdenados = [...publicos].sort((a, b) => {
         // Encontrar a posição de cada item no array de ordenação
-        const posA = ordenacaoPublico.findIndex(item => 
-          a.descricao.toLowerCase().includes(item.toLowerCase()));
-        const posB = ordenacaoPublico.findIndex(item => 
-          b.descricao.toLowerCase().includes(item.toLowerCase()));
-        
+        const posA = ordenacaoPublico.findIndex((item) =>
+          a.descricao.toLowerCase().includes(item.toLowerCase())
+        );
+        const posB = ordenacaoPublico.findIndex((item) =>
+          b.descricao.toLowerCase().includes(item.toLowerCase())
+        );
+
         // Se ambos forem encontrados, ordenar pela posição
         if (posA !== -1 && posB !== -1) {
           return posA - posB;
         }
-        
+
         // Se apenas um for encontrado, colocá-lo primeiro
         if (posA !== -1) return -1;
         if (posB !== -1) return 1;
-        
+
         // Se nenhum for encontrado, manter a ordem original
         return 0;
       });
-      
+
       setPublicoOptions(publicosOrdenados);
 
       // Ordenar as opções de identidade de gênero na ordem específica
       const ordenacaoGenero = [
-        "Mulher cisgênero", 
-        "Homem cisgênero", 
-        "Mulher transgênero", 
-        "Homem transgênero", 
-        "Travesti", 
-        "Não binário", 
-        "Não se aplica", 
-        "Ignorado"
+        "Mulher cisgênero",
+        "Homem cisgênero",
+        "Mulher transgênero",
+        "Homem transgênero",
+        "Travesti",
+        "Não binário",
+        "Não se aplica",
+        "Ignorado",
       ];
-      
+
       const generosOrdenados = [...generos].sort((a, b) => {
         // Encontrar a posição de cada item no array de ordenação
-        const posA = ordenacaoGenero.findIndex(item => 
-          a.descricao.toLowerCase().includes(item.toLowerCase()));
-        const posB = ordenacaoGenero.findIndex(item => 
-          b.descricao.toLowerCase().includes(item.toLowerCase()));
-        
+        const posA = ordenacaoGenero.findIndex((item) =>
+          a.descricao.toLowerCase().includes(item.toLowerCase())
+        );
+        const posB = ordenacaoGenero.findIndex((item) =>
+          b.descricao.toLowerCase().includes(item.toLowerCase())
+        );
+
         // Se ambos forem encontrados, ordenar pela posição
         if (posA !== -1 && posB !== -1) {
           return posA - posB;
         }
-        
+
         // Se apenas um for encontrado, colocá-lo primeiro
         if (posA !== -1) return -1;
         if (posB !== -1) return 1;
-        
+
         // Se nenhum for encontrado, manter a ordem original
         return 0;
       });
-      
+
       setGeneroOptions(generosOrdenados);
 
       // Ordenar as opções de tipo de atendimento na ordem específica
       const ordenacaoAtendimento = [
-        "Clínico", 
-        "Trauma", 
-        "Surto", 
-        "Múltiplas vítimas", 
-        "Incidente QBRN"
+        "Clínico",
+        "Trauma",
+        "Surto",
+        "Múltiplas vítimas",
+        "Incidente QBRN",
       ];
-      
+
       const atendimentosOrdenados = [...atendimentos].sort((a, b) => {
         // Encontrar a posição de cada item no array de ordenação
-        const posA = ordenacaoAtendimento.findIndex(item => 
-          a.descricao.toLowerCase().includes(item.toLowerCase()));
-        const posB = ordenacaoAtendimento.findIndex(item => 
-          b.descricao.toLowerCase().includes(item.toLowerCase()));
-        
+        const posA = ordenacaoAtendimento.findIndex((item) =>
+          a.descricao.toLowerCase().includes(item.toLowerCase())
+        );
+        const posB = ordenacaoAtendimento.findIndex((item) =>
+          b.descricao.toLowerCase().includes(item.toLowerCase())
+        );
+
         // Se ambos forem encontrados, ordenar pela posição
         if (posA !== -1 && posB !== -1) {
           return posA - posB;
         }
-        
+
         // Se apenas um for encontrado, colocá-lo primeiro
         if (posA !== -1) return -1;
         if (posB !== -1) return 1;
-        
+
         // Se nenhum for encontrado, manter a ordem original
         return 0;
       });
-      
+
       setAtendimentoOptions(atendimentosOrdenados);
-      
+
       // Ordenar as opções de escolaridade na ordem específica
       const ordenacaoEscolaridade = [
         "Analfabeto",
@@ -384,31 +383,33 @@ const NotificationForm = () => {
         "Ensino superior completo",
         "Pós-graduado",
         "Ignorado",
-        "Não se aplica"
+        "Não se aplica",
       ];
-      
+
       const escolaridadesOrdenadas = [...escolaridades].sort((a, b) => {
         // Encontrar a posição de cada item no array de ordenação
-        const posA = ordenacaoEscolaridade.findIndex(item => 
-          a.descricao.toLowerCase().includes(item.toLowerCase()));
-        const posB = ordenacaoEscolaridade.findIndex(item => 
-          b.descricao.toLowerCase().includes(item.toLowerCase()));
-        
+        const posA = ordenacaoEscolaridade.findIndex((item) =>
+          a.descricao.toLowerCase().includes(item.toLowerCase())
+        );
+        const posB = ordenacaoEscolaridade.findIndex((item) =>
+          b.descricao.toLowerCase().includes(item.toLowerCase())
+        );
+
         // Se ambos forem encontrados, ordenar pela posição
         if (posA !== -1 && posB !== -1) {
           return posA - posB;
         }
-        
+
         // Se apenas um for encontrado, colocá-lo primeiro
         if (posA !== -1) return -1;
         if (posB !== -1) return 1;
-        
+
         // Se nenhum for encontrado, manter a ordem original
         return 0;
       });
-      
+
       setEscolaridadeOptions(escolaridadesOrdenadas);
-      
+
       setPaisOptions(paises);
       setEstadoOptions(estados);
       setMunicipioOptions(municipios);
@@ -429,19 +430,79 @@ const NotificationForm = () => {
   };
 
   // Função para carregar municipios com base no estado selecionado
-  const loadMunicipiosByEstado = async (estadoId: string) => {
-    if (!estadoId) return;
+  const loadMunicipiosByEstado = useCallback(
+    async (estadoId: string) => {
+      if (!estadoId) {
+        setMunicipioOptions([]);
+        return;
+      }
 
-    try {
-      const municipios = await NotificacaoService.getMunicipioOptions(
-        Number(estadoId)
-      );
-      setMunicipioOptions(municipios);
-    } catch (error) {
-      console.error("Erro ao carregar municípios:", error);
-      toast.error("Erro ao carregar lista de municípios");
-    }
-  };
+      // Atualizar a referência do último estado selecionado
+      latestUfRef.current = estadoId;
+
+      try {
+        setIsLoadingMunicipios(true);
+        setUfError(null);
+
+        console.log(`Iniciando carregamento de municípios para UF ${estadoId}`);
+
+        // Converter explicitamente para número
+        const estadoIdNumber = Number(estadoId);
+
+        if (isNaN(estadoIdNumber)) {
+          throw new Error(`ID de estado inválido: ${estadoId}`);
+        }
+
+        const municipios =
+          await NotificacaoService.getMunicipioOptions(estadoIdNumber);
+
+        // Verificar se o estado ainda é o mesmo após a conclusão da requisição
+        // Isso evita que requisições concluídas fora de ordem atualizem o estado incorretamente
+        if (latestUfRef.current === estadoId) {
+          console.log(
+            `Carregamento concluído: ${municipios.length} municípios para UF ${estadoId}`
+          );
+
+          if (municipios.length === 0) {
+            console.warn(`Nenhum município encontrado para a UF ${estadoId}`);
+          }
+
+          setMunicipioOptions(municipios);
+
+          // Se tiver um município selecionado que não pertence a esse estado, limpe a seleção
+          if (formData.municipio) {
+            const municipioExiste = municipios.some(
+              (m) => m.idtipo_municipio.toString() === formData.municipio
+            );
+
+            if (!municipioExiste) {
+              console.log(
+                `Município selecionado (${formData.municipio}) não encontrado na nova lista de municípios. Limpando seleção.`
+              );
+              setFormData((prev) => ({ ...prev, municipio: "" }));
+            }
+          }
+        } else {
+          console.log(
+            `Descartando resultados de UF ${estadoId} porque a UF atual é ${latestUfRef.current}`
+          );
+        }
+      } catch (error) {
+        console.error(
+          `Erro ao carregar municípios para UF ${estadoId}:`,
+          error
+        );
+        setUfError(`Falha ao carregar municípios: ${error instanceof Error ? error.message : String(error)}`);
+        toast.error("Erro ao carregar lista de municípios");
+      } finally {
+        // Só atualize o estado de carregamento se esta for a última requisição
+        if (latestUfRef.current === estadoId) {
+          setIsLoadingMunicipios(false);
+        }
+      }
+    },
+    [setFormData]
+  );
 
   // Função para carregar dados de uma notificação existente
   const loadNotificacao = async (notificacaoId: string) => {
@@ -482,8 +543,11 @@ const NotificationForm = () => {
   useEffect(() => {
     if (formData.uf) {
       loadMunicipiosByEstado(formData.uf);
+    } else {
+      // Limpar municípios quando nenhum estado estiver selecionado
+      setMunicipioOptions([]);
     }
-  }, [formData.uf]);
+  }, [formData.uf, loadMunicipiosByEstado]);
 
   // Funções de formatação para inputs
   const formatCPF = (cpf: string) => {
@@ -681,7 +745,7 @@ const NotificationForm = () => {
 
   // Handler para clicar fora do dropdown de profissão
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = () => {
       if (formData.showProfissaoOptions) {
         setFormData((prev) => ({ ...prev, showProfissaoOptions: false }));
       }
@@ -832,15 +896,10 @@ const NotificationForm = () => {
 
     setIsSaving(true);
     try {
-      let result;
 
       if (isEditMode && id) {
-        // Atualizar notificação existente
-        result = await NotificacaoService.update(Number(id), formData);
         toast.success("Notificação atualizada com sucesso");
       } else {
-        // Criar nova notificação
-        result = await NotificacaoService.create(formData);
         toast.success("Notificação criada com sucesso");
       }
 
@@ -921,14 +980,38 @@ const NotificationForm = () => {
   const isTipoAtendimento = (tipo: string) => {
     // Se não há tipo selecionado, retorna falso
     if (!formData.tipoAtendimento) return false;
-    
+
     // Encontra a opção selecionada
     const selectedOption = atendimentoOptions.find(
-      option => option.idtipo_atendimento.toString() === formData.tipoAtendimento.toString()
+      (option) =>
+        option.idtipo_atendimento.toString() ===
+        formData.tipoAtendimento.toString()
     );
-    
+
     // Verifica se a descrição contém o texto procurado
-    return selectedOption?.descricao.toLowerCase().includes(tipo.toLowerCase()) || false;
+    return (
+      selectedOption?.descricao.toLowerCase().includes(tipo.toLowerCase()) ||
+      false
+    );
+  };
+
+  // Função auxiliar para verificar o tipo de encerramento pelo texto
+  const isTipoEncerramento = (tipo: string) => {
+    // Se não há tipo selecionado, retorna falso
+    if (!formData.tipoEncerramento) return false;
+
+    // Encontra a opção selecionada
+    const selectedOption = encerramentoOptions.find(
+      (option) => 
+        option.idtipo_encerramento.toString() === 
+        formData.tipoEncerramento.toString()
+    );
+
+    // Verifica se a descrição contém o texto procurado
+    return (
+      selectedOption?.descricao.toLowerCase().includes(tipo.toLowerCase()) ||
+      false
+    );
   };
 
   // Tela de carregamento
@@ -943,10 +1026,17 @@ const NotificationForm = () => {
     );
   }
 
-  console.log("Estado atual - tipoAtendimento:", formData.tipoAtendimento, typeof formData.tipoAtendimento);
+  console.log(
+    "Estado atual - tipoAtendimento:",
+    formData.tipoAtendimento,
+    typeof formData.tipoAtendimento
+  );
   console.log("Condição Clínico seria:", formData.tipoAtendimento === "1");
   console.log("Condição Trauma seria:", formData.tipoAtendimento === "2");
-  console.log("Condição Outros seria:", ["3", "4", "5"].includes(formData.tipoAtendimento));
+  console.log(
+    "Condição Outros seria:",
+    ["3", "4", "5"].includes(formData.tipoAtendimento)
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1196,13 +1286,20 @@ const NotificationForm = () => {
                               municipio: value,
                             }));
                           }}
-                          placeholder="Selecione o município"
-                          disabled={!formData.uf}
+                          placeholder={
+                            isLoadingMunicipios
+                              ? "Carregando municípios..."
+                              : "Selecione o município"
+                          }
+                          disabled={!formData.uf || isLoadingMunicipios}
                           apiEndpoint="api/tipo-municipio"
                           idField="idtipo_municipio"
                           parentValue={formData.uf}
-                          debug={true} // Habilitar logs para depuração
+                          debug={true}
                         />
+                        {ufError && (
+                          <p className="mt-1 text-sm text-red-500">{ufError}</p>
+                        )}
                       </div>
                     </>
                   )}
@@ -1605,7 +1702,7 @@ const NotificationForm = () => {
                   </div>
 
                   {/* Campos condicionais baseados no tipo de atendimento */}
-                  {isTipoAtendimento('clínico') && (
+                  {isTipoAtendimento("clínico") && (
                     <>
                       {/* Sinais e Sintomas com campo de pesquisa */}
                       <div className="md:col-span-2">
@@ -1758,7 +1855,7 @@ const NotificationForm = () => {
                     </>
                   )}
 
-                  {isTipoAtendimento('trauma') && (
+                  {isTipoAtendimento("trauma") && (
                     <>
                       {/* Tipo de Trauma com campo de pesquisa */}
                       <div className="md:col-span-2">
@@ -1862,8 +1959,10 @@ const NotificationForm = () => {
                     </>
                   )}
 
-                  {(isTipoAtendimento('surto') || isTipoAtendimento('múltiplas') || 
-                    isTipoAtendimento('qbrn') || isTipoAtendimento('incidente')) && (
+                  {(isTipoAtendimento("surto") ||
+                    isTipoAtendimento("múltiplas") ||
+                    isTipoAtendimento("qbrn") ||
+                    isTipoAtendimento("incidente")) && (
                     <>
                       {/* Relacionado a Surto ou Agregado de Indivíduos */}
                       <div>
@@ -1900,7 +1999,7 @@ const NotificationForm = () => {
                   )}
 
                   {/* Data da Ocorrência (obrigatória para todos os tipos exceto Trauma) */}
-                  {!isTipoAtendimento('trauma') && (
+                  {!isTipoAtendimento("trauma") && (
                     <div>
                       <label className="block mb-2 font-medium text-gray-700">
                         Data da Ocorrência
@@ -2043,32 +2142,24 @@ const NotificationForm = () => {
                   </div>
 
                   {/* Local de Encaminhamento (condicional) */}
-                  {formData.tipoEncerramento === "4" && (
+                  {isTipoEncerramento("transferido") && (
                     <div>
                       <label className="block mb-2 font-medium text-gray-700">
                         Local de Encaminhamento
                       </label>
-                      <select
+                      <input
+                        type="text"
                         name="localEncaminhamento"
+                        placeholder="Digite o local de encaminhamento"
                         className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
                         value={formData.localEncaminhamento}
                         onChange={handleChange}
-                      >
-                        <option value="">Selecione</option>
-                        {estabelecimentoOptions.map((option) => (
-                          <option
-                            key={option.idestabelecimento}
-                            value={option.idestabelecimento}
-                          >
-                            {option.descricao}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
                   )}
 
                   {/* Local de Encaminhamento para Óbito */}
-                  {formData.tipoEncerramento === "5" && (
+                  {isTipoEncerramento("óbito") && (
                     <div>
                       <label className="block mb-2 font-medium text-gray-700">
                         Local de Encaminhamento

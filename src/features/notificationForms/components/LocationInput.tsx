@@ -45,16 +45,19 @@ const LocationInput: React.FC<LocationInputProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [selectedOption, setSelectedOption] = useState<LocationOption | null>(null);
   const [localOptions, setLocalOptions] = useState<LocationOption[]>([]);
-  // Novo estado para rastrear se o usuário está editando manualmente
   const [isManuallyEditing, setIsManuallyEditing] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   const dropdownRef = useRef<HTMLDivElement>(null);
   
+  // Referência para o controlador de aborto de fetch
+  const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Referência para a última UF selecionada (quando este componente é um município)
+  const lastParentValueRef = useRef<string>("");
+  
   // Salvar a posição de scroll atual
   const scrollPositionRef = useRef({ x: 0, y: 0 });
-  // Rastrear a última URL chamada para evitar chamadas duplicadas
-  const lastApiCall = useRef("");
 
   const debugLog = (message: string, data?: any) => {
     if (debug) {
@@ -79,26 +82,47 @@ const LocationInput: React.FC<LocationInputProps> = ({
     if (name === "municipio" && parentValue !== undefined) {
       debugLog(`Valor do estado mudou para: ${parentValue}`);
       
+      // Evitar processamento se o valor do pai não mudou
+      if (lastParentValueRef.current === parentValue) {
+        debugLog(`Ignorando atualização - valor do estado não mudou`);
+        return;
+      }
+      
+      // Atualizar a referência para o novo valor do pai
+      lastParentValueRef.current = parentValue;
+      
       // Limpar seleção atual
       if (value) {
         onChange("");
       }
+      
       setSelectedOption(null);
       setSearchQuery("");
       setIsManuallyEditing(false);
       
+      // Limpar opções imediatamente
+      setLocalOptions([]);
+      
       // Apenas buscar municípios se tiver um estado selecionado
       if (parentValue) {
         fetchMunicipiosByEstado(parentValue);
-      } else {
-        setLocalOptions([]);
       }
     }
   }, [parentValue, name]);
 
-  // Fetch municípios por estado
+  // Função melhorada para buscar municípios
   const fetchMunicipiosByEstado = async (estadoId: string) => {
-    if (!apiEndpoint) return;
+    if (!apiEndpoint || !estadoId) return;
+    
+    // Cancelar qualquer requisição anterior
+    if (abortControllerRef.current) {
+      debugLog(`Cancelando requisição anterior de municípios`);
+      abortControllerRef.current.abort();
+    }
+    
+    // Criar novo controlador para esta requisição
+    abortControllerRef.current = new AbortController();
+    const { signal } = abortControllerRef.current;
     
     setIsLoading(true);
     debugLog(`Buscando municípios para o estado ID: ${estadoId}`);
@@ -107,65 +131,92 @@ const LocationInput: React.FC<LocationInputProps> = ({
     const port = import.meta.env.VITE_API_PORT || "";
     const baseUrl = server && port ? `${server}:${port}/` : "/";
     
-    // Tentamos várias formas possíveis de parâmetro para filtrar municípios por estado
-    const possibleParams = [
-      `tipo_estado_idtipo_estado=${estadoId}`,  // Este parece ser o formato correto baseado no banco
-      `estado=${estadoId}`,                     // Formato comum
-      `estado_id=${estadoId}`,                  // Outro formato comum
-      `uf_id=${estadoId}`                       // Outro possível formato
-    ];
+    // Usar apenas o formato de parâmetro primário e mais provável de funcionar
+    const url = `${baseUrl}${apiEndpoint}?tipo_estado_idtipo_estado=${estadoId}&limit=1000`;
     
-    let foundMunicipios: LocationOption[] = [];
-    let successParam = "";
-    
-    // Tentar cada formato de parâmetro
-    for (const param of possibleParams) {
+    try {
+      debugLog(`Fazendo requisição para: ${url}`);
+      const response = await axios.get(url, { signal });
+      
+      let municipios: LocationOption[] = [];
+      
+      if (response.data && Array.isArray(response.data)) {
+        municipios = response.data;
+      } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
+        municipios = response.data.data;
+      }
+      
+      debugLog(`Sucesso! Encontrados ${municipios.length} municípios`);
+      
+      // Verificar se ainda estamos processando o mesmo estado
+      if (lastParentValueRef.current === estadoId) {
+        setLocalOptions(municipios);
+      } else {
+        debugLog(`Estado mudou durante a requisição, descartando resultados`);
+      }
+    } catch (error: unknown) {
+      // Não mostrar erro se foi cancelamento
+      if (
+        error && 
+        typeof error === 'object' && 
+        'name' in error && 
+        (error.name === 'CanceledError' || error.name === 'AbortError')
+      ) {
+        debugLog(`Requisição cancelada para estado ${estadoId}`);
+        return;
+      }
+      
+      const errorMessage = error && typeof error === 'object' && 'message' in error 
+        ? error.message as string
+        : 'Erro desconhecido';
+      debugLog(`Erro ao buscar municípios: ${errorMessage}`, error);
+      
+      // Tentar com outro formato de parâmetro apenas em caso de falha
       try {
-        const url = `${baseUrl}${apiEndpoint}?${param}&limit=1000`;
+        const fallbackUrl = `${baseUrl}${apiEndpoint}?estado_id=${estadoId}&limit=1000`;
+        debugLog(`Tentando formato alternativo: ${fallbackUrl}`);
         
-        // Evitar chamadas duplicadas
-        if (url === lastApiCall.current) {
-          debugLog(`Pulando chamada duplicada: ${url}`);
-          continue;
+        const fallbackResponse = await axios.get(fallbackUrl, { signal });
+        let fallbackMunicipios: LocationOption[] = [];
+        
+        if (fallbackResponse.data && Array.isArray(fallbackResponse.data)) {
+          fallbackMunicipios = fallbackResponse.data;
+        } else if (fallbackResponse.data?.data && Array.isArray(fallbackResponse.data.data)) {
+          fallbackMunicipios = fallbackResponse.data.data;
         }
         
-        lastApiCall.current = url;
-        debugLog(`Tentando URL: ${url}`);
-        
-        const response = await axios.get(url);
-        let municipios: LocationOption[] = [];
-        
-        if (response.data && Array.isArray(response.data)) {
-          municipios = response.data;
-        } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
-          municipios = response.data.data;
+        if (fallbackMunicipios.length > 0) {
+          debugLog(`Fallback bem-sucedido! Encontrados ${fallbackMunicipios.length} municípios`);
+          setLocalOptions(fallbackMunicipios);
+        } else {
+          debugLog(`Fallback falhou - nenhum município encontrado`);
+          setLocalOptions([]);
         }
-        
-        if (municipios.length > 0) {
-          debugLog(`Sucesso! Encontrados ${municipios.length} municípios usando: ${param}`);
-          foundMunicipios = municipios;
-          successParam = param;
-          break;
-        }
-      } catch (error) {
-        debugLog(`Erro ao tentar com ${param}`, error);
+      } catch (fallbackError: unknown) {
+        const errorMessage = fallbackError && typeof fallbackError === 'object' && 'message' in fallbackError 
+          ? fallbackError.message as string
+          : 'Erro desconhecido';
+        debugLog(`Erro no fallback: ${errorMessage}`);
+        setLocalOptions([]);
+      }
+    } finally {
+      // Só atualizar estado se ainda estivermos processando o mesmo estado
+      if (lastParentValueRef.current === estadoId) {
+        setIsLoading(false);
       }
     }
-    
-    if (foundMunicipios.length > 0) {
-      debugLog(`Parâmetro correto identificado: ${successParam}`);
-      setLocalOptions(foundMunicipios);
-    } else {
-      debugLog('Não foi possível obter municípios com nenhum dos parâmetros testados');
-      setLocalOptions([]);
-    }
-    
-    setIsLoading(false);
   };
 
   // Fetch todas as opções (para países ou UFs)
   const fetchOptions = async (query = "") => {
     if (!apiEndpoint) return;
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Criar novo controlador para esta requisição
+    abortControllerRef.current = new AbortController();
+    const { signal } = abortControllerRef.current;
     
     setIsLoading(true);
     debugLog(`Buscando todas as opções de ${name}`);
@@ -187,20 +238,12 @@ const LocationInput: React.FC<LocationInputProps> = ({
         url += `?limit=${limit}`;
       }
       
-      // Evitar chamadas duplicadas
-      if (url === lastApiCall.current) {
-        debugLog(`Pulando chamada duplicada: ${url}`);
-        setIsLoading(false);
-        return;
-      }
-      
-      lastApiCall.current = url;
       debugLog(`Fazendo requisição: ${url}`);
       
-      const response = await axios.get(url);
+      const response = await axios.get(url, { signal });
+      
       let options: LocationOption[] = [];
       
-      // Lidar com diferentes formatos de resposta
       if (response.data && Array.isArray(response.data)) {
         options = response.data;
       } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
@@ -209,18 +252,28 @@ const LocationInput: React.FC<LocationInputProps> = ({
       
       debugLog(`Recebidos ${options.length} resultados`);
       setLocalOptions(options);
-    } catch (error) {
+    } catch (error: unknown) {
+      // Não mostrar erro se foi cancelamento
+      if (
+        error && 
+        typeof error === 'object' && 
+        'name' in error && 
+        (error.name === 'CanceledError' || error.name === 'AbortError')
+      ) {
+        debugLog(`Requisição cancelada`);
+        return;
+      }
+      
       debugLog('Erro ao buscar opções', error);
       setLocalOptions([]);
     } finally {
       setIsLoading(false);
     }
   };
-
+  // Buscar item específico por ID
+  // Buscar item específico por ID
   // Buscar item específico por ID
   const fetchById = async (id: string) => {
-    if (!apiEndpoint || !id) return null;
-    
     try {
       setIsLoading(true);
       const server = import.meta.env.VITE_API_SERVER || "";
@@ -239,14 +292,13 @@ const LocationInput: React.FC<LocationInputProps> = ({
       
       debugLog(`Item com ID ${id} não encontrado`);
       return null;
-    } catch (error) {
+    } catch (error: unknown) {
       debugLog(`Erro ao buscar por ID: ${id}`, error);
       return null;
     } finally {
       setIsLoading(false);
     }
   };
-
   // Filtra opções locais baseado no termo de pesquisa
   const filteredOptions = localOptions.filter(option => 
     option.descricao.toLowerCase().includes(searchQuery.toLowerCase())
@@ -372,6 +424,15 @@ const LocationInput: React.FC<LocationInputProps> = ({
       return () => clearTimeout(timeoutId);
     }
   }, [isDropdownOpen]);
+
+  // Cancelar requisições pendentes ao desmontar o componente
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const handleFocus = () => {
     if (disabled) return;
@@ -519,17 +580,21 @@ const LocationInput: React.FC<LocationInputProps> = ({
           ref={inputRef}
           type="text"
           name={name}
-          placeholder={placeholder}
+          placeholder={isLoading ? "Carregando..." : placeholder}
           className={`w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none ${className} ${disabled ? 'opacity-60 cursor-not-allowed bg-gray-50' : ''}`}
           value={searchQuery}
           onChange={handleInputChange}
           onFocus={handleFocus}
           onClick={handleFocus}
-          disabled={disabled}
+          disabled={disabled || isLoading}
           readOnly={!filterEnabled} // Se a filtragem estiver desativada, o input é somente leitura
         />
         <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-          <Search className="h-4 w-4 text-gray-400" />
+          {isLoading ? (
+            <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full" />
+          ) : (
+            <Search className="h-4 w-4 text-gray-400" />
+          )}
         </div>
       </div>
       
