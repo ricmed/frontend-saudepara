@@ -218,6 +218,24 @@ const NotificationForm = () => {
   const [searchTrauma, setSearchTrauma] = useState("");
   const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
 
+  // Lista de bairros de Belém para o dropdown
+  const belemBairros = [
+    "Cidade Velha", "Campina", "Reduto", "Umarizal", "Telegrafo", 
+    "Sacramenta", "Pedreira", "Marco", "Souza", "Marambaia",
+    "Canudos", "Fátima", "São Brás", "Nazaré", "Batista Campos",
+    "Jurunas", "Condor", "Guamá", "Terra Firme", "Cremação",
+    "Val-de-Cães", "Miramar", "Pratinha", "Tapanã", "Benguí",
+    "Maracangalha", "Barreiro", "Universitário", "Curió-Utínga", "Aurá",
+    "Castanheira", "Águas Lindas", "Guanabara", "São Clemente", "Parque Guajará",
+    "Tenoné", "Águas Negras", "Maracacuera", "Parque Verde", "Cruzeiro",
+    "Ponta Grossa", "Mangueirão", "Cabanagem", "Campina de Icoaraci", "Paracuri",
+    "Agulha", "Una", "Coqueiro", "Cruzeiro", "São João do Outeiro",
+    "Itaiteua", "Água Negra", "Maracajá", "Vila", "Praia Grande",
+    "Farol", "Mangueiras", "São Francisco", "Caranamduba", "Marahu",
+    "Paraíso", "Baia do Sol", "Sucurijuquara", "Caruara", "Bonfim",
+    "Ariramba", "Porto Arthur", "Murubira", "Chapéu Virado", "Aeroporto"
+  ].sort((a, b) => new Intl.Collator('pt-BR').compare(a, b)); // Ordenação considerando acentos em português
+
   // Estado para armazenar o objeto paciente completo selecionado
   const [, setSelectedPaciente] = useState<Paciente | null>(
     null
@@ -410,6 +428,59 @@ const NotificationForm = () => {
 
       setEscolaridadeOptions(escolaridadesOrdenadas);
 
+      // Ordenar as opções de tipo de encerramento na ordem específica
+      const ordenacaoEncerramento = [
+        "Atendido e liberado",
+        "Internação",
+        "Observação",
+        "Transferido",
+        "Óbito",
+      ];
+      
+      // Log the original options for debugging
+      console.log("Opções de encerramento originais:", 
+        encerramentos.map(e => `${e.idtipo_encerramento}: ${e.descricao}`));
+
+      const encerramentosOrdenados = [...encerramentos].sort((a, b) => {
+        // Função para encontrar a posição no array de ordenação
+        const getPosition = (option: EncerramentoOption) => {
+          // Verificar correspondência exata primeiro
+          const exactIndex = ordenacaoEncerramento.findIndex(
+            item => option.descricao.toLowerCase() === item.toLowerCase()
+          );
+          if (exactIndex !== -1) return exactIndex;
+          
+          // Se não houver correspondência exata, procurar por correspondência parcial
+          return ordenacaoEncerramento.findIndex(
+            item => option.descricao.toLowerCase().includes(item.toLowerCase())
+          );
+        };
+        
+        const posA = getPosition(a);
+        const posB = getPosition(b);
+        
+        // Log para debugging
+        console.log(`Comparando: ${a.descricao} (pos: ${posA}) com ${b.descricao} (pos: ${posB})`);
+
+        // Se ambos forem encontrados, ordenar pela posição
+        if (posA !== -1 && posB !== -1) {
+          return posA - posB;
+        }
+
+        // Se apenas um for encontrado, colocá-lo primeiro
+        if (posA !== -1) return -1;
+        if (posB !== -1) return 1;
+
+        // Se nenhum for encontrado, manter a ordem original
+        return 0;
+      });
+
+      // Log the sorted options for debugging
+      console.log("Opções de encerramento ordenadas:", 
+        encerramentosOrdenados.map(e => `${e.idtipo_encerramento}: ${e.descricao}`));
+
+      setEncerramentoOptions(encerramentosOrdenados);
+
       setPaisOptions(paises);
       setEstadoOptions(estados);
       setMunicipioOptions(municipios);
@@ -420,7 +491,6 @@ const NotificationForm = () => {
       setHipoteseDiagOptions(hipoteseDiag);
       setTraumaOptions(traumas);
       setEstabelecimentoOptions(estabelecimentos);
-      setEncerramentoOptions(encerramentos);
     } catch (error) {
       console.error("Erro ao carregar opções:", error);
       toast.error("Erro ao carregar opções para o formulário");
@@ -1241,14 +1311,19 @@ const NotificationForm = () => {
                         Bairro
                       </label>
                       <div className="relative">
-                        <input
-                          type="text"
+                        <select
                           name="bairro"
-                          placeholder="Digite o nome do bairro"
                           className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
                           value={formData.bairro}
                           onChange={handleChange}
-                        />
+                        >
+                          <option value="">Selecione o bairro</option>
+                          {belemBairros.map((bairro) => (
+                            <option key={bairro} value={bairro}>
+                              {bairro}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                   )}

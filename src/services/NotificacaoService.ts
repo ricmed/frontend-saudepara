@@ -157,9 +157,11 @@ export const NotificacaoService = {
   municipioAbortController: null as AbortController | null,
   
   // Método genérico para buscar opções de dropdown
-  async fetchOptions<T>(endpoint: string): Promise<T[]> {
+  async fetchOptions<T>(endpoint: string, limit: number = 100): Promise<T[]> {
     try {
-      const response = await axios.get(endpoint);
+      // Adicionar parâmetro de limite para obter mais itens
+      const paginatedEndpoint = `${endpoint}?limit=${limit}`;
+      const response = await axios.get(paginatedEndpoint);
       
       // Tratamento para diferentes formatos de resposta
       if (Array.isArray(response.data)) {
@@ -310,7 +312,7 @@ export const NotificacaoService = {
   },
 
   async getSintomaOptions(): Promise<SintomaOption[]> {
-    return this.fetchOptions<SintomaOption>(TIPO_ENDPOINTS.SINTOMA);
+    return this.fetchOptions<SintomaOption>(TIPO_ENDPOINTS.SINTOMA, 200);
   },
 
   async getHipoteseDiagOptions(): Promise<HipoteseDiagOption[]> {
