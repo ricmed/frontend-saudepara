@@ -9,7 +9,6 @@ import LocationInput from "@/features/notificationForms/components/LocationInput
 import {
   Search,
   Save,
-  Plus,
   X,
   User,
   ClipboardList,
@@ -437,10 +436,6 @@ const NotificationForm = () => {
         "Óbito",
       ];
       
-      // Log the original options for debugging
-      console.log("Opções de encerramento originais:", 
-        encerramentos.map(e => `${e.idtipo_encerramento}: ${e.descricao}`));
-
       const encerramentosOrdenados = [...encerramentos].sort((a, b) => {
         // Função para encontrar a posição no array de ordenação
         const getPosition = (option: EncerramentoOption) => {
@@ -458,9 +453,6 @@ const NotificationForm = () => {
         
         const posA = getPosition(a);
         const posB = getPosition(b);
-        
-        // Log para debugging
-        console.log(`Comparando: ${a.descricao} (pos: ${posA}) com ${b.descricao} (pos: ${posB})`);
 
         // Se ambos forem encontrados, ordenar pela posição
         if (posA !== -1 && posB !== -1) {
@@ -475,17 +467,11 @@ const NotificationForm = () => {
         return 0;
       });
 
-      // Log the sorted options for debugging
-      console.log("Opções de encerramento ordenadas:", 
-        encerramentosOrdenados.map(e => `${e.idtipo_encerramento}: ${e.descricao}`));
-
       setEncerramentoOptions(encerramentosOrdenados);
 
       setPaisOptions(paises);
       setEstadoOptions(estados);
       setMunicipioOptions(municipios);
-      // Não precisamos mais carregar opções de bairro já que é texto livre
-      // setBairroOptions(bairros);
       setRacaOptions(racas);
       setSintomaOptions(sintomas);
       setHipoteseDiagOptions(hipoteseDiag);
@@ -514,8 +500,6 @@ const NotificationForm = () => {
         setIsLoadingMunicipios(true);
         setUfError(null);
 
-        console.log(`Iniciando carregamento de municípios para UF ${estadoId}`);
-
         // Converter explicitamente para número
         const estadoIdNumber = Number(estadoId);
 
@@ -529,10 +513,6 @@ const NotificationForm = () => {
         // Verificar se o estado ainda é o mesmo após a conclusão da requisição
         // Isso evita que requisições concluídas fora de ordem atualizem o estado incorretamente
         if (latestUfRef.current === estadoId) {
-          console.log(
-            `Carregamento concluído: ${municipios.length} municípios para UF ${estadoId}`
-          );
-
           if (municipios.length === 0) {
             console.warn(`Nenhum município encontrado para a UF ${estadoId}`);
           }
@@ -546,16 +526,9 @@ const NotificationForm = () => {
             );
 
             if (!municipioExiste) {
-              console.log(
-                `Município selecionado (${formData.municipio}) não encontrado na nova lista de municípios. Limpando seleção.`
-              );
               setFormData((prev) => ({ ...prev, municipio: "" }));
             }
           }
-        } else {
-          console.log(
-            `Descartando resultados de UF ${estadoId} porque a UF atual é ${latestUfRef.current}`
-          );
         }
       } catch (error) {
         console.error(
@@ -650,9 +623,6 @@ const NotificationForm = () => {
 
   // Interface para o paciente esperado por ModalBuscaPaciente
   const handleSelectPaciente = (paciente: Paciente) => {
-    // Log detalhado para debug
-    console.log("Paciente recebido:", JSON.stringify(paciente, null, 2));
-
     // Armazenar o paciente completo para uso posterior
     setSelectedPaciente(paciente);
 
@@ -680,10 +650,8 @@ const NotificationForm = () => {
       // AQUI ESTÁ A MUDANÇA: Mapear especificamente o valor 7 para 8
       if (paciente.escolaridade_idescolaridade === 7) {
         escolaridadeValue = "8"; // Corrigindo o mapeamento específico
-        console.log("Escolaridade mapeada: 7 -> 8 (Ensino superior completo)");
       } else {
         escolaridadeValue = String(paciente.escolaridade_idescolaridade);
-        console.log("Escolaridade mantida:", escolaridadeValue);
       }
     } else if (
       paciente.tipo_escolaridade &&
@@ -692,10 +660,8 @@ const NotificationForm = () => {
       // Aplicar o mesmo mapeamento para a estrutura alternativa
       if (paciente.tipo_escolaridade.idescolaridade === 7) {
         escolaridadeValue = "8";
-        console.log("Escolaridade alternativa mapeada: 7 -> 8");
       } else {
         escolaridadeValue = String(paciente.tipo_escolaridade.idescolaridade);
-        console.log("Escolaridade alternativa mantida:", escolaridadeValue);
       }
     }
 
@@ -781,11 +747,6 @@ const NotificationForm = () => {
     >
   ) => {
     const { name, value } = e.target;
-
-    // Adicionar console.log para depuração do tipoAtendimento
-    if (name === "tipoAtendimento") {
-      console.log("No handleChange - tipoAtendimento:", value, typeof value);
-    }
 
     // Limpar erro quando o campo for alterado
     if (errors[name]) {
@@ -966,10 +927,17 @@ const NotificationForm = () => {
 
     setIsSaving(true);
     try {
+      // No need to convert arrays to strings - the service will handle the conversion
+      const notificacaoData = {
+        ...formData
+      };
 
+      // Realizar a operação de salvar ou atualizar
       if (isEditMode && id) {
+        await NotificacaoService.update(Number(id), notificacaoData);
         toast.success("Notificação atualizada com sucesso");
       } else {
+        await NotificacaoService.create(notificacaoData);
         toast.success("Notificação criada com sucesso");
       }
 
@@ -983,11 +951,6 @@ const NotificationForm = () => {
     }
   };
 
-  const handleReset = () => {
-    setFormData(initialFormData);
-    setSelectedPaciente(null);
-    setErrors({});
-  };
 
   // Prepare export options object with all loaded dropdown options
   const getExportOptions = () => {
@@ -1096,18 +1059,6 @@ const NotificationForm = () => {
     );
   }
 
-  console.log(
-    "Estado atual - tipoAtendimento:",
-    formData.tipoAtendimento,
-    typeof formData.tipoAtendimento
-  );
-  console.log("Condição Clínico seria:", formData.tipoAtendimento === "1");
-  console.log("Condição Trauma seria:", formData.tipoAtendimento === "2");
-  console.log(
-    "Condição Outros seria:",
-    ["3", "4", "5"].includes(formData.tipoAtendimento)
-  );
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Cabeçalho */}
@@ -1188,14 +1139,6 @@ const NotificationForm = () => {
                 <Save className="h-4 w-4" />
               )}
               {isSaving ? "Salvando..." : "Salvar"}
-            </button>
-            <button
-              type="button"
-              onClick={handleReset}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Novo Registro
             </button>
             <button
               type="button"
@@ -1756,11 +1699,6 @@ const NotificationForm = () => {
                       className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
                       value={formData.tipoAtendimento}
                       onChange={(e) => {
-                        console.log(
-                          "Tipo de atendimento selecionado:",
-                          e.target.value,
-                          typeof e.target.value
-                        );
                         handleChange(e);
                       }}
                     >
@@ -2258,14 +2196,6 @@ const NotificationForm = () => {
           </div>
 
           <div className="mt-6 flex space-x-4">
-            <button
-              type="button"
-              onClick={handleReset}
-              className="inline-flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Novo Registro
-            </button>
             <button
               type="button"
               onClick={() => window.history.back()}
