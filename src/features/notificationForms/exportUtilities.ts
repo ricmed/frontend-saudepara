@@ -1,617 +1,558 @@
-import { FormData } from "./NotificationForm";
-import { saveAs } from "file-saver";
-import * as XLSX from "xlsx";
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, BorderStyle } from "docx";
-import { jsPDF } from "jspdf";
-import "jspdf-autotable";
-import Papa from "papaparse";
+import { FormData } from './NotificationForm';
+import { jsPDF } from 'jspdf';
+import * as XLSX from 'xlsx';
+import { 
+  EventoOption, 
+  PublicoOption,
+  PaisOption,
+  EstadoOption,
+  MunicipioOption,
+  BairroOption,
+  GeneroOption,
+  RacaOption,
+  EscolaridadeOption,
+  AtendimentoOption,
+  SintomaOption,
+  HipoteseDiagOption,
+  TraumaOption,
+  EstabelecimentoOption,
+  EncerramentoOption
+} from '@/services/NotificacaoService';
 
-// Função para obter data formatada para nomes de arquivos
-const getFormattedDate = (): string => {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
-};
+// Interface para passar opções carregadas dinamicamente
+export interface ExportOptions {
+  eventoOptions: EventoOption[];
+  publicoOptions: PublicoOption[];
+  paisOptions: PaisOption[];
+  estadoOptions: EstadoOption[];
+  municipioOptions: MunicipioOption[];
+  bairroOptions: BairroOption[];
+  generoOptions: GeneroOption[];
+  racaOptions: RacaOption[];
+  escolaridadeOptions: EscolaridadeOption[];
+  atendimentoOptions: AtendimentoOption[];
+  sintomaOptions: SintomaOption[];
+  hipoteseDiagOptions: HipoteseDiagOption[];
+  traumaOptions: TraumaOption[];
+  estabelecimentoOptions: EstabelecimentoOption[];
+  encerramentoOptions: EncerramentoOption[];
+}
 
-// Formatar texto de opções - função auxiliar para obter o texto da label a partir do valor
-const getOptionLabel = (value: string, options: Array<{ value: string, label: string }>) => {
-  const option = options.find(opt => opt.value === value);
-  return option ? option.label : value;
-};
-
-// Função auxiliar para formatar valores de array
-const formatArrayValues = (values: string[], options: Array<{ value: string, label: string }>) => {
-  return values.map(value => getOptionLabel(value, options)).join(", ");
-};
-
-// Exportação para Excel (XLSX)
-export const exportToExcel = (formData: FormData) => {
-  // Criar uma planilha
-  const worksheet = XLSX.utils.json_to_sheet([flattenFormData(formData)]);
-  
-  // Criar uma pasta de trabalho
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Notificação");
-  
-  // Gerar o arquivo Excel
-  const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-  
-  // Salvar o arquivo
-  const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  saveAs(blob, `notificacao_${getFormattedDate()}.xlsx`);
-};
-
-// Exportação para CSV
-export const exportToCSV = (formData: FormData) => {
-  // Achatar os dados do formulário
-  const flatData = flattenFormData(formData);
-  
-  // Converter para CSV usando PapaParse
-  const csv = Papa.unparse([flatData]);
-  
-  // Criar e salvar o arquivo
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-  saveAs(blob, `notificacao_${getFormattedDate()}.csv`);
-};
-
-// Exportação para Word (DOCX)
-export const exportToWord = (formData: FormData) => {
-  // Criar documento
-  const doc = new Document({
-    sections: [{
-      properties: {},
-      children: [
-        // Título
-        new Paragraph({
-          text: "Formulário de Notificação",
-          heading: HeadingLevel.HEADING_1,
-          spacing: { after: 200 }
-        }),
-        
-        // Informações de data
-        new Paragraph({
-          children: [
-            new TextRun({ text: "Data da exportação: ", bold: true }),
-            new TextRun({ text: new Date().toLocaleDateString('pt-BR') })
-          ],
-          spacing: { after: 400 }
-        }),
-        
-        // Seção 1: Dados Gerais
-        createSectionTitle("1. Dados Gerais"),
-        createDocTable([
-          ["Evento", formData.evento || ""],
-          ["Público Atendido", getPublicoAtendidoLabel(formData.publicoAtendido) || ""]
-        ]),
-        
-        // Seção 2: Procedência do Indivíduo
-        createSectionTitle("2. Procedência do Indivíduo"),
-        createDocTable(createProcedenciaTableData(formData)),
-        
-        // Seção 3: Identificação do Indivíduo
-        createSectionTitle("3. Identificação do Indivíduo"),
-        createDocTable(createIdentificacaoTableData(formData)),
-        
-        // Seção 4: Informações do Atendimento
-        createSectionTitle("4. Informações do Atendimento"),
-        createDocTable(createAtendimentoTableData(formData)),
-        
-        // Seção 5: Informações da Unidade Notificadora
-        createSectionTitle("5. Informações da Unidade Notificadora"),
-        createDocTable([
-          ["Data do Atendimento", formData.dataAtendimento || ""],
-          ["Unidade Notificadora", formData.unidadeNotificadora || ""],
-          ["Nome do Notificador", formData.nomeNotificador || ""],
-          ["Contato do Notificador", formData.contatoNotificador || ""]
-        ]),
-        
-        // Seção 6: Encerramento do Caso
-        createSectionTitle("6. Encerramento do Caso"),
-        createDocTable(createEncerramentoTableData(formData))
-      ]
-    }]
-  });
-  
-  // Gerar e salvar o arquivo
-  Packer.toBlob(doc).then(blob => {
-    saveAs(blob, `notificacao_${getFormattedDate()}.docx`);
-  });
-};
-
-// Exportação para PDF
-export const exportToPDF = (formData: FormData) => {
-  // Criar um novo documento PDF
-  const doc = new jsPDF();
-  
-  // Adicionar título
-  doc.setFontSize(18);
-  doc.text("Formulário de Notificação", 14, 20);
-  
-  // Adicionar data
-  doc.setFontSize(10);
-  doc.text(`Data da exportação: ${new Date().toLocaleDateString('pt-BR')}`, 14, 30);
-  
-  // Posição Y atual para acompanhar onde estamos no documento
-  let yPos = 40;
-  const pageHeight = doc.internal.pageSize.height;
-  
-  // Função para adicionar uma seção ao PDF
-  const addSection = (title: string, tableData: any[][], startY: number) => {
-    // Verificar se precisamos de uma nova página
-    if (startY + 20 > pageHeight - 20) {
-      doc.addPage();
-      startY = 20;
+// Função auxiliar para converter objetos em texto legível
+const formatFormDataForExport = (
+  formData: FormData, 
+  options?: ExportOptions
+): Record<string, string> => {
+  // Se não temos opções carregadas, usamos mapeamentos básicos
+  const getPublicoAtendidoText = (id: string): string => {
+    if (options?.publicoOptions) {
+      const option = options.publicoOptions.find(o => o.idtipo_publico.toString() === id);
+      if (option) return option.descricao;
     }
     
-    // Adicionar título da seção
-    doc.setFontSize(14);
-    doc.text(title, 14, startY);
+    // Fallback para mapeamento básico
+    const mapping: Record<string, string> = {
+      "1": "Visitante",
+      "2": "Trabalhador",
+      "3": "Autoridade"
+    };
+    return mapping[id] || id;
+  };
+
+  const getResidenteBelemText = (id: string): string => {
+    // Este é um caso especial que provavelmente não tem opção no backend
+    const mapping: Record<string, string> = {
+      "1": "SIM",
+      "2": "NÃO",
+      "3": "ESTRANGEIRO"
+    };
+    return mapping[id] || id;
+  };
+
+  const getTipoAtendimentoText = (id: string): string => {
+    if (options?.atendimentoOptions) {
+      const option = options.atendimentoOptions.find(o => o.idtipo_atendimento.toString() === id);
+      if (option) return option.descricao;
+    }
     
-    // Converter dados para autoTable
-    const tableBody = tableData.map(row => [row[0], row[1]]);
+    // Fallback para mapeamento básico
+    const mapping: Record<string, string> = {
+      "1": "Clínico",
+      "2": "Trauma",
+      "3": "Surto",
+      "4": "Múltiplas vítimas",
+      "5": "Incidente QBRN"
+    };
+    return mapping[id] || id;
+  };
+
+  const getTipoEncerramentoText = (id: string): string => {
+    if (options?.encerramentoOptions) {
+      const option = options.encerramentoOptions.find(o => o.idtipo_encerramento.toString() === id);
+      if (option) return option.descricao;
+    }
     
-    // Adicionar tabela
-    (doc as any).autoTable({
-      startY: startY + 5,
-      head: [['Campo', 'Valor']],
-      body: tableBody,
-      margin: { top: 10 },
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [66, 133, 244] }
-    });
-    
-    // Retornar a nova posição Y
-    return (doc as any).previousAutoTable.finalY + 10;
+    // Fallback para mapeamento básico
+    const mapping: Record<string, string> = {
+      "1": "Atendido e liberado",
+      "2": "Internação",
+      "3": "Observação",
+      "4": "Transferido",
+      "5": "Óbito"
+    };
+    return mapping[id] || id;
   };
   
-  // Adicionar cada seção
-  yPos = addSection("1. Dados Gerais", [
-    ["Evento", formData.evento || ""],
-    ["Público Atendido", getPublicoAtendidoLabel(formData.publicoAtendido) || ""]
-  ], yPos);
-  
-  yPos = addSection("2. Procedência do Indivíduo", createProcedenciaTableData(formData), yPos);
-  yPos = addSection("3. Identificação do Indivíduo", createIdentificacaoTableData(formData), yPos);
-  yPos = addSection("4. Informações do Atendimento", createAtendimentoTableData(formData), yPos);
-  
-  yPos = addSection("5. Informações da Unidade Notificadora", [
-    ["Data do Atendimento", formData.dataAtendimento || ""],
-    ["Unidade Notificadora", formData.unidadeNotificadora || ""],
-    ["Nome do Notificador", formData.nomeNotificador || ""],
-    ["Contato do Notificador", formData.contatoNotificador || ""]
-  ], yPos);
-  
-  yPos = addSection("6. Encerramento do Caso", createEncerramentoTableData(formData), yPos);
-  
-  // Salvar o PDF
-  doc.save(`notificacao_${getFormattedDate()}.pdf`);
-};
-
-// Funções Auxiliares
-
-// Achatar os dados do formulário para exportação (especialmente para CSV e Excel)
-const flattenFormData = (formData: FormData) => {
-  const flatData: Record<string, string> = {};
-  
-  // Copiar todos os valores primitivos
-  Object.entries(formData).forEach(([key, value]) => {
-    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-      flatData[key] = String(value);
-    } else if (Array.isArray(value)) {
-      flatData[key] = value.join(', ');
+  // Funções adicionais para mapear outros tipos de valores
+  const getEventoText = (id: string): string => {
+    if (options?.eventoOptions) {
+      const option = options.eventoOptions.find(o => o.idtipo_evento.toString() === id);
+      if (option) return option.descricao;
     }
-  });
+    return id;
+  };
   
-  // Formatar campos específicos para melhor legibilidade
-  if (formData.publicoAtendido) {
-    flatData.publicoAtendido = getPublicoAtendidoLabel(formData.publicoAtendido);
-  }
+  const getPaisText = (id: string): string => {
+    if (options?.paisOptions) {
+      const option = options.paisOptions.find(o => o.idtipo_pais.toString() === id);
+      if (option) return option.descricao;
+    }
+    return id;
+  };
   
-  if (formData.identidadeGenero) {
-    flatData.identidadeGenero = getIdentidadeGeneroLabel(formData.identidadeGenero);
-  }
-
-  if (formData.residenteBelem) {
-    flatData.residenteBelem = getResidenteLabel(formData.residenteBelem);
-  }
-
-  if (formData.gestante) {
-    flatData.gestante = getGestanteLabel(formData.gestante);
-  }
-
-  if (formData.raca) {
-    flatData.raca = getRacaLabel(formData.raca);
-  }
-
-  if (formData.escolaridade) {
-    flatData.escolaridade = getEscolaridadeLabel(formData.escolaridade);
-  }
-
-  if (formData.tipoAtendimento) {
-    flatData.tipoAtendimento = getTipoAtendimentoLabel(formData.tipoAtendimento);
-  }
-
-  if (formData.tipoEncerramento) {
-    flatData.tipoEncerramento = getTipoEncerramentoLabel(formData.tipoEncerramento);
-  }
+  const getEstadoText = (id: string): string => {
+    if (options?.estadoOptions) {
+      const option = options.estadoOptions.find(o => o.idtipo_estado.toString() === id);
+      if (option) return option.descricao;
+    }
+    return id;
+  };
   
-  return flatData;
-};
+  const getMunicipioText = (id: string): string => {
+    if (options?.municipioOptions) {
+      const option = options.municipioOptions.find(o => o.idtipo_municipio.toString() === id);
+      if (option) return option.descricao;
+    }
+    return id;
+  };
+  
+  const getBairroText = (id: string): string => {
+    if (options?.bairroOptions) {
+      const option = options.bairroOptions.find(o => o.idbairro.toString() === id);
+      if (option) return option.descricao;
+    }
+    return id;
+  };
+  
+  const getGeneroText = (id: string): string => {
+    if (options?.generoOptions) {
+      const option = options.generoOptions.find(o => o.idtipo_genero.toString() === id);
+      if (option) return option.descricao;
+    }
+    return id;
+  };
+  
+  const getRacaText = (id: string): string => {
+    if (options?.racaOptions) {
+      const option = options.racaOptions.find(o => o.idtipo_raca.toString() === id);
+      if (option) return option.descricao;
+    }
+    return id;
+  };
+  
+  const getEscolaridadeText = (id: string): string => {
+    if (options?.escolaridadeOptions) {
+      const option = options.escolaridadeOptions.find(o => o.idtipo_escolaridade.toString() === id);
+      if (option) return option.descricao;
+    }
+    return id;
+  };
+  
+  const getEstabelecimentoText = (id: string): string => {
+    if (options?.estabelecimentoOptions) {
+      const option = options.estabelecimentoOptions.find(o => o.idestabelecimento.toString() === id);
+      if (option) return option.descricao;
+    }
+    return id;
+  };
 
-// Obter label para público atendido
-const getPublicoAtendidoLabel = (value: string) => {
-  const options = [
-    { value: "1", label: "Visitante" },
-    { value: "2", label: "Trabalhador" },
-    { value: "3", label: "Autoridade" }
-  ];
-  return getOptionLabel(value, options);
-};
+  // Formatação de data DD/MM/YYYY
+  const formatDate = (dateStr: string): string => {
+    if (!dateStr) return '';
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('pt-BR');
+    } catch (e) {
+      return dateStr;
+    }
+  };
 
-// Obter label para identidade de gênero
-const getIdentidadeGeneroLabel = (value: string) => {
-  const options = [
-    { value: "1", label: "Mulher cisgênero" },
-    { value: "2", label: "Homem cisgênero" },
-    { value: "3", label: "Mulher transgênero" },
-    { value: "4", label: "Homem transgênero" },
-    { value: "5", label: "Travesti" },
-    { value: "6", label: "Não binário" },
-    { value: "7", label: "Não se aplica" },
-    { value: "9", label: "Ignorado" }
-  ];
-  return getOptionLabel(value, options);
-};
-
-// Auxiliar para criar títulos de seção no DocX
-const createSectionTitle = (title: string) => {
-  return new Paragraph({
-    text: title,
-    heading: HeadingLevel.HEADING_2,
-    spacing: { before: 300, after: 200 }
-  });
-};
-
-// Auxiliar para criar tabelas no DocX
-const createDocTable = (data: string[][]) => {
-  const rows = data.map(row => {
-    return new TableRow({
-      children: [
-        new TableCell({
-          children: [new Paragraph({ text: row[0], spacing: { before: 50, after: 50 } })],
-          width: { size: 30, type: "pct" },
-          borders: {
-            top: { style: BorderStyle.SINGLE, size: 1, color: "DDDDDD" },
-            bottom: { style: BorderStyle.SINGLE, size: 1, color: "DDDDDD" },
-            left: { style: BorderStyle.SINGLE, size: 1, color: "DDDDDD" },
-            right: { style: BorderStyle.SINGLE, size: 1, color: "DDDDDD" }
-          }
-        }),
-        new TableCell({
-          children: [new Paragraph({ text: row[1], spacing: { before: 50, after: 50 } })],
-          width: { size: 70, type: "pct" },
-          borders: {
-            top: { style: BorderStyle.SINGLE, size: 1, color: "DDDDDD" },
-            bottom: { style: BorderStyle.SINGLE, size: 1, color: "DDDDDD" },
-            left: { style: BorderStyle.SINGLE, size: 1, color: "DDDDDD" },
-            right: { style: BorderStyle.SINGLE, size: 1, color: "DDDDDD" }
-          }
+  // Criar objeto para exportação
+  // Formatação dos sinais e sintomas
+  const getSintomasText = (): string => {
+    if (!formData.sinaisESintomas.length) return "";
+    
+    if (options?.sintomaOptions) {
+      return formData.sinaisESintomas
+        .map(id => {
+          const sintoma = options.sintomaOptions.find(s => s.idtipo_sintoma.toString() === id);
+          return sintoma ? sintoma.descricao : id;
         })
-      ]
+        .join(", ");
+    }
+    
+    return formData.sinaisESintomas.join(", ");
+  };
+  
+  // Formatação das hipóteses diagnósticas
+  const getHipotesesText = (): string => {
+    if (!formData.hipoteseDiagnostica.length) return "";
+    
+    if (options?.hipoteseDiagOptions) {
+      return formData.hipoteseDiagnostica
+        .map(id => {
+          const hipotese = options.hipoteseDiagOptions.find(h => h.idtipo_hipotese_diag.toString() === id);
+          return hipotese ? hipotese.descricao : id;
+        })
+        .join(", ");
+    }
+    
+    return formData.hipoteseDiagnostica.join(", ");
+  };
+  
+  // Formatação dos tipos de trauma
+  const getTraumasText = (): string => {
+    if (!formData.tipoTrauma.length) return "";
+    
+    if (options?.traumaOptions) {
+      return formData.tipoTrauma
+        .map(id => {
+          const trauma = options.traumaOptions.find(t => t.idtipo_trauma.toString() === id);
+          return trauma ? trauma.descricao : id;
+        })
+        .join(", ");
+    }
+    
+    return formData.tipoTrauma.join(", ");
+  };
+
+  return {
+    "Evento": getEventoText(formData.evento),
+    "Público Atendido": getPublicoAtendidoText(formData.publicoAtendido),
+    "Residente em Belém": getResidenteBelemText(formData.residenteBelem),
+    "Bairro": formData.residenteBelem === "1" ? getBairroText(formData.bairro) : formData.bairro,
+    "Município": formData.residenteBelem === "2" ? getMunicipioText(formData.municipio) : formData.municipio,
+    "UF": formData.residenteBelem === "2" ? getEstadoText(formData.uf) : formData.uf,
+    "País de Procedência": formData.residenteBelem === "3" ? getPaisText(formData.paisProcedencia) : formData.paisProcedencia,
+    "Local de Hospedagem": formData.localHospedagem,
+    "Contato do Local": formData.contatoLocal,
+    "Paciente": formData.paciente,
+    "Nome da Mãe": formData.nomeMae,
+    "Data de Nascimento": formatDate(formData.dataNascimento),
+    "Idade": formData.idade,
+    "CPF": formData.cpf,
+    "Identidade de Gênero": getGeneroText(formData.identidadeGenero),
+    "Gestante": formData.gestante === "1" ? "Sim" : "Não",
+    "Raça": getRacaText(formData.raca),
+    "Escolaridade": getEscolaridadeText(formData.escolaridade),
+    "Profissão": formData.profissao, // Ideal seria mapear pelo CBO
+    "Contato Telefônico": formData.contatoTelefonico,
+    "Tipo de Atendimento": getTipoAtendimentoText(formData.tipoAtendimento),
+    "Sinais e Sintomas": getSintomasText(),
+    "Data de Início dos Sintomas": formatDate(formData.dataInicioSintomas),
+    "Observação dos Sintomas": formData.observacaoSintomas,
+    "Hipótese Diagnóstica": getHipotesesText(),
+    "Observação da Hipótese": formData.observacaoHipotese,
+    "Tipo de Trauma": getTraumasText(),
+    "Data da Ocorrência": formatDate(formData.dataOcorrencia),
+    "Observação do Trauma": formData.observacaoTrauma,
+    "Relacionado a Surto": formData.relacionadoSurto === "1" ? "Sim" : "Não",
+    "Observação do Incidente": formData.observacaoIncidente,
+    "Data do Atendimento": formatDate(formData.dataAtendimento),
+    "Unidade Notificadora": getEstabelecimentoText(formData.unidadeNotificadora),
+    "Nome do Notificador": formData.nomeNotificador,
+    "Contato do Notificador": formData.contatoNotificador,
+    "Data de Encerramento": formatDate(formData.dataEncerramento),
+    "Tipo de Encerramento": getTipoEncerramentoText(formData.tipoEncerramento),
+    "Local de Encaminhamento": formData.localEncaminhamento
+      ? (formData.tipoEncerramento === "5" 
+          ? (formData.localEncaminhamento === "1" ? "SVO" : 
+             formData.localEncaminhamento === "2" ? "IML" : 
+             formData.localEncaminhamento === "3" ? "Ignorado" : formData.localEncaminhamento)
+          : getEstabelecimentoText(formData.localEncaminhamento))
+      : ""
+  };
+};
+
+// Exportar para Excel
+export const exportToExcel = (formData: FormData, options?: ExportOptions): void => {
+  try {
+    const formattedData = formatFormDataForExport(formData, options);
+    
+    // Converter em formato de planilha
+    const worksheet = XLSX.utils.json_to_sheet([formattedData]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Notificação");
+    
+    // Ajustar larguras das colunas
+    const colWidths = Object.keys(formattedData).map(key => ({
+      wch: Math.max(key.length, String(formattedData[key]).length, 15)
+    }));
+    worksheet['!cols'] = colWidths;
+    
+    // Gerar arquivo
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const data = new Blob([excelBuffer], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    
+    // Criar nome de arquivo limpo (removendo caracteres problemáticos)
+    const cleanFileName = (formData.paciente || 'Dados')
+      .replace(/[\\/:*?"<>|]/g, '')
+      .substring(0, 30);
+    
+    // Criar URL e link para download
+    const url = window.URL.createObjectURL(data);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Notificacao_${cleanFileName}.xlsx`;
+    link.click();
+    
+    // Limpar recursos
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+      link.remove();
+    }, 100);
+  } catch (error) {
+    console.error('Erro ao exportar para Excel:', error);
+    alert('Erro ao exportar para Excel. Verifique o console para mais detalhes.');
+  }
+};
+
+// Exportar para CSV
+export const exportToCSV = (formData: FormData, options?: ExportOptions): void => {
+  try {
+    const formattedData = formatFormDataForExport(formData, options);
+    
+    // Converter objeto em linhas de CSV
+    const headers = Object.keys(formattedData).join(',');
+    const values = Object.values(formattedData)
+      .map(value => `"${String(value).replace(/"/g, '""')}"`)
+      .join(',');
+    
+    const csvContent = `${headers}\n${values}`;
+    
+    // Criar blob e link para download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    
+    // Criar nome de arquivo limpo (removendo caracteres problemáticos)
+    const cleanFileName = (formData.paciente || 'Dados')
+      .replace(/[\\/:*?"<>|]/g, '')
+      .substring(0, 30);
+    
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Notificacao_${cleanFileName}.csv`;
+    link.click();
+    
+    // Limpar recursos
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+      link.remove();
+    }, 100);
+  } catch (error) {
+    console.error('Erro ao exportar para CSV:', error);
+    alert('Erro ao exportar para CSV. Verifique o console para mais detalhes.');
+  }
+};
+
+// Exportar para Word
+export const exportToWord = (formData: FormData, options?: ExportOptions): void => {
+  try {
+    const formattedData = formatFormDataForExport(formData, options);
+    
+    // Criar conteúdo HTML para Word
+    let htmlContent = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" 
+            xmlns:w="urn:schemas-microsoft-com:office:word" 
+            xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8">
+        <title>Notificação - ${formData.paciente || 'Dados'}</title>
+        <!--[if gte mso 9]>
+        <xml>
+          <w:WordDocument>
+            <w:View>Print</w:View>
+            <w:Zoom>100</w:Zoom>
+          </w:WordDocument>
+        </xml>
+        <![endif]-->
+        <style>
+          body { font-family: Arial, sans-serif; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; }
+          h1 { text-align: center; }
+          .section { margin-top: 20px; }
+          .section-title { background-color: #4472C4; color: white; padding: 5px; }
+        </style>
+      </head>
+      <body>
+        <h1>Formulário de Notificação</h1>
+    `;
+
+    // Dividir por seções
+    const sections = {
+      "1. Dados Gerais": ["Evento", "Público Atendido"],
+      "2. Procedência do indivíduo": ["Residente em Belém", "Bairro", "Município", "UF", "País de Procedência", "Local de Hospedagem", "Contato do Local"],
+      "3. Identificação do indivíduo": ["Paciente", "Nome da Mãe", "Data de Nascimento", "Idade", "CPF", "Identidade de Gênero", "Gestante", "Raça", "Escolaridade", "Profissão", "Contato Telefônico"],
+      "4. Informações do atendimento": ["Tipo de Atendimento", "Sinais e Sintomas", "Data de Início dos Sintomas", "Observação dos Sintomas", "Hipótese Diagnóstica", "Observação da Hipótese", "Tipo de Trauma", "Data da Ocorrência", "Observação do Trauma", "Relacionado a Surto", "Observação do Incidente"],
+      "5. Informações da unidade notificadora": ["Data do Atendimento", "Unidade Notificadora", "Nome do Notificador", "Contato do Notificador"],
+      "6. Encerramento do Caso": ["Data de Encerramento", "Tipo de Encerramento", "Local de Encaminhamento"]
+    };
+
+    // Adicionar cada seção ao HTML
+    Object.entries(sections).forEach(([title, fields]) => {
+      htmlContent += `
+        <div class="section">
+          <h2 class="section-title">${title}</h2>
+          <table>
+      `;
+      
+      fields.forEach(field => {
+        if (formattedData[field]) {
+          htmlContent += `
+            <tr>
+              <th>${field}</th>
+              <td>${formattedData[field]}</td>
+            </tr>
+          `;
+        }
+      });
+      
+      htmlContent += `
+          </table>
+        </div>
+      `;
     });
-  });
-  
-  return new Table({
-    rows: rows,
-    width: { size: 100, type: "pct" },
-    margins: { top: 100, bottom: 100, left: 100, right: 100 }
-  });
-};
 
-// Criar dados da tabela para a seção "Procedência do Indivíduo"
-const createProcedenciaTableData = (formData: FormData) => {
-  const data: string[][] = [
-    ["Residente em Belém?", getResidenteLabel(formData.residenteBelem)]
-  ];
-  
-  if (formData.residenteBelem === "1") {
-    data.push(["Bairro", formData.bairro || ""]);
-  } 
-  else if (formData.residenteBelem === "2") {
-    data.push(
-      ["UF", formData.uf || ""],
-      ["Município", formData.municipio || ""]
-    );
-  } 
-  else if (formData.residenteBelem === "3") {
-    data.push(
-      ["País de Procedência", formData.paisProcedencia || ""],
-      ["Local de Hospedagem", formData.localHospedagem || ""],
-      ["Contato do Local", formData.contatoLocal || ""]
-    );
-  }
-  
-  return data;
-};
+    htmlContent += `
+      </body>
+      </html>
+    `;
 
-// Obter label para residente em Belém
-const getResidenteLabel = (value: string) => {
-  const options = [
-    { value: "1", label: "SIM" },
-    { value: "2", label: "NÃO" },
-    { value: "3", label: "ESTRANGEIRO" }
-  ];
-  return getOptionLabel(value, options);
-};
-
-// Criar dados da tabela para a seção "Identificação do Indivíduo"
-const createIdentificacaoTableData = (formData: FormData) => {
-  const data: string[][] = [
-    ["Nome", formData.paciente || ""],
-    ["Nome da Mãe", formData.nomeMae || ""],
-    ["Data de Nascimento", formData.dataNascimento || ""],
-    ["Idade", formData.idade || ""],
-    ["CPF", formData.cpf || ""],
-    ["Identidade de Gênero", getIdentidadeGeneroLabel(formData.identidadeGenero)]
-  ];
-  
-  if (formData.identidadeGenero === "1") {
-    data.push(["Gestante", getGestanteLabel(formData.gestante)]);
-  }
-  
-  data.push(
-    ["Raça", getRacaLabel(formData.raca)],
-    ["Escolaridade", getEscolaridadeLabel(formData.escolaridade)],
-    ["Profissão/Ocupação", formData.profissao || ""],
-    ["Contato Telefônico", formData.contatoTelefonico || ""]
-  );
-  
-  return data;
-};
-
-// Obter label para gestante
-const getGestanteLabel = (value: string) => {
-  const options = [
-    { value: "1", label: "Sim" },
-    { value: "2", label: "Não" }
-  ];
-  return getOptionLabel(value, options);
-};
-
-// Obter label para raça
-const getRacaLabel = (value: string) => {
-  const options = [
-    { value: "1", label: "Branca" },
-    { value: "2", label: "Preta" },
-    { value: "3", label: "Amarela" },
-    { value: "4", label: "Parda" },
-    { value: "5", label: "Indígena" },
-    { value: "9", label: "Ignorado" }
-  ];
-  return getOptionLabel(value, options);
-};
-
-// Obter label para escolaridade
-const getEscolaridadeLabel = (value: string) => {
-  const options = [
-    { value: "0", label: "Analfabeto" },
-    { value: "1", label: "Ensino fundamental incompleto" },
-    { value: "2", label: "Ensino fundamental completo" },
-    { value: "3", label: "Ensino médio incompleto" },
-    { value: "4", label: "Ensino médio completo" },
-    { value: "5", label: "Ensino superior incompleto" },
-    { value: "8", label: "Ensino superior completo" },
-    { value: "9", label: "Pós-graduado" },
-    { value: "10", label: "Ignorado" },
-    { value: "11", label: "Não se aplica" }
-  ];
-  return getOptionLabel(value, options);
-};
-
-// Obter label para tipo de atendimento
-const getTipoAtendimentoLabel = (value: string) => {
-  const options = [
-    { value: "1", label: "Clínico" },
-    { value: "2", label: "Trauma" },
-    { value: "3", label: "Surto" },
-    { value: "4", label: "Múltiplas vítimas" },
-    { value: "5", label: "QBRN" }
-  ];
-  return getOptionLabel(value, options);
-};
-
-// Criar dados da tabela para a seção "Informações do Atendimento"
-const createAtendimentoTableData = (formData: FormData) => {
-  const data: string[][] = [
-    ["Tipo de Atendimento", getTipoAtendimentoLabel(formData.tipoAtendimento)]
-  ];
-  
-  if (formData.tipoAtendimento === "1") { // Clínico
-    const sinaisESintomasOptions = [
-      { value: "AbrasaoLaceracao", label: "ABRASÃO/LACERAÇÃO" },
-      { value: "Adenomegalia", label: "ADENOMEGALIA (AUMENTO DAS GLÂNDULAS / LINFONODO)" },
-      { value: "AgulhadaIntencional", label: "AGULHADA INTENCIONAL" },
-      { value: "Anorexia", label: "ANOREXIA (PERDA DE APETITE)" },
-      { value: "Calafrios", label: "CALAFRIOS" },
-      { value: "CongestaoNasal", label: "CONGESTÃO NASAL" },
-      { value: "Conjuntivite", label: "CONJUNTIVITE" },
-      { value: "Contusao", label: "CONTUSÃO" },
-      { value: "Convulsoes", label: "CONVULSÕES" },
-      { value: "Coriza", label: "CORIZA" },
-      { value: "CorteIncisaoPerfuracao", label: "CORTE/INCISÃO/PERFURAÇÃO" },
-      { value: "Desidratacao", label: "DESIDRATAÇÃO" },
-      { value: "Desorientacao", label: "DESORIENTAÇÃO (CONFUSÃO MENTAL) OU SONOLÊNCIA" },
-      { value: "Diarreia", label: "DIARREIA" },
-      { value: "Dispneia", label: "DIFICULDADE DE RESPIRAR (DISPNEIA)" },
-      { value: "DorAbdominal", label: "DOR ABDOMINAL" },
-      { value: "Artralgia", label: "DOR ARTICULAR (ARTRALGIA)" },
-      { value: "Cefaleia", label: "DOR DE CABEÇA (CEFALEIA)" },
-      { value: "DorDeGarganta", label: "DOR DE GARGANTA E OU FARINGITE" },
-      { value: "DorPanturrilha", label: "DOR NA PANTURRILHA" },
-      { value: "Mialgia", label: "DOR NO CORPO (MUSCULAR /MIALGIA)" },
-      { value: "DorRetroorbital", label: "DOR RETROORBITAL" },
-      { value: "EntorseLuxacao", label: "ENTORSE/LUXAÇÃO" },
-      { value: "LesaoArmaFogo", label: "LESÃO DECORRENTE DE ARMA DE FOGO" },
-      { value: "EstresseTermico", label: "ESTRESSE TÉRMICO / INSOLAÇÃO / QUEIMADURAS SOLARES" },
-      { value: "EventoDiabetes", label: "EVENTO RELACIONADO A DIABETES" },
-      { value: "EventoHipertensao", label: "EVENTO RELACIONADO A HIPERTENSÃO" },
-      { value: "ReacaoAlergica", label: "EVENTO RELACIONADO A REAÇÃO ALÉRGICA" },
-      { value: "Exantema", label: "EXANTEMA" },
-      { value: "ExposicaoRiscoIST", label: "EXPOSIÇÃO AO RISCO DE IST" },
-      { value: "Febre", label: "FEBRE" },
-      { value: "Fratura", label: "FRATURA" },
-      { value: "Hematoma", label: "HEMATOMA" },
-      { value: "HemorragiaCutanea", label: "HEMORRAGIA CUTÂNEA (PETÉQUIAS OU PROVA DO LAÇO)" },
-      { value: "HemorragiaOutrosLocais", label: "HEMORRAGIA EM OUTROS LOCAIS" },
-      { value: "HemorragiaMucosa", label: "HEMORRAGIA MUCOSA (NASAL OU GENGIVAL)" },
-      { value: "Ictericia", label: "ICTERÍCIA" },
-      { value: "IntoxicacaoMedicamento", label: "INTOXICAÇÃO (MEDICAMENTO)" },
-      { value: "IntoxicacaoAlimentar", label: "INTOXICAÇÃO ALIMENTAR" },
-      { value: "IntoxicacaoAlcool", label: "INTOXICAÇÃO OU USO EXCESSIVO POR ÁLCOOL" },
-      { value: "IntoxicacaoOutras", label: "INTOXICAÇÃO OUTRAS (VENENOS/AGROTÓXICOS/SANEANTES)" },
-      { value: "IntoxicacaoDrogasIlicitas", label: "INTOXICAÇÃO POR USO DE DROGAS ILÍCITAS" },
-      { value: "LesaoViolenciaDomestica", label: "LESÃO DECORRENTE DE VIOLÊNCIA DOMÉSTICA" },
-      { value: "LesaoAutomovel", label: "LESÃO DECORRENTE DE ACIDENTE COM AUTOMÓVEL" },
-      { value: "LesaoBicicleta", label: "LESÃO DECORRENTE DE ACIDENTE COM BICICLETA" },
-      { value: "LesaoMoto", label: "LESÃO DECORRENTE DE ACIDENTE COM MOTO" },
-      { value: "LesaoMultiplasVitimas", label: "LESÃO DECORRENTE DE ACIDENTE COM MÚLTIPLAS VÍTIMAS" },
-      { value: "LesaoOutroVeiculoMotor", label: "LESÃO DECORRENTE DE ACIDENTE COM OUTRO VEÍCULO" },
-      { value: "LesaoAglomeracao", label: "LESÃO DECORRENTE DE AGLOMERAÇÃO (PISOTEAMENTO)" },
-      { value: "LesaoArmaBranca", label: "LESÃO DECORRENTE DE ARMA BRANCA" },
-      { value: "LesaoDesastre", label: "LESÃO DECORRENTE DE DESASTRE" },
-      { value: "LesaoQueda", label: "LESÃO DECORRENTE DE QUEDA" },
-      { value: "LesaoViolenciaFisica", label: "LESÃO DECORRENTE DE VIOLÊNCIA FÍSICA INTERPESSOAL" },
-      { value: "LesaoAssedioSexual", label: "LESÃO DECORRENTE DE VIOLÊNCIA/ASSÉDIO SEXUAL" },
-      { value: "LesaoNegligencia", label: "LESÃO DECORRENTE NEGLIGÊNCIA/ABANDONO" },
-      { value: "LesaoAutoprovocada", label: "LESÃO POR VIOLÊNCIA FÍSICA AUTOPROVOCADA" },
-      { value: "LesoesCutaneasMpox", label: "LESÕES CUTÂNEAS - MPOX" },
-      { value: "LesoesCutaneas", label: "LESÕES CUTÂNEAS/VESÍCULAS/BOLHAS" },
-      { value: "Linfadenopatia", label: "LINFADENOPATIA" },
-      { value: "Nauseas", label: "NÁUSEAS E OU VÔMITO" },
-      { value: "Paralisia", label: "PARALISIA OU FLACIDEZ MUSCULAR (MEMBROS INFERIORES)" },
-      { value: "Petequias", label: "PETÉQUIAS" },
-      { value: "PrescricaoPEP", label: "PRESCRIÇÃO DE PROFILAXIA PÓS-EXPOSIÇÃO (PEP)" },
-      { value: "Prurido", label: "PRURIDO/COCEIRA" },
-      { value: "Queimadura", label: "QUEIMADURA" },
-      { value: "RigidezNuca", label: "RIGIDEZ DE NUCA" },
-      { value: "Taquicardia", label: "TAQUICARDIA" },
-      { value: "Tontura", label: "TONTURA/DESMAIO" },
-      { value: "Tosse", label: "TOSSE" },
-      { value: "VitimaOutrosDiscriminacao", label: "VÍTIMA DE OUTROS TIPOS DE DISCRIMINAÇÃO" },
-      { value: "VitimaRacismo", label: "VÍTIMA DE RACISMO" },
-      { value: "VitimaViolenciaPsicologica", label: "VÍTIMA DE VIOLÊNCIA PSICOLÓGICA" }
-    ];
+    // Criar blob e link para download
+    const blob = new Blob([htmlContent], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Notificacao_${formData.paciente || 'Dados'}.doc`;
+    link.click();
     
-    const hipoteseDiagnosticaOptions = [
-      { value: "AgulhadaIntencional", label: "Agulhada intencional" },
-      { value: "EstresseTermico", label: "Estresse térmico / insolação / queimaduras solares" },
-      { value: "EventoAdversoCremeParaCabelo", label: "Evento adverso pós uso de creme para o cabelo" },
-      { value: "EventoDiabetes", label: "Evento relacionado a diabetes" },
-      { value: "EventoHipertensao", label: "Evento relacionado a hipertensão" },
-      { value: "ReacaoAlergica", label: "Evento relacionado a reação alérgica" },
-      { value: "ExposicaoRiscoIST", label: "Exposição ao risco de IST" },
-      { value: "IntoxicacaoAlimentar", label: "Intoxicação alimentar" },
-      { value: "IntoxicacaoMedicamento", label: "Intoxicação (medicamento)" }
-      // Adicionamos apenas alguns para simplificar, mas na implementação real deve-se incluir todos
-    ];
+    // Limpar recursos
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+      link.remove();
+    }, 100);
+  } catch (error) {
+    console.error('Erro ao exportar para Word:', error);
+    alert('Erro ao exportar para Word. Verifique o console para mais detalhes.');
+  }
+};
+
+// Exportar para PDF
+export const exportToPDF = (formData: FormData, options?: ExportOptions): void => {
+  try {
+    const formattedData = formatFormDataForExport(formData, options);
     
-    data.push(
-      ["Sinais e Sintomas", formatArrayValues(formData.sinaisESintomas, sinaisESintomasOptions)],
-      ["Data de Início dos Sintomas", formData.dataInicioSintomas || ""],
-      ["Observação (Sintomas)", formData.observacaoSintomas || ""],
-      ["Hipótese Diagnóstica", formatArrayValues(formData.hipoteseDiagnostica, hipoteseDiagnosticaOptions)],
-      ["Observação (Hipótese)", formData.observacaoHipotese || ""]
-    );
-  } 
-  else if (formData.tipoAtendimento === "2") { // Trauma
-    const tipoTraumaOptions = [
-      { value: "Afogamento", label: "AFOGAMENTO" },
-      { value: "AgressaoFisica", label: "AGRESSÃO FÍSICA" },
-      { value: "AgressaoSexual", label: "AGRESSÃO SEXUAL" },
-      { value: "AtaqueAnimalInseto", label: "ATAQUE ANIMAL/INSETO" },
-      { value: "Contusao", label: "CONTUSÃO" },
-      { value: "CorteIncisaoPerfuracao", label: "CORTE/INCISÃO/PERFURAÇÃO" },
-      { value: "Distensao", label: "DISTENSÃO" },
-      { value: "EntorseLuxacao", label: "ENTORSE/LUXAÇÃO" },
-      { value: "Escoriacao", label: "ESCORIAÇÃO" },
-      { value: "EscalpelamentoMotor", label: "ESCALPELAMENTO POR MOTOR" },
-      { value: "Esmagamento", label: "ESMAGAMENTO" },
-      { value: "Fratura", label: "FRATURA" },
-      { value: "LesaoArmaFogo", label: "LESÃO DECORRENTE DE ARMA DE FOGO" },
-      { value: "LesaoViolenciaDomestica", label: "LESÃO DECORRENTE DE VIOLÊNCIA DOMÉSTICA" },
-      { value: "LesaoAutomovel", label: "LESÃO DECORRENTE DE ACIDENTE COM AUTOMÓVEL" },
-      { value: "LesaoEmbarcacao", label: "LESÃO DECORRENTE DE ACIDENTE COM EMBARCAÇÃO" },
-      { value: "LesaoBicicleta", label: "LESÃO DECORRENTE DE ACIDENTE COM BICICLETA" },
-      { value: "LesaoMoto", label: "LESÃO DECORRENTE DE ACIDENTE COM MOTO" },
-      { value: "LesaoMultiplasVitimas", label: "LESÃO DECORRENTE DE ACIDENTE COM MÚLTIPLAS VÍTIMAS" },
-      { value: "LesaoOutroVeiculoMotor", label: "LESÃO DECORRENTE DE ACIDENTE COM OUTRO VEÍCULO" },
-      { value: "LesaoAglomeracao", label: "LESÃO DECORRENTE DE AGLOMERAÇÃO (PISOTEAMENTO)" },
-      { value: "LesaoArmaBranca", label: "LESÃO DECORRENTE DE ARMA BRANCA" },
-      { value: "LesaoDesastre", label: "LESÃO DECORRENTE DE DESASTRE" },
-      { value: "LesaoQueda", label: "LESÃO DECORRENTE DE QUEDA" },
-      { value: "LesaoViolenciaFisica", label: "LESÃO DECORRENTE DE VIOLÊNCIA FÍSICA INTERPESSOAL" },
-      { value: "LesaoAssedioSexual", label: "LESÃO DECORRENTE DE VIOLÊNCIA/ASSÉDIO SEXUAL" },
-      { value: "LesaoNegligencia", label: "LESÃO DECORRENTE NEGLIGÊNCIA/ABANDONO" },
-      { value: "LesaoAutoprovocada", label: "LESÃO POR VIOLÊNCIA FÍSICA AUTOPROVOCADA" },
-      { value: "Pisoteamento", label: "PISOTEAMENTO" },
-      { value: "Queda", label: "QUEDA" },
-      { value: "QueimaduraLesaoCutanea", label: "QUEIMADURA/ LESÃO CUTÂNEA" },
-      { value: "Tontura", label: "TONTURA/DESMAIO" },
-      { value: "VitimaOutrosDiscriminacao", label: "VÍTIMA DE OUTROS TIPOS DE DISCRIMINAÇÃO" },
-      { value: "VitimaRacismo", label: "VÍTIMA DE RACISMO" },
-      { value: "VitimaViolenciaPsicologica", label: "VÍTIMA DE VIOLÊNCIA PSICOLÓGICA" }
-    ];
+    // Criar documento PDF
+    const doc = new jsPDF();
     
-    data.push(
-      ["Tipo de Trauma", formatArrayValues(formData.tipoTrauma, tipoTraumaOptions)],
-      ["Data da Ocorrência", formData.dataOcorrencia || ""],
-      ["Observação (Trauma)", formData.observacaoTrauma || ""]
-    );
-  } 
-  else if (["3", "4", "5"].includes(formData.tipoAtendimento)) { // Surto, Múltiplas vítimas, QBRN
-    data.push(
-      ["Relacionado a Surto", formData.relacionadoSurto === "1" ? "Sim" : "Não"],
-      ["Observação do Incidente", formData.observacaoIncidente || ""]
-    );
-  }
-  
-  return data;
-};
+    // Configurações do documento
+    doc.setFont('helvetica');
+    doc.setFontSize(20);
+    doc.text('Formulário de Notificação', 105, 15, { align: 'center' });
+    
+    // Dividir por seções
+    const sections = {
+      "1. Dados Gerais": ["Evento", "Público Atendido"],
+      "2. Procedência do indivíduo": ["Residente em Belém", "Bairro", "Município", "UF", "País de Procedência", "Local de Hospedagem", "Contato do Local"],
+      "3. Identificação do indivíduo": ["Paciente", "Nome da Mãe", "Data de Nascimento", "Idade", "CPF", "Identidade de Gênero", "Gestante", "Raça", "Escolaridade", "Profissão", "Contato Telefônico"],
+      "4. Informações do atendimento": ["Tipo de Atendimento", "Sinais e Sintomas", "Data de Início dos Sintomas", "Observação dos Sintomas", "Hipótese Diagnóstica", "Observação da Hipótese", "Tipo de Trauma", "Data da Ocorrência", "Observação do Trauma", "Relacionado a Surto", "Observação do Incidente"],
+      "5. Informações da unidade notificadora": ["Data do Atendimento", "Unidade Notificadora", "Nome do Notificador", "Contato do Notificador"],
+      "6. Encerramento do Caso": ["Data de Encerramento", "Tipo de Encerramento", "Local de Encaminhamento"]
+    };
 
-// Criar dados da tabela para a seção "Encerramento do Caso"
-const createEncerramentoTableData = (formData: FormData) => {
-  const data: string[][] = [
-    ["Data de Encerramento", formData.dataEncerramento || ""],
-    ["Tipo de Encerramento", getTipoEncerramentoLabel(formData.tipoEncerramento)]
-  ];
-  
-  if (formData.tipoEncerramento === "4") { // Transferido
-    data.push(["Local de Encaminhamento", formData.localEncaminhamento || ""]);
-  }
-  else if (formData.tipoEncerramento === "5") { // Óbito
-    data.push(["Local de Encaminhamento", getLocalEncerramentoObitoLabel(formData.localEncaminhamento)]);
-  }
-  
-  return data;
-};
+    let yPos = 30;
+    const lineHeight = 7;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 10;
+    const contentWidth = pageWidth - (2 * margin);
+    
+    // Função para verificar se precisa nova página
+    const checkNewPage = (heightNeeded: number) => {
+      if (yPos + heightNeeded > 280) {
+        doc.addPage();
+        yPos = 20;
+        return true;
+      }
+      return false;
+    };
 
-// Obter label para tipo de encerramento
-const getTipoEncerramentoLabel = (value: string) => {
-  const options = [
-    { value: "1", label: "Atendido e liberado" },
-    { value: "2", label: "Internação" },
-    { value: "3", label: "Observação" },
-    { value: "4", label: "Transferido" },
-    { value: "5", label: "Óbito" }
-  ];
-  return getOptionLabel(value, options);
-};
-
-// Obter label para local de encaminhamento de óbito
-const getLocalEncerramentoObitoLabel = (value: string) => {
-  const options = [
-    { value: "1", label: "SVO" },
-    { value: "2", label: "IML" },
-    { value: "3", label: "Ignorado" }
-  ];
-  return getOptionLabel(value, options);
+    // Adicionar cada seção ao PDF
+    Object.entries(sections).forEach(([title, fields]) => {
+      checkNewPage(10);
+      
+      // Adicionar título da seção
+      doc.setFillColor(68, 114, 196);
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.rect(margin, yPos, contentWidth, 8, 'F');
+      doc.text(title, margin + 2, yPos + 5.5);
+      yPos += 10;
+      
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(10);
+      
+      // Adicionar campos
+      fields.forEach(field => {
+        if (formattedData[field]) {
+          checkNewPage(lineHeight);
+          
+          // Quebrar texto longo
+          const value = formattedData[field] || '';
+          const maxWidth = contentWidth - 60;
+          
+          if (doc.getTextWidth(value) > maxWidth) {
+            // Para textos longos, usar splitTextToSize
+            const fieldName = field + ': ';
+            doc.setFont('helvetica', 'bold');
+            doc.text(fieldName, margin, yPos);
+            
+            doc.setFont('helvetica', 'normal');
+            const textLines = doc.splitTextToSize(value, maxWidth);
+            doc.text(textLines, margin + doc.getTextWidth(fieldName), yPos);
+            
+            yPos += (textLines.length * lineHeight);
+          } else {
+            // Para textos curtos, colocar na mesma linha
+            doc.setFont('helvetica', 'bold');
+            doc.text(field + ': ', margin, yPos);
+            
+            doc.setFont('helvetica', 'normal');
+            doc.text(value, margin + doc.getTextWidth(field + ': '), yPos);
+            
+            yPos += lineHeight;
+          }
+        }
+      });
+      
+      yPos += 5; // Espaço entre seções
+    });
+    
+    // Salvar PDF
+    doc.save(`Notificacao_${formData.paciente || 'Dados'}.pdf`);
+  } catch (error) {
+    console.error('Erro ao exportar para PDF:', error);
+    alert('Erro ao exportar para PDF. Verifique o console para mais detalhes.');
+  }
 };

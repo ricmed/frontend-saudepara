@@ -16,6 +16,7 @@ interface Municipio {
     idtipo_estado: number;
     descricao: string;
   };
+  estado_nome?: string;
 }
 
 interface Estado {
@@ -41,6 +42,8 @@ const ListaMunicipios = () => {
   const itemsPerPage = 20;
   const isMounted = useRef(false);
   const isSearchFetch = useRef(false);
+  const estadoNamesCache = useRef<Record<number, string>>({});
+  const todosMunicipios = useRef<Municipio[]>([]);
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
@@ -52,10 +55,19 @@ const ListaMunicipios = () => {
         const response = await EstadoService.getAllForSelect();
         if (isMounted.current) {
           setEstados(response);
+          
+          // Criar um cache de IDs de estado para nomes
+          const cache: Record<number, string> = {};
+          response.forEach((estado: Estado) => {
+            cache[estado.idtipo_estado] = estado.descricao;
+          });
+          estadoNamesCache.current = cache;
+          console.log('Cache de estados:', cache);
         }
       } catch (err) {
         if (isMounted.current) {
           setError("Erro ao carregar estados");
+          console.error("Erro ao carregar estados:", err);
         }
       }
     };
@@ -67,6 +79,27 @@ const ListaMunicipios = () => {
     };
   }, []);
 
+  // Função para processar municípios e adicionar estado_nome
+  const processarMunicipios = (municipios: Municipio[]) => {
+    if (!Array.isArray(municipios)) {
+      console.error('Dados não são um array:', municipios);
+      return [];
+    }
+    
+    return municipios.map(municipio => {
+      const estadoNome = estadoNamesCache.current[municipio.tipo_estado_idtipo_estado] || '';
+      
+      return {
+        ...municipio,
+        estado_nome: estadoNome,
+        tipo_estado: municipio.tipo_estado || {
+          idtipo_estado: municipio.tipo_estado_idtipo_estado,
+          descricao: estadoNome
+        }
+      };
+    });
+  };
+
   useEffect(() => {
     if (debouncedSearchTerm) {
       isSearchFetch.current = true;
@@ -74,28 +107,52 @@ const ListaMunicipios = () => {
     }
   }, [debouncedSearchTerm]);
 
+  // Este efeito lida com a paginação e a filtragem por termo de busca
   useEffect(() => {
     const carregarMunicipios = async () => {
       try {
         if (!isSearchFetch.current && isMounted.current) setLoading(true);
-
+        
+        console.log(`Buscando municípios - Página: ${currentPage}, Termo: ${debouncedSearchTerm}`);
+        
+        // Definir parâmetros para a busca
+        const params = {
+          page: currentPage,
+          limit: itemsPerPage,
+          ...(debouncedSearchTerm ? { descricao: debouncedSearchTerm } : {}),
+          ...(selectedEstado > 0 ? { tipo_estado_idtipo_estado: selectedEstado } : {})
+        };
+        
+        // Tentar obter municípios
         const response = await MunicipioService.getAllPaginated(
-          currentPage,
-          itemsPerPage,
-          debouncedSearchTerm,
-          selectedEstado || undefined
+          params.page,
+          params.limit,
+          params.descricao,
+          params.tipo_estado_idtipo_estado
         );
         
-        console.log('Dados recebidos:', response.data);
-
         if (isMounted.current) {
-          setMunicipios(response.data);
+          // Processar os municípios recebidos
+          const municipiosProcessados = processarMunicipios(response.data);
+          
+          // Atualizar o estado
+          setMunicipios(municipiosProcessados);
           setTotalItems(response.pagination.total);
           setTotalPages(Math.min(Math.max(response.pagination.pages, 1), 1000));
+          
+          // Atualizar cache de municípios
+          if (currentPage === 1) {
+            // Se for a primeira página, substituir o cache
+            todosMunicipios.current = municipiosProcessados;
+          } else {
+            // Senão, adicionar ao cache existente
+            todosMunicipios.current = [...todosMunicipios.current, ...municipiosProcessados];
+          }
         }
       } catch (err) {
         if (isMounted.current) {
           setError("Erro ao carregar municípios");
+          console.error("Erro ao carregar municípios:", err);
         }
       } finally {
         if (isMounted.current) {
@@ -115,6 +172,11 @@ const ListaMunicipios = () => {
       setProcessingId(id);
       await MunicipioService.delete(id);
 
+      // Remover o município excluído de todas as listas
+      todosMunicipios.current = todosMunicipios.current.filter(
+        item => item.idtipo_municipio !== id
+      );
+      
       setMunicipios((prev) => {
         const newData = prev.filter((item) => item.idtipo_municipio !== id);
         if (newData.length === 0 && currentPage > 1) {
@@ -129,11 +191,6 @@ const ListaMunicipios = () => {
     }
   };
 
-  // Add debug log
-  useEffect(() => {
-    console.log('Municipios atualizados:', municipios);
-  }, [municipios]);
-
   const tableColumns = [
     { 
       header: "Código", 
@@ -145,10 +202,7 @@ const ListaMunicipios = () => {
     },
     { 
       header: "Estado", 
-      accessor: (row: Municipio) => {
-        console.log('Row data:', row);
-        return row.tipo_estado?.descricao || '';
-      }
+      accessor: "estado_nome" as keyof Municipio
     }
   ];
 
@@ -156,7 +210,10 @@ const ListaMunicipios = () => {
     <select
       value={selectedEstado}
       onChange={(e) => {
-        setSelectedEstado(Number(e.target.value));
+        const novoEstadoId = Number(e.target.value);
+        console.log(`Filtro de estado alterado para: ${novoEstadoId}`);
+        setSelectedEstado(novoEstadoId);
+        // Resetar para a primeira página ao mudar o filtro
         setCurrentPage(1);
       }}
       className="w-64 pl-4 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-800"

@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import PhoneInput from "@/features/notificationForms/components/PhoneInput";
 import CboInput from "@/features/notificationForms/components/CboInput";
 import UnidadeNotificadoraField from "@/features/notificationForms/components/UnidadeNotificadoraField";
 import BrazilianPhoneInput from "@/features/notificationForms/components/BrazilianPhoneInput";
 import ModalBuscaPaciente from "@/features/paginaPacientesComu/components/ModalBuscaPaciente";
-import FormularioPaciente from "@/features/paginaPacientesComu/components/FormularioPaciente";
 import { Paciente } from "@/services/PacienteService";
+import LocationInput from "@/features/notificationForms/components/LocationInput";
 import {
   Search,
   Save,
@@ -28,6 +28,8 @@ import {
   FileOutput,
   Globe,
   ListChecks,
+  AlertCircle,
+  Loader,
 } from "lucide-react";
 // Import the export utilities
 import {
@@ -36,6 +38,28 @@ import {
   exportToWord,
   exportToPDF,
 } from "./exportUtilities";
+import { useParams, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+
+// Import do serviço e interfaces
+import {
+  NotificacaoService,
+  EventoOption,
+  PublicoOption,
+  PaisOption,
+  EstadoOption,
+  MunicipioOption,
+  BairroOption,
+  GeneroOption,
+  RacaOption,
+  EscolaridadeOption,
+  AtendimentoOption,
+  SintomaOption,
+  HipoteseDiagOption,
+  TraumaOption,
+  EstabelecimentoOption,
+  EncerramentoOption,
+} from "@/services/NotificacaoService";
 
 // Interface FormData atualizada
 export interface FormData {
@@ -92,600 +116,49 @@ export interface FormData {
   localEncaminhamento: string;
 }
 
-// Opções para os dropdowns
-const eventoOptions = [
-  "COP30",
-  "Carnaval",
-  "Copa do Mundo Feminina",
-  "Círio de Nazaré",
-];
-
-const publicoAtendidoOptions = [
-  { value: "1", label: "Visitante" },
-  { value: "2", label: "Trabalhador" },
-  { value: "3", label: "Autoridade" },
-  // VIP removido conforme solicitado
-];
-
-const residenteBelemOptions = [
-  { value: "1", label: "SIM" },
-  { value: "2", label: "NÃO" },
-  { value: "3", label: "ESTRANGEIRO" },
-];
-
-const bairrosBelemOptions = [
-  "Batista Campos",
-  "Campina",
-  "Cidade Velha",
-  "Condor",
-  "Cremação",
-  "Guamá",
-  "Jurunas",
-  "Nazaré",
-  "Pedreira",
-  "Reduto",
-  "Sacramenta",
-  "São Brás",
-  "Telégrafo",
-  "Umarizal",
-  "Marco",
-  "Marambaia",
-  "Terra Firme",
-  "Canudos",
-  "Universitário",
-  "Curió-Utinga",
-  "Águas Lindas",
-  "Tapanã",
-  "Icoaraci",
-  "Outeiro",
-  "Mosqueiro",
-  "Pratinha",
-  "Benguí",
-  "Val-de-Cães",
-  "Mangueirão",
-  "Parque Verde",
-  "Coqueiro",
-  "Cabanagem",
-  "Maracangalha",
-  "Barreiro",
-  "Miramar",
-  "Souza",
-  "Fátima",
-  "Tenoné",
-  "Una",
-  "Agulha",
-  "Ponta Grossa",
-  "Cruzeiro",
-  "São Clemente",
-  "Paracuri",
-  "Sideral",
-  "Aurá",
-  "Guanabara",
-  "Jaderlândia",
-  "Levilândia",
-  "Castanheira",
-  "Nova Marambaia",
-  "Maguari",
-  "Maracacuera",
-  "Parque Guajará",
-  "Bengui",
-  "Curuçambá",
-  "Paar",
-];
-
-const estadoOptions = [
-  "AC",
-  "AL",
-  "AP",
-  "AM",
-  "BA",
-  "CE",
-  "DF",
-  "ES",
-  "GO",
-  "MA",
-  "MT",
-  "MS",
-  "MG",
-  "PA",
-  "PB",
-  "PR",
-  "PE",
-  "PI",
-  "RJ",
-  "RN",
-  "RS",
-  "RO",
-  "RR",
-  "SC",
-  "SP",
-  "SE",
-  "TO",
-];
-
-const municipioParaOptions = [
-  "Abaetetuba",
-  "Abel Figueiredo",
-  "Acará",
-  "Afuá",
-  "Água Azul do Norte",
-  "Alenquer",
-  "Almeirim",
-  "Altamira",
-  "Anajás",
-  "Ananindeua",
-  "Anapu",
-  "Augusto Corrêa",
-  "Aurora do Pará",
-  "Aveiro",
-  "Bagre",
-  "Baião",
-  "Bannach",
-  "Barcarena",
-  "Belém",
-  "Belterra",
-  "Benevides",
-  "Bom Jesus do Tocantins",
-  "Bonito",
-  "Bragança",
-  "Brasil Novo",
-  "Brejo Grande do Araguaia",
-  "Breu Branco",
-  "Breves",
-  "Bujaru",
-  "Cachoeira do Arari",
-  "Cachoeira do Piriá",
-  "Cametá",
-  "Canaã dos Carajás",
-  "Capanema",
-  "Capitão Poço",
-  "Castanhal",
-  "Chaves",
-  "Colares",
-  "Conceição do Araguaia",
-  "Concórdia do Pará",
-  "Cumaru do Norte",
-  "Curionópolis",
-  "Curralinho",
-  "Curuá",
-  "Curuçá",
-  "Dom Eliseu",
-  "Eldorado do Carajás",
-  "Faro",
-  "Floresta do Araguaia",
-  "Garrafão do Norte",
-  "Goianésia do Pará",
-  "Gurupá",
-  "Igarapé-Açu",
-  "Igarapé-Miri",
-  "Inhangapi",
-  "Ipixuna do Pará",
-  "Irituia",
-  "Itaituba",
-  "Itupiranga",
-  "Jacareacanga",
-  "Jacundá",
-  "Juruti",
-  "Limoeiro do Ajuru",
-  "Mãe do Rio",
-  "Magalhães Barata",
-  "Marabá",
-  "Maracanã",
-  "Marapanim",
-  "Marituba",
-  "Medicilândia",
-  "Melgaço",
-  "Mocajuba",
-  "Moju",
-  "Mojuí dos Campos",
-  "Monte Alegre",
-  "Muaná",
-  "Nova Esperança do Piriá",
-  "Nova Ipixuna",
-  "Nova Timboteua",
-  "Novo Progresso",
-  "Novo Repartimento",
-  "Óbidos",
-  "Oeiras do Pará",
-  "Oriximiná",
-  "Ourém",
-  "Ourilândia do Norte",
-  "Pacajá",
-  "Palestina do Pará",
-  "Paragominas",
-  "Parauapebas",
-  "Pau D'Arco",
-  "Peixe-Boi",
-  "Piçarra",
-  "Placas",
-  "Ponta de Pedras",
-  "Portel",
-  "Porto de Moz",
-  "Prainha",
-  "Primavera",
-  "Quatipuru",
-  "Redenção",
-  "Rio Maria",
-  "Rondon do Pará",
-  "Rurópolis",
-  "Salinópolis",
-  "Salvaterra",
-  "Santa Bárbara do Pará",
-  "Santa Cruz do Arari",
-  "Santa Izabel do Pará",
-  "Santa Luzia do Pará",
-  "Santa Maria das Barreiras",
-  "Santa Maria do Pará",
-  "Santana do Araguaia",
-  "Santarém",
-  "Santarém Novo",
-  "Santo Antônio do Tauá",
-  "São Caetano de Odivelas",
-  "São Domingos do Araguaia",
-  "São Domingos do Capim",
-  "São Félix do Xingu",
-  "São Francisco do Pará",
-  "São Geraldo do Araguaia",
-  "São João da Ponta",
-  "São João de Pirabas",
-  "São João do Araguaia",
-  "São Miguel do Guamá",
-  "São Sebastião da Boa Vista",
-  "Sapucaia",
-  "Senador José Porfírio",
-  "Soure",
-  "Tailândia",
-  "Terra Alta",
-  "Terra Santa",
-  "Tomé-Açu",
-  "Tracuateua",
-  "Trairão",
-  "Tucumã",
-  "Tucuruí",
-  "Ulianópolis",
-  "Uruará",
-  "Vigia",
-  "Viseu",
-  "Vitória do Xingu",
-  "Xinguara",
-];
-
-const paisOptions = [
-  "Afeganistão",
-  "África do Sul",
-  "Albânia",
-  "Alemanha",
-  "Andorra",
-  "Angola",
-  "Antígua e Barbuda",
-  "Arábia Saudita",
-  "Argélia",
-  "Argentina",
-  "Armênia",
-  "Austrália",
-  "Áustria",
-  "Azerbaijão",
-  "Bahamas",
-  "Bahrein",
-  "Bangladesh",
-  "Barbados",
-  "Bélgica",
-  "Belize",
-  "Benin",
-  "Bielorrússia",
-  "Bolívia",
-  "Bósnia e Herzegovina",
-  "Botsuana",
-  "Brasil",
-  "Brunei",
-  "Bulgária",
-  // Lista reduzida para brevidade
-];
-
-const identidadeGeneroOptions = [
-  { value: "1", label: "Mulher cisgênero" },
-  { value: "2", label: "Homem cisgênero" },
-  { value: "3", label: "Mulher transgênero" },
-  { value: "4", label: "Homem transgênero" },
-  { value: "5", label: "Travesti" },
-  { value: "6", label: "Não binário" },
-  { value: "7", label: "Não se aplica" },
-  { value: "9", label: "Ignorado" },
-];
-
-const gestanteOptions = [
-  { value: "1", label: "Sim" },
-  { value: "2", label: "Não" },
-];
-
-const racaOptions = [
-  { value: "1", label: "Branca" },
-  { value: "2", label: "Preta" },
-  { value: "3", label: "Amarela" },
-  { value: "4", label: "Parda" },
-  { value: "5", label: "Indígena" },
-  { value: "9", label: "Ignorado" },
-];
-
-const escolaridadeOptions = [
-  { value: "0", label: "Analfabeto" },
-  { value: "1", label: "Ensino fundamental incompleto" },
-  { value: "2", label: "Ensino fundamental completo" },
-  { value: "3", label: "Ensino médio incompleto" },
-  { value: "4", label: "Ensino médio completo" },
-  { value: "5", label: "Ensino superior incompleto" },
-  { value: "8", label: "Ensino superior completo" },
-  { value: "9", label: "Pós-graduado" },
-  { value: "10", label: "Ignorado" },
-  { value: "11", label: "Não se aplica" },
-];
-
-const tipoAtendimentoOptions = [
-  { value: "1", label: "Clínico" },
-  { value: "2", label: "Trauma" },
-  { value: "3", label: "Surto" },
-  { value: "4", label: "Múltiplas vítimas" },
-  { value: "5", label: "Incidente QBRN" },
-];
-
-const sinaisESintomasOptions = [
-  { value: "AbrasaoLaceracao", label: "ABRASAO/LACERACAO" },
-  {
-    value: "Adenomegalia",
-    label: "ADENOMEGALIA (AUMENTO DAS GLANDULAS / LINFONODO)",
-  },
-  { value: "AgulhadaIntencional", label: "AGULHADA INTENCIONAL" },
-  { value: "Anorexia", label: "ANOREXIA (PERDA DE APETITE)" },
-  { value: "Calafrios", label: "CALAFRIOS" },
-  { value: "CongestaoNasal", label: "CONGESTAO NASAL" },
-  { value: "Conjuntivite", label: "CONJUNTIVITE" },
-  { value: "Contusao", label: "CONTUSAO" },
-  { value: "Convulsoes", label: "CONVULSOES" },
-  { value: "Coriza", label: "CORIZA" },
-  { value: "CorteIncisaoPerfuracao", label: "CORTE/INCISAO/PERFURACAO" },
-  { value: "Desidratacao", label: "DESIDRATACAO" },
-  {
-    value: "Desorientacao",
-    label: "DESORIENTACAO (CONFUSAO MENTAL) OU SONOLENCIA",
-  },
-  { value: "Diarreia", label: "DIARREIA" },
-  { value: "Dispneia", label: "DIFICULDADE DE RESPIRAR (DISPNEIA)" },
-  { value: "DorAbdominal", label: "DOR ABDOMINAL" },
-  { value: "Artralgia", label: "DOR ARTICULAR (ARTRALGIA)" },
-  { value: "Cefaleia", label: "DOR DE CABECA (CEFALEIA)" },
-  { value: "DorDeGarganta", label: "DOR DE GARGANTA E OU FARINGITE" },
-  { value: "DorPanturrilha", label: "DOR NA PANTURRILLHA" },
-  { value: "Mialgia", label: "DOR NO CORPO (MUSCULAR /MIALGIA)" },
-  { value: "DorRetroorbital", label: "DOR RETROORBITAL" },
-  { value: "EntorseLuxacao", label: "ENTORSE/LUXACAO" },
-  { value: "LesaoArmaFogo", label: "LESAO DECORRENTE DE ARMA DE FOGO" },
-  {
-    value: "EstresseTermico",
-    label: "ESTRESSE TERMICO / INSOLACAO / QUEIMADURAS SOLAR",
-  },
-  { value: "EventoDiabetes", label: "EVENTO RELACIONADO A DIABETES" },
-  { value: "EventoHipertensao", label: "EVENTO RELACIONADO A HIPERTENSAO" },
-  { value: "ReacaoAlergica", label: "EVENTO RELACIONADO A REACAO ALERGICA" },
-  { value: "Exantema", label: "EXANTEMA" },
-  { value: "ExposicaoRiscoIST", label: "EXPOSICAO AO RISCO DE IST" },
-  { value: "Febre", label: "FEBRE" },
-  { value: "Fratura", label: "FRATURA" },
-  { value: "Hematoma", label: "HEMATOMA" },
-  {
-    value: "HemorragiaCutanea",
-    label: "HEMORRAGIA CUTANEA (PETEQUIAS OU PROVA DO LACO)",
-  },
-  { value: "HemorragiaOutrosLocais", label: "HEMORRAGIA EM OUTROS LOCAIS" },
-  { value: "HemorragiaMucosa", label: "HEMORRAGIA MUCOSA (NASAL OU GENGIVAL)" },
-  { value: "Ictericia", label: "ICTERICIA" },
-  { value: "IntoxicacaoMedicamento", label: "INTOXICACAO (MEDICAMENTO)" },
-  { value: "IntoxicacaoAlimentar", label: "INTOXICACAO ALIMENTAR" },
-  {
-    value: "IntoxicacaoAlcool",
-    label: "INTOXICACAO OU USO EXCESSIVO POR ALCOOL",
-  },
-  {
-    value: "IntoxicacaoOutras",
-    label: "INTOXICACAO OUTRAS (VENENOS/AGROTOXICOS/SANEANTES)",
-  },
-  {
-    value: "IntoxicacaoDrogasIlicitas",
-    label: "INTOXICACAO POR USO DE DROGAS ILICITAS",
-  },
-  {
-    value: "LesaoViolenciaDomestica",
-    label: "LESAO DECORRENTE DE VIOLENCIA DOMESTICA",
-  },
-  {
-    value: "LesaoAutomovel",
-    label: "LESAO DECORRENTE DE ACIDENTE COM AUTOMOVEL",
-  },
-  {
-    value: "LesaoBicicleta",
-    label: "LESAO DECORRENTE DE ACIDENTE COM BICICLETA",
-  },
-  { value: "LesaoMoto", label: "LESAO DECORRENTE DE ACIDENTE COM MOTO" },
-  {
-    value: "LesaoMultiplasVitimas",
-    label: "LESAO DECORRENTE DE ACIDENTE COM MULTIPLAS VITIMAS",
-  },
-  {
-    value: "LesaoOutroVeiculoMotor",
-    label: "LESAO DECORRENTE DE ACIDENTE COM OUTRO VEICULO",
-  },
-  {
-    value: "LesaoAglomeracao",
-    label: "LESAO DECORRENTE DE AGLOMERACAO (PISOTEAMENTO)",
-  },
-  { value: "LesaoArmaBranca", label: "LESAO DECORRENTE DE ARMA BRANCA" },
-  { value: "LesaoDesastre", label: "LESAO DECORRENTE DE DESASTRE" },
-  { value: "LesaoQueda", label: "LESAO DECORRENTE DE QUEDA" },
-  {
-    value: "LesaoViolenciaFisica",
-    label: "LESAO DECORRENTE DE VIOLENCIA FISICA INTERPESSOAL",
-  },
-  {
-    value: "LesaoAssedioSexual",
-    label: "LESAO DECORRENTE DE VIOLENCIA/ASSEDIO SEXUAL",
-  },
-  { value: "LesaoNegligencia", label: "LESAO DECORRENTE NEGLIGENCIA/ABANDONO" },
-  {
-    value: "LesaoAutoprovocada",
-    label: "LESAO POR VIOLENCIA FISICA AUTOPROVOCADA",
-  },
-  { value: "LesoesCutaneasMpox", label: "LESOES CUTANEAS - MPOX" },
-  { value: "LesoesCutaneas", label: "LESOES CUTANEAS/VESICULAS/BOLHAS" },
-  { value: "Linfadenopatia", label: "LINFADENOPATIA" },
-  { value: "Nauseas", label: "NAUSEAS E OU VOMITO" },
-  {
-    value: "Paralisia",
-    label: "PARALISIA OU FLACIDEZ MUSCULAR (MEMBROS INFERIORES)",
-  },
-  { value: "Petequias", label: "PETÉQUIAS" },
-  {
-    value: "PrescricaoPEP",
-    label: "PRESCRICAO DE PROFILAXIA POS-EXPOSICAO (PEP)",
-  },
-  { value: "Prurido", label: "PRURIDO/COCEIRA" },
-  { value: "Queimadura", label: "QUEIMADURA" },
-  { value: "RigidezNuca", label: "RIGIDEZ DE NUCA" },
-  { value: "Taquicardia", label: "TAQUICARDIA" },
-  { value: "Tontura", label: "TONTURA/DESMAIO" },
-  { value: "Tosse", label: "TOSSE" },
-  {
-    value: "VitimaOutrosDiscriminacao",
-    label: "VITIMA DE OUTROS TIPOS DE DISCRIMINACAO",
-  },
-  { value: "VitimaRacismo", label: "VITIMA DE RACISMO" },
-  {
-    value: "VitimaViolenciaPsicologica",
-    label: "VITIMA DE VIOLENCIA PSICOLOGICA",
-  },
-];
-
-const hipoteseDiagnosticaOptions = [
-  { value: "AgulhadaIntencional", label: "Agulhada intencional" },
-  {
-    value: "EstresseTermico",
-    label: "Estresse térmico / insolação / queimaduras solares",
-  },
-  {
-    value: "EventoAdversoCremeParaCabelo",
-    label: "Evento adverso pós uso de creme para o cabelo",
-  },
-  { value: "EventoDiabetes", label: "Evento relacionado a diabetes" },
-  { value: "EventoHipertensao", label: "Evento relacionado a hipertensão" },
-  { value: "ReacaoAlergica", label: "Evento relacionado a reação alérgica" },
-  { value: "ExposicaoRiscoIST", label: "Exposição ao risco de IST" },
-  { value: "IntoxicacaoAlimentar", label: "Intoxicação alimentar" },
-  { value: "IntoxicacaoMedicamento", label: "Intoxicação (medicamento)" },
-  // Lista reduzida para brevidade
-];
-
-const tipoTraumaOptions = [
-  { value: "Afogamento", label: "AFOGAMENTO" },
-  { value: "AgressaoFisica", label: "AGRESSÃO FÍSICA" },
-  { value: "AgressaoSexual", label: "AGRESSÃO SEXUAL" },
-  { value: "AtaqueAnimalInseto", label: "ATAQUE ANIMAL/INSETO" },
-  { value: "Contusao", label: "CONTUSAO" },
-  { value: "CorteIncisaoPerfuracao", label: "CORTE/INCISAO/PERFURACAO" },
-  { value: "Distensao", label: "DISTENSÃO" },
-  { value: "EntorseLuxacao", label: "ENTORSE/LUXACAO" },
-  { value: "Escoriacao", label: "ESCORIAÇÃO" },
-  { value: "EscalpelamentoMotor", label: "ESCALPELAMENTO POR MOTOR" },
-  { value: "Esmagamento", label: "ESMAGAMENTO" },
-  { value: "Fratura", label: "FRATURA" },
-  { value: "LesaoArmaFogo", label: "LESAO DECORRENTE DE ARMA DE FOGO" },
-  {
-    value: "LesaoViolenciaDomestica",
-    label: "LESAO DECORRENTE DE VIOLENCIA DOMESTICA",
-  },
-  {
-    value: "LesaoAutomovel",
-    label: "LESAO DECORRENTE DE ACIDENTE COM AUTOMOVEL",
-  },
-  {
-    value: "LesaoEmbarcacao",
-    label: "LESAO DECORRENTE DE ACIDENTE COM EMBARCAÇÃO",
-  },
-  {
-    value: "LesaoBicicleta",
-    label: "LESAO DECORRENTE DE ACIDENTE COM BICICLETA",
-  },
-  { value: "LesaoMoto", label: "LESAO DECORRENTE DE ACIDENTE COM MOTO" },
-  {
-    value: "LesaoMultiplasVitimas",
-    label: "LESAO DECORRENTE DE ACIDENTE COM MULTIPLAS VITIMAS",
-  },
-  {
-    value: "LesaoOutroVeiculoMotor",
-    label: "LESAO DECORRENTE DE ACIDENTE COM OUTRO VEICULO",
-  },
-  {
-    value: "LesaoAglomeracao",
-    label: "LESAO DECORRENTE DE AGLOMERACAO (PISOTEAMENTO)",
-  },
-  { value: "LesaoArmaBranca", label: "LESAO DECORRENTE DE ARMA BRANCA" },
-  { value: "LesaoDesastre", label: "LESAO DECORRENTE DE DESASTRE" },
-  { value: "LesaoQueda", label: "LESAO DECORRENTE DE QUEDA" },
-  {
-    value: "LesaoViolenciaFisica",
-    label: "LESAO DECORRENTE DE VIOLENCIA FISICA INTERPESSOAL",
-  },
-  {
-    value: "LesaoAssedioSexual",
-    label: "LESAO DECORRENTE DE VIOLENCIA/ASSEDIO SEXUAL",
-  },
-  { value: "LesaoNegligencia", label: "LESAO DECORRENTE NEGLIGENCIA/ABANDONO" },
-  {
-    value: "LesaoAutoprovocada",
-    label: "LESAO POR VIOLENCIA FISICA AUTOPROVOCADA",
-  },
-  { value: "Pisoteamento", label: "PISOTEAMENTO" },
-  { value: "Queda", label: "QUEDA" },
-  { value: "QueimaduraLesaoCutanea", label: "QUEIMADURA/ LESÃO CUTÂNEA" },
-  { value: "Tontura", label: "TONTURA/DESMAIO" },
-  {
-    value: "VitimaOutrosDiscriminacao",
-    label: "VITIMA DE OUTROS TIPOS DE DISCRIMINACAO",
-  },
-  { value: "VitimaRacismo", label: "VITIMA DE RACISMO" },
-  {
-    value: "VitimaViolenciaPsicologica",
-    label: "VITIMA DE VIOLENCIA PSICOLOGICA",
-  },
-];
-
-const tipoEncerramentoOptions = [
-  { value: "1", label: "Atendido e liberado" },
-  { value: "2", label: "Internação" },
-  { value: "3", label: "Observação" },
-  { value: "4", label: "Transferido" },
-  { value: "5", label: "Óbito" },
-];
-
-const hospitalBelemOptions = [
-  "Hospital Metropolitano de Urgência e Emergência",
-  "Hospital de Pronto Socorro Municipal Mário Pinotti",
-  "Hospital Universitário João de Barros Barreto",
-  "Hospital Regional Dr. Abelardo Santos",
-  "Hospital Geral de Belém",
-  "Hospital Porto Dias",
-  "Hospital Ophir Loyola",
-  "Hospital de Clínicas Gaspar Vianna",
-  "Hospital da Santa Casa de Misericórdia do Pará",
-  "Hospital Galileu",
-];
-
-const localEncaminhamentoObitoOptions = [
-  { value: "1", label: "SVO" },
-  { value: "2", label: "IML" },
-  { value: "3", label: "Ignorado" },
-];
-
 const NotificationForm = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const isEditMode = !!id;
+
+  // Estado para controle de erros
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Estados para as opções de dropdown vindas da API
+  const [eventoOptions, setEventoOptions] = useState<EventoOption[]>([]);
+  const [publicoOptions, setPublicoOptions] = useState<PublicoOption[]>([]);
+  const [paisOptions, setPaisOptions] = useState<PaisOption[]>([]);
+  const [estadoOptions, setEstadoOptions] = useState<EstadoOption[]>([]);
+  const [municipioOptions, setMunicipioOptions] = useState<MunicipioOption[]>(
+    []
+  );
+  const [bairroOptions, setBairroOptions] = useState<BairroOption[]>([]);
+  const [generoOptions, setGeneroOptions] = useState<GeneroOption[]>([]);
+  const [racaOptions, setRacaOptions] = useState<RacaOption[]>([]);
+  const [escolaridadeOptions, setEscolaridadeOptions] = useState<
+    EscolaridadeOption[]
+  >([]);
+  const [atendimentoOptions, setAtendimentoOptions] = useState<
+    AtendimentoOption[]
+  >([]);
+  const [sintomaOptions, setSintomaOptions] = useState<SintomaOption[]>([]);
+  const [hipoteseDiagOptions, setHipoteseDiagOptions] = useState<
+    HipoteseDiagOption[]
+  >([]);
+  const [traumaOptions, setTraumaOptions] = useState<TraumaOption[]>([]);
+  const [encerramentoOptions, setEncerramentoOptions] = useState<
+    EncerramentoOption[]
+  >([]);
+  const [estabelecimentoOptions, setEstabelecimentoOptions] = useState<
+    EstabelecimentoOption[]
+  >([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [loadingEstabelecimentos, setLoadingEstabelecimentos] =
+    useState<boolean>(false);
+
+  // Initial form data
   const initialFormData: FormData = {
-    // Seção 1: Dados Gerais
     evento: "",
     publicoAtendido: "",
 
@@ -743,18 +216,319 @@ const NotificationForm = () => {
   const [searchSintomas, setSearchSintomas] = useState("");
   const [searchTrauma, setSearchTrauma] = useState("");
   const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
+
+  // Estado para armazenar o objeto paciente completo selecionado
+  const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(
+    null
+  );
+
+  // Estado para controlar seções expandidas
+  const [expandedSections, setExpandedSections] = useState<
+    Record<string, boolean>
+  >({
+    dadosGerais: true,
+    procedencia: true,
+    identificacao: true,
+    atendimento: true,
+    unidadeNotificadora: true,
+    encerramento: true,
+  });
+  const loadEstabelecimentos = useCallback(async () => {
+    try {
+      setLoadingEstabelecimentos(true);
+      const estabelecimentos =
+        await NotificacaoService.getEstabelecimentoOptions();
+      setEstabelecimentoOptions(estabelecimentos);
+    } catch (error) {
+      console.error("Erro ao carregar estabelecimentos:", error);
+      toast.error("Erro ao carregar lista de estabelecimentos");
+    } finally {
+      setLoadingEstabelecimentos(false);
+    }
+  }, []);
+
+  const loadAllOptions = async () => {
+    setIsLoading(true);
+    try {
+      const [
+        eventos,
+        publicos,
+        paises,
+        estados,
+        municipios,
+        generos,
+        racas,
+        escolaridades,
+        atendimentos,
+        sintomas,
+        hipoteseDiag,
+        traumas,
+        encerramentos,
+        estabelecimentos,
+      ] = await Promise.all([
+        NotificacaoService.getEventoOptions(),
+        NotificacaoService.getPublicoOptions(),
+        NotificacaoService.getPaisOptions(),
+        NotificacaoService.getEstadoOptions(),
+        NotificacaoService.getMunicipioOptions(),
+        NotificacaoService.getGeneroOptions(),
+        NotificacaoService.getRacaOptions(),
+        NotificacaoService.getEscolaridadeOptions(),
+        NotificacaoService.getAtendimentoOptions(),
+        NotificacaoService.getSintomaOptions(),
+        NotificacaoService.getHipoteseDiagOptions(),
+        NotificacaoService.getTraumaOptions(),
+        NotificacaoService.getEncerramentoOptions(),
+        NotificacaoService.getEstabelecimentoOptions(),
+      ]);
+
+      setEventoOptions(eventos);
+      
+      // Ordenar as opções de público atendido na ordem específica
+      const ordenacaoPublico = ["Participante", "Trabalhador", "Autoridade", "Outro"];
+      const publicosOrdenados = [...publicos].sort((a, b) => {
+        // Encontrar a posição de cada item no array de ordenação
+        const posA = ordenacaoPublico.findIndex(item => 
+          a.descricao.toLowerCase().includes(item.toLowerCase()));
+        const posB = ordenacaoPublico.findIndex(item => 
+          b.descricao.toLowerCase().includes(item.toLowerCase()));
+        
+        // Se ambos forem encontrados, ordenar pela posição
+        if (posA !== -1 && posB !== -1) {
+          return posA - posB;
+        }
+        
+        // Se apenas um for encontrado, colocá-lo primeiro
+        if (posA !== -1) return -1;
+        if (posB !== -1) return 1;
+        
+        // Se nenhum for encontrado, manter a ordem original
+        return 0;
+      });
+      
+      setPublicoOptions(publicosOrdenados);
+
+      // Ordenar as opções de identidade de gênero na ordem específica
+      const ordenacaoGenero = [
+        "Mulher cisgênero", 
+        "Homem cisgênero", 
+        "Mulher transgênero", 
+        "Homem transgênero", 
+        "Travesti", 
+        "Não binário", 
+        "Não se aplica", 
+        "Ignorado"
+      ];
+      
+      const generosOrdenados = [...generos].sort((a, b) => {
+        // Encontrar a posição de cada item no array de ordenação
+        const posA = ordenacaoGenero.findIndex(item => 
+          a.descricao.toLowerCase().includes(item.toLowerCase()));
+        const posB = ordenacaoGenero.findIndex(item => 
+          b.descricao.toLowerCase().includes(item.toLowerCase()));
+        
+        // Se ambos forem encontrados, ordenar pela posição
+        if (posA !== -1 && posB !== -1) {
+          return posA - posB;
+        }
+        
+        // Se apenas um for encontrado, colocá-lo primeiro
+        if (posA !== -1) return -1;
+        if (posB !== -1) return 1;
+        
+        // Se nenhum for encontrado, manter a ordem original
+        return 0;
+      });
+      
+      setGeneroOptions(generosOrdenados);
+
+      // Ordenar as opções de tipo de atendimento na ordem específica
+      const ordenacaoAtendimento = [
+        "Clínico", 
+        "Trauma", 
+        "Surto", 
+        "Múltiplas vítimas", 
+        "Incidente QBRN"
+      ];
+      
+      const atendimentosOrdenados = [...atendimentos].sort((a, b) => {
+        // Encontrar a posição de cada item no array de ordenação
+        const posA = ordenacaoAtendimento.findIndex(item => 
+          a.descricao.toLowerCase().includes(item.toLowerCase()));
+        const posB = ordenacaoAtendimento.findIndex(item => 
+          b.descricao.toLowerCase().includes(item.toLowerCase()));
+        
+        // Se ambos forem encontrados, ordenar pela posição
+        if (posA !== -1 && posB !== -1) {
+          return posA - posB;
+        }
+        
+        // Se apenas um for encontrado, colocá-lo primeiro
+        if (posA !== -1) return -1;
+        if (posB !== -1) return 1;
+        
+        // Se nenhum for encontrado, manter a ordem original
+        return 0;
+      });
+      
+      setAtendimentoOptions(atendimentosOrdenados);
+      
+      // Ordenar as opções de escolaridade na ordem específica
+      const ordenacaoEscolaridade = [
+        "Analfabeto",
+        "Ensino fundamental incompleto",
+        "Ensino fundamental completo",
+        "Ensino médio incompleto",
+        "Ensino médio completo",
+        "Ensino superior incompleto",
+        "Ensino superior completo",
+        "Pós-graduado",
+        "Ignorado",
+        "Não se aplica"
+      ];
+      
+      const escolaridadesOrdenadas = [...escolaridades].sort((a, b) => {
+        // Encontrar a posição de cada item no array de ordenação
+        const posA = ordenacaoEscolaridade.findIndex(item => 
+          a.descricao.toLowerCase().includes(item.toLowerCase()));
+        const posB = ordenacaoEscolaridade.findIndex(item => 
+          b.descricao.toLowerCase().includes(item.toLowerCase()));
+        
+        // Se ambos forem encontrados, ordenar pela posição
+        if (posA !== -1 && posB !== -1) {
+          return posA - posB;
+        }
+        
+        // Se apenas um for encontrado, colocá-lo primeiro
+        if (posA !== -1) return -1;
+        if (posB !== -1) return 1;
+        
+        // Se nenhum for encontrado, manter a ordem original
+        return 0;
+      });
+      
+      setEscolaridadeOptions(escolaridadesOrdenadas);
+      
+      setPaisOptions(paises);
+      setEstadoOptions(estados);
+      setMunicipioOptions(municipios);
+      // Não precisamos mais carregar opções de bairro já que é texto livre
+      // setBairroOptions(bairros);
+      setRacaOptions(racas);
+      setSintomaOptions(sintomas);
+      setHipoteseDiagOptions(hipoteseDiag);
+      setTraumaOptions(traumas);
+      setEstabelecimentoOptions(estabelecimentos);
+      setEncerramentoOptions(encerramentos);
+    } catch (error) {
+      console.error("Erro ao carregar opções:", error);
+      toast.error("Erro ao carregar opções para o formulário");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Função para carregar municipios com base no estado selecionado
+  const loadMunicipiosByEstado = async (estadoId: string) => {
+    if (!estadoId) return;
+
+    try {
+      const municipios = await NotificacaoService.getMunicipioOptions(
+        Number(estadoId)
+      );
+      setMunicipioOptions(municipios);
+    } catch (error) {
+      console.error("Erro ao carregar municípios:", error);
+      toast.error("Erro ao carregar lista de municípios");
+    }
+  };
+
+  // Função para carregar dados de uma notificação existente
+  const loadNotificacao = async (notificacaoId: string) => {
+    setIsLoading(true);
+    try {
+      const response = await NotificacaoService.getById(Number(notificacaoId));
+
+      // Usar o adapter para formatar os dados
+      const formattedData = response;
+      if (formattedData) {
+        setFormData(formattedData);
+
+        // Carregar municipios se tivermos um estado selecionado
+        if (formattedData.uf) {
+          loadMunicipiosByEstado(formattedData.uf);
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao carregar notificação:", error);
+      toast.error("Erro ao carregar dados da notificação");
+      navigate(-1); // Voltar se ocorrer erro
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Hook para carregar dados iniciais
+  useEffect(() => {
+    loadAllOptions();
+
+    // Carregar dados da notificação se estiver em modo de edição
+    if (isEditMode && id) {
+      loadNotificacao(id);
+    }
+  }, [isEditMode, id]);
+
+  // Hook para atualizar municípios quando o estado muda
+  useEffect(() => {
+    if (formData.uf) {
+      loadMunicipiosByEstado(formData.uf);
+    }
+  }, [formData.uf]);
+
+  // Funções de formatação para inputs
+  const formatCPF = (cpf: string) => {
+    // Remove caracteres não numéricos e limita a 11 dígitos
+    return cpf.replace(/\D/g, "").slice(0, 11);
+  };
+
+  const formatContato = (contato: string) => {
+    // Remove caracteres não numéricos e limita a 15 dígitos
+    return contato.replace(/\D/g, "").slice(0, 15);
+  };
+
+  // Handler específico para CPF
+  const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formattedCPF = formatCPF(e.target.value);
+
+    setFormData((prev) => ({
+      ...prev,
+      cpf: formattedCPF,
+    }));
+
+    if (errors.cpf) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors.cpf;
+        return newErrors;
+      });
+    }
+  };
+
   // Interface para o paciente esperado por ModalBuscaPaciente
   const handleSelectPaciente = (paciente: Paciente) => {
     // Log detalhado para debug
     console.log("Paciente recebido:", JSON.stringify(paciente, null, 2));
-    
+
+    // Armazenar o paciente completo para uso posterior
+    setSelectedPaciente(paciente);
+
     // Formatar a data corretamente
     let formattedDate = "";
     if (paciente.data_nascimento) {
       const date = new Date(paciente.data_nascimento);
-      formattedDate = date.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+      formattedDate = date.toISOString().split("T")[0]; // Formato YYYY-MM-DD
     }
-    
+
     // Verificar explicitamente se o nome_mae não é um CPF
     let nomeDaMae = paciente.nome_mae || "";
     // Se o nome_mae parece ser um CPF (apenas dígitos e tem entre 11 a 14 caracteres)
@@ -762,12 +536,13 @@ const NotificationForm = () => {
       nomeDaMae = ""; // Limpar se parecer um CPF
       console.warn("Nome da mãe parece ser um CPF, limpando o campo");
     }
-    
+
     // Mapeamento de escolaridade com correção específica
     let escolaridadeValue = "";
-    if (paciente.escolaridade_idescolaridade !== null && 
-        paciente.escolaridade_idescolaridade !== undefined) {
-      
+    if (
+      paciente.escolaridade_idescolaridade !== null &&
+      paciente.escolaridade_idescolaridade !== undefined
+    ) {
       // AQUI ESTÁ A MUDANÇA: Mapear especificamente o valor 7 para 8
       if (paciente.escolaridade_idescolaridade === 7) {
         escolaridadeValue = "8"; // Corrigindo o mapeamento específico
@@ -776,17 +551,20 @@ const NotificationForm = () => {
         escolaridadeValue = String(paciente.escolaridade_idescolaridade);
         console.log("Escolaridade mantida:", escolaridadeValue);
       }
-    } else if (paciente.tipo_escolaridade && paciente.tipo_escolaridade.idtipo_escolaridade) {
+    } else if (
+      paciente.tipo_escolaridade &&
+      paciente.tipo_escolaridade.idescolaridade
+    ) {
       // Aplicar o mesmo mapeamento para a estrutura alternativa
-      if (paciente.tipo_escolaridade.idtipo_escolaridade === 7) {
+      if (paciente.tipo_escolaridade.idescolaridade === 7) {
         escolaridadeValue = "8";
         console.log("Escolaridade alternativa mapeada: 7 -> 8");
       } else {
-        escolaridadeValue = String(paciente.tipo_escolaridade.idtipo_escolaridade);
+        escolaridadeValue = String(paciente.tipo_escolaridade.idescolaridade);
         console.log("Escolaridade alternativa mantida:", escolaridadeValue);
       }
     }
-    
+
     setFormData((prev) => ({
       ...prev,
       paciente: paciente.nome || "",
@@ -794,14 +572,15 @@ const NotificationForm = () => {
       dataNascimento: formattedDate,
       idade: calculateAge(paciente.data_nascimento).toString(),
       cpf: paciente.cpf || "",
-      identidadeGenero: paciente.tipo_genero_idtipo_genero.toString(),
-      raca: paciente.tipo_raca_idtipo_raca.toString(),
+      identidadeGenero: paciente.tipo_genero_idtipo_genero?.toString() || "",
+      raca: paciente.tipo_raca_idtipo_raca?.toString() || "",
       escolaridade: escolaridadeValue,
-      profissao: paciente.cbo_idcbo 
-        ? paciente.cbo_idcbo.toString() 
-        : "",
-      contatoTelefonico: paciente.contato || ""
+      profissao: paciente.cbo_idcbo ? paciente.cbo_idcbo.toString() : "",
+      contatoTelefonico: paciente.contato || "",
     }));
+
+    // Limpar erros ao selecionar um paciente
+    setErrors({});
   };
 
   // Função auxiliar para calcular idade
@@ -824,18 +603,8 @@ const NotificationForm = () => {
     return age;
   };
 
-  // Estado para controlar seções expandidas
-  const [expandedSections, setExpandedSections] = useState({
-    dadosGerais: true,
-    procedencia: true,
-    identificacao: true,
-    atendimento: true,
-    unidadeNotificadora: true,
-    encerramento: true,
-  });
-
   // Função para alternar a expansão de uma seção
-  const toggleSection = (section: keyof typeof expandedSections) => {
+  const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({
       ...prev,
       [section]: !prev[section],
@@ -878,7 +647,36 @@ const NotificationForm = () => {
     >
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    // Adicionar console.log para depuração do tipoAtendimento
+    if (name === "tipoAtendimento") {
+      console.log("No handleChange - tipoAtendimento:", value, typeof value);
+    }
+
+    // Limpar erro quando o campo for alterado
+    if (errors[name]) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
+
+    // Processamento específico para certos campos
+    let newValue = value;
+
+    // Limitar nome do paciente e nome da mãe a 100 caracteres
+    if (name === "paciente" && value.length > 100) {
+      newValue = value.slice(0, 100);
+    } else if (name === "nomeMae" && value.length > 100) {
+      newValue = value.slice(0, 100);
+    }
+    // Limitar contato telefônico a 15 caracteres numéricos
+    else if (name === "contatoTelefonico") {
+      newValue = formatContato(value);
+    }
+
+    setFormData((prev) => ({ ...prev, [name]: newValue }));
   };
 
   // Handler para clicar fora do dropdown de profissão
@@ -910,38 +708,206 @@ const NotificationForm = () => {
     });
   };
 
+  // Validar campos da seção de identificação do indivíduo
+  const validateIdentificacao = () => {
+    const newErrors: Record<string, string> = {};
+
+    // Validar nome do paciente
+    if (!formData.paciente.trim()) {
+      newErrors.paciente = "O campo nome é obrigatório";
+    } else if (formData.paciente.length > 100) {
+      newErrors.paciente = "O campo nome deve ter no máximo 100 caracteres";
+    }
+
+    // Validar nome da mãe (opcional)
+    if (formData.nomeMae && formData.nomeMae.length > 100) {
+      newErrors.nomeMae =
+        "O campo nome da mãe deve ter no máximo 100 caracteres";
+    }
+
+    // Validar data de nascimento
+    if (!formData.dataNascimento) {
+      newErrors.dataNascimento = "O campo data de nascimento é obrigatório";
+    } else {
+      const date = new Date(formData.dataNascimento);
+      if (isNaN(date.getTime())) {
+        newErrors.dataNascimento = "Data de nascimento inválida";
+      }
+    }
+
+    // Validar CPF (opcional)
+    if (formData.cpf && formData.cpf.length > 0 && formData.cpf.length !== 11) {
+      newErrors.cpf = "CPF deve ter 11 dígitos";
+    }
+
+    // Validar identidade de gênero
+    if (!formData.identidadeGenero) {
+      newErrors.identidadeGenero = "O campo identidade de gênero é obrigatório";
+    }
+
+    // Validar gestante para gênero feminino
+    if (formData.identidadeGenero === "1") {
+      // Supondo que "1" é o código para feminino
+      const idade = calculateAge(formData.dataNascimento);
+      if (idade >= 10 && !formData.gestante) {
+        newErrors.gestante = "Informe se a paciente está gestante";
+      }
+    }
+
+    // Validar raça
+    if (!formData.raca) {
+      newErrors.raca = "O campo raça é obrigatório";
+    }
+
+    // Validar contato telefônico (opcional)
+    if (formData.contatoTelefonico && formData.contatoTelefonico.length > 15) {
+      newErrors.contatoTelefonico =
+        "O contato deve ter no máximo 15 caracteres";
+    }
+
+    // Atualizar o estado com os erros encontrados
+    setErrors((prev) => ({ ...prev, ...newErrors }));
+
+    // Verificar se há algum erro
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Validar formulário antes de enviar
+  const validateForm = (): boolean => {
+    // Verificar campos obrigatórios
+    const requiredFields: Array<{ field: keyof FormData; label: string }> = [
+      { field: "evento", label: "Evento" },
+      { field: "publicoAtendido", label: "Público Atendido" },
+      { field: "residenteBelem", label: "Residente em Belém" },
+      { field: "paciente", label: "Paciente" },
+      { field: "tipoAtendimento", label: "Tipo de Atendimento" },
+      { field: "dataOcorrencia", label: "Data da Ocorrência" },
+      { field: "tipoEncerramento", label: "Tipo de Encerramento" },
+    ];
+
+    const missingFields = requiredFields.filter(
+      (item) => !formData[item.field]
+    );
+
+    if (missingFields.length > 0) {
+      const missingLabels = missingFields.map((item) => item.label).join(", ");
+      toast.error(`Preencha os campos obrigatórios: ${missingLabels}`);
+      return false;
+    }
+
+    // Validar campos de identificação do indivíduo
+    const identificacaoValida = validateIdentificacao();
+    if (!identificacaoValida) {
+      // Expandir a seção de identificação para mostrar os erros
+      setExpandedSections((prev) => ({
+        ...prev,
+        identificacao: true,
+      }));
+      toast.error("Existem erros nos campos de identificação do indivíduo");
+      return false;
+    }
+
+    // Validações específicas por tipo de atendimento
+    if (
+      formData.tipoAtendimento === "1" &&
+      formData.sinaisESintomas.length === 0
+    ) {
+      toast.error("Selecione pelo menos um sinal ou sintoma");
+      return false;
+    }
+
+    if (formData.tipoAtendimento === "2" && formData.tipoTrauma.length === 0) {
+      toast.error("Selecione pelo menos um tipo de trauma");
+      return false;
+    }
+
+    return true;
+  };
+
   // Handlers para ações do formulário
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Formulário enviado:", formData);
+
+    if (!validateForm()) return;
+
+    setIsSaving(true);
+    try {
+      let result;
+
+      if (isEditMode && id) {
+        // Atualizar notificação existente
+        result = await NotificacaoService.update(Number(id), formData);
+        toast.success("Notificação atualizada com sucesso");
+      } else {
+        // Criar nova notificação
+        result = await NotificacaoService.create(formData);
+        toast.success("Notificação criada com sucesso");
+      }
+
+      // Redirecionar para página de listagem ou detalhes
+      navigate("/notificacoes");
+    } catch (error: any) {
+      console.error("Erro ao salvar notificação:", error);
+      toast.error(error.message || "Erro ao salvar notificação");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleReset = () => {
     setFormData(initialFormData);
+    setSelectedPaciente(null);
+    setErrors({});
   };
 
-  // Update the handleExport function to use the export utilities
+  // Prepare export options object with all loaded dropdown options
+  const getExportOptions = () => {
+    return {
+      eventoOptions,
+      publicoOptions,
+      paisOptions,
+      estadoOptions,
+      municipioOptions,
+      bairroOptions,
+      generoOptions,
+      racaOptions,
+      escolaridadeOptions,
+      atendimentoOptions,
+      sintomaOptions,
+      hipoteseDiagOptions,
+      traumaOptions,
+      estabelecimentoOptions,
+      encerramentoOptions,
+    };
+  };
+
+  // Update the handleExport function to use the export utilities with options
   const handleExport = (format: string) => {
     try {
+      // Get all the dynamic options
+      const exportOptions = getExportOptions();
+
       switch (format) {
         case "Excel":
-          exportToExcel(formData);
+          exportToExcel(formData, exportOptions);
           break;
         case "Word":
-          exportToWord(formData);
+          exportToWord(formData, exportOptions);
           break;
         case "CSV":
-          exportToCSV(formData);
+          exportToCSV(formData, exportOptions);
           break;
         case "PDF":
-          exportToPDF(formData);
+          exportToPDF(formData, exportOptions);
           break;
         default:
           alert(`Export to ${format} is not supported`);
       }
     } catch (error) {
       console.error(`Error exporting to ${format}:`, error);
-      alert(`Failed to export to ${format}. Please try again.`);
+      toast.error(
+        `Falha ao exportar para ${format}. Por favor, tente novamente.`
+      );
     }
 
     setIsExportDropdownOpen(false);
@@ -950,6 +916,37 @@ const NotificationForm = () => {
   const toggleExportDropdown = () => {
     setIsExportDropdownOpen(!isExportDropdownOpen);
   };
+
+  // Função auxiliar para verificar o tipo de atendimento pelo texto
+  const isTipoAtendimento = (tipo: string) => {
+    // Se não há tipo selecionado, retorna falso
+    if (!formData.tipoAtendimento) return false;
+    
+    // Encontra a opção selecionada
+    const selectedOption = atendimentoOptions.find(
+      option => option.idtipo_atendimento.toString() === formData.tipoAtendimento.toString()
+    );
+    
+    // Verifica se a descrição contém o texto procurado
+    return selectedOption?.descricao.toLowerCase().includes(tipo.toLowerCase()) || false;
+  };
+
+  // Tela de carregamento
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader className="h-10 w-10 text-blue-500 animate-spin mx-auto mb-4" />
+          <p className="text-lg text-gray-600">Carregando formulário...</p>
+        </div>
+      </div>
+    );
+  }
+
+  console.log("Estado atual - tipoAtendimento:", formData.tipoAtendimento, typeof formData.tipoAtendimento);
+  console.log("Condição Clínico seria:", formData.tipoAtendimento === "1");
+  console.log("Condição Trauma seria:", formData.tipoAtendimento === "2");
+  console.log("Condição Outros seria:", ["3", "4", "5"].includes(formData.tipoAtendimento));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -966,7 +963,7 @@ const NotificationForm = () => {
             </button>
             <ClipboardList className="h-8 w-8" />
             <h1 className="text-2xl font-semibold">
-              Formulário de Notificação
+              {isEditMode ? "Editar Notificação" : "Nova Notificação"}
             </h1>
           </div>
 
@@ -1022,10 +1019,15 @@ const NotificationForm = () => {
             <button
               type="submit"
               form="notification-form"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+              disabled={isSaving}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              <Save className="h-4 w-4" />
-              Salvar
+              {isSaving ? (
+                <Loader className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              {isSaving ? "Salvando..." : "Salvar"}
             </button>
             <button
               type="button"
@@ -1076,8 +1078,11 @@ const NotificationForm = () => {
                     >
                       <option value="">Selecione</option>
                       {eventoOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
+                        <option
+                          key={option.idtipo_evento}
+                          value={option.idtipo_evento}
+                        >
+                          {option.descricao}
                         </option>
                       ))}
                     </select>
@@ -1095,9 +1100,12 @@ const NotificationForm = () => {
                       onChange={handleChange}
                     >
                       <option value="">Selecione</option>
-                      {publicoAtendidoOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
+                      {publicoOptions.map((option) => (
+                        <option
+                          key={option.idtipo_publico}
+                          value={option.idtipo_publico}
+                        >
+                          {option.descricao}
                         </option>
                       ))}
                     </select>
@@ -1130,11 +1138,9 @@ const NotificationForm = () => {
                       onChange={handleChange}
                     >
                       <option value="">Selecione</option>
-                      {residenteBelemOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
+                      <option value="1">SIM</option>
+                      <option value="2">NÃO</option>
+                      <option value="3">ESTRANGEIRO</option>
                     </select>
                   </div>
 
@@ -1144,59 +1150,59 @@ const NotificationForm = () => {
                       <label className="block mb-2 font-medium text-gray-700">
                         Bairro
                       </label>
-                      <select
-                        name="bairro"
-                        className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
-                        value={formData.bairro}
-                        onChange={handleChange}
-                      >
-                        <option value="">Selecione</option>
-                        {bairrosBelemOptions.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          name="bairro"
+                          placeholder="Digite o nome do bairro"
+                          className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                          value={formData.bairro}
+                          onChange={handleChange}
+                        />
+                      </div>
                     </div>
                   )}
 
                   {formData.residenteBelem === "2" && (
                     <>
                       <div>
-                        <label className="block mb-2 font-medium text-gray-700">
-                          UF
-                        </label>
-                        <select
+                        {/* UF - use os nomes de campos que correspondem à sua estrutura de banco de dados */}
+                        <LocationInput
                           name="uf"
-                          className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                          label="UF"
                           value={formData.uf}
-                          onChange={handleChange}
-                        >
-                          <option value="">Selecione</option>
-                          {estadoOptions.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(value) => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              uf: value,
+                              municipio: "",
+                            }));
+                          }}
+                          placeholder="Selecione a UF"
+                          disabled={false}
+                          apiEndpoint="api/tipo-estado"
+                          idField="idtipo_estado"
+                          debug={true} // Habilitar logs para depuração
+                        />
                       </div>
                       <div>
-                        <label className="block mb-2 font-medium text-gray-700">
-                          Município
-                        </label>
-                        <select
+                        <LocationInput
                           name="municipio"
-                          className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                          label="Município"
                           value={formData.municipio}
-                          onChange={handleChange}
-                        >
-                          <option value="">Selecione</option>
-                          {municipioParaOptions.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(value) => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              municipio: value,
+                            }));
+                          }}
+                          placeholder="Selecione o município"
+                          disabled={!formData.uf}
+                          apiEndpoint="api/tipo-municipio"
+                          idField="idtipo_municipio"
+                          parentValue={formData.uf}
+                          debug={true} // Habilitar logs para depuração
+                        />
                       </div>
                     </>
                   )}
@@ -1204,22 +1210,22 @@ const NotificationForm = () => {
                   {formData.residenteBelem === "3" && (
                     <>
                       <div>
-                        <label className="block mb-2 font-medium text-gray-700">
-                          País de Procedência
-                        </label>
-                        <select
+                        <LocationInput
                           name="paisProcedencia"
-                          className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                          label="País de Procedência"
                           value={formData.paisProcedencia}
-                          onChange={handleChange}
-                        >
-                          <option value="">Selecione</option>
-                          {paisOptions.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(value) => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              paisProcedencia: value,
+                            }));
+                          }}
+                          placeholder="Selecione o país"
+                          disabled={false}
+                          apiEndpoint="api/tipo-pais"
+                          idField="idtipo_pais"
+                          debug={true}
+                        />
                       </div>
                       <div>
                         <label className="block mb-2 font-medium text-gray-700">
@@ -1228,7 +1234,7 @@ const NotificationForm = () => {
                         <input
                           type="text"
                           name="localHospedagem"
-                          placeholder="Informe o local de hospedagem"
+                          placeholder="Informe o nome do local de hospedagem"
                           className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
                           value={formData.localHospedagem}
                           onChange={handleChange}
@@ -1236,7 +1242,7 @@ const NotificationForm = () => {
                       </div>
                       <div>
                         <label className="block mb-2 font-medium text-gray-700">
-                          Contato do Local
+                          Contato do Local da Hospedagem
                         </label>
                         <input
                           type="text"
@@ -1275,9 +1281,12 @@ const NotificationForm = () => {
                         type="text"
                         name="paciente"
                         placeholder="Nome do paciente"
-                        className="flex-1 p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                        className={`flex-1 p-3 border ${
+                          errors.paciente ? "border-red-500" : "border-gray-200"
+                        } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                         value={formData.paciente}
                         onChange={handleChange}
+                        maxLength={100}
                       />
                       <button
                         type="button"
@@ -1288,6 +1297,11 @@ const NotificationForm = () => {
                         <span>Pesquisar</span>
                       </button>
                     </div>
+                    {errors.paciente && (
+                      <p className="mt-1 text-sm text-red-500">
+                        {errors.paciente}
+                      </p>
+                    )}
                   </div>
 
                   {/* Nome da Mãe */}
@@ -1299,10 +1313,18 @@ const NotificationForm = () => {
                       type="text"
                       name="nomeMae"
                       placeholder="Nome da mãe do paciente"
-                      className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                      className={`w-full p-3 border ${
+                        errors.nomeMae ? "border-red-500" : "border-gray-200"
+                      } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.nomeMae}
                       onChange={handleChange}
+                      maxLength={100}
                     />
+                    {errors.nomeMae && (
+                      <p className="mt-1 text-sm text-red-500">
+                        {errors.nomeMae}
+                      </p>
+                    )}
                   </div>
 
                   {/* Data de Nascimento */}
@@ -1313,10 +1335,19 @@ const NotificationForm = () => {
                     <input
                       type="date"
                       name="dataNascimento"
-                      className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                      className={`w-full p-3 border ${
+                        errors.dataNascimento
+                          ? "border-red-500"
+                          : "border-gray-200"
+                      } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.dataNascimento}
                       onChange={handleChange}
                     />
+                    {errors.dataNascimento && (
+                      <p className="mt-1 text-sm text-red-500">
+                        {errors.dataNascimento}
+                      </p>
+                    )}
                   </div>
 
                   {/* Idade */}
@@ -1330,7 +1361,19 @@ const NotificationForm = () => {
                       placeholder="Digite a idade"
                       className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
                       value={formData.idade}
-                      onChange={handleChange}
+                      onChange={(e) => {
+                        // Limitar a 3 caracteres
+                        const value = e.target.value;
+                        if (value.length <= 3) {
+                          handleChange({
+                            target: {
+                              name: "idade",
+                              value: value,
+                            },
+                          } as React.ChangeEvent<HTMLInputElement>);
+                        }
+                      }}
+                      maxLength={3}
                     />
                   </div>
 
@@ -1342,11 +1385,17 @@ const NotificationForm = () => {
                     <input
                       type="text"
                       name="cpf"
-                      placeholder="XXX.XXX.XXX-XX"
-                      className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                      placeholder="Apenas números"
+                      className={`w-full p-3 border ${
+                        errors.cpf ? "border-red-500" : "border-gray-200"
+                      } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.cpf}
-                      onChange={handleChange}
+                      onChange={handleCPFChange}
+                      maxLength={11}
                     />
+                    {errors.cpf && (
+                      <p className="mt-1 text-sm text-red-500">{errors.cpf}</p>
+                    )}
                   </div>
 
                   {/* Identidade de Gênero */}
@@ -1356,17 +1405,29 @@ const NotificationForm = () => {
                     </label>
                     <select
                       name="identidadeGenero"
-                      className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                      className={`w-full p-3 border ${
+                        errors.identidadeGenero
+                          ? "border-red-500"
+                          : "border-gray-200"
+                      } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.identidadeGenero}
                       onChange={handleChange}
                     >
                       <option value="">Selecione</option>
-                      {identidadeGeneroOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
+                      {generoOptions.map((option) => (
+                        <option
+                          key={option.idtipo_genero}
+                          value={option.idtipo_genero}
+                        >
+                          {option.descricao}
                         </option>
                       ))}
                     </select>
+                    {errors.identidadeGenero && (
+                      <p className="mt-1 text-sm text-red-500">
+                        {errors.identidadeGenero}
+                      </p>
+                    )}
                   </div>
 
                   {/* Gestante (condicional) */}
@@ -1377,17 +1438,21 @@ const NotificationForm = () => {
                       </label>
                       <select
                         name="gestante"
-                        className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                        className={`w-full p-3 border ${
+                          errors.gestante ? "border-red-500" : "border-gray-200"
+                        } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                         value={formData.gestante}
                         onChange={handleChange}
                       >
                         <option value="">Selecione</option>
-                        {gestanteOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
+                        <option value="1">Sim</option>
+                        <option value="2">Não</option>
                       </select>
+                      {errors.gestante && (
+                        <p className="mt-1 text-sm text-red-500">
+                          {errors.gestante}
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -1398,17 +1463,25 @@ const NotificationForm = () => {
                     </label>
                     <select
                       name="raca"
-                      className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                      className={`w-full p-3 border ${
+                        errors.raca ? "border-red-500" : "border-gray-200"
+                      } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.raca}
                       onChange={handleChange}
                     >
                       <option value="">Selecione</option>
                       {racaOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
+                        <option
+                          key={option.idtipo_raca}
+                          value={option.idtipo_raca}
+                        >
+                          {option.descricao}
                         </option>
                       ))}
                     </select>
+                    {errors.raca && (
+                      <p className="mt-1 text-sm text-red-500">{errors.raca}</p>
+                    )}
                   </div>
 
                   {/* Escolaridade */}
@@ -1424,8 +1497,11 @@ const NotificationForm = () => {
                     >
                       <option value="">Selecione</option>
                       {escolaridadeOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
+                        <option
+                          key={option.idtipo_escolaridade}
+                          value={option.idtipo_escolaridade}
+                        >
+                          {option.descricao}
                         </option>
                       ))}
                     </select>
@@ -1452,15 +1528,35 @@ const NotificationForm = () => {
                     <PhoneInput
                       name="contatoTelefonico"
                       value={formData.contatoTelefonico}
-                      onChange={(value) =>
+                      onChange={(value) => {
+                        // Extrair apenas o número de telefone (sem o código do país)
+                        const phoneNumberOnly = value.replace(/^\+\d+\s/, "");
+
+                        // Aplicar formatação para limitar a 15 dígitos numéricos
+                        const formattedValue = formatContato(phoneNumberOnly);
+
                         setFormData((prev) => ({
                           ...prev,
-                          contatoTelefonico: value,
-                        }))
-                      }
+                          contatoTelefonico: formattedValue,
+                        }));
+
+                        // Limpar erro se existir
+                        if (errors.contatoTelefonico) {
+                          setErrors((prev) => {
+                            const newErrors = { ...prev };
+                            delete newErrors.contatoTelefonico;
+                            return newErrors;
+                          });
+                        }
+                      }}
                       label="Contato Telefônico"
                       placeholder="Digite o número de telefone"
                     />
+                    {errors.contatoTelefonico && (
+                      <p className="mt-1 text-sm text-red-500">
+                        {errors.contatoTelefonico}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1487,19 +1583,29 @@ const NotificationForm = () => {
                       name="tipoAtendimento"
                       className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
                       value={formData.tipoAtendimento}
-                      onChange={handleChange}
+                      onChange={(e) => {
+                        console.log(
+                          "Tipo de atendimento selecionado:",
+                          e.target.value,
+                          typeof e.target.value
+                        );
+                        handleChange(e);
+                      }}
                     >
                       <option value="">Selecione</option>
-                      {tipoAtendimentoOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
+                      {atendimentoOptions.map((option) => (
+                        <option
+                          key={option.idtipo_atendimento}
+                          value={option.idtipo_atendimento}
+                        >
+                          {option.descricao}
                         </option>
                       ))}
                     </select>
                   </div>
 
                   {/* Campos condicionais baseados no tipo de atendimento */}
-                  {formData.tipoAtendimento === "1" && ( // Clínico
+                  {isTipoAtendimento('clínico') && (
                     <>
                       {/* Sinais e Sintomas com campo de pesquisa */}
                       <div className="md:col-span-2">
@@ -1530,41 +1636,41 @@ const NotificationForm = () => {
                           </div>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
-                          {sinaisESintomasOptions
+                          {sintomaOptions
                             .filter(
                               (option) =>
                                 searchSintomas === "" ||
-                                option.label
+                                option.descricao
                                   .toLowerCase()
                                   .includes(searchSintomas.toLowerCase())
                             )
                             .map((option) => (
                               <label
-                                key={option.value}
+                                key={option.idtipo_sintoma}
                                 className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer transition-all duration-200 hover:border-blue-400 hover:bg-blue-50/50 group"
                               >
                                 <input
                                   type="checkbox"
                                   checked={formData.sinaisESintomas.includes(
-                                    option.value
+                                    option.idtipo_sintoma.toString()
                                   )}
                                   onChange={() =>
                                     handleCheckboxChange(
                                       "sinaisESintomas",
-                                      option.value
+                                      option.idtipo_sintoma.toString()
                                     )
                                   }
                                   className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 transition-all duration-200 group-hover:border-blue-400"
                                 />
                                 <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors duration-200">
-                                  {option.label}
+                                  {option.descricao}
                                 </span>
                               </label>
                             ))}
                         </div>
                         {searchSintomas &&
-                          sinaisESintomasOptions.filter((option) =>
-                            option.label
+                          sintomaOptions.filter((option) =>
+                            option.descricao
                               .toLowerCase()
                               .includes(searchSintomas.toLowerCase())
                           ).length === 0 && (
@@ -1609,26 +1715,26 @@ const NotificationForm = () => {
                           Hipótese Diagnóstica
                         </label>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                          {hipoteseDiagnosticaOptions.map((option) => (
+                          {hipoteseDiagOptions.map((option) => (
                             <label
-                              key={option.value}
+                              key={option.idtipo_hipotese_diag}
                               className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer transition-all duration-200 hover:border-blue-400 hover:bg-blue-50/50 group"
                             >
                               <input
                                 type="checkbox"
                                 checked={formData.hipoteseDiagnostica.includes(
-                                  option.value
+                                  option.idtipo_hipotese_diag.toString()
                                 )}
                                 onChange={() =>
                                   handleCheckboxChange(
                                     "hipoteseDiagnostica",
-                                    option.value
+                                    option.idtipo_hipotese_diag.toString()
                                   )
                                 }
                                 className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 transition-all duration-200 group-hover:border-blue-400"
                               />
                               <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors duration-200">
-                                {option.label}
+                                {option.descricao}
                               </span>
                             </label>
                           ))}
@@ -1652,7 +1758,7 @@ const NotificationForm = () => {
                     </>
                   )}
 
-                  {formData.tipoAtendimento === "2" && ( // Trauma
+                  {isTipoAtendimento('trauma') && (
                     <>
                       {/* Tipo de Trauma com campo de pesquisa */}
                       <div className="md:col-span-2">
@@ -1681,41 +1787,41 @@ const NotificationForm = () => {
                           </div>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
-                          {tipoTraumaOptions
+                          {traumaOptions
                             .filter(
                               (option) =>
                                 searchTrauma === "" ||
-                                option.label
+                                option.descricao
                                   .toLowerCase()
                                   .includes(searchTrauma.toLowerCase())
                             )
                             .map((option) => (
                               <label
-                                key={option.value}
+                                key={option.idtipo_trauma}
                                 className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer transition-all duration-200 hover:border-blue-400 hover:bg-blue-50/50 group"
                               >
                                 <input
                                   type="checkbox"
                                   checked={formData.tipoTrauma.includes(
-                                    option.value
+                                    option.idtipo_trauma.toString()
                                   )}
                                   onChange={() =>
                                     handleCheckboxChange(
                                       "tipoTrauma",
-                                      option.value
+                                      option.idtipo_trauma.toString()
                                     )
                                   }
                                   className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 transition-all duration-200 group-hover:border-blue-400"
                                 />
                                 <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors duration-200">
-                                  {option.label}
+                                  {option.descricao}
                                 </span>
                               </label>
                             ))}
                         </div>
                         {searchTrauma &&
-                          tipoTraumaOptions.filter((option) =>
-                            option.label
+                          traumaOptions.filter((option) =>
+                            option.descricao
                               .toLowerCase()
                               .includes(searchTrauma.toLowerCase())
                           ).length === 0 && (
@@ -1756,8 +1862,8 @@ const NotificationForm = () => {
                     </>
                   )}
 
-                  {/* Surto, Múltiplas vítimas, QBRN */}
-                  {["3", "4", "5"].includes(formData.tipoAtendimento) && (
+                  {(isTipoAtendimento('surto') || isTipoAtendimento('múltiplas') || 
+                    isTipoAtendimento('qbrn') || isTipoAtendimento('incidente')) && (
                     <>
                       {/* Relacionado a Surto ou Agregado de Indivíduos */}
                       <div>
@@ -1791,6 +1897,22 @@ const NotificationForm = () => {
                         />
                       </div>
                     </>
+                  )}
+
+                  {/* Data da Ocorrência (obrigatória para todos os tipos exceto Trauma) */}
+                  {!isTipoAtendimento('trauma') && (
+                    <div>
+                      <label className="block mb-2 font-medium text-gray-700">
+                        Data da Ocorrência
+                      </label>
+                      <input
+                        type="date"
+                        name="dataOcorrencia"
+                        className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                        value={formData.dataOcorrencia}
+                        onChange={handleChange}
+                      />
+                    </div>
                   )}
                 </div>
               </div>
@@ -1909,9 +2031,12 @@ const NotificationForm = () => {
                       onChange={handleChange}
                     >
                       <option value="">Selecione</option>
-                      {tipoEncerramentoOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
+                      {encerramentoOptions.map((option) => (
+                        <option
+                          key={option.idtipo_encerramento}
+                          value={option.idtipo_encerramento}
+                        >
+                          {option.descricao}
                         </option>
                       ))}
                     </select>
@@ -1930,9 +2055,12 @@ const NotificationForm = () => {
                         onChange={handleChange}
                       >
                         <option value="">Selecione</option>
-                        {hospitalBelemOptions.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
+                        {estabelecimentoOptions.map((option) => (
+                          <option
+                            key={option.idestabelecimento}
+                            value={option.idestabelecimento}
+                          >
+                            {option.descricao}
                           </option>
                         ))}
                       </select>
@@ -1952,11 +2080,9 @@ const NotificationForm = () => {
                         onChange={handleChange}
                       >
                         <option value="">Selecione</option>
-                        {localEncaminhamentoObitoOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
+                        <option value="1">SVO</option>
+                        <option value="2">IML</option>
+                        <option value="3">Ignorado</option>
                       </select>
                     </div>
                   )}
@@ -1965,15 +2091,7 @@ const NotificationForm = () => {
             )}
           </div>
 
-          {/* Botões de Ação (Inferiores) */}
-          <div className="flex justify-center gap-4 mt-8 pb-8">
-            <button
-              type="submit"
-              className="inline-flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              <Save className="h-4 w-4" />
-              Salvar
-            </button>
+          <div className="mt-6 flex space-x-4">
             <button
               type="button"
               onClick={handleReset}

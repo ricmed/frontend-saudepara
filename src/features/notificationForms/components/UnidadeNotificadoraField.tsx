@@ -78,7 +78,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
       console.log('Buscando estabelecimentos com params:', params);
       
       // URL completa da API - AJUSTE PARA SEU AMBIENTE
-      const apiUrl = 'https://marcioreis.uk:5544/api/estabelecimentos';
+      const apiUrl = 'http://localhost:3000/api/estabelecimentos';
       
       try {
         // Fazer a requisição à API com a URL completa

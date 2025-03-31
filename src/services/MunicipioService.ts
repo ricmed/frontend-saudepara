@@ -41,10 +41,19 @@ const handleApiError = (error: AxiosError<APIError>) => {
 export const MunicipioService = {
   getAll: async (): Promise<Municipio[]> => {
     try {
-      const response = await axios.get<Municipio[]>(API_URL);
-      return response.data;
+      const response = await axios.get<PaginatedResponse>(API_URL);
+      // Verificar se a resposta tem a estrutura esperada
+      if (response.data && response.data.data && Array.isArray(response.data.data)) {
+        return response.data.data;
+      } else if (Array.isArray(response.data)) {
+        return response.data;
+      } else {
+        console.error('Resposta inesperada do servidor:', response.data);
+        return [];
+      }
     } catch (error) {
-      return handleApiError(error as AxiosError<APIError>);
+      console.error('Erro em getAll:', error);
+      return [];
     }
   },
 
@@ -66,41 +75,34 @@ export const MunicipioService = {
       }
 
       if (estadoId && estadoId > 0) {
+        console.log('Filtro por estado:', estadoId);
         params.tipo_estado_idtipo_estado = estadoId;
       }
 
+      console.log(`Fazendo requisição para ${API_URL}${endpoint} com params:`, params);
+      
       const response = await axios.get<PaginatedResponse>(`${API_URL}${endpoint}`, { params });
       
-      return {
-        data: response.data.data.map(municipio => ({
-          ...municipio,
-          estado_descricao: municipio.tipo_estado?.descricao
-        })),
-        pagination: response.data.pagination
-      };
-    } catch (error) {
-      return handleApiError(error as AxiosError<APIError>);
-    }
-  },
-
-  getByEstado: async (estadoId: number): Promise<Municipio[]> => {
-    try {
-      if (isNaN(estadoId) || estadoId <= 0) {
-        throw new Error('ID do estado inválido');
-      }
+      console.log('Resposta do servidor:', response.status);
+      console.log('Total de itens retornados:', response.data.data?.length || 0);
       
-      const response = await axios.get<PaginatedResponse>(`${API_URL}`, {
-        params: {
-          tipo_estado_idtipo_estado: estadoId
-        }
-      });
-      return response.data.data;
+      return response.data;
     } catch (error) {
-      return handleApiError(error as AxiosError<APIError>);
+      console.error('Erro ao buscar municípios:', error);
+      // Retornar um objeto vazio mas válido em caso de erro
+      return {
+        data: [],
+        pagination: {
+          total: 0,
+          pages: 0,
+          currentPage: page,
+          perPage: itemsPerPage
+        }
+      };
     }
   },
 
-  getById: async (id: number): Promise<Municipio> => {
+  getById: async (id: number): Promise<Municipio | null> => {
     try {
       if (isNaN(id) || id <= 0) {
         throw new Error('ID inválido');
@@ -109,7 +111,8 @@ export const MunicipioService = {
       const response = await axios.get<Municipio>(`${API_URL}/${id}`);
       return response.data;
     } catch (error) {
-      return handleApiError(error as AxiosError<APIError>);
+      console.error(`Erro ao buscar município ${id}:`, error);
+      return null;
     }
   },
 
@@ -117,7 +120,7 @@ export const MunicipioService = {
     codigo: string, 
     descricao: string,
     estadoId: number
-  ): Promise<Municipio> => {
+  ): Promise<Municipio | null> => {
     try {
       if (codigo.length > 10) {
         throw new Error('Código deve ter no máximo 10 caracteres');
@@ -137,7 +140,8 @@ export const MunicipioService = {
 
       return response.data;
     } catch (error) {
-      return handleApiError(error as AxiosError<APIError>);
+      console.error('Erro ao criar município:', error);
+      return null;
     }
   },
 
@@ -146,7 +150,7 @@ export const MunicipioService = {
     codigo: string,
     descricao: string,
     estadoId: number
-  ): Promise<void> => {
+  ): Promise<boolean> => {
     try {
       if (isNaN(id) || id <= 0) {
         throw new Error('ID inválido');
@@ -166,64 +170,25 @@ export const MunicipioService = {
         descricao: descricao.trim(),
         tipo_estado_idtipo_estado: estadoId
       });
+      
+      return true;
     } catch (error) {
-      return handleApiError(error as AxiosError<APIError>);
+      console.error(`Erro ao atualizar município ${id}:`, error);
+      return false;
     }
   },
 
-  delete: async (id: number): Promise<void> => {
+  delete: async (id: number): Promise<boolean> => {
     try {
       if (isNaN(id) || id <= 0) {
         throw new Error('ID inválido');
       }
       
       await axios.delete(`${API_URL}/${id}`);
+      return true;
     } catch (error) {
-      return handleApiError(error as AxiosError<APIError>);
-    }
-  },
-
-  checkExisting: async (
-    codigo: string,
-    estadoId: number,
-    excludeId?: number
-  ): Promise<boolean> => {
-    try {
-      const params = {
-        codigo: codigo.trim(),
-        tipo_estado_idtipo_estado: estadoId,
-        excludeId
-      };
-      
-      const response = await axios.get<{ exists: boolean }>(
-        `${API_URL}/check-existing`,
-        { params }
-      );
-      return response.data.exists;
-    } catch (error) {
-      return handleApiError(error as AxiosError<APIError>);
-    }
-  },
-
-  checkExistingDescricao: async (
-    descricao: string,
-    estadoId: number,
-    excludeId?: number
-  ): Promise<boolean> => {
-    try {
-      const params = {
-        descricao: descricao.trim(),
-        tipo_estado_idtipo_estado: estadoId,
-        excludeId
-      };
-      
-      const response = await axios.get<{ exists: boolean }>(
-        `${API_URL}/check-existing`,
-        { params }
-      );
-      return response.data.exists;
-    } catch (error) {
-      return handleApiError(error as AxiosError<APIError>);
+      console.error(`Erro ao excluir município ${id}:`, error);
+      return false;
     }
   }
 };

@@ -34,6 +34,7 @@
     "react-flags-select": "^2.2.3",
     "react-google-charts": "^5.2.1",
     "react-router-dom": "^6.21.1",
+    "react-toastify": "^11.0.5",
     "recharts": "^2.15.1",
     "uuid": "^11.0.3",
     "xlsx": "^0.18.5"

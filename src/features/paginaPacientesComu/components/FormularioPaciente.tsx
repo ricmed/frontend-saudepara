@@ -75,7 +75,6 @@ const FormularioPaciente = ({
 
   // Estados para dados do formulário e comportamento
   const [formData, setFormData] = useState<PacienteFormData>(initialFormData);
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const [apiError, setApiError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
@@ -88,6 +87,7 @@ const FormularioPaciente = ({
   );
   const [isLoadingOptions, setIsLoadingOptions] = useState<boolean>(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Estado para controlar seções expandidas
   const [expandedSections, setExpandedSections] = useState({
