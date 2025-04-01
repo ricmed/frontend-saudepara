@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { Search, X } from "lucide-react";
 import axios from 'axios';
 
-// Interface para opções de localização (estados, municípios)
+// Interface for location options (states, municipalities)
 interface LocationOption {
   [key: string]: any;
   descricao: string;
@@ -41,6 +41,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
   debug = false
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [displayValue, setDisplayValue] = useState<string>("");
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [selectedOption, setSelectedOption] = useState<LocationOption | null>(null);
@@ -50,13 +51,13 @@ const LocationInput: React.FC<LocationInputProps> = ({
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   const dropdownRef = useRef<HTMLDivElement>(null);
   
-  // Referência para o controlador de aborto de fetch
+  // Reference for fetch abort controller
   const abortControllerRef = useRef<AbortController | null>(null);
   
-  // Referência para a última UF selecionada (quando este componente é um município)
+  // Reference for the last parent value (when this component is a municipality)
   const lastParentValueRef = useRef<string>("");
   
-  // Salvar a posição de scroll atual
+  // Save current scroll position
   const scrollPositionRef = useRef({ x: 0, y: 0 });
 
   const debugLog = (message: string, data?: any) => {
@@ -69,73 +70,74 @@ const LocationInput: React.FC<LocationInputProps> = ({
     }
   };
 
-  // Inicializar opções locais com as opções fornecidas via props
+  // Initialize local options with provided props
   useEffect(() => {
     if (options && options.length > 0) {
-      debugLog(`Usando ${options.length} opções recebidas via props`);
+      debugLog(`Using ${options.length} options received via props`);
       setLocalOptions(options);
     }
   }, [options]);
 
-  // Resetar seleção quando o valor pai muda (para municípios)
+  // Reset selection when parent value changes (for municipalities)
   useEffect(() => {
     if (name === "municipio" && parentValue !== undefined) {
-      debugLog(`Valor do estado mudou para: ${parentValue}`);
+      debugLog(`State value changed to: ${parentValue}`);
       
-      // Evitar processamento se o valor do pai não mudou
+      // Avoid processing if parent value hasn't changed
       if (lastParentValueRef.current === parentValue) {
-        debugLog(`Ignorando atualização - valor do estado não mudou`);
+        debugLog(`Ignoring update - state value hasn't changed`);
         return;
       }
       
-      // Atualizar a referência para o novo valor do pai
+      // Update reference to new parent value
       lastParentValueRef.current = parentValue;
       
-      // Limpar seleção atual
+      // Clear current selection
       if (value) {
         onChange("");
       }
       
       setSelectedOption(null);
       setSearchQuery("");
+      setDisplayValue("");
       setIsManuallyEditing(false);
       
-      // Limpar opções imediatamente
+      // Clear options immediately
       setLocalOptions([]);
       
-      // Apenas buscar municípios se tiver um estado selecionado
+      // Only fetch municipalities if a state is selected
       if (parentValue) {
         fetchMunicipiosByEstado(parentValue);
       }
     }
   }, [parentValue, name]);
 
-  // Função melhorada para buscar municípios
+  // Improved function to fetch municipalities
   const fetchMunicipiosByEstado = async (estadoId: string) => {
     if (!apiEndpoint || !estadoId) return;
     
-    // Cancelar qualquer requisição anterior
+    // Cancel any previous request
     if (abortControllerRef.current) {
-      debugLog(`Cancelando requisição anterior de municípios`);
+      debugLog(`Canceling previous municipality request`);
       abortControllerRef.current.abort();
     }
     
-    // Criar novo controlador para esta requisição
+    // Create new controller for this request
     abortControllerRef.current = new AbortController();
     const { signal } = abortControllerRef.current;
     
     setIsLoading(true);
-    debugLog(`Buscando municípios para o estado ID: ${estadoId}`);
+    debugLog(`Fetching municipalities for state ID: ${estadoId}`);
     
     const server = import.meta.env.VITE_API_SERVER || "";
     const port = import.meta.env.VITE_API_PORT || "";
     const baseUrl = server && port ? `${server}:${port}/` : "/";
     
-    // Usar apenas o formato de parâmetro primário e mais provável de funcionar
+    // Use only the primary parameter format most likely to work
     const url = `${baseUrl}${apiEndpoint}?tipo_estado_idtipo_estado=${estadoId}&limit=1000`;
     
     try {
-      debugLog(`Fazendo requisição para: ${url}`);
+      debugLog(`Making request to: ${url}`);
       const response = await axios.get(url, { signal });
       
       let municipios: LocationOption[] = [];
@@ -146,35 +148,35 @@ const LocationInput: React.FC<LocationInputProps> = ({
         municipios = response.data.data;
       }
       
-      debugLog(`Sucesso! Encontrados ${municipios.length} municípios`);
+      debugLog(`Success! Found ${municipios.length} municipalities`);
       
-      // Verificar se ainda estamos processando o mesmo estado
+      // Check if we're still processing the same state
       if (lastParentValueRef.current === estadoId) {
         setLocalOptions(municipios);
       } else {
-        debugLog(`Estado mudou durante a requisição, descartando resultados`);
+        debugLog(`State changed during request, discarding results`);
       }
     } catch (error: unknown) {
-      // Não mostrar erro se foi cancelamento
+      // Don't show error if it was a cancellation
       if (
         error && 
         typeof error === 'object' && 
         'name' in error && 
         (error.name === 'CanceledError' || error.name === 'AbortError')
       ) {
-        debugLog(`Requisição cancelada para estado ${estadoId}`);
+        debugLog(`Request canceled for state ${estadoId}`);
         return;
       }
       
       const errorMessage = error && typeof error === 'object' && 'message' in error 
         ? error.message as string
-        : 'Erro desconhecido';
-      debugLog(`Erro ao buscar municípios: ${errorMessage}`, error);
+        : 'Unknown error';
+      debugLog(`Error fetching municipalities: ${errorMessage}`, error);
       
-      // Tentar com outro formato de parâmetro apenas em caso de falha
+      // Try with alternative parameter format only in case of failure
       try {
         const fallbackUrl = `${baseUrl}${apiEndpoint}?estado_id=${estadoId}&limit=1000`;
-        debugLog(`Tentando formato alternativo: ${fallbackUrl}`);
+        debugLog(`Trying alternative format: ${fallbackUrl}`);
         
         const fallbackResponse = await axios.get(fallbackUrl, { signal });
         let fallbackMunicipios: LocationOption[] = [];
@@ -186,50 +188,50 @@ const LocationInput: React.FC<LocationInputProps> = ({
         }
         
         if (fallbackMunicipios.length > 0) {
-          debugLog(`Fallback bem-sucedido! Encontrados ${fallbackMunicipios.length} municípios`);
+          debugLog(`Fallback successful! Found ${fallbackMunicipios.length} municipalities`);
           setLocalOptions(fallbackMunicipios);
         } else {
-          debugLog(`Fallback falhou - nenhum município encontrado`);
+          debugLog(`Fallback failed - no municipalities found`);
           setLocalOptions([]);
         }
       } catch (fallbackError: unknown) {
         const errorMessage = fallbackError && typeof fallbackError === 'object' && 'message' in fallbackError 
           ? fallbackError.message as string
-          : 'Erro desconhecido';
-        debugLog(`Erro no fallback: ${errorMessage}`);
+          : 'Unknown error';
+        debugLog(`Fallback error: ${errorMessage}`);
         setLocalOptions([]);
       }
     } finally {
-      // Só atualizar estado se ainda estivermos processando o mesmo estado
+      // Only update state if we're still processing the same state
       if (lastParentValueRef.current === estadoId) {
         setIsLoading(false);
       }
     }
   };
 
-  // Fetch todas as opções (para países ou UFs)
+  // Fetch all options (for countries or states)
   const fetchOptions = async (query = "") => {
     if (!apiEndpoint) return;
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
     
-    // Criar novo controlador para esta requisição
+    // Create new controller for this request
     abortControllerRef.current = new AbortController();
     const { signal } = abortControllerRef.current;
     
     setIsLoading(true);
-    debugLog(`Buscando todas as opções de ${name}`);
+    debugLog(`Fetching all ${name} options`);
     
     const server = import.meta.env.VITE_API_SERVER || "";
     const port = import.meta.env.VITE_API_PORT || "";
     const baseUrl = server && port ? `${server}:${port}/` : "/";
     
     try {
-      // Para busca com termo ou busca geral
+      // For search with term or general search
       let url = `${baseUrl}${apiEndpoint}`;
       
-      // Usar um limite maior para países para garantir que todos sejam carregados
+      // Use a larger limit for countries to ensure all are loaded
       const limit = name === "paisProcedencia" ? 300 : 1000;
       
       if (query) {
@@ -238,7 +240,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
         url += `?limit=${limit}`;
       }
       
-      debugLog(`Fazendo requisição: ${url}`);
+      debugLog(`Making request: ${url}`);
       
       const response = await axios.get(url, { signal });
       
@@ -250,29 +252,28 @@ const LocationInput: React.FC<LocationInputProps> = ({
         options = response.data.data;
       }
       
-      debugLog(`Recebidos ${options.length} resultados`);
+      debugLog(`Received ${options.length} results`);
       setLocalOptions(options);
     } catch (error: unknown) {
-      // Não mostrar erro se foi cancelamento
+      // Don't show error if it was a cancellation
       if (
         error && 
         typeof error === 'object' && 
         'name' in error && 
         (error.name === 'CanceledError' || error.name === 'AbortError')
       ) {
-        debugLog(`Requisição cancelada`);
+        debugLog(`Request canceled`);
         return;
       }
       
-      debugLog('Erro ao buscar opções', error);
+      debugLog('Error fetching options', error);
       setLocalOptions([]);
     } finally {
       setIsLoading(false);
     }
   };
-  // Buscar item específico por ID
-  // Buscar item específico por ID
-  // Buscar item específico por ID
+
+  // Fetch specific item by ID
   const fetchById = async (id: string) => {
     try {
       setIsLoading(true);
@@ -281,70 +282,71 @@ const LocationInput: React.FC<LocationInputProps> = ({
       const baseUrl = server && port ? `${server}:${port}/` : "/";
       
       const url = `${baseUrl}${apiEndpoint}/${id}`;
-      debugLog(`Buscando item por ID: ${url}`);
+      debugLog(`Fetching item by ID: ${url}`);
       
       const response = await axios.get(url);
       
       if (response.data && response.data[idField]) {
-        debugLog(`Item encontrado: ${response.data.descricao}`);
+        debugLog(`Item found: ${response.data.descricao}`);
         return response.data;
       }
       
-      debugLog(`Item com ID ${id} não encontrado`);
+      debugLog(`Item with ID ${id} not found`);
       return null;
     } catch (error: unknown) {
-      debugLog(`Erro ao buscar por ID: ${id}`, error);
+      debugLog(`Error fetching by ID: ${id}`, error);
       return null;
     } finally {
       setIsLoading(false);
     }
   };
-  // Filtra opções locais baseado no termo de pesquisa
+
+  // Filter local options based on search term
   const filteredOptions = localOptions.filter(option => 
     option.descricao.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Carregar opção selecionada se houver um valor - com verificação de edição manual
+  // Load selected option if there's a value - with manual editing check
   useEffect(() => {
-    // Pular este efeito se o usuário estiver digitando manualmente
+    // Skip this effect if user is typing manually
     if (isManuallyEditing) {
       return;
     }
     
     const loadSelectedOption = async () => {
       if (value) {
-        // Primeiro tentar encontrar nas opções locais
+        // First try to find in local options
         const foundOption = localOptions.find(opt => String(opt[idField]) === String(value));
         
         if (foundOption) {
-          debugLog(`Opção encontrada localmente: ${foundOption.descricao}`);
+          debugLog(`Option found locally: ${foundOption.descricao}`);
           setSelectedOption(foundOption);
-          setSearchQuery(foundOption.descricao);
+          setDisplayValue(foundOption.descricao);
         } else if (apiEndpoint) {
-          // Se não encontrou localmente, buscar na API
-          debugLog(`Buscando opção por ID na API: ${value}`);
+          // If not found locally, fetch from API
+          debugLog(`Fetching option by ID from API: ${value}`);
           const option = await fetchById(value);
           
           if (option) {
             setSelectedOption(option);
-            setSearchQuery(option.descricao);
+            setDisplayValue(option.descricao);
           } else {
-            // Se falhou também na API, limpar seleção
+            // If also failed on API, clear selection
             setSelectedOption(null);
-            setSearchQuery("");
+            setDisplayValue("");
           }
         }
       } else if (value === "") {
-        // Limpar seleção quando o valor é explicitamente vazio
+        // Clear selection when value is explicitly empty
         setSelectedOption(null);
-        setSearchQuery("");
+        setDisplayValue("");
       }
     };
     
     loadSelectedOption();
   }, [value, localOptions, apiEndpoint, idField, isManuallyEditing]);
 
-  // Manipulador para fechar o dropdown quando clicar fora
+  // Handler to close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -355,12 +357,14 @@ const LocationInput: React.FC<LocationInputProps> = ({
       ) {
         setIsDropdownOpen(false);
         
-        // Quando fechar o dropdown sem selecionar, resetar para o valor anterior se necessário
+        // When closing dropdown without selecting, reset to previous value if needed
         if (isManuallyEditing && selectedOption) {
-          setSearchQuery(selectedOption.descricao);
+          setSearchQuery("");
+          setDisplayValue(selectedOption.descricao);
           setIsManuallyEditing(false);
         } else if (isManuallyEditing && !selectedOption) {
           setSearchQuery("");
+          setDisplayValue("");
           setIsManuallyEditing(false);
         }
       }
@@ -372,7 +376,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isDropdownOpen, isManuallyEditing, selectedOption]);
 
-  // Atualiza a posição do dropdown quando aberto
+  // Update dropdown position when opened
   useEffect(() => {
     if (isDropdownOpen && inputRef.current) {
       const rect = inputRef.current.getBoundingClientRect();
@@ -382,14 +386,14 @@ const LocationInput: React.FC<LocationInputProps> = ({
         left: rect.left + window.scrollX
       });
       
-      // Carregar opções quando o dropdown é aberto
+      // Load options when dropdown is opened
       if (name === "municipio") {
-        // Para municípios, precisamos do valor do estado
+        // For municipalities, we need the state value
         if (parentValue && localOptions.length === 0) {
           fetchMunicipiosByEstado(parentValue);
         }
       } else {
-        // Para estados e outros, buscamos todos
+        // For states and others, we fetch all
         if (localOptions.length === 0) {
           fetchOptions(searchQuery);
         }
@@ -397,15 +401,15 @@ const LocationInput: React.FC<LocationInputProps> = ({
     }
   }, [isDropdownOpen, name, parentValue, localOptions.length]);
   
-  // Pesquisa por texto com debounce
+  // Text search with debounce
   useEffect(() => {
     if (isDropdownOpen && searchQuery.length >= 2) {
       const timer = setTimeout(() => {
         if (name === "municipio" && parentValue) {
-          // Para municípios, filtramos localmente as opções já carregadas
-          // Não precisamos fazer outra chamada API
+          // For municipalities, we filter locally already loaded options
+          // We don't need to make another API call
         } else {
-          // Para estados, fazemos uma busca por termo
+          // For states, we do a term search
           fetchOptions(searchQuery);
         }
       }, 300);
@@ -414,7 +418,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
     }
   }, [searchQuery, isDropdownOpen, name, parentValue]);
   
-  // Restaurar a posição de scroll ao abrir o dropdown
+  // Restore scroll position when opening dropdown
   useEffect(() => {
     if (isDropdownOpen) {
       const timeoutId = setTimeout(() => {
@@ -425,7 +429,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
     }
   }, [isDropdownOpen]);
 
-  // Cancelar requisições pendentes ao desmontar o componente
+  // Cancel pending requests when unmounting component
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
@@ -437,25 +441,30 @@ const LocationInput: React.FC<LocationInputProps> = ({
   const handleFocus = () => {
     if (disabled) return;
     
-    // Salvar posição atual de scroll
+    // Save current scroll position
     scrollPositionRef.current = {
       x: window.scrollX,
       y: window.scrollY
     };
     
-    // Abrir dropdown
+    // In search mode, clear the input value but keep the display value
+    if (filterEnabled) {
+      setSearchQuery("");
+    }
+    
+    // Open dropdown
     setIsDropdownOpen(true);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     
-    // Quando o usuário começa a digitar, entramos no modo de edição manual
+    // When user starts typing, enter manual editing mode
     if (!isManuallyEditing) {
       setIsManuallyEditing(true);
-      // Se tínhamos uma seleção antes e agora estamos digitando, remover a seleção
+      // If we had a selection before and now we're typing, remove the selection
       if (selectedOption) {
-        // Informar ao componente pai que o valor foi limpo
+        // Inform parent component that the value was cleared
         onChange("");
         setSelectedOption(null);
       }
@@ -465,35 +474,38 @@ const LocationInput: React.FC<LocationInputProps> = ({
   };
 
   const handleOptionSelect = (option: LocationOption) => {
-    // Salvar posição de scroll atual
+    // Save current scroll position
     const scrollPosition = {
       x: window.scrollX,
       y: window.scrollY
     };
     
-    debugLog(`Opção selecionada: ${option.descricao} (${option[idField]})`);
+    debugLog(`Option selected: ${option.descricao} (${option[idField]})`);
     
     setSelectedOption(option);
-    setSearchQuery(option.descricao);
-    setIsManuallyEditing(false); // Sair do modo de edição manual
+    setDisplayValue(option.descricao);
+    setSearchQuery("");
+    setIsManuallyEditing(false); // Exit manual editing mode
     onChange(option[idField].toString());
     setIsDropdownOpen(false);
     
-    // Pequeno timeout para garantir que o scroll seja restaurado após fechar o dropdown
+    // Small timeout to ensure scroll is restored after closing dropdown
     setTimeout(() => {
       window.scrollTo(scrollPosition.x, scrollPosition.y);
     }, 10);
   };
 
-  const handleClear = () => {
-    debugLog('Seleção limpa');
+  const handleClear = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent opening dropdown when clearing
+    debugLog('Selection cleared');
+    setDisplayValue("");
     setSearchQuery("");
     setSelectedOption(null);
-    setIsManuallyEditing(false); // Sair do modo de edição manual
-    onChange(""); // Garante que retorna uma string vazia
+    setIsManuallyEditing(false); // Exit manual editing mode
+    onChange(""); // Ensure returns an empty string
   };
 
-  // Renderiza o dropdown em um portal fora da hierarquia DOM
+  // Render dropdown in a portal outside DOM hierarchy
   const renderDropdown = () => {
     if (!isDropdownOpen) return null;
     
@@ -581,41 +593,31 @@ const LocationInput: React.FC<LocationInputProps> = ({
           type="text"
           name={name}
           placeholder={isLoading ? "Carregando..." : placeholder}
-          className={`w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none ${className} ${disabled ? 'opacity-60 cursor-not-allowed bg-gray-50' : ''}`}
-          value={searchQuery}
-          onChange={handleInputChange}
+          className={`w-full p-3 pl-3 pr-10 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none ${className} ${disabled ? 'opacity-60 cursor-not-allowed bg-gray-50' : ''}`}
+          value={displayValue}
+          readOnly={true}  // Make the main input read-only
           onFocus={handleFocus}
           onClick={handleFocus}
           disabled={disabled || isLoading}
-          readOnly={!filterEnabled} // Se a filtragem estiver desativada, o input é somente leitura
         />
-        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+        <div className="absolute inset-y-0 right-0 flex items-center pr-3">
           {isLoading ? (
             <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full" />
+          ) : displayValue ? (
+            <button 
+              onClick={handleClear}
+              className="text-gray-400 hover:text-red-500 focus:outline-none"
+              type="button"
+            >
+              <X className="h-4 w-4" />
+            </button>
           ) : (
-            <Search className="h-4 w-4 text-gray-400" />
+            <Search className="h-4 w-4 text-gray-400 pointer-events-none" />
           )}
         </div>
       </div>
       
-      {selectedOption && (
-        <div className="mt-2 flex items-center">
-          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">
-            {selectedOption.descricao}
-          </span>
-          {!disabled && (
-            <button
-              type="button"
-              className="ml-2 text-xs text-red-500 hover:text-red-700"
-              onClick={handleClear}
-            >
-              <X className="h-3 w-3" />
-            </button>
-          )}
-        </div>
-      )}
-      
-      {/* Renderiza o dropdown usando portal */}
+      {/* Render dropdown using portal */}
       {renderDropdown()}
     </div>
   );

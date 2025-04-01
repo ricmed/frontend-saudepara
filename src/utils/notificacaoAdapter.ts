@@ -266,11 +266,9 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
 
   // Converter valores específicos
   const residenteBelem =
-    trimmedData.residenteBelem === "1"
-      ? "S"
-      : trimmedData.residenteBelem === "2"
-      ? "N"
-      : "S";
+  trimmedData.residenteBelem === "1"
+  ? "S"
+  : "N"; // Tanto "2" (não residente BR) quanto "3" (estrangeiro) mapeiam para "N"
 
   const surto = trimmedData.relacionadoSurto === "1" ? "S" : "N";
 
@@ -282,7 +280,9 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
     tipo_publico_idtipo_publico: parseInt(trimmedData.publicoAtendido) || null,
     paciente_idpaciente: pacienteId,
     residente_belem: residenteBelem,
-    tipo_pais_idtipo_pais: trimmedData.residenteBelem === "1" ? 105 : parseInt(trimmedData.paisProcedencia) || null,
+    tipo_pais_idtipo_pais: trimmedData.residenteBelem === "3" 
+  ? parseInt(trimmedData.paisProcedencia) || null 
+  : 105, // Brasil para opções 1 e 2
     tipo_atendimento_idtipo_atendimento: parseInt(trimmedData.tipoAtendimento) || null,
     data_ocorrencia: trimmedData.dataOcorrencia || new Date().toISOString().split("T")[0],
     surto,
@@ -303,12 +303,8 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
     ...(trimmedData.municipio && {
       tipo_municipio_idtipo_municipio: parseInt(trimmedData.municipio) || null,
     }),
-    ...(trimmedData.localHospedagem && {
-      local_hospedagem: trimmedData.localHospedagem,
-    }),
-    ...(trimmedData.contatoLocal && {
-      contato_local_hospedagem: trimmedData.contatoLocal,
-    }),
+    local_hospedagem: trimmedData.localHospedagem || "", 
+contato_local_hospedagem: trimmedData.contatoLocal || "",
     ...(trimmedData.dataInicioSintomas && {
       data_inicio_sintomas: trimmedData.dataInicioSintomas,
     }),
@@ -389,6 +385,9 @@ export const salvarNotificacaoCompleta = async (
   isUpdate: boolean = false,
   notificacaoId?: number
 ): Promise<any> => {
+
+  console.log("Dados antes de salvar - Tipo residente:", formData.residenteBelem, "País:", formData.paisProcedencia);
+
   const server = import.meta.env.VITE_API_SERVER;
   const port = import.meta.env.VITE_API_PORT;
   

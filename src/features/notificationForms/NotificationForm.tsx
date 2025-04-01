@@ -215,36 +215,40 @@ const NotificationForm = () => {
 
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
-  const normalizarDadosResidencia = (data) => {
-    // Clone os dados para não modificar o original diretamente
-    const normalizados = { ...data };
-
-    // Normalizar baseado no tipo de residência
+  const normalizarDadosResidencia = (data: FormData): FormData => {
+  // Clone os dados para não modificar o original diretamente
+  const normalizados = { ...data };
+  
+  // Se é brasileiro
+  if (parseInt(normalizados.paisProcedencia) === 105) {
+    // Residente em Belém
     if (normalizados.residenteBelem === "1") {
-      // Residente em Belém
-      // Manter bairro, mas remover outros campos de localização
+      // Já está correto, apenas limpar outros campos
       normalizados.uf = "";
       normalizados.municipio = "";
-      normalizados.paisProcedencia = "105"; // Brasil
       normalizados.localHospedagem = "";
       normalizados.contatoLocal = "";
-    } else if (normalizados.residenteBelem === "2") {
-      // Não residente (outro município)
-      // Manter UF e município, remover outros
+    } 
+    // Não residente em Belém (outro município brasileiro)
+    else if (normalizados.residenteBelem === "2") {
+      // Limpar campos não aplicáveis
       normalizados.bairro = "";
-      normalizados.paisProcedencia = "105"; // Brasil
       normalizados.localHospedagem = "";
       normalizados.contatoLocal = "";
-    } else if (normalizados.residenteBelem === "3") {
-      // Estrangeiro
-      // Manter país e hospedagem, remover outros
-      normalizados.bairro = "";
-      normalizados.uf = "";
-      normalizados.municipio = "";
     }
-
-    return normalizados;
-  };
+  } 
+  // Se estrangeiro (país não é Brasil)
+  else if (parseInt(normalizados.paisProcedencia) !== 105) {
+    // Forçar opção "Estrangeiro"
+    normalizados.residenteBelem = "3";
+    // Limpar campos brasileiros
+    normalizados.bairro = "";
+    normalizados.uf = "";
+    normalizados.municipio = "";
+  }
+  
+  return normalizados;
+};
 
   const [searchSintomas, setSearchSintomas] = useState("");
   const [searchTrauma, setSearchTrauma] = useState("");
