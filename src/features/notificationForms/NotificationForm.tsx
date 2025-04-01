@@ -156,8 +156,7 @@ const NotificationForm = () => {
   >([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [] =
-    useState<boolean>(false);
+  const [] = useState<boolean>(false);
 
   // Initial form data
   const initialFormData: FormData = {
@@ -216,32 +215,116 @@ const NotificationForm = () => {
 
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+  const normalizarDadosResidencia = (data) => {
+    // Clone os dados para não modificar o original diretamente
+    const normalizados = { ...data };
+
+    // Normalizar baseado no tipo de residência
+    if (normalizados.residenteBelem === "1") {
+      // Residente em Belém
+      // Manter bairro, mas remover outros campos de localização
+      normalizados.uf = "";
+      normalizados.municipio = "";
+      normalizados.paisProcedencia = "105"; // Brasil
+      normalizados.localHospedagem = "";
+      normalizados.contatoLocal = "";
+    } else if (normalizados.residenteBelem === "2") {
+      // Não residente (outro município)
+      // Manter UF e município, remover outros
+      normalizados.bairro = "";
+      normalizados.paisProcedencia = "105"; // Brasil
+      normalizados.localHospedagem = "";
+      normalizados.contatoLocal = "";
+    } else if (normalizados.residenteBelem === "3") {
+      // Estrangeiro
+      // Manter país e hospedagem, remover outros
+      normalizados.bairro = "";
+      normalizados.uf = "";
+      normalizados.municipio = "";
+    }
+
+    return normalizados;
+  };
+
   const [searchSintomas, setSearchSintomas] = useState("");
   const [searchTrauma, setSearchTrauma] = useState("");
   const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
 
   // Lista de bairros de Belém para o dropdown
   const belemBairros = [
-    "Cidade Velha", "Campina", "Reduto", "Umarizal", "Telegrafo", 
-    "Sacramenta", "Pedreira", "Marco", "Souza", "Marambaia",
-    "Canudos", "Fátima", "São Brás", "Nazaré", "Batista Campos",
-    "Jurunas", "Condor", "Guamá", "Terra Firme", "Cremação",
-    "Val-de-Cães", "Miramar", "Pratinha", "Tapanã", "Benguí",
-    "Maracangalha", "Barreiro", "Universitário", "Curió-Utínga", "Aurá",
-    "Castanheira", "Águas Lindas", "Guanabara", "São Clemente", "Parque Guajará",
-    "Tenoné", "Águas Negras", "Maracacuera", "Parque Verde", "Cruzeiro",
-    "Ponta Grossa", "Mangueirão", "Cabanagem", "Campina de Icoaraci", "Paracuri",
-    "Agulha", "Una", "Coqueiro", "São João do Outeiro",
-    "Itaiteua", "Água Negra", "Maracajá", "Vila", "Praia Grande",
-    "Farol", "Mangueiras", "São Francisco", "Caranamduba", "Marahu",
-    "Paraíso", "Baia do Sol", "Sucurijuquara", "Caruara", "Bonfim",
-    "Ariramba", "Porto Arthur", "Murubira", "Chapéu Virado", "Aeroporto"
-  ].sort((a, b) => new Intl.Collator('pt-BR').compare(a, b)); // Ordenação considerando acentos em português
+    "Cidade Velha",
+    "Campina",
+    "Reduto",
+    "Umarizal",
+    "Telegrafo",
+    "Sacramenta",
+    "Pedreira",
+    "Marco",
+    "Souza",
+    "Marambaia",
+    "Canudos",
+    "Fátima",
+    "São Brás",
+    "Nazaré",
+    "Batista Campos",
+    "Jurunas",
+    "Condor",
+    "Guamá",
+    "Terra Firme",
+    "Cremação",
+    "Val-de-Cães",
+    "Miramar",
+    "Pratinha",
+    "Tapanã",
+    "Benguí",
+    "Maracangalha",
+    "Barreiro",
+    "Universitário",
+    "Curió-Utínga",
+    "Aurá",
+    "Castanheira",
+    "Águas Lindas",
+    "Guanabara",
+    "São Clemente",
+    "Parque Guajará",
+    "Tenoné",
+    "Águas Negras",
+    "Maracacuera",
+    "Parque Verde",
+    "Cruzeiro",
+    "Ponta Grossa",
+    "Mangueirão",
+    "Cabanagem",
+    "Campina de Icoaraci",
+    "Paracuri",
+    "Agulha",
+    "Una",
+    "Coqueiro",
+    "São João do Outeiro",
+    "Itaiteua",
+    "Água Negra",
+    "Maracajá",
+    "Vila",
+    "Praia Grande",
+    "Farol",
+    "Mangueiras",
+    "São Francisco",
+    "Caranamduba",
+    "Marahu",
+    "Paraíso",
+    "Baia do Sol",
+    "Sucurijuquara",
+    "Caruara",
+    "Bonfim",
+    "Ariramba",
+    "Porto Arthur",
+    "Murubira",
+    "Chapéu Virado",
+    "Aeroporto",
+  ].sort((a, b) => new Intl.Collator("pt-BR").compare(a, b)); // Ordenação considerando acentos em português
 
   // Estado para armazenar o objeto paciente completo selecionado
-  const [, setSelectedPaciente] = useState<Paciente | null>(
-    null
-  );
+  const [, setSelectedPaciente] = useState<Paciente | null>(null);
 
   // Estado para controlar seções expandidas
   const [expandedSections, setExpandedSections] = useState<
@@ -441,22 +524,22 @@ const NotificationForm = () => {
         "Transferido",
         "Óbito",
       ];
-      
+
       const encerramentosOrdenados = [...encerramentos].sort((a, b) => {
         // Função para encontrar a posição no array de ordenação
         const getPosition = (option: EncerramentoOption) => {
           // Verificar correspondência exata primeiro
           const exactIndex = ordenacaoEncerramento.findIndex(
-            item => option.descricao.toLowerCase() === item.toLowerCase()
+            (item) => option.descricao.toLowerCase() === item.toLowerCase()
           );
           if (exactIndex !== -1) return exactIndex;
-          
+
           // Se não houver correspondência exata, procurar por correspondência parcial
-          return ordenacaoEncerramento.findIndex(
-            item => option.descricao.toLowerCase().includes(item.toLowerCase())
+          return ordenacaoEncerramento.findIndex((item) =>
+            option.descricao.toLowerCase().includes(item.toLowerCase())
           );
         };
-        
+
         const posA = getPosition(a);
         const posB = getPosition(b);
 
@@ -541,7 +624,9 @@ const NotificationForm = () => {
           `Erro ao carregar municípios para UF ${estadoId}:`,
           error
         );
-        setUfError(`Falha ao carregar municípios: ${error instanceof Error ? error.message : String(error)}`);
+        setUfError(
+          `Falha ao carregar municípios: ${error instanceof Error ? error.message : String(error)}`
+        );
         toast.error("Erro ao carregar lista de municípios");
       } finally {
         // Só atualize o estado de carregamento se esta for a última requisição
@@ -559,22 +644,26 @@ const NotificationForm = () => {
     try {
       // Buscar dados da notificação
       const response = await NotificacaoService.getById(Number(notificacaoId));
-  
-      // Usar o adapter para formatar os dados (agora com await)
+
+      // Usar o adapter para formatar os dados
       const formattedData = response;
-      
+
       console.log("Dados da notificação carregados:", formattedData);
-      
+
       if (formattedData) {
+        // Normalizar dados para garantir consistência
+        const dadosNormalizados = normalizarDadosResidencia(formattedData);
+        console.log("Dados normalizados:", dadosNormalizados);
+
         // Verificar especificamente os sintomas
-        console.log("Sintomas carregados:", formattedData.sinaisESintomas);
-        
-        // Atualizar o formulário com os dados formatados
-        setFormData(formattedData);
-  
+        console.log("Sintomas carregados:", dadosNormalizados.sinaisESintomas);
+
+        // Atualizar o formulário com os dados normalizados
+        setFormData(dadosNormalizados);
+
         // Carregar municípios se tivermos um estado selecionado
-        if (formattedData.uf) {
-          loadMunicipiosByEstado(formattedData.uf);
+        if (dadosNormalizados.uf) {
+          loadMunicipiosByEstado(dadosNormalizados.uf);
         }
       }
     } catch (error) {
@@ -803,6 +892,64 @@ const NotificationForm = () => {
     };
   }, [formData.showProfissaoOptions]);
 
+  useEffect(() => {
+    if (formData.tipoAtendimento) {
+      // Se o tipo de atendimento é clínico (assumindo código 1), limpar campos de trauma
+      if (isTipoAtendimento("clínico")) {
+        setFormData((prev) => ({
+          ...prev,
+          tipoTrauma: [],
+          observacaoTrauma: "",
+        }));
+      }
+      // Se o tipo de atendimento é trauma (assumindo código 2), limpar campos clínicos
+      else if (isTipoAtendimento("trauma")) {
+        setFormData((prev) => ({
+          ...prev,
+          sinaisESintomas: [],
+          dataInicioSintomas: "",
+          observacaoSintomas: "",
+          hipoteseDiagnostica: [],
+          observacaoHipotese: "",
+        }));
+      }
+    }
+  }, [formData.tipoAtendimento]);
+
+  // Adicionar este useEffect para limpar campos quando muda opção de residente
+  useEffect(() => {
+    // Somente executar se já tiver um valor selecionado (evita limpar na inicialização)
+    if (formData.residenteBelem && Object.keys(formData).length > 1) {
+      // Criar uma cópia do formData para fazer as alterações
+      const updatedData = { ...formData };
+
+      // Se selecionar "SIM" (residente em Belém), limpar campos de não-residentes
+      if (formData.residenteBelem === "1") {
+        updatedData.uf = "";
+        updatedData.municipio = "";
+        updatedData.paisProcedencia = "105"; // Brasil
+        updatedData.localHospedagem = "";
+        updatedData.contatoLocal = "";
+      }
+      // Se selecionar "NÃO" (outro município/estado), limpar bairro e dados estrangeiros
+      else if (formData.residenteBelem === "2") {
+        updatedData.bairro = "";
+        updatedData.paisProcedencia = "105"; // Brasil
+        updatedData.localHospedagem = "";
+        updatedData.contatoLocal = "";
+      }
+      // Se selecionar "ESTRANGEIRO", limpar dados de localização nacional
+      else if (formData.residenteBelem === "3") {
+        updatedData.bairro = "";
+        updatedData.uf = "";
+        updatedData.municipio = "";
+      }
+
+      // Atualizar o estado
+      setFormData(updatedData);
+    }
+  }, [formData.residenteBelem]);
+
   // Handler para checkboxes (múltipla seleção)
   const handleCheckboxChange = (field: keyof FormData, value: string) => {
     if (!value) return;
@@ -896,71 +1043,91 @@ const NotificationForm = () => {
     ];
 
     const newErrors: Record<string, string> = {};
-    const missingFields = requiredFields.filter(item => !formData[item.field]);
-    
+    const missingFields = requiredFields.filter(
+      (item) => !formData[item.field]
+    );
+
     // Adicionar mensagens de erro para cada campo faltante
-    missingFields.forEach(item => {
+    missingFields.forEach((item) => {
       newErrors[item.field] = `O campo ${item.label} é obrigatório`;
     });
 
     // Adicionar validações específicas para outros campos
-    if (formData.tipoAtendimento === "1" && formData.sinaisESintomas.length === 0) {
+    if (isTipoAtendimento("clínico") && formData.sinaisESintomas.length === 0) {
       newErrors.sinaisESintomas = "Selecione pelo menos um sinal ou sintoma";
     }
 
-    if (formData.tipoAtendimento === "2" && formData.tipoTrauma.length === 0) {
+    if (isTipoAtendimento("trauma") && formData.tipoTrauma.length === 0) {
       newErrors.tipoTrauma = "Selecione pelo menos um tipo de trauma";
     }
-    
+
     // Atualizar o estado com os erros encontrados
     setErrors(newErrors);
-    
+
     // Se houver erros, expandir as seções relevantes e fazer scroll
     if (Object.keys(newErrors).length > 0) {
       // Expandir seções com erros
       const newExpandedSections = { ...expandedSections };
-      
+
       if (newErrors.evento || newErrors.publicoAtendido) {
         newExpandedSections.dadosGerais = true;
       }
-      
-      if (newErrors.residenteBelem || newErrors.bairro || newErrors.municipio || 
-          newErrors.uf || newErrors.paisProcedencia) {
+
+      if (
+        newErrors.residenteBelem ||
+        newErrors.bairro ||
+        newErrors.municipio ||
+        newErrors.uf ||
+        newErrors.paisProcedencia
+      ) {
         newExpandedSections.procedencia = true;
       }
-      
-      if (newErrors.paciente || newErrors.dataNascimento || newErrors.identidadeGenero || 
-          newErrors.raca) {
+
+      if (
+        newErrors.paciente ||
+        newErrors.dataNascimento ||
+        newErrors.identidadeGenero ||
+        newErrors.raca
+      ) {
         newExpandedSections.identificacao = true;
       }
-      
-      if (newErrors.tipoAtendimento || newErrors.sinaisESintomas || newErrors.tipoTrauma || 
-          newErrors.dataOcorrencia) {
+
+      if (
+        newErrors.tipoAtendimento ||
+        newErrors.sinaisESintomas ||
+        newErrors.tipoTrauma ||
+        newErrors.dataOcorrencia
+      ) {
         newExpandedSections.atendimento = true;
       }
-      
+
       if (newErrors.tipoEncerramento) {
         newExpandedSections.encerramento = true;
       }
-      
+
       setExpandedSections(newExpandedSections);
-      
+
       // Depois de expandir as seções, scroll para o primeiro erro
       setTimeout(() => {
         const firstErrorField = document.querySelector('[data-error="true"]');
         if (firstErrorField) {
-          firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          firstErrorField.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
         }
       }, 100);
-      
+
       // Exibir toast com resumo
       if (missingFields.length > 0) {
-        const missingLabels = missingFields.map(item => item.label).join(', ');
+        const missingLabels = missingFields
+          .map((item) => item.label)
+          .join(", ");
         toast.error(`Preencha os campos obrigatórios: ${missingLabels}`);
       } else {
-        toast.error('Corrija os erros no formulário para continuar');
+        toast.error("Corrija os erros no formulário para continuar");
       }
-      
+
       return false;
     }
 
@@ -972,36 +1139,29 @@ const NotificationForm = () => {
     console.log("BOTÃO SALVAR CLICADO");
     e.preventDefault();
     console.log("Form prevent default executado");
-  
+
     const isValid = validateForm();
     console.log("Form validation result:", isValid);
     if (!validateForm()) return;
-  
+
     setIsSaving(true);
     try {
       console.log("Dados do formulário:", JSON.stringify(formData, null, 2));
       console.log("Sintomas selecionados:", formData.sinaisESintomas);
-      
+
       // Usar a função importada salvarNotificacaoCompleta
       if (isEditMode && id) {
         // Para atualização
-        await salvarNotificacaoCompleta(
-          formData,
-          true,
-          Number(id)
-        );
+        await salvarNotificacaoCompleta(formData, true, Number(id));
         console.log("Notificação atualizada com sucesso");
         toast.success("Notificação atualizada com sucesso");
       } else {
         // Para criação
-        await salvarNotificacaoCompleta(
-          formData,
-          false
-        );
+        await salvarNotificacaoCompleta(formData, false);
         console.log("Notificação criada com sucesso");
         toast.success("Notificação criada com sucesso");
       }
-  
+
       // Redirecionar para página de listagem ou detalhes
       navigate("/lista-comunicacao");
     } catch (error: any) {
@@ -1014,7 +1174,11 @@ const NotificationForm = () => {
 
   // Função para limpar o formulário
   const handleClearForm = () => {
-    if (window.confirm("Tem certeza que deseja limpar todos os campos do formulário?")) {
+    if (
+      window.confirm(
+        "Tem certeza que deseja limpar todos os campos do formulário?"
+      )
+    ) {
       setFormData(initialFormData);
       setErrors({});
       toast.info("Formulário limpo com sucesso");
@@ -1104,8 +1268,8 @@ const NotificationForm = () => {
 
     // Encontra a opção selecionada
     const selectedOption = encerramentoOptions.find(
-      (option) => 
-        option.idtipo_encerramento.toString() === 
+      (option) =>
+        option.idtipo_encerramento.toString() ===
         formData.tipoEncerramento.toString()
     );
 
@@ -1267,7 +1431,9 @@ const NotificationForm = () => {
                     <select
                       name="evento"
                       className={`w-full p-3 border ${
-                        errors.evento ? "border-red-500 bg-red-50" : "border-gray-200"
+                        errors.evento
+                          ? "border-red-500 bg-red-50"
+                          : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.evento}
                       onChange={handleChange}
@@ -1293,7 +1459,9 @@ const NotificationForm = () => {
                     <select
                       name="publicoAtendido"
                       className={`w-full p-3 border ${
-                        errors.publicoAtendido ? "border-red-500 bg-red-50" : "border-gray-200"
+                        errors.publicoAtendido
+                          ? "border-red-500 bg-red-50"
+                          : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.publicoAtendido}
                       onChange={handleChange}
@@ -1334,7 +1502,9 @@ const NotificationForm = () => {
                     <select
                       name="residenteBelem"
                       className={`w-full p-3 border ${
-                        errors.residenteBelem ? "border-red-500 bg-red-50" : "border-gray-200"
+                        errors.residenteBelem
+                          ? "border-red-500 bg-red-50"
+                          : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.residenteBelem}
                       onChange={handleChange}
@@ -1357,7 +1527,9 @@ const NotificationForm = () => {
                         <select
                           name="bairro"
                           className={`w-full p-3 border ${
-                            errors.bairro ? "border-red-500 bg-red-50" : "border-gray-200"
+                            errors.bairro
+                              ? "border-red-500 bg-red-50"
+                              : "border-gray-200"
                           } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                           value={formData.bairro}
                           onChange={handleChange}
@@ -1495,17 +1667,19 @@ const NotificationForm = () => {
                       Nome
                     </label>
                     <div className="flex gap-2">
-                    <input
-                      type="text"
-                      name="paciente"
-                      placeholder="Nome do paciente"
-                      className={`flex-1 p-3 border ${
-                        errors.paciente ? "border-red-500 bg-red-50" : "border-gray-200"
-                      } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
-                      value={formData.paciente}
-                      onChange={handleChange}
-                      maxLength={100}
-                      data-error={errors.paciente ? "true" : "false"}
+                      <input
+                        type="text"
+                        name="paciente"
+                        placeholder="Nome do paciente"
+                        className={`flex-1 p-3 border ${
+                          errors.paciente
+                            ? "border-red-500 bg-red-50"
+                            : "border-gray-200"
+                        } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
+                        value={formData.paciente}
+                        onChange={handleChange}
+                        maxLength={100}
+                        data-error={errors.paciente ? "true" : "false"}
                       />
                       <button
                         type="button"
@@ -1533,7 +1707,9 @@ const NotificationForm = () => {
                       name="nomeMae"
                       placeholder="Nome da mãe do paciente"
                       className={`w-full p-3 border ${
-                        errors.nomeMae ? "border-red-500 bg-red-50" : "border-gray-200"
+                        errors.nomeMae
+                          ? "border-red-500 bg-red-50"
+                          : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.nomeMae}
                       onChange={handleChange}
@@ -1608,7 +1784,9 @@ const NotificationForm = () => {
                       name="cpf"
                       placeholder="Apenas números"
                       className={`w-full p-3 border ${
-                        errors.cpf ? "border-red-500 bg-red-50" : "border-gray-200"
+                        errors.cpf
+                          ? "border-red-500 bg-red-50"
+                          : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.cpf}
                       onChange={handleCPFChange}
@@ -1659,10 +1837,12 @@ const NotificationForm = () => {
                       <label className="block mb-2 font-medium text-gray-700">
                         Gestante
                       </label>
-                        <select
+                      <select
                         name="gestante"
                         className={`w-full p-3 border ${
-                          errors.gestante ? "border-red-500 bg-red-50" : "border-gray-200"
+                          errors.gestante
+                            ? "border-red-500 bg-red-50"
+                            : "border-gray-200"
                         } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                         value={formData.gestante}
                         onChange={handleChange}
@@ -1688,7 +1868,9 @@ const NotificationForm = () => {
                     <select
                       name="raca"
                       className={`w-full p-3 border ${
-                        errors.raca ? "border-red-500 bg-red-50" : "border-gray-200"
+                        errors.raca
+                          ? "border-red-500 bg-red-50"
+                          : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.raca}
                       onChange={handleChange}
@@ -1807,7 +1989,9 @@ const NotificationForm = () => {
                     <select
                       name="tipoAtendimento"
                       className={`w-full p-3 border ${
-                        errors.tipoAtendimento ? "border-red-500 bg-red-50" : "border-gray-200"
+                        errors.tipoAtendimento
+                          ? "border-red-500 bg-red-50"
+                          : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.tipoAtendimento}
                       onChange={handleChange}
@@ -2250,7 +2434,9 @@ const NotificationForm = () => {
                     <select
                       name="tipoEncerramento"
                       className={`w-full p-3 border ${
-                        errors.tipoEncerramento ? "border-red-500 bg-red-50" : "border-gray-200"
+                        errors.tipoEncerramento
+                          ? "border-red-500 bg-red-50"
+                          : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.tipoEncerramento}
                       onChange={handleChange}

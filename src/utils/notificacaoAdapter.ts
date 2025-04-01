@@ -251,10 +251,7 @@ export function extractLocalEncaminhamento(notificacao: NotificacaoGenerica): st
  * @param frontendData Dados do formulário de frontend
  * @param isUpdate Indica se é uma atualização (true) ou criação (false)
  */
-export const formatToBackend = (
-  frontendData: FormData,
-  isUpdate: boolean = false
-): NotificacaoGenerica => {
+export const formatToBackend = (frontendData: FormData, isUpdate: boolean = false): NotificacaoGenerica => {
   const trimFields = <T extends Record<string, any>>(data: T): T => {
     const result: Record<string, any> = {};
 
@@ -286,15 +283,17 @@ export const formatToBackend = (
     paciente_idpaciente: pacienteId,
     residente_belem: residenteBelem,
     tipo_pais_idtipo_pais: trimmedData.residenteBelem === "1" ? 105 : parseInt(trimmedData.paisProcedencia) || null,
-    tipo_atendimento_idtipo_atendimento:
-      parseInt(trimmedData.tipoAtendimento) || null,
-    data_ocorrencia:
-      trimmedData.dataOcorrencia || new Date().toISOString().split("T")[0],
+    tipo_atendimento_idtipo_atendimento: parseInt(trimmedData.tipoAtendimento) || null,
+    data_ocorrencia: trimmedData.dataOcorrencia || new Date().toISOString().split("T")[0],
     surto,
-    estabelecimento_idestabelecimento:
-      parseInt(trimmedData.unidadeNotificadora) || null,
-    tipo_encerramento_idtipo_encerramento:
-      parseInt(trimmedData.tipoEncerramento) || null,
+    estabelecimento_idestabelecimento: parseInt(trimmedData.unidadeNotificadora) || null,
+    tipo_encerramento_idtipo_encerramento: parseInt(trimmedData.tipoEncerramento) || null,
+
+    // IMPORTANTE: Adicione estes campos sempre, mesmo que vazios
+    observavao_incidente: trimmedData.observacaoIncidente || "",
+    observacao_sintomas: trimmedData.observacaoSintomas || "",
+    observacao_hiposete: trimmedData.observacaoHipotese || "",
+    observacao_trauma: trimmedData.observacaoTrauma || "",
 
     // Campos opcionais
     ...(trimmedData.bairro && { bairro: trimmedData.bairro }),
@@ -314,23 +313,23 @@ export const formatToBackend = (
       data_inicio_sintomas: trimmedData.dataInicioSintomas,
     }),
     ...(trimmedData.observacaoSintomas && {
-      observacao_sintomas: trimmedData.observacaoSintomas,
+      observacao_sintomas: trimmedData.observacaoSintomas || "",
     }),
     ...(trimmedData.hipoteseDiagnostica.length > 0 && {
       tipo_hipotese_diag_idtipo_hipotese_diag:
         parseInt(trimmedData.hipoteseDiagnostica[0]) || null,
     }),
-    ...(trimmedData.observacaoHipotese && {
-      observacao_hiposete: trimmedData.observacaoHipotese,
-    }),
-    ...(trimmedData.tipoTrauma.length > 0 && {
-      tipo_trauma_idtipo_trauma: parseInt(trimmedData.tipoTrauma[0]) || null,
-    }),
-    ...(trimmedData.observacaoTrauma && {
-      observacao_trauma: trimmedData.observacaoTrauma,
+  ...(trimmedData.observacaoHipotese && {
+    observacao_hiposete: trimmedData.observacaoHipotese || "",
+  }),
+  tipo_trauma_idtipo_trauma: trimmedData.tipoTrauma.length > 0 
+    ? parseInt(trimmedData.tipoTrauma[0]) 
+    : null,
+  ...(trimmedData.observacaoTrauma && {
+    observacao_trauma: trimmedData.observacaoTrauma || "",
     }),
     ...(trimmedData.observacaoIncidente && {
-      observavao_incidente: trimmedData.observacaoIncidente,
+      observavao_incidente: trimmedData.observacaoIncidente || "",
     }),
     ...(trimmedData.dataAtendimento && {
       data_atendimento: trimmedData.dataAtendimento,
