@@ -335,7 +335,7 @@ export const NotificacaoService = {
   async getById(id: number): Promise<FormData> {
     try {
       const response = await api.get(`/${id}`);
-      const formData = formatFromBackend(response.data);
+      const formData = await formatFromBackend(response.data);
       
       if (!formData) {
         throw new Error('Erro ao formatar dados da notificação');
@@ -362,7 +362,7 @@ export const NotificacaoService = {
     try {
       // Converter formData para o formato da API
       const apiData = formatToBackend(formData, false);
-      console.log("Dados enviados para API (create):", apiData);
+      console.log("Dados enviados para API (create):", JSON.stringify(apiData, null, 2));
       
       const response = await api.post('', apiData);
       return response.data;
@@ -376,7 +376,7 @@ export const NotificacaoService = {
     try {
       // Converter formData para o formato da API
       const apiData = formatToBackend(formData, true);
-      console.log(`Atualizando notificação ${id} com dados:`, apiData);
+      console.log(`Atualizando notificação ${id} com dados:`, JSON.stringify(apiData, null, 2));
       
       const response = await api.put(`/${id}`, apiData);
       return response.data;

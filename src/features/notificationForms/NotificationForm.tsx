@@ -56,6 +56,7 @@ import {
   EstabelecimentoOption,
   EncerramentoOption,
 } from "@/services/NotificacaoService";
+import { salvarNotificacaoCompleta } from "@/utils/notificacaoAdapter";
 
 // Interface FormData atualizada
 export interface FormData {
@@ -74,6 +75,7 @@ export interface FormData {
 
   // Seção 3: Identificação do indivíduo
   paciente: string;
+  pacienteId?: number; // Adicione esta linha para armazenar o ID do paciente
   nomeMae: string;
   dataNascimento: string;
   idade: string;
@@ -173,6 +175,7 @@ const NotificationForm = () => {
 
     // Seção 3: Identificação do indivíduo
     paciente: "",
+    pacienteId: undefined, // ou null, dependendo de como prefere inicializar
     nomeMae: "",
     dataNascimento: "",
     idade: "",
@@ -228,7 +231,7 @@ const NotificationForm = () => {
     "Castanheira", "Águas Lindas", "Guanabara", "São Clemente", "Parque Guajará",
     "Tenoné", "Águas Negras", "Maracacuera", "Parque Verde", "Cruzeiro",
     "Ponta Grossa", "Mangueirão", "Cabanagem", "Campina de Icoaraci", "Paracuri",
-    "Agulha", "Una", "Coqueiro", "Cruzeiro", "São João do Outeiro",
+    "Agulha", "Una", "Coqueiro", "São João do Outeiro",
     "Itaiteua", "Água Negra", "Maracajá", "Vila", "Praia Grande",
     "Farol", "Mangueiras", "São Francisco", "Caranamduba", "Marahu",
     "Paraíso", "Baia do Sol", "Sucurijuquara", "Caruara", "Bonfim",
@@ -286,6 +289,9 @@ const NotificationForm = () => {
         NotificacaoService.getEncerramentoOptions(),
         NotificacaoService.getEstabelecimentoOptions(),
       ]);
+
+      console.log("Lista de países:", paises);
+      setPaisOptions(paises);
 
       setEventoOptions(eventos);
 
@@ -551,14 +557,22 @@ const NotificationForm = () => {
   const loadNotificacao = async (notificacaoId: string) => {
     setIsLoading(true);
     try {
+      // Buscar dados da notificação
       const response = await NotificacaoService.getById(Number(notificacaoId));
-
-      // Usar o adapter para formatar os dados
+  
+      // Usar o adapter para formatar os dados (agora com await)
       const formattedData = response;
+      
+      console.log("Dados da notificação carregados:", formattedData);
+      
       if (formattedData) {
+        // Verificar especificamente os sintomas
+        console.log("Sintomas carregados:", formattedData.sinaisESintomas);
+        
+        // Atualizar o formulário com os dados formatados
         setFormData(formattedData);
-
-        // Carregar municipios se tivermos um estado selecionado
+  
+        // Carregar municípios se tivermos um estado selecionado
         if (formattedData.uf) {
           loadMunicipiosByEstado(formattedData.uf);
         }
@@ -668,6 +682,7 @@ const NotificationForm = () => {
     setFormData((prev) => ({
       ...prev,
       paciente: paciente.nome || "",
+      pacienteId: paciente.idpaciente,
       nomeMae: nomeDaMae,
       dataNascimento: formattedDate,
       idade: calculateAge(paciente.data_nascimento).toString(),
@@ -880,39 +895,72 @@ const NotificationForm = () => {
       { field: "tipoEncerramento", label: "Tipo de Encerramento" },
     ];
 
-    const missingFields = requiredFields.filter(
-      (item) => !formData[item.field]
-    );
+    const newErrors: Record<string, string> = {};
+    const missingFields = requiredFields.filter(item => !formData[item.field]);
+    
+    // Adicionar mensagens de erro para cada campo faltante
+    missingFields.forEach(item => {
+      newErrors[item.field] = `O campo ${item.label} é obrigatório`;
+    });
 
-    if (missingFields.length > 0) {
-      const missingLabels = missingFields.map((item) => item.label).join(", ");
-      toast.error(`Preencha os campos obrigatórios: ${missingLabels}`);
-      return false;
-    }
-
-    // Validar campos de identificação do indivíduo
-    const identificacaoValida = validateIdentificacao();
-    if (!identificacaoValida) {
-      // Expandir a seção de identificação para mostrar os erros
-      setExpandedSections((prev) => ({
-        ...prev,
-        identificacao: true,
-      }));
-      toast.error("Existem erros nos campos de identificação do indivíduo");
-      return false;
-    }
-
-    // Validações específicas por tipo de atendimento
-    if (
-      formData.tipoAtendimento === "1" &&
-      formData.sinaisESintomas.length === 0
-    ) {
-      toast.error("Selecione pelo menos um sinal ou sintoma");
-      return false;
+    // Adicionar validações específicas para outros campos
+    if (formData.tipoAtendimento === "1" && formData.sinaisESintomas.length === 0) {
+      newErrors.sinaisESintomas = "Selecione pelo menos um sinal ou sintoma";
     }
 
     if (formData.tipoAtendimento === "2" && formData.tipoTrauma.length === 0) {
-      toast.error("Selecione pelo menos um tipo de trauma");
+      newErrors.tipoTrauma = "Selecione pelo menos um tipo de trauma";
+    }
+    
+    // Atualizar o estado com os erros encontrados
+    setErrors(newErrors);
+    
+    // Se houver erros, expandir as seções relevantes e fazer scroll
+    if (Object.keys(newErrors).length > 0) {
+      // Expandir seções com erros
+      const newExpandedSections = { ...expandedSections };
+      
+      if (newErrors.evento || newErrors.publicoAtendido) {
+        newExpandedSections.dadosGerais = true;
+      }
+      
+      if (newErrors.residenteBelem || newErrors.bairro || newErrors.municipio || 
+          newErrors.uf || newErrors.paisProcedencia) {
+        newExpandedSections.procedencia = true;
+      }
+      
+      if (newErrors.paciente || newErrors.dataNascimento || newErrors.identidadeGenero || 
+          newErrors.raca) {
+        newExpandedSections.identificacao = true;
+      }
+      
+      if (newErrors.tipoAtendimento || newErrors.sinaisESintomas || newErrors.tipoTrauma || 
+          newErrors.dataOcorrencia) {
+        newExpandedSections.atendimento = true;
+      }
+      
+      if (newErrors.tipoEncerramento) {
+        newExpandedSections.encerramento = true;
+      }
+      
+      setExpandedSections(newExpandedSections);
+      
+      // Depois de expandir as seções, scroll para o primeiro erro
+      setTimeout(() => {
+        const firstErrorField = document.querySelector('[data-error="true"]');
+        if (firstErrorField) {
+          firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+      
+      // Exibir toast com resumo
+      if (missingFields.length > 0) {
+        const missingLabels = missingFields.map(item => item.label).join(', ');
+        toast.error(`Preencha os campos obrigatórios: ${missingLabels}`);
+      } else {
+        toast.error('Corrija os erros no formulário para continuar');
+      }
+      
       return false;
     }
 
@@ -921,28 +969,41 @@ const NotificationForm = () => {
 
   // Handlers para ações do formulário
   const handleSubmit = async (e: React.FormEvent) => {
+    console.log("BOTÃO SALVAR CLICADO");
     e.preventDefault();
-
+    console.log("Form prevent default executado");
+  
+    const isValid = validateForm();
+    console.log("Form validation result:", isValid);
     if (!validateForm()) return;
-
+  
     setIsSaving(true);
     try {
-      // No need to convert arrays to strings - the service will handle the conversion
-      const notificacaoData = {
-        ...formData
-      };
-
-      // Realizar a operação de salvar ou atualizar
+      console.log("Dados do formulário:", JSON.stringify(formData, null, 2));
+      console.log("Sintomas selecionados:", formData.sinaisESintomas);
+      
+      // Usar a função importada salvarNotificacaoCompleta
       if (isEditMode && id) {
-        await NotificacaoService.update(Number(id), notificacaoData);
+        // Para atualização
+        await salvarNotificacaoCompleta(
+          formData,
+          true,
+          Number(id)
+        );
+        console.log("Notificação atualizada com sucesso");
         toast.success("Notificação atualizada com sucesso");
       } else {
-        await NotificacaoService.create(notificacaoData);
+        // Para criação
+        await salvarNotificacaoCompleta(
+          formData,
+          false
+        );
+        console.log("Notificação criada com sucesso");
         toast.success("Notificação criada com sucesso");
       }
-
+  
       // Redirecionar para página de listagem ou detalhes
-      navigate("/notificacoes");
+      navigate("/lista-comunicacao");
     } catch (error: any) {
       console.error("Erro ao salvar notificação:", error);
       toast.error(error.message || "Erro ao salvar notificação");
@@ -951,6 +1012,14 @@ const NotificationForm = () => {
     }
   };
 
+  // Função para limpar o formulário
+  const handleClearForm = () => {
+    if (window.confirm("Tem certeza que deseja limpar todos os campos do formulário?")) {
+      setFormData(initialFormData);
+      setErrors({});
+      toast.info("Formulário limpo com sucesso");
+    }
+  };
 
   // Prepare export options object with all loaded dropdown options
   const getExportOptions = () => {
@@ -1131,7 +1200,7 @@ const NotificationForm = () => {
               type="submit"
               form="notification-form"
               disabled={isSaving}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {isSaving ? (
                 <Loader className="h-4 w-4 animate-spin" />
@@ -1142,8 +1211,16 @@ const NotificationForm = () => {
             </button>
             <button
               type="button"
+              onClick={handleClearForm}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+            >
+              <ArchiveX className="h-4 w-4" />
+              Limpar
+            </button>
+            <button
+              type="button"
               onClick={() => window.history.back()}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
             >
               <X className="h-4 w-4" />
               Cancelar
@@ -1157,6 +1234,20 @@ const NotificationForm = () => {
           onSubmit={handleSubmit}
           className="space-y-4"
         >
+          {Object.keys(errors).length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <h3 className="text-red-700 font-medium mb-2">
+                Corrija os seguintes erros para continuar:
+              </h3>
+              <ul className="list-disc pl-5 space-y-1">
+                {Object.entries(errors).map(([field, message]) => (
+                  <li key={field} className="text-red-600 text-sm">
+                    {message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {/* Seção 1: Dados Gerais */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <SectionHeader
@@ -1171,13 +1262,16 @@ const NotificationForm = () => {
                   {/* Evento */}
                   <div>
                     <label className="block mb-2 font-medium text-gray-700">
-                      Evento
+                      Evento <span className="text-red-500">*</span>
                     </label>
                     <select
                       name="evento"
-                      className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                      className={`w-full p-3 border ${
+                        errors.evento ? "border-red-500 bg-red-50" : "border-gray-200"
+                      } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.evento}
                       onChange={handleChange}
+                      data-error={errors.evento ? "true" : "false"}
                     >
                       <option value="">Selecione</option>
                       {eventoOptions.map((option) => (
@@ -1198,9 +1292,12 @@ const NotificationForm = () => {
                     </label>
                     <select
                       name="publicoAtendido"
-                      className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                      className={`w-full p-3 border ${
+                        errors.publicoAtendido ? "border-red-500 bg-red-50" : "border-gray-200"
+                      } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.publicoAtendido}
                       onChange={handleChange}
+                      data-error={errors.publicoAtendido ? "true" : "false"}
                     >
                       <option value="">Selecione</option>
                       {publicoOptions.map((option) => (
@@ -1236,9 +1333,12 @@ const NotificationForm = () => {
                     </label>
                     <select
                       name="residenteBelem"
-                      className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                      className={`w-full p-3 border ${
+                        errors.residenteBelem ? "border-red-500 bg-red-50" : "border-gray-200"
+                      } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.residenteBelem}
                       onChange={handleChange}
+                      data-error={errors.residenteBelem ? "true" : "false"}
                     >
                       <option value="">Selecione</option>
                       <option value="1">SIM</option>
@@ -1256,9 +1356,12 @@ const NotificationForm = () => {
                       <div className="relative">
                         <select
                           name="bairro"
-                          className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                          className={`w-full p-3 border ${
+                            errors.bairro ? "border-red-500 bg-red-50" : "border-gray-200"
+                          } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                           value={formData.bairro}
                           onChange={handleChange}
+                          data-error={errors.bairro ? "true" : "false"}
                         >
                           <option value="">Selecione o bairro</option>
                           {belemBairros.map((bairro) => (
@@ -1392,16 +1495,17 @@ const NotificationForm = () => {
                       Nome
                     </label>
                     <div className="flex gap-2">
-                      <input
-                        type="text"
-                        name="paciente"
-                        placeholder="Nome do paciente"
-                        className={`flex-1 p-3 border ${
-                          errors.paciente ? "border-red-500" : "border-gray-200"
-                        } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
-                        value={formData.paciente}
-                        onChange={handleChange}
-                        maxLength={100}
+                    <input
+                      type="text"
+                      name="paciente"
+                      placeholder="Nome do paciente"
+                      className={`flex-1 p-3 border ${
+                        errors.paciente ? "border-red-500 bg-red-50" : "border-gray-200"
+                      } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
+                      value={formData.paciente}
+                      onChange={handleChange}
+                      maxLength={100}
+                      data-error={errors.paciente ? "true" : "false"}
                       />
                       <button
                         type="button"
@@ -1429,11 +1533,12 @@ const NotificationForm = () => {
                       name="nomeMae"
                       placeholder="Nome da mãe do paciente"
                       className={`w-full p-3 border ${
-                        errors.nomeMae ? "border-red-500" : "border-gray-200"
+                        errors.nomeMae ? "border-red-500 bg-red-50" : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.nomeMae}
                       onChange={handleChange}
                       maxLength={100}
+                      data-error={errors.nomeMae ? "true" : "false"}
                     />
                     {errors.nomeMae && (
                       <p className="mt-1 text-sm text-red-500">
@@ -1452,11 +1557,12 @@ const NotificationForm = () => {
                       name="dataNascimento"
                       className={`w-full p-3 border ${
                         errors.dataNascimento
-                          ? "border-red-500"
+                          ? "border-red-500 bg-red-50"
                           : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.dataNascimento}
                       onChange={handleChange}
+                      data-error={errors.dataNascimento ? "true" : "false"}
                     />
                     {errors.dataNascimento && (
                       <p className="mt-1 text-sm text-red-500">
@@ -1502,11 +1608,12 @@ const NotificationForm = () => {
                       name="cpf"
                       placeholder="Apenas números"
                       className={`w-full p-3 border ${
-                        errors.cpf ? "border-red-500" : "border-gray-200"
+                        errors.cpf ? "border-red-500 bg-red-50" : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.cpf}
                       onChange={handleCPFChange}
                       maxLength={11}
+                      data-error={errors.cpf ? "true" : "false"}
                     />
                     {errors.cpf && (
                       <p className="mt-1 text-sm text-red-500">{errors.cpf}</p>
@@ -1522,11 +1629,12 @@ const NotificationForm = () => {
                       name="identidadeGenero"
                       className={`w-full p-3 border ${
                         errors.identidadeGenero
-                          ? "border-red-500"
+                          ? "border-red-500 bg-red-50"
                           : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.identidadeGenero}
                       onChange={handleChange}
+                      data-error={errors.identidadeGenero ? "true" : "false"}
                     >
                       <option value="">Selecione</option>
                       {generoOptions.map((option) => (
@@ -1551,13 +1659,14 @@ const NotificationForm = () => {
                       <label className="block mb-2 font-medium text-gray-700">
                         Gestante
                       </label>
-                      <select
+                        <select
                         name="gestante"
                         className={`w-full p-3 border ${
-                          errors.gestante ? "border-red-500" : "border-gray-200"
+                          errors.gestante ? "border-red-500 bg-red-50" : "border-gray-200"
                         } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                         value={formData.gestante}
                         onChange={handleChange}
+                        data-error={errors.gestante ? "true" : "false"}
                       >
                         <option value="">Selecione</option>
                         <option value="1">Sim</option>
@@ -1579,10 +1688,11 @@ const NotificationForm = () => {
                     <select
                       name="raca"
                       className={`w-full p-3 border ${
-                        errors.raca ? "border-red-500" : "border-gray-200"
+                        errors.raca ? "border-red-500 bg-red-50" : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.raca}
                       onChange={handleChange}
+                      data-error={errors.raca ? "true" : "false"}
                     >
                       <option value="">Selecione</option>
                       {racaOptions.map((option) => (
@@ -1696,11 +1806,12 @@ const NotificationForm = () => {
                     </label>
                     <select
                       name="tipoAtendimento"
-                      className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                      className={`w-full p-3 border ${
+                        errors.tipoAtendimento ? "border-red-500 bg-red-50" : "border-gray-200"
+                      } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.tipoAtendimento}
-                      onChange={(e) => {
-                        handleChange(e);
-                      }}
+                      onChange={handleChange}
+                      data-error={errors.tipoAtendimento ? "true" : "false"}
                     >
                       <option value="">Selecione</option>
                       {atendimentoOptions.map((option) => (
@@ -2138,9 +2249,12 @@ const NotificationForm = () => {
                     </label>
                     <select
                       name="tipoEncerramento"
-                      className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                      className={`w-full p-3 border ${
+                        errors.tipoEncerramento ? "border-red-500 bg-red-50" : "border-gray-200"
+                      } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.tipoEncerramento}
                       onChange={handleChange}
+                      data-error={errors.tipoEncerramento ? "true" : "false"}
                     >
                       <option value="">Selecione</option>
                       {encerramentoOptions.map((option) => (
@@ -2195,11 +2309,33 @@ const NotificationForm = () => {
             )}
           </div>
 
-          <div className="mt-6 flex space-x-4">
+          {/* Botões de ação na parte inferior do formulário (centralizados) */}
+          <div className="mt-8 flex justify-center space-x-4">
+            <button
+              type="submit"
+              form="notification-form"
+              disabled={isSaving}
+              className="inline-flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {isSaving ? (
+                <Loader className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              {isSaving ? "Salvando..." : "Salvar"}
+            </button>
+            <button
+              type="button"
+              onClick={handleClearForm}
+              className="inline-flex items-center gap-2 px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+            >
+              <ArchiveX className="h-4 w-4" />
+              Limpar
+            </button>
             <button
               type="button"
               onClick={() => window.history.back()}
-              className="inline-flex items-center gap-2 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
             >
               <X className="h-4 w-4" />
               Cancelar

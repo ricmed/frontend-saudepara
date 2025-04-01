@@ -37,7 +37,7 @@ import {
       {
         icon: <FileText className="h-8 w-8 text-white" />,
         nome: "Ficha de Comunicação",
-        link: "/ficha-comunicacao",
+        link: "/lista-comunicacao",
       }
     ];
   

@@ -108,6 +108,7 @@ import RelatorioEstabelecimento from "@/features/list/views/RelatorioEstabelecim
 
 // Formulários de Notificação
 import NotificationForm from "@/features/notificationForms/NotificationForm";
+import ListaNotificacoes from "@/features/notificationForms/ListaNotificacoes";
 import HomePage from "@/features/home/HomePage";
 
 function App() {
@@ -338,10 +339,11 @@ function App() {
             element={<PaginaPacientesFicha />}
           />
           {/* Rotas de Notificações */}
-          <Route path="/modulo-comunicacao" element={<NotificationForm />} />
-          <Route path="/notificacoes/nova" element={<NotificationForm />} />
+          <Route path="/lista-comunicacao" element={<ListaNotificacoes />} />
+          <Route path="/formulario-comunicacao" element={<NotificationForm />} />
+          <Route path="/formulario-comunicacao/nova" element={<NotificationForm />} />
           <Route
-            path="/notificacoes/editar/:id"
+            path="/formulario-comunicacao/editar/:id"
             element={<NotificationForm />}
           />
           {/* Rotas de Dashboard */}

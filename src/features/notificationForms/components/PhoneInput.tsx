@@ -254,59 +254,132 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
   className = "",
   label = "Contato Telefônico",
 }) => {
-  const [selectedCountry, setSelectedCountry] = useState<CountryCode>(countryCodes[29]); // Brasil como padrão
-  const [phoneNumber, setPhoneNumber] = useState<string>("");
+  // Refs para controlar o ciclo de renderização
+  const isInternalChangeRef = useRef(false);
+  const previousValueRef = useRef(value);
+  
+  // Estado interno
+  const [internalPhoneNumber, setInternalPhoneNumber] = useState("");
+  const [selectedCountry, setSelectedCountry] = useState<CountryCode>(
+    countryCodes.find(c => c.code === "BR") || countryCodes[0] // Brasil como padrão
+  );
+  
+  // UI states
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
-  const buttonRef = useRef<HTMLButtonElement>(null);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const dropdownRef = useRef<HTMLDivElement>(null);
   
-  // Salvar a posição de scroll atual
+  // Refs para elementos do DOM
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef({ x: 0, y: 0 });
 
   // Função para normalizar texto (remover acentos e converter para minúsculas)
   const normalizeText = (text: string): string => {
     return text
-      .normalize('NFD')              // Decompõe os caracteres acentuados
-      .replace(/[\u0300-\u036f]/g, '') // Remove os acentos
-      .toLowerCase();                // Converte para minúsculas
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
   };
 
-  // Inicializar com valor existente, se houver
+  // Efeito para processar mudanças no valor que vêm do componente pai
   useEffect(() => {
-    if (value) {
-      // Extrair o código do país e o número
-      // Suporta formatos como "+55 12345678" ou "+55 123-4567" ou "+5512345678"
-      const match = value.match(/^(\+\d+)[-\s]?(.*)$/);
-      if (match) {
-        const dialCode = match[1];
-        const number = match[2];
+    // Pular processamento se a mudança foi interna
+    if (isInternalChangeRef.current) {
+      return;
+    }
+    
+    // Se o valor externo mudou, processe-o
+    if (value !== previousValueRef.current) {
+      previousValueRef.current = value;
+      
+      if (value) {
+        // Tentar extrair código do país e número
+        const match = value.match(/^(\+\d+)[-\s]?(.*)$/);
         
-        // Procurar o país correspondente ao código
-        const country = countryCodes.find(c => c.dial_code === dialCode);
-        if (country) {
-          setSelectedCountry(country);
-          setPhoneNumber(number);
+        if (match) {
+          const dialCode = match[1];
+          const number = match[2];
+          
+          // Procurar o país pelo código
+          const country = countryCodes.find(c => c.dial_code === dialCode);
+          
+          if (country) {
+            setSelectedCountry(country);
+            setInternalPhoneNumber(number);
+          } else {
+            setInternalPhoneNumber(value);
+          }
         } else {
-          // Caso não encontre o país, mantém o número completo
-          setPhoneNumber(value);
+          setInternalPhoneNumber(value);
         }
       } else {
-        // Se não conseguir extrair o código do país, mantém o número completo
-        setPhoneNumber(value);
+        setInternalPhoneNumber("");
       }
-    } else {
-      // Se o valor for vazio, limpa o número de telefone
-      setPhoneNumber("");
     }
   }, [value]);
 
-  // Atualiza o valor completo quando o país ou número mudam
-  useEffect(() => {
-    const fullNumber = phoneNumber ? `${selectedCountry.dial_code} ${phoneNumber}` : "";
+  // Função que formata e notifica o componente pai de mudanças
+  const notifyParentOfChange = (country: CountryCode, phone: string) => {
+    const fullNumber = phone ? `${country.dial_code} ${phone}` : "";
+    
+    // Marcar que esta mudança é interna para evitar loops
+    isInternalChangeRef.current = true;
+    previousValueRef.current = fullNumber;
+    
+    // Notificar o pai
     onChange(fullNumber);
-  }, [selectedCountry, phoneNumber]);
+    
+    // Resetar a flag após um curto período
+    setTimeout(() => {
+      isInternalChangeRef.current = false;
+    }, 50);
+  };
+
+  // Handler para mudanças no input do telefone
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newPhone = e.target.value;
+    setInternalPhoneNumber(newPhone);
+    
+    // Notificar o pai apenas se houver um valor significativo
+    if (newPhone.trim()) {
+      notifyParentOfChange(selectedCountry, newPhone);
+    }
+  };
+
+  // Handler para seleção de país
+  const handleCountrySelect = (country: CountryCode, e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    setSelectedCountry(country);
+    setIsDropdownOpen(false);
+    setSearchQuery("");
+    
+    // Notificar o pai se tivermos um número de telefone
+    if (internalPhoneNumber.trim()) {
+      notifyParentOfChange(country, internalPhoneNumber);
+    }
+    
+    // Restaurar posição de scroll
+    setTimeout(() => {
+      window.scrollTo(scrollPositionRef.current.x, scrollPositionRef.current.y);
+    }, 10);
+  };
+
+  // Toggle do dropdown
+  const toggleDropdown = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Salvar posição atual de scroll
+    scrollPositionRef.current = {
+      x: window.scrollX,
+      y: window.scrollY
+    };
+    
+    setIsDropdownOpen(!isDropdownOpen);
+  };
 
   // Manipulador para fechar o dropdown quando clicar fora
   useEffect(() => {
@@ -341,7 +414,6 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
   // Restaurar a posição de scroll ao abrir o dropdown
   useEffect(() => {
     if (isDropdownOpen) {
-      // Pequeno timeout para garantir que o scroll seja restaurado após qualquer mudança de DOM
       const timeoutId = setTimeout(() => {
         window.scrollTo(scrollPositionRef.current.x, scrollPositionRef.current.y);
       }, 10);
@@ -350,45 +422,12 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
     }
   }, [isDropdownOpen]);
 
-  const toggleDropdown = (e: React.MouseEvent<HTMLButtonElement>) => {
-    // Prevenir comportamento padrão
-    e.preventDefault();
-    e.stopPropagation();
-    
-    // Salvar posição atual de scroll
-    scrollPositionRef.current = {
-      x: window.scrollX,
-      y: window.scrollY
-    };
-    
-    // Toggle do dropdown
-    setIsDropdownOpen(!isDropdownOpen);
-  };
-
-  const handleCountrySelect = (country: CountryCode, e: React.MouseEvent<HTMLButtonElement>) => {
-    // Prevenir comportamento padrão
-    e.preventDefault();
-    e.stopPropagation();
-    
-    setSelectedCountry(country);
-    setIsDropdownOpen(false);
-    setSearchQuery("");
-    
-    // Forçando a atualização do valor completo imediatamente
-    onChange(phoneNumber ? `${country.dial_code} ${phoneNumber}` : country.dial_code);
-    
-    // Pequeno timeout para garantir que o scroll seja restaurado após fechar o dropdown
-    setTimeout(() => {
-      window.scrollTo(scrollPositionRef.current.x, scrollPositionRef.current.y);
-    }, 10);
-  };
-
   // Função para obter URL da bandeira
   const getFlagUrl = (countryCode: string) => {
     return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
   };
 
-  // Filtra países baseado na busca (por nome ou código telefônico) com normalização
+  // Filtra países baseado na busca
   const filteredCountries = searchQuery
     ? countryCodes.filter(
         country => {
@@ -403,7 +442,6 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
   // Handler para evitar reset de scroll no input de busca
   const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
-    // Garante que a página não role
     e.stopPropagation();
   };
   
@@ -503,8 +541,8 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
         <input
           type="tel"
           name={name}
-          value={phoneNumber}
-          onChange={(e) => setPhoneNumber(e.target.value)}
+          value={internalPhoneNumber}
+          onChange={handlePhoneChange}
           placeholder={placeholder}
           className={`flex-1 p-3 border border-gray-200 rounded-r-lg text-sm ${className}`}
         />
