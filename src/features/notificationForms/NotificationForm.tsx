@@ -26,6 +26,7 @@ import {
   Globe,
   ListChecks,
   Loader,
+  HelpCircle, // Adicionar este ícone
 } from "lucide-react";
 // Import the export utilities
 import {
@@ -113,6 +114,40 @@ export interface FormData {
   tipoEncerramento: string;
   localEncaminhamento: string;
 }
+
+// Modifique a função normalizeText para garantir que apenas converta para caixa alta sem remover acentos, se necessário
+function normalizeText(text: string): string {
+  if (!text) return "";
+  // Remove acentos e converte para caixa alta
+  return text.normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")  // Remove acentos
+    .toUpperCase();
+}
+
+// Adicione uma função para converter todos os textos de um objeto para caixa alta
+const toUpperCaseAllStrings = (obj: any): any => {
+  if (!obj) return obj;
+  
+  if (typeof obj === 'string') {
+    return normalizeText(obj); // remove acentos e cedilhas e converte para caixa alta
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => toUpperCaseAllStrings(item));
+  }
+  
+  if (typeof obj === 'object') {
+    const result: any = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        result[key] = toUpperCaseAllStrings(obj[key]);
+      }
+    }
+    return result;
+  }
+  
+  return obj;
+};
 
 const NotificationForm = () => {
   const { id } = useParams<{ id: string }>();
@@ -342,6 +377,31 @@ const NotificationForm = () => {
     encerramento: true,
   });
 
+  // Efeito para calcular idade automaticamente quando a data de nascimento mudar
+  useEffect(() => {
+    if (formData.dataNascimento) {
+      const calculatedAge = calculateAge(formData.dataNascimento);
+      setFormData((prev) => ({
+        ...prev,
+        idade: calculatedAge.toString()
+      }));
+    }
+  }, [formData.dataNascimento]);
+
+  // Adicione esta função para converter todas as opções para caixa alta
+  const convertOptionsToUpperCase = useCallback((options: any[]) => {
+    return options.map(option => {
+      const newOption = {...option};
+      
+      // Procura pela propriedade de descrição e converte para caixa alta E remove acentos
+      if (newOption.descricao) {
+        newOption.descricao = normalizeText(newOption.descricao);
+      }
+      
+      return newOption;
+    });
+  }, []);
+
   const loadAllOptions = async () => {
     setIsLoading(true);
     try {
@@ -377,10 +437,10 @@ const NotificationForm = () => {
         NotificacaoService.getEstabelecimentoOptions(),
       ]);
 
-      console.log("Lista de países:", paises);
-      setPaisOptions(paises);
-
-      setEventoOptions(eventos);
+      // Converter todas as descrições para caixa alta
+      console.log("Lista de países:", convertOptionsToUpperCase(paises));
+      setPaisOptions(convertOptionsToUpperCase(paises));
+      setEventoOptions(convertOptionsToUpperCase(eventos));
 
       // Ordenar as opções de público atendido na ordem específica
       const ordenacaoPublico = [
@@ -388,14 +448,16 @@ const NotificationForm = () => {
         "Trabalhador",
         "Autoridade",
         "Outro",
-      ];
-      const publicosOrdenados = [...publicos].sort((a, b) => {
+      ].map(item => normalizeText(item));
+
+      const publicosUpperCase = convertOptionsToUpperCase(publicos);
+      const publicosOrdenados = [...publicosUpperCase].sort((a, b) => {
         // Encontrar a posição de cada item no array de ordenação
         const posA = ordenacaoPublico.findIndex((item) =>
-          a.descricao.toLowerCase().includes(item.toLowerCase())
+          a.descricao.includes(item)
         );
         const posB = ordenacaoPublico.findIndex((item) =>
-          b.descricao.toLowerCase().includes(item.toLowerCase())
+          b.descricao.includes(item)
         );
 
         // Se ambos forem encontrados, ordenar pela posição
@@ -423,15 +485,16 @@ const NotificationForm = () => {
         "Não binário",
         "Não se aplica",
         "Ignorado",
-      ];
+      ].map(item => normalizeText(item));
 
-      const generosOrdenados = [...generos].sort((a, b) => {
+      const generosUpperCase = convertOptionsToUpperCase(generos);
+      const generosOrdenados = [...generosUpperCase].sort((a, b) => {
         // Encontrar a posição de cada item no array de ordenação
         const posA = ordenacaoGenero.findIndex((item) =>
-          a.descricao.toLowerCase().includes(item.toLowerCase())
+          a.descricao.includes(item)
         );
         const posB = ordenacaoGenero.findIndex((item) =>
-          b.descricao.toLowerCase().includes(item.toLowerCase())
+          b.descricao.includes(item)
         );
 
         // Se ambos forem encontrados, ordenar pela posição
@@ -456,15 +519,16 @@ const NotificationForm = () => {
         "Surto",
         "Múltiplas vítimas",
         "Incidente QBRN",
-      ];
+      ].map(item => normalizeText(item));
 
-      const atendimentosOrdenados = [...atendimentos].sort((a, b) => {
+      const atendimentosUpperCase = convertOptionsToUpperCase(atendimentos);
+      const atendimentosOrdenados = [...atendimentosUpperCase].sort((a, b) => {
         // Encontrar a posição de cada item no array de ordenação
         const posA = ordenacaoAtendimento.findIndex((item) =>
-          a.descricao.toLowerCase().includes(item.toLowerCase())
+          a.descricao.includes(item)
         );
         const posB = ordenacaoAtendimento.findIndex((item) =>
-          b.descricao.toLowerCase().includes(item.toLowerCase())
+          b.descricao.includes(item)
         );
 
         // Se ambos forem encontrados, ordenar pela posição
@@ -494,15 +558,16 @@ const NotificationForm = () => {
         "Pós-graduado",
         "Ignorado",
         "Não se aplica",
-      ];
+      ].map(item => normalizeText(item));
 
-      const escolaridadesOrdenadas = [...escolaridades].sort((a, b) => {
+      const escolaridadesUpperCase = convertOptionsToUpperCase(escolaridades);
+      const escolaridadesOrdenadas = [...escolaridadesUpperCase].sort((a, b) => {
         // Encontrar a posição de cada item no array de ordenação
         const posA = ordenacaoEscolaridade.findIndex((item) =>
-          a.descricao.toLowerCase().includes(item.toLowerCase())
+          a.descricao.includes(item)
         );
         const posB = ordenacaoEscolaridade.findIndex((item) =>
-          b.descricao.toLowerCase().includes(item.toLowerCase())
+          b.descricao.includes(item)
         );
 
         // Se ambos forem encontrados, ordenar pela posição
@@ -527,20 +592,21 @@ const NotificationForm = () => {
         "Observação",
         "Transferido",
         "Óbito",
-      ];
+      ].map(item => normalizeText(item));
 
-      const encerramentosOrdenados = [...encerramentos].sort((a, b) => {
+      const encerramentosUpperCase = convertOptionsToUpperCase(encerramentos);
+      const encerramentosOrdenados = [...encerramentosUpperCase].sort((a, b) => {
         // Função para encontrar a posição no array de ordenação
         const getPosition = (option: EncerramentoOption) => {
           // Verificar correspondência exata primeiro
           const exactIndex = ordenacaoEncerramento.findIndex(
-            (item) => option.descricao.toLowerCase() === item.toLowerCase()
+            (item) => option.descricao === item
           );
           if (exactIndex !== -1) return exactIndex;
 
           // Se não houver correspondência exata, procurar por correspondência parcial
           return ordenacaoEncerramento.findIndex((item) =>
-            option.descricao.toLowerCase().includes(item.toLowerCase())
+            option.descricao.includes(item)
           );
         };
 
@@ -562,14 +628,14 @@ const NotificationForm = () => {
 
       setEncerramentoOptions(encerramentosOrdenados);
 
-      setPaisOptions(paises);
-      setEstadoOptions(estados);
-      setMunicipioOptions(municipios);
-      setRacaOptions(racas);
-      setSintomaOptions(sintomas);
-      setHipoteseDiagOptions(hipoteseDiag);
-      setTraumaOptions(traumas);
-      setEstabelecimentoOptions(estabelecimentos);
+      setPaisOptions(convertOptionsToUpperCase(paises));
+      setEstadoOptions(convertOptionsToUpperCase(estados));
+      setMunicipioOptions(convertOptionsToUpperCase(municipios));
+      setRacaOptions(convertOptionsToUpperCase(racas));
+      setSintomaOptions(convertOptionsToUpperCase(sintomas));
+      setHipoteseDiagOptions(convertOptionsToUpperCase(hipoteseDiag));
+      setTraumaOptions(convertOptionsToUpperCase(traumas));
+      setEstabelecimentoOptions(convertOptionsToUpperCase(estabelecimentos));
     } catch (error) {
       console.error("Erro ao carregar opções:", error);
       toast.error("Erro ao carregar opções para o formulário");
@@ -642,15 +708,18 @@ const NotificationForm = () => {
     [setFormData]
   );
 
-  // Função para carregar dados de uma notificação existente
+  // Modifique a função loadNotificacao para converter os dados que vêm do banco para caixa alta
   const loadNotificacao = async (notificacaoId: string) => {
     setIsLoading(true);
     try {
       // Buscar dados da notificação
       const response = await NotificacaoService.getById(Number(notificacaoId));
 
+      // Converter todos os textos para caixa alta
+      const responseUpperCase = toUpperCaseAllStrings(response);
+
       // Usar o adapter para formatar os dados
-      const formattedData = response;
+      const formattedData = responseUpperCase;
 
       console.log("Dados da notificação carregados:", formattedData);
 
@@ -705,6 +774,18 @@ const NotificationForm = () => {
     return cpf.replace(/\D/g, "").slice(0, 11);
   };
 
+  // Nova função para exibir CPF formatado
+  const displayFormattedCPF = (cpf: string) => {
+    // Remove caracteres não numéricos e limita a 11 dígitos
+    const cleanCPF = cpf.replace(/\D/g, "").slice(0, 11);
+    
+    // Se o CPF não tiver 11 dígitos, retorna ele apenas limpo
+    if (cleanCPF.length !== 11) return cleanCPF;
+    
+    // Formata como XXX.XXX.XXX-XX
+    return `${cleanCPF.substring(0, 3)}.${cleanCPF.substring(3, 6)}.${cleanCPF.substring(6, 9)}-${cleanCPF.substring(9)}`;
+  };
+
   const formatContato = (contato: string) => {
     // Remove caracteres não numéricos e limita a 15 dígitos
     return contato.replace(/\D/g, "").slice(0, 15);
@@ -712,7 +793,9 @@ const NotificationForm = () => {
 
   // Handler específico para CPF
   const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formattedCPF = formatCPF(e.target.value);
+    const rawValue = e.target.value;
+    // Remove formatação para armazenar apenas os dígitos no estado
+    const formattedCPF = formatCPF(rawValue);
 
     setFormData((prev) => ({
       ...prev,
@@ -729,19 +812,23 @@ const NotificationForm = () => {
   };
 
   // Interface para o paciente esperado por ModalBuscaPaciente
+  // Modificar o handleSelectPaciente para garantir que os dados do paciente estão em caixa alta
   const handleSelectPaciente = (paciente: Paciente) => {
+    // Converter todos os campos de texto para caixa alta
+    const pacienteUpperCase = toUpperCaseAllStrings(paciente);
+    
     // Armazenar o paciente completo para uso posterior
-    setSelectedPaciente(paciente);
+    setSelectedPaciente(pacienteUpperCase);
 
     // Formatar a data corretamente
     let formattedDate = "";
-    if (paciente.data_nascimento) {
-      const date = new Date(paciente.data_nascimento);
+    if (pacienteUpperCase.data_nascimento) {
+      const date = new Date(pacienteUpperCase.data_nascimento);
       formattedDate = date.toISOString().split("T")[0]; // Formato YYYY-MM-DD
     }
 
     // Verificar explicitamente se o nome_mae não é um CPF
-    let nomeDaMae = paciente.nome_mae || "";
+    let nomeDaMae = pacienteUpperCase.nome_mae || "";
     // Se o nome_mae parece ser um CPF (apenas dígitos e tem entre 11 a 14 caracteres)
     if (/^\d{11,14}$/.test(nomeDaMae)) {
       nomeDaMae = ""; // Limpar se parecer um CPF
@@ -751,40 +838,40 @@ const NotificationForm = () => {
     // Mapeamento de escolaridade com correção específica
     let escolaridadeValue = "";
     if (
-      paciente.escolaridade_idescolaridade !== null &&
-      paciente.escolaridade_idescolaridade !== undefined
+      pacienteUpperCase.escolaridade_idescolaridade !== null &&
+      pacienteUpperCase.escolaridade_idescolaridade !== undefined
     ) {
       // AQUI ESTÁ A MUDANÇA: Mapear especificamente o valor 7 para 8
-      if (paciente.escolaridade_idescolaridade === 7) {
+      if (pacienteUpperCase.escolaridade_idescolaridade === 7) {
         escolaridadeValue = "8"; // Corrigindo o mapeamento específico
       } else {
-        escolaridadeValue = String(paciente.escolaridade_idescolaridade);
+        escolaridadeValue = String(pacienteUpperCase.escolaridade_idescolaridade);
       }
     } else if (
-      paciente.tipo_escolaridade &&
-      paciente.tipo_escolaridade.idescolaridade
+      pacienteUpperCase.tipo_escolaridade &&
+      pacienteUpperCase.tipo_escolaridade.idescolaridade
     ) {
       // Aplicar o mesmo mapeamento para a estrutura alternativa
-      if (paciente.tipo_escolaridade.idescolaridade === 7) {
+      if (pacienteUpperCase.tipo_escolaridade.idescolaridade === 7) {
         escolaridadeValue = "8";
       } else {
-        escolaridadeValue = String(paciente.tipo_escolaridade.idescolaridade);
+        escolaridadeValue = String(pacienteUpperCase.tipo_escolaridade.idescolaridade);
       }
     }
 
     setFormData((prev) => ({
       ...prev,
-      paciente: paciente.nome || "",
-      pacienteId: paciente.idpaciente,
+      paciente: pacienteUpperCase.nome || "",
+      pacienteId: pacienteUpperCase.idpaciente,
       nomeMae: nomeDaMae,
       dataNascimento: formattedDate,
-      idade: calculateAge(paciente.data_nascimento).toString(),
-      cpf: paciente.cpf || "",
-      identidadeGenero: paciente.tipo_genero_idtipo_genero?.toString() || "",
-      raca: paciente.tipo_raca_idtipo_raca?.toString() || "",
+      idade: calculateAge(pacienteUpperCase.data_nascimento).toString(),
+      cpf: pacienteUpperCase.cpf || "",
+      identidadeGenero: pacienteUpperCase.tipo_genero_idtipo_genero?.toString() || "",
+      raca: pacienteUpperCase.tipo_raca_idtipo_raca?.toString() || "",
       escolaridade: escolaridadeValue,
-      profissao: paciente.cbo_idcbo ? paciente.cbo_idcbo.toString() : "",
-      contatoTelefonico: paciente.contato || "",
+      profissao: pacienteUpperCase.cbo_idcbo ? pacienteUpperCase.cbo_idcbo.toString() : "",
+      contatoTelefonico: pacienteUpperCase.contato || "",
     }));
 
     // Limpar erros ao selecionar um paciente
@@ -848,7 +935,7 @@ const NotificationForm = () => {
     </button>
   );
 
-  // Handler genérico para mudanças nos campos
+  // Modificar o handleChange para garantir que todos os textos estão em caixa alta
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
@@ -868,12 +955,28 @@ const NotificationForm = () => {
     // Processamento específico para certos campos
     let newValue = value;
 
-    // Limitar nome do paciente e nome da mãe a 100 caracteres
-    if (name === "paciente" && value.length > 100) {
-      newValue = value.slice(0, 100);
-    } else if (name === "nomeMae" && value.length > 100) {
-      newValue = value.slice(0, 100);
+    // Converter todos os campos de texto para caixa alta
+    if (typeof newValue === 'string') {
+      newValue = normalizeText(newValue); // remove acentos, cedilhas e converte para caixa alta
     }
+
+    // Aplicar normalização apenas para campos de texto - não em datas, números, IDs, etc.
+    const textFields = [
+      "paciente", "nomeMae", "bairro", "localHospedagem", 
+      "nomeNotificador", "observacaoSintomas", "observacaoHipotese", 
+      "observacaoTrauma", "observacaoIncidente"
+    ];
+
+    if (textFields.includes(name)) {
+      // Para esses campos, além de converter para caixa alta, remover acentos
+      newValue = normalizeText(value);
+      
+      if (name === "paciente" && newValue.length > 100) {
+        newValue = newValue.slice(0, 100);
+      } else if (name === "nomeMae" && newValue.length > 100) {
+        newValue = newValue.slice(0, 100);
+      }
+    } 
     // Limitar contato telefônico a 15 caracteres numéricos
     else if (name === "contatoTelefonico") {
       newValue = formatContato(value);
@@ -1139,6 +1242,7 @@ const NotificationForm = () => {
   };
 
   // Handlers para ações do formulário
+  // Modificar a função handleSubmit para garantir que todos os dados enviados estejam em caixa alta
   const handleSubmit = async (e: React.FormEvent) => {
     console.log("BOTÃO SALVAR CLICADO");
     e.preventDefault();
@@ -1150,18 +1254,21 @@ const NotificationForm = () => {
 
     setIsSaving(true);
     try {
-      console.log("Dados do formulário:", JSON.stringify(formData, null, 2));
-      console.log("Sintomas selecionados:", formData.sinaisESintomas);
+      // Converter todos os dados para caixa alta antes de enviar
+      const formDataUpperCase = toUpperCaseAllStrings(formData);
+      
+      console.log("Dados do formulário:", JSON.stringify(formDataUpperCase, null, 2));
+      console.log("Sintomas selecionados:", formDataUpperCase.sinaisESintomas);
 
       // Usar a função importada salvarNotificacaoCompleta
       if (isEditMode && id) {
         // Para atualização
-        await salvarNotificacaoCompleta(formData, true, Number(id));
+        await salvarNotificacaoCompleta(formDataUpperCase, true, Number(id));
         console.log("Notificação atualizada com sucesso");
         toast.success("Notificação atualizada com sucesso");
       } else {
         // Para criação
-        await salvarNotificacaoCompleta(formData, false);
+        await salvarNotificacaoCompleta(formDataUpperCase, false);
         console.log("Notificação criada com sucesso");
         toast.success("Notificação criada com sucesso");
       }
@@ -1250,39 +1357,48 @@ const NotificationForm = () => {
   const isTipoAtendimento = (tipo: string) => {
     // Se não há tipo selecionado, retorna falso
     if (!formData.tipoAtendimento) return false;
-
+  
     // Encontra a opção selecionada
     const selectedOption = atendimentoOptions.find(
       (option) =>
         option.idtipo_atendimento.toString() ===
         formData.tipoAtendimento.toString()
     );
-
-    // Verifica se a descrição contém o texto procurado
-    return (
-      selectedOption?.descricao.toLowerCase().includes(tipo.toLowerCase()) ||
-      false
-    );
+  
+    if (!selectedOption) return false;
+    
+    // Normalizar ambos os textos antes de comparar
+    const normalizedDescription = selectedOption.descricao;
+    const normalizedTipo = normalizeText(tipo);
+    
+    // Verificar se a descrição contém o texto procurado
+    return normalizedDescription.includes(normalizedTipo);
   };
-
+  
   // Função auxiliar para verificar o tipo de encerramento pelo texto
   const isTipoEncerramento = (tipo: string) => {
     // Se não há tipo selecionado, retorna falso
     if (!formData.tipoEncerramento) return false;
-
+  
     // Encontra a opção selecionada
     const selectedOption = encerramentoOptions.find(
       (option) =>
         option.idtipo_encerramento.toString() ===
         formData.tipoEncerramento.toString()
     );
-
-    // Verifica se a descrição contém o texto procurado
-    return (
-      selectedOption?.descricao.toLowerCase().includes(tipo.toLowerCase()) ||
-      false
-    );
+  
+    if (!selectedOption) return false;
+    
+    // Normalizar ambos os textos antes de comparar
+    const normalizedDescription = selectedOption.descricao;
+    const normalizedTipo = normalizeText(tipo);
+    
+    // Verificar se a descrição contém o texto procurado
+    return normalizedDescription.includes(normalizedTipo);
   };
+
+  // Estado para controlar a visibilidade do popover de ajuda de identidade de gênero
+  const [showGenderHelp, setShowGenderHelp] = useState<boolean>(false);
 
   // Tela de carregamento
   if (isLoading) {
@@ -1311,7 +1427,7 @@ const NotificationForm = () => {
             </button>
             <ClipboardList className="h-8 w-8" />
             <h1 className="text-2xl font-semibold">
-              {isEditMode ? "Editar Notificação" : "Nova Notificação"}
+              {isEditMode ? "Editar Dados da Ficha de Comunicação" : "Nova Comunicação"}
             </h1>
           </div>
 
@@ -1759,8 +1875,8 @@ const NotificationForm = () => {
                     <input
                       type="number"
                       name="idade"
-                      placeholder="Digite a idade"
-                      className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                      placeholder={formData.dataNascimento ? "Calculada automaticamente" : "Digite a idade"}
+                      className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none disabled:bg-gray-100 disabled:text-gray-500"
                       value={formData.idade}
                       onChange={(e) => {
                         // Limitar a 3 caracteres
@@ -1774,8 +1890,14 @@ const NotificationForm = () => {
                           } as React.ChangeEvent<HTMLInputElement>);
                         }
                       }}
+                      disabled={!!formData.dataNascimento}
                       maxLength={3}
                     />
+                    {formData.dataNascimento && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Idade calculada a partir da data de nascimento
+                      </p>
+                    )}
                   </div>
 
                   {/* CPF */}
@@ -1786,15 +1908,15 @@ const NotificationForm = () => {
                     <input
                       type="text"
                       name="cpf"
-                      placeholder="Apenas números"
+                      placeholder="000.000.000-00"
                       className={`w-full p-3 border ${
                         errors.cpf
                           ? "border-red-500 bg-red-50"
                           : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
-                      value={formData.cpf}
+                      value={formData.cpf ? displayFormattedCPF(formData.cpf) : ""}
                       onChange={handleCPFChange}
-                      maxLength={11}
+                      maxLength={14} // Aumentar para comportar os caracteres de formatação
                       data-error={errors.cpf ? "true" : "false"}
                     />
                     {errors.cpf && (
@@ -1804,9 +1926,44 @@ const NotificationForm = () => {
 
                   {/* Identidade de Gênero */}
                   <div>
-                    <label className="block mb-2 font-medium text-gray-700">
-                      Identidade de Gênero
-                    </label>
+                    <div className="flex items-center gap-2 mb-2">
+                      <label className="font-medium text-gray-700">
+                        Identidade de Gênero
+                      </label>
+                      <button 
+                        type="button" 
+                        onClick={() => setShowGenderHelp(!showGenderHelp)} 
+                        className="text-gray-500 hover:text-blue-600 transition-colors focus:outline-none"
+                        aria-label="Ajuda sobre identidade de gênero"
+                      >
+                        <HelpCircle className="h-4 w-4" />
+                      </button>
+                    </div>
+                    
+                    {showGenderHelp && (
+                      <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-gray-700 relative">
+                        <button 
+                          type="button" 
+                          onClick={() => setShowGenderHelp(false)} 
+                          className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+                          aria-label="Fechar ajuda"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                        <h4 className="font-medium text-blue-700 mb-2">Entendendo Identidade de Gênero:</h4>
+                        <ul className="space-y-1.5">
+                          <li><strong>Mulher cisgênero:</strong> Pessoa nascida com sexo feminino que se identifica como mulher.</li>
+                          <li><strong>Homem cisgênero:</strong> Pessoa nascida com sexo masculino que se identifica como homem.</li>
+                          <li><strong>Mulher transgênero:</strong> Pessoa nascida com sexo masculino que se identifica como mulher.</li>
+                          <li><strong>Homem transgênero:</strong> Pessoa nascida com sexo feminino que se identifica como homem.</li>
+                          <li><strong>Travesti:</strong> Pessoa designada como homem ao nascer que se expressa no gênero feminino.</li>
+                          <li><strong>Não binário:</strong> Pessoa cuja identidade não se limita ao binário masculino/feminino.</li>
+                          <li><strong>Não se aplica:</strong> Quando a identidade de gênero não é relevante para o atendimento.</li>
+                          <li><strong>Ignorado:</strong> Quando a informação não está disponível.</li>
+                        </ul>
+                      </div>
+                    )}
+                    
                     <select
                       name="identidadeGenero"
                       className={`w-full p-3 border ${
@@ -2461,16 +2618,16 @@ const NotificationForm = () => {
                   {/* Local de Encaminhamento (condicional) */}
                   {isTipoEncerramento("transferido") && (
                     <div>
-                      <label className="block mb-2 font-medium text-gray-700">
-                        Local de Encaminhamento
-                      </label>
-                      <input
-                        type="text"
-                        name="localEncaminhamento"
-                        placeholder="Digite o local de encaminhamento"
-                        className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                      <UnidadeNotificadoraField
                         value={formData.localEncaminhamento}
-                        onChange={handleChange}
+                        onChange={(value) => 
+                          setFormData((prev) => ({
+                            ...prev,
+                            localEncaminhamento: value,
+                          }))
+                        }
+                        label="Local de Encaminhamento"
+                        placeholder="Buscar estabelecimento para encaminhamento..."
                       />
                     </div>
                   )}

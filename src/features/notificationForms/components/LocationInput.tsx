@@ -3,6 +3,15 @@ import { createPortal } from "react-dom";
 import { Search, X } from "lucide-react";
 import axios from 'axios';
 
+// Função para remover acentos e converter para maiúsculas
+function normalizeText(text: string): string {
+  if (!text) return "";
+  // Remove acentos e converte para caixa alta
+  return text.normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")  // Remove acentos
+    .toUpperCase();
+}
+
 // Interface for location options (states, municipalities)
 interface LocationOption {
   [key: string]: any;
@@ -70,11 +79,21 @@ const LocationInput: React.FC<LocationInputProps> = ({
     }
   };
 
+  // Função para normalizar as opções recebidas, removendo acentos e cedilhas
+  const normalizeOptions = (options: LocationOption[]): LocationOption[] => {
+    return options.map(option => ({
+      ...option,
+      descricao: normalizeText(option.descricao)
+    }));
+  };
+
   // Initialize local options with provided props
   useEffect(() => {
     if (options && options.length > 0) {
       debugLog(`Using ${options.length} options received via props`);
-      setLocalOptions(options);
+      // Normalizar as opções recebidas
+      const normalizedOptions = normalizeOptions(options);
+      setLocalOptions(normalizedOptions);
     }
   }, [options]);
 
@@ -152,7 +171,9 @@ const LocationInput: React.FC<LocationInputProps> = ({
       
       // Check if we're still processing the same state
       if (lastParentValueRef.current === estadoId) {
-        setLocalOptions(municipios);
+        // Normalizar os municípios recebidos
+        const normalizedMunicipios = normalizeOptions(municipios);
+        setLocalOptions(normalizedMunicipios);
       } else {
         debugLog(`State changed during request, discarding results`);
       }
@@ -189,7 +210,9 @@ const LocationInput: React.FC<LocationInputProps> = ({
         
         if (fallbackMunicipios.length > 0) {
           debugLog(`Fallback successful! Found ${fallbackMunicipios.length} municipalities`);
-          setLocalOptions(fallbackMunicipios);
+          // Normalizar os municípios recebidos pelo fallback
+          const normalizedMunicipios = normalizeOptions(fallbackMunicipios);
+          setLocalOptions(normalizedMunicipios);
         } else {
           debugLog(`Fallback failed - no municipalities found`);
           setLocalOptions([]);
@@ -235,7 +258,9 @@ const LocationInput: React.FC<LocationInputProps> = ({
       const limit = name === "paisProcedencia" ? 300 : 1000;
       
       if (query) {
-        url += `?descricao=${encodeURIComponent(query)}&limit=${limit}`;
+        // Normalizar a consulta antes de enviar para a API
+        const normalizedQuery = normalizeText(query);
+        url += `?descricao=${encodeURIComponent(normalizedQuery)}&limit=${limit}`;
       } else {
         url += `?limit=${limit}`;
       }
@@ -253,7 +278,9 @@ const LocationInput: React.FC<LocationInputProps> = ({
       }
       
       debugLog(`Received ${options.length} results`);
-      setLocalOptions(options);
+      // Normalizar as opções recebidas
+      const normalizedOptions = normalizeOptions(options);
+      setLocalOptions(normalizedOptions);
     } catch (error: unknown) {
       // Don't show error if it was a cancellation
       if (
@@ -287,6 +314,10 @@ const LocationInput: React.FC<LocationInputProps> = ({
       const response = await axios.get(url);
       
       if (response.data && response.data[idField]) {
+        // Normalizar a descrição do item
+        if (response.data.descricao) {
+          response.data.descricao = normalizeText(response.data.descricao);
+        }
         debugLog(`Item found: ${response.data.descricao}`);
         return response.data;
       }
@@ -302,9 +333,12 @@ const LocationInput: React.FC<LocationInputProps> = ({
   };
 
   // Filter local options based on search term
-  const filteredOptions = localOptions.filter(option => 
-    option.descricao.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredOptions = localOptions.filter(option => {
+    // Normalizar tanto a descrição da opção quanto o termo de pesquisa
+    const normalizedDesc = normalizeText(option.descricao);
+    const normalizedSearch = normalizeText(searchQuery);
+    return normalizedDesc.includes(normalizedSearch);
+  });
 
   // Load selected option if there's a value - with manual editing check
   useEffect(() => {
@@ -470,6 +504,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
       }
     }
     
+    // Aplicar normalização (remover acentos e converter para maiúsculas)
     setSearchQuery(query);
   };
 
@@ -554,7 +589,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
           ) : filteredOptions.length > 0 ? (
             <>
               <div className="px-4 py-1 text-xs text-gray-400">
-                {filteredOptions.length} opções encontradas
+                {filteredOptions.length} opcoes encontradas
               </div>
               {filteredOptions.map((option) => (
                 <button
@@ -575,7 +610,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
                 ? 'Nenhum resultado encontrado' 
                 : name === "municipio" && !parentValue 
                   ? 'Selecione uma UF primeiro'
-                  : 'Nenhuma opção disponível'}
+                  : 'Nenhuma opcao disponivel'}
             </div>
           )}
         </div>

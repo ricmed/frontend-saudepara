@@ -31,7 +31,7 @@ import {
     const aplicativos: AppConfig[] = [
       {
         icon: <UserCircle className="h-8 w-8 text-white" />,
-        nome: "Pacientes",
+        nome: "Dados dos Pacientes",
         link: "/pacientes/lista",
       },
       {

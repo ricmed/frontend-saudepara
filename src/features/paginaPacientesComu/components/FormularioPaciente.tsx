@@ -51,6 +51,42 @@ const gestanteOptions = [
   { value: "N", label: "Não" },
 ];
 
+// Modificar a função de normalização para garantir a remoção de acentos e cedilhas
+function normalizeText(text: string): string {
+  if (!text) return "";
+  
+  // Remove acentos e cedilhas e converte para caixa alta
+  return text.normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")  // Remove completamente todos os acentos
+    .toUpperCase();
+}
+
+// Modificar a função toUpperCaseAllStrings para também aplicar normalização de texto
+const toUpperCaseAllStrings = (obj: any): any => {
+  if (!obj) return obj;
+  
+  if (typeof obj === 'string') {
+    // Além de colocar em caixa alta, normalizar para remover acentos/cedilhas
+    return normalizeText(obj);
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => toUpperCaseAllStrings(item));
+  }
+  
+  if (typeof obj === 'object') {
+    const result: any = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        result[key] = toUpperCaseAllStrings(obj[key]);
+      }
+    }
+    return result;
+  }
+  
+  return obj;
+};
+
 const FormularioPaciente = ({
   isModal = false,
   onPacienteSalvo,
@@ -105,15 +141,24 @@ const FormularioPaciente = ({
       try {
         // Carregar gêneros
         const generos = await PacienteService.getTiposGenero();
-        setGeneroOptions(generos);
+        setGeneroOptions(generos.map(option => ({
+          ...option,
+          descricao: normalizeText(option.descricao)
+        })));
 
         // Carregar raças
         const racas = await PacienteService.getTiposRaca();
-        setRacaOptions(racas);
+        setRacaOptions(racas.map(option => ({
+          ...option,
+          descricao: normalizeText(option.descricao)
+        })));
 
         // Carregar escolaridades
         const escolaridades = await PacienteService.getTiposEscolaridade();
-        setEscolaridadeOptions(escolaridades);
+        setEscolaridadeOptions(escolaridades.map(option => ({
+          ...option,
+          descricao: normalizeText(option.descricao)
+        })));
       } catch (error) {
         console.error("Erro ao carregar opções de dropdown:", error);
         setLoadingError(
@@ -142,30 +187,34 @@ const FormularioPaciente = ({
             throw new Error("Paciente não encontrado");
           }
 
+          // Converter todos os campos de texto para caixa alta
+          const pacienteUpperCase = toUpperCaseAllStrings(paciente);
+          console.log("Dados convertidos para caixa alta:", pacienteUpperCase);
+
           // Verificação adicional para escolaridade
           let escolaridadeId = null;
           if (
-            paciente.escolaridade_idescolaridade !== null &&
-            paciente.escolaridade_idescolaridade !== undefined
+            pacienteUpperCase.escolaridade_idescolaridade !== null &&
+            pacienteUpperCase.escolaridade_idescolaridade !== undefined
           ) {
-            escolaridadeId = Number(paciente.escolaridade_idescolaridade);
+            escolaridadeId = Number(pacienteUpperCase.escolaridade_idescolaridade);
           }
 
           setFormData({
-            nome: paciente.nome || "",
-            nome_mae: paciente.nome_mae || "",
-            data_nascimento: paciente.data_nascimento
-              ? new Date(paciente.data_nascimento).toISOString().split("T")[0]
+            nome: pacienteUpperCase.nome || "",
+            nome_mae: pacienteUpperCase.nome_mae || "",
+            data_nascimento: pacienteUpperCase.data_nascimento
+              ? new Date(pacienteUpperCase.data_nascimento).toISOString().split("T")[0]
               : "",
-            cpf: paciente.cpf || "",
-            tipo_genero_idtipo_genero: paciente.tipo_genero_idtipo_genero || "",
-            gestante: paciente.gestante || "",
-            tipo_raca_idtipo_raca: paciente.tipo_raca_idtipo_raca || "",
+            cpf: pacienteUpperCase.cpf || "",
+            tipo_genero_idtipo_genero: pacienteUpperCase.tipo_genero_idtipo_genero || "",
+            gestante: pacienteUpperCase.gestante || "",
+            tipo_raca_idtipo_raca: pacienteUpperCase.tipo_raca_idtipo_raca || "",
             escolaridade_idescolaridade:
               escolaridadeId === null ? "" : escolaridadeId,
-            cbo_idcbo: paciente.cbo_idcbo || null,
-            ddi: paciente.ddi || "55",
-            contato: paciente.contato || "",
+            cbo_idcbo: pacienteUpperCase.cbo_idcbo || null,
+            ddi: pacienteUpperCase.ddi || "55",
+            contato: pacienteUpperCase.contato || "",
           });
         })
         .catch((error) => {
@@ -217,7 +266,7 @@ const FormularioPaciente = ({
     </button>
   );
 
-  // Handler genérico para mudanças nos campos
+  // Handler genérico para mudanças nos campos - modificado para normalizar texto
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
@@ -236,8 +285,7 @@ const FormularioPaciente = ({
   
     // Tratamento específico para cada campo
     if (name === 'escolaridade_idescolaridade') {
-      console.log(`Alterando ${name} para: "${value}" (${typeof value})`);
-      // Converter para número ou null para valor vazio
+      // Converter para número ou vazio
       setFormData(prev => ({
         ...prev,
         [name]: value === "" ? "" : Number(value)
@@ -249,10 +297,25 @@ const FormularioPaciente = ({
         ...prev,
         [name]: value === "" ? "" : Number(value)
       }));
+    }
+    else if (name === 'nome' || name === 'nome_mae') {
+      // Normalizar texto: remove acentos, cedilha e converte para maiúsculas
+      const normalizedValue = normalizeText(value);
+      // Limitar a 100 caracteres
+      const limitedValue = normalizedValue.slice(0, 100);
+      
+      setFormData(prev => ({ 
+        ...prev, 
+        [name]: limitedValue 
+      }));
     } 
     else {
-      // Campos de texto
-      setFormData(prev => ({ ...prev, [name]: value }));
+      // Campos de texto simples - converter para caixa alta
+      let newValue = value;
+      if (typeof newValue === 'string') {
+        newValue = newValue.toUpperCase();
+      }
+      setFormData(prev => ({ ...prev, [name]: newValue }));
     }
   };
 
@@ -262,8 +325,22 @@ const FormularioPaciente = ({
     return cpf.replace(/\D/g, "").slice(0, 11);
   };
 
+  // Nova função para exibir CPF formatado
+  const displayFormattedCPF = (cpf: string) => {
+    // Remove qualquer caractere que não seja número
+    const cleanCPF = cpf.replace(/\D/g, "").slice(0, 11);
+    
+    // Se o CPF não tiver 11 dígitos, retorna ele apenas limpo
+    if (cleanCPF.length !== 11) return cleanCPF;
+    
+    // Formata como XXX.XXX.XXX-XX
+    return `${cleanCPF.substring(0, 3)}.${cleanCPF.substring(3, 6)}.${cleanCPF.substring(6, 9)}-${cleanCPF.substring(9)}`;
+  };
+
   const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formattedCPF = formatCPF(e.target.value);
+    const rawValue = e.target.value;
+    // Remove formatação para armazenar apenas os dígitos no estado
+    const formattedCPF = formatCPF(rawValue);
 
     setFormData((prev) => ({
       ...prev,
@@ -338,10 +415,14 @@ const FormularioPaciente = ({
       JSON.stringify(formData, null, 2)
     );
 
+    // Garantir nomes normalizados (sem acentos e em caixa alta)
+    const nome = normalizeText(formData.nome);
+    const nome_mae = formData.nome_mae ? normalizeText(formData.nome_mae) : null;
+
     // Iniciar com os dados obrigatórios
     const result: any = {
-      nome: formData.nome,
-      nome_mae: formData.nome_mae || null,
+      nome: nome,
+      nome_mae: nome_mae,
       data_nascimento: formData.data_nascimento,
       cpf: formData.cpf || null,
       tipo_genero_idtipo_genero: formData.tipo_genero_idtipo_genero as number,
@@ -377,20 +458,24 @@ const FormularioPaciente = ({
       try {
         // Converter dados do formulário para o formato da API
         const pacienteData = convertFormDataToApiFormat();
+        
+        // Garantir que todos os dados de texto estejam em caixa alta
+        const pacienteUpperCase = toUpperCaseAllStrings(pacienteData);
+        console.log("Dados para salvar em caixa alta:", pacienteUpperCase);
 
         // Criar ou atualizar paciente
         let paciente;
 
         if (pacienteId) {
-          paciente = await PacienteService.update(pacienteId, pacienteData);
+          paciente = await PacienteService.update(pacienteId, pacienteUpperCase);
         } else {
-          paciente = await PacienteService.create(pacienteData);
+          paciente = await PacienteService.create(pacienteUpperCase);
         }
 
         // Sucesso!
         setIsSuccess(true);
         if (isModal && onPacienteSalvo) {
-          onPacienteSalvo(pacienteData);
+          onPacienteSalvo(pacienteUpperCase);
         } else if (!pacienteId) {
           setFormData(initialFormData); // Limpar formulário se for criação
         }
@@ -669,13 +754,13 @@ const FormularioPaciente = ({
                     <input
                       type="text"
                       name="cpf"
-                      placeholder="Digite apenas os números"
+                      placeholder="000.000.000-00"
                       className={`w-full p-3 border ${
                         errors.cpf ? "border-red-500" : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
-                      value={formData.cpf}
+                      value={formData.cpf ? displayFormattedCPF(formData.cpf) : ""}
                       onChange={handleCPFChange}
-                      maxLength={11}
+                      maxLength={14}
                       disabled={isLoading || isLoadingOptions}
                     />
                     {errors.cpf && (
