@@ -29,7 +29,7 @@ export interface MunicipioOption extends BaseOption {
 }
 
 export interface BairroOption extends BaseOption {
-  idbairro: number;
+  idtipo_bairro: number;  // Corrigido de idbairro para idtipo_bairro
 }
 
 export interface GeneroOption extends BaseOption {
@@ -91,6 +91,7 @@ const TIPO_ENDPOINTS = {
   PAIS: `${server}:${port}/api/tipo-pais`,
   ESTADO: `${server}:${port}/api/tipo-estado`,
   MUNICIPIO: `${server}:${port}/api/tipo-municipio`,
+  BAIRRO: `${server}:${port}/api/tipo-bairro`,
   GENERO: `${server}:${port}/api/tipo-genero`,
   RACA: `${server}:${port}/api/tipo-raca`,
   ESCOLARIDADE: `${server}:${port}/api/tipo-escolaridade`,
@@ -293,6 +294,10 @@ export const NotificacaoService = {
       // Limpar o controlador após a conclusão
       this.municipioAbortController = null;
     }
+  },
+
+  async getBairroOptions(): Promise<BairroOption[]> {
+    return this.fetchOptions<BairroOption>(TIPO_ENDPOINTS.BAIRRO, 100);
   },
 
   async getGeneroOptions(): Promise<GeneroOption[]> {

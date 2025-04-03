@@ -93,6 +93,10 @@ import CadastroPais from "@/features/apps/components/CadastroPais";
 import ListaGeneros from "@/features/apps/list/ListaGenero";
 import CadastroGenero from "@/features/apps/components/CadastroGenero";
 
+// Features - Bairros
+import ListaBairros from "@/features/apps/list/ListaBairro";
+import CadastroBairro from "@/features/apps/components/CadastroBairro";
+
 // Features - Pacientes
 import FormularioPaciente from "@/features/paginaPacientesComu/components/FormularioPaciente";
 import ListaPacientes from "@/features/paginaPacientesComu/components/ListaPacientes";
@@ -201,6 +205,10 @@ function App() {
           <Route path="/genero/lista" element={<ListaGeneros />} />
           <Route path="/genero/cadastro" element={<CadastroGenero />} />
           <Route path="/genero/editar/:id" element={<CadastroGenero />} />
+          {/* Rotas de Bairros */}
+          <Route path="/bairro/lista" element={<ListaBairros />} />
+          <Route path="/bairro/cadastro" element={<CadastroBairro />} />
+          <Route path="/bairro/editar/:id" element={<CadastroBairro />} />
           {/* Rotas de Tipos de Encerramento */}
           <Route
             path="/lista-tipos-encerramento"

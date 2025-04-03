@@ -6,6 +6,7 @@ import BrazilianPhoneInput from "@/features/notificationForms/components/Brazili
 import ModalBuscaPaciente from "@/features/paginaPacientesComu/components/ModalBuscaPaciente";
 import { Paciente } from "@/services/PacienteService";
 import LocationInput from "@/features/notificationForms/components/LocationInput";
+import BairroInput from "./components/BairroInput";
 import {
   Search,
   Save,
@@ -119,24 +120,25 @@ export interface FormData {
 function normalizeText(text: string): string {
   if (!text) return "";
   // Remove acentos e converte para caixa alta
-  return text.normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")  // Remove acentos
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Remove acentos
     .toUpperCase();
 }
 
 // Adicione uma função para converter todos os textos de um objeto para caixa alta
 const toUpperCaseAllStrings = (obj: any): any => {
   if (!obj) return obj;
-  
-  if (typeof obj === 'string') {
+
+  if (typeof obj === "string") {
     return normalizeText(obj); // remove acentos e cedilhas e converte para caixa alta
   }
-  
+
   if (Array.isArray(obj)) {
-    return obj.map(item => toUpperCaseAllStrings(item));
+    return obj.map((item) => toUpperCaseAllStrings(item));
   }
-  
-  if (typeof obj === 'object') {
+
+  if (typeof obj === "object") {
     const result: any = {};
     for (const key in obj) {
       if (Object.prototype.hasOwnProperty.call(obj, key)) {
@@ -145,7 +147,7 @@ const toUpperCaseAllStrings = (obj: any): any => {
     }
     return result;
   }
-  
+
   return obj;
 };
 
@@ -251,39 +253,39 @@ const NotificationForm = () => {
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const normalizarDadosResidencia = (data: FormData): FormData => {
-  // Clone os dados para não modificar o original diretamente
-  const normalizados = { ...data };
-  
-  // Se é brasileiro
-  if (parseInt(normalizados.paisProcedencia) === 105) {
-    // Residente em Belém
-    if (normalizados.residenteBelem === "1") {
-      // Já está correto, apenas limpar outros campos
+    // Clone os dados para não modificar o original diretamente
+    const normalizados = { ...data };
+
+    // Se é brasileiro
+    if (parseInt(normalizados.paisProcedencia) === 105) {
+      // Residente em Belém
+      if (normalizados.residenteBelem === "1") {
+        // Já está correto, apenas limpar outros campos
+        normalizados.uf = "";
+        normalizados.municipio = "";
+        normalizados.localHospedagem = "";
+        normalizados.contatoLocal = "";
+      }
+      // Não residente em Belém (outro município brasileiro)
+      else if (normalizados.residenteBelem === "2") {
+        // Limpar campos não aplicáveis
+        normalizados.bairro = "";
+        normalizados.localHospedagem = "";
+        normalizados.contatoLocal = "";
+      }
+    }
+    // Se estrangeiro (país não é Brasil)
+    else if (parseInt(normalizados.paisProcedencia) !== 105) {
+      // Forçar opção "Estrangeiro"
+      normalizados.residenteBelem = "3";
+      // Limpar campos brasileiros
+      normalizados.bairro = "";
       normalizados.uf = "";
       normalizados.municipio = "";
-      normalizados.localHospedagem = "";
-      normalizados.contatoLocal = "";
-    } 
-    // Não residente em Belém (outro município brasileiro)
-    else if (normalizados.residenteBelem === "2") {
-      // Limpar campos não aplicáveis
-      normalizados.bairro = "";
-      normalizados.localHospedagem = "";
-      normalizados.contatoLocal = "";
     }
-  } 
-  // Se estrangeiro (país não é Brasil)
-  else if (parseInt(normalizados.paisProcedencia) !== 105) {
-    // Forçar opção "Estrangeiro"
-    normalizados.residenteBelem = "3";
-    // Limpar campos brasileiros
-    normalizados.bairro = "";
-    normalizados.uf = "";
-    normalizados.municipio = "";
-  }
-  
-  return normalizados;
-};
+
+    return normalizados;
+  };
 
   const [searchSintomas, setSearchSintomas] = useState("");
   const [searchTrauma, setSearchTrauma] = useState("");
@@ -383,21 +385,21 @@ const NotificationForm = () => {
       const calculatedAge = calculateAge(formData.dataNascimento);
       setFormData((prev) => ({
         ...prev,
-        idade: calculatedAge.toString()
+        idade: calculatedAge.toString(),
       }));
     }
   }, [formData.dataNascimento]);
 
   // Adicione esta função para converter todas as opções para caixa alta
   const convertOptionsToUpperCase = useCallback((options: any[]) => {
-    return options.map(option => {
-      const newOption = {...option};
-      
+    return options.map((option) => {
+      const newOption = { ...option };
+
       // Procura pela propriedade de descrição e converte para caixa alta E remove acentos
       if (newOption.descricao) {
         newOption.descricao = normalizeText(newOption.descricao);
       }
-      
+
       return newOption;
     });
   }, []);
@@ -448,7 +450,7 @@ const NotificationForm = () => {
         "Trabalhador",
         "Autoridade",
         "Outro",
-      ].map(item => normalizeText(item));
+      ].map((item) => normalizeText(item));
 
       const publicosUpperCase = convertOptionsToUpperCase(publicos);
       const publicosOrdenados = [...publicosUpperCase].sort((a, b) => {
@@ -485,7 +487,7 @@ const NotificationForm = () => {
         "Não binário",
         "Não se aplica",
         "Ignorado",
-      ].map(item => normalizeText(item));
+      ].map((item) => normalizeText(item));
 
       const generosUpperCase = convertOptionsToUpperCase(generos);
       const generosOrdenados = [...generosUpperCase].sort((a, b) => {
@@ -519,7 +521,7 @@ const NotificationForm = () => {
         "Surto",
         "Múltiplas vítimas",
         "Incidente QBRN",
-      ].map(item => normalizeText(item));
+      ].map((item) => normalizeText(item));
 
       const atendimentosUpperCase = convertOptionsToUpperCase(atendimentos);
       const atendimentosOrdenados = [...atendimentosUpperCase].sort((a, b) => {
@@ -558,30 +560,32 @@ const NotificationForm = () => {
         "Pós-graduado",
         "Ignorado",
         "Não se aplica",
-      ].map(item => normalizeText(item));
+      ].map((item) => normalizeText(item));
 
       const escolaridadesUpperCase = convertOptionsToUpperCase(escolaridades);
-      const escolaridadesOrdenadas = [...escolaridadesUpperCase].sort((a, b) => {
-        // Encontrar a posição de cada item no array de ordenação
-        const posA = ordenacaoEscolaridade.findIndex((item) =>
-          a.descricao.includes(item)
-        );
-        const posB = ordenacaoEscolaridade.findIndex((item) =>
-          b.descricao.includes(item)
-        );
+      const escolaridadesOrdenadas = [...escolaridadesUpperCase].sort(
+        (a, b) => {
+          // Encontrar a posição de cada item no array de ordenação
+          const posA = ordenacaoEscolaridade.findIndex((item) =>
+            a.descricao.includes(item)
+          );
+          const posB = ordenacaoEscolaridade.findIndex((item) =>
+            b.descricao.includes(item)
+          );
 
-        // Se ambos forem encontrados, ordenar pela posição
-        if (posA !== -1 && posB !== -1) {
-          return posA - posB;
+          // Se ambos forem encontrados, ordenar pela posição
+          if (posA !== -1 && posB !== -1) {
+            return posA - posB;
+          }
+
+          // Se apenas um for encontrado, colocá-lo primeiro
+          if (posA !== -1) return -1;
+          if (posB !== -1) return 1;
+
+          // Se nenhum for encontrado, manter a ordem original
+          return 0;
         }
-
-        // Se apenas um for encontrado, colocá-lo primeiro
-        if (posA !== -1) return -1;
-        if (posB !== -1) return 1;
-
-        // Se nenhum for encontrado, manter a ordem original
-        return 0;
-      });
+      );
 
       setEscolaridadeOptions(escolaridadesOrdenadas);
 
@@ -592,39 +596,41 @@ const NotificationForm = () => {
         "Observação",
         "Transferido",
         "Óbito",
-      ].map(item => normalizeText(item));
+      ].map((item) => normalizeText(item));
 
       const encerramentosUpperCase = convertOptionsToUpperCase(encerramentos);
-      const encerramentosOrdenados = [...encerramentosUpperCase].sort((a, b) => {
-        // Função para encontrar a posição no array de ordenação
-        const getPosition = (option: EncerramentoOption) => {
-          // Verificar correspondência exata primeiro
-          const exactIndex = ordenacaoEncerramento.findIndex(
-            (item) => option.descricao === item
-          );
-          if (exactIndex !== -1) return exactIndex;
+      const encerramentosOrdenados = [...encerramentosUpperCase].sort(
+        (a, b) => {
+          // Função para encontrar a posição no array de ordenação
+          const getPosition = (option: EncerramentoOption) => {
+            // Verificar correspondência exata primeiro
+            const exactIndex = ordenacaoEncerramento.findIndex(
+              (item) => option.descricao === item
+            );
+            if (exactIndex !== -1) return exactIndex;
 
-          // Se não houver correspondência exata, procurar por correspondência parcial
-          return ordenacaoEncerramento.findIndex((item) =>
-            option.descricao.includes(item)
-          );
-        };
+            // Se não houver correspondência exata, procurar por correspondência parcial
+            return ordenacaoEncerramento.findIndex((item) =>
+              option.descricao.includes(item)
+            );
+          };
 
-        const posA = getPosition(a);
-        const posB = getPosition(b);
+          const posA = getPosition(a);
+          const posB = getPosition(b);
 
-        // Se ambos forem encontrados, ordenar pela posição
-        if (posA !== -1 && posB !== -1) {
-          return posA - posB;
+          // Se ambos forem encontrados, ordenar pela posição
+          if (posA !== -1 && posB !== -1) {
+            return posA - posB;
+          }
+
+          // Se apenas um for encontrado, colocá-lo primeiro
+          if (posA !== -1) return -1;
+          if (posB !== -1) return 1;
+
+          // Se nenhum for encontrado, manter a ordem original
+          return 0;
         }
-
-        // Se apenas um for encontrado, colocá-lo primeiro
-        if (posA !== -1) return -1;
-        if (posB !== -1) return 1;
-
-        // Se nenhum for encontrado, manter a ordem original
-        return 0;
-      });
+      );
 
       setEncerramentoOptions(encerramentosOrdenados);
 
@@ -778,10 +784,10 @@ const NotificationForm = () => {
   const displayFormattedCPF = (cpf: string) => {
     // Remove caracteres não numéricos e limita a 11 dígitos
     const cleanCPF = cpf.replace(/\D/g, "").slice(0, 11);
-    
+
     // Se o CPF não tiver 11 dígitos, retorna ele apenas limpo
     if (cleanCPF.length !== 11) return cleanCPF;
-    
+
     // Formata como XXX.XXX.XXX-XX
     return `${cleanCPF.substring(0, 3)}.${cleanCPF.substring(3, 6)}.${cleanCPF.substring(6, 9)}-${cleanCPF.substring(9)}`;
   };
@@ -816,7 +822,7 @@ const NotificationForm = () => {
   const handleSelectPaciente = (paciente: Paciente) => {
     // Converter todos os campos de texto para caixa alta
     const pacienteUpperCase = toUpperCaseAllStrings(paciente);
-    
+
     // Armazenar o paciente completo para uso posterior
     setSelectedPaciente(pacienteUpperCase);
 
@@ -845,7 +851,9 @@ const NotificationForm = () => {
       if (pacienteUpperCase.escolaridade_idescolaridade === 7) {
         escolaridadeValue = "8"; // Corrigindo o mapeamento específico
       } else {
-        escolaridadeValue = String(pacienteUpperCase.escolaridade_idescolaridade);
+        escolaridadeValue = String(
+          pacienteUpperCase.escolaridade_idescolaridade
+        );
       }
     } else if (
       pacienteUpperCase.tipo_escolaridade &&
@@ -855,7 +863,9 @@ const NotificationForm = () => {
       if (pacienteUpperCase.tipo_escolaridade.idescolaridade === 7) {
         escolaridadeValue = "8";
       } else {
-        escolaridadeValue = String(pacienteUpperCase.tipo_escolaridade.idescolaridade);
+        escolaridadeValue = String(
+          pacienteUpperCase.tipo_escolaridade.idescolaridade
+        );
       }
     }
 
@@ -867,10 +877,13 @@ const NotificationForm = () => {
       dataNascimento: formattedDate,
       idade: calculateAge(pacienteUpperCase.data_nascimento).toString(),
       cpf: pacienteUpperCase.cpf || "",
-      identidadeGenero: pacienteUpperCase.tipo_genero_idtipo_genero?.toString() || "",
+      identidadeGenero:
+        pacienteUpperCase.tipo_genero_idtipo_genero?.toString() || "",
       raca: pacienteUpperCase.tipo_raca_idtipo_raca?.toString() || "",
       escolaridade: escolaridadeValue,
-      profissao: pacienteUpperCase.cbo_idcbo ? pacienteUpperCase.cbo_idcbo.toString() : "",
+      profissao: pacienteUpperCase.cbo_idcbo
+        ? pacienteUpperCase.cbo_idcbo.toString()
+        : "",
       contatoTelefonico: pacienteUpperCase.contato || "",
     }));
 
@@ -956,27 +969,33 @@ const NotificationForm = () => {
     let newValue = value;
 
     // Converter todos os campos de texto para caixa alta
-    if (typeof newValue === 'string') {
+    if (typeof newValue === "string") {
       newValue = normalizeText(newValue); // remove acentos, cedilhas e converte para caixa alta
     }
 
     // Aplicar normalização apenas para campos de texto - não em datas, números, IDs, etc.
     const textFields = [
-      "paciente", "nomeMae", "bairro", "localHospedagem", 
-      "nomeNotificador", "observacaoSintomas", "observacaoHipotese", 
-      "observacaoTrauma", "observacaoIncidente"
+      "paciente",
+      "nomeMae",
+      "bairro",
+      "localHospedagem",
+      "nomeNotificador",
+      "observacaoSintomas",
+      "observacaoHipotese",
+      "observacaoTrauma",
+      "observacaoIncidente",
     ];
 
     if (textFields.includes(name)) {
       // Para esses campos, além de converter para caixa alta, remover acentos
       newValue = normalizeText(value);
-      
+
       if (name === "paciente" && newValue.length > 100) {
         newValue = newValue.slice(0, 100);
       } else if (name === "nomeMae" && newValue.length > 100) {
         newValue = newValue.slice(0, 100);
       }
-    } 
+    }
     // Limitar contato telefônico a 15 caracteres numéricos
     else if (name === "contatoTelefonico") {
       newValue = formatContato(value);
@@ -1256,8 +1275,11 @@ const NotificationForm = () => {
     try {
       // Converter todos os dados para caixa alta antes de enviar
       const formDataUpperCase = toUpperCaseAllStrings(formData);
-      
-      console.log("Dados do formulário:", JSON.stringify(formDataUpperCase, null, 2));
+
+      console.log(
+        "Dados do formulário:",
+        JSON.stringify(formDataUpperCase, null, 2)
+      );
       console.log("Sintomas selecionados:", formDataUpperCase.sinaisESintomas);
 
       // Usar a função importada salvarNotificacaoCompleta
@@ -1357,42 +1379,42 @@ const NotificationForm = () => {
   const isTipoAtendimento = (tipo: string) => {
     // Se não há tipo selecionado, retorna falso
     if (!formData.tipoAtendimento) return false;
-  
+
     // Encontra a opção selecionada
     const selectedOption = atendimentoOptions.find(
       (option) =>
         option.idtipo_atendimento.toString() ===
         formData.tipoAtendimento.toString()
     );
-  
+
     if (!selectedOption) return false;
-    
+
     // Normalizar ambos os textos antes de comparar
     const normalizedDescription = selectedOption.descricao;
     const normalizedTipo = normalizeText(tipo);
-    
+
     // Verificar se a descrição contém o texto procurado
     return normalizedDescription.includes(normalizedTipo);
   };
-  
+
   // Função auxiliar para verificar o tipo de encerramento pelo texto
   const isTipoEncerramento = (tipo: string) => {
     // Se não há tipo selecionado, retorna falso
     if (!formData.tipoEncerramento) return false;
-  
+
     // Encontra a opção selecionada
     const selectedOption = encerramentoOptions.find(
       (option) =>
         option.idtipo_encerramento.toString() ===
         formData.tipoEncerramento.toString()
     );
-  
+
     if (!selectedOption) return false;
-    
+
     // Normalizar ambos os textos antes de comparar
     const normalizedDescription = selectedOption.descricao;
     const normalizedTipo = normalizeText(tipo);
-    
+
     // Verificar se a descrição contém o texto procurado
     return normalizedDescription.includes(normalizedTipo);
   };
@@ -1427,7 +1449,9 @@ const NotificationForm = () => {
             </button>
             <ClipboardList className="h-8 w-8" />
             <h1 className="text-2xl font-semibold">
-              {isEditMode ? "Editar Dados da Ficha de Comunicação" : "Nova Comunicação"}
+              {isEditMode
+                ? "Editar Dados da Ficha de Comunicação"
+                : "Nova Comunicação"}
             </h1>
           </div>
 
@@ -1640,29 +1664,23 @@ const NotificationForm = () => {
                   {/* Campos condicionais baseados na residência */}
                   {formData.residenteBelem === "1" && (
                     <div>
-                      <label className="block mb-2 font-medium text-gray-700">
-                        Bairro
-                      </label>
-                      <div className="relative">
-                        <select
-                          name="bairro"
-                          className={`w-full p-3 border ${
-                            errors.bairro
-                              ? "border-red-500 bg-red-50"
-                              : "border-gray-200"
-                          } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
-                          value={formData.bairro}
-                          onChange={handleChange}
-                          data-error={errors.bairro ? "true" : "false"}
-                        >
-                          <option value="">Selecione o bairro</option>
-                          {belemBairros.map((bairro) => (
-                            <option key={bairro} value={bairro}>
-                              {bairro}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      <BairroInput
+                        label="Bairro"
+                        value={formData.bairro}
+                        onChange={(value) => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            bairro: value,
+                          }));
+                        }}
+                        placeholder="Selecione o bairro"
+                        disabled={false}
+                      />
+                      {errors.bairro && (
+                        <p className="mt-1 text-sm text-red-500">
+                          {errors.bairro}
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -1875,7 +1893,11 @@ const NotificationForm = () => {
                     <input
                       type="number"
                       name="idade"
-                      placeholder={formData.dataNascimento ? "Calculada automaticamente" : "Digite a idade"}
+                      placeholder={
+                        formData.dataNascimento
+                          ? "Calculada automaticamente"
+                          : "Digite a idade"
+                      }
                       className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none disabled:bg-gray-100 disabled:text-gray-500"
                       value={formData.idade}
                       onChange={(e) => {
@@ -1914,7 +1936,9 @@ const NotificationForm = () => {
                           ? "border-red-500 bg-red-50"
                           : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
-                      value={formData.cpf ? displayFormattedCPF(formData.cpf) : ""}
+                      value={
+                        formData.cpf ? displayFormattedCPF(formData.cpf) : ""
+                      }
                       onChange={handleCPFChange}
                       maxLength={14} // Aumentar para comportar os caracteres de formatação
                       data-error={errors.cpf ? "true" : "false"}
@@ -1930,40 +1954,66 @@ const NotificationForm = () => {
                       <label className="font-medium text-gray-700">
                         Identidade de Gênero
                       </label>
-                      <button 
-                        type="button" 
-                        onClick={() => setShowGenderHelp(!showGenderHelp)} 
+                      <button
+                        type="button"
+                        onClick={() => setShowGenderHelp(!showGenderHelp)}
                         className="text-gray-500 hover:text-blue-600 transition-colors focus:outline-none"
                         aria-label="Ajuda sobre identidade de gênero"
                       >
                         <HelpCircle className="h-4 w-4" />
                       </button>
                     </div>
-                    
+
                     {showGenderHelp && (
                       <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-gray-700 relative">
-                        <button 
-                          type="button" 
-                          onClick={() => setShowGenderHelp(false)} 
+                        <button
+                          type="button"
+                          onClick={() => setShowGenderHelp(false)}
                           className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
                           aria-label="Fechar ajuda"
                         >
                           <X className="h-4 w-4" />
                         </button>
-                        <h4 className="font-medium text-blue-700 mb-2">Entendendo Identidade de Gênero:</h4>
+                        <h4 className="font-medium text-blue-700 mb-2">
+                          Entendendo Identidade de Gênero:
+                        </h4>
                         <ul className="space-y-1.5">
-                          <li><strong>Mulher cisgênero:</strong> Pessoa nascida com sexo feminino que se identifica como mulher.</li>
-                          <li><strong>Homem cisgênero:</strong> Pessoa nascida com sexo masculino que se identifica como homem.</li>
-                          <li><strong>Mulher transgênero:</strong> Pessoa nascida com sexo masculino que se identifica como mulher.</li>
-                          <li><strong>Homem transgênero:</strong> Pessoa nascida com sexo feminino que se identifica como homem.</li>
-                          <li><strong>Travesti:</strong> Pessoa designada como homem ao nascer que se expressa no gênero feminino.</li>
-                          <li><strong>Não binário:</strong> Pessoa cuja identidade não se limita ao binário masculino/feminino.</li>
-                          <li><strong>Não se aplica:</strong> Quando a identidade de gênero não é relevante para o atendimento.</li>
-                          <li><strong>Ignorado:</strong> Quando a informação não está disponível.</li>
+                          <li>
+                            <strong>Mulher cisgênero:</strong> Pessoa nascida
+                            com sexo feminino que se identifica como mulher.
+                          </li>
+                          <li>
+                            <strong>Homem cisgênero:</strong> Pessoa nascida com
+                            sexo masculino que se identifica como homem.
+                          </li>
+                          <li>
+                            <strong>Mulher transgênero:</strong> Pessoa nascida
+                            com sexo masculino que se identifica como mulher.
+                          </li>
+                          <li>
+                            <strong>Homem transgênero:</strong> Pessoa nascida
+                            com sexo feminino que se identifica como homem.
+                          </li>
+                          <li>
+                            <strong>Travesti:</strong> Pessoa designada como
+                            homem ao nascer que se expressa no gênero feminino.
+                          </li>
+                          <li>
+                            <strong>Não binário:</strong> Pessoa cuja identidade
+                            não se limita ao binário masculino/feminino.
+                          </li>
+                          <li>
+                            <strong>Não se aplica:</strong> Quando a identidade
+                            de gênero não é relevante para o atendimento.
+                          </li>
+                          <li>
+                            <strong>Ignorado:</strong> Quando a informação não
+                            está disponível.
+                          </li>
                         </ul>
                       </div>
                     )}
-                    
+
                     <select
                       name="identidadeGenero"
                       className={`w-full p-3 border ${
@@ -2620,7 +2670,7 @@ const NotificationForm = () => {
                     <div>
                       <UnidadeNotificadoraField
                         value={formData.localEncaminhamento}
-                        onChange={(value) => 
+                        onChange={(value) =>
                           setFormData((prev) => ({
                             ...prev,
                             localEncaminhamento: value,

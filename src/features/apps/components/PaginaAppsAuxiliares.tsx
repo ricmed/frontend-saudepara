@@ -1,4 +1,4 @@
-import {  Building2,  Award,  FileSpreadsheet,  FileCheck,  Clock,  Leaf,  Menu,  GraduationCap,  UserSquare,  MapPin, Map, CheckCircle, Users, Calendar, AlertTriangle, HeartPulse, Stethoscope, Thermometer} from "lucide-react";
+import {  Building2,  Award,  FileSpreadsheet,  FileCheck,  Clock,  Leaf,  Menu,  GraduationCap,  UserSquare,  MapPin, Map, CheckCircle, Users, Calendar, AlertTriangle, HeartPulse, Stethoscope, Thermometer, HomeIcon} from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "../../../i18n/useTranslations";
@@ -79,6 +79,11 @@ const PaginaAppsAuxiliares = () => {
       icon: <Thermometer className="h-8 w-8 text-white" />,
       nome: "Tipos de Sintoma",
       link: "/lista-tipos-sintoma",
+    },
+    {
+      icon: <HomeIcon className="h-8 w-8 text-white" />,
+      nome: "Tipos de Bairro",
+      link: "/bairro/lista",
     },
     {
       icon: <Clock className="h-8 w-8 text-white" />,
