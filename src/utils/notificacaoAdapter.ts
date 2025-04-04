@@ -327,6 +327,10 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
     observacao_hiposete: trimmedData.observacaoHipotese || "",
     observacao_trauma: trimmedData.observacaoTrauma || "",
 
+    // Adicionar telefone do paciente no payload para notificações novas
+    // Para edições este campo não deve ser enviado pois não faz parte da tabela de notificação
+    ...(isUpdate ? {} : { contato_paciente: trimmedData.contatoTelefonico || "" }),
+
     // Campos opcionais
     ...(trimmedData.bairro && { 
       tipo_bairro_idtipo_bairro: parseInt(trimmedData.bairro) || null 

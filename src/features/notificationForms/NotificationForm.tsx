@@ -755,10 +755,12 @@ const NotificationForm = () => {
     return `${cleanCPF.substring(0, 3)}.${cleanCPF.substring(3, 6)}.${cleanCPF.substring(6, 9)}-${cleanCPF.substring(9)}`;
   };
 
-  const formatContato = (contato: string) => {
-    // Remove caracteres não numéricos e limita a 15 dígitos
-    return contato.replace(/\D/g, "").slice(0, 15);
-  };
+  // Modificar ou remover a função de formatação para manter o formato original
+const formatContato = (contato: string) => {
+  // Removendo apenas a limitação de caracteres, mantendo a formatação original
+  // E apenas limitando o tamanho máximo para 15 caracteres
+  return contato.slice(0, 15);
+};
 
   // Handler específico para CPF
   const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2323,12 +2325,10 @@ const NotificationForm = () => {
                       name="contatoTelefonico"
                       value={formData.contatoTelefonico}
                       onChange={(value) => {
-                        // Extrair apenas o número de telefone (sem o código do país)
-                        const phoneNumberOnly = value.replace(/^\+\d+\s/, "");
-
-                        // Aplicar formatação para limitar a 15 dígitos numéricos
-                        const formattedValue = formatContato(phoneNumberOnly);
-
+                        // Preserve the full phone number including country code
+                        // Just limit the maximum length to prevent excessive data
+                        const formattedValue = value.slice(0, 20);
+                        
                         setFormData((prev) => ({
                           ...prev,
                           contatoTelefonico: formattedValue,
