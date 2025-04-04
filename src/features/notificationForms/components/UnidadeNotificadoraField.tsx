@@ -17,6 +17,7 @@ interface UnidadeNotificadoraFieldProps {
   label?: string;
   placeholder?: string;
   className?: string;
+  isForEncaminhamento?: boolean; // New prop to track if this is for encaminhamento
 }
 
 const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
@@ -24,7 +25,8 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   onChange,
   label = "Unidade Notificadora",
   placeholder = "Buscar unidade notificadora...",
-  className = ""
+  className = "",
+  isForEncaminhamento = false // Default to false
 }) => {
   const [unidadesNotificadoras, setUnidadesNotificadoras] = useState<Estabelecimento[]>([]);
   const [loadingUnidades, setLoadingUnidades] = useState(false);
@@ -193,6 +195,9 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   const fetchEstabelecimentoById = async (id: string) => {
     if (!id) return;
     
+    // Log the ID we're trying to fetch - this helps debug issues
+    console.log(`Buscando estabelecimento ID: ${id} para ${isForEncaminhamento ? 'encaminhamento' : 'unidade notificadora'}`);
+    
     try {
       setLoadingUnidades(true);
       const apiUrl = `https://marcioreis.uk:5544/api/estabelecimentos/${id}`;
@@ -202,7 +207,9 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
       if (response.data && response.data.idestabelecimento) {
         setSelectedEstabelecimento(response.data);
         setDisplayValue(response.data.nome);
+        console.log(`Estabelecimento encontrado: ${response.data.nome} (ID: ${response.data.idestabelecimento})`);
       } else {
+        console.log(`Estabelecimento não encontrado para ID: ${id}`);
         setSelectedEstabelecimento(null);
         setDisplayValue("");
       }
@@ -350,7 +357,12 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
     setDisplayValue(estabelecimento.nome);
     setSearchQuery("");
     setIsManuallyEditing(false); // Sair do modo de edição manual
-    onChange(estabelecimento.idestabelecimento.toString());
+    
+    // Convert to string and log what we're sending back
+    const idToSend = estabelecimento.idestabelecimento.toString();
+    console.log(`Selecionado ${isForEncaminhamento ? 'encaminhamento' : 'unidade'}: ${estabelecimento.nome} (ID: ${idToSend})`);
+    
+    onChange(idToSend);
     setIsDropdownOpen(false);
     
     // Pequeno timeout para garantir que o scroll seja restaurado após fechar o dropdown
@@ -507,6 +519,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
             onFocus={handleFocus}
             onClick={handleFocus}
             disabled={loadingUnidades && !isDropdownOpen}
+            data-field-type={isForEncaminhamento ? "encaminhamento" : "unidade"}
           />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           {displayValue && (

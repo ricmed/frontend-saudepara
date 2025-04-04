@@ -220,12 +220,19 @@ export async function extractSintomasStrings(notificacao: NotificacaoGenerica): 
  * Extrai o local de encaminhamento de uma notificação
  */
 export function extractLocalEncaminhamento(notificacao: NotificacaoGenerica): string {
-  let localEncaminhamento = "";
+  let localEncaminhamento = '';
   
+  // Check for estabelecimento_idestabelecimento_encaminhado first (this is the correct field name)
+  if (notificacao.estabelecimento_idestabelecimento_encaminhado) {
+    const encaminhamentoId = notificacao.estabelecimento_idestabelecimento_encaminhado;
+    console.log(`Local de encaminhamento encontrado em 'estabelecimento_idestabelecimento_encaminhado': ${encaminhamentoId}`);
+    return encaminhamentoId.toString();
+  }
+  
+  // Then check legacy field names
   if (notificacao.local_encaminhamento) {
-    localEncaminhamento = notificacao.local_encaminhamento;
-    console.log(`Local de encaminhamento encontrado no campo 'local_encaminhamento': ${localEncaminhamento}`);
-    return localEncaminhamento;
+    console.log(`Local de encaminhamento encontrado no campo 'local_encaminhamento': ${notificacao.local_encaminhamento}`);
+    return notificacao.local_encaminhamento.toString();
   }
   
   const possibleFields = [
@@ -277,6 +284,27 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
   const surto = trimmedData.relacionadoSurto === "1" ? "S" : "N";
 
   const pacienteId = trimmedData.pacienteId ? Number(trimmedData.pacienteId) : null;
+
+  // Processar o local de encaminhamento (conforme esperado pelo backend)
+  let estabelecimentoEncaminhado = null;
+  if (trimmedData.localEncaminhamento) {
+    // Se é um número numérico, use diretamente
+    if (!isNaN(Number(trimmedData.localEncaminhamento))) {
+      estabelecimentoEncaminhado = parseInt(trimmedData.localEncaminhamento);
+    }
+    // Para casos de transferência onde pode ser uma string, mantenha a string
+    else {
+      estabelecimentoEncaminhado = trimmedData.localEncaminhamento;
+    }
+  }
+  
+  // Log especial para debug do campo de encaminhamento
+  console.log("Processando campo de encaminhamento:", {
+    original: trimmedData.localEncaminhamento,
+    tipo: typeof trimmedData.localEncaminhamento,
+    convertido: estabelecimentoEncaminhado,
+    tipoEncerramento: trimmedData.tipoEncerramento
+  });
 
   // Construir payload para o backend
   const payload: NotificacaoGenerica = {
@@ -346,12 +374,11 @@ contato_local_hospedagem: trimmedData.contatoLocal || "",
       data_encerramento: trimmedData.dataEncerramento,
     }),
     
-    // CORREÇÃO: Sempre incluir local_encaminhamento quando o tipo de encerramento for 3 (transferido) ou 4 (óbito)
-    ...(["3", "4"].includes(trimmedData.tipoEncerramento) 
-      ? { local_encaminhamento: trimmedData.localEncaminhamento || "" } 
-      : (trimmedData.localEncaminhamento 
-          ? { local_encaminhamento: trimmedData.localEncaminhamento }
-          : {}))
+    // CORREÇÃO: Usar o nome de campo correto conforme esperado pelo backend
+    // Inserir apenas quando tipoEncerramento é 3 (transferido) ou 4 (óbito) ou quando o valor existe
+    ...((["3", "4"].includes(trimmedData.tipoEncerramento) || estabelecimentoEncaminhado) 
+      ? { estabelecimento_idestabelecimento_encaminhado: estabelecimentoEncaminhado } 
+      : {})
   };
 
   console.log("Enviando payload para o backend:", JSON.stringify(payload, null, 2));
@@ -409,12 +436,39 @@ export const salvarNotificacaoCompleta = async (
     
     if (isUpdate && notificacaoId) {
       // Atualizar notificação existente
-      response = await axios.put(`${server}:${port}/api/notificacao/${notificacaoId}`, payloadBackend);
-      savedNotificacaoId = notificacaoId;
+      try {
+        console.log(`Enviando atualização para notificação ${notificacaoId}:`, JSON.stringify(payloadBackend, null, 2));
+        response = await axios.put(`${server}:${port}/api/notificacao/${notificacaoId}`, payloadBackend);
+        savedNotificacaoId = notificacaoId;
+      } catch (error: any) {
+        // Log detalhado do erro para diagnóstico
+        console.error("Erro detalhado ao atualizar notificação:", {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          message: error.message,
+          payload: payloadBackend
+        });
+        throw error;
+      }
     } else {
       // Criar nova notificação
-      response = await axios.post(`${server}:${port}/api/notificacao`, payloadBackend);
-      savedNotificacaoId = response.data.idnotificacao;
+      try {
+        console.log("Enviando notificação para criação:", JSON.stringify(payloadBackend, null, 2));
+        response = await axios.post(`${server}:${port}/api/notificacao`, payloadBackend);
+        savedNotificacaoId = response.data.idnotificacao;
+        console.log(`Notificação criada com ID: ${savedNotificacaoId}`);
+      } catch (error: any) {
+        // Log detalhado do erro para diagnóstico
+        console.error("Erro detalhado ao criar notificação:", {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          message: error.message,
+          payload: payloadBackend
+        });
+        throw error;
+      }
     }
     
     // Extrair IDs dos sintomas do formulário

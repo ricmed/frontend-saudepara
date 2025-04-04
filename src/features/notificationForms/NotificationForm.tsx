@@ -2854,7 +2854,10 @@ const NotificationForm = () => {
                         }
                         label="Local de Encaminhamento"
                         placeholder="Buscar estabelecimento para encaminhamento..."
+                        isForEncaminhamento={true} // Add this prop
                       />
+                      {/* Add debug info */}
+                      <p className="mt-1 text-xs text-blue-400">ID selecionado: {formData.localEncaminhamento || 'Nenhum'}</p>
                     </div>
                   )}
 
