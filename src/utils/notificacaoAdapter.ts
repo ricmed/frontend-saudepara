@@ -27,6 +27,10 @@ export const formatFromBackend = async (
       ? "2"
       : "3";
 
+  // Mapear o campo tipo_bairro_idtipo_bairro para bairro
+  const bairroId = backendData.tipo_bairro_idtipo_bairro ?
+    backendData.tipo_bairro_idtipo_bairro.toString() : "";
+
   const relacionadoSurto = backendData.surto === "S" ? "1" : "2";
 
   // Buscar sintomas com método melhorado e aguardar resultado
@@ -82,7 +86,7 @@ export const formatFromBackend = async (
 
     // Seção 2: Procedência do indivíduo
     residenteBelem,
-    bairro: backendData.bairro || "",
+    bairro: backendData.tipo_bairro_idtipo_bairro?.toString() || "",
     municipio: backendData.tipo_municipio_idtipo_municipio?.toString() || "",
     uf: backendData.tipo_estado_idtipo_estado?.toString() || "",
     paisProcedencia: backendData.tipo_pais_idtipo_pais?.toString() || "",
@@ -296,7 +300,9 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
     observacao_trauma: trimmedData.observacaoTrauma || "",
 
     // Campos opcionais
-    ...(trimmedData.bairro && { bairro: trimmedData.bairro }),
+    ...(trimmedData.bairro && { 
+      tipo_bairro_idtipo_bairro: parseInt(trimmedData.bairro) || null 
+    }),
     ...(trimmedData.uf && {
       tipo_estado_idtipo_estado: parseInt(trimmedData.uf) || null,
     }),

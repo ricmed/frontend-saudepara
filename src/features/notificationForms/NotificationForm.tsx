@@ -7,6 +7,8 @@ import ModalBuscaPaciente from "@/features/paginaPacientesComu/components/ModalB
 import { Paciente } from "@/services/PacienteService";
 import LocationInput from "@/features/notificationForms/components/LocationInput";
 import BairroInput from "./components/BairroInput";
+import { debounce } from "lodash";
+import axios from "axios";
 import {
   Search,
   Save,
@@ -172,6 +174,11 @@ const NotificationForm = () => {
   const [ufError, setUfError] = useState<string | null>(null);
   const latestUfRef = useRef<string>("");
   const [bairroOptions] = useState<BairroOption[]>([]);
+  const [pacienteSuggestions, setPacienteSuggestions] = useState<Paciente[]>(
+    []
+  );
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isCreatingNewPatient, setIsCreatingNewPatient] = useState(false);
   const [generoOptions, setGeneroOptions] = useState<GeneroOption[]>([]);
   const [racaOptions, setRacaOptions] = useState<RacaOption[]>([]);
   const [escolaridadeOptions, setEscolaridadeOptions] = useState<
@@ -290,79 +297,6 @@ const NotificationForm = () => {
   const [searchSintomas, setSearchSintomas] = useState("");
   const [searchTrauma, setSearchTrauma] = useState("");
   const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
-
-  // Lista de bairros de Belém para o dropdown
-  const belemBairros = [
-    "Cidade Velha",
-    "Campina",
-    "Reduto",
-    "Umarizal",
-    "Telegrafo",
-    "Sacramenta",
-    "Pedreira",
-    "Marco",
-    "Souza",
-    "Marambaia",
-    "Canudos",
-    "Fátima",
-    "São Brás",
-    "Nazaré",
-    "Batista Campos",
-    "Jurunas",
-    "Condor",
-    "Guamá",
-    "Terra Firme",
-    "Cremação",
-    "Val-de-Cães",
-    "Miramar",
-    "Pratinha",
-    "Tapanã",
-    "Benguí",
-    "Maracangalha",
-    "Barreiro",
-    "Universitário",
-    "Curió-Utínga",
-    "Aurá",
-    "Castanheira",
-    "Águas Lindas",
-    "Guanabara",
-    "São Clemente",
-    "Parque Guajará",
-    "Tenoné",
-    "Águas Negras",
-    "Maracacuera",
-    "Parque Verde",
-    "Cruzeiro",
-    "Ponta Grossa",
-    "Mangueirão",
-    "Cabanagem",
-    "Campina de Icoaraci",
-    "Paracuri",
-    "Agulha",
-    "Una",
-    "Coqueiro",
-    "São João do Outeiro",
-    "Itaiteua",
-    "Água Negra",
-    "Maracajá",
-    "Vila",
-    "Praia Grande",
-    "Farol",
-    "Mangueiras",
-    "São Francisco",
-    "Caranamduba",
-    "Marahu",
-    "Paraíso",
-    "Baia do Sol",
-    "Sucurijuquara",
-    "Caruara",
-    "Bonfim",
-    "Ariramba",
-    "Porto Arthur",
-    "Murubira",
-    "Chapéu Virado",
-    "Aeroporto",
-  ].sort((a, b) => new Intl.Collator("pt-BR").compare(a, b)); // Ordenação considerando acentos em português
 
   // Estado para armazenar o objeto paciente completo selecionado
   const [, setSelectedPaciente] = useState<Paciente | null>(null);
@@ -649,6 +583,35 @@ const NotificationForm = () => {
       setIsLoading(false);
     }
   };
+
+  const searchPacienteByName = useCallback(
+    debounce(async (name: string) => {
+      if (name.length < 3) {
+        setPacienteSuggestions([]);
+        setShowSuggestions(false);
+        return;
+      }
+
+      try {
+        const server = import.meta.env.VITE_API_SERVER;
+        const port = import.meta.env.VITE_API_PORT;
+        const response = await axios.get(
+          `${server}:${port}/api/paciente/search?nome=${encodeURIComponent(name)}`
+        );
+
+        // Converter todos os pacientes para caixa alta conforme padrão do app
+        const pacientes = response.data.map((p: Paciente) =>
+          toUpperCaseAllStrings(p)
+        );
+        setPacienteSuggestions(pacientes);
+        setShowSuggestions(true);
+      } catch (error) {
+        console.error("Erro ao buscar pacientes:", error);
+        setPacienteSuggestions([]);
+      }
+    }, 500),
+    []
+  );
 
   // Função para carregar municipios com base no estado selecionado
   const loadMunicipiosByEstado = useCallback(
@@ -1076,6 +1039,69 @@ const NotificationForm = () => {
     }
   }, [formData.residenteBelem]);
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showSuggestions) {
+        const target = e.target as HTMLElement;
+        // Verificar se o clique foi fora da área de sugestões
+        if (!target.closest(".paciente-suggestions-area")) {
+          setShowSuggestions(false);
+        }
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showSuggestions]);
+
+  const criarNovoPaciente = async () => {
+    setIsCreatingNewPatient(true);
+
+    try {
+      const server = import.meta.env.VITE_API_SERVER;
+      const port = import.meta.env.VITE_API_PORT;
+
+      // Dados básicos do novo paciente
+      const novoPaciente = {
+        nome: formData.paciente,
+        nome_mae: formData.nomeMae || "",
+        data_nascimento: formData.dataNascimento || null,
+        cpf: formData.cpf || "",
+        contato: formData.contatoTelefonico || "",
+        tipo_genero_idtipo_genero: formData.identidadeGenero || null,
+        tipo_raca_idtipo_raca: formData.raca || null,
+        escolaridade_idescolaridade: formData.escolaridade || null,
+        cbo_idcbo: formData.profissao || null,
+      };
+
+      // Enviar para a API
+      const response = await axios.post(
+        `${server}:${port}/api/paciente`,
+        novoPaciente
+      );
+
+      // Atualizar o formData com o novo paciente e seu ID
+      const pacienteCriado = response.data;
+
+      // Converter para caixa alta e atualizar formData
+      const pacienteUpperCase = toUpperCaseAllStrings(pacienteCriado);
+      setFormData((prev) => ({
+        ...prev,
+        pacienteId: pacienteUpperCase.idpaciente,
+      }));
+
+      toast.success("Novo paciente criado com sucesso!");
+    } catch (error) {
+      console.error("Erro ao criar novo paciente:", error);
+      toast.error("Erro ao criar novo paciente. Por favor, tente novamente.");
+    } finally {
+      setIsCreatingNewPatient(false);
+      setShowSuggestions(false);
+    }
+  };
+
   // Handler para checkboxes (múltipla seleção)
   const handleCheckboxChange = (field: keyof FormData, value: string) => {
     if (!value) return;
@@ -1155,8 +1181,43 @@ const NotificationForm = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  const handlePacienteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+
+    // Normalizar para caixa alta como o restante da aplicação
+    const normalizedValue = normalizeText(value);
+
+    // Atualizar o formData sem o ID se estiver digitando manualmente
+    setFormData((prev) => ({
+      ...prev,
+      paciente: normalizedValue,
+      pacienteId: undefined, // Limpar o ID porque estamos digitando um novo nome
+    }));
+
+    // Buscar pacientes com nome similar
+    searchPacienteByName(normalizedValue);
+
+    // Limpar erro se existir
+    if (errors.paciente) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors.paciente;
+        return newErrors;
+      });
+    }
+  };
+
   // Validar formulário antes de enviar
   const validateForm = (): boolean => {
+    // Verificar se tem ID do paciente
+    if (!formData.pacienteId) {
+      const newErrors: Record<string, string> = {
+        paciente: "É necessário selecionar ou criar um paciente válido com ID",
+      };
+      setErrors((prev) => ({ ...prev, ...newErrors }));
+      setExpandedSections((prev) => ({ ...prev, identificacao: true }));
+      return false;
+    }
     // Verificar campos obrigatórios
     const requiredFields: Array<{ field: keyof FormData; label: string }> = [
       { field: "evento", label: "Evento" },
@@ -1267,9 +1328,68 @@ const NotificationForm = () => {
     e.preventDefault();
     console.log("Form prevent default executado");
 
+    // Se tem nome de paciente, mas não tem ID, criar paciente automaticamente
+    if (formData.paciente.trim() && !formData.pacienteId) {
+      try {
+        const server = import.meta.env.VITE_API_SERVER;
+        const port = import.meta.env.VITE_API_PORT;
+
+        toast.info("Criando novo paciente automaticamente...");
+
+        // Criar payload de novo paciente com os dados disponíveis
+        const novoPaciente = {
+          nome: formData.paciente,
+          nome_mae: formData.nomeMae || "",
+          data_nascimento: formData.dataNascimento || null,
+          cpf: formData.cpf || "",
+          contato: formData.contatoTelefonico || "",
+          tipo_genero_idtipo_genero: formData.identidadeGenero
+            ? parseInt(formData.identidadeGenero)
+            : null,
+          tipo_raca_idtipo_raca: formData.raca ? parseInt(formData.raca) : null,
+          escolaridade_idescolaridade: formData.escolaridade
+            ? parseInt(formData.escolaridade)
+            : null,
+          cbo_idcbo: formData.profissao ? parseInt(formData.profissao) : null,
+        };
+
+        // Criar o paciente no backend
+        const response = await axios.post(
+          `${server}:${port}/api/paciente`,
+          novoPaciente
+        );
+
+        // Atualizar o formData com o ID do paciente criado
+        formData.pacienteId = response.data.idpaciente;
+
+        console.log(
+          "Paciente criado automaticamente com ID:",
+          response.data.idpaciente
+        );
+      } catch (error) {
+        console.error("Erro ao criar paciente automaticamente:", error);
+        toast.error(
+          "Erro ao criar o paciente. Verifique os dados e tente novamente."
+        );
+        setIsSaving(false);
+        return; // Impedir envio do formulário
+      }
+    } else if (!formData.paciente.trim()) {
+      toast.error("O nome do paciente é obrigatório");
+      setErrors((prev) => ({
+        ...prev,
+        paciente: "O nome do paciente é obrigatório",
+      }));
+      setExpandedSections((prev) => ({
+        ...prev,
+        identificacao: true,
+      }));
+      return;
+    }
+
     const isValid = validateForm();
     console.log("Form validation result:", isValid);
-    if (!validateForm()) return;
+    if (!isValid) return;
 
     setIsSaving(true);
     try {
@@ -1671,6 +1791,7 @@ const NotificationForm = () => {
                           setFormData((prev) => ({
                             ...prev,
                             bairro: value,
+                            tipo_bairro_idtipo_bairro: value, // Adicionar esta linha
                           }));
                         }}
                         placeholder="Selecione o bairro"
@@ -1804,33 +1925,88 @@ const NotificationForm = () => {
                     <label className="block mb-2 font-medium text-gray-700">
                       Nome
                     </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        name="paciente"
-                        placeholder="Nome do paciente"
-                        className={`flex-1 p-3 border ${
-                          errors.paciente
-                            ? "border-red-500 bg-red-50"
-                            : "border-gray-200"
-                        } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
-                        value={formData.paciente}
-                        onChange={handleChange}
-                        maxLength={100}
-                        data-error={errors.paciente ? "true" : "false"}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setIsPatientModalOpen(true)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                      >
-                        <Search className="h-4 w-4" />
-                        <span>Pesquisar</span>
-                      </button>
+                    <div className="relative paciente-suggestions-area">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          name="paciente"
+                          placeholder="Nome do paciente"
+                          className={`flex-1 p-3 border ${
+                            errors.paciente
+                              ? "border-red-500 bg-red-50"
+                              : "border-gray-200"
+                          } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
+                          value={formData.paciente}
+                          onChange={handlePacienteChange}
+                          maxLength={100}
+                          data-error={errors.paciente ? "true" : "false"}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setIsPatientModalOpen(true)}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                        >
+                          <Search className="h-4 w-4" />
+                          <span>Pesquisar</span>
+                        </button>
+                      </div>
+
+                      {/* Mostrar sugestões */}
+                      {showSuggestions && pacienteSuggestions.length > 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          {pacienteSuggestions.map((paciente) => (
+                            <button
+                              key={paciente.idpaciente}
+                              type="button"
+                              className="w-full px-4 py-2 text-left hover:bg-blue-50 text-sm text-gray-700 cursor-pointer border-b border-gray-100 last:border-b-0"
+                              onClick={() => {
+                                handleSelectPaciente(paciente);
+                                setShowSuggestions(false);
+                              }}
+                            >
+                              <div className="font-medium">{paciente.nome}</div>
+                              <div className="text-xs text-gray-500">
+                                {paciente.data_nascimento
+                                  ? `Nascimento: ${new Date(paciente.data_nascimento).toLocaleDateString()}`
+                                  : ""}
+                                {paciente.cpf ? ` | CPF: ${paciente.cpf}` : ""}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Mensagem quando não há resultados */}
+                      {showSuggestions &&
+                        formData.paciente.length >= 3 &&
+                        pacienteSuggestions.length === 0 && (
+                          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center">
+                            <p className="text-sm text-gray-600">
+                              Nenhum paciente encontrado.
+                            </p>
+                            <button
+                              type="button"
+                              className="mt-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
+                              onClick={criarNovoPaciente}
+                              disabled={isCreatingNewPatient}
+                            >
+                              {isCreatingNewPatient
+                                ? "Criando..."
+                                : "Criar novo paciente"}
+                            </button>
+                          </div>
+                        )}
                     </div>
                     {errors.paciente && (
                       <p className="mt-1 text-sm text-red-500">
                         {errors.paciente}
+                      </p>
+                    )}
+
+                    {/* Mostra o ID do paciente quando for selecionado */}
+                    {formData.pacienteId && (
+                      <p className="mt-1 text-xs text-blue-500">
+                        ID do paciente: {formData.pacienteId}
                       </p>
                     )}
                   </div>
