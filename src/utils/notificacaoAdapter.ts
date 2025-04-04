@@ -392,6 +392,7 @@ export const salvarNotificacaoCompleta = async (
   notificacaoId?: number
 ): Promise<any> => {
 
+  console.log("DADOS DO FORM ANTES DE ENVIAR:", formData);
   console.log("Dados antes de salvar - Tipo residente:", formData.residenteBelem, "País:", formData.paisProcedencia);
 
   const server = import.meta.env.VITE_API_SERVER;
@@ -399,6 +400,8 @@ export const salvarNotificacaoCompleta = async (
   
   // Formatar dados para o backend
   const payloadBackend = formatToBackend(formData, isUpdate);
+  
+  console.log("PAYLOAD APÓS FORMATAÇÃO:", payloadBackend);
   
   try {
     let response;
