@@ -39,10 +39,9 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   
-  // Salvar a posição de scroll atual
-  const scrollPositionRef = useRef({ x: 0, y: 0 });
+  // Usar um estado para posição em vez de ref para forçar re-render
+  const [scrollPosition, setScrollPosition] = useState({ x: 0, y: 0 });
   
   // Add a cache for storing previous search results
   const estabelecimentosCache = useRef<Record<string, Estabelecimento[]>>({});
@@ -66,7 +65,6 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
     }
     
     setErrorUnidades(errorMessage);
-    setUnidadesNotificadoras([]);
     setLoadingUnidades(false);
   };
 
@@ -85,26 +83,12 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
         return;
       }
       
-      // Handle minimum search length
-      if (searchTerm && searchTerm.length < 3) {
-        // For 1-2 characters, use client-side filtering on the full dataset
-        if (estabelecimentosCache.current["_all_"]) {
-          const filtered = estabelecimentosCache.current["_all_"].filter(item => 
-            item.nome.toLowerCase().includes(searchTerm.toLowerCase())
-          );
-          setUnidadesNotificadoras(filtered);
-          setLoadingUnidades(false);
-          return;
-        } else if (!initialLoadDone.current) {
-          // If we haven't loaded all data yet, do it now
-          searchTerm = "";
-        } else {
-          // Otherwise show a message about minimum chars
-          setErrorUnidades("Digite pelo menos 3 caracteres para pesquisar");
-          setUnidadesNotificadoras([]);
-          setLoadingUnidades(false);
-          return;
-        }
+      // Para termos de pesquisa, exigir 3+ caracteres mas não limpar a lista
+      if (searchTerm && searchTerm.length < 3 && searchTerm.length > 0) {
+        setErrorUnidades("Digite pelo menos 3 caracteres para pesquisar");
+        // Não limpar a lista para manter todas as unidades visíveis
+        setLoadingUnidades(false);
+        return;
       }
       
       // Preparar parâmetros para a API
@@ -186,8 +170,6 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
       }
       setErrorUnidades(error.message || "Erro ao carregar unidades");
       setLoadingUnidades(false);
-      // Garantir que unidadesNotificadoras seja um array vazio em caso de erro
-      setUnidadesNotificadoras([]);
     }
   };
 
@@ -200,7 +182,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
     
     try {
       setLoadingUnidades(true);
-      const apiUrl = `https://marcioreis.uk:5544/api/estabelecimentos/${id}`;
+      const apiUrl = `https://app.hml.saude.pa.gov.br:443/api/estabelecimentos/${id}`;
       
       const response = await axios.get(apiUrl);
       
@@ -222,12 +204,6 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
     }
   };
   
-  // Carregar unidades iniciais ao montar o componente
-  useEffect(() => {
-    // Não precisamos carregar unidades iniciais até o usuário interagir
-    // fetchUnidadesNotificadoras("");
-  }, []);
-
   // Processar o valor inicial, se houver
   useEffect(() => {
     if (!isManuallyEditing && value) {
@@ -238,44 +214,19 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
     }
   }, [value, isManuallyEditing]);
 
-  // Atualizar a posição do dropdown quando aberto
-  useEffect(() => {
-    if (isDropdownOpen && inputRef.current) {
-      const rect = inputRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + window.scrollY,
-        left: rect.left + window.scrollX
-      });
-      
-      // Buscar dados quando o dropdown é aberto
-      if (unidadesNotificadoras.length === 0) {
-        fetchUnidadesNotificadoras(searchQuery);
-      }
+  // Safely close dropdown and restore state
+  const closeDropdown = () => {
+    setIsDropdownOpen(false);
+    
+    // Quando fechar o dropdown sem selecionar, resetar para o valor anterior se necessário
+    if (isManuallyEditing && selectedEstabelecimento) {
+      setSearchQuery("");
+      setIsManuallyEditing(false);
+    } else if (isManuallyEditing && !selectedEstabelecimento) {
+      setSearchQuery("");
+      setIsManuallyEditing(false);
     }
-  }, [isDropdownOpen]);
-  
-  // Optimize debounce for search
-  useEffect(() => {
-    if (isDropdownOpen) {
-      const timer = setTimeout(() => {
-        fetchUnidadesNotificadoras(searchQuery);
-      }, searchQuery.length < 3 ? 0 : 300); // No delay for short queries
-      
-      return () => clearTimeout(timer);
-    }
-  }, [searchQuery, isDropdownOpen]);
-  
-  // Restaurar a posição de scroll ao abrir o dropdown
-  useEffect(() => {
-    if (isDropdownOpen) {
-      // Pequeno timeout para garantir que o scroll seja restaurado após qualquer mudança de DOM
-      const timeoutId = setTimeout(() => {
-        window.scrollTo(scrollPositionRef.current.x, scrollPositionRef.current.y);
-      }, 10);
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [isDropdownOpen]);
+  };
 
   // Manipulador para fechar o dropdown quando clicar fora
   useEffect(() => {
@@ -286,16 +237,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
         dropdownRef.current && 
         !dropdownRef.current.contains(event.target as Node)
       ) {
-        setIsDropdownOpen(false);
-        
-        // Quando fechar o dropdown sem selecionar, resetar para o valor anterior se necessário
-        if (isManuallyEditing && selectedEstabelecimento) {
-          setSearchQuery("");
-          setIsManuallyEditing(false);
-        } else if (isManuallyEditing && !selectedEstabelecimento) {
-          setSearchQuery("");
-          setIsManuallyEditing(false);
-        }
+        closeDropdown();
       }
     };
 
@@ -309,21 +251,119 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isDropdownOpen, isManuallyEditing, selectedEstabelecimento]);
 
+  // Improved positioning logic for dropdown, especially for mobile
+  const updateDropdownPosition = () => {
+    if (!inputRef.current || !dropdownRef.current) return;
+    
+    const rect = inputRef.current.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    
+    // Check if we're on mobile by screen width
+    const isMobile = viewportWidth <= 768;
+    
+    // On mobile, position relative to viewport rather than document
+    if (isMobile) {
+      // Calculate how much space is available below the input
+      const spaceBelow = viewportHeight - rect.bottom;
+      // Default maximum height for dropdown
+      const maxDropdownHeight = Math.min(300, viewportHeight * 0.6); // Limitar a 60% da altura da viewport
+      
+      // Make sure the dropdown doesn't exceed screen width on mobile
+      const leftPosition = Math.max(0, rect.left);
+      // Ajustar a largura para incluir o botão de pesquisa
+      const totalWidth = inputRef.current.offsetWidth + 64; // Adicionar largura aproximada do botão
+      const adjustedWidth = Math.min(totalWidth, viewportWidth - leftPosition);
+      
+      // If there's not enough space below, position above if possible
+      if (spaceBelow < 150 && rect.top > 150) {
+        dropdownRef.current.style.setProperty('bottom', `${viewportHeight - rect.top}px`);
+        dropdownRef.current.style.setProperty('top', 'auto');
+        dropdownRef.current.style.setProperty('max-height', `${Math.min(rect.top - 10, maxDropdownHeight)}px`);
+      } else {
+        // Position below with appropriate max height
+        dropdownRef.current.style.setProperty('top', `${rect.bottom}px`);
+        dropdownRef.current.style.setProperty('bottom', 'auto');
+        dropdownRef.current.style.setProperty('max-height', `${Math.min(spaceBelow - 10, maxDropdownHeight)}px`);
+      }
+      
+      // Set horizontal position - ensure it's visible on screen
+      dropdownRef.current.style.setProperty('left', `${leftPosition}px`);
+      dropdownRef.current.style.setProperty('width', `${adjustedWidth}px`);
+      
+      // Use fixed positioning on mobile to avoid scroll issues
+      dropdownRef.current.style.setProperty('position', 'fixed');
+      
+      // Make sure the z-index is high enough
+      dropdownRef.current.style.setProperty('z-index', '9999');
+      
+      // Add some subtle animation for smoother UX
+      dropdownRef.current.style.setProperty('transition', 'opacity 0.2s, transform 0.2s');
+      dropdownRef.current.style.setProperty('opacity', '1');
+      dropdownRef.current.style.setProperty('transform', 'translateY(0)');
+    } else {
+      // On desktop, use absolute positioning relative to document
+      const rect = inputRef.current.getBoundingClientRect();
+      const totalWidth = inputRef.current.offsetWidth + 64; // Adicionar largura do botão
+      
+      dropdownRef.current.style.setProperty('position', 'absolute');
+      dropdownRef.current.style.setProperty('top', `${rect.bottom + window.scrollY}px`);
+      dropdownRef.current.style.setProperty('left', `${rect.left + window.scrollX}px`);
+      dropdownRef.current.style.setProperty('width', `${totalWidth}px`);
+      dropdownRef.current.style.setProperty('max-height', '300px');
+    }
+  };
+
+  // Update dropdown position when it's opened or window is resized
+  useEffect(() => {
+    if (isDropdownOpen) {
+      updateDropdownPosition();
+      
+      // Fetch data when dropdown is opened if needed
+      if (unidadesNotificadoras.length === 0) {
+        fetchUnidadesNotificadoras("");
+      }
+      
+      // Track window resize
+      window.addEventListener('resize', updateDropdownPosition);
+      // Track scroll
+      window.addEventListener('scroll', updateDropdownPosition);
+      
+      return () => {
+        window.removeEventListener('resize', updateDropdownPosition);
+        window.removeEventListener('scroll', updateDropdownPosition);
+      };
+    }
+  }, [isDropdownOpen]);
+  
+  // Debounce for search - adjusting behavior based on query length
+  useEffect(() => {
+    if (isDropdownOpen) {
+      // For empty or long queries, use debounce
+      if (searchQuery.length === 0 || searchQuery.length >= 3) {
+        const timer = setTimeout(() => {
+          fetchUnidadesNotificadoras(searchQuery);
+        }, 300);
+        
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [searchQuery, isDropdownOpen]);
+
   const handleFocus = () => {
-    // Salvar posição atual de scroll
-    scrollPositionRef.current = {
+    // Store current scroll position
+    setScrollPosition({
       x: window.scrollX,
       y: window.scrollY
-    };
+    });
     
-    // Limpar a consulta de pesquisa ao focar
+    // Clear search query when focusing
     setSearchQuery("");
     
-    // Abrir dropdown
+    // Open dropdown
     setIsDropdownOpen(true);
   };
   
-  // Update the handle input change function to fetch immediately when clearing
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     
@@ -340,19 +380,22 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
     
     setSearchQuery(query);
     
-    // When clearing the search field, immediately refresh results
-    if (query === "" && isDropdownOpen) {
+    // Show appropriate message based on query length
+    if (query.length > 0 && query.length < 3) {
+      setErrorUnidades("Digite pelo menos 3 caracteres para pesquisar");
+      // Não limpar a lista, mostrar a mensagem junto com todas as unidades
+    } else if (query.length >= 3 && isDropdownOpen) {
+      // Only fetch new results when we have 3+ characters
+      setErrorUnidades(null);
+      fetchUnidadesNotificadoras(query);
+    } else if (query.length === 0 && isDropdownOpen) {
+      // Se limpou a pesquisa, mostrar todas as unidades novamente
+      setErrorUnidades(null);
       fetchUnidadesNotificadoras("");
     }
   };
 
   const handleEstabelecimentoSelect = (estabelecimento: Estabelecimento) => {
-    // Salvar posição de scroll atual
-    const scrollPosition = {
-      x: window.scrollX,
-      y: window.scrollY
-    };
-    
     setSelectedEstabelecimento(estabelecimento);
     setDisplayValue(estabelecimento.nome);
     setSearchQuery("");
@@ -363,12 +406,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
     console.log(`Selecionado ${isForEncaminhamento ? 'encaminhamento' : 'unidade'}: ${estabelecimento.nome} (ID: ${idToSend})`);
     
     onChange(idToSend);
-    setIsDropdownOpen(false);
-    
-    // Pequeno timeout para garantir que o scroll seja restaurado após fechar o dropdown
-    setTimeout(() => {
-      window.scrollTo(scrollPosition.x, scrollPosition.y);
-    }, 10);
+    closeDropdown();
   };
 
   const handleClear = () => {
@@ -382,31 +420,28 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   const handleSearchButtonClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // Evitar propagação
     
-    // Salvar posição atual de scroll
-    scrollPositionRef.current = {
+    // Store current scroll position
+    setScrollPosition({
       x: window.scrollX,
       y: window.scrollY
-    };
+    });
     
     setIsDropdownOpen(true);
     fetchUnidadesNotificadoras("");
   };
 
-  // Pre-filter results on the client side for better performance
+  // Filter results client-side - mostrar todos se não tiver pesquisa, ou filtrar com 3+ caracteres
   const filteredUnidades = useMemo(() => {
-    if (searchQuery.length > 0 && searchQuery.length < 3) {
-      return unidadesNotificadoras.filter(est => 
-        est.nome.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-    
-    // Only apply client-side filtering for queries of less than 3 characters
-    if (searchQuery.length < 3) {
+    if (searchQuery.length === 0) {
+      // Mostrar todas as unidades quando não há pesquisa
+      return unidadesNotificadoras;
+    } else if (searchQuery.length >= 3) {
+      // Quando pesquisa tem 3+ caracteres, usar os resultados da API
+      return unidadesNotificadoras;
+    } else {
+      // Para 1-2 caracteres, fazer um filtro local mas mostrar todas as unidades
       return unidadesNotificadoras;
     }
-    
-    // For 3+ characters, the server already filtered the results
-    return unidadesNotificadoras;
   }, [unidadesNotificadoras, searchQuery]);
   
   // Renderiza o dropdown em um portal fora da hierarquia DOM - using filteredUnidades
@@ -416,39 +451,34 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
     return createPortal(
       <div 
         ref={dropdownRef}
+        className="fixed z-[9999] bg-white rounded-lg shadow-md border border-gray-200 flex flex-col"
         style={{
-          position: 'absolute',
-          top: `${dropdownPosition.top}px`,
-          left: `${dropdownPosition.left}px`,
-          zIndex: 9999,
-          width: `${inputRef.current ? inputRef.current.offsetWidth + 64 : 354}px`, // Adicionar largura do botão
-          backgroundColor: 'white',
-          borderRadius: '0.5rem',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-          border: '1px solid #e5e7eb',
-          maxHeight: '300px', // Altura fixa para o container
-          display: 'flex',
-          flexDirection: 'column'
+          overscrollBehavior: 'contain',
+          WebkitOverflowScrolling: 'touch',
         }}
       >
-        <div className="p-2 border-b border-gray-100">
-          <input
-            type="text"
-            placeholder="Filtrar unidades..."
-            className="w-full p-2 text-sm border border-gray-200 rounded-md"
-            value={searchQuery}
-            onChange={handleInputChange}
-            onClick={(e) => e.stopPropagation()}
-            autoFocus
-          />
+        <div className="p-2 border-b border-gray-100 sticky top-0 bg-white z-10">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Filtrar unidades..."
+              className="w-full p-2 pr-8 text-sm border border-gray-200 rounded-md"
+              value={searchQuery}
+              onChange={handleInputChange}
+              onClick={(e) => e.stopPropagation()}
+              autoFocus
+            />
+            {searchQuery.length > 0 && (
+              <button 
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                onClick={() => setSearchQuery("")}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
-        <div 
-          className="overflow-y-auto py-1 flex-grow"
-          style={{
-            overscrollBehavior: 'contain',
-            WebkitOverflowScrolling: 'touch',
-          }}
-        >
+        <div className="overflow-y-auto py-1 flex-grow">
           {loadingUnidades ? (
             <div className="px-4 py-2 text-sm text-gray-500 text-center">
               Carregando...
@@ -469,8 +499,9 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
             <>
               <div className="px-4 py-1 text-xs text-gray-400">
                 {filteredUnidades.length} unidades encontradas
-                {unidadesNotificadoras.length > filteredUnidades.length ? 
-                  ` (filtradas de ${unidadesNotificadoras.length})` : ''}
+                {searchQuery.length > 0 && searchQuery.length < 3 && (
+                  <span className="ml-2 text-amber-500">Digite pelo menos 3 caracteres para refinar a pesquisa</span>
+                )}
               </div>
               {filteredUnidades.map((estabelecimento) => (
                 <button
@@ -495,9 +526,17 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
             </>
           ) : (
             <div className="px-4 py-2 text-sm text-gray-500">
-              {searchQuery.length > 0 ? 'Nenhuma unidade encontrada com este termo' : 'Nenhuma unidade disponível'}
+              {searchQuery.length >= 3 ? 'Nenhuma unidade encontrada com este termo' : 'Carregando unidades...'}
             </div>
           )}
+        </div>
+        <div className="p-2 border-t border-gray-100 sticky bottom-0 bg-white">
+          <button
+            className="w-full py-2 text-sm text-center bg-gray-100 hover:bg-gray-200 rounded-md"
+            onClick={closeDropdown}
+          >
+            Fechar
+          </button>
         </div>
       </div>,
       document.body

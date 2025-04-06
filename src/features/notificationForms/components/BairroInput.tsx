@@ -216,19 +216,32 @@ const BairroInput: React.FC<BairroInputProps> = ({
   // Handler to close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      // Verificar se estamos em um dispositivo móvel
+      const isMobile = window.innerWidth <= 768;
+      
       if (
         inputRef.current && 
         !inputRef.current.contains(event.target as Node) &&
         dropdownRef.current && 
         !dropdownRef.current.contains(event.target as Node)
       ) {
-        setIsDropdownOpen(false);
-        setSearchQuery("");
+        // Em dispositivos móveis, adicionar uma pequena pausa
+        // para permitir que o teclado feche antes de processar a ação
+        if (isMobile) {
+          setTimeout(() => {
+            setIsDropdownOpen(false);
+          }, 100);
+        } else {
+          setIsDropdownOpen(false);
+        }
       }
     };
-
+  
     if (isDropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
+      // Pequeno timeout para evitar que o mesmo clique que abriu o dropdown o feche imediatamente
+      setTimeout(() => {
+        document.addEventListener("mousedown", handleClickOutside);
+      }, 100);
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isDropdownOpen]);
@@ -282,17 +295,32 @@ const BairroInput: React.FC<BairroInputProps> = ({
   const handleFocus = () => {
     if (disabled) return;
     
-    // Save current scroll position
+    // Detectar se estamos em um dispositivo móvel
+    const isMobile = window.innerWidth <= 768;
+    
+    // Salvar posição atual de scroll
     scrollPositionRef.current = {
       x: window.scrollX,
       y: window.scrollY
     };
     
-    // Clear search but keep display value
+    // Limpar a consulta de pesquisa ao focar
     setSearchQuery("");
     
-    // Open dropdown
+    // Abrir dropdown
     setIsDropdownOpen(true);
+    
+    // Em dispositivos móveis, forçar um pequeno timeout para garantir
+    // que o dropdown seja posicionado corretamente após o teclado aparecer
+    if (isMobile && inputRef.current) {
+      setTimeout(() => {
+        const rect = inputRef.current!.getBoundingClientRect();
+        setDropdownPosition({
+          top: rect.bottom + window.scrollY,
+          left: rect.left + window.scrollX
+        });
+      }, 50);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -334,25 +362,47 @@ const BairroInput: React.FC<BairroInputProps> = ({
   const renderDropdown = () => {
     if (!isDropdownOpen) return null;
     
+    // Detectar se estamos em um dispositivo móvel
+    const isMobile = window.innerWidth <= 768;
+    
+    // Em dispositivos móveis, anexamos o dropdown ao elemento pai em vez de ao body
+    // para manter o contexto de rolagem
+    const dropdownParent = (isMobile && inputRef.current && inputRef.current.parentElement) 
+      ? inputRef.current.parentElement 
+      : document.body;
+  
+    // Calcular posição do dropdown
+    let topPosition = dropdownPosition.top;
+    let leftPosition = dropdownPosition.left;
+    
+    // Em dispositivos móveis, posicionar relativo ao elemento pai
+    if (isMobile && inputRef.current) {
+      const inputHeight = inputRef.current.offsetHeight;
+      topPosition = inputHeight + 4; // 4px de espaço
+      leftPosition = 0;
+    }
+    
     return createPortal(
       <div 
         ref={dropdownRef}
         style={{
-          position: 'absolute',
-          top: `${dropdownPosition.top}px`,
-          left: `${dropdownPosition.left}px`,
+          position: isMobile ? 'absolute' : 'fixed',
+          top: isMobile ? `${topPosition}px` : `${dropdownPosition.top}px`,
+          left: isMobile ? `${leftPosition}px` : `${dropdownPosition.left}px`,
           zIndex: 9999,
-          width: `${inputRef.current ? inputRef.current.offsetWidth : 290}px`,
+          width: isMobile ? '100%' : `${inputRef.current ? inputRef.current.offsetWidth : 290}px`,
           backgroundColor: 'white',
           borderRadius: '0.5rem',
           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
           border: '1px solid #e5e7eb',
-          maxHeight: '300px',
+          maxHeight: isMobile ? '50vh' : '300px',
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          // Prevenir que o dropdown fique fora da tela em dispositivos móveis
+          maxWidth: '100vw'
         }}
       >
-        <div className="p-2 border-b border-gray-100">
+        <div className="p-2 border-b border-gray-100 sticky top-0 bg-white">
           <input
             type="text"
             placeholder="Pesquisar bairros..."
@@ -360,7 +410,7 @@ const BairroInput: React.FC<BairroInputProps> = ({
             value={searchQuery}
             onChange={handleInputChange}
             onClick={(e) => e.stopPropagation()}
-            autoFocus
+            autoFocus={!isMobile} // Evitar autofocus em mobile que pode causar problemas
           />
         </div>
         <div 
@@ -368,6 +418,8 @@ const BairroInput: React.FC<BairroInputProps> = ({
           style={{
             overscrollBehavior: 'contain',
             WebkitOverflowScrolling: 'touch',
+            // Em mobile, limite a altura máxima para evitar cobrir toda a tela
+            maxHeight: isMobile ? 'calc(50vh - 50px)' : undefined
           }}
         >
           {isLoading ? (
@@ -401,7 +453,7 @@ const BairroInput: React.FC<BairroInputProps> = ({
           )}
         </div>
       </div>,
-      document.body
+      dropdownParent
     );
   };
 

@@ -8,6 +8,7 @@ import { Paciente } from "@/services/PacienteService";
 import LocationInput from "@/features/notificationForms/components/LocationInput";
 import BairroInput from "./components/BairroInput";
 import { debounce } from "lodash";
+import CustomDateInput from './components/CustomDateInput';
 import axios from "axios";
 import {
   Search,
@@ -381,7 +382,7 @@ const NotificationForm = () => {
       // Ordenar as opções de público atendido na ordem específica
       const ordenacaoPublico = [
         "Participante",
-        "Trabalhador",
+        "Trab. do Evento",
         "Autoridade",
         "Outro",
       ].map((item) => normalizeText(item));
@@ -726,6 +727,52 @@ const NotificationForm = () => {
       loadNotificacao(id);
     }
   }, [isEditMode, id]);
+
+  // Desativar a tradução automática para todo o formulário
+  useEffect(() => {
+    // Desativar tradução automática para todo o formulário
+    const formElement = document.getElementById('notification-form');
+    if (formElement) {
+      formElement.setAttribute('translate', 'no');
+      
+      // Adicionalmente, adicionar classes específicas para navegadores
+      formElement.classList.add('notranslate');
+    }
+    
+    // Adicionar meta tag dinamicamente se não existir
+    if (!document.querySelector('meta[name="google"][content="notranslate"]')) {
+      const meta = document.createElement('meta');
+      meta.name = 'google';
+      meta.content = 'notranslate';
+      document.head.appendChild(meta);
+    }
+    
+    // Impedir a tradução automática especificamente para o Chrome
+    document.documentElement.setAttribute('translate', 'no');
+    
+    // Adicionar estilo que a Google usa para detectar conteúdo que não deve ser traduzido
+    if (!document.getElementById('notranslate-style')) {
+      const style = document.createElement('style');
+      style.id = 'notranslate-style';
+      style.textContent = '.notranslate { font-family: _notranslate, Arial, sans-serif !important; }';
+      document.head.appendChild(style);
+    }
+    
+    // Adicionar classe notranslate a todos os elementos select e label
+    const elements = document.querySelectorAll('select, label, option');
+    elements.forEach(element => {
+      element.classList.add('notranslate');
+    });
+    
+    return () => {
+      // Limpar quando o componente for desmontado (opcional)
+      document.documentElement.removeAttribute('translate');
+      
+      if (document.getElementById('notranslate-style')) {
+        document.getElementById('notranslate-style')?.remove();
+      }
+    };
+  }, []);
 
   // Hook para atualizar municípios quando o estado muda
   useEffect(() => {
@@ -1775,11 +1822,12 @@ const formatContato = (contato: string) => {
                       value={formData.residenteBelem}
                       onChange={handleChange}
                       data-error={errors.residenteBelem ? "true" : "false"}
+                      translate="no"
                     >
-                      <option value="">Selecione</option>
-                      <option value="1">SIM</option>
-                      <option value="2">NÃO</option>
-                      <option value="3">ESTRANGEIRO</option>
+                      <option value="" translate="no">Selecione</option>
+                      <option value="1" translate="no">SIM</option>
+                      <option value="2" translate="no">NÃO</option>
+                      <option value="3" translate="no">ESTRANGEIRO</option>
                     </select>
                   </div>
 
@@ -2044,8 +2092,7 @@ const formatContato = (contato: string) => {
                     <label className="block mb-2 font-medium text-gray-700">
                       Data de Nascimento
                     </label>
-                    <input
-                      type="date"
+                    <CustomDateInput
                       name="dataNascimento"
                       className={`w-full p-3 border ${
                         errors.dataNascimento
@@ -2383,12 +2430,14 @@ const formatContato = (contato: string) => {
                       value={formData.tipoAtendimento}
                       onChange={handleChange}
                       data-error={errors.tipoAtendimento ? "true" : "false"}
+                      translate="no"
                     >
-                      <option value="">Selecione</option>
+                      <option value="" translate="no">Selecione</option>
                       {atendimentoOptions.map((option) => (
                         <option
                           key={option.idtipo_atendimento}
                           value={option.idtipo_atendimento}
+                          translate="no"
                         >
                           {option.descricao}
                         </option>
@@ -2440,6 +2489,7 @@ const formatContato = (contato: string) => {
                               <label
                                 key={option.idtipo_sintoma}
                                 className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer transition-all duration-200 hover:border-blue-400 hover:bg-blue-50/50 group"
+                                translate="no"
                               >
                                 <input
                                   type="checkbox"
@@ -2477,8 +2527,7 @@ const formatContato = (contato: string) => {
                         <label className="block mb-2 font-medium text-gray-700">
                           Data de Início dos Sintomas
                         </label>
-                        <input
-                          type="date"
+                        <CustomDateInput
                           name="dataInicioSintomas"
                           className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
                           value={formData.dataInicioSintomas}
@@ -2591,6 +2640,7 @@ const formatContato = (contato: string) => {
                               <label
                                 key={option.idtipo_trauma}
                                 className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer transition-all duration-200 hover:border-blue-400 hover:bg-blue-50/50 group"
+                                translate="no"
                               >
                                 <input
                                   type="checkbox"
@@ -2628,8 +2678,7 @@ const formatContato = (contato: string) => {
                         <label className="block mb-2 font-medium text-gray-700">
                           Data da Ocorrência
                         </label>
-                        <input
-                          type="date"
+                        <CustomDateInput
                           name="dataOcorrencia"
                           className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
                           value={formData.dataOcorrencia}
@@ -2699,8 +2748,7 @@ const formatContato = (contato: string) => {
                       <label className="block mb-2 font-medium text-gray-700">
                         Data da Ocorrência
                       </label>
-                      <input
-                        type="date"
+                      <CustomDateInput
                         name="dataOcorrencia"
                         className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
                         value={formData.dataOcorrencia}
@@ -2729,8 +2777,7 @@ const formatContato = (contato: string) => {
                     <label className="block mb-2 font-medium text-gray-700">
                       Data do Atendimento
                     </label>
-                    <input
-                      type="date"
+                    <CustomDateInput
                       name="dataAtendimento"
                       className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
                       value={formData.dataAtendimento}
@@ -2804,8 +2851,7 @@ const formatContato = (contato: string) => {
                     <label className="block mb-2 font-medium text-gray-700">
                       Data de Encerramento
                     </label>
-                    <input
-                      type="date"
+                    <CustomDateInput
                       name="dataEncerramento"
                       className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
                       value={formData.dataEncerramento}

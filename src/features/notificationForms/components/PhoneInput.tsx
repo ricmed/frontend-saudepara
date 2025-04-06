@@ -257,12 +257,13 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
   // Refs para controlar o ciclo de renderização
   const isInternalChangeRef = useRef(false);
   const previousValueRef = useRef(value);
+  const initialLoadRef = useRef(true);
   
   // Estado interno
   const [internalPhoneNumber, setInternalPhoneNumber] = useState("");
-  const [selectedCountry, setSelectedCountry] = useState<CountryCode>(
-    countryCodes.find(c => c.code === "BR") || countryCodes[0] // Brasil como padrão
-  );
+  
+  // NÃO configurar país padrão - será determinado pelo valor inicial
+  const [selectedCountry, setSelectedCountry] = useState<CountryCode | null>(null);
   
   // UI states
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
@@ -274,7 +275,42 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef({ x: 0, y: 0 });
 
-  // Função para normalizar texto (remover acentos e converter para minúsculas)
+  // Detectar o país a partir do código de discagem (mais eficaz)
+  const detectCountryFromNumber = (phoneNumber: string) => {
+    if (!phoneNumber) return null;
+    
+    console.log("Detectando país a partir de:", phoneNumber);
+    
+    // Se o número começa com +, extrair o código do país
+    if (phoneNumber.startsWith('+')) {
+      const dialCode = phoneNumber.split(' ')[0];
+      console.log("Código DDI extraído:", dialCode);
+      
+      // Encontrar o país pelo código de discagem exato
+      const country = countryCodes.find(c => c.dial_code === dialCode);
+      if (country) {
+        console.log("País encontrado:", country.name);
+        return country;
+      }
+      
+      // Se não encontrou um match exato, procurar por prefixo do maior pro menor
+      const sortedCodes = [...countryCodes].sort((a, b) => 
+        b.dial_code.replace(/\D/g, '').length - a.dial_code.replace(/\D/g, '').length
+      );
+      
+      for (const country of sortedCodes) {
+        if (dialCode.startsWith(country.dial_code)) {
+          console.log("País encontrado por prefixo:", country.name);
+          return country;
+        }
+      }
+    }
+    
+    // Padrão, caso não tenha encontrado
+    return null;
+  };
+  
+  // Normalizar texto (remover acentos e converter para minúsculas)
   const normalizeText = (text: string): string => {
     return text
       .normalize('NFD')
@@ -282,38 +318,69 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
       .toLowerCase();
   };
 
+  // Inicialização - deve acontecer uma única vez no carregamento
+  useEffect(() => {
+    if (value && initialLoadRef.current) {
+      console.log("Inicializando com valor:", value);
+      initialLoadRef.current = false;
+      
+      // Detectar país
+      const detectedCountry = detectCountryFromNumber(value);
+      if (detectedCountry) {
+        console.log("País detectado na inicialização:", detectedCountry.name);
+        setSelectedCountry(detectedCountry);
+        
+        // Extrair o número sem o código do país
+        const parts = value.split(' ');
+        if (parts.length > 1) {
+          const phoneNumber = parts.slice(1).join(' ');
+          setInternalPhoneNumber(phoneNumber);
+        }
+      } else {
+        // Se não conseguir detectar, usar Brasil como padrão
+        const defaultCountry = countryCodes.find(c => c.code === "BR") || countryCodes[0];
+        console.log("Usando país padrão:", defaultCountry.name);
+        setSelectedCountry(defaultCountry);
+        setInternalPhoneNumber(value);
+      }
+    } else if (!selectedCountry) {
+      // Se não tiver país selecionado nem valor, usar Brasil como padrão
+      const defaultCountry = countryCodes.find(c => c.code === "BR") || countryCodes[0];
+      console.log("Definindo país padrão:", defaultCountry.name);
+      setSelectedCountry(defaultCountry);
+    }
+  }, [value]);
+
   // Efeito para processar mudanças no valor que vêm do componente pai
   useEffect(() => {
-    // Pular processamento se a mudança foi interna
-    if (isInternalChangeRef.current) {
+    // Pular se a inicialização já foi feita ou se a mudança foi interna
+    if (!initialLoadRef.current && isInternalChangeRef.current) {
+      console.log("Pulando processamento (mudança interna)");
       return;
     }
     
-    // Se o valor externo mudou, processe-o
+    // Se o valor vindo de fora mudou, processar
     if (value !== previousValueRef.current) {
       previousValueRef.current = value;
       
       if (value) {
-        // Tentar extrair código do país e número
-        const match = value.match(/^(\+\d+)[-\s]?(.*)$/);
+        console.log("Processando valor externo:", value);
         
-        if (match) {
-          const dialCode = match[1];
-          const number = match[2];
+        // Detectar país
+        const detectedCountry = detectCountryFromNumber(value);
+        if (detectedCountry) {
+          console.log("País detectado na atualização:", detectedCountry.name);
+          setSelectedCountry(detectedCountry);
           
-          // Procurar o país pelo código
-          const country = countryCodes.find(c => c.dial_code === dialCode);
-          
-          if (country) {
-            setSelectedCountry(country);
-            setInternalPhoneNumber(number);
-          } else {
-            setInternalPhoneNumber(value);
+          // Extrair o número sem o código do país
+          const parts = value.split(' ');
+          if (parts.length > 1) {
+            const phoneNumber = parts.slice(1).join(' ');
+            setInternalPhoneNumber(phoneNumber);
           }
-        } else {
-          setInternalPhoneNumber(value);
         }
       } else {
+        console.log("Valor vazio, limpando número interno");
         setInternalPhoneNumber("");
       }
     }
@@ -321,7 +388,18 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
 
   // Função que formata e notifica o componente pai de mudanças
   const notifyParentOfChange = (country: CountryCode, phone: string) => {
-    const fullNumber = phone ? `${country.dial_code} ${phone}` : "";
+    if (!country) {
+      console.error("País inválido");
+      return;
+    }
+    
+    // Remover o + para obter apenas os dígitos
+    const dialCode = country.dial_code.replace(/^\+/, '');
+    
+    // Formatar incluindo o + no DDI
+    const fullNumber = phone ? `+${dialCode} ${phone.trim()}` : "";
+    
+    console.log("Notificando mudança:", fullNumber, "com país:", country.name);
     
     // Marcar que esta mudança é interna para evitar loops
     isInternalChangeRef.current = true;
@@ -342,8 +420,16 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
     setInternalPhoneNumber(newPhone);
     
     // Notificar o pai apenas se houver um valor significativo
-    if (newPhone.trim()) {
+    if (selectedCountry && newPhone.trim()) {
       notifyParentOfChange(selectedCountry, newPhone);
+    } else if (!newPhone.trim()) {
+      // Se o campo estiver vazio, notificar com string vazia
+      onChange("");
+      isInternalChangeRef.current = true;
+      previousValueRef.current = "";
+      setTimeout(() => {
+        isInternalChangeRef.current = false;
+      }, 50);
     }
   };
 
@@ -352,11 +438,13 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
     e.preventDefault();
     e.stopPropagation();
     
+    console.log("País selecionado:", country.name, country.dial_code);
+    
     setSelectedCountry(country);
     setIsDropdownOpen(false);
     setSearchQuery("");
     
-    // Notificar o pai se tivermos um número de telefone
+    // Notificar o pai imediatamente com o novo código de país
     if (internalPhoneNumber.trim()) {
       notifyParentOfChange(country, internalPhoneNumber);
     }
@@ -527,13 +615,17 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
           onClick={toggleDropdown}
           className="flex items-center h-full px-4 py-3 bg-gray-50 border border-gray-200 border-r-0 rounded-l-lg hover:bg-gray-100 transition-colors"
         >
-          <img 
-            src={getFlagUrl(selectedCountry.code)} 
-            alt={`Bandeira ${selectedCountry.name}`} 
-            className="w-5 h-auto mr-2"
-            style={{ border: '1px solid #eaeaea', borderRadius: '2px' }}
-          />
-          <span className="font-medium text-sm">{selectedCountry.dial_code}</span>
+          {selectedCountry && (
+            <>
+              <img 
+                src={getFlagUrl(selectedCountry.code)} 
+                alt={`Bandeira ${selectedCountry.name}`} 
+                className="w-5 h-auto mr-2"
+                style={{ border: '1px solid #eaeaea', borderRadius: '2px' }}
+              />
+              <span className="font-medium text-sm">{selectedCountry.dial_code}</span>
+            </>
+          )}
           <ChevronDown className="ml-2 h-4 w-4 text-gray-400" />
         </button>
 
