@@ -813,6 +813,12 @@ const NotificationForm = () => {
     return contato.slice(0, 15);
   };
 
+  // ADICIONE AQUI: Função específica para contatoLocal
+  const formatContatoLocal = (contato: string) => {
+    // Remove caracteres não numéricos e limita a 11 dígitos
+    return contato.replace(/\D/g, "").slice(0, 11);
+  };
+
   // Handler específico para CPF
   const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
@@ -828,6 +834,26 @@ const NotificationForm = () => {
       setErrors((prev) => {
         const newErrors = { ...prev };
         delete newErrors.cpf;
+        return newErrors;
+      });
+    }
+  };
+
+  // ADICIONE AQUI: Handler específico para contatoLocal
+  const handleContatoLocalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value;
+    const formattedValue = formatContatoLocal(rawValue);
+
+    setFormData((prev) => ({
+      ...prev,
+      contatoLocal: formattedValue,
+    }));
+
+    // Clear error if exists
+    if (errors.contatoLocal) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors.contatoLocal;
         return newErrors;
       });
     }
@@ -1380,7 +1406,7 @@ const NotificationForm = () => {
     console.log("BOTÃO SALVAR CLICADO");
     e.preventDefault();
     console.log("Form prevent default executado");
-  
+
     // Verifica se tem paciente
     if (!formData.paciente.trim()) {
       toast.error("O nome do paciente é obrigatório");
@@ -1394,15 +1420,15 @@ const NotificationForm = () => {
       }));
       return;
     }
-  
+
     // Se tem nome de paciente, mas não tem ID, criar paciente automaticamente
     if (formData.paciente.trim() && !formData.pacienteId) {
       try {
         const server = import.meta.env.VITE_API_SERVER;
         const port = import.meta.env.VITE_API_PORT;
-  
+
         toast.info("Criando novo paciente automaticamente...");
-  
+
         // Criar payload de novo paciente com os dados disponíveis
         const novoPaciente = {
           nome: formData.paciente,
@@ -1419,16 +1445,16 @@ const NotificationForm = () => {
             : null,
           cbo_idcbo: formData.profissao ? parseInt(formData.profissao) : null,
         };
-  
+
         // Criar o paciente no backend
         const response = await axios.post(
           `${server}:${port}/api/paciente`,
           novoPaciente
         );
-  
+
         // Atualizar o formData com o ID do paciente criado
         formData.pacienteId = response.data.idpaciente;
-  
+
         console.log(
           "Paciente criado automaticamente com ID:",
           response.data.idpaciente
@@ -1441,7 +1467,7 @@ const NotificationForm = () => {
         setIsSaving(false);
         return; // Impedir envio do formulário
       }
-    } 
+    }
     // ADICIONAR AQUI: Se já tem ID de paciente, atualizar dados do paciente
     else if (formData.pacienteId) {
       try {
@@ -1455,39 +1481,45 @@ const NotificationForm = () => {
           tipo_genero_idtipo_genero: formData.identidadeGenero
             ? parseInt(formData.identidadeGenero)
             : undefined,
-          tipo_raca_idtipo_raca: formData.raca ? parseInt(formData.raca) : undefined,
+          tipo_raca_idtipo_raca: formData.raca
+            ? parseInt(formData.raca)
+            : undefined,
           escolaridade_idescolaridade: formData.escolaridade
             ? parseInt(formData.escolaridade)
             : undefined,
-          cbo_idcbo: formData.profissao ? parseInt(formData.profissao) : undefined,
-          ddi: formData.ddi || "55"
+          cbo_idcbo: formData.profissao
+            ? parseInt(formData.profissao)
+            : undefined,
+          ddi: formData.ddi || "55",
         };
-        
+
         // Usar o serviço para atualizar o paciente
         await PacienteService.update(formData.pacienteId, pacienteData);
         console.log("Dados do paciente atualizados com sucesso!");
       } catch (error) {
         console.error("Erro ao atualizar dados do paciente:", error);
-        toast.warning("Aviso: Os dados do paciente não puderam ser atualizados, mas tentaremos salvar a notificação.");
+        toast.warning(
+          "Aviso: Os dados do paciente não puderam ser atualizados, mas tentaremos salvar a notificação."
+        );
         // Não impedir o envio da notificação se a atualização do paciente falhar
       }
     }
-  
+
     const isValid = validateForm();
     console.log("Form validation result:", isValid);
     if (!isValid) return;
-  
+
     setIsSaving(true);
     try {
       // Converter todos os dados para caixa alta antes de enviar
       const formDataUpperCase = toUpperCaseAllStrings(formData);
-  
+
       console.log(
         "Dados do formulário:",
         JSON.stringify(formDataUpperCase, null, 2)
       );
       console.log("Sintomas selecionados:", formDataUpperCase.sinaisESintomas);
-  
+
       // Usar a função importada salvarNotificacaoCompleta
       if (isEditMode && id) {
         // Para atualização
@@ -1500,7 +1532,7 @@ const NotificationForm = () => {
         console.log("Notificação criada com sucesso");
         toast.success("Notificação criada com sucesso");
       }
-  
+
       // Redirecionar para página de listagem ou detalhes
       navigate("/lista-comunicacao");
     } catch (error: any) {
@@ -1948,6 +1980,38 @@ const NotificationForm = () => {
                           <p className="mt-1 text-sm text-red-500">{ufError}</p>
                         )}
                       </div>
+                      <div>
+                        <label className="block mb-2 font-medium text-gray-700">
+                          Local de Hospedagem
+                        </label>
+                        <input
+                          type="text"
+                          name="localHospedagem"
+                          placeholder="Informe o nome do local de hospedagem"
+                          className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                          value={formData.localHospedagem}
+                          onChange={handleChange}
+                        />
+                      </div>
+                      <div>
+                        <label className="block mb-2 font-medium text-gray-700">
+                          Contato do Local da Hospedagem
+                        </label>
+                        <input
+                          type="text"
+                          name="contatoLocal"
+                          placeholder="Apenas números (máx 11 dígitos)"
+                          className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                          value={formData.contatoLocal}
+                          onChange={handleContatoLocalChange}
+                          inputMode="numeric" // Shows numeric keyboard on mobile devices
+                        />
+                        {errors.contatoLocal && (
+                          <p className="mt-1 text-sm text-red-500">
+                            {errors.contatoLocal}
+                          </p>
+                        )}
+                      </div>
                     </>
                   )}
 
@@ -1994,8 +2058,14 @@ const NotificationForm = () => {
                           placeholder="DDD XXXXX-XXXX"
                           className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
                           value={formData.contatoLocal}
-                          onChange={handleChange}
+                          onChange={handleContatoLocalChange}
+                          inputMode="numeric" // Shows numeric keyboard on mobile devices
                         />
+                        {errors.contatoLocal && (
+                          <p className="mt-1 text-sm text-red-500">
+                            {errors.contatoLocal}
+                          </p>
+                        )}
                       </div>
                     </>
                   )}
