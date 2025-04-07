@@ -1077,8 +1077,6 @@ const NotificationForm = () => {
           sinaisESintomas: [],
           dataInicioSintomas: "",
           observacaoSintomas: "",
-          hipoteseDiagnostica: [],
-          observacaoHipotese: "",
         }));
       }
     }
@@ -2831,6 +2829,52 @@ const NotificationForm = () => {
                           placeholder="Informações adicionais sobre o trauma..."
                           className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
                           value={formData.observacaoTrauma}
+                          onChange={handleChange}
+                        />
+                      </div>
+                      {/* ADICIONE ESTES CAMPOS: Hipótese Diagnóstica */}
+                      <div className="md:col-span-2">
+                        <label className="block mb-2 font-medium text-gray-700">
+                          Hipótese Diagnóstica
+                        </label>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          {hipoteseDiagOptions.map((option) => (
+                            <label
+                              key={option.idtipo_hipotese_diag}
+                              className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer transition-all duration-200 hover:border-blue-400 hover:bg-blue-50/50 group"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={formData.hipoteseDiagnostica.includes(
+                                  option.idtipo_hipotese_diag.toString()
+                                )}
+                                onChange={() =>
+                                  handleCheckboxChange(
+                                    "hipoteseDiagnostica",
+                                    option.idtipo_hipotese_diag.toString()
+                                  )
+                                }
+                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 transition-all duration-200 group-hover:border-blue-400"
+                              />
+                              <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors duration-200">
+                                {option.descricao}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Observação da Hipótese */}
+                      <div className="md:col-span-2">
+                        <label className="block mb-2 font-medium text-gray-700">
+                          Observação da Hipótese
+                        </label>
+                        <textarea
+                          name="observacaoHipotese"
+                          rows={3}
+                          placeholder="Informações adicionais sobre a hipótese diagnóstica..."
+                          className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                          value={formData.observacaoHipotese}
                           onChange={handleChange}
                         />
                       </div>
