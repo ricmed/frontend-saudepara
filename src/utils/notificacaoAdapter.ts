@@ -57,32 +57,51 @@ export const formatFromBackend = async (
   }
 
   // Processar contatos telefônicos - versão melhorada
-  let contatoTelefonico = "";
-  let contatoNotificador = "";
+let contatoTelefonico = "";
+let contatoNotificador = "";
+let ddi = backendData.paciente?.ddi || "55"; // Começa com o DDI do backend
 
-  // Contato do paciente
-  if (backendData.paciente?.contato) {
+// Contato do paciente
+if (backendData.paciente?.contato) {
+  // Se o contato começa com +, extrair o DDI dele
+  if (backendData.paciente.contato.startsWith('+') && backendData.paciente.contato.includes(' ')) {
+    const parts = backendData.paciente.contato.split(' ');
+    // Atualizar o DDI a partir do número (mais confiável)
+    ddi = parts[0].replace('+', '');
+    // Armazenar apenas o número
+    contatoTelefonico = parts.slice(1).join(' ');
+  } else {
+    // Se não tem formato +XX, usar o valor completo
     contatoTelefonico = backendData.paciente.contato;
-  } else if (backendData.paciente?.telefone) {
-    contatoTelefonico = backendData.paciente.telefone;
-  } else if (backendData.paciente?.celular) {
-    contatoTelefonico = backendData.paciente.celular;
   }
+} else if (backendData.paciente?.telefone) {
+  contatoTelefonico = backendData.paciente.telefone;
+} else if (backendData.paciente?.celular) {
+  contatoTelefonico = backendData.paciente.celular;
+}
 
-  // Contato do notificador
-  if (backendData.contato_notificador) {
+// Contato do notificador
+if (backendData.contato_notificador) {
+  // Se o contato começa com +, extrair apenas o número
+  if (backendData.contato_notificador.startsWith('+') && backendData.contato_notificador.includes(' ')) {
+    const parts = backendData.contato_notificador.split(' ');
+    // Armazenar apenas o número (não precisamos do DDI do notificador)
+    contatoNotificador = parts.slice(1).join(' ');
+  } else {
     contatoNotificador = backendData.contato_notificador;
-  } else if (backendData.telefone_notificador) {
-    contatoNotificador = backendData.telefone_notificador;
-  } else if (backendData.celular_notificador) {
-    contatoNotificador = backendData.celular_notificador;
   }
+} else if (backendData.telefone_notificador) {
+  contatoNotificador = backendData.telefone_notificador;
+} else if (backendData.celular_notificador) {
+  contatoNotificador = backendData.celular_notificador;
+}
 
   // Criar objeto de formulário com dados do backend
   const formData: FormData = {
     // Seção 1: Dados Gerais
     evento: backendData.tipo_evento_idtipo_evento?.toString() || "",
     publicoAtendido: backendData.tipo_publico_idtipo_publico?.toString() || "",
+    ddi: ddi,
 
     // Seção 2: Procedência do indivíduo
     residenteBelem,
@@ -326,6 +345,8 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
     observacao_sintomas: trimmedData.observacaoSintomas || "",
     observacao_hiposete: trimmedData.observacaoHipotese || "",
     observacao_trauma: trimmedData.observacaoTrauma || "",
+
+    ddi: trimmedData.ddi || "55", // Adicionar o campo ddi
 
     // Adicionar telefone do paciente no payload para notificações novas
     // Para edições este campo não deve ser enviado pois não faz parte da tabela de notificação

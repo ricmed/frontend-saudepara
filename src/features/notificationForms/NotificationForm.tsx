@@ -8,7 +8,7 @@ import { Paciente } from "@/services/PacienteService";
 import LocationInput from "@/features/notificationForms/components/LocationInput";
 import BairroInput from "./components/BairroInput";
 import { debounce } from "lodash";
-import CustomDateInput from './components/CustomDateInput';
+import CustomDateInput from "./components/CustomDateInput";
 import axios from "axios";
 import {
   Search,
@@ -92,6 +92,7 @@ export interface FormData {
   profissao: string;
   profissaoSearch?: string;
   showProfissaoOptions?: boolean;
+  ddi: string;
   contatoTelefonico: string;
 
   // Seção 4: Informações do atendimento
@@ -231,6 +232,7 @@ const NotificationForm = () => {
     profissao: "",
     profissaoSearch: "",
     showProfissaoOptions: false,
+    ddi: "55", // Valor padrão (Brasil)
     contatoTelefonico: "",
 
     // Seção 4: Informações do atendimento
@@ -731,45 +733,46 @@ const NotificationForm = () => {
   // Desativar a tradução automática para todo o formulário
   useEffect(() => {
     // Desativar tradução automática para todo o formulário
-    const formElement = document.getElementById('notification-form');
+    const formElement = document.getElementById("notification-form");
     if (formElement) {
-      formElement.setAttribute('translate', 'no');
-      
+      formElement.setAttribute("translate", "no");
+
       // Adicionalmente, adicionar classes específicas para navegadores
-      formElement.classList.add('notranslate');
+      formElement.classList.add("notranslate");
     }
-    
+
     // Adicionar meta tag dinamicamente se não existir
     if (!document.querySelector('meta[name="google"][content="notranslate"]')) {
-      const meta = document.createElement('meta');
-      meta.name = 'google';
-      meta.content = 'notranslate';
+      const meta = document.createElement("meta");
+      meta.name = "google";
+      meta.content = "notranslate";
       document.head.appendChild(meta);
     }
-    
+
     // Impedir a tradução automática especificamente para o Chrome
-    document.documentElement.setAttribute('translate', 'no');
-    
+    document.documentElement.setAttribute("translate", "no");
+
     // Adicionar estilo que a Google usa para detectar conteúdo que não deve ser traduzido
-    if (!document.getElementById('notranslate-style')) {
-      const style = document.createElement('style');
-      style.id = 'notranslate-style';
-      style.textContent = '.notranslate { font-family: _notranslate, Arial, sans-serif !important; }';
+    if (!document.getElementById("notranslate-style")) {
+      const style = document.createElement("style");
+      style.id = "notranslate-style";
+      style.textContent =
+        ".notranslate { font-family: _notranslate, Arial, sans-serif !important; }";
       document.head.appendChild(style);
     }
-    
+
     // Adicionar classe notranslate a todos os elementos select e label
-    const elements = document.querySelectorAll('select, label, option');
-    elements.forEach(element => {
-      element.classList.add('notranslate');
+    const elements = document.querySelectorAll("select, label, option");
+    elements.forEach((element) => {
+      element.classList.add("notranslate");
     });
-    
+
     return () => {
       // Limpar quando o componente for desmontado (opcional)
-      document.documentElement.removeAttribute('translate');
-      
-      if (document.getElementById('notranslate-style')) {
-        document.getElementById('notranslate-style')?.remove();
+      document.documentElement.removeAttribute("translate");
+
+      if (document.getElementById("notranslate-style")) {
+        document.getElementById("notranslate-style")?.remove();
       }
     };
   }, []);
@@ -803,11 +806,11 @@ const NotificationForm = () => {
   };
 
   // Modificar ou remover a função de formatação para manter o formato original
-const formatContato = (contato: string) => {
-  // Removendo apenas a limitação de caracteres, mantendo a formatação original
-  // E apenas limitando o tamanho máximo para 15 caracteres
-  return contato.slice(0, 15);
-};
+  const formatContato = (contato: string) => {
+    // Removendo apenas a limitação de caracteres, mantendo a formatação original
+    // E apenas limitando o tamanho máximo para 15 caracteres
+    return contato.slice(0, 15);
+  };
 
   // Handler específico para CPF
   const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1824,10 +1827,18 @@ const formatContato = (contato: string) => {
                       data-error={errors.residenteBelem ? "true" : "false"}
                       translate="no"
                     >
-                      <option value="" translate="no">Selecione</option>
-                      <option value="1" translate="no">SIM</option>
-                      <option value="2" translate="no">NÃO</option>
-                      <option value="3" translate="no">ESTRANGEIRO</option>
+                      <option value="" translate="no">
+                        Selecione
+                      </option>
+                      <option value="1" translate="no">
+                        SIM
+                      </option>
+                      <option value="2" translate="no">
+                        NÃO
+                      </option>
+                      <option value="3" translate="no">
+                        ESTRANGEIRO
+                      </option>
                     </select>
                   </div>
 
@@ -2371,15 +2382,32 @@ const formatContato = (contato: string) => {
                     <PhoneInput
                       name="contatoTelefonico"
                       value={formData.contatoTelefonico}
+                      ddi={formData.ddi} // Passar o DDI separadamente
                       onChange={(value) => {
                         // Preserve the full phone number including country code
-                        // Just limit the maximum length to prevent excessive data
                         const formattedValue = value.slice(0, 20);
-                        
+
+                        // Extrair o código do país e o número de telefone
+                        let ddi = "55"; // Valor padrão (Brasil)
+                        let phoneNumber = formattedValue;
+
+                        // Se o valor tem formato +XX YYYYY, separar o DDI e o número
+                        if (
+                          formattedValue.startsWith("+") &&
+                          formattedValue.includes(" ")
+                        ) {
+                          const parts = formattedValue.split(" ");
+                          ddi = parts[0].replace("+", ""); // Remove o "+" do DDI
+                          phoneNumber = parts.slice(1).join(" "); // O resto é o número
+                        }
+
                         setFormData((prev) => ({
                           ...prev,
-                          contatoTelefonico: formattedValue,
+                          contatoTelefonico: phoneNumber, // Armazena apenas o número, sem o código do país
+                          ddi: ddi, // Adicione este campo no seu formData para armazenar o DDI separadamente
                         }));
+
+                        console.log(`DDI: ${ddi}, Número: ${phoneNumber}`); // Debug
 
                         // Limpar erro se existir
                         if (errors.contatoTelefonico) {
@@ -2432,7 +2460,9 @@ const formatContato = (contato: string) => {
                       data-error={errors.tipoAtendimento ? "true" : "false"}
                       translate="no"
                     >
-                      <option value="" translate="no">Selecione</option>
+                      <option value="" translate="no">
+                        Selecione
+                      </option>
                       {atendimentoOptions.map((option) => (
                         <option
                           key={option.idtipo_atendimento}
@@ -2903,7 +2933,10 @@ const formatContato = (contato: string) => {
                         isForEncaminhamento={true} // Add this prop
                       />
                       {/* Add debug info */}
-                      <p className="mt-1 text-xs text-blue-400">ID selecionado: {formData.localEncaminhamento || 'Nenhum'}</p>
+                      <p className="mt-1 text-xs text-blue-400">
+                        ID selecionado:{" "}
+                        {formData.localEncaminhamento || "Nenhum"}
+                      </p>
                     </div>
                   )}
 

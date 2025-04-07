@@ -240,6 +240,8 @@ const countryCodes: CountryCode[] = [
 interface PhoneInputProps {
   value: string;
   onChange: (value: string) => void;
+  ddi?: string; // Adicionar esta nova prop
+  onChangeWithCode?: (dialCode: string, phoneNumber: string) => void; // Novo callback
   name: string;
   placeholder?: string;
   className?: string;
@@ -249,6 +251,8 @@ interface PhoneInputProps {
 const PhoneInput: React.FC<PhoneInputProps> = ({
   value,
   onChange,
+  ddi,
+  onChangeWithCode,
   name,
   placeholder = "Digite o número de telefone",
   className = "",
@@ -324,8 +328,9 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
       console.log("Inicializando com valor:", value);
       initialLoadRef.current = false;
       
-      // Detectar país
+      // Primeiro tentar detectar país do número fornecido
       const detectedCountry = detectCountryFromNumber(value);
+      
       if (detectedCountry) {
         console.log("País detectado na inicialização:", detectedCountry.name);
         setSelectedCountry(detectedCountry);
@@ -335,12 +340,20 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
         if (parts.length > 1) {
           const phoneNumber = parts.slice(1).join(' ');
           setInternalPhoneNumber(phoneNumber);
+        } else {
+          setInternalPhoneNumber(value);
         }
       } else {
-        // Se não conseguir detectar, usar Brasil como padrão
-        const defaultCountry = countryCodes.find(c => c.code === "BR") || countryCodes[0];
-        console.log("Usando país padrão:", defaultCountry.name);
-        setSelectedCountry(defaultCountry);
+        // Se não conseguiu detectar do número, verificar se temos ddi na prop
+        const defaultCountry = ddi 
+          ? countryCodes.find(c => c.dial_code === `+${ddi}`) 
+          : countryCodes.find(c => c.code === "BR");
+        
+        // Se ainda não encontrou, usar Brasil como padrão
+        const finalCountry = defaultCountry || countryCodes.find(c => c.code === "BR") || countryCodes[0];
+        
+        console.log("Usando país pelo DDI:", finalCountry.name);
+        setSelectedCountry(finalCountry);
         setInternalPhoneNumber(value);
       }
     } else if (!selectedCountry) {
@@ -349,7 +362,7 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
       console.log("Definindo país padrão:", defaultCountry.name);
       setSelectedCountry(defaultCountry);
     }
-  }, [value]);
+  }, [value, ddi]); // ⚠️ Adicione ddi como dependência
 
   // Efeito para processar mudanças no valor que vêm do componente pai
   useEffect(() => {
@@ -407,6 +420,11 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
     
     // Notificar o pai
     onChange(fullNumber);
+    
+    // Também notificar com valores separados, se o callback estiver definido
+    if (onChangeWithCode && phone.trim()) {
+      onChangeWithCode(dialCode, phone.trim());
+    }
     
     // Resetar a flag após um curto período
     setTimeout(() => {
