@@ -9,6 +9,7 @@ import LocationInput from "@/features/notificationForms/components/LocationInput
 import BairroInput from "./components/BairroInput";
 import { debounce } from "lodash";
 import CustomDateInput from "./components/CustomDateInput";
+import { PacienteService } from "@/services/PacienteService";
 import axios from "axios";
 import {
   Search,
@@ -1379,15 +1380,29 @@ const NotificationForm = () => {
     console.log("BOTÃO SALVAR CLICADO");
     e.preventDefault();
     console.log("Form prevent default executado");
-
+  
+    // Verifica se tem paciente
+    if (!formData.paciente.trim()) {
+      toast.error("O nome do paciente é obrigatório");
+      setErrors((prev) => ({
+        ...prev,
+        paciente: "O nome do paciente é obrigatório",
+      }));
+      setExpandedSections((prev) => ({
+        ...prev,
+        identificacao: true,
+      }));
+      return;
+    }
+  
     // Se tem nome de paciente, mas não tem ID, criar paciente automaticamente
     if (formData.paciente.trim() && !formData.pacienteId) {
       try {
         const server = import.meta.env.VITE_API_SERVER;
         const port = import.meta.env.VITE_API_PORT;
-
+  
         toast.info("Criando novo paciente automaticamente...");
-
+  
         // Criar payload de novo paciente com os dados disponíveis
         const novoPaciente = {
           nome: formData.paciente,
@@ -1404,16 +1419,16 @@ const NotificationForm = () => {
             : null,
           cbo_idcbo: formData.profissao ? parseInt(formData.profissao) : null,
         };
-
+  
         // Criar o paciente no backend
         const response = await axios.post(
           `${server}:${port}/api/paciente`,
           novoPaciente
         );
-
+  
         // Atualizar o formData com o ID do paciente criado
         formData.pacienteId = response.data.idpaciente;
-
+  
         console.log(
           "Paciente criado automaticamente com ID:",
           response.data.idpaciente
@@ -1426,34 +1441,53 @@ const NotificationForm = () => {
         setIsSaving(false);
         return; // Impedir envio do formulário
       }
-    } else if (!formData.paciente.trim()) {
-      toast.error("O nome do paciente é obrigatório");
-      setErrors((prev) => ({
-        ...prev,
-        paciente: "O nome do paciente é obrigatório",
-      }));
-      setExpandedSections((prev) => ({
-        ...prev,
-        identificacao: true,
-      }));
-      return;
+    } 
+    // ADICIONAR AQUI: Se já tem ID de paciente, atualizar dados do paciente
+    else if (formData.pacienteId) {
+      try {
+        // Atualizar os dados do paciente antes de salvar a notificação
+        const pacienteData = {
+          nome: formData.paciente,
+          nome_mae: formData.nomeMae || "",
+          data_nascimento: formData.dataNascimento || undefined,
+          cpf: formData.cpf || "",
+          contato: formData.contatoTelefonico || "",
+          tipo_genero_idtipo_genero: formData.identidadeGenero
+            ? parseInt(formData.identidadeGenero)
+            : undefined,
+          tipo_raca_idtipo_raca: formData.raca ? parseInt(formData.raca) : undefined,
+          escolaridade_idescolaridade: formData.escolaridade
+            ? parseInt(formData.escolaridade)
+            : undefined,
+          cbo_idcbo: formData.profissao ? parseInt(formData.profissao) : undefined,
+          ddi: formData.ddi || "55"
+        };
+        
+        // Usar o serviço para atualizar o paciente
+        await PacienteService.update(formData.pacienteId, pacienteData);
+        console.log("Dados do paciente atualizados com sucesso!");
+      } catch (error) {
+        console.error("Erro ao atualizar dados do paciente:", error);
+        toast.warning("Aviso: Os dados do paciente não puderam ser atualizados, mas tentaremos salvar a notificação.");
+        // Não impedir o envio da notificação se a atualização do paciente falhar
+      }
     }
-
+  
     const isValid = validateForm();
     console.log("Form validation result:", isValid);
     if (!isValid) return;
-
+  
     setIsSaving(true);
     try {
       // Converter todos os dados para caixa alta antes de enviar
       const formDataUpperCase = toUpperCaseAllStrings(formData);
-
+  
       console.log(
         "Dados do formulário:",
         JSON.stringify(formDataUpperCase, null, 2)
       );
       console.log("Sintomas selecionados:", formDataUpperCase.sinaisESintomas);
-
+  
       // Usar a função importada salvarNotificacaoCompleta
       if (isEditMode && id) {
         // Para atualização
@@ -1466,7 +1500,7 @@ const NotificationForm = () => {
         console.log("Notificação criada com sucesso");
         toast.success("Notificação criada com sucesso");
       }
-
+  
       // Redirecionar para página de listagem ou detalhes
       navigate("/lista-comunicacao");
     } catch (error: any) {

@@ -270,9 +270,10 @@ export const PacienteService = {
       
       // Tratamento explícito para escolaridade
       if (data.hasOwnProperty('escolaridade_idescolaridade')) {
-        if (data.escolaridade_idescolaridade === "" || 
-            data.escolaridade_idescolaridade === 0 ||
-            data.escolaridade_idescolaridade === null) {
+        if (data.escolaridade_idescolaridade === null || 
+            data.escolaridade_idescolaridade === undefined || 
+            data.escolaridade_idescolaridade === 0 || 
+            String(data.escolaridade_idescolaridade) === "") {
           formattedData.escolaridade_idescolaridade = null;
         } else {
           formattedData.escolaridade_idescolaridade = Number(data.escolaridade_idescolaridade);
@@ -281,9 +282,10 @@ export const PacienteService = {
       
       // Tratamento explícito para CBO
       if (data.hasOwnProperty('cbo_idcbo')) {
-        if (data.cbo_idcbo === "" || 
+        if (data.cbo_idcbo === null || 
+            data.cbo_idcbo === undefined ||
             data.cbo_idcbo === 0 ||
-            data.cbo_idcbo === null) {
+            String(data.cbo_idcbo).trim() === "") {
           formattedData.cbo_idcbo = null;
         } else {
           formattedData.cbo_idcbo = Number(data.cbo_idcbo);

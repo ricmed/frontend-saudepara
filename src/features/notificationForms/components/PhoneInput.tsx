@@ -285,32 +285,40 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
     
     console.log("Detectando país a partir de:", phoneNumber);
     
-    // Se o número começa com +, extrair o código do país
+    // Verificar formato +XX XXXXX ou apenas +XX
     if (phoneNumber.startsWith('+')) {
-      const dialCode = phoneNumber.split(' ')[0];
-      console.log("Código DDI extraído:", dialCode);
+      const dialCodePart = phoneNumber.includes(' ') 
+        ? phoneNumber.split(' ')[0]
+        : phoneNumber;
       
-      // Encontrar o país pelo código de discagem exato
-      const country = countryCodes.find(c => c.dial_code === dialCode);
+      console.log("Código DDI extraído:", dialCodePart);
+      
+      // Buscar correspondência exata
+      const country = countryCodes.find(c => c.dial_code === dialCodePart);
       if (country) {
-        console.log("País encontrado:", country.name);
+        console.log("País encontrado exato:", country.name);
         return country;
       }
       
-      // Se não encontrou um match exato, procurar por prefixo do maior pro menor
-      const sortedCodes = [...countryCodes].sort((a, b) => 
-        b.dial_code.replace(/\D/g, '').length - a.dial_code.replace(/\D/g, '').length
-      );
-      
-      for (const country of sortedCodes) {
-        if (dialCode.startsWith(country.dial_code)) {
-          console.log("País encontrado por prefixo:", country.name);
-          return country;
+      // Buscar por prefixo se não encontrou exato
+      for (const c of countryCodes) {
+        if (dialCodePart.startsWith(c.dial_code)) {
+          console.log("País encontrado por prefixo:", c.name);
+          return c;
         }
       }
     }
     
-    // Padrão, caso não tenha encontrado
+    // Se nada funcionou e temos o ddi como prop, usá-lo
+    if (ddi) {
+      const country = countryCodes.find(c => c.dial_code === `+${ddi}`);
+      if (country) {
+        console.log("País encontrado via prop ddi:", country.name);
+        return country;
+      }
+    }
+    
+    // Caso não tenha encontrado
     return null;
   };
   
@@ -362,7 +370,7 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
       console.log("Definindo país padrão:", defaultCountry.name);
       setSelectedCountry(defaultCountry);
     }
-  }, [value, ddi]); // ⚠️ Adicione ddi como dependência
+  }, [value, ddi, selectedCountry]); // Adicionei selectedCountry como dependência
 
   // Efeito para processar mudanças no valor que vêm do componente pai
   useEffect(() => {
@@ -527,6 +535,31 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
       return () => clearTimeout(timeoutId);
     }
   }, [isDropdownOpen]);
+
+  useEffect(() => {
+    // Verificar se a prop ddi mudou e não é uma mudança interna
+    if (ddi && !isInternalChangeRef.current) {
+      console.log("DDI mudou externamente:", ddi);
+      const dialCode = `+${ddi}`;
+      const country = countryCodes.find(c => c.dial_code === dialCode);
+      
+      if (country && (!selectedCountry || country.dial_code !== selectedCountry.dial_code)) {
+        console.log("Atualizando país pelo novo DDI:", country.name);
+        setSelectedCountry(country);
+        
+        // Manter o número de telefone, apenas atualizar o país
+        if (internalPhoneNumber) {
+          // Desativar a notificação ao pai temporariamente para evitar loops
+          const tempNumber = internalPhoneNumber;
+          setInternalPhoneNumber("");
+          setTimeout(() => {
+            setInternalPhoneNumber(tempNumber);
+            notifyParentOfChange(country, tempNumber);
+          }, 50);
+        }
+      }
+    }
+  }, [ddi]);
 
   // Função para obter URL da bandeira
   const getFlagUrl = (countryCode: string) => {
