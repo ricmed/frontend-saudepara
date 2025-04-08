@@ -3194,22 +3194,21 @@ const NotificationForm = () => {
                   {/* Local de Encaminhamento para Óbito */}
                   {isTipoEncerramento("óbito") && (
                     <div>
-                      <UnidadeNotificadoraField
+                      <label className="block mb-2 font-medium text-gray-700">
+                        Local de Encaminhamento
+                      </label>
+                      <select
+                        name="localEncaminhamento"
+                        className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
                         value={formData.localEncaminhamento}
-                        onChange={(value) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            localEncaminhamento: value,
-                          }))
-                        }
-                        label="Local de Encaminhamento"
-                        placeholder="Selecione o local de encaminhamento"
-                        isForEncaminhamento={true}
-                        specificEstablishments={[
-                          "SVO DVS SESPA",
-                          "Centro de Perícias Científicas Renato Chaves (IML)",
-                        ]}
-                      />
+                        onChange={handleChange}
+                      >
+                        <option value="">-- Selecione (Opcional) --</option>
+                        <option value="12205">SVO DVS SESPA</option>
+                        <option value="23115">
+                          Centro de Perícias Científicas Renato Chaves (IML)
+                        </option>
+                      </select>
                       <p className="mt-1 text-xs text-gray-500">
                         Campo opcional. Se não for selecionado, considera-se que
                         o óbito ocorreu na unidade notificadora.
