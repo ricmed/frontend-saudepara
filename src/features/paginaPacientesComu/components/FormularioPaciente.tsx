@@ -13,9 +13,11 @@ import {
   ChevronUp,
   AlertCircle,
   CheckCircle,
+  HelpCircle,
 } from "lucide-react";
 import CboInput from "@/features/notificationForms/components/CboInput";
 import PhoneInput from "@/features/notificationForms/components/PhoneInput";
+import CustomDateInput from "@/features/notificationForms/components/CustomDateInput";
 import {
   PacienteService,
   Paciente,
@@ -43,6 +45,7 @@ export interface PacienteFormData {
   cbo_idcbo: number | null;
   ddi: string;
   contato: string;
+  idade?: string;
 }
 
 // Opções default para os dropdowns (serão substituídas por dados do banco)
@@ -133,6 +136,9 @@ const FormularioPaciente = ({
     contato: true,
   });
 
+  // Estado para mostrar/esconder o popover de ajuda de identidade de gênero
+  const [showGenderHelp, setShowGenderHelp] = useState<boolean>(false);
+
   // Carregar as opções de dropdown do banco de dados
   useEffect(() => {
     const loadDropdownOptions = async () => {
@@ -209,14 +215,22 @@ const FormularioPaciente = ({
             );
           }
 
+          // Formatar a data de nascimento e calcular a idade
+          const formattedDate = pacienteUpperCase.data_nascimento
+            ? new Date(pacienteUpperCase.data_nascimento)
+                .toISOString()
+                .split("T")[0]
+            : "";
+
+          // Calcular a idade se tiver data de nascimento
+          const calculatedAge = formattedDate
+            ? calculateAge(formattedDate)
+            : "";
+
           setFormData({
             nome: pacienteUpperCase.nome || "",
             nome_mae: pacienteUpperCase.nome_mae || "",
-            data_nascimento: pacienteUpperCase.data_nascimento
-              ? new Date(pacienteUpperCase.data_nascimento)
-                  .toISOString()
-                  .split("T")[0]
-              : "",
+            data_nascimento: formattedDate,
             cpf: pacienteUpperCase.cpf || "",
             tipo_genero_idtipo_genero:
               pacienteUpperCase.tipo_genero_idtipo_genero || "",
@@ -228,6 +242,7 @@ const FormularioPaciente = ({
             cbo_idcbo: pacienteUpperCase.cbo_idcbo || null,
             ddi: pacienteUpperCase.ddi || "55",
             contato: pacienteUpperCase.contato || "",
+            idade: calculatedAge,
           });
         })
         .catch((error) => {
@@ -241,6 +256,24 @@ const FormularioPaciente = ({
         });
     }
   }, [pacienteId]);
+
+  useEffect(() => {
+    // Se a data de nascimento está vazia, limpar a idade e habilitar o campo
+    if (!formData.data_nascimento) {
+      setFormData((prev) => ({
+        ...prev,
+        idade: "",
+      }));
+    }
+    // Se a data de nascimento existe, calcular a idade
+    else {
+      const calculatedAge = calculateAge(formData.data_nascimento);
+      setFormData((prev) => ({
+        ...prev,
+        idade: calculatedAge,
+      }));
+    }
+  }, [formData.data_nascimento]);
 
   // Função para alternar a expansão de uma seção
   const toggleSection = (section: keyof typeof expandedSections) => {
@@ -278,6 +311,26 @@ const FormularioPaciente = ({
       )}
     </button>
   );
+
+  // Função para calcular idade a partir da data de nascimento
+  const calculateAge = (birthdate: string) => {
+    if (!birthdate) return "";
+
+    const birthDate = new Date(birthdate);
+    const today = new Date();
+
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDifference = today.getMonth() - birthDate.getMonth();
+
+    if (
+      monthDifference < 0 ||
+      (monthDifference === 0 && today.getDate() < birthDate.getDate())
+    ) {
+      age--;
+    }
+
+    return age.toString();
+  };
 
   // Handler genérico para mudanças nos campos - modificado para normalizar texto
   const handleChange = (
@@ -322,6 +375,61 @@ const FormularioPaciente = ({
         ...prev,
         [name]: limitedValue,
       }));
+    } else if (name === "data_nascimento") {
+      // Usar uma verificação mais rigorosa para considerar o campo vazio
+      if (!value || value === "" || value.trim() === "") {
+        console.log("Campo de data limpo:", value); // Debugging temporário
+        setFormData((prev) => ({
+          ...prev,
+          [name]: "",
+          idade: "", // Limpar a idade
+        }));
+
+        // Limpar erro se existir
+        if (errors.data_nascimento) {
+          setErrors((prev) => {
+            const newErrors = { ...prev };
+            delete newErrors.data_nascimento;
+            return newErrors;
+          });
+        }
+      } else {
+        // Se tem data, calcular a idade automaticamente
+        const age = calculateAge(value);
+
+        // Verificar se a idade é válida (não maior que 120)
+        const ageNum = parseInt(age);
+        if (!isNaN(ageNum) && ageNum > 120) {
+          setErrors((prev) => ({
+            ...prev,
+            data_nascimento: "A idade não pode ser maior que 120 anos",
+          }));
+          return;
+        }
+
+        setFormData((prev) => ({
+          ...prev,
+          [name]: value,
+          idade: age,
+        }));
+      }
+    } else if (name === "idade") {
+      // Se a idade for alterada manualmente (apenas quando data_nascimento estiver vazia)
+      if (!formData.data_nascimento) {
+        const ageValue = value === "" ? "" : value;
+        const ageNum = parseInt(ageValue);
+
+        // Verificar se a idade é maior que 120
+        if (!isNaN(ageNum) && ageNum > 120) {
+          setErrors((prev) => ({
+            ...prev,
+            idade: "A idade não pode ser maior que 120 anos",
+          }));
+          return;
+        }
+
+        setFormData((prev) => ({ ...prev, idade: ageValue }));
+      }
     } else {
       // Campos de texto simples - converter para caixa alta
       let newValue = value;
@@ -393,6 +501,24 @@ const FormularioPaciente = ({
       const date = new Date(formData.data_nascimento);
       if (isNaN(date.getTime())) {
         newErrors.data_nascimento = "Data de nascimento inválida";
+      } else {
+        // Verificar se a data de nascimento não resulta em idade maior que 120 anos
+        const age = parseInt(calculateAge(formData.data_nascimento));
+        if (age > 120) {
+          newErrors.data_nascimento = "A idade não pode ser maior que 120 anos";
+        }
+      }
+    }
+
+    // Validar idade quando não há data de nascimento
+    if (!formData.data_nascimento && formData.idade) {
+      const age = parseInt(formData.idade);
+      if (isNaN(age)) {
+        newErrors.idade = "Idade inválida";
+      } else if (age > 120) {
+        newErrors.idade = "A idade não pode ser maior que 120 anos";
+      } else if (age < 0) {
+        newErrors.idade = "A idade não pode ser negativa";
       }
     }
 
@@ -480,10 +606,7 @@ const FormularioPaciente = ({
 
         // Criar ou atualizar paciente
         if (pacienteId) {
-          await PacienteService.update(
-            pacienteId,
-            pacienteUpperCase
-          );
+          await PacienteService.update(pacienteId, pacienteUpperCase);
         } else {
           await PacienteService.create(pacienteUpperCase);
         }
@@ -516,25 +639,6 @@ const FormularioPaciente = ({
     setErrors({});
     setApiError(null);
     setIsSuccess(false);
-  };
-
-  const calculateAge = (birthdate: string) => {
-    if (!birthdate) return "";
-
-    const birthDate = new Date(birthdate);
-    const today = new Date();
-
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDifference = today.getMonth() - birthDate.getMonth();
-
-    if (
-      monthDifference < 0 ||
-      (monthDifference === 0 && today.getDate() < birthDate.getDate())
-    ) {
-      age--;
-    }
-
-    return age;
   };
 
   return (
@@ -733,31 +837,63 @@ const FormularioPaciente = ({
                     <label className="block mb-2 font-medium text-gray-700">
                       Data de Nascimento <span className="text-red-500">*</span>
                     </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Calendar className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <input
-                        type="date"
-                        name="data_nascimento"
-                        className={`w-full p-3 pl-10 border ${
-                          errors.data_nascimento
-                            ? "border-red-500"
-                            : "border-gray-200"
-                        } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
-                        value={formData.data_nascimento}
-                        onChange={handleChange}
-                        disabled={isLoading || isLoadingOptions}
-                      />
-                    </div>
+                    <CustomDateInput
+                      name="data_nascimento"
+                      className={`w-full p-3 border ${
+                        errors.data_nascimento
+                          ? "border-red-500"
+                          : "border-gray-200"
+                      } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
+                      value={formData.data_nascimento}
+                      onChange={handleChange}
+                      disabled={isLoading || isLoadingOptions}
+                      placeholder="DD/MM/AAAA"
+                      required={true}
+                      data-error={errors.data_nascimento ? "true" : "false"}
+                    />
                     {errors.data_nascimento && (
                       <p className="mt-1 text-sm text-red-500">
                         {errors.data_nascimento}
                       </p>
                     )}
-                    {formData.data_nascimento && !errors.data_nascimento && (
-                      <p className="mt-1 text-sm text-gray-500">
-                        Idade: {calculateAge(formData.data_nascimento)} anos
+                  </div>
+
+                  {/* Idade */}
+                  <div>
+                    <label className="block mb-2 font-medium text-gray-700">
+                      Idade
+                    </label>
+                    <input
+                      type="number"
+                      name="idade"
+                      placeholder={
+                        formData.data_nascimento
+                          ? "Calculada automaticamente"
+                          : "Digite a idade"
+                      }
+                      className={`w-full p-3 border ${errors.idade ? "border-red-500" : "border-gray-200"} rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none ${
+                        formData.data_nascimento
+                          ? "bg-gray-100 text-gray-700"
+                          : ""
+                      }`}
+                      value={formData.idade || ""}
+                      onChange={handleChange}
+                      disabled={Boolean(formData.data_nascimento)} // Importante: converter explicitamente para booleano
+                      min="0"
+                      max="120"
+                    />
+                    {formData.data_nascimento ? (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Idade calculada a partir da data de nascimento
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Preencha apenas se não souber a data de nascimento exata
+                      </p>
+                    )}
+                    {errors.idade && (
+                      <p className="mt-1 text-sm text-red-500">
+                        {errors.idade}
                       </p>
                     )}
                   </div>
@@ -803,10 +939,71 @@ const FormularioPaciente = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Identidade de Gênero */}
                   <div>
-                    <label className="block mb-2 font-medium text-gray-700">
-                      Identidade de Gênero{" "}
-                      <span className="text-red-500">*</span>
-                    </label>
+                    <div className="flex items-center gap-2 mb-2">
+                      <label className="font-medium text-gray-700">
+                        Identidade de Gênero{" "}
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowGenderHelp(!showGenderHelp)}
+                        className="text-gray-500 hover:text-blue-600 transition-colors focus:outline-none"
+                        aria-label="Ajuda sobre identidade de gênero"
+                      >
+                        <HelpCircle className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    {showGenderHelp && (
+                      <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-gray-700 relative">
+                        <button
+                          type="button"
+                          onClick={() => setShowGenderHelp(false)}
+                          className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+                          aria-label="Fechar ajuda"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                        <h4 className="font-medium text-blue-700 mb-2">
+                          Entendendo Identidade de Gênero:
+                        </h4>
+                        <ul className="space-y-1.5">
+                          <li>
+                            <strong>Mulher cisgênero:</strong> Pessoa nascida
+                            com sexo feminino que se identifica como mulher.
+                          </li>
+                          <li>
+                            <strong>Homem cisgênero:</strong> Pessoa nascida com
+                            sexo masculino que se identifica como homem.
+                          </li>
+                          <li>
+                            <strong>Mulher transgênero:</strong> Pessoa nascida
+                            com sexo masculino que se identifica como mulher.
+                          </li>
+                          <li>
+                            <strong>Homem transgênero:</strong> Pessoa nascida
+                            com sexo feminino que se identifica como homem.
+                          </li>
+                          <li>
+                            <strong>Travesti:</strong> Pessoa designada como
+                            homem ao nascer que se expressa no gênero feminino.
+                          </li>
+                          <li>
+                            <strong>Não binário:</strong> Pessoa cuja identidade
+                            não se limita ao binário masculino/feminino.
+                          </li>
+                          <li>
+                            <strong>Não se aplica:</strong> Quando a identidade
+                            de gênero não é relevante para o atendimento.
+                          </li>
+                          <li>
+                            <strong>Ignorado:</strong> Quando a informação não
+                            está disponível.
+                          </li>
+                        </ul>
+                      </div>
+                    )}
+
                     <select
                       name="tipo_genero_idtipo_genero"
                       className={`w-full p-3 border ${
@@ -832,10 +1029,9 @@ const FormularioPaciente = ({
                     )}
                   </div>
 
-                  {/* Gestante (condicional - para gêneros 1 e 3 que correspondem a mulheres) */}
+                  {/* Gestante (condicional - apenas para mulher cisgênero) */}
                   {typeof formData.tipo_genero_idtipo_genero === "number" &&
-                    (formData.tipo_genero_idtipo_genero === 1 ||
-                      formData.tipo_genero_idtipo_genero === 3) && (
+                    formData.tipo_genero_idtipo_genero === 1 && (
                       <div>
                         <label className="block mb-2 font-medium text-gray-700">
                           Gestante

@@ -69,6 +69,23 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
   const handleManualChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
     setManualInputValue(inputValue);
+
+    // Verificar se o campo está vazio e notificar o componente pai
+    if (!inputValue || inputValue === '') {
+      const syntheticEvent = {
+        target: {
+          name,
+          value: ""
+        },
+        currentTarget: {
+          name,
+          value: ""
+        }
+      } as React.ChangeEvent<HTMLInputElement>;
+      
+      onChange(syntheticEvent);
+      return; // Importante para parar a execução da função
+    }
     
     // Aplicar formatação automática enquanto digita (XX/XX/XXXX)
     const cleaned = inputValue.replace(/[^\d]/g, '');

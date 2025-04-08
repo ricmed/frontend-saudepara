@@ -31,7 +31,9 @@ import {
   Globe,
   ListChecks,
   Loader,
-  HelpCircle, // Adicionar este ícone
+  HelpCircle,
+  AlertCircle, 
+  CheckCircle
 } from "lucide-react";
 // Import the export utilities
 import {
@@ -163,6 +165,9 @@ const NotificationForm = () => {
 
   // Estado para controle de erros
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const [isSuccess, setIsSuccess] = useState<boolean>(false);
+const [apiError, setApiError] = useState<string | null>(null);
 
   // Estados para as opções de dropdown vindas da API
   const [eventoOptions, setEventoOptions] = useState<EventoOption[]>([]);
@@ -321,9 +326,42 @@ const NotificationForm = () => {
   useEffect(() => {
     if (formData.dataNascimento) {
       const calculatedAge = calculateAge(formData.dataNascimento);
+
+      // Verificar se a idade calculada é válida (não maior que 120)
+      if (calculatedAge > 120) {
+        // Opção 1: Limpar a data de nascimento se for inválida
+        setFormData((prev) => ({
+          ...prev,
+          dataNascimento: "", // Limpar data inválida
+          idade: "", // Limpar idade também
+        }));
+
+        // Mostrar mensagem de erro
+        setErrors((prev) => ({
+          ...prev,
+          dataNascimento: "A idade não pode ser maior que 120 anos",
+        }));
+      } else {
+        // Se a idade for válida, atualizar normalmente
+        setFormData((prev) => ({
+          ...prev,
+          idade: calculatedAge.toString(),
+        }));
+
+        // Limpar erro se existir
+        if (errors.dataNascimento) {
+          setErrors((prev) => {
+            const newErrors = { ...prev };
+            delete newErrors.dataNascimento;
+            return newErrors;
+          });
+        }
+      }
+    } else {
+      // Quando data de nascimento for limpa, limpar idade também
       setFormData((prev) => ({
         ...prev,
-        idade: calculatedAge.toString(),
+        idade: "",
       }));
     }
   }, [formData.dataNascimento]);
@@ -1404,7 +1442,11 @@ const NotificationForm = () => {
     console.log("BOTÃO SALVAR CLICADO");
     e.preventDefault();
     console.log("Form prevent default executado");
-
+  
+    // Limpar estados de feedback
+    setApiError(null);
+    setIsSuccess(false);
+  
     // Verifica se tem paciente
     if (!formData.paciente.trim()) {
       toast.error("O nome do paciente é obrigatório");
@@ -1418,15 +1460,15 @@ const NotificationForm = () => {
       }));
       return;
     }
-
+  
     // Se tem nome de paciente, mas não tem ID, criar paciente automaticamente
     if (formData.paciente.trim() && !formData.pacienteId) {
       try {
         const server = import.meta.env.VITE_API_SERVER;
         const port = import.meta.env.VITE_API_PORT;
-
+  
         toast.info("Criando novo paciente automaticamente...");
-
+  
         // Criar payload de novo paciente com os dados disponíveis
         const novoPaciente = {
           nome: formData.paciente,
@@ -1443,16 +1485,16 @@ const NotificationForm = () => {
             : null,
           cbo_idcbo: formData.profissao ? parseInt(formData.profissao) : null,
         };
-
+  
         // Criar o paciente no backend
         const response = await axios.post(
           `${server}:${port}/api/paciente`,
           novoPaciente
         );
-
+  
         // Atualizar o formData com o ID do paciente criado
         formData.pacienteId = response.data.idpaciente;
-
+  
         console.log(
           "Paciente criado automaticamente com ID:",
           response.data.idpaciente
@@ -1462,6 +1504,7 @@ const NotificationForm = () => {
         toast.error(
           "Erro ao criar o paciente. Verifique os dados e tente novamente."
         );
+        setApiError("Erro ao criar o paciente. Verifique os dados e tente novamente.");
         setIsSaving(false);
         return; // Impedir envio do formulário
       }
@@ -1490,7 +1533,7 @@ const NotificationForm = () => {
             : undefined,
           ddi: formData.ddi || "55",
         };
-
+  
         // Usar o serviço para atualizar o paciente
         await PacienteService.update(formData.pacienteId, pacienteData);
         console.log("Dados do paciente atualizados com sucesso!");
@@ -1502,39 +1545,45 @@ const NotificationForm = () => {
         // Não impedir o envio da notificação se a atualização do paciente falhar
       }
     }
-
+  
     const isValid = validateForm();
     console.log("Form validation result:", isValid);
     if (!isValid) return;
-
+  
     setIsSaving(true);
     try {
       // Converter todos os dados para caixa alta antes de enviar
       const formDataUpperCase = toUpperCaseAllStrings(formData);
-
+  
       console.log(
         "Dados do formulário:",
         JSON.stringify(formDataUpperCase, null, 2)
       );
       console.log("Sintomas selecionados:", formDataUpperCase.sinaisESintomas);
-
+  
       // Usar a função importada salvarNotificacaoCompleta
       if (isEditMode && id) {
         // Para atualização
         await salvarNotificacaoCompleta(formDataUpperCase, true, Number(id));
         console.log("Notificação atualizada com sucesso");
+        setIsSuccess(true); // Definir estado de sucesso
         toast.success("Notificação atualizada com sucesso");
       } else {
         // Para criação
         await salvarNotificacaoCompleta(formDataUpperCase, false);
         console.log("Notificação criada com sucesso");
+        setIsSuccess(true); // Definir estado de sucesso
         toast.success("Notificação criada com sucesso");
       }
-
-      // Redirecionar para página de listagem ou detalhes
-      navigate("/lista-comunicacao");
+  
+      // Redirecionar para página de listagem ou detalhes após um breve delay para mostrar a mensagem de sucesso
+      setTimeout(() => {
+        navigate("/lista-comunicacao");
+      }, 1500);
+  
     } catch (error: any) {
       console.error("Erro ao salvar notificação:", error);
+      setApiError(error.message || "Erro ao salvar notificação"); // Definir mensagem de erro
       toast.error(error.message || "Erro ao salvar notificação");
     } finally {
       setIsSaving(false);
@@ -1773,6 +1822,39 @@ const NotificationForm = () => {
         </div>
       </header>
       <main className="max-w-5xl mx-auto p-6">
+        {isLoading && (
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <div className="h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-blue-700">
+                Carregando dados da notificação...
+              </p>
+            </div>
+          </div>
+        )}
+        {apiError && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-start gap-2 text-red-600">
+              <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium">Erro</p>
+                <p className="text-sm">{apiError}</p>
+              </div>
+            </div>
+          </div>
+        )}
+        {isSuccess && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center gap-2 text-green-600">
+              <CheckCircle className="h-5 w-5" />
+              <p>
+                {isEditMode
+                  ? "Notificação atualizada com sucesso!"
+                  : "Notificação cadastrada com sucesso!"}
+              </p>
+            </div>
+          </div>
+        )}
         <form
           id="notification-form"
           onSubmit={handleSubmit}
@@ -1834,7 +1916,7 @@ const NotificationForm = () => {
                   {/* Público Atendido */}
                   <div>
                     <label className="block mb-2 font-medium text-gray-700">
-                      Público Atendido
+                      Público Atendido <span className="text-red-500">*</span>
                     </label>
                     <select
                       name="publicoAtendido"
@@ -1877,7 +1959,8 @@ const NotificationForm = () => {
                   {/* Residente em Belém? */}
                   <div>
                     <label className="block mb-2 font-medium text-gray-700">
-                      Residente em Belém?
+                      Residente em Belém?{" "}
+                      <span className="text-red-500">*</span>
                     </label>
                     <select
                       name="residenteBelem"
@@ -2086,7 +2169,7 @@ const NotificationForm = () => {
                   {/* Nome do Paciente */}
                   <div>
                     <label className="block mb-2 font-medium text-gray-700">
-                      Nome
+                      Nome <span className="text-red-500">*</span>
                     </label>
                     <div className="relative paciente-suggestions-area">
                       <div className="flex gap-2">
@@ -2203,7 +2286,7 @@ const NotificationForm = () => {
                   {/* Data de Nascimento */}
                   <div>
                     <label className="block mb-2 font-medium text-gray-700">
-                      Data de Nascimento
+                      Data de Nascimento <span className="text-red-500">*</span>
                     </label>
                     <CustomDateInput
                       name="dataNascimento"
@@ -2239,8 +2322,21 @@ const NotificationForm = () => {
                       className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none disabled:bg-gray-100 disabled:text-gray-500"
                       value={formData.idade}
                       onChange={(e) => {
-                        // Limitar a 3 caracteres
+                        // Obter o valor digitado
                         const value = e.target.value;
+
+                        // Verificar se é um número válido e não maior que 120
+                        const numValue = parseInt(value);
+                        if (!isNaN(numValue) && numValue > 120) {
+                          // Se for maior que 120, mostrar erro
+                          setErrors((prev) => ({
+                            ...prev,
+                            idade: "A idade não pode ser maior que 120 anos",
+                          }));
+                          return;
+                        }
+
+                        // Limitar a 3 caracteres e processar normalmente
                         if (value.length <= 3) {
                           handleChange({
                             target: {
@@ -2248,14 +2344,30 @@ const NotificationForm = () => {
                               value: value,
                             },
                           } as React.ChangeEvent<HTMLInputElement>);
+
+                          // Limpar erro se existir
+                          if (errors.idade) {
+                            setErrors((prev) => {
+                              const newErrors = { ...prev };
+                              delete newErrors.idade;
+                              return newErrors;
+                            });
+                          }
                         }
                       }}
                       disabled={!!formData.dataNascimento}
                       maxLength={3}
+                      min="0"
+                      max="120"
                     />
                     {formData.dataNascimento && (
                       <p className="mt-1 text-xs text-gray-500">
                         Idade calculada a partir da data de nascimento
+                      </p>
+                    )}
+                    {errors.idade && (
+                      <p className="mt-1 text-xs text-red-500">
+                        {errors.idade}
                       </p>
                     )}
                   </div>
@@ -2290,7 +2402,8 @@ const NotificationForm = () => {
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <label className="font-medium text-gray-700">
-                        Identidade de Gênero
+                        Identidade de Gênero{" "}
+                        <span className="text-red-500">*</span>
                       </label>
                       <button
                         type="button"
@@ -2412,7 +2525,7 @@ const NotificationForm = () => {
                   {/* Raça */}
                   <div>
                     <label className="block mb-2 font-medium text-gray-700">
-                      Raça
+                      Raça <span className="text-red-500">*</span>
                     </label>
                     <select
                       name="raca"
@@ -2548,7 +2661,8 @@ const NotificationForm = () => {
                   {/* Tipo de Atendimento */}
                   <div>
                     <label className="block mb-2 font-medium text-gray-700">
-                      Tipo de Atendimento
+                      Tipo de Atendimento{" "}
+                      <span className="text-red-500">*</span>
                     </label>
                     <select
                       name="tipoAtendimento"
@@ -2808,7 +2922,8 @@ const NotificationForm = () => {
                       {/* Data da Ocorrência */}
                       <div>
                         <label className="block mb-2 font-medium text-gray-700">
-                          Data da Ocorrência
+                          Data da Ocorrência{" "}
+                          <span className="text-red-500">*</span>
                         </label>
                         <CustomDateInput
                           name="dataOcorrencia"
@@ -3040,7 +3155,8 @@ const NotificationForm = () => {
                   {/* Tipo de Encerramento */}
                   <div>
                     <label className="block mb-2 font-medium text-gray-700">
-                      Tipo de Encerramento
+                      Tipo de Encerramento{" "}
+                      <span className="text-red-500">*</span>
                     </label>
                     <select
                       name="tipoEncerramento"
