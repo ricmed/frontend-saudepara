@@ -32,8 +32,8 @@ import {
   ListChecks,
   Loader,
   HelpCircle,
-  AlertCircle, 
-  CheckCircle
+  AlertCircle,
+  CheckCircle,
 } from "lucide-react";
 // Import the export utilities
 import {
@@ -167,7 +167,7 @@ const NotificationForm = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
-const [apiError, setApiError] = useState<string | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   // Estados para as opções de dropdown vindas da API
   const [eventoOptions, setEventoOptions] = useState<EventoOption[]>([]);
@@ -753,7 +753,9 @@ const [apiError, setApiError] = useState<string | null>(null);
     } catch (error) {
       console.error("Erro ao carregar notificação:", error);
       toast.error("Erro ao carregar dados da notificação");
-      return () => {navigate("/lista-comunicacao")}; // Voltar se ocorrer erro
+      return () => {
+        navigate("/lista-comunicacao");
+      }; // Voltar se ocorrer erro
     } finally {
       setIsLoading(false);
     }
@@ -1442,11 +1444,11 @@ const [apiError, setApiError] = useState<string | null>(null);
     console.log("BOTÃO SALVAR CLICADO");
     e.preventDefault();
     console.log("Form prevent default executado");
-  
+
     // Limpar estados de feedback
     setApiError(null);
     setIsSuccess(false);
-  
+
     // Verifica se tem paciente
     if (!formData.paciente.trim()) {
       toast.error("O nome do paciente é obrigatório");
@@ -1460,15 +1462,15 @@ const [apiError, setApiError] = useState<string | null>(null);
       }));
       return;
     }
-  
+
     // Se tem nome de paciente, mas não tem ID, criar paciente automaticamente
     if (formData.paciente.trim() && !formData.pacienteId) {
       try {
         const server = import.meta.env.VITE_API_SERVER;
         const port = import.meta.env.VITE_API_PORT;
-  
+
         toast.info("Criando novo paciente automaticamente...");
-  
+
         // Criar payload de novo paciente com os dados disponíveis
         const novoPaciente = {
           nome: formData.paciente,
@@ -1485,16 +1487,16 @@ const [apiError, setApiError] = useState<string | null>(null);
             : null,
           cbo_idcbo: formData.profissao ? parseInt(formData.profissao) : null,
         };
-  
+
         // Criar o paciente no backend
         const response = await axios.post(
           `${server}:${port}/api/paciente`,
           novoPaciente
         );
-  
+
         // Atualizar o formData com o ID do paciente criado
         formData.pacienteId = response.data.idpaciente;
-  
+
         console.log(
           "Paciente criado automaticamente com ID:",
           response.data.idpaciente
@@ -1504,7 +1506,9 @@ const [apiError, setApiError] = useState<string | null>(null);
         toast.error(
           "Erro ao criar o paciente. Verifique os dados e tente novamente."
         );
-        setApiError("Erro ao criar o paciente. Verifique os dados e tente novamente.");
+        setApiError(
+          "Erro ao criar o paciente. Verifique os dados e tente novamente."
+        );
         setIsSaving(false);
         return; // Impedir envio do formulário
       }
@@ -1533,7 +1537,7 @@ const [apiError, setApiError] = useState<string | null>(null);
             : undefined,
           ddi: formData.ddi || "55",
         };
-  
+
         // Usar o serviço para atualizar o paciente
         await PacienteService.update(formData.pacienteId, pacienteData);
         console.log("Dados do paciente atualizados com sucesso!");
@@ -1545,22 +1549,22 @@ const [apiError, setApiError] = useState<string | null>(null);
         // Não impedir o envio da notificação se a atualização do paciente falhar
       }
     }
-  
+
     const isValid = validateForm();
     console.log("Form validation result:", isValid);
     if (!isValid) return;
-  
+
     setIsSaving(true);
     try {
       // Converter todos os dados para caixa alta antes de enviar
       const formDataUpperCase = toUpperCaseAllStrings(formData);
-  
+
       console.log(
         "Dados do formulário:",
         JSON.stringify(formDataUpperCase, null, 2)
       );
       console.log("Sintomas selecionados:", formDataUpperCase.sinaisESintomas);
-  
+
       // Usar a função importada salvarNotificacaoCompleta
       if (isEditMode && id) {
         // Para atualização
@@ -1575,12 +1579,11 @@ const [apiError, setApiError] = useState<string | null>(null);
         setIsSuccess(true); // Definir estado de sucesso
         toast.success("Notificação criada com sucesso");
       }
-  
+
       // Redirecionar para página de listagem ou detalhes após um breve delay para mostrar a mensagem de sucesso
       setTimeout(() => {
         navigate("/lista-comunicacao");
       }, 1500);
-  
     } catch (error: any) {
       console.error("Erro ao salvar notificação:", error);
       setApiError(error.message || "Erro ao salvar notificação"); // Definir mensagem de erro
@@ -1625,7 +1628,7 @@ const [apiError, setApiError] = useState<string | null>(null);
   };
 
   // Update the handleExport function to use the export utilities with options
-  const handleExport = (format: string) => {
+  const handleExport = async (format: string) => {
     try {
       // Get all the dynamic options
       const exportOptions = getExportOptions();
@@ -1643,8 +1646,6 @@ const [apiError, setApiError] = useState<string | null>(null);
         case "PDF":
           exportToPDF(formData, exportOptions);
           break;
-        default:
-          alert(`Export to ${format} is not supported`);
       }
     } catch (error) {
       console.error(`Error exporting to ${format}:`, error);
@@ -1751,37 +1752,23 @@ const [apiError, setApiError] = useState<string | null>(null);
                 Exportar
               </button>
 
-              {/* Dropdown de Exportação */}
+              {/* Dropdown de Exportação - Apenas PDF e PNG */}
               {isExportDropdownOpen && (
                 <div className="absolute right-0 mt-2 w-48 rounded-md shadow-xl bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
                   <div className="py-1" role="menu" aria-orientation="vertical">
-                    <button
-                      onClick={() => handleExport("Word")}
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left flex items-center gap-2"
-                      role="menuitem"
-                    >
-                      <FileChartColumnIncreasing className="h-4 w-4" /> Word
-                    </button>
-                    <button
-                      onClick={() => handleExport("Excel")}
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left flex items-center gap-2"
-                      role="menuitem"
-                    >
-                      <FileSpreadsheet className="h-4 w-4" /> Excel
-                    </button>
-                    <button
-                      onClick={() => handleExport("CSV")}
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left flex items-center gap-2"
-                      role="menuitem"
-                    >
-                      <FileText className="h-4 w-4" /> CSV
-                    </button>
                     <button
                       onClick={() => handleExport("PDF")}
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left flex items-center gap-2"
                       role="menuitem"
                     >
                       <Files className="h-4 w-4" /> PDF
+                    </button>
+                    <button
+                      onClick={() => handleExport("PNG")}
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left flex items-center gap-2"
+                      role="menuitem"
+                    >
+                      <FileChartColumnIncreasing className="h-4 w-4" /> PNG
                     </button>
                   </div>
                 </div>
@@ -3207,20 +3194,26 @@ const [apiError, setApiError] = useState<string | null>(null);
                   {/* Local de Encaminhamento para Óbito */}
                   {isTipoEncerramento("óbito") && (
                     <div>
-                      <label className="block mb-2 font-medium text-gray-700">
-                        Local de Encaminhamento
-                      </label>
-                      <select
-                        name="localEncaminhamento"
-                        className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                      <UnidadeNotificadoraField
                         value={formData.localEncaminhamento}
-                        onChange={handleChange}
-                      >
-                        <option value="">Selecione</option>
-                        <option value="1">SVO</option>
-                        <option value="2">IML</option>
-                        <option value="3">Ignorado</option>
-                      </select>
+                        onChange={(value) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            localEncaminhamento: value,
+                          }))
+                        }
+                        label="Local de Encaminhamento"
+                        placeholder="Selecione o local de encaminhamento"
+                        isForEncaminhamento={true}
+                        specificEstablishments={[
+                          "SVO DVS SESPA",
+                          "Centro de Perícias Científicas Renato Chaves (IML)",
+                        ]}
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Campo opcional. Se não for selecionado, considera-se que
+                        o óbito ocorreu na unidade notificadora.
+                      </p>
                     </div>
                   )}
                 </div>

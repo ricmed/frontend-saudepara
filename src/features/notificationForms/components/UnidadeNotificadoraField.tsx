@@ -17,7 +17,8 @@ interface UnidadeNotificadoraFieldProps {
   label?: string;
   placeholder?: string;
   className?: string;
-  isForEncaminhamento?: boolean; // New prop to track if this is for encaminhamento
+  isForEncaminhamento?: boolean; // Para diferenciar entre unidade notificadora e encaminhamento
+  specificEstablishments?: string[]; // Nova prop para filtrar estabelecimentos específicos
 }
 
 const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
@@ -26,7 +27,8 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   label = "Unidade Notificadora",
   placeholder = "Buscar unidade notificadora...",
   className = "",
-  isForEncaminhamento = false // Default to false
+  isForEncaminhamento = false,
+  specificEstablishments = [] // Inicializa como array vazio
 }) => {
   const [unidadesNotificadoras, setUnidadesNotificadoras] = useState<Estabelecimento[]>([]);
   const [loadingUnidades, setLoadingUnidades] = useState(false);
@@ -78,7 +80,19 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
       const cacheKey = searchTerm || "_all_";
       if (estabelecimentosCache.current[cacheKey]) {
         console.log(`Using cached establishments for "${cacheKey}"`);
-        setUnidadesNotificadoras(estabelecimentosCache.current[cacheKey]);
+        let cachedEstabelecimentos = estabelecimentosCache.current[cacheKey];
+        
+        // Se temos estabelecimentos específicos, filtrá-los do cache
+        if (specificEstablishments && specificEstablishments.length > 0) {
+          cachedEstabelecimentos = cachedEstabelecimentos.filter(est => 
+            specificEstablishments.some(name => 
+              est.nome.toUpperCase().includes(name.toUpperCase())
+            )
+          );
+          console.log(`Filtered to ${cachedEstabelecimentos.length} specific establishments`);
+        }
+        
+        setUnidadesNotificadoras(cachedEstabelecimentos);
         setLoadingUnidades(false);
         return;
       }
@@ -139,10 +153,20 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
           estabelecimentosAtivos = [];
         }
         
-        // Store in cache
+        // Store all results in cache before filtering
         estabelecimentosCache.current[cacheKey] = estabelecimentosAtivos;
         if (!searchTerm) {
           initialLoadDone.current = true;
+        }
+        
+        // Filtrar por estabelecimentos específicos se fornecidos
+        if (specificEstablishments && specificEstablishments.length > 0) {
+          estabelecimentosAtivos = estabelecimentosAtivos.filter(est => 
+            specificEstablishments.some(name => 
+              est.nome.toUpperCase().includes(name.toUpperCase())
+            )
+          );
+          console.log(`Filtered to ${estabelecimentosAtivos.length} specific establishments: ${specificEstablishments.join(', ')}`);
         }
         
         setUnidadesNotificadoras(estabelecimentosAtivos);
@@ -432,17 +456,26 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
 
   // Filter results client-side - mostrar todos se não tiver pesquisa, ou filtrar com 3+ caracteres
   const filteredUnidades = useMemo(() => {
+    let results = unidadesNotificadoras;
+    
     if (searchQuery.length === 0) {
       // Mostrar todas as unidades quando não há pesquisa
-      return unidadesNotificadoras;
+      results = unidadesNotificadoras;
     } else if (searchQuery.length >= 3) {
       // Quando pesquisa tem 3+ caracteres, usar os resultados da API
-      return unidadesNotificadoras;
+      results = unidadesNotificadoras;
     } else {
       // Para 1-2 caracteres, fazer um filtro local mas mostrar todas as unidades
-      return unidadesNotificadoras;
+      results = unidadesNotificadoras;
     }
-  }, [unidadesNotificadoras, searchQuery]);
+    
+    // Log para diagnóstico
+    if (specificEstablishments && specificEstablishments.length > 0) {
+      console.log(`Exibindo ${results.length} estabelecimentos específicos`);
+    }
+    
+    return results;
+  }, [unidadesNotificadoras, searchQuery, specificEstablishments]);
   
   // Renderiza o dropdown em um portal fora da hierarquia DOM - using filteredUnidades
   const renderDropdown = () => {
@@ -498,7 +531,9 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
           ) : filteredUnidades.length > 0 ? (
             <>
               <div className="px-4 py-1 text-xs text-gray-400">
-                {filteredUnidades.length} unidades encontradas
+                {filteredUnidades.length} {specificEstablishments && specificEstablishments.length > 0 ? 
+                  "estabelecimentos específicos" : 
+                  "unidades"} encontrad{filteredUnidades.length === 1 ? "o" : "os"}
                 {searchQuery.length > 0 && searchQuery.length < 3 && (
                   <span className="ml-2 text-amber-500">Digite pelo menos 3 caracteres para refinar a pesquisa</span>
                 )}
@@ -559,6 +594,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
             onClick={handleFocus}
             disabled={loadingUnidades && !isDropdownOpen}
             data-field-type={isForEncaminhamento ? "encaminhamento" : "unidade"}
+            data-specific-filter={specificEstablishments && specificEstablishments.length > 0 ? "true" : "false"}
           />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           {displayValue && (
