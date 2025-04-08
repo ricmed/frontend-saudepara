@@ -574,7 +574,7 @@ const ListaPacientes = () => {
                 <Menu className="h-6 w-6" />
               </button>
               <button
-                onClick={() => navigate(-1)}
+                onClick={() => navigate("/modulo-pacientes-ficha")}
                 className="p-2 hover:bg-blue-700 rounded-full transition-colors"
               >
                 <ArrowLeft className="h-6 w-6" />

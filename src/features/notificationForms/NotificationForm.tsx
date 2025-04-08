@@ -753,7 +753,7 @@ const [apiError, setApiError] = useState<string | null>(null);
     } catch (error) {
       console.error("Erro ao carregar notificação:", error);
       toast.error("Erro ao carregar dados da notificação");
-      navigate(-1); // Voltar se ocorrer erro
+      return () => {navigate("/lista-comunicacao")}; // Voltar se ocorrer erro
     } finally {
       setIsLoading(false);
     }
@@ -1726,7 +1726,7 @@ const [apiError, setApiError] = useState<string | null>(null);
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4 text-white">
             <button
-              onClick={() => window.history.back()}
+              onClick={() => navigate("/lista-comunicacao")}
               className="p-2 hover:bg-white/10 rounded-lg transition-colors"
               title="Voltar"
             >
@@ -1812,7 +1812,7 @@ const [apiError, setApiError] = useState<string | null>(null);
             </button>
             <button
               type="button"
-              onClick={() => window.history.back()}
+              onClick={() => navigate("/lista-comunicacao")}
               className="inline-flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
             >
               <X className="h-4 w-4" />
@@ -3253,7 +3253,7 @@ const [apiError, setApiError] = useState<string | null>(null);
             </button>
             <button
               type="button"
-              onClick={() => window.history.back()}
+              onClick={() => navigate("/lista-comunicacao")}
               className="inline-flex items-center gap-2 px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
             >
               <X className="h-4 w-4" />
