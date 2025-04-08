@@ -398,156 +398,129 @@ export const exportToWord = (formData: FormData, exportOptions?: ExportOptions):
   }
 };
 
-// Export to PDF format (FIXED VERSION)
-const advancedTextProcessor = (value: unknown): string => {
-  if (value === undefined || value === null) return '';
-  
-  return String(value)
-    // Separação de palavras complexas
-    .replace(/([a-zÀ-ú])([A-ZÀ-Ú])/g, '$1 $2')          // CamelCase para espaços
-    .replace(/([A-ZÀ-Ú]{2,})([A-ZÀ-Ú][a-zà-ú])/g, '$1 $2') // Siglas + palavras
-    .replace(/(\d+)([A-Za-zÀ-ú]+)/gi, '$1 $2')          // Números antes de texto
-    .replace(/([A-Za-zÀ-ú]+)(\d+)/gi, '$1 $2')          // Texto antes de números
-    .replace(/([:])(\S)/g, '$1 $2')                     // Espaço após dois pontos
-    .replace(/(\s{2,})/g, ' ')                          // Remove espaços múltiplos
-    .trim();
-};
-
 // Função de exportação atualizada
 export const exportToPDF = (formData: FormData, exportOptions?: ExportOptions): boolean => {
   try {
-    const rawData = prepareDataForExport(formData, exportOptions);
-    const doc = new jsPDF('p', 'pt', 'a4');
+    const data = prepareDataForExport(formData, exportOptions);
+    const doc = new jsPDF();
+    
+    // Dimensões e configurações
     const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 40;
-    let currentY = margin + 20;
-
-    // Configurações globais
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-
-    // Função para adicionar cabeçalho
-    const addHeader = () => {
-      doc.setFillColor(70, 130, 180); // Azul
-      doc.rect(0, 0, pageWidth, 40, 'F');
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(255);
-      doc.text('FORMULÁRIO DE NOTIFICAÇÃO', pageWidth / 2, 25, { align: 'center' });
-      doc.setFontSize(10);
-    };
-
-    // Função para adicionar seções
-    const addSection = (title: string, fields: string[]) => {
+    const pageHeight = doc.internal.pageSize.getHeight();
+    
+    // Adicionar título do documento
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("Formulário de Notificação", pageWidth / 2, 15, { align: 'center' });
+    
+    let currentY = 25;
+    
+    // Definir as seções e seus campos
+    const sections = [
+      {
+        title: "1. Dados Gerais",
+        fields: ["Evento", "Público Atendido"]
+      },
+      {
+        title: "2. Procedência do indivíduo",
+        fields: ["Residente em Belém", "Bairro", "Município", "UF", 
+                "País de Procedência", "Local de Hospedagem", "Contato do Local"]
+      },
+      {
+        title: "3. Identificação do indivíduo",
+        fields: ["Nome do Paciente", "Nome da Mãe", "Data de Nascimento", "Idade", 
+                "CPF", "Identidade de Gênero", "Gestante", "Raça", "Escolaridade", 
+                "Profissão", "Contato Telefônico"]
+      },
+      {
+        title: "4. Informações do atendimento",
+        fields: ["Tipo de Atendimento", "Sinais e Sintomas", "Data de Início dos Sintomas",
+                "Observação dos Sintomas", "Hipótese Diagnóstica", "Observação da Hipótese",
+                "Tipo de Trauma", "Data da Ocorrência", "Observação do Trauma", 
+                "Relacionado a Surto", "Observação do Incidente"]
+      },
+      {
+        title: "5. Informações da unidade notificadora",
+        fields: ["Data do Atendimento", "Unidade Notificadora", 
+                "Nome do Notificador", "Contato do Notificador"]
+      },
+      {
+        title: "6. Encerramento do Caso",
+        fields: ["Data de Encerramento", "Tipo de Encerramento", "Local de Encaminhamento"]
+      }
+    ];
+    
+    // Processar cada seção
+    for (const section of sections) {
+      // Adicionar cabeçalho da seção
+      doc.setFillColor(65, 105, 225); // Royal Blue
+      doc.rect(10, currentY, pageWidth - 20, 8, 'F');
+      
+      doc.setTextColor(255, 255, 255);
       doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(70, 130, 180); // Azul
-      doc.text(title.toUpperCase(), margin, currentY);
-      currentY += 15;
-
-      doc.setDrawColor(200);
-      doc.setLineWidth(0.5);
-      doc.line(margin, currentY, pageWidth - margin, currentY);
-      currentY += 20;
-
-      const data = fields
-        .filter(field => rawData[field])
-        .map(field => ({
-          label: advancedTextProcessor(field),
-          value: advancedTextProcessor(rawData[field])
-        }));
-
-      if (data.length === 0) return;
-
-      doc.autoTable({
-        startY: currentY,
-        head: [['Campo', 'Valor']],
-        body: data.map(item => [item.label, item.value]),
-        margin: { left: margin, right: margin },
-        styles: {
-          font: 'helvetica',
-          fontSize: 10,
-          cellPadding: 6,
-          overflow: 'linebreak',
-          valign: 'middle'
-        },
-        headStyles: {
-          fillColor: [245, 245, 245],
-          textColor: 70,
-          fontStyle: 'bold',
-          lineWidth: 0.3
-        },
-        bodyStyles: {
-          lineWidth: 0.3,
-          lineColor: 200
-        },
-        columnStyles: {
-          0: { 
-            cellWidth: 120,
-            fontStyle: 'bold',
-            textColor: 70
+      doc.text(section.title, 12, currentY + 5.5);
+      
+      currentY += 10;
+      
+      // Preparar dados para a tabela
+      const tableData = section.fields
+        .filter(field => data[field] !== undefined && data[field] !== null && String(data[field]).trim() !== '')
+        .map(field => [field, data[field] ?? '']);
+      
+      if (tableData.length > 0) {
+        // Usar autoTable para essa seção
+        doc.autoTable({
+          startY: currentY,
+          body: tableData,
+          theme: 'plain',
+          styles: {
+            fontSize: 10,
+            cellPadding: 3,
+            lineColor: [220, 220, 220],
+            lineWidth: 0.1
           },
-          1: { 
-            cellWidth: 'auto',
-            textColor: 40
-          }
-        },
-        theme: 'grid',
-        didDrawPage: (data) => {
-          if (data.cursor) {
-            currentY = data.cursor.y + 15;
-          }
-        }
-      });
-    };
-
-    // Adiciona cabeçalho
-    addHeader();
-
-    // Adiciona conteúdo principal
-    addSection('1. Dados Gerais', ['Evento', 'Público Atendido']);
-    addSection('2. Procedência', [
-      'Residente em Belém', 'Bairro', 'Município', 'UF', 
-      'País de Procedência', 'Local de Hospedagem', 'Contato do Local'
-    ]);
-    addSection('3. Identificação', [
-      'Nome do Paciente', 'Nome da Mãe', 'Data de Nascimento', 'Idade', 
-      'CPF', 'Identidade de Gênero', 'Gestante', 'Raça', 'Escolaridade', 
-      'Profissão', 'Contato Telefônico'
-    ]);
-    addSection('4. Atendimento', [
-      'Tipo de Atendimento', 'Sinais e Sintomas', 'Data de Início dos Sintomas',
-      'Observação dos Sintomas', 'Hipótese Diagnóstica', 'Observação da Hipótese',
-      'Tipo de Trauma', 'Data da Ocorrência', 'Observação do Trauma', 
-      'Relacionado a Surto', 'Observação do Incidente'
-    ]);
-    addSection('5. Unidade Notificadora', [
-      'Data do Atendimento', 'Unidade Notificadora', 
-      'Nome do Notificador', 'Contato do Notificador'
-    ]);
-    addSection('6. Encerramento', [
-      'Data de Encerramento', 'Tipo de Encerramento', 'Local de Encaminhamento'
-    ]);
-
-    // Adiciona footer
+          columnStyles: {
+            0: { fontStyle: 'bold', cellWidth: 70 },
+            1: { cellWidth: 'auto' }
+          },
+          didDrawPage: (data) => {
+            // Adicionar rodapé em cada página
+            const pageNumber = doc.getNumberOfPages();
+            const text = `Gerado em ${new Date().toLocaleDateString('pt-BR')} - Página ${pageNumber}`;
+            
+            doc.setFontSize(8);
+            doc.setTextColor(100, 100, 100);
+            doc.text(text, pageWidth - 10, pageHeight - 10, { align: 'right' });
+          },
+          margin: { left: 10, right: 10 }
+        });
+        
+        // Atualizar a posição Y após a tabela
+        currentY = (doc as any).lastAutoTable.finalY + 10;
+      } else {
+        currentY += 5; // Espaço adicional se não houver campos
+      }
+    }
+    
+    // Atualizar todos os rodapés com o número total de páginas
     const totalPages = doc.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
       doc.setFontSize(8);
-      doc.setTextColor(100);
+      doc.setTextColor(100, 100, 100);
       doc.text(
         `Gerado em ${new Date().toLocaleDateString('pt-BR')} - Página ${i} de ${totalPages}`,
-        pageWidth - margin,
-        doc.internal.pageSize.getHeight() - 15,
+        pageWidth - 10,
+        pageHeight - 10,
         { align: 'right' }
       );
     }
-
-    // Salvar PDF
+    
+    // Salvar o PDF
     doc.save(generateFilename(formData, 'pdf'));
     return true;
   } catch (error) {
-    console.error("Erro na geração do PDF:", error);
+    console.error("Erro ao gerar PDF:", error);
     return false;
   }
 };
