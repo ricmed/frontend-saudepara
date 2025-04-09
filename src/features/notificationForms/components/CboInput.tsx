@@ -74,16 +74,22 @@ const CboInput: React.FC<CboInputProps> = ({
       // Normalizar o termo de pesquisa
       const normalizedSearchTerm = normalizeText(searchTerm);
       
-      // Para termos de pesquisa, exigir 3+ caracteres
-      if (normalizedSearchTerm && normalizedSearchTerm.length < 3 && normalizedSearchTerm.length > 0) {
-        setErrorMessage("Digite pelo menos 3 caracteres para pesquisar");
-        // Não limpar a lista de CBOs para manter a lista completa visível
+      // Exigir sempre 3+ caracteres para pesquisar - modificação principal
+      if (normalizedSearchTerm.length < 3) {
+        if (normalizedSearchTerm.length > 0) {
+          setErrorMessage("Digite pelo menos 3 caracteres para pesquisar");
+        } else {
+          setErrorMessage("Digite pelo menos 3 caracteres para ver as profissões");
+        }
+        
+        // Limpar os resultados se não tiver caracteres suficientes
+        setCbos([]);
         setIsLoading(false);
         return;
       }
       
       // Check cache first
-      const cacheKey = normalizedSearchTerm || "_all_";
+      const cacheKey = normalizedSearchTerm;
       if (cboCache.current[cacheKey]) {
         console.log(`Using cached data for "${cacheKey}"`);
         setCbos(cboCache.current[cacheKey]);
@@ -94,10 +100,8 @@ const CboInput: React.FC<CboInputProps> = ({
       const server = import.meta.env.VITE_API_SERVER;
       const port = import.meta.env.VITE_API_PORT;
       
-      // Usar o endpoint correto com base na presença do termo de busca
-      const endpoint = normalizedSearchTerm 
-        ? `${server}:${port}/api/tipo-cbo/search?descricao=${encodeURIComponent(normalizedSearchTerm)}&limit=10000` 
-        : `${server}:${port}/api/tipo-cbo?limit=10000`;
+      // Sempre usar o endpoint de pesquisa, pois agora só chamamos quando há termo
+      const endpoint = `${server}:${port}/api/tipo-cbo/search?descricao=${encodeURIComponent(normalizedSearchTerm)}&limit=10000`;
       
       const response = await axios.get(endpoint);
       
@@ -108,9 +112,6 @@ const CboInput: React.FC<CboInputProps> = ({
         const normalizedData = normalizeCbos(data);
         // Store in cache
         cboCache.current[cacheKey] = normalizedData;
-        if (!normalizedSearchTerm) {
-          initialLoadDone.current = true;
-        }
         
         setCbos(normalizedData);
       } else {
@@ -281,8 +282,15 @@ const CboInput: React.FC<CboInputProps> = ({
   useEffect(() => {
     if (isDropdownOpen) {
       updateDropdownPosition();
-      // Fetch data when dropdown is opened
-      fetchCbos(searchQuery);
+      
+      // Não buscar dados ao abrir o dropdown, esperando 3+ caracteres
+      if (searchQuery.length >= 3) {
+        fetchCbos(searchQuery);
+      } else {
+        // Apenas mostrar mensagem sem buscar dados
+        setErrorMessage("Digite pelo menos 3 caracteres para ver as profissões");
+        setCbos([]);
+      }
       
       // Track window resize
       window.addEventListener('resize', updateDropdownPosition);
@@ -342,15 +350,15 @@ const CboInput: React.FC<CboInputProps> = ({
     // Show appropriate message based on query length
     if (query.length > 0 && query.length < 3) {
       setErrorMessage("Digite pelo menos 3 caracteres para pesquisar");
-      // Não limpar a lista, mostrar a mensagem junto com todas as profissões
-    } else if (query.length >= 3 && isDropdownOpen) {
-      // Only fetch new results when we have 3+ characters
+      // Limpar os resultados se não tiver caracteres suficientes
+      setCbos([]);
+    } else if (query.length >= 3) {
+      // Fetch results for 3+ characters
       setErrorMessage(null);
-      fetchCbos(query);
-    } else if (query.length === 0 && isDropdownOpen) {
-      // Se limpou a pesquisa, mostrar todas as profissões novamente
-      setErrorMessage(null);
-      fetchCbos("");
+    } else if (query.length === 0) {
+      // Mensagem quando campo está vazio
+      setErrorMessage("Digite pelo menos 3 caracteres para ver as profissões");
+      setCbos([]);
     }
   };
 
@@ -371,16 +379,13 @@ const CboInput: React.FC<CboInputProps> = ({
     onChange(""); // Ensure returns an empty string
   };
 
-  // Filter results client-side - mostrar todos se não tiver pesquisa, ou filtrar com 3+ caracteres
+  // Filter results client-side - modificado para exigir 3+ caracteres sempre
   const filteredCbos = useMemo(() => {
-    if (searchQuery.length === 0) {
-      // Mostrar todas as profissões quando não há pesquisa
-      return cbos;
-    } else if (searchQuery.length >= 3) {
-      // Quando pesquisa tem 3+ caracteres, usar os resultados da API
-      return cbos;
+    if (searchQuery.length < 3) {
+      // Não mostrar nenhuma profissão com menos de 3 caracteres
+      return [];
     } else {
-      // Para 1-2 caracteres, fazer um filtro local mas mostrar todas as profissões
+      // Usar os resultados da API quando tem 3+ caracteres
       return cbos;
     }
   }, [cbos, searchQuery]);
@@ -428,9 +433,9 @@ const CboInput: React.FC<CboInputProps> = ({
           ) : errorMessage ? (
             <div className="px-4 py-2 text-sm text-red-500">
               {errorMessage}
-              {errorMessage !== "Digite pelo menos 3 caracteres para pesquisar" && (
+              {errorMessage.includes("servidor") && (
                 <button 
-                  onClick={() => fetchCbos("")} 
+                  onClick={() => searchQuery.length >= 3 ? fetchCbos(searchQuery) : null} 
                   className="ml-2 text-blue-500 underline"
                 >
                   Tentar novamente
@@ -441,9 +446,6 @@ const CboInput: React.FC<CboInputProps> = ({
             <>
               <div className="px-4 py-1 text-xs text-gray-400">
                 {filteredCbos.length} profissoes encontradas
-                {searchQuery.length > 0 && searchQuery.length < 3 && (
-                  <span className="ml-2 text-amber-500">Digite pelo menos 3 caracteres para refinar a pesquisa</span>
-                )}
               </div>
               {filteredCbos.map((cbo) => (
                 <button
@@ -460,7 +462,7 @@ const CboInput: React.FC<CboInputProps> = ({
             </>
           ) : (
             <div className="px-4 py-2 text-sm text-gray-500">
-              {searchQuery.length >= 3 ? 'Nenhuma profissao encontrada' : 'Carregando lista de profissoes...'}
+              {searchQuery.length >= 3 ? 'Nenhuma profissao encontrada' : 'Digite pelo menos 3 caracteres para pesquisar...'}
             </div>
           )}
         </div>

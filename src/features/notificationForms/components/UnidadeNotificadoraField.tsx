@@ -76,8 +76,22 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
       setLoadingUnidades(true);
       setErrorUnidades(null);
       
+      // Exigir sempre 3+ caracteres para pesquisar - modificação principal
+      if (searchTerm.length < 3) {
+        if (searchTerm.length > 0) {
+          setErrorUnidades("Digite pelo menos 3 caracteres para pesquisar");
+        } else {
+          setErrorUnidades("Digite pelo menos 3 caracteres para ver as unidades");
+        }
+        
+        // Limpar os resultados se não tiver caracteres suficientes
+        setUnidadesNotificadoras([]);
+        setLoadingUnidades(false);
+        return;
+      }
+      
       // Check cache first
-      const cacheKey = searchTerm || "_all_";
+      const cacheKey = searchTerm;
       if (estabelecimentosCache.current[cacheKey]) {
         console.log(`Using cached establishments for "${cacheKey}"`);
         let cachedEstabelecimentos = estabelecimentosCache.current[cacheKey];
@@ -93,14 +107,6 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
         }
         
         setUnidadesNotificadoras(cachedEstabelecimentos);
-        setLoadingUnidades(false);
-        return;
-      }
-      
-      // Para termos de pesquisa, exigir 3+ caracteres mas não limpar a lista
-      if (searchTerm && searchTerm.length < 3 && searchTerm.length > 0) {
-        setErrorUnidades("Digite pelo menos 3 caracteres para pesquisar");
-        // Não limpar a lista para manter todas as unidades visíveis
         setLoadingUnidades(false);
         return;
       }
@@ -155,9 +161,6 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
         
         // Store all results in cache before filtering
         estabelecimentosCache.current[cacheKey] = estabelecimentosAtivos;
-        if (!searchTerm) {
-          initialLoadDone.current = true;
-        }
         
         // Filtrar por estabelecimentos específicos se fornecidos
         if (specificEstablishments && specificEstablishments.length > 0) {
@@ -343,10 +346,9 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
     if (isDropdownOpen) {
       updateDropdownPosition();
       
-      // Fetch data when dropdown is opened if needed
-      if (unidadesNotificadoras.length === 0) {
-        fetchUnidadesNotificadoras("");
-      }
+      // Não buscar dados ao abrir o dropdown, apenas mostrar mensagem
+      setErrorUnidades("Digite pelo menos 3 caracteres para ver as unidades");
+      setUnidadesNotificadoras([]);
       
       // Track window resize
       window.addEventListener('resize', updateDropdownPosition);
@@ -360,17 +362,14 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
     }
   }, [isDropdownOpen]);
   
-  // Debounce for search - adjusting behavior based on query length
+  // Debounce for search - only search with 3+ characters
   useEffect(() => {
-    if (isDropdownOpen) {
-      // For empty or long queries, use debounce
-      if (searchQuery.length === 0 || searchQuery.length >= 3) {
-        const timer = setTimeout(() => {
-          fetchUnidadesNotificadoras(searchQuery);
-        }, 300);
-        
-        return () => clearTimeout(timer);
-      }
+    if (isDropdownOpen && searchQuery.length >= 3) {
+      const timer = setTimeout(() => {
+        fetchUnidadesNotificadoras(searchQuery);
+      }, 300);
+      
+      return () => clearTimeout(timer);
     }
   }, [searchQuery, isDropdownOpen]);
 
@@ -407,15 +406,16 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
     // Show appropriate message based on query length
     if (query.length > 0 && query.length < 3) {
       setErrorUnidades("Digite pelo menos 3 caracteres para pesquisar");
-      // Não limpar a lista, mostrar a mensagem junto com todas as unidades
+      // Limpar a lista com menos de 3 caracteres
+      setUnidadesNotificadoras([]);
     } else if (query.length >= 3 && isDropdownOpen) {
       // Only fetch new results when we have 3+ characters
       setErrorUnidades(null);
       fetchUnidadesNotificadoras(query);
     } else if (query.length === 0 && isDropdownOpen) {
-      // Se limpou a pesquisa, mostrar todas as unidades novamente
-      setErrorUnidades(null);
-      fetchUnidadesNotificadoras("");
+      // Mensagem para campo vazio
+      setErrorUnidades("Digite pelo menos 3 caracteres para ver as unidades");
+      setUnidadesNotificadoras([]);
     }
   };
 
@@ -451,31 +451,21 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
     });
     
     setIsDropdownOpen(true);
-    fetchUnidadesNotificadoras("");
+    // Não buscar dados automaticamente ao clicar no botão de pesquisa
+    setErrorUnidades("Digite pelo menos 3 caracteres para ver as unidades");
+    setUnidadesNotificadoras([]);
   };
 
-  // Filter results client-side - mostrar todos se não tiver pesquisa, ou filtrar com 3+ caracteres
+  // Filter results client-side - modificado para exigir 3+ caracteres sempre
   const filteredUnidades = useMemo(() => {
-    let results = unidadesNotificadoras;
-    
-    if (searchQuery.length === 0) {
-      // Mostrar todas as unidades quando não há pesquisa
-      results = unidadesNotificadoras;
-    } else if (searchQuery.length >= 3) {
-      // Quando pesquisa tem 3+ caracteres, usar os resultados da API
-      results = unidadesNotificadoras;
+    if (searchQuery.length < 3) {
+      // Não mostrar nenhuma unidade com menos de 3 caracteres
+      return [];
     } else {
-      // Para 1-2 caracteres, fazer um filtro local mas mostrar todas as unidades
-      results = unidadesNotificadoras;
+      // Apenas mostrar resultados com 3+ caracteres
+      return unidadesNotificadoras;
     }
-    
-    // Log para diagnóstico
-    if (specificEstablishments && specificEstablishments.length > 0) {
-      console.log(`Exibindo ${results.length} estabelecimentos específicos`);
-    }
-    
-    return results;
-  }, [unidadesNotificadoras, searchQuery, specificEstablishments]);
+  }, [unidadesNotificadoras, searchQuery]);
   
   // Renderiza o dropdown em um portal fora da hierarquia DOM - using filteredUnidades
   const renderDropdown = () => {
@@ -519,9 +509,9 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
           ) : errorUnidades ? (
             <div className="px-4 py-2 text-sm text-red-500">
               {errorUnidades}
-              {errorUnidades !== "Digite pelo menos 3 caracteres para pesquisar" && (
+              {errorUnidades.includes("servidor") && (
                 <button 
-                  onClick={() => fetchUnidadesNotificadoras("")} 
+                  onClick={() => searchQuery.length >= 3 ? fetchUnidadesNotificadoras(searchQuery) : null} 
                   className="ml-2 text-blue-500 underline"
                 >
                   Tentar novamente
@@ -533,10 +523,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
               <div className="px-4 py-1 text-xs text-gray-400">
                 {filteredUnidades.length} {specificEstablishments && specificEstablishments.length > 0 ? 
                   "estabelecimentos específicos" : 
-                  "unidades"} encontrad{filteredUnidades.length === 1 ? "o" : "os"}
-                {searchQuery.length > 0 && searchQuery.length < 3 && (
-                  <span className="ml-2 text-amber-500">Digite pelo menos 3 caracteres para refinar a pesquisa</span>
-                )}
+                  "unidades"} encontrad{filteredUnidades.length === 1 ? "a" : "as"}
               </div>
               {filteredUnidades.map((estabelecimento) => (
                 <button
@@ -561,7 +548,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
             </>
           ) : (
             <div className="px-4 py-2 text-sm text-gray-500">
-              {searchQuery.length >= 3 ? 'Nenhuma unidade encontrada com este termo' : 'Carregando unidades...'}
+              {searchQuery.length >= 3 ? 'Nenhuma unidade encontrada com este termo' : 'Digite pelo menos 3 caracteres para pesquisar...'}
             </div>
           )}
         </div>
