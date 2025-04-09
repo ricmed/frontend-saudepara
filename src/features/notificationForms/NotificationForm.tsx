@@ -3210,8 +3210,7 @@ const NotificationForm = () => {
                         </option>
                       </select>
                       <p className="mt-1 text-xs text-gray-500">
-                        Campo opcional. Se não for selecionado, considera-se que
-                        o óbito ocorreu na unidade notificadora.
+                        Campo opcional. Selecione um dos campos acima, se for necessário encaminhamento para estes locais.
                       </p>
                     </div>
                   )}

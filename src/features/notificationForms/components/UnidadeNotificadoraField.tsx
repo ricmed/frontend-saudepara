@@ -107,7 +107,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
       
       // Preparar parâmetros para a API
       const params: any = {
-        limit: 10000, // Buscar todas as unidades disponíveis
+        limit: 11000, // Buscar todas as unidades disponíveis
         orderBy: 'nome',
         orderDir: 'asc',
         ativo: 'S'
@@ -122,7 +122,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
       console.log('Buscando estabelecimentos com params:', params);
       
       // URL completa da API - AJUSTE PARA SEU AMBIENTE
-      const apiUrl = 'https://marcioreis.uk:5544/api/estabelecimentos';
+      const apiUrl = 'https://app.hml.saude.pa.gov.br:443/api/estabelecimentos';
       
       try {
         // Fazer a requisição à API com a URL completa
