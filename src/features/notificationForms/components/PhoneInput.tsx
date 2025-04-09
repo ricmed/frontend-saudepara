@@ -214,7 +214,11 @@ const countryCodes: CountryCode[] = [
   { name: "Tailândia", code: "TH", dial_code: "+66" },
   { name: "Taiwan", code: "TW", dial_code: "+886" },
   { name: "Tanzânia", code: "TZ", dial_code: "+255" },
-  { name: "Território Britânico do Oceano Índico", code: "IO", dial_code: "+246" },
+  {
+    name: "Território Britânico do Oceano Índico",
+    code: "IO",
+    dial_code: "+246",
+  },
   { name: "Timor-Leste", code: "TL", dial_code: "+670" },
   { name: "Togo", code: "TG", dial_code: "+228" },
   { name: "Tokelau", code: "TK", dial_code: "+690" },
@@ -234,7 +238,7 @@ const countryCodes: CountryCode[] = [
   { name: "Vietnã", code: "VN", dial_code: "+84" },
   { name: "Wallis e Futuna", code: "WF", dial_code: "+681" },
   { name: "Zâmbia", code: "ZM", dial_code: "+260" },
-  { name: "Zimbábue", code: "ZW", dial_code: "+263" }
+  { name: "Zimbábue", code: "ZW", dial_code: "+263" },
 ];
 
 interface PhoneInputProps {
@@ -262,18 +266,20 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
   const isInternalChangeRef = useRef(false);
   const previousValueRef = useRef(value);
   const initialLoadRef = useRef(true);
-  
+
   // Estado interno
   const [internalPhoneNumber, setInternalPhoneNumber] = useState("");
-  
+
   // NÃO configurar país padrão - será determinado pelo valor inicial
-  const [selectedCountry, setSelectedCountry] = useState<CountryCode | null>(null);
-  
+  const [selectedCountry, setSelectedCountry] = useState<CountryCode | null>(
+    null
+  );
+
   // UI states
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   const [searchQuery, setSearchQuery] = useState<string>("");
-  
+
   // Refs para elementos do DOM
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -282,24 +288,24 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
   // Detectar o país a partir do código de discagem (mais eficaz)
   const detectCountryFromNumber = (phoneNumber: string) => {
     if (!phoneNumber) return null;
-    
+
     console.log("Detectando país a partir de:", phoneNumber);
-    
+
     // Verificar formato +XX XXXXX ou apenas +XX
-    if (phoneNumber.startsWith('+')) {
-      const dialCodePart = phoneNumber.includes(' ') 
-        ? phoneNumber.split(' ')[0]
+    if (phoneNumber.startsWith("+")) {
+      const dialCodePart = phoneNumber.includes(" ")
+        ? phoneNumber.split(" ")[0]
         : phoneNumber;
-      
+
       console.log("Código DDI extraído:", dialCodePart);
-      
+
       // Buscar correspondência exata
-      const country = countryCodes.find(c => c.dial_code === dialCodePart);
+      const country = countryCodes.find((c) => c.dial_code === dialCodePart);
       if (country) {
         console.log("País encontrado exato:", country.name);
         return country;
       }
-      
+
       // Buscar por prefixo se não encontrou exato
       for (const c of countryCodes) {
         if (dialCodePart.startsWith(c.dial_code)) {
@@ -308,25 +314,25 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
         }
       }
     }
-    
+
     // Se nada funcionou e temos o ddi como prop, usá-lo
     if (ddi) {
-      const country = countryCodes.find(c => c.dial_code === `+${ddi}`);
+      const country = countryCodes.find((c) => c.dial_code === `+${ddi}`);
       if (country) {
         console.log("País encontrado via prop ddi:", country.name);
         return country;
       }
     }
-    
+
     // Caso não tenha encontrado
     return null;
   };
-  
+
   // Normalizar texto (remover acentos e converter para minúsculas)
   const normalizeText = (text: string): string => {
     return text
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase();
   };
 
@@ -335,38 +341,42 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
     if (value && initialLoadRef.current) {
       console.log("Inicializando com valor:", value);
       initialLoadRef.current = false;
-      
+
       // Primeiro tentar detectar país do número fornecido
       const detectedCountry = detectCountryFromNumber(value);
-      
+
       if (detectedCountry) {
         console.log("País detectado na inicialização:", detectedCountry.name);
         setSelectedCountry(detectedCountry);
-        
+
         // Extrair o número sem o código do país
-        const parts = value.split(' ');
+        const parts = value.split(" ");
         if (parts.length > 1) {
-          const phoneNumber = parts.slice(1).join(' ');
+          const phoneNumber = parts.slice(1).join(" ");
           setInternalPhoneNumber(phoneNumber);
         } else {
           setInternalPhoneNumber(value);
         }
       } else {
         // Se não conseguiu detectar do número, verificar se temos ddi na prop
-        const defaultCountry = ddi 
-          ? countryCodes.find(c => c.dial_code === `+${ddi}`) 
-          : countryCodes.find(c => c.code === "BR");
-        
+        const defaultCountry = ddi
+          ? countryCodes.find((c) => c.dial_code === `+${ddi}`)
+          : countryCodes.find((c) => c.code === "BR");
+
         // Se ainda não encontrou, usar Brasil como padrão
-        const finalCountry = defaultCountry || countryCodes.find(c => c.code === "BR") || countryCodes[0];
-        
+        const finalCountry =
+          defaultCountry ||
+          countryCodes.find((c) => c.code === "BR") ||
+          countryCodes[0];
+
         console.log("Usando país pelo DDI:", finalCountry.name);
         setSelectedCountry(finalCountry);
         setInternalPhoneNumber(value);
       }
     } else if (!selectedCountry) {
       // Se não tiver país selecionado nem valor, usar Brasil como padrão
-      const defaultCountry = countryCodes.find(c => c.code === "BR") || countryCodes[0];
+      const defaultCountry =
+        countryCodes.find((c) => c.code === "BR") || countryCodes[0];
       console.log("Definindo país padrão:", defaultCountry.name);
       setSelectedCountry(defaultCountry);
     }
@@ -379,24 +389,24 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
       console.log("Pulando processamento (mudança interna)");
       return;
     }
-    
+
     // Se o valor vindo de fora mudou, processar
     if (value !== previousValueRef.current) {
       previousValueRef.current = value;
-      
+
       if (value) {
         console.log("Processando valor externo:", value);
-        
+
         // Detectar país
         const detectedCountry = detectCountryFromNumber(value);
         if (detectedCountry) {
           console.log("País detectado na atualização:", detectedCountry.name);
           setSelectedCountry(detectedCountry);
-          
+
           // Extrair o número sem o código do país
-          const parts = value.split(' ');
+          const parts = value.split(" ");
           if (parts.length > 1) {
-            const phoneNumber = parts.slice(1).join(' ');
+            const phoneNumber = parts.slice(1).join(" ");
             setInternalPhoneNumber(phoneNumber);
           }
         }
@@ -414,11 +424,14 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
       return;
     }
     
+    // Garantir que só temos dígitos numéricos e limitar a 15
+    const cleanPhone = phone.replace(/\D/g, "").slice(0, 15);
+    
     // Remover o + para obter apenas os dígitos
     const dialCode = country.dial_code.replace(/^\+/, '');
     
     // Formatar incluindo o + no DDI
-    const fullNumber = phone ? `+${dialCode} ${phone.trim()}` : "";
+    const fullNumber = cleanPhone ? `+${dialCode} ${cleanPhone.trim()}` : "";
     
     console.log("Notificando mudança:", fullNumber, "com país:", country.name);
     
@@ -430,8 +443,8 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
     onChange(fullNumber);
     
     // Também notificar com valores separados, se o callback estiver definido
-    if (onChangeWithCode && phone.trim()) {
-      onChangeWithCode(dialCode, phone.trim());
+    if (onChangeWithCode && cleanPhone.trim()) {
+      onChangeWithCode(dialCode, cleanPhone.trim());
     }
     
     // Resetar a flag após um curto período
@@ -442,9 +455,18 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
 
   // Handler para mudanças no input do telefone
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newPhone = e.target.value;
+    // Obter valor digitado
+    let newPhone = e.target.value;
+
+    // Remover caracteres não numéricos
+    newPhone = newPhone.replace(/\D/g, "");
+
+    // Limitar a 15 dígitos
+    newPhone = newPhone.slice(0, 15);
+
+    // Atualizar o valor interno
     setInternalPhoneNumber(newPhone);
-    
+
     // Notificar o pai apenas se houver um valor significativo
     if (selectedCountry && newPhone.trim()) {
       notifyParentOfChange(selectedCountry, newPhone);
@@ -460,21 +482,24 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
   };
 
   // Handler para seleção de país
-  const handleCountrySelect = (country: CountryCode, e: React.MouseEvent<HTMLButtonElement>) => {
+  const handleCountrySelect = (
+    country: CountryCode,
+    e: React.MouseEvent<HTMLButtonElement>
+  ) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     console.log("País selecionado:", country.name, country.dial_code);
-    
+
     setSelectedCountry(country);
     setIsDropdownOpen(false);
     setSearchQuery("");
-    
+
     // Notificar o pai imediatamente com o novo código de país
     if (internalPhoneNumber.trim()) {
       notifyParentOfChange(country, internalPhoneNumber);
     }
-    
+
     // Restaurar posição de scroll
     setTimeout(() => {
       window.scrollTo(scrollPositionRef.current.x, scrollPositionRef.current.y);
@@ -485,13 +510,13 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
   const toggleDropdown = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     // Salvar posição atual de scroll
     scrollPositionRef.current = {
       x: window.scrollX,
-      y: window.scrollY
+      y: window.scrollY,
     };
-    
+
     setIsDropdownOpen(!isDropdownOpen);
   };
 
@@ -499,9 +524,9 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
-        buttonRef.current && 
+        buttonRef.current &&
         !buttonRef.current.contains(event.target as Node) &&
-        dropdownRef.current && 
+        dropdownRef.current &&
         !dropdownRef.current.contains(event.target as Node)
       ) {
         setIsDropdownOpen(false);
@@ -520,18 +545,21 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
       const rect = buttonRef.current.getBoundingClientRect();
       setDropdownPosition({
         top: rect.bottom + window.scrollY,
-        left: rect.left + window.scrollX
+        left: rect.left + window.scrollX,
       });
     }
   }, [isDropdownOpen]);
-  
+
   // Restaurar a posição de scroll ao abrir o dropdown
   useEffect(() => {
     if (isDropdownOpen) {
       const timeoutId = setTimeout(() => {
-        window.scrollTo(scrollPositionRef.current.x, scrollPositionRef.current.y);
+        window.scrollTo(
+          scrollPositionRef.current.x,
+          scrollPositionRef.current.y
+        );
       }, 10);
-      
+
       return () => clearTimeout(timeoutId);
     }
   }, [isDropdownOpen]);
@@ -541,12 +569,15 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
     if (ddi && !isInternalChangeRef.current) {
       console.log("DDI mudou externamente:", ddi);
       const dialCode = `+${ddi}`;
-      const country = countryCodes.find(c => c.dial_code === dialCode);
-      
-      if (country && (!selectedCountry || country.dial_code !== selectedCountry.dial_code)) {
+      const country = countryCodes.find((c) => c.dial_code === dialCode);
+
+      if (
+        country &&
+        (!selectedCountry || country.dial_code !== selectedCountry.dial_code)
+      ) {
         console.log("Atualizando país pelo novo DDI:", country.name);
         setSelectedCountry(country);
-        
+
         // Manter o número de telefone, apenas atualizar o país
         if (internalPhoneNumber) {
           // Desativar a notificação ao pai temporariamente para evitar loops
@@ -568,14 +599,14 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
 
   // Filtra países baseado na busca
   const filteredCountries = searchQuery
-    ? countryCodes.filter(
-        country => {
-          const normalizedQuery = normalizeText(searchQuery);
-          const normalizedName = normalizeText(country.name);
-          return normalizedName.includes(normalizedQuery) || 
-                 country.dial_code.includes(searchQuery);
-        }
-      )
+    ? countryCodes.filter((country) => {
+        const normalizedQuery = normalizeText(searchQuery);
+        const normalizedName = normalizeText(country.name);
+        return (
+          normalizedName.includes(normalizedQuery) ||
+          country.dial_code.includes(searchQuery)
+        );
+      })
     : countryCodes;
 
   // Handler para evitar reset de scroll no input de busca
@@ -583,7 +614,7 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
     setSearchQuery(e.target.value);
     e.stopPropagation();
   };
-  
+
   // Handler para evitar scroll no clique do input de busca
   const handleSearchInputClick = (e: React.MouseEvent<HTMLInputElement>) => {
     e.stopPropagation();
@@ -592,20 +623,21 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
   // Renderiza o dropdown em um portal fora da hierarquia DOM
   const renderDropdown = () => {
     if (!isDropdownOpen) return null;
-    
+
     return createPortal(
-      <div 
+      <div
         ref={dropdownRef}
         style={{
-          position: 'absolute',
+          position: "absolute",
           top: `${dropdownPosition.top}px`,
           left: `${dropdownPosition.left}px`,
           zIndex: 9999,
-          width: '290px',
-          backgroundColor: 'white',
-          borderRadius: '0.5rem',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-          border: '1px solid #e5e7eb'
+          width: "290px",
+          backgroundColor: "white",
+          borderRadius: "0.5rem",
+          boxShadow:
+            "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+          border: "1px solid #e5e7eb",
         }}
       >
         <div className="p-2 border-b border-gray-100">
@@ -618,12 +650,12 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
             onClick={handleSearchInputClick}
           />
         </div>
-        <div 
+        <div
           className="max-h-60 overflow-y-auto py-1"
           style={{
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            WebkitOverflowScrolling: 'touch'
+            overflowY: "auto",
+            overflowX: "hidden",
+            WebkitOverflowScrolling: "touch",
           }}
         >
           {filteredCountries.map((country) => (
@@ -633,14 +665,16 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
               className="flex items-center w-full px-4 py-2 text-left hover:bg-blue-50 focus:bg-blue-100 focus:outline-none transition-colors"
               onClick={(e) => handleCountrySelect(country, e)}
             >
-              <img 
-                src={getFlagUrl(country.code)} 
-                alt={`Bandeira ${country.name}`} 
+              <img
+                src={getFlagUrl(country.code)}
+                alt={`Bandeira ${country.name}`}
                 className="w-5 h-auto mr-3"
-                style={{ border: '1px solid #eaeaea', borderRadius: '2px' }}
+                style={{ border: "1px solid #eaeaea", borderRadius: "2px" }}
               />
               <span className="font-medium text-sm w-12">{country.code}</span>
-              <span className="text-sm text-gray-700 font-semibold w-16">{country.dial_code}</span>
+              <span className="text-sm text-gray-700 font-semibold w-16">
+                {country.dial_code}
+              </span>
               <span className="text-sm">{country.name}</span>
             </button>
           ))}
@@ -657,7 +691,9 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
 
   return (
     <div className="w-full">
-      {label && <label className="block mb-2 font-medium text-gray-700">{label}</label>}
+      {label && (
+        <label className="block mb-2 font-medium text-gray-700">{label}</label>
+      )}
       <div className="flex">
         {/* Seletor de código de país */}
         <button
@@ -668,13 +704,15 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
         >
           {selectedCountry && (
             <>
-              <img 
-                src={getFlagUrl(selectedCountry.code)} 
-                alt={`Bandeira ${selectedCountry.name}`} 
+              <img
+                src={getFlagUrl(selectedCountry.code)}
+                alt={`Bandeira ${selectedCountry.name}`}
                 className="w-5 h-auto mr-2"
-                style={{ border: '1px solid #eaeaea', borderRadius: '2px' }}
+                style={{ border: "1px solid #eaeaea", borderRadius: "2px" }}
               />
-              <span className="font-medium text-sm">{selectedCountry.dial_code}</span>
+              <span className="font-medium text-sm">
+                {selectedCountry.dial_code}
+              </span>
             </>
           )}
           <ChevronDown className="ml-2 h-4 w-4 text-gray-400" />
@@ -683,6 +721,9 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
         {/* Input para o número de telefone */}
         <input
           type="tel"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={15}
           name={name}
           value={internalPhoneNumber}
           onChange={handlePhoneChange}

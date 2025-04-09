@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Search, X } from "lucide-react";
 import axios from 'axios';
@@ -42,14 +42,13 @@ const BairroInput: React.FC<BairroInputProps> = ({
   const [selectedOption, setSelectedOption] = useState<Bairro | null>(null);
   const [options, setOptions] = useState<Bairro[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   const dropdownRef = useRef<HTMLDivElement>(null);
   
   // Reference for fetch abort controller
   const abortControllerRef = useRef<AbortController | null>(null);
   
-  // Save current scroll position
-  const scrollPositionRef = useRef({ x: 0, y: 0 });
+  // Para armazenar a posição atual de scroll
+  const [scrollPosition, setScrollPosition] = useState({ x: 0, y: 0 });
 
   const debugLog = (message: string, data?: any) => {
     if (debug) {
@@ -167,16 +166,73 @@ const BairroInput: React.FC<BairroInputProps> = ({
     }
   };
 
-  // Filter options based on search term
-  const filteredOptions = options.filter(option => {
-    // Se não há termo de busca, mostrar todos
-    if (!searchQuery) return true;
+  // Função para atualizar a posição do dropdown
+  const updateDropdownPosition = () => {
+    if (!inputRef.current || !dropdownRef.current) return;
     
-    // Normalizar tanto a descrição da opção quanto o termo de pesquisa
-    const normalizedDesc = option.descricao; // Já está normalizado nas opções
+    const rect = inputRef.current.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    
+    // Verificar se estamos em dispositivo móvel
+    const isMobile = viewportWidth <= 768;
+    
+    // Em dispositivos móveis, posicionar em relação à viewport
+    if (isMobile) {
+      // Calcular espaço disponível abaixo do input
+      const spaceBelow = viewportHeight - rect.bottom;
+      // Altura máxima para o dropdown
+      const maxDropdownHeight = Math.min(300, viewportHeight * 0.6);
+      
+      // Garantir que o dropdown não exceda a largura da tela
+      const leftPosition = Math.max(0, rect.left);
+      const adjustedWidth = Math.min(rect.width, viewportWidth - leftPosition);
+      
+      // Se não houver espaço suficiente abaixo, posicionar acima se possível
+      if (spaceBelow < 150 && rect.top > 150) {
+        dropdownRef.current.style.setProperty('bottom', `${viewportHeight - rect.top}px`);
+        dropdownRef.current.style.setProperty('top', 'auto');
+        dropdownRef.current.style.setProperty('max-height', `${Math.min(rect.top - 10, maxDropdownHeight)}px`);
+      } else {
+        // Posicionar abaixo com altura máxima apropriada
+        dropdownRef.current.style.setProperty('top', `${rect.bottom}px`);
+        dropdownRef.current.style.setProperty('bottom', 'auto');
+        dropdownRef.current.style.setProperty('max-height', `${Math.min(spaceBelow - 10, maxDropdownHeight)}px`);
+      }
+      
+      // Definir posição horizontal - garantir que esteja visível na tela
+      dropdownRef.current.style.setProperty('left', `${leftPosition}px`);
+      dropdownRef.current.style.setProperty('width', `${adjustedWidth}px`);
+      
+      // Usar posicionamento fixo em dispositivos móveis para evitar problemas com scroll
+      dropdownRef.current.style.setProperty('position', 'fixed');
+      
+      // Garantir que o z-index seja alto o suficiente
+      dropdownRef.current.style.setProperty('z-index', '9999');
+      
+      // Adicionar animação sutil para UX mais suave
+      dropdownRef.current.style.setProperty('transition', 'opacity 0.2s, transform 0.2s');
+      dropdownRef.current.style.setProperty('opacity', '1');
+      dropdownRef.current.style.setProperty('transform', 'translateY(0)');
+    } else {
+      // Em desktop, usar posicionamento absoluto em relação ao documento
+      dropdownRef.current.style.setProperty('position', 'absolute');
+      dropdownRef.current.style.setProperty('top', `${rect.bottom + window.scrollY}px`);
+      dropdownRef.current.style.setProperty('left', `${rect.left + window.scrollX}px`);
+      dropdownRef.current.style.setProperty('width', `${rect.width}px`);
+      dropdownRef.current.style.setProperty('max-height', '300px');
+    }
+  };
+
+  // Filter options based on search term
+  const filteredOptions = useMemo(() => {
+    // Se não há termo de busca, mostrar todos
+    if (!searchQuery) return options;
+    
+    // Normalizar o termo de pesquisa
     const normalizedSearch = normalizeText(searchQuery);
-    return normalizedDesc.includes(normalizedSearch);
-  });
+    return options.filter(option => option.descricao.includes(normalizedSearch));
+  }, [options, searchQuery]);
 
   // Load selected option if there's a value
   useEffect(() => {
@@ -216,27 +272,16 @@ const BairroInput: React.FC<BairroInputProps> = ({
   // Handler to close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // Verificar se estamos em um dispositivo móvel
-      const isMobile = window.innerWidth <= 768;
-      
       if (
         inputRef.current && 
         !inputRef.current.contains(event.target as Node) &&
         dropdownRef.current && 
         !dropdownRef.current.contains(event.target as Node)
       ) {
-        // Em dispositivos móveis, adicionar uma pequena pausa
-        // para permitir que o teclado feche antes de processar a ação
-        if (isMobile) {
-          setTimeout(() => {
-            setIsDropdownOpen(false);
-          }, 100);
-        } else {
-          setIsDropdownOpen(false);
-        }
+        closeDropdown();
       }
     };
-  
+    
     if (isDropdownOpen) {
       // Pequeno timeout para evitar que o mesmo clique que abriu o dropdown o feche imediatamente
       setTimeout(() => {
@@ -246,24 +291,34 @@ const BairroInput: React.FC<BairroInputProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isDropdownOpen]);
 
-  // Update dropdown position when opened
+  // Fechar dropdown com segurança
+  const closeDropdown = () => {
+    setIsDropdownOpen(false);
+    setSearchQuery("");
+  };
+
+  // Update dropdown position when opened or window is resized
   useEffect(() => {
-    if (isDropdownOpen && inputRef.current) {
-      const rect = inputRef.current.getBoundingClientRect();
+    if (isDropdownOpen) {
+      updateDropdownPosition();
+      // Buscar dados quando o dropdown é aberto
+      fetchBairros(searchQuery);
       
-      setDropdownPosition({
-        top: rect.bottom + window.scrollY,
-        left: rect.left + window.scrollX
-      });
+      // Monitorar redimensionamento da janela
+      window.addEventListener('resize', updateDropdownPosition);
+      // Monitorar scroll
+      window.addEventListener('scroll', updateDropdownPosition);
       
-      // Load options when dropdown is opened
-      fetchBairros();
+      return () => {
+        window.removeEventListener('resize', updateDropdownPosition);
+        window.removeEventListener('scroll', updateDropdownPosition);
+      };
     }
-  }, [isDropdownOpen]);
+  }, [isDropdownOpen, searchQuery]);
   
-  // Text search with debounce
+  // Debounce para pesquisa - apenas pesquisar com 3+ caracteres
   useEffect(() => {
-    if (isDropdownOpen && searchQuery.length >= 2) {
+    if (isDropdownOpen && searchQuery.length >= 3) {
       const timer = setTimeout(() => {
         fetchBairros(searchQuery);
       }, 300);
@@ -271,17 +326,6 @@ const BairroInput: React.FC<BairroInputProps> = ({
       return () => clearTimeout(timer);
     }
   }, [searchQuery, isDropdownOpen]);
-  
-  // Restore scroll position when opening dropdown
-  useEffect(() => {
-    if (isDropdownOpen) {
-      const timeoutId = setTimeout(() => {
-        window.scrollTo(scrollPositionRef.current.x, scrollPositionRef.current.y);
-      }, 10);
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [isDropdownOpen]);
 
   // Cancel pending requests when unmounting component
   useEffect(() => {
@@ -295,32 +339,17 @@ const BairroInput: React.FC<BairroInputProps> = ({
   const handleFocus = () => {
     if (disabled) return;
     
-    // Detectar se estamos em um dispositivo móvel
-    const isMobile = window.innerWidth <= 768;
-    
-    // Salvar posição atual de scroll
-    scrollPositionRef.current = {
+    // Armazenar posição atual de scroll
+    setScrollPosition({
       x: window.scrollX,
       y: window.scrollY
-    };
+    });
     
     // Limpar a consulta de pesquisa ao focar
     setSearchQuery("");
     
     // Abrir dropdown
     setIsDropdownOpen(true);
-    
-    // Em dispositivos móveis, forçar um pequeno timeout para garantir
-    // que o dropdown seja posicionado corretamente após o teclado aparecer
-    if (isMobile && inputRef.current) {
-      setTimeout(() => {
-        const rect = inputRef.current!.getBoundingClientRect();
-        setDropdownPosition({
-          top: rect.bottom + window.scrollY,
-          left: rect.left + window.scrollX
-        });
-      }, 50);
-    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -329,12 +358,6 @@ const BairroInput: React.FC<BairroInputProps> = ({
   };
 
   const handleOptionSelect = (option: Bairro) => {
-    // Save current scroll position
-    const scrollPosition = {
-      x: window.scrollX,
-      y: window.scrollY
-    };
-    
     debugLog(`Opção selecionada: ${option.descricao} (${option.idtipo_bairro})`);
     
     setSelectedOption(option);
@@ -342,11 +365,6 @@ const BairroInput: React.FC<BairroInputProps> = ({
     setSearchQuery("");
     onChange(option.idtipo_bairro.toString());
     setIsDropdownOpen(false);
-    
-    // Small timeout to ensure scroll is restored after closing dropdown
-    setTimeout(() => {
-      window.scrollTo(scrollPosition.x, scrollPosition.y);
-    }, 10);
   };
 
   const handleClear = (e: React.MouseEvent) => {
@@ -362,66 +380,38 @@ const BairroInput: React.FC<BairroInputProps> = ({
   const renderDropdown = () => {
     if (!isDropdownOpen) return null;
     
-    // Detectar se estamos em um dispositivo móvel
-    const isMobile = window.innerWidth <= 768;
-    
-    // Em dispositivos móveis, anexamos o dropdown ao elemento pai em vez de ao body
-    // para manter o contexto de rolagem
-    const dropdownParent = (isMobile && inputRef.current && inputRef.current.parentElement) 
-      ? inputRef.current.parentElement 
-      : document.body;
-  
-    // Calcular posição do dropdown
-    let topPosition = dropdownPosition.top;
-    let leftPosition = dropdownPosition.left;
-    
-    // Em dispositivos móveis, posicionar relativo ao elemento pai
-    if (isMobile && inputRef.current) {
-      const inputHeight = inputRef.current.offsetHeight;
-      topPosition = inputHeight + 4; // 4px de espaço
-      leftPosition = 0;
-    }
-    
     return createPortal(
       <div 
         ref={dropdownRef}
+        className="fixed z-[9999] bg-white rounded-lg shadow-md border border-gray-200 flex flex-col"
         style={{
-          position: isMobile ? 'absolute' : 'fixed',
-          top: isMobile ? `${topPosition}px` : `${dropdownPosition.top}px`,
-          left: isMobile ? `${leftPosition}px` : `${dropdownPosition.left}px`,
+          overscrollBehavior: 'contain',
+          WebkitOverflowScrolling: 'touch',
           zIndex: 9999,
-          width: isMobile ? '100%' : `${inputRef.current ? inputRef.current.offsetWidth : 290}px`,
-          backgroundColor: 'white',
-          borderRadius: '0.5rem',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-          border: '1px solid #e5e7eb',
-          maxHeight: isMobile ? '50vh' : '300px',
-          display: 'flex',
-          flexDirection: 'column',
-          // Prevenir que o dropdown fique fora da tela em dispositivos móveis
-          maxWidth: '100vw'
         }}
       >
-        <div className="p-2 border-b border-gray-100 sticky top-0 bg-white">
-          <input
-            type="text"
-            placeholder="Pesquisar bairros..."
-            className="w-full p-2 text-sm border border-gray-200 rounded-md"
-            value={searchQuery}
-            onChange={handleInputChange}
-            onClick={(e) => e.stopPropagation()}
-            autoFocus={!isMobile} // Evitar autofocus em mobile que pode causar problemas
-          />
+        <div className="p-2 border-b border-gray-100 sticky top-0 bg-white z-10">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Filtrar bairros..."
+              className="w-full p-2 pr-8 text-sm border border-gray-200 rounded-md"
+              value={searchQuery}
+              onChange={handleInputChange}
+              onClick={(e) => e.stopPropagation()}
+              autoFocus
+            />
+            {searchQuery.length > 0 && (
+              <button 
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                onClick={() => setSearchQuery("")}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
-        <div 
-          className="overflow-y-auto py-1 flex-grow"
-          style={{
-            overscrollBehavior: 'contain',
-            WebkitOverflowScrolling: 'touch',
-            // Em mobile, limite a altura máxima para evitar cobrir toda a tela
-            maxHeight: isMobile ? 'calc(50vh - 50px)' : undefined
-          }}
-        >
+        <div className="overflow-y-auto py-1 flex-grow">
           {isLoading ? (
             <div className="px-4 py-2 text-sm text-gray-500 text-center">
               Carregando...
@@ -436,7 +426,7 @@ const BairroInput: React.FC<BairroInputProps> = ({
                   key={option.idtipo_bairro}
                   type="button"
                   className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 ${
-                    selectedOption && selectedOption.idtipo_bairro === option.idtipo_bairro ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                    selectedOption?.idtipo_bairro === option.idtipo_bairro ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
                   }`}
                   onClick={() => handleOptionSelect(option)}
                 >
@@ -452,8 +442,16 @@ const BairroInput: React.FC<BairroInputProps> = ({
             </div>
           )}
         </div>
+        <div className="p-2 border-t border-gray-100 sticky bottom-0 bg-white">
+          <button
+            className="w-full py-2 text-sm text-center bg-gray-100 hover:bg-gray-200 rounded-md"
+            onClick={closeDropdown}
+          >
+            Fechar
+          </button>
+        </div>
       </div>,
-      dropdownParent
+      document.body
     );
   };
 
