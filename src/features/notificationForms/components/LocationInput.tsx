@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Search, X } from "lucide-react";
 import axios from 'axios';
@@ -57,17 +57,16 @@ const LocationInput: React.FC<LocationInputProps> = ({
   const [localOptions, setLocalOptions] = useState<LocationOption[]>([]);
   const [isManuallyEditing, setIsManuallyEditing] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Para armazenar a posição atual de scroll
+  const [scrollPosition, setScrollPosition] = useState({ x: 0, y: 0 });
   
   // Reference for fetch abort controller
   const abortControllerRef = useRef<AbortController | null>(null);
   
   // Reference for the last parent value (when this component is a municipality)
   const lastParentValueRef = useRef<string>("");
-  
-  // Save current scroll position
-  const scrollPositionRef = useRef({ x: 0, y: 0 });
 
   const debugLog = (message: string, data?: any) => {
     if (debug) {
@@ -130,6 +129,64 @@ const LocationInput: React.FC<LocationInputProps> = ({
       }
     }
   }, [parentValue, name]);
+
+  // Função para atualizar a posição do dropdown
+  const updateDropdownPosition = () => {
+    if (!inputRef.current || !dropdownRef.current) return;
+    
+    const rect = inputRef.current.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    
+    // Verificar se estamos em dispositivo móvel
+    const isMobile = viewportWidth <= 768;
+    
+    // Em dispositivos móveis, posicionar em relação à viewport
+    if (isMobile) {
+      // Calcular espaço disponível abaixo do input
+      const spaceBelow = viewportHeight - rect.bottom;
+      // Altura máxima para o dropdown
+      const maxDropdownHeight = Math.min(300, viewportHeight * 0.6);
+      
+      // Garantir que o dropdown não exceda a largura da tela
+      const leftPosition = Math.max(0, rect.left);
+      const adjustedWidth = Math.min(rect.width, viewportWidth - leftPosition);
+      
+      // Se não houver espaço suficiente abaixo, posicionar acima se possível
+      if (spaceBelow < 150 && rect.top > 150) {
+        dropdownRef.current.style.setProperty('bottom', `${viewportHeight - rect.top}px`);
+        dropdownRef.current.style.setProperty('top', 'auto');
+        dropdownRef.current.style.setProperty('max-height', `${Math.min(rect.top - 10, maxDropdownHeight)}px`);
+      } else {
+        // Posicionar abaixo com altura máxima apropriada
+        dropdownRef.current.style.setProperty('top', `${rect.bottom}px`);
+        dropdownRef.current.style.setProperty('bottom', 'auto');
+        dropdownRef.current.style.setProperty('max-height', `${Math.min(spaceBelow - 10, maxDropdownHeight)}px`);
+      }
+      
+      // Definir posição horizontal - garantir que esteja visível na tela
+      dropdownRef.current.style.setProperty('left', `${leftPosition}px`);
+      dropdownRef.current.style.setProperty('width', `${adjustedWidth}px`);
+      
+      // Usar posicionamento fixo em dispositivos móveis para evitar problemas com scroll
+      dropdownRef.current.style.setProperty('position', 'fixed');
+      
+      // Garantir que o z-index seja alto o suficiente
+      dropdownRef.current.style.setProperty('z-index', '9999');
+      
+      // Adicionar animação sutil para UX mais suave
+      dropdownRef.current.style.setProperty('transition', 'opacity 0.2s, transform 0.2s');
+      dropdownRef.current.style.setProperty('opacity', '1');
+      dropdownRef.current.style.setProperty('transform', 'translateY(0)');
+    } else {
+      // Em desktop, usar posicionamento absoluto em relação ao documento
+      dropdownRef.current.style.setProperty('position', 'absolute');
+      dropdownRef.current.style.setProperty('top', `${rect.bottom + window.scrollY}px`);
+      dropdownRef.current.style.setProperty('left', `${rect.left + window.scrollX}px`);
+      dropdownRef.current.style.setProperty('width', `${rect.width}px`);
+      dropdownRef.current.style.setProperty('max-height', '300px');
+    }
+  };
 
   // Improved function to fetch municipalities
   const fetchMunicipiosByEstado = async (estadoId: string) => {
@@ -332,13 +389,15 @@ const LocationInput: React.FC<LocationInputProps> = ({
     }
   };
 
-  // Filter local options based on search term
-  const filteredOptions = localOptions.filter(option => {
-    // Normalizar tanto a descrição da opção quanto o termo de pesquisa
-    const normalizedDesc = normalizeText(option.descricao);
+  // Filter local options based on search term with memo
+  const filteredOptions = useMemo(() => {
+    // Se não há termo de busca, mostrar todos
+    if (!searchQuery) return localOptions;
+    
+    // Normalizar o termo de pesquisa
     const normalizedSearch = normalizeText(searchQuery);
-    return normalizedDesc.includes(normalizedSearch);
-  });
+    return localOptions.filter(option => option.descricao.includes(normalizedSearch));
+  }, [localOptions, searchQuery]);
 
   // Load selected option if there's a value - with manual editing check
   useEffect(() => {
@@ -380,63 +439,46 @@ const LocationInput: React.FC<LocationInputProps> = ({
     loadSelectedOption();
   }, [value, localOptions, apiEndpoint, idField, isManuallyEditing]);
 
+  // Fechar dropdown com segurança
+  const closeDropdown = () => {
+    setIsDropdownOpen(false);
+    
+    // Quando fechar o dropdown sem selecionar, resetar para o valor anterior se necessário
+    if (isManuallyEditing && selectedOption) {
+      setSearchQuery("");
+      setIsManuallyEditing(false);
+    } else if (isManuallyEditing && !selectedOption) {
+      setSearchQuery("");
+      setIsManuallyEditing(false);
+    }
+  };
+
   // Handler to close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // Detectar se estamos em um dispositivo móvel
-      const isMobile = window.innerWidth <= 768;
-      
       if (
         inputRef.current && 
         !inputRef.current.contains(event.target as Node) &&
         dropdownRef.current && 
         !dropdownRef.current.contains(event.target as Node)
       ) {
-        // Em dispositivos móveis, adicionar uma pequena pausa
-        // para permitir que o teclado feche antes de processar a ação
-        if (isMobile) {
-          setTimeout(() => {
-            setIsDropdownOpen(false);
-            
-            // Quando fechar o dropdown sem selecionar, resetar para o valor anterior se necessário
-            if (isManuallyEditing && selectedOption) {
-              setSearchQuery("");
-              setIsManuallyEditing(false);
-            } else if (isManuallyEditing && !selectedOption) {
-              setSearchQuery("");
-              setIsManuallyEditing(false);
-            }
-          }, 100);
-        } else {
-          setIsDropdownOpen(false);
-          
-          // Quando fechar o dropdown sem selecionar, resetar para o valor anterior se necessário
-          if (isManuallyEditing && selectedOption) {
-            setSearchQuery("");
-            setIsManuallyEditing(false);
-          } else if (isManuallyEditing && !selectedOption) {
-            setSearchQuery("");
-            setIsManuallyEditing(false);
-          }
-        }
+        closeDropdown();
       }
     };
-  
+    
     if (isDropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
+      // Pequeno timeout para evitar que o mesmo clique que abriu o dropdown o feche imediatamente
+      setTimeout(() => {
+        document.addEventListener("mousedown", handleClickOutside);
+      }, 100);
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isDropdownOpen, isManuallyEditing, selectedOption]);
 
-  // Update dropdown position when opened
+  // Update dropdown position when opened or window is resized
   useEffect(() => {
-    if (isDropdownOpen && inputRef.current) {
-      const rect = inputRef.current.getBoundingClientRect();
-      
-      setDropdownPosition({
-        top: rect.bottom + window.scrollY,
-        left: rect.left + window.scrollX
-      });
+    if (isDropdownOpen) {
+      updateDropdownPosition();
       
       // Load options when dropdown is opened
       if (name === "municipio") {
@@ -450,8 +492,18 @@ const LocationInput: React.FC<LocationInputProps> = ({
           fetchOptions(searchQuery);
         }
       }
+      
+      // Monitorar redimensionamento da janela
+      window.addEventListener('resize', updateDropdownPosition);
+      // Monitorar scroll
+      window.addEventListener('scroll', updateDropdownPosition);
+      
+      return () => {
+        window.removeEventListener('resize', updateDropdownPosition);
+        window.removeEventListener('scroll', updateDropdownPosition);
+      };
     }
-  }, [isDropdownOpen, name, parentValue, localOptions.length]);
+  }, [isDropdownOpen, name, parentValue, localOptions.length, searchQuery]);
   
   // Text search with debounce
   useEffect(() => {
@@ -469,17 +521,6 @@ const LocationInput: React.FC<LocationInputProps> = ({
       return () => clearTimeout(timer);
     }
   }, [searchQuery, isDropdownOpen, name, parentValue]);
-  
-  // Restore scroll position when opening dropdown
-  useEffect(() => {
-    if (isDropdownOpen) {
-      const timeoutId = setTimeout(() => {
-        window.scrollTo(scrollPositionRef.current.x, scrollPositionRef.current.y);
-      }, 10);
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [isDropdownOpen]);
 
   // Cancel pending requests when unmounting component
   useEffect(() => {
@@ -493,32 +534,17 @@ const LocationInput: React.FC<LocationInputProps> = ({
   const handleFocus = () => {
     if (disabled) return;
     
-    // Detectar se estamos em um dispositivo móvel
-    const isMobile = window.innerWidth <= 768;
-    
-    // Salvar posição atual de scroll
-    scrollPositionRef.current = {
+    // Armazenar posição atual de scroll
+    setScrollPosition({
       x: window.scrollX,
       y: window.scrollY
-    };
+    });
     
     // Limpar a consulta de pesquisa ao focar
     setSearchQuery("");
     
     // Abrir dropdown
     setIsDropdownOpen(true);
-    
-    // Em dispositivos móveis, forçar um pequeno timeout para garantir
-    // que o dropdown seja posicionado corretamente após o teclado aparecer
-    if (isMobile && inputRef.current) {
-      setTimeout(() => {
-        const rect = inputRef.current!.getBoundingClientRect();
-        setDropdownPosition({
-          top: rect.bottom + window.scrollY,
-          left: rect.left + window.scrollX
-        });
-      }, 50);
-    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -540,12 +566,6 @@ const LocationInput: React.FC<LocationInputProps> = ({
   };
 
   const handleOptionSelect = (option: LocationOption) => {
-    // Save current scroll position
-    const scrollPosition = {
-      x: window.scrollX,
-      y: window.scrollY
-    };
-    
     debugLog(`Option selected: ${option.descricao} (${option[idField]})`);
     
     setSelectedOption(option);
@@ -554,11 +574,6 @@ const LocationInput: React.FC<LocationInputProps> = ({
     setIsManuallyEditing(false); // Exit manual editing mode
     onChange(option[idField].toString());
     setIsDropdownOpen(false);
-    
-    // Small timeout to ensure scroll is restored after closing dropdown
-    setTimeout(() => {
-      window.scrollTo(scrollPosition.x, scrollPosition.y);
-    }, 10);
   };
 
   const handleClear = (e: React.MouseEvent) => {
@@ -575,69 +590,40 @@ const LocationInput: React.FC<LocationInputProps> = ({
   const renderDropdown = () => {
     if (!isDropdownOpen) return null;
     
-    // Detectar se estamos em um dispositivo móvel
-    const isMobile = window.innerWidth <= 768;
-    
-    // Em dispositivos móveis, anexamos o dropdown ao elemento pai em vez de ao body
-    // para manter o contexto de rolagem
-    const dropdownParent = isMobile && inputRef.current && inputRef.current.parentElement 
-      ? inputRef.current.parentElement 
-      : document.body;
-  
-    // Calcular posição do dropdown
-    let topPosition = dropdownPosition.top;
-    let leftPosition = dropdownPosition.left;
-    
-    // Em dispositivos móveis, posicionar relativo ao elemento pai
-    if (isMobile && inputRef.current) {
-      const inputHeight = inputRef.current.offsetHeight;
-      topPosition = inputHeight + 4; // 4px de espaço
-      leftPosition = 0;
-    }
-    
     return createPortal(
       <div 
         ref={dropdownRef}
+        className="fixed z-[9999] bg-white rounded-lg shadow-md border border-gray-200 flex flex-col"
         style={{
-          position: isMobile ? 'absolute' : 'fixed',
-          top: isMobile ? `${topPosition}px` : `${dropdownPosition.top}px`,
-          left: isMobile ? `${leftPosition}px` : `${dropdownPosition.left}px`,
+          overscrollBehavior: 'contain',
+          WebkitOverflowScrolling: 'touch',
           zIndex: 9999,
-          width: isMobile ? '100%' : `${inputRef.current ? inputRef.current.offsetWidth : 290}px`,
-          backgroundColor: 'white',
-          borderRadius: '0.5rem',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-          border: '1px solid #e5e7eb',
-          maxHeight: isMobile ? '50vh' : '300px',
-          display: 'flex',
-          flexDirection: 'column',
-          // Prevenir que o dropdown fique fora da tela em dispositivos móveis
-          maxWidth: '100vw'
         }}
       >
         {filterEnabled && (
-          <div className="p-2 border-b border-gray-100 sticky top-0 bg-white">
-            <input
-              type="text"
-              placeholder="Pesquisar..."
-              className="w-full p-2 text-sm border border-gray-200 rounded-md"
-              value={searchQuery}
-              onChange={handleInputChange}
-              onClick={(e) => e.stopPropagation()}
-              autoFocus={!isMobile} // Evitar autofocus em mobile que pode causar problemas
-            />
+          <div className="p-2 border-b border-gray-100 sticky top-0 bg-white z-10">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Pesquisar..."
+                className="w-full p-2 pr-8 text-sm border border-gray-200 rounded-md"
+                value={searchQuery}
+                onChange={handleInputChange}
+                onClick={(e) => e.stopPropagation()}
+                autoFocus
+              />
+              {searchQuery.length > 0 && (
+                <button 
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  onClick={() => setSearchQuery("")}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           </div>
         )}
-        <div 
-          className="overflow-y-auto py-1 flex-grow"
-          style={{
-            overscrollBehavior: 'contain',
-            WebkitOverflowScrolling: 'touch',
-            // Em mobile, limite a altura máxima para evitar cobrir toda a tela
-            maxHeight: isMobile ? 'calc(50vh - 50px)' : undefined
-          }}
-        >
-          {/* O resto do conteúdo do dropdown permanece o mesmo */}
+        <div className="overflow-y-auto py-1 flex-grow">
           {isLoading ? (
             <div className="px-4 py-2 text-sm text-gray-500 text-center">
               Carregando...
@@ -670,8 +656,16 @@ const LocationInput: React.FC<LocationInputProps> = ({
             </div>
           )}
         </div>
+        <div className="p-2 border-t border-gray-100 sticky bottom-0 bg-white">
+          <button
+            className="w-full py-2 text-sm text-center bg-gray-100 hover:bg-gray-200 rounded-md"
+            onClick={closeDropdown}
+          >
+            Fechar
+          </button>
+        </div>
       </div>,
-      dropdownParent
+      document.body
     );
   };
 
