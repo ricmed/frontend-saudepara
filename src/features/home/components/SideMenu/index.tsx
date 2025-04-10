@@ -46,7 +46,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     {
       icon: <ChartSpline />,
       label: t("menu.dashboard"),
-      onClick: () => navigate("/dashboard"),
+      onClick: () => navigate("/dashboard-page"),
     },
     {
       icon: <BookType />,

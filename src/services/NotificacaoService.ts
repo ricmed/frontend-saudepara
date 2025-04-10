@@ -3,6 +3,9 @@ import { FormData } from '@/features/notificationForms/NotificationForm';
 import { formatFromBackend, formatToBackend, formatListResponse } from '@/utils/notificacaoAdapter';
 
 // Interfaces para os tipos de dados usados nos dropdowns e checkboxes
+export interface CboOption extends BaseOption {
+  idtipo_cbo: number;
+}
 export interface BaseOption {
   id: number;
   descricao: string;
@@ -95,6 +98,7 @@ const TIPO_ENDPOINTS = {
   GENERO: `${server}:${port}/api/tipo-genero`,
   RACA: `${server}:${port}/api/tipo-raca`,
   ESCOLARIDADE: `${server}:${port}/api/tipo-escolaridade`,
+  CBO: `${server}:${port}/api/tipo-cbo`,
   ATENDIMENTO: `${server}:${port}/api/tipo-atendimento`,
   SINTOMA: `${server}:${port}/api/tipo-sintoma`,
   HIPOTESE_DIAG: `${server}:${port}/api/tipo-hipotese-diag`,
@@ -310,6 +314,25 @@ export const NotificacaoService = {
 
   async getEscolaridadeOptions(): Promise<EscolaridadeOption[]> {
     return this.fetchOptions<EscolaridadeOption>(TIPO_ENDPOINTS.ESCOLARIDADE);
+  },
+
+  async getCboOptions(): Promise<BaseOption[]> {
+    try {
+      const response = await axios.get(`${server}:${port}/api/tipo-cbo?limit=10000`);
+      
+      // Verificar diferentes formatos de resposta
+      const data = response.data?.data || response.data || [];
+      
+      // Mapear para o formato correto
+      return data.map((cbo: any) => ({
+        id: cbo.idtipo_cbo || cbo.id,  // Campo alternativo caso o backend use outro nome
+        descricao: cbo.descricao || cbo.nome || "Descrição não disponível"
+      }));
+      
+    } catch (error) {
+      console.error('Erro ao buscar opções de CBO:', error);
+      return [];
+    }
   },
 
   async getAtendimentoOptions(): Promise<AtendimentoOption[]> {

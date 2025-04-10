@@ -6,6 +6,9 @@ interface NotificacaoGenerica {
 // Interface para os dados do formulário frontend
 import { FormData } from "@/features/notificationForms/NotificationForm";
 import axios from "axios";
+import indexedDBService from '@/services/indexedDB';
+import syncService from '@/services/syncService';
+import { toast } from 'react-toastify';
 
 /**
  * Formata dados do backend para o formato esperado pelo frontend (FormData)
@@ -434,6 +437,7 @@ export const salvarSintomasViaApi = async (notificacaoId: number, sintomasIds: n
 
 /**
  * Função principal para salvar uma notificação completa (incluindo sintomas)
+ * com suporte para modo offline
  * @param formData Dados do formulário
  * @param isUpdate Indica se é uma atualização
  * @param notificacaoId ID da notificação (apenas para atualizações)
@@ -447,6 +451,18 @@ export const salvarNotificacaoCompleta = async (
   console.log("DADOS DO FORM ANTES DE ENVIAR:", formData);
   console.log("Dados antes de salvar - Tipo residente:", formData.residenteBelem, "País:", formData.paisProcedencia);
 
+  // Sempre salvar localmente primeiro
+  const localId = await indexedDBService.saveNotificacao(formData, isUpdate, notificacaoId);
+
+  // Se estiver offline, retornar o ID local e informar ao usuário
+  if (!syncService.isNetworkAvailable()) {
+    toast.info('Você está offline. Os dados foram salvos localmente e serão sincronizados quando houver conexão.', {
+      icon: '📴',
+    });
+    
+    return { id: localId, idnotificacao: localId };
+  }
+  
   const server = import.meta.env.VITE_API_SERVER;
   const port = import.meta.env.VITE_API_PORT;
   
@@ -474,7 +490,13 @@ export const salvarNotificacaoCompleta = async (
           message: error.message,
           payload: payloadBackend
         });
-        throw error;
+        
+        // Informar o usuário que os dados foram salvos localmente
+        toast.warning('Não foi possível enviar para o servidor. Os dados foram salvos localmente e serão sincronizados depois.', {
+          icon: '🔄',
+        });
+        
+        return { id: localId, idnotificacao: localId };
       }
     } else {
       // Criar nova notificação
@@ -492,7 +514,13 @@ export const salvarNotificacaoCompleta = async (
           message: error.message,
           payload: payloadBackend
         });
-        throw error;
+        
+        // Informar o usuário que os dados foram salvos localmente
+        toast.warning('Não foi possível enviar para o servidor. Os dados foram salvos localmente e serão sincronizados depois.', {
+          icon: '🔄',
+        });
+        
+        return { id: localId, idnotificacao: localId };
       }
     }
     
@@ -501,20 +529,68 @@ export const salvarNotificacaoCompleta = async (
     
     // Chamar função para salvar sintomas em endpoint separado
     if (sintomasIds.length > 0 || isUpdate) {
-      await salvarSintomasViaApi(savedNotificacaoId, sintomasIds);
+      try {
+        await salvarSintomasViaApi(savedNotificacaoId, sintomasIds);
+      } catch (error) {
+        console.error("Erro ao salvar sintomas:", error);
+        toast.warning('Notificação salva, mas houve erro ao salvar sintomas.');
+      }
     }
+    
+    // Marcar a notificação como sincronizada no IndexedDB
+    await indexedDBService.markNotificacaoAsSynced(localId);
     
     return response.data;
   } catch (error) {
     console.error("Erro ao salvar notificação:", error);
-    throw error;
+    toast.error('Erro ao salvar. Os dados estão armazenados localmente e serão sincronizados quando possível.');
+    return { id: localId, idnotificacao: localId, syncPending: true };
   }
+};
+
+/**
+ * Função para buscar notificação com suporte offline
+ * @param id ID da notificação
+ */
+export const buscarNotificacao = async (id: number): Promise<FormData | null> => {
+  // Se estiver online, buscar do servidor primeiro
+  if (syncService.isNetworkAvailable()) {
+    try {
+      const server = import.meta.env.VITE_API_SERVER;
+      const port = import.meta.env.VITE_API_PORT;
+      
+      const response = await axios.get(`${server}:${port}/api/notificacao/${id}`);
+      const data = await formatFromBackend(response.data);
+      
+      // Salvar localmente para acesso offline futuro
+      if (data) {
+        await indexedDBService.saveNotificacao(data, true, id);
+        await indexedDBService.markNotificacaoAsSynced(id);
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Erro ao buscar notificação do servidor:', error);
+      toast.warning('Não foi possível buscar do servidor. Tentando dados locais...');
+      // Cair para o cache local se houver erro
+    }
+  } else {
+    toast.info('Você está offline. Buscando dados do armazenamento local.');
+  }
+  
+  // Buscar do armazenamento local
+  return await indexedDBService.getNotificacao(id);
 };
 
 /**
  * Função auxiliar para buscar sintomas via API quando necessário
  */
 async function fetchSintomasForNotificacao(notificacaoId: number): Promise<any[]> {
+  // Se offline, retornar array vazio
+  if (!syncService.isNetworkAvailable()) {
+    return [];
+  }
+  
   const server = import.meta.env.VITE_API_SERVER;
   const port = import.meta.env.VITE_API_PORT;
   

@@ -209,7 +209,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
     
     try {
       setLoadingUnidades(true);
-      const apiUrl = `https://app.hml.saude.pa.gov.br:443/api/estabelecimentos/${id}`;
+      const apiUrl = `https://app.trn.saude.pa.gov.br:443/api/estabelecimentos/${id}`;
       
       const response = await axios.get(apiUrl);
       

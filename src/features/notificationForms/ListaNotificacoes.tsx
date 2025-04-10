@@ -23,6 +23,13 @@ import autoTable from "jspdf-autotable";
 import SideMenu from "@/features/apps/components/SideMenu";
 import { toast } from "react-toastify";
 import { NotificacaoService } from "@/services/NotificacaoService";
+import {
+  exportListToExcel,
+  exportListToCSV,
+  exportListToPDF,
+  ExportOptions
+} from '@/features/notificationForms/components/exportUtilities';
+import EnhancedNotificationDashboard from '@/features/dashboard/NotificationDashboard';
 
 // Tipos
 interface Notificacao {
@@ -86,6 +93,7 @@ interface ColumnDefinition {
 const allColumns: ColumnDefinition[] = [
   { key: "paciente", label: "Paciente", sortable: true },
   { key: "tipo_evento", label: "Evento", sortable: true },
+  { key: "cbo", label: "CBO", sortable: true }, // Nome correto do campo
   { key: "data_ocorrencia", label: "Data Ocorrência", sortable: true },
   { key: "data_atendimento", label: "Data Atendimento", sortable: true },
   { key: "tipo_atendimento", label: "Tipo Atendimento", sortable: true },
@@ -245,6 +253,57 @@ const ListaNotificacoes = () => {
     fetchData();
   }, [currentPage, itemsPerPage, debouncedSearchParams]);
 
+  // Adicione este estado para armazenar as opções de exportação
+const [exportOptions, setExportOptions] = useState<ExportOptions>({
+  eventoOptions: [],
+  publicoOptions: [],
+  paisOptions: [],
+  estadoOptions: [],
+  municipioOptions: [],
+  bairroOptions: [],
+  generoOptions: [],
+  racaOptions: [],
+  escolaridadeOptions: [],
+  atendimentoOptions: [],
+  sintomaOptions: [],
+  hipoteseDiagOptions: [],
+  traumaOptions: [],
+  estabelecimentoOptions: [],
+  encerramentoOptions: [],
+  cboOptions: []
+});
+
+useEffect(() => {
+  const loadOptions = async () => {
+    try {
+      const options = {
+        eventoOptions: await NotificacaoService.getEventoOptions(),
+        publicoOptions: await NotificacaoService.getPublicoOptions(),
+        paisOptions: await NotificacaoService.getPaisOptions(),
+        estadoOptions: await NotificacaoService.getEstadoOptions(),
+        municipioOptions: await NotificacaoService.getMunicipioOptions(),
+        bairroOptions: await NotificacaoService.getBairroOptions(),
+        generoOptions: await NotificacaoService.getGeneroOptions(),
+        racaOptions: await NotificacaoService.getRacaOptions(),
+        escolaridadeOptions: await NotificacaoService.getEscolaridadeOptions(),
+        atendimentoOptions: await NotificacaoService.getAtendimentoOptions(),
+        sintomaOptions: await NotificacaoService.getSintomaOptions(),
+        hipoteseDiagOptions: await NotificacaoService.getHipoteseDiagOptions(),
+        traumaOptions: await NotificacaoService.getTraumaOptions(),
+        estabelecimentoOptions: await NotificacaoService.getEstabelecimentoOptions(),
+        encerramentoOptions: await NotificacaoService.getEncerramentoOptions(),
+        cboOptions: await NotificacaoService.getCboOptions()
+      };
+      setExportOptions(options);
+    } catch (error) {
+      console.error("Erro ao carregar opções:", error);
+    }
+  };
+
+  loadOptions();
+}, []);
+
+
   // Função para buscar todos os dados para exportação
   const fetchAllData = async () => {
     try {
@@ -354,162 +413,178 @@ const ListaNotificacoes = () => {
   // Funções de exportação
   const handleExportCSV = async (type: "page" | "all") => {
     try {
-      const dataToExport =
-        type === "page" ? notificacoes : await fetchAllData();
-      if (!dataToExport) return;
-
-      // Formatar os dados para CSV
-      const formattedData = dataToExport.map((notificacao) => ({
-        paciente: notificacao.paciente || "",
-        evento: notificacao.tipo_evento?.descricao || "",
-        data_ocorrencia: formatDate(notificacao.data_ocorrencia),
-        data_atendimento: formatDate(notificacao.data_atendimento),
-        tipo_atendimento: notificacao.tipo_atendimento?.descricao || "",
-        tipo_encerramento: notificacao.tipo_encerramento?.descricao || "",
-        unidade_notificadora:
-          notificacao
-            .estabelecimento_notificacao_estabelecimento_idestabelecimentoToestabelecimento
-            ?.nome || "",
-      }));
-
-      if (type === "page" && csvLinkRef) {
-        csvLinkRef.link.click();
-      } else if (csvLinkAllRef.current) {
-        csvLinkAllRef.current.data = formattedData;
-        csvLinkAllRef.current.link.click();
+      // Mostrar loader ou feedback visual
+      setIsLoading(true);
+      
+      // Buscar dados - página atual ou todos
+      const dataToExport = type === "page" 
+        ? notificacoes 
+        : await fetchAllData();
+        
+      if (!dataToExport || dataToExport.length === 0) {
+        toast.info("Não há dados para exportar.");
+        setIsLoading(false);
+        setIsExportMenuOpen(false);
+        return;
       }
+  
+      // Buscar opções para conversão de IDs para descrições
+      const options: ExportOptions = {
+        eventoOptions: await NotificacaoService.getEventoOptions(),
+        publicoOptions: await NotificacaoService.getPublicoOptions(),
+        paisOptions: await NotificacaoService.getPaisOptions(), 
+        estadoOptions: await NotificacaoService.getEstadoOptions(),
+        municipioOptions: await NotificacaoService.getMunicipioOptions(), 
+        bairroOptions: await NotificacaoService.getBairroOptions(),
+        cboOptions: await NotificacaoService.getCboOptions(),
+        generoOptions: await NotificacaoService.getGeneroOptions(),
+        racaOptions: await NotificacaoService.getRacaOptions(),
+        escolaridadeOptions: await NotificacaoService.getEscolaridadeOptions(),
+        atendimentoOptions: await NotificacaoService.getAtendimentoOptions(),
+        sintomaOptions: await NotificacaoService.getSintomaOptions(),
+        hipoteseDiagOptions: await NotificacaoService.getHipoteseDiagOptions(),
+        traumaOptions: await NotificacaoService.getTraumaOptions(),
+        estabelecimentoOptions: await NotificacaoService.getEstabelecimentoOptions(),
+        encerramentoOptions: await NotificacaoService.getEncerramentoOptions()
+      };
+  
+      // Usar a função de exportação da sua biblioteca
+      exportListToCSV(dataToExport, options);
+      
+      // Feedback para o usuário
+      toast.success(`CSV exportado com sucesso`);
+      
       setIsExportMenuOpen(false);
+      setIsLoading(false);
     } catch (error) {
+      console.error("Erro ao exportar CSV:", error);
       setError("Erro ao exportar CSV. Tente novamente.");
+      setIsLoading(false);
+      
+      if (error instanceof Error) {
+        toast.error(`Erro na exportação: ${error.message}`);
+      } else {
+        toast.error("Erro na exportação. Tente novamente.");
+      }
     }
   };
 
   // Função de exportação Excel
   const handleExportExcel = async (type: "page" | "all") => {
     try {
-      const dataToExport =
-        type === "page" ? notificacoes : await fetchAllData();
-      if (!dataToExport) return;
-
-      // Formatar os dados para Excel
-      const formattedData = dataToExport.map((notificacao) => ({
-        Paciente: notificacao.paciente || "",
-        Evento: notificacao.tipo_evento?.descricao || "",
-        "Data Ocorrência": formatDate(notificacao.data_ocorrencia),
-        "Data Atendimento": formatDate(notificacao.data_atendimento),
-        "Tipo Atendimento": notificacao.tipo_atendimento?.descricao || "",
-        "Tipo Encerramento": notificacao.tipo_encerramento?.descricao || "",
-        "Unidade Notificadora":
-          notificacao
-            .estabelecimento_notificacao_estabelecimento_idestabelecimentoToestabelecimento
-            ?.nome || "",
-      }));
-
-      const worksheet = XLSX.utils.json_to_sheet(formattedData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Notificações");
-      XLSX.writeFile(
-        workbook,
-        `notificacoes_${type === "page" ? "pagina_atual" : "completo"}.xlsx`
-      );
+      // Mostrar loader ou feedback visual
+      setIsLoading(true);
+      
+      // Buscar dados - página atual ou todos
+      const dataToExport = type === "page" 
+        ? notificacoes 
+        : await fetchAllData();
+        
+      if (!dataToExport || dataToExport.length === 0) {
+        toast.info("Não há dados para exportar.");
+        setIsLoading(false);
+        setIsExportMenuOpen(false);
+        return;
+      }
+  
+      // Buscar todas as opções para converter IDs em descrições
+      const options: ExportOptions = {
+        eventoOptions: await NotificacaoService.getEventoOptions(),
+        publicoOptions: await NotificacaoService.getPublicoOptions(),
+        paisOptions: await NotificacaoService.getPaisOptions(), 
+        estadoOptions: await NotificacaoService.getEstadoOptions(),
+        municipioOptions: await NotificacaoService.getMunicipioOptions(), 
+        bairroOptions: await NotificacaoService.getBairroOptions(),
+        cboOptions: await NotificacaoService.getCboOptions(),
+        generoOptions: await NotificacaoService.getGeneroOptions(),
+        racaOptions: await NotificacaoService.getRacaOptions(),
+        escolaridadeOptions: await NotificacaoService.getEscolaridadeOptions(),
+        atendimentoOptions: await NotificacaoService.getAtendimentoOptions(),
+        sintomaOptions: await NotificacaoService.getSintomaOptions(),
+        hipoteseDiagOptions: await NotificacaoService.getHipoteseDiagOptions(),
+        traumaOptions: await NotificacaoService.getTraumaOptions(),
+        estabelecimentoOptions: await NotificacaoService.getEstabelecimentoOptions(),
+        encerramentoOptions: await NotificacaoService.getEncerramentoOptions()
+      };
+  
+      // Usar a função de exportação da sua biblioteca
+      exportListToExcel(dataToExport, options);
+      
+      // Feedback para o usuário
+      toast.success(`Dados exportados com sucesso para Excel`);
+      
       setIsExportMenuOpen(false);
+      setIsLoading(false);
     } catch (error) {
+      console.error("Erro ao exportar Excel:", error);
       setError("Erro ao exportar Excel. Tente novamente.");
+      setIsLoading(false);
+      
+      // Feedback específico para o usuário
+      if (error instanceof Error) {
+        toast.error(`Erro na exportação: ${error.message}`);
+      } else {
+        toast.error("Erro na exportação. Tente novamente.");
+      }
     }
   };
 
   // Função de exportação PDF
   const handleExportPDF = async (type: "page" | "all") => {
     try {
-      const dataToExport =
-        type === "page" ? notificacoes : await fetchAllData();
-      if (!dataToExport) return;
-
-      const doc = new jsPDF();
-      doc.setFontSize(16);
-      doc.text("Relatório de Notificações", 14, 15);
-      doc.setFontSize(10);
-      doc.text(`Gerado em: ${new Date().toLocaleDateString("pt-BR")}`, 14, 22);
-      doc.text(
-        `Tipo: ${type === "page" ? "Página Atual" : "Dados Completos"}`,
-        14,
-        29
-      );
-
-      const tableColumn = allColumns
-        .filter((col) => selectedColumns.includes(col.key as string))
-        .map((col) => col.label);
-
-      const tableRows = dataToExport.map((notificacao) =>
-        allColumns
-          .filter((col) => selectedColumns.includes(col.key))
-          .map((col) => {
-            const key = String(col.key);
-
-            if (key === "data_ocorrencia" || key === "data_atendimento") {
-              return formatDate(notificacao[key] as string);
-            }
-
-            if (key === "paciente") {
-              return notificacao.paciente || "";
-            }
-
-            if (key === "tipo_evento") {
-              return notificacao.tipo_evento?.descricao || "";
-            }
-
-            if (key === "tipo_atendimento") {
-              return notificacao.tipo_atendimento?.descricao || "";
-            }
-
-            if (key === "tipo_encerramento") {
-              return notificacao.tipo_encerramento?.descricao || "";
-            }
-
-            if (key === "unidade_notificadora") {
-              return (
-                notificacao
-                  .estabelecimento_notificacao_estabelecimento_idestabelecimentoToestabelecimento
-                  ?.nome || ""
-              );
-            }
-
-            const value = notificacao[key];
-            return value !== undefined && value !== null ? String(value) : "";
-          })
-      );
-
-      // Gera a tabela
-      autoTable(doc, {
-        head: [tableColumn],
-        body: tableRows,
-        startY: 35,
-        theme: "grid",
-        styles: {
-          fontSize: 8,
-          cellPadding: 2,
-          overflow: "linebreak",
-        },
-        headStyles: {
-          fillColor: [63, 81, 181], // Cor azul como na imagem fornecida
-          textColor: 255,
-          fontSize: 8,
-          fontStyle: "bold",
-        },
-        alternateRowStyles: {
-          fillColor: [245, 245, 245],
-        },
-      });
-
-      // Rodapé com total
-      const finalY = (doc as any).lastAutoTable.finalY || 35;
-      doc.text(`Total de registros: ${dataToExport.length}`, 14, finalY + 10);
-      doc.save(
-        `notificacoes_${type === "page" ? "pagina_atual" : "completo"}.pdf`
-      );
+      // Mostrar loader ou feedback visual
+      setIsLoading(true);
+      
+      // Buscar dados - página atual ou todos
+      const dataToExport = type === "page" 
+        ? notificacoes 
+        : await fetchAllData();
+        
+      if (!dataToExport || dataToExport.length === 0) {
+        toast.info("Não há dados para exportar.");
+        setIsLoading(false);
+        setIsExportMenuOpen(false);
+        return;
+      }
+  
+      // Buscar opções para conversão de IDs para descrições
+      const options: ExportOptions = {
+        eventoOptions: await NotificacaoService.getEventoOptions(),
+        publicoOptions: await NotificacaoService.getPublicoOptions(),
+        paisOptions: await NotificacaoService.getPaisOptions(), 
+        estadoOptions: await NotificacaoService.getEstadoOptions(),
+        municipioOptions: await NotificacaoService.getMunicipioOptions(), 
+        bairroOptions: await NotificacaoService.getBairroOptions(),
+        cboOptions: await NotificacaoService.getCboOptions(),
+        generoOptions: await NotificacaoService.getGeneroOptions(),
+        racaOptions: await NotificacaoService.getRacaOptions(),
+        escolaridadeOptions: await NotificacaoService.getEscolaridadeOptions(),
+        atendimentoOptions: await NotificacaoService.getAtendimentoOptions(),
+        sintomaOptions: await NotificacaoService.getSintomaOptions(),
+        hipoteseDiagOptions: await NotificacaoService.getHipoteseDiagOptions(),
+        traumaOptions: await NotificacaoService.getTraumaOptions(),
+        estabelecimentoOptions: await NotificacaoService.getEstabelecimentoOptions(),
+        encerramentoOptions: await NotificacaoService.getEncerramentoOptions()
+      };
+  
+      // Usar a função de exportação da sua biblioteca
+      exportListToPDF(dataToExport, options);
+      
+      // Feedback para o usuário
+      toast.success(`PDF exportado com sucesso`);
+      
       setIsExportMenuOpen(false);
+      setIsLoading(false);
     } catch (error) {
-      setError("Erro ao gerar PDF. Tente novamente.");
+      console.error("Erro ao exportar PDF:", error);
+      setError("Erro ao exportar PDF. Tente novamente.");
+      setIsLoading(false);
+      
+      if (error instanceof Error) {
+        toast.error(`Erro na exportação: ${error.message}`);
+      } else {
+        toast.error("Erro na exportação. Tente novamente.");
+      }
     }
   };
 
@@ -553,47 +628,17 @@ const ListaNotificacoes = () => {
           <h3 className="text-sm font-medium text-gray-700 px-2">
             Página Atual
           </h3>
-          <button
-            onClick={() => handleExportCSV("page")}
-            className="w-full text-left text-sm text-gray-700 hover:bg-gray-50 px-2 py-1 rounded"
-          >
-            CSV
-          </button>
-          <button
-            onClick={() => handleExportExcel("page")}
-            className="w-full text-left text-sm text-gray-700 hover:bg-gray-50 px-2 py-1 rounded"
-          >
-            Excel
-          </button>
-          <button
-            onClick={() => handleExportPDF("page")}
-            className="w-full text-left text-sm text-gray-700 hover:bg-gray-50 px-2 py-1 rounded"
-          >
-            PDF
-          </button>
+          <button onClick={() => handleExportCSV("page")}>CSV (página atual)</button>
+          <button onClick={() => handleExportExcel("page")}>Excel (página atual)</button>
+          <button onClick={() => handleExportPDF("page")}>PDF (página atual)</button>
         </div>
         <div>
           <h3 className="text-sm font-medium text-gray-700 px-2">
             Todos os Dados
           </h3>
-          <button
-            onClick={() => handleExportCSV("all")}
-            className="w-full text-left text-sm text-gray-700 hover:bg-gray-50 px-2 py-1 rounded"
-          >
-            CSV
-          </button>
-          <button
-            onClick={() => handleExportExcel("all")}
-            className="w-full text-left text-sm text-gray-700 hover:bg-gray-50 px-2 py-1 rounded"
-          >
-            Excel
-          </button>
-          <button
-            onClick={() => handleExportPDF("all")}
-            className="w-full text-left text-sm text-gray-700 hover:bg-gray-50 px-2 py-1 rounded"
-          >
-            PDF
-          </button>
+          <button onClick={() => handleExportCSV("all")}>CSV (todos os dados)</button>
+          <button onClick={() => handleExportExcel("all")}>Excel (todos os dados)</button>
+          <button onClick={() => handleExportPDF("all")}>PDF (todos os dados)</button>
         </div>
       </div>
     );
@@ -1069,6 +1114,11 @@ const ListaNotificacoes = () => {
             </div>
           </div>
         </div>
+          {/* Adicione o dashboard aqui */}
+      <EnhancedNotificationDashboard
+        notificacoes={notificacoes || []} 
+        exportOptions={exportOptions || {}}  
+      />
       </main>
 
       {/* Links invisíveis para exportação CSV */}

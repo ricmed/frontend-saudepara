@@ -115,6 +115,9 @@ import NotificationForm from "@/features/notificationForms/NotificationForm";
 import ListaNotificacoes from "@/features/notificationForms/ListaNotificacoes";
 import HomePage from "@/features/home/HomePage";
 
+import DashboardPage from '@/features/dashboard/DashboardPage';
+
+
 function App() {
   return (
     <LanguageProvider>
@@ -356,6 +359,8 @@ function App() {
           />
           {/* Rotas de Dashboard */}
           <Route path="/dashboard" element={<NotificationDashboard />} />
+          <Route path="/dashboard-page" element={<DashboardPage />} />
+
         </Routes>
       </Router>
     </LanguageProvider>
