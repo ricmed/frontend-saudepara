@@ -38,10 +38,9 @@ export default defineConfig({
         enabled: true
       },
       workbox: {
-        // Configurações de cache
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
         runtimeCaching: [
           {
-            // API de homologação
             urlPattern: /^https:\/\/app-api\.hml\.saude\.pa\.gov\.br\/.*$/i,
             handler: 'NetworkFirst',
             options: {
@@ -54,7 +53,6 @@ export default defineConfig({
             }
           },
           {
-            // App de homologação
             urlPattern: /^https:\/\/app\.hml\.saude\.pa\.gov\.br\/.*$/i,
             handler: 'NetworkFirst',
             options: {
@@ -67,7 +65,6 @@ export default defineConfig({
             }
           },
           {
-            // App de treinamento
             urlPattern: /^https:\/\/app\.trn\.saude\.pa\.gov\.br\/.*$/i,
             handler: 'NetworkFirst',
             options: {
@@ -80,7 +77,6 @@ export default defineConfig({
             }
           },
           {
-            // Recursos estáticos
             urlPattern: /\.(js|css|png|jpg|jpeg|svg|ico)$/,
             handler: 'StaleWhileRevalidate',
             options: {
@@ -88,7 +84,6 @@ export default defineConfig({
             }
           },
           {
-            // Fontes
             urlPattern: /\.(woff|woff2|ttf|eot)$/,
             handler: 'CacheFirst',
             options: {
