@@ -74,13 +74,13 @@ class SyncService {
       for (const { id, formData } of pendingNotificacoes) {
         try {
           // Verificar se é uma edição (baseado no ID da formData se disponível)
-          const isEdit = !!formData.id;
+          const isEdit = !!(formData as any).id;
           
           // Usar a função existente para salvar a notificação
           await salvarNotificacaoCompleta(
             formData, 
             isEdit, 
-            isEdit ? Number(formData.id) : undefined
+            isEdit ? Number((formData as any).id) : undefined
           );
 
           // Marcar como sincronizada

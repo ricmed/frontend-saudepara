@@ -27,9 +27,9 @@ import {
   exportListToExcel,
   exportListToCSV,
   exportListToPDF,
-  ExportOptions
-} from '@/features/notificationForms/components/exportUtilities';
-import EnhancedNotificationDashboard from '@/features/dashboard/NotificationDashboard';
+  ExportOptions,
+} from "@/features/notificationForms/components/exportUtilities";
+import EnhancedNotificationDashboard from "@/features/dashboard/NotificationDashboard";
 
 // Tipos
 interface Notificacao {
@@ -153,6 +153,9 @@ const ListaNotificacoes = () => {
   // Controle de exportação
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
 
+  const [allNotificacoes, setAllNotificacoes] = useState<Notificacao[]>([]);
+  const [isDashboardLoading, setIsDashboardLoading] = useState(true);
+
   // Erro e loading
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -254,55 +257,99 @@ const ListaNotificacoes = () => {
   }, [currentPage, itemsPerPage, debouncedSearchParams]);
 
   // Adicione este estado para armazenar as opções de exportação
-const [exportOptions, setExportOptions] = useState<ExportOptions>({
-  eventoOptions: [],
-  publicoOptions: [],
-  paisOptions: [],
-  estadoOptions: [],
-  municipioOptions: [],
-  bairroOptions: [],
-  generoOptions: [],
-  racaOptions: [],
-  escolaridadeOptions: [],
-  atendimentoOptions: [],
-  sintomaOptions: [],
-  hipoteseDiagOptions: [],
-  traumaOptions: [],
-  estabelecimentoOptions: [],
-  encerramentoOptions: [],
-  cboOptions: []
-});
+  const [exportOptions, setExportOptions] = useState<ExportOptions>({
+    eventoOptions: [],
+    publicoOptions: [],
+    paisOptions: [],
+    estadoOptions: [],
+    municipioOptions: [],
+    bairroOptions: [],
+    generoOptions: [],
+    racaOptions: [],
+    escolaridadeOptions: [],
+    atendimentoOptions: [],
+    sintomaOptions: [],
+    hipoteseDiagOptions: [],
+    traumaOptions: [],
+    estabelecimentoOptions: [],
+    encerramentoOptions: [],
+    cboOptions: [],
+  });
 
-useEffect(() => {
-  const loadOptions = async () => {
-    try {
-      const options = {
-        eventoOptions: await NotificacaoService.getEventoOptions(),
-        publicoOptions: await NotificacaoService.getPublicoOptions(),
-        paisOptions: await NotificacaoService.getPaisOptions(),
-        estadoOptions: await NotificacaoService.getEstadoOptions(),
-        municipioOptions: await NotificacaoService.getMunicipioOptions(),
-        bairroOptions: await NotificacaoService.getBairroOptions(),
-        generoOptions: await NotificacaoService.getGeneroOptions(),
-        racaOptions: await NotificacaoService.getRacaOptions(),
-        escolaridadeOptions: await NotificacaoService.getEscolaridadeOptions(),
-        atendimentoOptions: await NotificacaoService.getAtendimentoOptions(),
-        sintomaOptions: await NotificacaoService.getSintomaOptions(),
-        hipoteseDiagOptions: await NotificacaoService.getHipoteseDiagOptions(),
-        traumaOptions: await NotificacaoService.getTraumaOptions(),
-        estabelecimentoOptions: await NotificacaoService.getEstabelecimentoOptions(),
-        encerramentoOptions: await NotificacaoService.getEncerramentoOptions(),
-        cboOptions: await NotificacaoService.getCboOptions()
-      };
-      setExportOptions(options);
-    } catch (error) {
-      console.error("Erro ao carregar opções:", error);
-    }
-  };
+  useEffect(() => {
+    const loadOptions = async () => {
+      try {
+        const options = {
+          eventoOptions: await NotificacaoService.getEventoOptions(),
+          publicoOptions: await NotificacaoService.getPublicoOptions(),
+          paisOptions: await NotificacaoService.getPaisOptions(),
+          estadoOptions: await NotificacaoService.getEstadoOptions(),
+          municipioOptions: await NotificacaoService.getMunicipioOptions(),
+          bairroOptions: await NotificacaoService.getBairroOptions(),
+          generoOptions: await NotificacaoService.getGeneroOptions(),
+          racaOptions: await NotificacaoService.getRacaOptions(),
+          escolaridadeOptions:
+            await NotificacaoService.getEscolaridadeOptions(),
+          atendimentoOptions: await NotificacaoService.getAtendimentoOptions(),
+          sintomaOptions: await NotificacaoService.getSintomaOptions(),
+          hipoteseDiagOptions:
+            await NotificacaoService.getHipoteseDiagOptions(),
+          traumaOptions: await NotificacaoService.getTraumaOptions(),
+          estabelecimentoOptions:
+            await NotificacaoService.getEstabelecimentoOptions(),
+          encerramentoOptions:
+            await NotificacaoService.getEncerramentoOptions(),
+          cboOptions: await NotificacaoService.getCboOptions(),
+        };
+        setExportOptions(options);
+      } catch (error) {
+        console.error("Erro ao carregar opções:", error);
+      }
+    };
 
-  loadOptions();
-}, []);
+    loadOptions();
+  }, []);
 
+  useEffect(() => {
+    const loadAllDataForDashboard = async () => {
+      try {
+        setIsDashboardLoading(true);
+
+        let allData: Notificacao[] = [];
+        let page = 1;
+        let hasMore = true;
+
+        // Fetch all pages of data
+        while (hasMore) {
+          const response = await NotificacaoService.getAll(page, 100); // Fetch in larger chunks
+
+          if (response && response.data && response.data.length > 0) {
+            allData = [...allData, ...response.data];
+
+            if (page >= response.meta.totalPages) {
+              hasMore = false;
+            } else {
+              page++;
+            }
+          } else {
+            hasMore = false;
+          }
+        }
+
+        setAllNotificacoes(allData);
+        console.log(`Carregados ${allData.length} registros para o dashboard`);
+      } catch (error) {
+        console.error(
+          "Erro ao carregar todos os dados para o dashboard:",
+          error
+        );
+      } finally {
+        setIsDashboardLoading(false);
+      }
+    };
+
+    loadAllDataForDashboard();
+  }, []);
 
   // Função para buscar todos os dados para exportação
   const fetchAllData = async () => {
@@ -415,26 +462,25 @@ useEffect(() => {
     try {
       // Mostrar loader ou feedback visual
       setIsLoading(true);
-      
+
       // Buscar dados - página atual ou todos
-      const dataToExport = type === "page" 
-        ? notificacoes 
-        : await fetchAllData();
-        
+      const dataToExport =
+        type === "page" ? notificacoes : await fetchAllData();
+
       if (!dataToExport || dataToExport.length === 0) {
         toast.info("Não há dados para exportar.");
         setIsLoading(false);
         setIsExportMenuOpen(false);
         return;
       }
-  
+
       // Buscar opções para conversão de IDs para descrições
       const options: ExportOptions = {
         eventoOptions: await NotificacaoService.getEventoOptions(),
         publicoOptions: await NotificacaoService.getPublicoOptions(),
-        paisOptions: await NotificacaoService.getPaisOptions(), 
+        paisOptions: await NotificacaoService.getPaisOptions(),
         estadoOptions: await NotificacaoService.getEstadoOptions(),
-        municipioOptions: await NotificacaoService.getMunicipioOptions(), 
+        municipioOptions: await NotificacaoService.getMunicipioOptions(),
         bairroOptions: await NotificacaoService.getBairroOptions(),
         cboOptions: await NotificacaoService.getCboOptions(),
         generoOptions: await NotificacaoService.getGeneroOptions(),
@@ -444,23 +490,24 @@ useEffect(() => {
         sintomaOptions: await NotificacaoService.getSintomaOptions(),
         hipoteseDiagOptions: await NotificacaoService.getHipoteseDiagOptions(),
         traumaOptions: await NotificacaoService.getTraumaOptions(),
-        estabelecimentoOptions: await NotificacaoService.getEstabelecimentoOptions(),
-        encerramentoOptions: await NotificacaoService.getEncerramentoOptions()
+        estabelecimentoOptions:
+          await NotificacaoService.getEstabelecimentoOptions(),
+        encerramentoOptions: await NotificacaoService.getEncerramentoOptions(),
       };
-  
+
       // Usar a função de exportação da sua biblioteca
       exportListToCSV(dataToExport, options);
-      
+
       // Feedback para o usuário
       toast.success(`CSV exportado com sucesso`);
-      
+
       setIsExportMenuOpen(false);
       setIsLoading(false);
     } catch (error) {
       console.error("Erro ao exportar CSV:", error);
       setError("Erro ao exportar CSV. Tente novamente.");
       setIsLoading(false);
-      
+
       if (error instanceof Error) {
         toast.error(`Erro na exportação: ${error.message}`);
       } else {
@@ -474,26 +521,25 @@ useEffect(() => {
     try {
       // Mostrar loader ou feedback visual
       setIsLoading(true);
-      
+
       // Buscar dados - página atual ou todos
-      const dataToExport = type === "page" 
-        ? notificacoes 
-        : await fetchAllData();
-        
+      const dataToExport =
+        type === "page" ? notificacoes : await fetchAllData();
+
       if (!dataToExport || dataToExport.length === 0) {
         toast.info("Não há dados para exportar.");
         setIsLoading(false);
         setIsExportMenuOpen(false);
         return;
       }
-  
+
       // Buscar todas as opções para converter IDs em descrições
       const options: ExportOptions = {
         eventoOptions: await NotificacaoService.getEventoOptions(),
         publicoOptions: await NotificacaoService.getPublicoOptions(),
-        paisOptions: await NotificacaoService.getPaisOptions(), 
+        paisOptions: await NotificacaoService.getPaisOptions(),
         estadoOptions: await NotificacaoService.getEstadoOptions(),
-        municipioOptions: await NotificacaoService.getMunicipioOptions(), 
+        municipioOptions: await NotificacaoService.getMunicipioOptions(),
         bairroOptions: await NotificacaoService.getBairroOptions(),
         cboOptions: await NotificacaoService.getCboOptions(),
         generoOptions: await NotificacaoService.getGeneroOptions(),
@@ -503,23 +549,24 @@ useEffect(() => {
         sintomaOptions: await NotificacaoService.getSintomaOptions(),
         hipoteseDiagOptions: await NotificacaoService.getHipoteseDiagOptions(),
         traumaOptions: await NotificacaoService.getTraumaOptions(),
-        estabelecimentoOptions: await NotificacaoService.getEstabelecimentoOptions(),
-        encerramentoOptions: await NotificacaoService.getEncerramentoOptions()
+        estabelecimentoOptions:
+          await NotificacaoService.getEstabelecimentoOptions(),
+        encerramentoOptions: await NotificacaoService.getEncerramentoOptions(),
       };
-  
+
       // Usar a função de exportação da sua biblioteca
       exportListToExcel(dataToExport, options);
-      
+
       // Feedback para o usuário
       toast.success(`Dados exportados com sucesso para Excel`);
-      
+
       setIsExportMenuOpen(false);
       setIsLoading(false);
     } catch (error) {
       console.error("Erro ao exportar Excel:", error);
       setError("Erro ao exportar Excel. Tente novamente.");
       setIsLoading(false);
-      
+
       // Feedback específico para o usuário
       if (error instanceof Error) {
         toast.error(`Erro na exportação: ${error.message}`);
@@ -534,26 +581,25 @@ useEffect(() => {
     try {
       // Mostrar loader ou feedback visual
       setIsLoading(true);
-      
+
       // Buscar dados - página atual ou todos
-      const dataToExport = type === "page" 
-        ? notificacoes 
-        : await fetchAllData();
-        
+      const dataToExport =
+        type === "page" ? notificacoes : await fetchAllData();
+
       if (!dataToExport || dataToExport.length === 0) {
         toast.info("Não há dados para exportar.");
         setIsLoading(false);
         setIsExportMenuOpen(false);
         return;
       }
-  
+
       // Buscar opções para conversão de IDs para descrições
       const options: ExportOptions = {
         eventoOptions: await NotificacaoService.getEventoOptions(),
         publicoOptions: await NotificacaoService.getPublicoOptions(),
-        paisOptions: await NotificacaoService.getPaisOptions(), 
+        paisOptions: await NotificacaoService.getPaisOptions(),
         estadoOptions: await NotificacaoService.getEstadoOptions(),
-        municipioOptions: await NotificacaoService.getMunicipioOptions(), 
+        municipioOptions: await NotificacaoService.getMunicipioOptions(),
         bairroOptions: await NotificacaoService.getBairroOptions(),
         cboOptions: await NotificacaoService.getCboOptions(),
         generoOptions: await NotificacaoService.getGeneroOptions(),
@@ -563,23 +609,24 @@ useEffect(() => {
         sintomaOptions: await NotificacaoService.getSintomaOptions(),
         hipoteseDiagOptions: await NotificacaoService.getHipoteseDiagOptions(),
         traumaOptions: await NotificacaoService.getTraumaOptions(),
-        estabelecimentoOptions: await NotificacaoService.getEstabelecimentoOptions(),
-        encerramentoOptions: await NotificacaoService.getEncerramentoOptions()
+        estabelecimentoOptions:
+          await NotificacaoService.getEstabelecimentoOptions(),
+        encerramentoOptions: await NotificacaoService.getEncerramentoOptions(),
       };
-  
+
       // Usar a função de exportação da sua biblioteca
       exportListToPDF(dataToExport, options);
-      
+
       // Feedback para o usuário
       toast.success(`PDF exportado com sucesso`);
-      
+
       setIsExportMenuOpen(false);
       setIsLoading(false);
     } catch (error) {
       console.error("Erro ao exportar PDF:", error);
       setError("Erro ao exportar PDF. Tente novamente.");
       setIsLoading(false);
-      
+
       if (error instanceof Error) {
         toast.error(`Erro na exportação: ${error.message}`);
       } else {
@@ -628,17 +675,53 @@ useEffect(() => {
           <h3 className="text-sm font-medium text-gray-700 px-2">
             Página Atual
           </h3>
-          <button onClick={() => handleExportCSV("page")}>CSV (página atual)</button>
-          <button onClick={() => handleExportExcel("page")}>Excel (página atual)</button>
-          <button onClick={() => handleExportPDF("page")}>PDF (página atual)</button>
+          <button
+            onClick={() => handleExportCSV("page")}
+            className="w-full text-left px-2 py-1.5 text-gray-700 hover:bg-gray-50 rounded flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            CSV (página atual)
+          </button>
+          <button
+            onClick={() => handleExportExcel("page")}
+            className="w-full text-left px-2 py-1.5 text-gray-700 hover:bg-gray-50 rounded flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Excel (página atual)
+          </button>
+          <button
+            onClick={() => handleExportPDF("page")}
+            className="w-full text-left px-2 py-1.5 text-gray-700 hover:bg-gray-50 rounded flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            PDF (página atual)
+          </button>
         </div>
         <div>
           <h3 className="text-sm font-medium text-gray-700 px-2">
             Todos os Dados
           </h3>
-          <button onClick={() => handleExportCSV("all")}>CSV (todos os dados)</button>
-          <button onClick={() => handleExportExcel("all")}>Excel (todos os dados)</button>
-          <button onClick={() => handleExportPDF("all")}>PDF (todos os dados)</button>
+          <button
+            onClick={() => handleExportCSV("all")}
+            className="w-full text-left px-2 py-1.5 text-gray-700 hover:bg-gray-50 rounded flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            CSV (todos os dados)
+          </button>
+          <button
+            onClick={() => handleExportExcel("all")}
+            className="w-full text-left px-2 py-1.5 text-gray-700 hover:bg-gray-50 rounded flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Excel (todos os dados)
+          </button>
+          <button
+            onClick={() => handleExportPDF("all")}
+            className="w-full text-left px-2 py-1.5 text-gray-700 hover:bg-gray-50 rounded flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            PDF (todos os dados)
+          </button>
         </div>
       </div>
     );
@@ -664,7 +747,9 @@ useEffect(() => {
               >
                 <ArrowLeft className="h-6 w-6" />
               </button>
-              <h1 className="text-2xl font-bold">Lista de Formulários de Comunicação de Caso Cadastrados</h1>
+              <h1 className="text-2xl font-bold">
+                Lista de Formulários de Comunicação de Caso Cadastrados
+              </h1>
             </div>
 
             {/* Grupo de botões à direita */}
@@ -1114,11 +1199,28 @@ useEffect(() => {
             </div>
           </div>
         </div>
-          {/* Adicione o dashboard aqui */}
-      <EnhancedNotificationDashboard
-        notificacoes={notificacoes || []} 
-        exportOptions={exportOptions || {}}  
-      />
+        {/* Adicione o dashboard aqui */}
+        <div className="mt-8">
+          <h2 className="text-xl font-bold text-gray-800 mb-4">
+            Dashboard de Notificações
+          </h2>
+
+          {isDashboardLoading ? (
+            <div className="bg-white p-6 rounded-xl shadow-md flex justify-center items-center h-64">
+              <div className="flex flex-col items-center">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mb-2"></div>
+                <p className="text-gray-600">
+                  Carregando dados completos para o dashboard...
+                </p>
+              </div>
+            </div>
+          ) : (
+            <EnhancedNotificationDashboard
+              notificacoes={allNotificacoes}
+              exportOptions={exportOptions || {}}
+            />
+          )}
+        </div>
       </main>
 
       {/* Links invisíveis para exportação CSV */}
