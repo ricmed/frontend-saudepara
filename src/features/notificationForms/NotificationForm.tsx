@@ -187,6 +187,7 @@ const NotificationForm = () => {
   );
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isCreatingNewPatient, setIsCreatingNewPatient] = useState(false);
+  const [originalCpf, setOriginalCpf] = useState<string>('');
   const [generoOptions, setGeneroOptions] = useState<GeneroOption[]>([]);
   const [racaOptions, setRacaOptions] = useState<RacaOption[]>([]);
   const [escolaridadeOptions, setEscolaridadeOptions] = useState<
@@ -309,6 +310,24 @@ const NotificationForm = () => {
 
   // Estado para armazenar o objeto paciente completo selecionado
   const [, setSelectedPaciente] = useState<Paciente | null>(null);
+
+  const searchCpfExists = async (cpf: string): Promise<boolean> => {
+    // Não verificar CPFs vazios ou incompletos
+    if (!cpf || cpf.length !== 11) return false;
+
+    try {
+      const server = import.meta.env.VITE_API_SERVER;
+      const port = import.meta.env.VITE_API_PORT;
+      const response = await axios.get(
+        `${server}:${port}/api/paciente/check-cpf/${cpf}`
+      );
+
+      return response.data.exists;
+    } catch (error) {
+      console.error("Erro ao verificar CPF:", error);
+      return false;
+    }
+  };
 
   // Estado para controlar seções expandidas
   const [expandedSections, setExpandedSections] = useState<
@@ -719,7 +738,6 @@ const NotificationForm = () => {
     [setFormData]
   );
 
-  // Modifique a função loadNotificacao para converter os dados que vêm do banco para caixa alta
   const loadNotificacao = async (notificacaoId: string) => {
     setIsLoading(true);
     try {
@@ -742,7 +760,11 @@ const NotificationForm = () => {
         // Verificar especificamente os sintomas
         console.log("Sintomas carregados:", dadosNormalizados.sinaisESintomas);
 
+        // Armazenar o CPF original para comparações
+        setOriginalCpf(dadosNormalizados.cpf || '');
+
         // Atualizar o formulário com os dados normalizados
+        setFormData(dadosNormalizados);
         setFormData(dadosNormalizados);
 
         // Carregar municípios se tivermos um estado selecionado
@@ -860,7 +882,7 @@ const NotificationForm = () => {
   };
 
   // Handler específico para CPF
-  const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCPFChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
     // Remove formatação para armazenar apenas os dígitos no estado
     const formattedCPF = formatCPF(rawValue);
@@ -870,12 +892,25 @@ const NotificationForm = () => {
       cpf: formattedCPF,
     }));
 
+    // Limpar erro existente
     if (errors.cpf) {
       setErrors((prev) => {
         const newErrors = { ...prev };
         delete newErrors.cpf;
         return newErrors;
       });
+    }
+
+    // Verificar CPF existente apenas se for um CPF completo
+    if (formattedCPF.length === 11 && formattedCPF !== originalCpf) {
+      const exists = await searchCpfExists(formattedCPF);
+
+      if (exists) {
+        setErrors((prev) => ({
+          ...prev,
+          cpf: "O CPF digitado já existe",
+        }));
+      }
     }
   };
 
@@ -897,19 +932,24 @@ const NotificationForm = () => {
         return newErrors;
       });
     }
-  };
-
-  // Interface para o paciente esperado por ModalBuscaPaciente
-  // Modificar o handleSelectPaciente para garantir que os dados do paciente estão em caixa alta
+  }
+  
   const handleSelectPaciente = (paciente: Paciente) => {
     // Converter todos os campos de texto para caixa alta
     const pacienteUpperCase = toUpperCaseAllStrings(paciente);
 
     // Armazenar o paciente completo para uso posterior
     setSelectedPaciente(pacienteUpperCase);
+    
+    // Armazenar o CPF original para comparações
+    setOriginalCpf(pacienteUpperCase.cpf || '');
 
     // Formatar a data corretamente
     let formattedDate = "";
+    if (pacienteUpperCase.data_nascimento) {
+      const date = new Date(pacienteUpperCase.data_nascimento);
+      formattedDate = date.toISOString().split("T")[0]; // Formato YYYY-MM-DD
+    }
     if (pacienteUpperCase.data_nascimento) {
       const date = new Date(pacienteUpperCase.data_nascimento);
       formattedDate = date.toISOString().split("T")[0]; // Formato YYYY-MM-DD
@@ -1335,14 +1375,16 @@ const NotificationForm = () => {
       setExpandedSections((prev) => ({ ...prev, identificacao: true }));
       return false;
     }
+
     // Verificar campos obrigatórios
     const requiredFields: Array<{ field: keyof FormData; label: string }> = [
       { field: "evento", label: "Evento" },
       { field: "publicoAtendido", label: "Público Atendido" },
       { field: "residenteBelem", label: "Residente em Belém" },
       { field: "paciente", label: "Paciente" },
+      { field: "paisProcedencia", label: "País de procedência" }, // Adicionado como obrigatório
       { field: "tipoAtendimento", label: "Tipo de Atendimento" },
-      { field: "dataOcorrencia", label: "Data da Ocorrência" },
+      { field: "dataOcorrencia", label: "Data da Ocorrência" }, // Já era obrigatório
       { field: "tipoEncerramento", label: "Tipo de Encerramento" },
     ];
 
@@ -1382,7 +1424,7 @@ const NotificationForm = () => {
         newErrors.bairro ||
         newErrors.municipio ||
         newErrors.uf ||
-        newErrors.paisProcedencia
+        newErrors.paisProcedencia // Incluir verificação para país
       ) {
         newExpandedSections.procedencia = true;
       }
@@ -1419,6 +1461,15 @@ const NotificationForm = () => {
             behavior: "smooth",
             block: "center",
           });
+
+          // Adicionalmente, podemos focar no campo com erro
+          if (
+            firstErrorField instanceof HTMLInputElement ||
+            firstErrorField instanceof HTMLSelectElement ||
+            firstErrorField instanceof HTMLTextAreaElement
+          ) {
+            firstErrorField.focus();
+          }
         }
       }, 100);
 
@@ -1501,14 +1552,72 @@ const NotificationForm = () => {
           "Paciente criado automaticamente com ID:",
           response.data.idpaciente
         );
-      } catch (error) {
+      } catch (error: any) {
         console.error("Erro ao criar paciente automaticamente:", error);
-        toast.error(
-          "Erro ao criar o paciente. Verifique os dados e tente novamente."
-        );
-        setApiError(
-          "Erro ao criar o paciente. Verifique os dados e tente novamente."
-        );
+
+        // Mostrar mensagem de erro mais específica
+        let errorMessage =
+          "Erro ao criar o paciente. Verifique os dados e tente novamente.";
+
+        // Se o erro contém informações da API, mostrar essas informações
+        if (
+          error.response &&
+          error.response.data &&
+          error.response.data.message
+        ) {
+          errorMessage = error.response.data.message;
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+
+        toast.error(errorMessage);
+        setApiError(errorMessage);
+
+        // Destacar campos específicos com erro, se a API retornar essa informação
+        if (
+          error.response &&
+          error.response.data &&
+          error.response.data.errors
+        ) {
+          const backendErrors = error.response.data.errors;
+
+          // Mapear erros do backend para os campos do formulário
+          const mappedErrors: Record<string, string> = {};
+
+          Object.entries(backendErrors).forEach(([key, value]) => {
+            // Mapear nome dos campos do backend para nomes no nosso formData
+            const fieldMapping: Record<string, string> = {
+              nome: "paciente",
+              cpf: "cpf",
+              data_nascimento: "dataNascimento",
+              // adicionar outros mapeamentos conforme necessário
+            };
+
+            const fieldName = fieldMapping[key] || key;
+            mappedErrors[fieldName] = Array.isArray(value)
+              ? value[0]
+              : String(value);
+          });
+
+          setErrors((prev) => ({ ...prev, ...mappedErrors }));
+
+          // Expandir a seção de identificação do paciente
+          setExpandedSections((prev) => ({ ...prev, identificacao: true }));
+
+          // Rolar até o primeiro erro
+          setTimeout(() => {
+            const firstErrorField = document.querySelector(
+              '[data-error="true"]'
+            );
+            if (firstErrorField) {
+              firstErrorField.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+              });
+            }
+          }, 100);
+        }
+
         setIsSaving(false);
         return; // Impedir envio do formulário
       }
@@ -1586,8 +1695,114 @@ const NotificationForm = () => {
       }, 1500);
     } catch (error: any) {
       console.error("Erro ao salvar notificação:", error);
-      setApiError(error.message || "Erro ao salvar notificação"); // Definir mensagem de erro
-      toast.error(error.message || "Erro ao salvar notificação");
+
+      // Tratamento de erros melhorado
+      let errorMessage = "Erro ao salvar notificação";
+      let validationErrors: Record<string, string> = {};
+
+      // Extrair mensagem de erro e possíveis erros de validação do backend
+      if (error.response && error.response.data) {
+        // Mensagem geral de erro
+        if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        }
+
+        // Erros específicos por campo
+        if (error.response.data.errors) {
+          const backendErrors = error.response.data.errors;
+
+          // Mapear os erros do backend para nossos campos do formulário
+          Object.entries(backendErrors).forEach(([key, value]) => {
+            // Mapeamento dos nomes de campo do backend para o frontend
+            const fieldMapping: Record<string, string> = {
+              tipo_evento_idtipo_evento: "evento",
+              tipo_publico_idtipo_publico: "publicoAtendido",
+              paciente_idpaciente: "paciente",
+              residente_belem: "residenteBelem",
+              tipo_pais_idtipo_pais: "paisProcedencia",
+              tipo_estado_idtipo_estado: "uf",
+              tipo_municipio_idtipo_municipio: "municipio",
+              tipo_bairro_idtipo_bairro: "bairro",
+              tipo_atendimento_idtipo_atendimento: "tipoAtendimento",
+              data_ocorrencia: "dataOcorrencia",
+              tipo_encerramento_idtipo_encerramento: "tipoEncerramento",
+              // Adicionar mais mapeamentos conforme necessário
+            };
+
+            const fieldName = fieldMapping[key] || key;
+            validationErrors[fieldName] = Array.isArray(value)
+              ? value[0]
+              : String(value);
+          });
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      // Atualizar estado de erro e exibir toast
+      setApiError(errorMessage);
+      toast.error(errorMessage);
+
+      // Atualizar erros específicos por campo
+      if (Object.keys(validationErrors).length > 0) {
+        setErrors((prev) => ({ ...prev, ...validationErrors }));
+
+        // Expandir seções relevantes com base nos erros
+        const sectionsToExpand: Record<string, boolean> = {};
+
+        // Lógica para determinar quais seções expandir
+        Object.keys(validationErrors).forEach((field) => {
+          if (["evento", "publicoAtendido"].includes(field)) {
+            sectionsToExpand.dadosGerais = true;
+          } else if (
+            [
+              "residenteBelem",
+              "paisProcedencia",
+              "uf",
+              "municipio",
+              "bairro",
+            ].includes(field)
+          ) {
+            sectionsToExpand.procedencia = true;
+          } else if (
+            [
+              "paciente",
+              "nomeMae",
+              "dataNascimento",
+              "cpf",
+              "identidadeGenero",
+              "raca",
+            ].includes(field)
+          ) {
+            sectionsToExpand.identificacao = true;
+          } else if (
+            [
+              "tipoAtendimento",
+              "sinaisESintomas",
+              "tipoTrauma",
+              "dataOcorrencia",
+            ].includes(field)
+          ) {
+            sectionsToExpand.atendimento = true;
+          } else if (["tipoEncerramento", "dataEncerramento"].includes(field)) {
+            sectionsToExpand.encerramento = true;
+          }
+        });
+
+        // Expandir as seções determinadas
+        setExpandedSections((prev) => ({ ...prev, ...sectionsToExpand }));
+
+        // Rolar até o primeiro campo com erro
+        setTimeout(() => {
+          const firstErrorField = document.querySelector('[data-error="true"]');
+          if (firstErrorField) {
+            firstErrorField.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
+          }
+        }, 100);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -2101,6 +2316,8 @@ const NotificationForm = () => {
                           apiEndpoint="api/tipo-pais"
                           idField="idtipo_pais"
                           debug={true}
+                          required={true} // Marcado como obrigatório
+                          error={errors.paisProcedencia} // Passar erro específico
                         />
                       </div>
                       <div>
@@ -3210,7 +3427,8 @@ const NotificationForm = () => {
                         </option>
                       </select>
                       <p className="mt-1 text-xs text-gray-500">
-                        Campo opcional. Selecione um dos campos acima, se for necessário encaminhamento para estes locais.
+                        Campo opcional. Selecione um dos campos acima, se for
+                        necessário encaminhamento para estes locais.
                       </p>
                     </div>
                   )}

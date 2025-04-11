@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
+import axios from "axios";
 import {
   User,
   Save,
@@ -14,6 +15,7 @@ import {
   AlertCircle,
   CheckCircle,
   HelpCircle,
+  Loader
 } from "lucide-react";
 import CboInput from "@/features/notificationForms/components/CboInput";
 import PhoneInput from "@/features/notificationForms/components/PhoneInput";
@@ -23,6 +25,7 @@ import {
   Paciente,
   OptionItem,
 } from "@/services/PacienteService";
+import { toast } from "react-toastify";
 
 // Interface para as props do componente
 interface FormularioPacienteProps {
@@ -118,6 +121,7 @@ const FormularioPaciente = ({
   const [apiError, setApiError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false); // Novo estado para controle de salvamento
 
   // Estados para os dados dos dropdowns carregados do banco
   const [generoOptions, setGeneroOptions] = useState<OptionItem[]>([]);
@@ -128,6 +132,7 @@ const FormularioPaciente = ({
   const [isLoadingOptions, setIsLoadingOptions] = useState<boolean>(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [originalCpf, setOriginalCpf] = useState<string>(""); // Armazenar CPF original para validação
 
   // Estado para controlar seções expandidas
   const [expandedSections, setExpandedSections] = useState({
@@ -204,6 +209,9 @@ const FormularioPaciente = ({
           const pacienteUpperCase = toUpperCaseAllStrings(paciente);
           console.log("Dados convertidos para caixa alta:", pacienteUpperCase);
 
+          // Salvar o CPF original para verificação de duplicidade
+          setOriginalCpf(pacienteUpperCase.cpf || "");
+
           // Verificação adicional para escolaridade
           let escolaridadeId = null;
           if (
@@ -268,12 +276,51 @@ const FormularioPaciente = ({
     // Se a data de nascimento existe, calcular a idade
     else {
       const calculatedAge = calculateAge(formData.data_nascimento);
+
+      // Verificar se a idade é válida (não maior que 120)
+      const age = parseInt(calculatedAge);
+      if (!isNaN(age) && age > 120) {
+        setErrors((prev) => ({
+          ...prev,
+          data_nascimento: "A idade não pode ser maior que 120 anos",
+        }));
+        return;
+      }
+
       setFormData((prev) => ({
         ...prev,
         idade: calculatedAge,
       }));
+
+      // Limpar erro de data de nascimento se existir
+      if (errors.data_nascimento) {
+        setErrors((prev) => {
+          const newErrors = { ...prev };
+          delete newErrors.data_nascimento;
+          return newErrors;
+        });
+      }
     }
   }, [formData.data_nascimento]);
+
+  // Função para verificar se o CPF já existe
+  const searchCpfExists = async (cpf: string): Promise<boolean> => {
+    // Não verificar CPFs vazios ou incompletos
+    if (!cpf || cpf.length !== 11) return false;
+    
+    try {
+      const server = import.meta.env.VITE_API_SERVER;
+      const port = import.meta.env.VITE_API_PORT;
+      const response = await axios.get(
+        `${server}:${port}/api/paciente/check-cpf/${cpf}`
+      );
+      
+      return response.data.exists;
+    } catch (error) {
+      console.error("Erro ao verificar CPF:", error);
+      return false;
+    }
+  };
 
   // Função para alternar a expansão de uma seção
   const toggleSection = (section: keyof typeof expandedSections) => {
@@ -394,6 +441,19 @@ const FormularioPaciente = ({
           });
         }
       } else {
+        // Verificar se a data é futura
+        const selectedDate = new Date(value);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Remover horas para comparação justa
+        
+        if (selectedDate > today) {
+          setErrors(prev => ({
+            ...prev,
+            data_nascimento: "A data de nascimento não pode ser futura"
+          }));
+          return;
+        }
+        
         // Se tem data, calcular a idade automaticamente
         const age = calculateAge(value);
 
@@ -458,7 +518,7 @@ const FormularioPaciente = ({
     return `${cleanCPF.substring(0, 3)}.${cleanCPF.substring(3, 6)}.${cleanCPF.substring(6, 9)}-${cleanCPF.substring(9)}`;
   };
 
-  const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCPFChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
     // Remove formatação para armazenar apenas os dígitos no estado
     const formattedCPF = formatCPF(rawValue);
@@ -474,6 +534,18 @@ const FormularioPaciente = ({
         delete newErrors.cpf;
         return newErrors;
       });
+    }
+    
+    // Verificar CPF existente se tiver 11 dígitos e for diferente do original
+    if (formattedCPF.length === 11 && formattedCPF !== originalCpf) {
+      const exists = await searchCpfExists(formattedCPF);
+      
+      if (exists) {
+        setErrors((prev) => ({
+          ...prev,
+          cpf: "O CPF digitado já existe",
+        }));
+      }
     }
   };
 
@@ -506,6 +578,13 @@ const FormularioPaciente = ({
         const age = parseInt(calculateAge(formData.data_nascimento));
         if (age > 120) {
           newErrors.data_nascimento = "A idade não pode ser maior que 120 anos";
+        }
+        
+        // Verificar se a data não é futura
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Zerar horas para comparação justa
+        if (date > today) {
+          newErrors.data_nascimento = "A data de nascimento não pode ser futura";
         }
       }
     }
@@ -544,6 +623,43 @@ const FormularioPaciente = ({
     }
 
     setErrors(newErrors);
+    
+    // Se houver erros, expandir as seções relevantes e fazer scroll
+    if (Object.keys(newErrors).length > 0) {
+      // Expandir seções com erros
+      const newExpandedSections = { ...expandedSections };
+      
+      if (newErrors.nome || newErrors.nome_mae || newErrors.data_nascimento || 
+          newErrors.idade || newErrors.cpf) {
+        newExpandedSections.dados_pessoais = true;
+      }
+      
+      if (newErrors.tipo_genero_idtipo_genero || newErrors.tipo_raca_idtipo_raca || 
+          newErrors.escolaridade_idescolaridade) {
+        newExpandedSections.dados_complementares = true;
+      }
+      
+      if (newErrors.contato) {
+        newExpandedSections.contato = true;
+      }
+      
+      setExpandedSections(newExpandedSections);
+      
+      // Depois de expandir as seções, scroll para o primeiro erro
+      setTimeout(() => {
+        const firstErrorField = document.querySelector('[data-error="true"]');
+        if (firstErrorField) {
+          firstErrorField.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }
+      }, 100);
+      
+      // Exibir toast com resumo
+      toast.error("Corrija os erros no formulário para continuar");
+    }
+    
     return Object.keys(newErrors).length === 0;
   };
 
@@ -587,14 +703,14 @@ const FormularioPaciente = ({
     return result;
   };
 
-  // Adicione uma função para criar um novo paciente com dados limpos
+  // Melhorado: tratamento de erros do backend
   const handleCrearPacienteComDadosLimpos = async () => {
     // Limpar mensagens anteriores
     setApiError(null);
     setIsSuccess(false);
 
     if (validateForm()) {
-      setIsLoading(true);
+      setIsSaving(true);
 
       try {
         // Converter dados do formulário para o formato da API
@@ -613,17 +729,89 @@ const FormularioPaciente = ({
 
         // Sucesso!
         setIsSuccess(true);
+        toast.success(pacienteId 
+          ? "Paciente atualizado com sucesso!" 
+          : "Paciente cadastrado com sucesso!");
+          
         if (isModal && onPacienteSalvo) {
           onPacienteSalvo(pacienteUpperCase);
         } else if (!pacienteId) {
           setFormData(initialFormData); // Limpar formulário se for criação
         }
-      } catch (error) {
-        setApiError(
-          error instanceof Error ? error.message : "Erro ao salvar paciente"
-        );
+      } catch (error: any) {
+        // Melhor tratamento de erros do backend
+        let errorMessage = "Erro ao salvar paciente";
+        let validationErrors: Record<string, string> = {};
+        
+        // Extrair mensagem de erro e possíveis erros de validação do backend
+        if (error.response && error.response.data) {
+          // Mensagem geral de erro
+          if (error.response.data.message) {
+            errorMessage = error.response.data.message;
+          }
+          
+          // Erros específicos por campo
+          if (error.response.data.errors) {
+            const backendErrors = error.response.data.errors;
+            
+            // Mapear os erros do backend para campos do formulário
+            Object.entries(backendErrors).forEach(([key, value]) => {
+              // Mapeamento de campos conforme necessário
+              const fieldMapping: Record<string, string> = {
+                "nome": "nome",
+                "nome_mae": "nome_mae",
+                "data_nascimento": "data_nascimento",
+                "cpf": "cpf",
+                "tipo_genero_idtipo_genero": "tipo_genero_idtipo_genero",
+                "tipo_raca_idtipo_raca": "tipo_raca_idtipo_raca",
+                "escolaridade_idescolaridade": "escolaridade_idescolaridade",
+                "contato": "contato"
+              };
+              
+              const fieldName = fieldMapping[key] || key;
+              validationErrors[fieldName] = Array.isArray(value) ? value[0] : String(value);
+            });
+          }
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        
+        setApiError(errorMessage);
+        toast.error(errorMessage);
+        
+        // Adicionar erros de validação de campos específicos
+        if (Object.keys(validationErrors).length > 0) {
+          setErrors(prev => ({...prev, ...validationErrors}));
+          
+          // Expandir seções com erros
+          const sectionsToExpand = { ...expandedSections };
+          
+          // Determinar quais seções expandir com base nos erros
+          Object.keys(validationErrors).forEach(field => {
+            if (["nome", "nome_mae", "data_nascimento", "idade", "cpf"].includes(field)) {
+              sectionsToExpand.dados_pessoais = true;
+            } else if (["tipo_genero_idtipo_genero", "tipo_raca_idtipo_raca", "escolaridade_idescolaridade"].includes(field)) {
+              sectionsToExpand.dados_complementares = true;
+            } else if (["contato", "ddi"].includes(field)) {
+              sectionsToExpand.contato = true;
+            }
+          });
+          
+          setExpandedSections(sectionsToExpand);
+          
+          // Rolar até o primeiro campo com erro
+          setTimeout(() => {
+            const firstErrorField = document.querySelector('[data-error="true"]');
+            if (firstErrorField) {
+              firstErrorField.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+              });
+            }
+          }, 100);
+        }
       } finally {
-        setIsLoading(false);
+        setIsSaving(false);
       }
     }
   };
@@ -666,26 +854,26 @@ const FormularioPaciente = ({
               <button
                 type="submit"
                 form="paciente-form"
-                disabled={isLoading || isLoadingOptions}
+                disabled={isSaving || isLoadingOptions}
                 className={`inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors ${
-                  isLoading || isLoadingOptions
+                  isSaving || isLoadingOptions
                     ? "opacity-70 cursor-not-allowed"
                     : ""
                 }`}
               >
-                {isLoading ? (
-                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                {isSaving ? (
+                  <Loader className="h-4 w-4 animate-spin" />
                 ) : (
                   <Save className="h-4 w-4" />
                 )}
-                Salvar
+                {isSaving ? "Salvando..." : "Salvar"}
               </button>
               <button
                 type="button"
                 onClick={handleReset}
-                disabled={isLoading || isLoadingOptions}
+                disabled={isSaving || isLoadingOptions}
                 className={`inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors ${
-                  isLoading || isLoadingOptions
+                  isSaving || isLoadingOptions
                     ? "opacity-70 cursor-not-allowed"
                     : ""
                 }`}
@@ -696,9 +884,9 @@ const FormularioPaciente = ({
               <button
                 type="button"
                 onClick={() => window.history.back()}
-                disabled={isLoading}
+                disabled={isSaving}
                 className={`inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors ${
-                  isLoading ? "opacity-70 cursor-not-allowed" : ""
+                  isSaving ? "opacity-70 cursor-not-allowed" : ""
                 }`}
               >
                 <X className="h-4 w-4" />
@@ -796,12 +984,13 @@ const FormularioPaciente = ({
                       name="nome"
                       placeholder="Nome completo do paciente"
                       className={`w-full p-3 border ${
-                        errors.nome ? "border-red-500" : "border-gray-200"
+                        errors.nome ? "border-red-500 bg-red-50" : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.nome}
                       onChange={handleChange}
                       maxLength={100}
                       disabled={isLoading || isLoadingOptions}
+                      data-error={errors.nome ? "true" : "false"}
                     />
                     {errors.nome && (
                       <p className="mt-1 text-sm text-red-500">{errors.nome}</p>
@@ -818,12 +1007,13 @@ const FormularioPaciente = ({
                       name="nome_mae"
                       placeholder="Nome da mãe do paciente"
                       className={`w-full p-3 border ${
-                        errors.nome_mae ? "border-red-500" : "border-gray-200"
+                        errors.nome_mae ? "border-red-500 bg-red-50" : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.nome_mae}
                       onChange={handleChange}
                       maxLength={100}
                       disabled={isLoading || isLoadingOptions}
+                      data-error={errors.nome_mae ? "true" : "false"}
                     />
                     {errors.nome_mae && (
                       <p className="mt-1 text-sm text-red-500">
@@ -841,7 +1031,7 @@ const FormularioPaciente = ({
                       name="data_nascimento"
                       className={`w-full p-3 border ${
                         errors.data_nascimento
-                          ? "border-red-500"
+                          ? "border-red-500 bg-red-50"
                           : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.data_nascimento}
@@ -850,12 +1040,10 @@ const FormularioPaciente = ({
                       placeholder="DD/MM/AAAA"
                       required={true}
                       data-error={errors.data_nascimento ? "true" : "false"}
+                      error={errors.data_nascimento}
+                      // Impedir datas futuras
+                      maxDate={new Date().toISOString().split('T')[0]}
                     />
-                    {errors.data_nascimento && (
-                      <p className="mt-1 text-sm text-red-500">
-                        {errors.data_nascimento}
-                      </p>
-                    )}
                   </div>
 
                   {/* Idade */}
@@ -871,7 +1059,7 @@ const FormularioPaciente = ({
                           ? "Calculada automaticamente"
                           : "Digite a idade"
                       }
-                      className={`w-full p-3 border ${errors.idade ? "border-red-500" : "border-gray-200"} rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none ${
+                      className={`w-full p-3 border ${errors.idade ? "border-red-500 bg-red-50" : "border-gray-200"} rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none ${
                         formData.data_nascimento
                           ? "bg-gray-100 text-gray-700"
                           : ""
@@ -881,6 +1069,7 @@ const FormularioPaciente = ({
                       disabled={Boolean(formData.data_nascimento)} // Importante: converter explicitamente para booleano
                       min="0"
                       max="120"
+                      data-error={errors.idade ? "true" : "false"}
                     />
                     {formData.data_nascimento ? (
                       <p className="mt-1 text-xs text-gray-500">
@@ -908,7 +1097,7 @@ const FormularioPaciente = ({
                       name="cpf"
                       placeholder="000.000.000-00"
                       className={`w-full p-3 border ${
-                        errors.cpf ? "border-red-500" : "border-gray-200"
+                        errors.cpf ? "border-red-500 bg-red-50" : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={
                         formData.cpf ? displayFormattedCPF(formData.cpf) : ""
@@ -916,6 +1105,7 @@ const FormularioPaciente = ({
                       onChange={handleCPFChange}
                       maxLength={14}
                       disabled={isLoading || isLoadingOptions}
+                      data-error={errors.cpf ? "true" : "false"}
                     />
                     {errors.cpf && (
                       <p className="mt-1 text-sm text-red-500">{errors.cpf}</p>
@@ -1008,12 +1198,13 @@ const FormularioPaciente = ({
                       name="tipo_genero_idtipo_genero"
                       className={`w-full p-3 border ${
                         errors.tipo_genero_idtipo_genero
-                          ? "border-red-500"
+                          ? "border-red-500 bg-red-50"
                           : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.tipo_genero_idtipo_genero}
                       onChange={handleChange}
                       disabled={isLoading || isLoadingOptions}
+                      data-error={errors.tipo_genero_idtipo_genero ? "true" : "false"}
                     >
                       <option value="">Selecione</option>
                       {generoOptions.map((option) => (
@@ -1062,12 +1253,13 @@ const FormularioPaciente = ({
                       name="tipo_raca_idtipo_raca"
                       className={`w-full p-3 border ${
                         errors.tipo_raca_idtipo_raca
-                          ? "border-red-500"
+                          ? "border-red-500 bg-red-50"
                           : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.tipo_raca_idtipo_raca}
                       onChange={handleChange}
                       disabled={isLoading || isLoadingOptions}
+                      data-error={errors.tipo_raca_idtipo_raca ? "true" : "false"}
                     >
                       <option value="">Selecione</option>
                       {racaOptions.map((option) => (
@@ -1090,10 +1282,15 @@ const FormularioPaciente = ({
                     </label>
                     <select
                       name="escolaridade_idescolaridade"
-                      className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                      className={`w-full p-3 border ${
+                        errors.escolaridade_idescolaridade 
+                          ? "border-red-500 bg-red-50" 
+                          : "border-gray-200"
+                      } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                       value={formData.escolaridade_idescolaridade}
                       onChange={handleChange}
                       disabled={isLoading || isLoadingOptions}
+                      data-error={errors.escolaridade_idescolaridade ? "true" : "false"}
                     >
                       <option value="">Selecione</option>
                       {escolaridadeOptions.map((option) => (
@@ -1102,6 +1299,11 @@ const FormularioPaciente = ({
                         </option>
                       ))}
                     </select>
+                    {errors.escolaridade_idescolaridade && (
+                      <p className="mt-1 text-sm text-red-500">
+                        {errors.escolaridade_idescolaridade}
+                      </p>
+                    )}
                   </div>
 
                   {/* Profissão/Ocupação com pesquisa */}
@@ -1155,6 +1357,15 @@ const FormularioPaciente = ({
                           ...prev,
                           contato: value,
                         }));
+                        
+                        // Limpar erro se existir
+                        if (errors.contato) {
+                          setErrors(prev => {
+                            const newErrors = {...prev};
+                            delete newErrors.contato;
+                            return newErrors;
+                          });
+                        }
                       }}
                       onChangeWithCode={(ddiValue, phoneNumber) => {
                         // Novo callback para atualizar separadamente o DDI e o número
@@ -1163,9 +1374,19 @@ const FormularioPaciente = ({
                           ddi: ddiValue, // Atualiza o DDI no estado
                           contato: phoneNumber, // Atualiza apenas o número no estado
                         }));
+                        
+                        // Limpar erro se existir
+                        if (errors.contato) {
+                          setErrors(prev => {
+                            const newErrors = {...prev};
+                            delete newErrors.contato;
+                            return newErrors;
+                          });
+                        }
                       }}
                       label="Contato Telefônico"
                       placeholder="Digite o número de telefone"
+                      data-error={errors.contato ? "true" : "false"}
                     />
                     {errors.contato && (
                       <p className="mt-1 text-sm text-red-500">
@@ -1182,27 +1403,27 @@ const FormularioPaciente = ({
           <div className="flex justify-center gap-4 mt-8 pb-8">
             <button
               type="submit"
-              disabled={isLoading || isLoadingOptions}
+              disabled={isSaving || isLoadingOptions}
               className={`inline-flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors ${
-                isLoading || isLoadingOptions
+                isSaving || isLoadingOptions
                   ? "opacity-70 cursor-not-allowed"
                   : ""
               }`}
             >
-              {isLoading ? (
-                <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              {isSaving ? (
+                <Loader className="h-4 w-4 animate-spin" />
               ) : (
                 <Save className="h-4 w-4" />
               )}
-              Salvar
+              {isSaving ? "Salvando..." : "Salvar"}
             </button>
             {!isModal && (
               <button
                 type="button"
                 onClick={handleReset}
-                disabled={isLoading || isLoadingOptions}
+                disabled={isSaving || isLoadingOptions}
                 className={`inline-flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors ${
-                  isLoading || isLoadingOptions
+                  isSaving || isLoadingOptions
                     ? "opacity-70 cursor-not-allowed"
                     : ""
                 }`}
@@ -1216,9 +1437,9 @@ const FormularioPaciente = ({
               onClick={
                 isModal ? () => onClose?.() : () => window.history.back()
               }
-              disabled={isLoading}
+              disabled={isSaving}
               className={`inline-flex items-center gap-2 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors ${
-                isLoading ? "opacity-70 cursor-not-allowed" : ""
+                isSaving ? "opacity-70 cursor-not-allowed" : ""
               }`}
             >
               <X className="h-4 w-4" />

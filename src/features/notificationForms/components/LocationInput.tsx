@@ -32,6 +32,8 @@ interface LocationInputProps {
   apiEndpoint?: string;
   parentValue?: string;
   debug?: boolean;
+  required?: boolean; // Adicionado suporte para campos obrigatórios
+  error?: string; // Adicionado suporte para mensagens de erro
 }
 
 const LocationInput: React.FC<LocationInputProps> = ({
@@ -47,7 +49,9 @@ const LocationInput: React.FC<LocationInputProps> = ({
   filterEnabled = true,
   apiEndpoint = "",
   parentValue = "",
-  debug = false
+  debug = false,
+  required = false, // Valor padrão para campos obrigatórios
+  error = "" // Valor padrão para mensagem de erro
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [displayValue, setDisplayValue] = useState<string>("");
@@ -671,19 +675,28 @@ const LocationInput: React.FC<LocationInputProps> = ({
 
   return (
     <div className="w-full">
-      {label && <label className="block mb-2 font-medium text-gray-700">{label}</label>}
+      {label && (
+        <label className="block mb-2 font-medium text-gray-700">
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+      )}
       <div className="relative">
         <input
           ref={inputRef}
           type="text"
           name={name}
           placeholder={isLoading ? "Carregando..." : placeholder}
-          className={`w-full p-3 pl-3 pr-10 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none ${className} ${disabled ? 'opacity-60 cursor-not-allowed bg-gray-50' : ''}`}
+          className={`w-full p-3 pl-3 pr-10 border ${
+            error ? "border-red-500 bg-red-50" : "border-gray-200"
+          } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none ${className} ${
+            disabled ? "opacity-60 cursor-not-allowed bg-gray-50" : ""
+          }`}
           value={displayValue}
           readOnly={true}  // Make the main input read-only
           onFocus={handleFocus}
           onClick={handleFocus}
           disabled={disabled || isLoading}
+          data-error={error ? "true" : "false"} // Para fins de CSS e scroll automatizado
         />
         <div className="absolute inset-y-0 right-0 flex items-center pr-3">
           {isLoading ? (
@@ -701,6 +714,11 @@ const LocationInput: React.FC<LocationInputProps> = ({
           )}
         </div>
       </div>
+      
+      {/* Exibir mensagem de erro, se houver */}
+      {error && (
+        <p className="mt-1 text-sm text-red-500">{error}</p>
+      )}
       
       {/* Render dropdown using portal */}
       {renderDropdown()}
