@@ -241,11 +241,28 @@ const countryCodes: CountryCode[] = [
   { name: "Zimbábue", code: "ZW", dial_code: "+263" },
 ];
 
+// Definição dos padrões de tamanho de número de telefone por país
+const phonePatterns = {
+  // Para cada país, define os tamanhos esperados para números locais (sem o DDI)
+  // e também o formato de exibição
+  BR: { lengths: [10, 11], formats: [
+    { length: 10, format: (n: string) => `(${n.slice(0, 2)}) ${n.slice(2, 6)}-${n.slice(6)}` }, // Fixo
+    { length: 11, format: (n: string) => `(${n.slice(0, 2)}) ${n.slice(2, 7)}-${n.slice(7)}` } // Celular
+  ]},
+  US: { lengths: [10], formats: [
+    { length: 10, format: (n: string) => `(${n.slice(0, 3)}) ${n.slice(3, 6)}-${n.slice(6)}` }
+  ]},
+  GB: { lengths: [10], formats: [
+    { length: 10, format: (n: string) => `${n.slice(0, 4)} ${n.slice(4, 7)} ${n.slice(7)}` }
+  ]},
+  // Outros países podem ser adicionados seguindo o mesmo padrão
+};
+
 interface PhoneInputProps {
   value: string;
   onChange: (value: string) => void;
   ddi?: string; // Adicionar esta nova prop
-  onChangeWithCode?: (dialCode: string, phoneNumber: string) => void; // Novo callback
+  onChangeWithCode?: (dialCode: string, phoneNumber: string, countryCode: string) => void;
   name: string;
   placeholder?: string;
   className?: string;
@@ -285,7 +302,7 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef({ x: 0, y: 0 });
 
-  // Detectar o país a partir do código de discagem (mais eficaz)
+  // Função melhorada para detectar o país a partir do código de discagem
   const detectCountryFromNumber = (phoneNumber: string) => {
     if (!phoneNumber) return null;
 
@@ -293,9 +310,11 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
 
     // Verificar formato +XX XXXXX ou apenas +XX
     if (phoneNumber.startsWith("+")) {
-      const dialCodePart = phoneNumber.includes(" ")
-        ? phoneNumber.split(" ")[0]
-        : phoneNumber;
+      // Remover espaços e caracteres não numéricos do código DDI
+      const cleanedPhone = phoneNumber.replace(/\s+/g, " ").trim();
+      const dialCodePart = cleanedPhone.includes(" ")
+        ? cleanedPhone.split(" ")[0]
+        : cleanedPhone;
 
       console.log("Código DDI extraído:", dialCodePart);
 
@@ -307,7 +326,12 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
       }
 
       // Buscar por prefixo se não encontrou exato
-      for (const c of countryCodes) {
+      // Ordenar códigos DDI do mais longo para o mais curto para priorizar códigos mais específicos
+      const sortedCountryCodes = [...countryCodes].sort((a, b) => 
+        b.dial_code.length - a.dial_code.length
+      );
+      
+      for (const c of sortedCountryCodes) {
         if (dialCodePart.startsWith(c.dial_code)) {
           console.log("País encontrado por prefixo:", c.name);
           return c;
@@ -315,7 +339,23 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
       }
     }
 
-    // Se nada funcionou e temos o ddi como prop, usá-lo
+    // Verificar se o número começa com o código do país sem o +
+    // Por exemplo, se começa com "55" para Brasil
+    const numericPhone = phoneNumber.replace(/\D/g, '');
+    for (const pattern of countryCodes) {
+      const dialDigits = pattern.dial_code.replace(/\D/g, '');
+      if (numericPhone.startsWith(dialDigits)) {
+        // Verificar se o tamanho restante do número faz sentido para este país
+        const nationalPart = numericPhone.substring(dialDigits.length);
+        // Verificar alguns padrões de tamanho comuns
+        if ([8, 9, 10, 11].includes(nationalPart.length)) {
+          console.log("País encontrado pelo prefixo numérico:", pattern.name);
+          return pattern;
+        }
+      }
+    }
+
+    // Se temos o ddi como prop, usá-lo
     if (ddi) {
       const country = countryCodes.find((c) => c.dial_code === `+${ddi}`);
       if (country) {
@@ -355,7 +395,14 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
           const phoneNumber = parts.slice(1).join(" ");
           setInternalPhoneNumber(phoneNumber);
         } else {
-          setInternalPhoneNumber(value);
+          // Se não tem espaço, tenta extrair o número nacional
+          const dialDigits = detectedCountry.dial_code.replace(/\D/g, '');
+          const numericPhone = value.replace(/\D/g, '');
+          if (numericPhone.startsWith(dialDigits)) {
+            setInternalPhoneNumber(numericPhone.substring(dialDigits.length));
+          } else {
+            setInternalPhoneNumber(value);
+          }
         }
       } else {
         // Se não conseguiu detectar do número, verificar se temos ddi na prop
@@ -404,10 +451,19 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
           setSelectedCountry(detectedCountry);
 
           // Extrair o número sem o código do país
-          const parts = value.split(" ");
-          if (parts.length > 1) {
-            const phoneNumber = parts.slice(1).join(" ");
-            setInternalPhoneNumber(phoneNumber);
+          if (value.includes(" ")) {
+            const parts = value.split(" ");
+            if (parts.length > 1) {
+              const phoneNumber = parts.slice(1).join(" ");
+              setInternalPhoneNumber(phoneNumber);
+            }
+          } else {
+            // Se não tem espaço, tenta extrair o número nacional
+            const dialDigits = detectedCountry.dial_code.replace(/\D/g, '');
+            const numericPhone = value.replace(/\D/g, '');
+            if (numericPhone.startsWith(dialDigits)) {
+              setInternalPhoneNumber(numericPhone.substring(dialDigits.length));
+            }
           }
         }
       } else {
@@ -430,6 +486,20 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
     // Remover o + para obter apenas os dígitos
     const dialCode = country.dial_code.replace(/^\+/, '');
     
+    // Aplicar formatação específica baseada no país
+    let formattedNationalNumber = cleanPhone;
+    const countryCode = country.code;
+    
+    // Verificar se temos formatação específica para este país
+    if (countryCode in phonePatterns) {
+      const pattern = phonePatterns[countryCode as keyof typeof phonePatterns];
+      // Encontrar o formato apropriado para o tamanho do número
+      const format = pattern.formats.find(f => f.length === cleanPhone.length);
+      if (format) {
+        formattedNationalNumber = format.format(cleanPhone);
+      }
+    }
+    
     // Formatar incluindo o + no DDI
     const fullNumber = cleanPhone ? `+${dialCode} ${cleanPhone.trim()}` : "";
     
@@ -442,10 +512,11 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
     // Notificar o pai
     onChange(fullNumber);
     
-    // Também notificar com valores separados, se o callback estiver definido
-    if (onChangeWithCode && cleanPhone.trim()) {
-      onChangeWithCode(dialCode, cleanPhone.trim());
-    }
+    // Além de enviar o número formatado, envie também o código do país
+  if (onChangeWithCode && cleanPhone.trim()) {
+    // Enviar também o código do país, não apenas o DDI
+    onChangeWithCode(dialCode, cleanPhone.trim(), country.code);
+  }
     
     // Resetar a flag após um curto período
     setTimeout(() => {
@@ -689,6 +760,36 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
     );
   };
 
+  // Função aprimorada para formatação visual do número no input
+  const formatVisualPhoneNumber = (number: string, countryCode: string) => {
+    // Se não tiver número ou país, retornar como está
+    if (!number || !countryCode) return number;
+    
+    // Verificar se temos formatação específica para este país
+    if (countryCode in phonePatterns) {
+      const pattern = phonePatterns[countryCode as keyof typeof phonePatterns];
+      // Encontrar o formato apropriado para o tamanho do número
+      const format = pattern.formats.find(f => f.length === number.length);
+      if (format) {
+        return format.format(number);
+      }
+    }
+    
+    // Formatação padrão se não encontrar específica
+    if (number.length > 6) {
+      return `${number.slice(0, 3)} ${number.slice(3, 6)} ${number.slice(6)}`;
+    } else if (number.length > 3) {
+      return `${number.slice(0, 3)} ${number.slice(3)}`;
+    }
+    
+    return number;
+  };
+
+  // Versão visual formatada do número para exibição
+  const displayNumber = selectedCountry 
+    ? formatVisualPhoneNumber(internalPhoneNumber, selectedCountry.code) 
+    : internalPhoneNumber;
+
   return (
     <div className="w-full">
       {label && (
@@ -718,14 +819,12 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
           <ChevronDown className="ml-2 h-4 w-4 text-gray-400" />
         </button>
 
-        {/* Input para o número de telefone */}
+        {/* Input para o número de telefone - usando a versão formatada para exibição */}
         <input
           type="tel"
           inputMode="numeric"
-          pattern="[0-9]*"
-          maxLength={15}
           name={name}
-          value={internalPhoneNumber}
+          value={displayNumber}
           onChange={handlePhoneChange}
           placeholder={placeholder}
           className={`flex-1 p-3 border border-gray-200 rounded-r-lg text-sm ${className}`}

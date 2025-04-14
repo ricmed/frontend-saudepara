@@ -43,12 +43,91 @@ interface ColumnDefinition {
   sortable?: boolean;
 }
 
+// Adicione esta função ao seu componente
+const formatPhoneNumber = (phone: string | null | undefined) => {
+  if (!phone) return "";
+  
+  // Remove todos os caracteres não numéricos
+  const cleaned = phone.replace(/\D/g, '');
+  
+  // DDIs mais comuns
+  const ddiPatterns = [
+    { ddi: '55', country: 'BR', lengths: [10, 11] }, // Brasil
+    { ddi: '1', country: 'US', lengths: [10] },      // EUA/Canadá
+    { ddi: '351', country: 'PT', lengths: [9] },     // Portugal
+    { ddi: '34', country: 'ES', lengths: [9] },      // Espanha
+    { ddi: '44', country: 'GB', lengths: [10] },     // Reino Unido
+    { ddi: '49', country: 'DE', lengths: [10, 11] }, // Alemanha
+    { ddi: '33', country: 'FR', lengths: [9] },      // França
+    { ddi: '39', country: 'IT', lengths: [9, 10] },  // Itália
+    { ddi: '81', country: 'JP', lengths: [10] },     // Japão
+    { ddi: '86', country: 'CN', lengths: [11] },     // China
+    { ddi: '91', country: 'IN', lengths: [10] }      // Índia
+    // Você pode adicionar mais países conforme necessário
+  ];
+  
+  // Ordenamos do DDI mais longo para o mais curto para evitar detecções parciais erradas
+  ddiPatterns.sort((a, b) => b.ddi.length - a.ddi.length);
+  
+  // Tenta identificar o DDI
+  let foundPattern = null;
+  let nationalNumber = cleaned;
+  
+  for (const pattern of ddiPatterns) {
+    if (cleaned.startsWith(pattern.ddi)) {
+      const possibleNationalNumber = cleaned.substring(pattern.ddi.length);
+      if (pattern.lengths.includes(possibleNationalNumber.length)) {
+        foundPattern = pattern;
+        nationalNumber = possibleNationalNumber;
+        break;
+      }
+    }
+  }
+  
+  // Se encontrou um DDI válido
+  if (foundPattern) {
+    // Formatação específica para o Brasil
+    if (foundPattern.country === 'BR') {
+      if (nationalNumber.length === 11) { // Celular
+        return `+${foundPattern.ddi} (${nationalNumber.slice(0, 2)}) ${nationalNumber.slice(2, 7)}-${nationalNumber.slice(7)}`;
+      } else if (nationalNumber.length === 10) { // Fixo
+        return `+${foundPattern.ddi} (${nationalNumber.slice(0, 2)}) ${nationalNumber.slice(2, 6)}-${nationalNumber.slice(6)}`;
+      }
+    }
+    // EUA/Canadá
+    else if (foundPattern.country === 'US') {
+      return `+${foundPattern.ddi} (${nationalNumber.slice(0, 3)}) ${nationalNumber.slice(3, 6)}-${nationalNumber.slice(6)}`;
+    }
+    // Reino Unido
+    else if (foundPattern.country === 'GB') {
+      return `+${foundPattern.ddi} ${nationalNumber.slice(0, 4)} ${nationalNumber.slice(4)}`;
+    }
+    
+    // Formato genérico para outros países
+    return `+${foundPattern.ddi} ${nationalNumber}`;
+  }
+  
+  // Se não tiver DDI, assume formato brasileiro
+  if (cleaned.length === 11) { // Celular brasileiro com DDD
+    return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
+  } else if (cleaned.length === 10) { // Fixo brasileiro com DDD
+    return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`;
+  } else if (cleaned.length === 9 && cleaned.startsWith('9')) { // Celular sem DDD
+    return `${cleaned.slice(0, 5)}-${cleaned.slice(5)}`;
+  } else if (cleaned.length === 8) { // Fixo sem DDD
+    return `${cleaned.slice(0, 4)}-${cleaned.slice(4)}`;
+  }
+  
+  // Retorna como está se não encaixar em nenhum padrão
+  return phone;
+};
+
 // Colunas disponíveis para exibição
 const allColumns: ColumnDefinition[] = [
   { key: "nome", label: "Nome", sortable: true },
-  { key: "nome_mae", label: "Nome da Mãe", sortable: true },
-  { key: "data_nascimento", label: "Data Nascimento", sortable: true },
-  { key: "cpf", label: "CPF", sortable: true },
+  { key: "nome_mae", label: "Nome da Mãe", sortable: false },
+  { key: "data_nascimento", label: "Data Nascimento", sortable: false },
+  { key: "cpf", label: "CPF", sortable: false },
   { key: "tipo_genero", label: "Gênero", sortable: false },
   { key: "tipo_raca", label: "Raça/Cor", sortable: false },
   { key: "tipo_escolaridade", label: "Escolaridade", sortable: false },
@@ -69,6 +148,7 @@ const ListaPacientes = () => {
 
   // Estados principais
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
+  const [allPacientes, setAllPacientes] = useState<Paciente[]>([]);
   const [paginationMeta, setPaginationMeta] = useState<PaginationMeta>({
     total: 0,
     pages: 1,
@@ -87,20 +167,21 @@ const ListaPacientes = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [tempPage, setTempPage] = useState("1");
+  const [isUsingLocalSort, setIsUsingLocalSort] = useState(false);
 
   // Ordenação
   const [sortKey, setSortKey] = useState<keyof Paciente>("nome");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
-  const [isSortingMenuOpen, setIsSortingMenuOpen] = useState(false);
+  // Removendo o menu de ordenação
+  const [isColumnsMenuOpen, setIsColumnsMenuOpen] = useState(false);
 
-  // Controle de colunas
+  // Controle de colunas - removendo CPF e adicionando nome_mae
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
     "nome",
+    "nome_mae",
     "data_nascimento",
-    "cpf",
     "contato",
   ]);
-  const [isColumnsMenuOpen, setIsColumnsMenuOpen] = useState(false);
 
   // Controle de exportação
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
@@ -114,7 +195,6 @@ const ListaPacientes = () => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsColumnsMenuOpen(false);
-        setIsSortingMenuOpen(false);
         setIsExportMenuOpen(false);
       }
     }
@@ -125,18 +205,62 @@ const ListaPacientes = () => {
     };
   }, []);
 
+  // Função para buscar todos os dados
+  const fetchAllData = async (): Promise<Paciente[]> => {
+    try {
+      setError(null);
+      
+      let allPacientes: Paciente[] = [];
+      let page = 1;
+      let hasMore = true;
+      const LARGE_PAGE_SIZE = 500; // Usar um tamanho de página grande para reduzir o número de requisições
+  
+      // Buscar todas as páginas
+      while (hasMore) {
+        const response = await PacienteService.getAll(page, LARGE_PAGE_SIZE);
+  
+        if (response && response.data && response.data.length > 0) {
+          allPacientes = [...allPacientes, ...response.data];
+  
+          if (page >= response.pagination.pages || response.data.length < LARGE_PAGE_SIZE) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+  
+      return allPacientes;
+    } catch (error) {
+      console.error("Erro ao buscar todos os dados:", error);
+      setError("Erro ao buscar todos os pacientes para ordenação.");
+      return [];
+    }
+  };
+
   // Carregar dados
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-
-        // Buscar dados com base nos parâmetros atuais
+  
+        // Se estamos usando ordenação local e temos todos os dados
+        if (isUsingLocalSort && allPacientes.length > 0) {
+          // Aplicar paginação manualmente
+          const startIndex = (currentPage - 1) * itemsPerPage;
+          const endIndex = startIndex + itemsPerPage;
+          setPacientes(allPacientes.slice(startIndex, endIndex));
+          
+          // Já temos a paginação calculada, então não precisamos fazer mais nada
+          setIsLoading(false);
+          return;
+        }
+  
+        // Caso contrário, usar a API normal com paginação do backend
         let response;
-        if (
-          debouncedSearchParams.term &&
-          debouncedSearchParams.term.length >= 3
-        ) {
+        if (debouncedSearchParams.term && debouncedSearchParams.term.length >= 3) {
           response = await PacienteService.search(
             debouncedSearchParams.term,
             currentPage,
@@ -145,22 +269,29 @@ const ListaPacientes = () => {
         } else {
           response = await PacienteService.getAll(currentPage, itemsPerPage);
         }
-
+  
         if (response && response.data) {
           // Verificar se estamos em uma página válida
-          if (
-            response.pagination.pages > 0 &&
-            currentPage > response.pagination.pages
-          ) {
-            // Se a página atual for maior que o total de páginas, volte para a página 1
+          if (response.pagination.pages > 0 && currentPage > response.pagination.pages) {
             setCurrentPage(1);
             setTempPage("1");
             setIsLoading(false);
             return;
           }
-
-          // Atualizar os dados
-          setPacientes(response.data);
+  
+          // Ordenar os dados da página atual
+          const sortedData = [...response.data].sort((a, b) => {
+            const valueA = (a.nome || '').toLowerCase();
+            const valueB = (b.nome || '').toLowerCase();
+            
+            if (sortOrder === "asc") {
+              return valueA.localeCompare(valueB, 'pt-BR');
+            } else {
+              return valueB.localeCompare(valueA, 'pt-BR');
+            }
+          });
+  
+          setPacientes(sortedData);
           setPaginationMeta({
             total: response.pagination.total,
             pages: response.pagination.pages,
@@ -176,52 +307,37 @@ const ListaPacientes = () => {
         setIsLoading(false);
       }
     };
-
+  
     fetchData();
-  }, [currentPage, itemsPerPage, debouncedSearchParams]);
+  }, [currentPage, itemsPerPage, debouncedSearchParams, isUsingLocalSort]);
 
-  // Função para buscar todos os dados para exportação
-  const fetchAllData = async () => {
-    try {
-      setIsLoading(true);
-
-      let allPacientes: Paciente[] = [];
-      let page = 1;
-      let hasMore = true;
-
-      // Buscar todas as páginas
-      while (hasMore) {
-        const response =
-          debouncedSearchParams.term && debouncedSearchParams.term.length >= 3
-            ? await PacienteService.search(
-                debouncedSearchParams.term,
-                page,
-                100
-              )
-            : await PacienteService.getAll(page, 100);
-
-        if (response && response.data && response.data.length > 0) {
-          allPacientes = [...allPacientes, ...response.data];
-
-          if (page >= response.pagination.pages) {
-            hasMore = false;
-          } else {
-            page++;
-          }
-        } else {
-          hasMore = false;
-        }
+  // Atualizar paginação quando mudar a página ou itens por página
+  useEffect(() => {
+    if (allPacientes.length > 0) {
+      // Verificar se a página atual é válida
+      const totalPages = Math.ceil(allPacientes.length / itemsPerPage);
+      
+      let newPage = currentPage;
+      if (totalPages > 0 && currentPage > totalPages) {
+        newPage = 1;
+        setCurrentPage(1);
+        setTempPage("1");
       }
-
-      return allPacientes;
-    } catch (error) {
-      console.error("Erro ao buscar todos os dados:", error);
-      setError("Erro ao exportar dados. Tente novamente.");
-      return null;
-    } finally {
-      setIsLoading(false);
+      
+      // Aplicar paginação
+      const startIndex = (newPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      setPacientes(allPacientes.slice(startIndex, endIndex));
+      
+      // Atualizar metadados de paginação
+      setPaginationMeta({
+        total: allPacientes.length,
+        pages: totalPages,
+        currentPage: newPage,
+        perPage: itemsPerPage,
+      });
     }
-  };
+  }, [currentPage, itemsPerPage, allPacientes]);
 
   // Funções de manipulação de dados
   const handleDelete = async (id: number) => {
@@ -260,24 +376,117 @@ const ListaPacientes = () => {
   const handlePageChange = (newPage: number) => {
     // Garantir que a página nunca seja maior que o total de páginas
     const safeNewPage = Math.min(newPage, paginationMeta.pages);
-
+  
     if (safeNewPage >= 1 && safeNewPage <= paginationMeta.pages) {
-      setCurrentPage(safeNewPage);
-      setTempPage(safeNewPage.toString());
+      // Se estiver usando ordenação local e tivermos todos os dados
+      if (isUsingLocalSort && allPacientes.length > 0) {
+        setCurrentPage(safeNewPage);
+        setTempPage(safeNewPage.toString());
+        
+        // Aplicar paginação manualmente
+        const startIndex = (safeNewPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        setPacientes(allPacientes.slice(startIndex, endIndex));
+      } 
+      // Caso contrário, apenas atualiza a página e deixa o useEffect cuidar do resto
+      else {
+        setCurrentPage(safeNewPage);
+        setTempPage(safeNewPage.toString());
+      }
     }
   };
 
-  // Ordenação
-  const handleSortChange = (key: keyof Paciente) => {
-    if (sortKey === key) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortKey(key);
-      setSortOrder("asc");
+  // Função para ordenar os pacientes
+  const handleSortChange = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Alternar a ordem de classificação
+      const newSortOrder = sortOrder === "asc" ? "desc" : "asc";
+      setSortOrder(newSortOrder);
+      
+      // Se ainda não estamos usando ordenação local, carregue todos os pacientes automaticamente
+      if (!isUsingLocalSort && allPacientes.length === 0) {
+        // Buscar todos os pacientes sem pedir confirmação
+        const fetchedPacientes = await fetchAllData();
+        
+        if (fetchedPacientes.length > 0) {
+          // Ordenar todos os pacientes
+          const sortedData = [...fetchedPacientes].sort((a, b) => {
+            const valueA = (a.nome || '').toLowerCase();
+            const valueB = (b.nome || '').toLowerCase();
+            
+            if (newSortOrder === "asc") {
+              return valueA.localeCompare(valueB, 'pt-BR');
+            } else {
+              return valueB.localeCompare(valueA, 'pt-BR');
+            }
+          });
+          
+          // Atualizar o estado com todos os pacientes ordenados
+          setAllPacientes(sortedData);
+          
+          // Aplicar paginação manualmente
+          const startIndex = (currentPage - 1) * itemsPerPage;
+          const endIndex = startIndex + itemsPerPage;
+          setPacientes(sortedData.slice(startIndex, endIndex));
+          
+          // Atualizar metadados de paginação
+          setPaginationMeta({
+            total: sortedData.length,
+            pages: Math.ceil(sortedData.length / itemsPerPage),
+            currentPage: currentPage,
+            perPage: itemsPerPage,
+          });
+          
+          // Ativar modo de ordenação local
+          setIsUsingLocalSort(true);
+        }
+      } 
+      // Se já temos todos os pacientes e estamos no modo de ordenação local
+      else if (isUsingLocalSort && allPacientes.length > 0) {
+        // Ordenar todos os pacientes
+        const sortedData = [...allPacientes].sort((a, b) => {
+          const valueA = (a.nome || '').toLowerCase();
+          const valueB = (b.nome || '').toLowerCase();
+          
+          if (newSortOrder === "asc") {
+            return valueA.localeCompare(valueB, 'pt-BR');
+          } else {
+            return valueB.localeCompare(valueA, 'pt-BR');
+          }
+        });
+        
+        // Atualizar o estado com todos os pacientes ordenados
+        setAllPacientes(sortedData);
+        
+        // Aplicar paginação manualmente
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        setPacientes(sortedData.slice(startIndex, endIndex));
+      }
+      // Ordenação apenas da página atual (fallback)
+      else {
+        const sortedPageData = [...pacientes].sort((a, b) => {
+          const valueA = (a.nome || '').toLowerCase();
+          const valueB = (b.nome || '').toLowerCase();
+          
+          if (newSortOrder === "asc") {
+            return valueA.localeCompare(valueB, 'pt-BR');
+          } else {
+            return valueB.localeCompare(valueA, 'pt-BR');
+          }
+        });
+        
+        setPacientes(sortedPageData);
+      }
+    } catch (error) {
+      console.error("Erro ao ordenar pacientes:", error);
+      setError("Erro ao ordenar pacientes. Tente novamente.");
+    } finally {
+      setIsLoading(false);
     }
-    setIsSortingMenuOpen(false);
   };
-
   // Colunas
   const handleToggleColumn = (colKey: string) => {
     if (selectedColumns.includes(colKey)) {
@@ -288,26 +497,41 @@ const ListaPacientes = () => {
   };
 
   // Funções de exportação
-  const handleExportCSV = async (type: "page" | "all") => {
+  const handleExportCSV = (type: "page" | "all") => {
     try {
-      const dataToExport = type === "page" ? pacientes : await fetchAllData();
-      if (!dataToExport) return;
+      const dataToExport = type === "page" ? pacientes : allPacientes;
+      if (!dataToExport.length) return;
 
-      // Formatar os dados para CSV
-      const formattedData = dataToExport.map((paciente) => ({
-        nome: paciente.nome,
-        nome_mae: paciente.nome_mae || "",
-        data_nascimento: formatDate(paciente.data_nascimento),
-        cpf: formatCPF(paciente.cpf),
-        genero: paciente.tipo_genero?.descricao || "",
-        raca: paciente.tipo_raca?.descricao || "",
-        escolaridade: paciente.tipo_escolaridade?.descricao || "",
-        contato: paciente.contato || "",
-      }));
+      // Formatar os dados para CSV usando todas as colunas selecionadas
+      const formattedData = dataToExport.map((paciente) => {
+        const data: any = {};
+        
+        allColumns.forEach(col => {
+          if (selectedColumns.includes(col.key)) {
+            if (col.key === "data_nascimento") {
+              data[col.label] = formatDate(paciente.data_nascimento);
+            } else if (col.key === "cpf") {
+              data[col.label] = formatCPF(paciente.cpf);
+            } else if (col.key === "tipo_genero") {
+              data[col.label] = paciente.tipo_genero?.descricao || "";
+            } else if (col.key === "tipo_raca") {
+              data[col.label] = paciente.tipo_raca?.descricao || "";
+            } else if (col.key === "tipo_escolaridade") {
+              data[col.label] = paciente.tipo_escolaridade?.descricao || "";
+            } else if (col.key === "contato") {
+              data[col.label] = `${paciente.idpaciente} - ${formatPhoneNumber(paciente.contato)}`;
+            } else {
+              data[col.label] = paciente[col.key as keyof Paciente] || "";
+            }
+          }
+        });
+        
+        return data;
+      });
 
       if (type === "page" && csvLinkRef) {
         csvLinkRef.link.click();
-      } else if (csvLinkAllRef.current) {
+      } else if (type === "all" && csvLinkAllRef.current) {
         csvLinkAllRef.current.data = formattedData;
         csvLinkAllRef.current.link.click();
       }
@@ -318,22 +542,37 @@ const ListaPacientes = () => {
   };
 
   // Função de exportação Excel
-  const handleExportExcel = async (type: "page" | "all") => {
+  const handleExportExcel = (type: "page" | "all") => {
     try {
-      const dataToExport = type === "page" ? pacientes : await fetchAllData();
-      if (!dataToExport) return;
+      const dataToExport = type === "page" ? pacientes : allPacientes;
+      if (!dataToExport.length) return;
 
-      // Formatar os dados para Excel
-      const formattedData = dataToExport.map((paciente) => ({
-        Nome: paciente.nome,
-        "Nome da Mãe": paciente.nome_mae || "",
-        "Data de Nascimento": formatDate(paciente.data_nascimento),
-        CPF: formatCPF(paciente.cpf),
-        Gênero: paciente.tipo_genero?.descricao || "",
-        "Raça/Cor": paciente.tipo_raca?.descricao || "",
-        Escolaridade: paciente.tipo_escolaridade?.descricao || "",
-        Contato: paciente.contato || "",
-      }));
+      // Formatar os dados para Excel usando todas as colunas selecionadas
+      const formattedData = dataToExport.map((paciente) => {
+        const data: any = {};
+        
+        allColumns.forEach(col => {
+          if (selectedColumns.includes(col.key)) {
+            if (col.key === "data_nascimento") {
+              data[col.label] = formatDate(paciente.data_nascimento);
+            } else if (col.key === "cpf") {
+              data[col.label] = formatCPF(paciente.cpf);
+            } else if (col.key === "tipo_genero") {
+              data[col.label] = paciente.tipo_genero?.descricao || "";
+            } else if (col.key === "tipo_raca") {
+              data[col.label] = paciente.tipo_raca?.descricao || "";
+            } else if (col.key === "tipo_escolaridade") {
+              data[col.label] = paciente.tipo_escolaridade?.descricao || "";
+            } else if (col.key === "contato") {
+              data[col.label] = `${paciente.idpaciente} - ${formatPhoneNumber(paciente.contato)}`;
+            } else {
+              data[col.label] = paciente[col.key as keyof Paciente] || "";
+            }
+          }
+        });
+        
+        return data;
+      });
 
       const worksheet = XLSX.utils.json_to_sheet(formattedData);
       const workbook = XLSX.utils.book_new();
@@ -349,10 +588,10 @@ const ListaPacientes = () => {
   };
 
   // Função de exportação PDF
-  const handleExportPDF = async (type: "page" | "all") => {
+  const handleExportPDF = (type: "page" | "all") => {
     try {
-      const dataToExport = type === "page" ? pacientes : await fetchAllData();
-      if (!dataToExport) return;
+      const dataToExport = type === "page" ? pacientes : allPacientes;
+      if (!dataToExport.length) return;
 
       const doc = new jsPDF();
       doc.setFontSize(16);
@@ -365,6 +604,7 @@ const ListaPacientes = () => {
         29
       );
 
+      // Usar todas as colunas disponíveis para PDF
       const tableColumn = allColumns
         .filter((col) => selectedColumns.includes(col.key))
         .map((col) => col.label);
@@ -393,6 +633,10 @@ const ListaPacientes = () => {
 
             if (key === "tipo_escolaridade") {
               return paciente.tipo_escolaridade?.descricao || "";
+            }
+            
+            if (key === "contato") {
+              return `${paciente.idpaciente} - ${formatPhoneNumber(paciente.contato)}`;
             }
 
             const value = paciente[key];
@@ -589,7 +833,6 @@ const ListaPacientes = () => {
                 <button
                   onClick={() => {
                     setIsColumnsMenuOpen(!isColumnsMenuOpen);
-                    setIsSortingMenuOpen(false);
                     setIsExportMenuOpen(false);
                   }}
                   className="px-4 py-2 bg-white text-blue-600 rounded-md hover:bg-gray-100 transition-colors flex items-center gap-2"
@@ -605,48 +848,13 @@ const ListaPacientes = () => {
                 <ColumnsMenu isOpen={isColumnsMenuOpen} />
               </div>
 
-              {/* Botão Ordenação */}
-              <div className="relative">
-                <button
-                  onClick={() => {
-                    setIsSortingMenuOpen(!isSortingMenuOpen);
-                    setIsColumnsMenuOpen(false);
-                    setIsExportMenuOpen(false);
-                  }}
-                  className="px-4 py-2 bg-white text-blue-600 rounded-md hover:bg-gray-100 transition-colors flex items-center gap-2"
-                >
-                  Ordenação
-                  {isSortingMenuOpen ? (
-                    <ChevronUp className="w-4 h-4" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4" />
-                  )}
-                </button>
-                {isSortingMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 p-2">
-                    {allColumns
-                      .filter((col) => col.sortable !== false)
-                      .map((col) => (
-                        <button
-                          key={col.key}
-                          onClick={() =>
-                            handleSortChange(col.key as keyof Paciente)
-                          }
-                          className="block w-full text-left text-sm text-gray-700 hover:bg-gray-50 px-2 py-1 rounded"
-                        >
-                          {col.label}
-                        </button>
-                      ))}
-                  </div>
-                )}
-              </div>
+              {/* Removido o botão de Ordenação */}
 
               {/* Botão Exportar */}
               <div className="relative">
                 <button
                   onClick={() => {
                     setIsExportMenuOpen(!isExportMenuOpen);
-                    setIsSortingMenuOpen(false);
                     setIsColumnsMenuOpen(false);
                   }}
                   className="px-4 py-2 bg-white text-blue-600 rounded-md hover:bg-gray-100 transition-colors flex items-center gap-2"
@@ -669,7 +877,7 @@ const ListaPacientes = () => {
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder="Buscar paciente..."
+                      placeholder="Buscar por nome, CPF ou nome da mãe..."
                       value={searchParams.term}
                       onChange={(e) => {
                         setSearchParams({
@@ -686,6 +894,11 @@ const ListaPacientes = () => {
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <Search className="h-4 w-4 text-gray-400" />
                     </div>
+                    {searchParams.term && searchParams.term.length < 3 && (
+                      <div className="absolute -bottom-6 left-0 text-xs text-yellow-600">
+                        Digite pelo menos 3 caracteres para buscar
+                      </div>
+                    )}
                   </div>
                   <button
                     onClick={() => setIsBuscaModalOpen(true)}
@@ -744,21 +957,18 @@ const ListaPacientes = () => {
                         >
                           <div className="flex items-center">
                             {col.label}
-                            {col.sortable !== false && (
+                            {/* Mantém a ordenação apenas para a coluna Nome */}
+                            {col.key === "nome" && (
                               <button
-                                onClick={() =>
-                                  handleSortChange(col.key as keyof Paciente)
-                                }
+                                onClick={handleSortChange}
                                 className="ml-1 focus:outline-none text-white"
+                                aria-label={sortOrder === "asc" ? "Ordenar decrescente" : "Ordenar crescente"}
+                                title={sortOrder === "asc" ? "Ordenar decrescente" : "Ordenar crescente"}
                               >
-                                {sortKey === col.key ? (
-                                  sortOrder === "asc" ? (
-                                    <span>▲</span>
-                                  ) : (
-                                    <span>▼</span>
-                                  )
+                                {sortOrder === "asc" ? (
+                                  <span>▲</span>
                                 ) : (
-                                  <span className="text-blue-200">▼</span>
+                                  <span>▼</span>
                                 )}
                               </button>
                             )}
@@ -883,16 +1093,11 @@ const ListaPacientes = () => {
 
                             if (key === "contato") {
                               return (
-                                <td
-                                  key={key}
-                                  className="px-6 py-4 whitespace-nowrap"
-                                >
+                                <td key={key} className="px-6 py-4 whitespace-nowrap">
                                   {paciente.contato ? (
-                                    <div className="flex items-center">
-                                      <span>{paciente.contato}</span>
-                                    </div>
+                                    <span className="font-medium">{formatPhoneNumber(paciente.contato)}</span>
                                   ) : (
-                                    <span className="text-gray-400">-</span>
+                                    <span className="text-gray-400">Sem contato</span>
                                   )}
                                 </td>
                               );
@@ -1066,16 +1271,31 @@ const ListaPacientes = () => {
 
       {/* Links invisíveis para exportação CSV */}
       <CSVLink
-        data={pacientes.map((paciente) => ({
-          nome: paciente.nome,
-          nome_mae: paciente.nome_mae || "",
-          data_nascimento: formatDate(paciente.data_nascimento),
-          cpf: formatCPF(paciente.cpf),
-          genero: paciente.tipo_genero?.descricao || "",
-          raca: paciente.tipo_raca?.descricao || "",
-          escolaridade: paciente.tipo_escolaridade?.descricao || "",
-          contato: paciente.contato || "",
-        }))}
+        data={pacientes.map((paciente) => {
+          const data: any = {};
+        
+          allColumns.forEach(col => {
+            if (selectedColumns.includes(col.key)) {
+              if (col.key === "data_nascimento") {
+                data[col.label] = formatDate(paciente.data_nascimento);
+              } else if (col.key === "cpf") {
+                data[col.label] = formatCPF(paciente.cpf);
+              } else if (col.key === "tipo_genero") {
+                data[col.label] = paciente.tipo_genero?.descricao || "";
+              } else if (col.key === "tipo_raca") {
+                data[col.label] = paciente.tipo_raca?.descricao || "";
+              } else if (col.key === "tipo_escolaridade") {
+                data[col.label] = paciente.tipo_escolaridade?.descricao || "";
+              } else if (col.key === "contato") {
+                data[col.label] = `${paciente.idpaciente} - ${formatPhoneNumber(paciente.contato)}`;
+              } else {
+                data[col.label] = paciente[col.key as keyof Paciente] || "";
+              }
+            }
+          });
+          
+          return data;
+        })}
         filename="pacientes_pagina_atual.csv"
         style={{ display: "none" }}
         ref={(ref: any) => setCsvLinkRef(ref)}
