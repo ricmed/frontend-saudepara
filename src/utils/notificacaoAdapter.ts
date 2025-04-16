@@ -37,14 +37,15 @@ const formatarDataUniversal = (dateString: string): string => {
 // Função para processar datas com ajuste de fuso horário
 const processarData = (dateString: string | null | undefined): string => {
   if (!dateString) return "";
-  return convertUTCDateToLocal(dateString).toISOString().split("T")[0];
+  // Pega apenas a parte da data, ignorando o fuso horário
+  return dateString.split("T")[0];
 };
 
 // Função para converter datas locais para UTC
 const processarDataParaUTC = (dateString: string | null | undefined): string => {
   if (!dateString) return "";
-  const date = new Date(dateString);
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+  // Mantém apenas a parte da data, sem conversão
+  return dateString;
 };
 
 /**
