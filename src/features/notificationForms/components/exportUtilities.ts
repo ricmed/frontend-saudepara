@@ -60,14 +60,34 @@ const getLabelFromOptions = (value: string | undefined, options: any[], idField:
     : (value || "");
 };
 
-// Função para formatar datas
-const formatDate = (dateString?: string): string => {
+// Função universal de formatação de datas
+export const formatarDataUniversal = (dateString?: string | null): string => {
   if (!dateString) return "";
+  
+  // Logs para verificar o que está acontecendo
+  console.log(`Data original: ${dateString}`);
+  
   try {
     const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR');
+    console.log(`Data após criação do objeto Date: ${date.toISOString()}`);
+    
+    const offset = date.getTimezoneOffset() * 60000;
+    console.log(`Offset em milissegundos: ${offset}`);
+    
+    const adjustedDate = new Date(date.getTime() + offset);
+    console.log(`Data após ajuste: ${adjustedDate.toISOString()}`);
+    
+    const result = adjustedDate.toLocaleDateString("pt-BR", {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+    
+    console.log(`Resultado final formatado: ${result}`);
+    return result;
   } catch (error) {
-    return dateString;
+    console.error('Erro ao formatar data:', error);
+    return "Data inválida";
   }
 };
 
@@ -468,7 +488,7 @@ const prepareDataForExport = (formData: FormData, exportOptions?: ExportOptions)
     // Seção 3: Identificação do indivíduo
     "Nome do Paciente": formData.paciente,
     "Nome da Mãe": formData.nomeMae,
-    "Data de Nascimento": formatDate(formData.dataNascimento),
+    "Data de Nascimento": formatarDataUniversal(formData.dataNascimento),
     "Idade": getAge(),
     "CPF": formData.cpf,
     "Identidade de Gênero": getIdentidadeGeneroLabel(formData.identidadeGenero),
@@ -481,24 +501,24 @@ const prepareDataForExport = (formData: FormData, exportOptions?: ExportOptions)
     // Seção 4: Informações do atendimento
     "Tipo de Atendimento": getTipoAtendimentoLabel(formData.tipoAtendimento),
     "Sinais e Sintomas": Array.isArray(formData.sinaisESintomas) ? getSintomasLabels(formData.sinaisESintomas) : "",
-    "Data de Início dos Sintomas": formatDate(formData.dataInicioSintomas),
+    "Data de Início dos Sintomas": formatarDataUniversal(formData.dataInicioSintomas),
     "Observação dos Sintomas": formData.observacaoSintomas,
     "Hipótese Diagnóstica": Array.isArray(formData.hipoteseDiagnostica) ? getHipoteseDiagLabels(formData.hipoteseDiagnostica) : "",
     "Observação da Hipótese": formData.observacaoHipotese,
     "Tipo de Trauma": Array.isArray(formData.tipoTrauma) ? getTraumaLabels(formData.tipoTrauma) : "",
-    "Data da Ocorrência": formatDate(formData.dataOcorrencia),
+    "Data da Ocorrência": formatarDataUniversal(formData.dataOcorrencia),
     "Observação do Trauma": formData.observacaoTrauma,
     "Relacionado a Surto": formData.relacionadoSurto === "1" ? "Sim" : formData.relacionadoSurto === "2" ? "Não" : "",
     "Observação do Incidente": formData.observacaoIncidente,
 
     // Seção 5: Informações da unidade notificadora
-    "Data do Atendimento": formatDate(formData.dataAtendimento),
+    "Data do Atendimento": formatarDataUniversal(formData.dataAtendimento),
     "Unidade Notificadora": getUnidadeNotificadoraText(),
     "Nome do Notificador": formData.nomeNotificador,
     "Contato do Notificador": formData.contatoNotificador,
 
     // Seção 6: Encerramento do Caso
-    "Data de Encerramento": formatDate(formData.dataEncerramento),
+    "Data de Encerramento": formatarDataUniversal(formData.dataEncerramento),
     "Tipo de Encerramento": getTipoEncerramentoLabel(formData.tipoEncerramento),
     "Local de Encaminhamento": getLocalEncaminhamentoText()
   };
@@ -1130,7 +1150,7 @@ const formatNotificacaoForExport = (
     // Identificação do indivíduo
     "Nome do Paciente": paciente.nome || "",
     "Nome da Mãe": paciente.nome_mae || "",
-    "Data de Nascimento": formatDate(paciente.data_nascimento),
+    "Data de Nascimento": formatarDataUniversal(paciente.data_nascimento),
     "Idade": getAge(), // Usando a função aprimorada
     "CPF": paciente.cpf || "",
     "Identidade de Gênero": getLabelFromOptions(
@@ -1159,24 +1179,24 @@ const formatNotificacaoForExport = (
       'idtipo_atendimento'
     ),
     "Sinais e Sintomas": getSintomasText(),
-    "Data de Início dos Sintomas": formatDate(original.data_inicio_sintomas),
+    "Data de Início dos Sintomas": formatarDataUniversal(original.data_inicio_sintomas),
     "Observação dos Sintomas": original.observacao_sintomas || "",
     "Hipótese Diagnóstica": getHipoteseText(),
     "Observação da Hipótese": original.observacao_hiposete || original.observacao_hipotese || "",
     "Tipo de Trauma": getTraumaText(),
-    "Data da Ocorrência": formatDate(original.data_ocorrencia),
+    "Data da Ocorrência": formatarDataUniversal(original.data_ocorrencia),
     "Observação do Trauma": original.observacao_trauma || "",
     "Relacionado a Surto": getSurtoText(),
     "Observação do Incidente": original.observavao_incidente || original.observacao_incidente || "",
 
     // Informações da unidade notificadora
-    "Data do Atendimento": formatDate(original.data_atendimento),
+    "Data do Atendimento": formatarDataUniversal(original.data_atendimento),
     "Unidade Notificadora": getUnidadeNotificadoraText(), // Usando a função aprimorada
     "Nome do Notificador": original.nome_notificador || "",
     "Contato do Notificador": original.contato_notificador || "",
 
     // Encerramento do Caso
-    "Data de Encerramento": formatDate(original.data_encerramento),
+    "Data de Encerramento": formatarDataUniversal(original.data_encerramento),
     "Tipo de Encerramento": getLabelFromOptions(
       original.tipo_encerramento_idtipo_encerramento?.toString(), 
       options?.encerramentoOptions || [],
@@ -1251,19 +1271,23 @@ export const exportListToExcel = (
     
     worksheet['!cols'] = columnsWidth;
     
-    // Aplicar formatação de células para datas
-    for (let i = 0; i < formattedData.length; i++) {
-      const row = i + 1; // linha 0 é o cabeçalho
-      
-      Object.keys(formattedData[0]).forEach((key, colIndex) => {
-        const col = XLSX.utils.encode_col(colIndex);
-        const cell = worksheet[`${col}${row}`];
-        
-        if (cell && key.includes('Data')) {
-          (cell as any).z = 'dd/mm/yyyy';
-        }
-      });
+    // Ajustar formato de datas
+    const dateFields = ['Data de Nascimento', 'Data de Início dos Sintomas', 'Data da Ocorrência', 'Data do Atendimento', 'Data de Encerramento'];
+const header = Object.keys(formattedData[0] || {});
+for (let rowIdx = 1; rowIdx <= formattedData.length; rowIdx++) {
+  for (let colIdx = 0; colIdx < header.length; colIdx++) {
+    const field = header[colIdx];
+    if (dateFields.includes(field)) {
+      const cellRef = XLSX.utils.encode_cell({ r: rowIdx, c: colIdx });
+      const cell = worksheet[cellRef];
+      if (cell && cell.v) {
+        // Aplicar formato de data diretamente sem criar objetos Date
+        cell.t = 's'; // Manter como string
+        cell.z = 'dd/mm/yyyy'; // Formato visual
+      }
     }
+  }
+}
     
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Notificações");

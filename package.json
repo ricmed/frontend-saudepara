@@ -18,6 +18,7 @@
     "@types/react-csv": "^1.1.10",
     "@types/uuid": "^10.0.0",
     "axios": "^1.6.2",
+    "dayjs": "^1.11.13",
     "docx": "^9.3.0",
     "dotenv": "^16.4.7",
     "file-saver": "^2.0.5",

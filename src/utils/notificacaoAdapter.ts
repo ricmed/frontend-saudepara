@@ -10,6 +10,43 @@ import indexedDBService from '@/services/indexedDB';
 import syncService from '@/services/syncService';
 import { toast } from 'react-toastify';
 
+// Função auxiliar para conversão de datas UTC para local
+const convertUTCDateToLocal = (dateString: string): Date => {
+  const date = new Date(dateString);
+  return new Date(date.getTime() + date.getTimezoneOffset() * 60000);
+};
+
+// Função auxiliar para formatação universal de datas
+const formatarDataUniversal = (dateString: string): string => {
+  try {
+    const date = convertUTCDateToLocal(dateString);
+    const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
+    return date.toLocaleDateString("pt-BR", {
+      timeZone: userTimeZone,
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  } catch (error) {
+    console.error('Erro ao formatar data:', error);
+    return "Data inválida";
+  }
+};
+
+// Função para processar datas com ajuste de fuso horário
+const processarData = (dateString: string | null | undefined): string => {
+  if (!dateString) return "";
+  return convertUTCDateToLocal(dateString).toISOString().split("T")[0];
+};
+
+// Função para converter datas locais para UTC
+const processarDataParaUTC = (dateString: string | null | undefined): string => {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+};
+
 /**
  * Formata dados do backend para o formato esperado pelo frontend (FormData)
  * @param backendData Dados recebidos da API
@@ -46,14 +83,18 @@ export const formatFromBackend = async (
   // Calcular idade a partir da data de nascimento se disponível
   let idade = backendData.paciente?.idade?.toString() || "";
   if (!idade && backendData.paciente?.data_nascimento) {
-    const birthDate = new Date(backendData.paciente.data_nascimento);
+    const birthDate = convertUTCDateToLocal(backendData.paciente.data_nascimento);
     const today = new Date();
-    idade = String(today.getFullYear() - birthDate.getFullYear());
+    const todayUTC = new Date(
+      Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
+    );
     
-    // Ajustar se o aniversário ainda não ocorreu este ano
+    idade = String(todayUTC.getFullYear() - birthDate.getUTCFullYear());
+    
     if (
-      today.getMonth() < birthDate.getMonth() ||
-      (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate())
+      todayUTC.getMonth() < birthDate.getUTCMonth() ||
+      (todayUTC.getMonth() === birthDate.getUTCMonth() && 
+       todayUTC.getDate() < birthDate.getUTCDate())
     ) {
       idade = String(parseInt(idade) - 1);
     }
@@ -119,11 +160,7 @@ if (backendData.contato_notificador) {
     paciente: backendData.paciente?.nome || "",
     pacienteId: backendData.paciente_idpaciente || undefined,
     nomeMae: backendData.paciente?.nome_mae || "",
-    dataNascimento: backendData.paciente?.data_nascimento
-      ? new Date(backendData.paciente.data_nascimento)
-          .toISOString()
-          .split("T")[0]
-      : "",
+    dataNascimento: processarData(backendData.paciente?.data_nascimento),
     idade,
     cpf: backendData.paciente?.cpf || "",
     identidadeGenero:
@@ -141,9 +178,7 @@ if (backendData.contato_notificador) {
     tipoAtendimento:
       backendData.tipo_atendimento_idtipo_atendimento?.toString() || "",
     sinaisESintomas,
-    dataInicioSintomas: backendData.data_inicio_sintomas
-      ? new Date(backendData.data_inicio_sintomas).toISOString().split("T")[0]
-      : "",
+    dataInicioSintomas: processarData(backendData.data_inicio_sintomas),
     observacaoSintomas: backendData.observacao_sintomas || "",
     hipoteseDiagnostica: backendData.tipo_hipotese_diag_idtipo_hipotese_diag
       ? [backendData.tipo_hipotese_diag_idtipo_hipotese_diag.toString()]
@@ -152,26 +187,20 @@ if (backendData.contato_notificador) {
     tipoTrauma: backendData.tipo_trauma_idtipo_trauma
       ? [backendData.tipo_trauma_idtipo_trauma.toString()]
       : [],
-    dataOcorrencia: backendData.data_ocorrencia
-      ? new Date(backendData.data_ocorrencia).toISOString().split("T")[0]
-      : "",
+    dataOcorrencia: processarData(backendData.data_ocorrencia),
     observacaoTrauma: backendData.observacao_trauma || "",
     relacionadoSurto,
     observacaoIncidente: backendData.observavao_incidente || "",
 
     // Seção 5: Informações da unidade notificadora
-    dataAtendimento: backendData.data_atendimento
-      ? new Date(backendData.data_atendimento).toISOString().split("T")[0]
-      : "",
+    dataAtendimento: processarData(backendData.data_atendimento),
     unidadeNotificadora:
       backendData.estabelecimento_idestabelecimento?.toString() || "",
     nomeNotificador: backendData.nome_notificador || "",
     contatoNotificador,
 
     // Seção 6: Encerramento do Caso
-    dataEncerramento: backendData.data_encerramento
-      ? new Date(backendData.data_encerramento).toISOString().split("T")[0]
-      : "",
+    dataEncerramento: processarData(backendData.data_encerramento),
     tipoEncerramento:
       backendData.tipo_encerramento_idtipo_encerramento?.toString() || "",
     localEncaminhamento,
@@ -328,7 +357,7 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
     tipoEncerramento: trimmedData.tipoEncerramento
   });
 
-  // Construir payload para o backend
+  // Construir payload para o backend com datas ajustadas para UTC
   const payload: NotificacaoGenerica = {
     tipo_evento_idtipo_evento: parseInt(trimmedData.evento) || null,
     tipo_publico_idtipo_publico: parseInt(trimmedData.publicoAtendido) || null,
@@ -338,7 +367,7 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
   ? parseInt(trimmedData.paisProcedencia) || null 
   : 105, // Brasil para opções 1 e 2
     tipo_atendimento_idtipo_atendimento: parseInt(trimmedData.tipoAtendimento) || null,
-    data_ocorrencia: trimmedData.dataOcorrencia || new Date().toISOString().split("T")[0],
+    data_ocorrencia: processarDataParaUTC(trimmedData.dataOcorrencia) || new Date().toISOString().split("T")[0],
     surto,
     estabelecimento_idestabelecimento: parseInt(trimmedData.unidadeNotificadora) || null,
     tipo_encerramento_idtipo_encerramento: parseInt(trimmedData.tipoEncerramento) || null,
@@ -366,9 +395,9 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
       tipo_municipio_idtipo_municipio: parseInt(trimmedData.municipio) || null,
     }),
     local_hospedagem: trimmedData.localHospedagem || "", 
-contato_local_hospedagem: trimmedData.contatoLocal || "",
+    contato_local_hospedagem: trimmedData.contatoLocal || "",
     ...(trimmedData.dataInicioSintomas && {
-      data_inicio_sintomas: trimmedData.dataInicioSintomas,
+      data_inicio_sintomas: processarDataParaUTC(trimmedData.dataInicioSintomas),
     }),
     ...(trimmedData.observacaoSintomas && {
       observacao_sintomas: trimmedData.observacaoSintomas || "",
@@ -390,7 +419,7 @@ contato_local_hospedagem: trimmedData.contatoLocal || "",
       observavao_incidente: trimmedData.observacaoIncidente || "",
     }),
     ...(trimmedData.dataAtendimento && {
-      data_atendimento: trimmedData.dataAtendimento,
+      data_atendimento: processarDataParaUTC(trimmedData.dataAtendimento),
     }),
     ...(trimmedData.nomeNotificador && {
       nome_notificador: trimmedData.nomeNotificador,
@@ -399,7 +428,7 @@ contato_local_hospedagem: trimmedData.contatoLocal || "",
       contato_notificador: trimmedData.contatoNotificador.substring(0, 15)
     }),
     ...(trimmedData.dataEncerramento && {
-      data_encerramento: trimmedData.dataEncerramento,
+      data_encerramento: processarDataParaUTC(trimmedData.dataEncerramento),
     }),
     
     // CORREÇÃO: Usar o nome de campo correto conforme esperado pelo backend
@@ -638,12 +667,12 @@ export const formatListResponse = (apiResponse: any) => {
     limit: meta.limit || meta.perPage || 10,
   };
   
-  // Processar dados para exibição
+  // Processar dados para exibição com formatação universal
   const formattedData = items.map((item: NotificacaoGenerica) => {
     // Recuperar informações mais relevantes para exibição em lista
     const pacienteNome = item.paciente?.nome || "N/A";
     const dataOcorrencia = item.data_ocorrencia
-      ? new Date(item.data_ocorrencia).toLocaleDateString("pt-BR")
+      ? formatarDataUniversal(item.data_ocorrencia)
       : "N/A";
     const tipoAtendimento = item.tipo_atendimento?.descricao || "N/A";
     const tipoEvento = item.tipo_evento?.descricao || "N/A";

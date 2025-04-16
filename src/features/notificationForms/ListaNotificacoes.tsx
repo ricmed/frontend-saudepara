@@ -451,10 +451,45 @@ const ListaNotificacoes = () => {
   };
 
   // Formatar data para exibição
-  const formatDate = (dateString: string | null | undefined) => {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("pt-BR");
+  const formatDate = (dateString: string | null | undefined): string => {
+    try {
+      if (!dateString) return "";
+      
+      // Extrair apenas a parte da data (YYYY-MM-DD)
+      const datePart = dateString.split('T')[0];
+      
+      // Dividir em componentes
+      const [year, month, day] = datePart.split('-');
+      
+      // Retornar no formato brasileiro
+      return `${day}/${month}/${year}`;
+    } catch (error) {
+      console.error('Erro ao formatar data:', error);
+      return "Data inválida";
+    }
+  };
+
+  // Função utilitária para ajustar datas para timezone local e formato ISO (YYYY-MM-DD)
+  const adjustDatesForExport = (data: any[]) => {
+    return data.map(item => {
+      const formattedItem = { ...item };
+      // Lista de campos de data a ajustar
+      const dateFields = [
+        'data_ocorrencia',
+        'data_atendimento',
+        'data_encerramento',
+        'data_inicio_sintomas',
+        'data_nascimento',
+      ];
+      dateFields.forEach(field => {
+        if (formattedItem[field]) {
+          const date = new Date(formattedItem[field]);
+          const localDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
+          formattedItem[field] = localDate.toISOString().split('T')[0];
+        }
+      });
+      return formattedItem;
+    });
   };
 
   // Funções de exportação
@@ -495,8 +530,11 @@ const ListaNotificacoes = () => {
         encerramentoOptions: await NotificacaoService.getEncerramentoOptions(),
       };
 
+      // Ajustar datas antes de exportar
+      const formattedData = adjustDatesForExport(dataToExport);
+
       // Usar a função de exportação da sua biblioteca
-      exportListToCSV(dataToExport, options);
+      exportListToCSV(formattedData, options);
 
       // Feedback para o usuário
       toast.success(`CSV exportado com sucesso`);
@@ -554,8 +592,11 @@ const ListaNotificacoes = () => {
         encerramentoOptions: await NotificacaoService.getEncerramentoOptions(),
       };
 
+      // Ajustar datas antes de exportar
+      const formattedData = adjustDatesForExport(dataToExport);
+
       // Usar a função de exportação da sua biblioteca
-      exportListToExcel(dataToExport, options);
+      exportListToExcel(formattedData, options);
 
       // Feedback para o usuário
       toast.success(`Dados exportados com sucesso para Excel`);
@@ -614,8 +655,11 @@ const ListaNotificacoes = () => {
         encerramentoOptions: await NotificacaoService.getEncerramentoOptions(),
       };
 
+      // Ajustar datas antes de exportar
+      const formattedData = adjustDatesForExport(dataToExport);
+
       // Usar a função de exportação da sua biblioteca
-      exportListToPDF(dataToExport, options);
+      exportListToPDF(formattedData, options);
 
       // Feedback para o usuário
       toast.success(`PDF exportado com sucesso`);
