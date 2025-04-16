@@ -1464,13 +1464,24 @@ const NotificationForm = () => {
         item.message || `O campo ${item.label} é obrigatório`;
     });
 
-    // Adicionar validações específicas para outros campos
-    if (isTipoAtendimento("clínico") && formData.sinaisESintomas.length === 0) {
-      newErrors.sinaisESintomas = "Selecione pelo menos um sinal ou sintoma";
+    // Adicionar validações específicas para sintomas e traumas baseadas no tipo de atendimento
+    if (
+      isTipoAtendimento("CLINICO") ||
+      isTipoAtendimento("SURTO") ||
+      isTipoAtendimento("INCIDENTE QBRN")
+    ) {
+      if (formData.sinaisESintomas.length === 0) {
+        newErrors.sinaisESintomas = "Selecione pelo menos um sinal ou sintoma";
+      }
     }
 
-    if (isTipoAtendimento("trauma") && formData.tipoTrauma.length === 0) {
-      newErrors.tipoTrauma = "Selecione pelo menos um tipo de trauma";
+    if (
+      isTipoAtendimento("TRAUMA") ||
+      isTipoAtendimento("MULTIPLAS VITIMAS")
+    ) {
+      if (formData.tipoTrauma.length === 0) {
+        newErrors.tipoTrauma = "Selecione pelo menos um tipo de trauma";
+      }
     }
 
     // Validar se unidadeNotificadora é um número válido
@@ -1478,8 +1489,12 @@ const NotificationForm = () => {
       formData.unidadeNotificadora &&
       !/^\d+$/.test(formData.unidadeNotificadora)
     ) {
-      newErrors.unidadeNotificadora =
-        "Selecione uma unidade notificadora válida";
+      newErrors.unidadeNotificadora = "Selecione uma unidade notificadora válida";
+    }
+
+    // Verificar se tipoEncerramento é "Transferido" e se localEncaminhamento está preenchido
+    if (isTipoEncerramento("transferido") && !formData.localEncaminhamento) {
+      newErrors.localEncaminhamento = "O local de encaminhamento é obrigatório para transferência";
     }
 
     // Atualizar o estado com os erros encontrados
@@ -1526,7 +1541,8 @@ const NotificationForm = () => {
       if (
         newErrors.tipoEncerramento ||
         newErrors.unidadeNotificadora ||
-        newErrors.dataAtendimento
+        newErrors.dataAtendimento ||
+        newErrors.localEncaminhamento
       ) {
         newExpandedSections.encerramento = true;
         newExpandedSections.unidadeNotificadora = true;
@@ -2978,86 +2994,87 @@ const NotificationForm = () => {
                     </select>
                   </div>
 
-                  {/* Renderização condicional dos campos de acordo com o tipo de atendimento */}
+                  {/* Sinais e Sintomas para CLINICO, SURTO, INCIDENTE QBRN */}
                   {(isTipoAtendimento("CLINICO") ||
                     isTipoAtendimento("SURTO") ||
                     isTipoAtendimento("INCIDENTE QBRN")) && (
-                    <>
-                      {/* Sinais e Sintomas com campo de pesquisa */}
-                      <div className="md:col-span-2">
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="font-medium text-gray-700">
-                            Sinais e Sintomas
-                          </label>
-                          <div className="relative w-64">
-                            <input
-                              type="text"
-                              placeholder="Pesquisar sintomas..."
-                              value={searchSintomas}
-                              onChange={(e) =>
-                                setSearchSintomas(e.target.value)
-                              }
-                              className="w-full p-2 pl-8 text-sm border border-gray-200 rounded-lg hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
-                            />
-                            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                            {searchSintomas && (
-                              <button
-                                type="button"
-                                onClick={() => setSearchSintomas("")}
-                                className="absolute right-2 top-1/2 transform -translate-y-1/2"
-                              >
-                                <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
-                          {sintomaOptions
-                            .filter(
-                              (option) =>
-                                searchSintomas === "" ||
-                                option.descricao
-                                  .toLowerCase()
-                                  .includes(searchSintomas.toLowerCase())
-                            )
-                            .map((option) => (
-                              <label
-                                key={option.idtipo_sintoma}
-                                className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer transition-all duration-200 hover:border-blue-400 hover:bg-blue-50/50 group"
-                                translate="no"
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={formData.sinaisESintomas.includes(
-                                    option.idtipo_sintoma.toString()
-                                  )}
-                                  onChange={() =>
-                                    handleCheckboxChange(
-                                      "sinaisESintomas",
-                                      option.idtipo_sintoma.toString()
-                                    )
-                                  }
-                                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 transition-all duration-200 group-hover:border-blue-400"
-                                />
-                                <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors duration-200">
-                                  {option.descricao}
-                                </span>
-                              </label>
-                            ))}
-                        </div>
-                        {searchSintomas &&
-                          sintomaOptions.filter((option) =>
-                            option.descricao
-                              .toLowerCase()
-                              .includes(searchSintomas.toLowerCase())
-                          ).length === 0 && (
-                            <div className="text-center py-4 text-gray-500">
-                              Nenhum sintoma encontrado para "{searchSintomas}"
-                            </div>
+                    <div className="md:col-span-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="font-medium text-gray-700">
+                          Sinais e Sintomas
+                        </label>
+                        <div className="relative w-64">
+                          <input
+                            type="text"
+                            placeholder="Pesquisar sintomas..."
+                            value={searchSintomas}
+                            onChange={(e) =>
+                              setSearchSintomas(e.target.value)
+                            }
+                            className="w-full p-2 pl-8 text-sm border border-gray-200 rounded-lg hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                          />
+                          <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          {searchSintomas && (
+                            <button
+                              type="button"
+                              onClick={() => setSearchSintomas("")}
+                              className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                            >
+                              <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                            </button>
                           )}
+                        </div>
                       </div>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
+                        {sintomaOptions
+                          .filter(
+                            (option) =>
+                              searchSintomas === "" ||
+                              option.descricao
+                                .toLowerCase()
+                                .includes(searchSintomas.toLowerCase())
+                          )
+                          .map((option) => (
+                            <label
+                              key={option.idtipo_sintoma}
+                              className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer transition-all duration-200 hover:border-blue-400 hover:bg-blue-50/50 group"
+                              translate="no"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={formData.sinaisESintomas.includes(
+                                  option.idtipo_sintoma.toString()
+                                )}
+                                onChange={() =>
+                                  handleCheckboxChange(
+                                    "sinaisESintomas",
+                                    option.idtipo_sintoma.toString()
+                                  )
+                                }
+                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 transition-all duration-200 group-hover:border-blue-400"
+                              />
+                              <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors duration-200">
+                                {option.descricao}
+                              </span>
+                            </label>
+                          ))}
+                      </div>
+                      {searchSintomas &&
+                        sintomaOptions.filter((option) =>
+                          option.descricao
+                            .toLowerCase()
+                            .includes(searchSintomas.toLowerCase())
+                        ).length === 0 && (
+                          <div className="text-center py-4 text-gray-500">
+                            Nenhum sintoma encontrado para "{searchSintomas}"
+                          </div>
+                        )}
+                    </div>
+                  )}
 
-                      {/* Data de Início dos Sintomas */}
+                  {/* Data de Início dos Sintomas e Observação apenas para CLINICO */}
+                  {isTipoAtendimento("CLINICO") && (
+                    <>
                       <div>
                         <label className="block mb-2 font-medium text-gray-700">
                           Data de Início dos Sintomas
@@ -3082,7 +3099,6 @@ const NotificationForm = () => {
                         )}
                       </div>
 
-                      {/* Observação dos Sintomas */}
                       <div className="md:col-span-2">
                         <label className="block mb-2 font-medium text-gray-700">
                           Observação
@@ -3099,6 +3115,7 @@ const NotificationForm = () => {
                     </>
                   )}
 
+                  {/* Trauma ou múltiplas vítimas */}
                   {(isTipoAtendimento("TRAUMA") ||
                     isTipoAtendimento("MULTIPLAS VITIMAS")) && (
                     <>
