@@ -122,7 +122,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
-  const [autoRefreshCountdown, setAutoRefreshCountdown] = useState(30);
+  const [autoRefreshCountdown, setAutoRefreshCountdown] = useState(60); // Modificado para 60 segundos
 
   // Dados base do dashboard
   const [totalNotifications, setTotalNotifications] = useState(0);
@@ -224,8 +224,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
     // Se a atualização automática está habilitada, configurar o intervalo
     if (autoRefreshEnabled) {
-      // Configurar o contador regressivo
-      let countdown = 30;
+      // Configurar o contador regressivo - Alterado para 60 segundos (1 minuto)
+      let countdown = 60;
       setAutoRefreshCountdown(countdown);
       
       // Atualizar o contador a cada segundo
@@ -236,7 +236,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         // Quando o contador chegar a zero, atualizar os dados
         if (countdown <= 0) {
           refreshData();
-          countdown = 30;
+          countdown = 60; // Resetar para 60 segundos
           setAutoRefreshCountdown(countdown);
         }
       }, 1000);
