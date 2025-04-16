@@ -6,8 +6,8 @@ interface NotificacaoGenerica {
 // Interface para os dados do formulário frontend
 import { FormData } from "@/features/notificationForms/NotificationForm";
 import axios from "axios";
-import indexedDBService from '@/services/indexedDB';
-import syncService from '@/services/syncService';
+// import indexedDBService from '@/services/indexedDB'; // COMENTADO - SERÁ USADO NO FUTURO
+// import syncService from '@/services/syncService';    // COMENTADO - SERÁ USADO NO FUTURO
 import { toast } from 'react-toastify';
 
 // Função auxiliar para conversão de datas UTC para local
@@ -466,7 +466,7 @@ export const salvarSintomasViaApi = async (notificacaoId: number, sintomasIds: n
 
 /**
  * Função principal para salvar uma notificação completa (incluindo sintomas)
- * com suporte para modo offline
+ * Versão simplificada sem suporte offline
  * @param formData Dados do formulário
  * @param isUpdate Indica se é uma atualização
  * @param notificacaoId ID da notificação (apenas para atualizações)
@@ -476,24 +476,22 @@ export const salvarNotificacaoCompleta = async (
   isUpdate: boolean = false,
   notificacaoId?: number
 ): Promise<any> => {
-
+  
   console.log("DADOS DO FORM ANTES DE ENVIAR:", formData);
   console.log("Dados antes de salvar - Tipo residente:", formData.residenteBelem, "País:", formData.paisProcedencia);
-
-  // Sempre salvar localmente primeiro
-  const localId = await indexedDBService.saveNotificacao(formData, isUpdate, notificacaoId);
-
-  // Se estiver offline, retornar o ID local e informar ao usuário
-  if (!syncService.isNetworkAvailable()) {
-    toast.info('Você está offline. Os dados foram salvos localmente e serão sincronizados quando houver conexão.', {
-      icon: '📴',
-    });
-    
-    return { id: localId, idnotificacao: localId };
-  }
   
   const server = import.meta.env.VITE_API_SERVER;
   const port = import.meta.env.VITE_API_PORT;
+  
+  // Verificar campos obrigatórios
+  if (!formData.evento) console.warn("Campo obrigatório ausente: evento");
+  if (!formData.publicoAtendido) console.warn("Campo obrigatório ausente: publicoAtendido");
+  if (!formData.pacienteId) console.warn("Campo obrigatório ausente: pacienteId");
+  if (!formData.residenteBelem) console.warn("Campo obrigatório ausente: residenteBelem");
+  if (!formData.paisProcedencia) console.warn("Campo obrigatório ausente: paisProcedencia");
+  if (!formData.tipoAtendimento) console.warn("Campo obrigatório ausente: tipoAtendimento");
+  if (!formData.dataOcorrencia) console.warn("Campo obrigatório ausente: dataOcorrencia");
+  if (!formData.tipoEncerramento) console.warn("Campo obrigatório ausente: tipoEncerramento");
   
   // Formatar dados para o backend
   const payloadBackend = formatToBackend(formData, isUpdate);
@@ -506,50 +504,61 @@ export const salvarNotificacaoCompleta = async (
     
     if (isUpdate && notificacaoId) {
       // Atualizar notificação existente
-      try {
-        console.log(`Enviando atualização para notificação ${notificacaoId}:`, JSON.stringify(payloadBackend, null, 2));
-        response = await axios.put(`${server}:${port}/api/notificacao/${notificacaoId}`, payloadBackend);
-        savedNotificacaoId = notificacaoId;
-      } catch (error: any) {
-        // Log detalhado do erro para diagnóstico
-        console.error("Erro detalhado ao atualizar notificação:", {
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          data: error.response?.data,
-          message: error.message,
-          payload: payloadBackend
-        });
-        
-        // Informar o usuário que os dados foram salvos localmente
-        toast.warning('Não foi possível enviar para o servidor. Os dados foram salvos localmente e serão sincronizados depois.', {
-          icon: '🔄',
-        });
-        
-        return { id: localId, idnotificacao: localId };
+      console.log(`Enviando atualização para notificação ${notificacaoId}:`, JSON.stringify(payloadBackend, null, 2));
+      
+      // Ajustes adicionais para o payload de atualização (se necessário)
+      // Garantir que o ID do paciente está correto
+      if (!payloadBackend.paciente_idpaciente) {
+        console.error("ERRO: ID do paciente ausente na atualização!");
       }
+      
+      response = await axios.put(`${server}:${port}/api/notificacao/${notificacaoId}`, payloadBackend);
+      savedNotificacaoId = notificacaoId;
     } else {
       // Criar nova notificação
+      console.log("Enviando notificação para criação:", JSON.stringify(payloadBackend, null, 2));
+      
+      // Verificações específicas para criação
+      if (!payloadBackend.paciente_idpaciente) {
+        console.error("ERRO: ID do paciente é obrigatório para criar notificação!");
+        throw new Error("ID do paciente não informado");
+      }
+      
+      if (!payloadBackend.tipo_evento_idtipo_evento) {
+        console.error("ERRO: Tipo de evento é obrigatório!");
+        throw new Error("Tipo de evento não informado");
+      }
+      
+      if (!payloadBackend.tipo_publico_idtipo_publico) {
+        console.error("ERRO: Público atendido é obrigatório!");
+        throw new Error("Público atendido não informado");
+      }
+      
+      if (!payloadBackend.tipo_encerramento_idtipo_encerramento) {
+        console.error("ERRO: Tipo de encerramento é obrigatório!");
+        throw new Error("Tipo de encerramento não informado");
+      }
+      
+      // Garantir que a data está em formato UTC correto
+      if (payloadBackend.data_ocorrencia) {
+        console.log("Data de ocorrência formatada:", payloadBackend.data_ocorrencia);
+      }
+      
       try {
-        console.log("Enviando notificação para criação:", JSON.stringify(payloadBackend, null, 2));
         response = await axios.post(`${server}:${port}/api/notificacao`, payloadBackend);
         savedNotificacaoId = response.data.idnotificacao;
         console.log(`Notificação criada com ID: ${savedNotificacaoId}`);
-      } catch (error: any) {
-        // Log detalhado do erro para diagnóstico
-        console.error("Erro detalhado ao criar notificação:", {
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          data: error.response?.data,
-          message: error.message,
-          payload: payloadBackend
-        });
+      } catch (postError: any) {
+        // Log mais detalhado do erro de POST
+        console.error("Erro detalhado na criação:", postError);
+        console.error("Status:", postError.response?.status);
+        console.error("Erro completo:", JSON.stringify(postError.response?.data || {}, null, 2));
         
-        // Informar o usuário que os dados foram salvos localmente
-        toast.warning('Não foi possível enviar para o servidor. Os dados foram salvos localmente e serão sincronizados depois.', {
-          icon: '🔄',
-        });
+        if (postError.response?.data?.errors) {
+          console.error("Campos com erro:", postError.response.data.errors);
+        }
         
-        return { id: localId, idnotificacao: localId };
+        throw postError; // Repassar o erro
       }
     }
     
@@ -566,60 +575,73 @@ export const salvarNotificacaoCompleta = async (
       }
     }
     
-    // Marcar a notificação como sincronizada no IndexedDB
-    await indexedDBService.markNotificacaoAsSynced(localId);
-    
+    toast.success('Notificação salva com sucesso!');
     return response.data;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erro ao salvar notificação:", error);
-    toast.error('Erro ao salvar. Os dados estão armazenados localmente e serão sincronizados quando possível.');
-    return { id: localId, idnotificacao: localId, syncPending: true };
+    
+    // Log detalhado do erro para diagnóstico
+    if (error.response) {
+      console.error("Detalhes da resposta de erro:", {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: JSON.stringify(error.response.data, null, 2)
+      });
+      
+      // Mostra exatamente quais campos têm problemas
+      if (error.response.data?.errors) {
+        console.error("Erros por campo:", error.response.data.errors);
+        const errorFields = Array.isArray(error.response.data.errors) 
+          ? error.response.data.errors
+          : [error.response.data.errors];
+          
+        errorFields.forEach((err: any) => {
+          // Mostrar detalhes de cada campo com erro
+          if (err.field && err.message) {
+            console.error(`Erro no campo ${err.field}: ${err.message}`);
+          } else {
+            console.error("Erro não estruturado:", err);
+          }
+        });
+      }
+      
+      // Mostrar mensagem específica do erro
+      if (error.response.data?.message) {
+        toast.error(`Erro: ${error.response.data.message}`);
+      } else {
+        toast.error('Erro ao salvar a notificação. Por favor, tente novamente.');
+      }
+    } else {
+      toast.error('Erro de comunicação com o servidor. Verifique sua conexão.');
+    }
+    
+    throw error;
   }
 };
 
 /**
- * Função para buscar notificação com suporte offline
+ * Função para buscar notificação do servidor
+ * Versão simplificada sem suporte offline
  * @param id ID da notificação
  */
 export const buscarNotificacao = async (id: number): Promise<FormData | null> => {
-  // Se estiver online, buscar do servidor primeiro
-  if (syncService.isNetworkAvailable()) {
-    try {
-      const server = import.meta.env.VITE_API_SERVER;
-      const port = import.meta.env.VITE_API_PORT;
-      
-      const response = await axios.get(`${server}:${port}/api/notificacao/${id}`);
-      const data = await formatFromBackend(response.data);
-      
-      // Salvar localmente para acesso offline futuro
-      if (data) {
-        await indexedDBService.saveNotificacao(data, true, id);
-        await indexedDBService.markNotificacaoAsSynced(id);
-      }
-      
-      return data;
-    } catch (error) {
-      console.error('Erro ao buscar notificação do servidor:', error);
-      toast.warning('Não foi possível buscar do servidor. Tentando dados locais...');
-      // Cair para o cache local se houver erro
-    }
-  } else {
-    toast.info('Você está offline. Buscando dados do armazenamento local.');
+  try {
+    const server = import.meta.env.VITE_API_SERVER;
+    const port = import.meta.env.VITE_API_PORT;
+    
+    const response = await axios.get(`${server}:${port}/api/notificacao/${id}`);
+    return await formatFromBackend(response.data);
+  } catch (error) {
+    console.error('Erro ao buscar notificação:', error);
+    toast.error('Erro ao buscar dados da notificação.');
+    throw error;
   }
-  
-  // Buscar do armazenamento local
-  return await indexedDBService.getNotificacao(id);
 };
 
 /**
  * Função auxiliar para buscar sintomas via API quando necessário
  */
 async function fetchSintomasForNotificacao(notificacaoId: number): Promise<any[]> {
-  // Se offline, retornar array vazio
-  if (!syncService.isNetworkAvailable()) {
-    return [];
-  }
-  
   const server = import.meta.env.VITE_API_SERVER;
   const port = import.meta.env.VITE_API_PORT;
   

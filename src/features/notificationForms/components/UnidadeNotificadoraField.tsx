@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import axios from "axios";
-import { Search, X } from "lucide-react";
+import { Search, X, AlertCircle } from "lucide-react";
 import { createPortal } from "react-dom";
 
 interface Estabelecimento {
@@ -19,6 +19,8 @@ interface UnidadeNotificadoraFieldProps {
   className?: string;
   isForEncaminhamento?: boolean; // Para diferenciar entre unidade notificadora e encaminhamento
   specificEstablishments?: string[]; // Nova prop para filtrar estabelecimentos específicos
+  hasError?: boolean; // Nova prop para indicar erro
+  errorMessage?: string; // Nova prop para mensagem de erro personalizada
 }
 
 const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
@@ -28,7 +30,11 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   placeholder = "Buscar unidade notificadora...",
   className = "",
   isForEncaminhamento = false,
-  specificEstablishments = [] // Inicializa como array vazio
+  specificEstablishments = [], // Inicializa como array vazio
+  hasError = false, // Valor padrão
+  errorMessage = isForEncaminhamento ? 
+    "O local de encaminhamento é obrigatório" : 
+    "O campo estabelecimento é obrigatório" // Mensagem padrão
 }) => {
   const [unidadesNotificadoras, setUnidadesNotificadoras] = useState<Estabelecimento[]>([]);
   const [loadingUnidades, setLoadingUnidades] = useState(false);
@@ -565,16 +571,25 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
     );
   };
 
+  // Definir classes de erro baseadas na prop hasError
+  const errorClasses = hasError ? 
+    "border-red-500 bg-red-50" : 
+    "border-gray-200";
+
   return (
     <div className="w-full">
-      {label && <label className="block mb-2 font-medium text-gray-700">{label}</label>}
+      {label && (
+        <label className="block mb-2 font-medium text-gray-700">
+          {label} {hasError && <span className="text-red-500">*</span>}
+        </label>
+      )}
       <div className="flex gap-2">
         <div className="relative flex-1">
           <input
             ref={inputRef}
             type="text"
             placeholder={placeholder}
-            className={`w-full p-3 pl-9 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none ${className}`}
+            className={`w-full p-3 pl-9 border rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none ${errorClasses} ${className}`}
             value={displayValue}
             readOnly={true}
             onFocus={handleFocus}
@@ -582,6 +597,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
             disabled={loadingUnidades && !isDropdownOpen}
             data-field-type={isForEncaminhamento ? "encaminhamento" : "unidade"}
             data-specific-filter={specificEstablishments && specificEstablishments.length > 0 ? "true" : "false"}
+            data-error={hasError ? "true" : "false"} // Adicionar atributo para marcar erro para scroll
           />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           {displayValue && (
@@ -597,12 +613,20 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
         <button
           type="button"
           onClick={handleSearchButtonClick}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+          className={`px-4 py-2 ${hasError ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-lg transition-colors flex items-center gap-2`}
           disabled={loadingUnidades && !isDropdownOpen}
         >
           <Search className="h-4 w-4" />
         </button>
       </div>
+
+      {/* Mensagem de erro */}
+      {hasError && (
+        <div className="mt-1 flex items-center text-red-500 text-sm">
+          <AlertCircle className="h-4 w-4 mr-1 flex-shrink-0" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
 
       {/* Renderiza o dropdown usando portal */}
       {renderDropdown()}

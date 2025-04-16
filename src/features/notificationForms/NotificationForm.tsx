@@ -1377,15 +1377,16 @@ const NotificationForm = () => {
     }
 
     // Verificar campos obrigatórios
-    const requiredFields: Array<{ field: keyof FormData; label: string }> = [
+    const requiredFields: Array<{ field: keyof FormData; label: string; message?: string }> = [
       { field: "evento", label: "Evento" },
       { field: "publicoAtendido", label: "Público Atendido" },
       { field: "residenteBelem", label: "Residente em Belém" },
       { field: "paciente", label: "Paciente" },
-      { field: "paisProcedencia", label: "País de procedência" }, // Adicionado como obrigatório
+      { field: "paisProcedencia", label: "País de procedência" },
       { field: "tipoAtendimento", label: "Tipo de Atendimento" },
-      { field: "dataOcorrencia", label: "Data da Ocorrência" }, // Já era obrigatório
+      { field: "dataOcorrencia", label: "Data da Ocorrência" },
       { field: "tipoEncerramento", label: "Tipo de Encerramento" },
+      { field: "unidadeNotificadora", label: "Unidade Notificadora"},
     ];
 
     const newErrors: Record<string, string> = {};
@@ -1395,7 +1396,7 @@ const NotificationForm = () => {
 
     // Adicionar mensagens de erro para cada campo faltante
     missingFields.forEach((item) => {
-      newErrors[item.field] = `O campo ${item.label} é obrigatório`;
+      newErrors[item.field] = item.message || `O campo ${item.label} é obrigatório`;
     });
 
     // Adicionar validações específicas para outros campos
@@ -1405,6 +1406,11 @@ const NotificationForm = () => {
 
     if (isTipoAtendimento("trauma") && formData.tipoTrauma.length === 0) {
       newErrors.tipoTrauma = "Selecione pelo menos um tipo de trauma";
+    }
+    
+    // Validar se unidadeNotificadora é um número válido
+    if (formData.unidadeNotificadora && !/^\d+$/.test(formData.unidadeNotificadora)) {
+      newErrors.unidadeNotificadora = "Selecione uma unidade notificadora válida";
     }
 
     // Atualizar o estado com os erros encontrados
@@ -1424,7 +1430,7 @@ const NotificationForm = () => {
         newErrors.bairro ||
         newErrors.municipio ||
         newErrors.uf ||
-        newErrors.paisProcedencia // Incluir verificação para país
+        newErrors.paisProcedencia
       ) {
         newExpandedSections.procedencia = true;
       }
@@ -1447,8 +1453,9 @@ const NotificationForm = () => {
         newExpandedSections.atendimento = true;
       }
 
-      if (newErrors.tipoEncerramento) {
+      if (newErrors.tipoEncerramento || newErrors.unidadeNotificadora) {
         newExpandedSections.encerramento = true;
+        newExpandedSections.unidadeNotificadora = true;
       }
 
       setExpandedSections(newExpandedSections);
@@ -1491,310 +1498,126 @@ const NotificationForm = () => {
 
   // Handlers para ações do formulário
   // Modificar a função handleSubmit para garantir que todos os dados enviados estejam em caixa alta
-  const handleSubmit = async (e: React.FormEvent) => {
-    console.log("BOTÃO SALVAR CLICADO");
-    e.preventDefault();
-    console.log("Form prevent default executado");
+  // No arquivo NotificationForm.tsx, procure o método handleSubmit e substitua por este:
 
-    // Limpar estados de feedback
-    setApiError(null);
-    setIsSuccess(false);
+const handleSubmit = async (e: React.FormEvent) => {
+  console.log("BOTÃO SALVAR CLICADO");
+  e.preventDefault();
+  console.log("Form prevent default executado");
 
-    // Verifica se tem paciente
-    if (!formData.paciente.trim()) {
-      toast.error("O nome do paciente é obrigatório");
-      setErrors((prev) => ({
-        ...prev,
-        paciente: "O nome do paciente é obrigatório",
-      }));
-      setExpandedSections((prev) => ({
-        ...prev,
-        identificacao: true,
-      }));
-      return;
-    }
+  // Limpar estados de feedback
+  setApiError(null);
+  setIsSuccess(false);
 
-    // Se tem nome de paciente, mas não tem ID, criar paciente automaticamente
-    if (formData.paciente.trim() && !formData.pacienteId) {
-      try {
-        const server = import.meta.env.VITE_API_SERVER;
-        const port = import.meta.env.VITE_API_PORT;
+  // Verifica se tem paciente
+  if (!formData.paciente.trim()) {
+    toast.error("O nome do paciente é obrigatório");
+    setErrors((prev) => ({
+      ...prev,
+      paciente: "O nome do paciente é obrigatório",
+    }));
+    setExpandedSections((prev) => ({
+      ...prev,
+      identificacao: true,
+    }));
+    return;
+  }
 
-        toast.info("Criando novo paciente automaticamente...");
-
-        // Criar payload de novo paciente com os dados disponíveis
-        const novoPaciente = {
-          nome: formData.paciente,
-          nome_mae: formData.nomeMae || "",
-          data_nascimento: formData.dataNascimento || null,
-          cpf: formData.cpf || "",
-          contato: formData.contatoTelefonico || "",
-          tipo_genero_idtipo_genero: formData.identidadeGenero
-            ? parseInt(formData.identidadeGenero)
-            : null,
-          tipo_raca_idtipo_raca: formData.raca ? parseInt(formData.raca) : null,
-          escolaridade_idescolaridade: formData.escolaridade
-            ? parseInt(formData.escolaridade)
-            : null,
-          cbo_idcbo: formData.profissao ? parseInt(formData.profissao) : null,
-        };
-
-        // Criar o paciente no backend
-        const response = await axios.post(
-          `${server}:${port}/api/paciente`,
-          novoPaciente
-        );
-
-        // Atualizar o formData com o ID do paciente criado
-        formData.pacienteId = response.data.idpaciente;
-
-        console.log(
-          "Paciente criado automaticamente com ID:",
-          response.data.idpaciente
-        );
-      } catch (error: any) {
-        console.error("Erro ao criar paciente automaticamente:", error);
-
-        // Mostrar mensagem de erro mais específica
-        let errorMessage =
-          "Erro ao criar o paciente. Verifique os dados e tente novamente.";
-
-        // Se o erro contém informações da API, mostrar essas informações
-        if (
-          error.response &&
-          error.response.data &&
-          error.response.data.message
-        ) {
-          errorMessage = error.response.data.message;
-        } else if (error.message) {
-          errorMessage = error.message;
-        }
-
-        toast.error(errorMessage);
-        setApiError(errorMessage);
-
-        // Destacar campos específicos com erro, se a API retornar essa informação
-        if (
-          error.response &&
-          error.response.data &&
-          error.response.data.errors
-        ) {
-          const backendErrors = error.response.data.errors;
-
-          // Mapear erros do backend para os campos do formulário
-          const mappedErrors: Record<string, string> = {};
-
-          Object.entries(backendErrors).forEach(([key, value]) => {
-            // Mapear nome dos campos do backend para nomes no nosso formData
-            const fieldMapping: Record<string, string> = {
-              nome: "paciente",
-              cpf: "cpf",
-              data_nascimento: "dataNascimento",
-              // adicionar outros mapeamentos conforme necessário
-            };
-
-            const fieldName = fieldMapping[key] || key;
-            mappedErrors[fieldName] = Array.isArray(value)
-              ? value[0]
-              : String(value);
-          });
-
-          setErrors((prev) => ({ ...prev, ...mappedErrors }));
-
-          // Expandir a seção de identificação do paciente
-          setExpandedSections((prev) => ({ ...prev, identificacao: true }));
-
-          // Rolar até o primeiro erro
-          setTimeout(() => {
-            const firstErrorField = document.querySelector(
-              '[data-error="true"]'
-            );
-            if (firstErrorField) {
-              firstErrorField.scrollIntoView({
-                behavior: "smooth",
-                block: "center",
-              });
-            }
-          }, 100);
-        }
-
-        setIsSaving(false);
-        return; // Impedir envio do formulário
-      }
-    }
-    // ADICIONAR AQUI: Se já tem ID de paciente, atualizar dados do paciente
-    else if (formData.pacienteId) {
-      try {
-        // Atualizar os dados do paciente antes de salvar a notificação
-        const pacienteData = {
-          nome: formData.paciente,
-          nome_mae: formData.nomeMae || "",
-          data_nascimento: formData.dataNascimento || undefined,
-          cpf: formData.cpf || "",
-          contato: formData.contatoTelefonico || "",
-          tipo_genero_idtipo_genero: formData.identidadeGenero
-            ? parseInt(formData.identidadeGenero)
-            : undefined,
-          tipo_raca_idtipo_raca: formData.raca
-            ? parseInt(formData.raca)
-            : undefined,
-          escolaridade_idescolaridade: formData.escolaridade
-            ? parseInt(formData.escolaridade)
-            : undefined,
-          cbo_idcbo: formData.profissao
-            ? parseInt(formData.profissao)
-            : undefined,
-          ddi: formData.ddi || "55",
-        };
-
-        // Usar o serviço para atualizar o paciente
-        await PacienteService.update(formData.pacienteId, pacienteData);
-        console.log("Dados do paciente atualizados com sucesso!");
-      } catch (error) {
-        console.error("Erro ao atualizar dados do paciente:", error);
-        toast.warning(
-          "Aviso: Os dados do paciente não puderam ser atualizados, mas tentaremos salvar a notificação."
-        );
-        // Não impedir o envio da notificação se a atualização do paciente falhar
-      }
-    }
-
-    const isValid = validateForm();
-    console.log("Form validation result:", isValid);
-    if (!isValid) return;
-
-    setIsSaving(true);
+  // Se tem nome de paciente, mas não tem ID, criar paciente automaticamente
+  if (formData.paciente.trim() && !formData.pacienteId) {
     try {
-      // Converter todos os dados para caixa alta antes de enviar
-      const formDataUpperCase = toUpperCaseAllStrings(formData);
+      const server = import.meta.env.VITE_API_SERVER;
+      const port = import.meta.env.VITE_API_PORT;
+
+      toast.info("Criando novo paciente automaticamente...");
+
+      // Criar payload de novo paciente com os dados disponíveis
+      const novoPaciente = {
+        nome: formData.paciente,
+        nome_mae: formData.nomeMae || "",
+        data_nascimento: formData.dataNascimento || null,
+        cpf: formData.cpf || "",
+        contato: formData.contatoTelefonico || "",
+        tipo_genero_idtipo_genero: formData.identidadeGenero
+          ? parseInt(formData.identidadeGenero)
+          : null,
+        tipo_raca_idtipo_raca: formData.raca ? parseInt(formData.raca) : null,
+        escolaridade_idescolaridade: formData.escolaridade
+          ? parseInt(formData.escolaridade)
+          : null,
+        cbo_idcbo: formData.profissao ? parseInt(formData.profissao) : null,
+      };
+
+      // Criar o paciente no backend
+      const response = await axios.post(
+        `${server}:${port}/api/paciente`,
+        novoPaciente
+      );
+
+      // Atualizar o formData com o ID do paciente criado
+      formData.pacienteId = response.data.idpaciente;
 
       console.log(
-        "Dados do formulário:",
-        JSON.stringify(formDataUpperCase, null, 2)
+        "Paciente criado automaticamente com ID:",
+        response.data.idpaciente
       );
-      console.log("Sintomas selecionados:", formDataUpperCase.sinaisESintomas);
-
-      // Usar a função importada salvarNotificacaoCompleta
-      if (isEditMode && id) {
-        // Para atualização
-        await salvarNotificacaoCompleta(formDataUpperCase, true, Number(id));
-        console.log("Notificação atualizada com sucesso");
-        setIsSuccess(true); // Definir estado de sucesso
-        toast.success("Notificação atualizada com sucesso");
-      } else {
-        // Para criação
-        await salvarNotificacaoCompleta(formDataUpperCase, false);
-        console.log("Notificação criada com sucesso");
-        setIsSuccess(true); // Definir estado de sucesso
-        toast.success("Notificação criada com sucesso");
-      }
-
-      // Redirecionar para página de listagem ou detalhes após um breve delay para mostrar a mensagem de sucesso
-      setTimeout(() => {
-        navigate("/lista-comunicacao");
-      }, 1500);
     } catch (error: any) {
-      console.error("Erro ao salvar notificação:", error);
+      console.error("Erro ao criar paciente automaticamente:", error);
 
-      // Tratamento de erros melhorado
-      let errorMessage = "Erro ao salvar notificação";
-      let validationErrors: Record<string, string> = {};
+      // Mostrar mensagem de erro mais específica
+      let errorMessage =
+        "Erro ao criar o paciente. Verifique os dados e tente novamente.";
 
-      // Extrair mensagem de erro e possíveis erros de validação do backend
-      if (error.response && error.response.data) {
-        // Mensagem geral de erro
-        if (error.response.data.message) {
-          errorMessage = error.response.data.message;
-        }
-
-        // Erros específicos por campo
-        if (error.response.data.errors) {
-          const backendErrors = error.response.data.errors;
-
-          // Mapear os erros do backend para nossos campos do formulário
-          Object.entries(backendErrors).forEach(([key, value]) => {
-            // Mapeamento dos nomes de campo do backend para o frontend
-            const fieldMapping: Record<string, string> = {
-              tipo_evento_idtipo_evento: "evento",
-              tipo_publico_idtipo_publico: "publicoAtendido",
-              paciente_idpaciente: "paciente",
-              residente_belem: "residenteBelem",
-              tipo_pais_idtipo_pais: "paisProcedencia",
-              tipo_estado_idtipo_estado: "uf",
-              tipo_municipio_idtipo_municipio: "municipio",
-              tipo_bairro_idtipo_bairro: "bairro",
-              tipo_atendimento_idtipo_atendimento: "tipoAtendimento",
-              data_ocorrencia: "dataOcorrencia",
-              tipo_encerramento_idtipo_encerramento: "tipoEncerramento",
-              // Adicionar mais mapeamentos conforme necessário
-            };
-
-            const fieldName = fieldMapping[key] || key;
-            validationErrors[fieldName] = Array.isArray(value)
-              ? value[0]
-              : String(value);
-          });
-        }
+      // Se o erro contém informações da API, mostrar essas informações
+      if (
+        error.response &&
+        error.response.data &&
+        error.response.data.message
+      ) {
+        errorMessage = error.response.data.message;
       } else if (error.message) {
         errorMessage = error.message;
       }
 
-      // Atualizar estado de erro e exibir toast
-      setApiError(errorMessage);
       toast.error(errorMessage);
+      setApiError(errorMessage);
 
-      // Atualizar erros específicos por campo
-      if (Object.keys(validationErrors).length > 0) {
-        setErrors((prev) => ({ ...prev, ...validationErrors }));
+      // Destacar campos específicos com erro, se a API retornar essa informação
+      if (
+        error.response &&
+        error.response.data &&
+        error.response.data.errors
+      ) {
+        const backendErrors = error.response.data.errors;
 
-        // Expandir seções relevantes com base nos erros
-        const sectionsToExpand: Record<string, boolean> = {};
+        // Mapear erros do backend para os campos do formulário
+        const mappedErrors: Record<string, string> = {};
 
-        // Lógica para determinar quais seções expandir
-        Object.keys(validationErrors).forEach((field) => {
-          if (["evento", "publicoAtendido"].includes(field)) {
-            sectionsToExpand.dadosGerais = true;
-          } else if (
-            [
-              "residenteBelem",
-              "paisProcedencia",
-              "uf",
-              "municipio",
-              "bairro",
-            ].includes(field)
-          ) {
-            sectionsToExpand.procedencia = true;
-          } else if (
-            [
-              "paciente",
-              "nomeMae",
-              "dataNascimento",
-              "cpf",
-              "identidadeGenero",
-              "raca",
-            ].includes(field)
-          ) {
-            sectionsToExpand.identificacao = true;
-          } else if (
-            [
-              "tipoAtendimento",
-              "sinaisESintomas",
-              "tipoTrauma",
-              "dataOcorrencia",
-            ].includes(field)
-          ) {
-            sectionsToExpand.atendimento = true;
-          } else if (["tipoEncerramento", "dataEncerramento"].includes(field)) {
-            sectionsToExpand.encerramento = true;
-          }
+        Object.entries(backendErrors).forEach(([key, value]) => {
+          // Mapear nome dos campos do backend para nomes no nosso formData
+          const fieldMapping: Record<string, string> = {
+            nome: "paciente",
+            cpf: "cpf",
+            data_nascimento: "dataNascimento",
+            // adicionar outros mapeamentos conforme necessário
+          };
+
+          const fieldName = fieldMapping[key] || key;
+          mappedErrors[fieldName] = Array.isArray(value)
+            ? value[0]
+            : String(value);
         });
 
-        // Expandir as seções determinadas
-        setExpandedSections((prev) => ({ ...prev, ...sectionsToExpand }));
+        setErrors((prev) => ({ ...prev, ...mappedErrors }));
 
-        // Rolar até o primeiro campo com erro
+        // Expandir a seção de identificação do paciente
+        setExpandedSections((prev) => ({ ...prev, identificacao: true }));
+
+        // Rolar até o primeiro erro
         setTimeout(() => {
-          const firstErrorField = document.querySelector('[data-error="true"]');
+          const firstErrorField = document.querySelector(
+            '[data-error="true"]'
+          );
           if (firstErrorField) {
             firstErrorField.scrollIntoView({
               behavior: "smooth",
@@ -1803,10 +1626,196 @@ const NotificationForm = () => {
           }
         }, 100);
       }
-    } finally {
+
       setIsSaving(false);
+      return; // Impedir envio do formulário
     }
-  };
+  }
+  // ADICIONAR AQUI: Se já tem ID de paciente, atualizar dados do paciente
+  else if (formData.pacienteId) {
+    try {
+      // Atualizar os dados do paciente antes de salvar a notificação
+      const pacienteData = {
+        nome: formData.paciente,
+        nome_mae: formData.nomeMae || "",
+        data_nascimento: formData.dataNascimento || undefined,
+        cpf: formData.cpf || "",
+        contato: formData.contatoTelefonico || "",
+        tipo_genero_idtipo_genero: formData.identidadeGenero
+          ? parseInt(formData.identidadeGenero)
+          : undefined,
+        tipo_raca_idtipo_raca: formData.raca
+          ? parseInt(formData.raca)
+          : undefined,
+        escolaridade_idescolaridade: formData.escolaridade
+          ? parseInt(formData.escolaridade)
+          : undefined,
+        cbo_idcbo: formData.profissao
+          ? parseInt(formData.profissao)
+          : undefined,
+        ddi: formData.ddi || "55",
+      };
+
+      // Usar o serviço para atualizar o paciente
+      await PacienteService.update(formData.pacienteId, pacienteData);
+      console.log("Dados do paciente atualizados com sucesso!");
+    } catch (error) {
+      console.error("Erro ao atualizar dados do paciente:", error);
+      toast.warning(
+        "Aviso: Os dados do paciente não puderam ser atualizados, mas tentaremos salvar a notificação."
+      );
+      // Não impedir o envio da notificação se a atualização do paciente falhar
+    }
+  }
+
+  const isValid = validateForm();
+  console.log("Form validation result:", isValid);
+  if (!isValid) return;
+
+  setIsSaving(true);
+  try {
+    // Converter todos os dados para caixa alta antes de enviar
+    const formDataUpperCase = toUpperCaseAllStrings(formData);
+
+    console.log(
+      "Dados do formulário:",
+      JSON.stringify(formDataUpperCase, null, 2)
+    );
+    console.log("Sintomas selecionados:", formDataUpperCase.sinaisESintomas);
+
+    // Usar a função importada salvarNotificacaoCompleta
+    if (isEditMode && id) {
+      // Para atualização
+      await salvarNotificacaoCompleta(formDataUpperCase, true, Number(id));
+      console.log("Notificação atualizada com sucesso");
+      setIsSuccess(true); // Definir estado de sucesso
+      toast.success("Notificação atualizada com sucesso");
+    } else {
+      // Para criação
+      await salvarNotificacaoCompleta(formDataUpperCase, false);
+      console.log("Notificação criada com sucesso");
+      setIsSuccess(true); // Definir estado de sucesso
+      toast.success("Notificação criada com sucesso");
+    }
+
+    // Redirecionar para página de listagem ou detalhes após um breve delay para mostrar a mensagem de sucesso
+    setTimeout(() => {
+      navigate("/lista-comunicacao");
+    }, 1500);
+  } catch (error: any) {
+    console.error("Erro ao salvar notificação:", error);
+
+    // Tratamento de erros melhorado
+    let errorMessage = "Erro ao salvar notificação";
+    let validationErrors: Record<string, string> = {};
+
+    // Extrair mensagem de erro e possíveis erros de validação do backend
+    if (error.response && error.response.data) {
+      // Mensagem geral de erro
+      if (error.response.data.message) {
+        errorMessage = error.response.data.message;
+      }
+
+      // Erros específicos por campo
+      if (error.response.data.errors) {
+        const backendErrors = error.response.data.errors;
+
+        // Mapear os erros do backend para nossos campos do formulário
+        Object.entries(backendErrors).forEach(([key, value]) => {
+          // Mapeamento dos nomes de campo do backend para o frontend
+          const fieldMapping: Record<string, string> = {
+            tipo_evento_idtipo_evento: "evento",
+            tipo_publico_idtipo_publico: "publicoAtendido",
+            paciente_idpaciente: "paciente",
+            residente_belem: "residenteBelem",
+            tipo_pais_idtipo_pais: "paisProcedencia",
+            tipo_estado_idtipo_estado: "uf",
+            tipo_municipio_idtipo_municipio: "municipio",
+            tipo_bairro_idtipo_bairro: "bairro",
+            tipo_atendimento_idtipo_atendimento: "tipoAtendimento",
+            data_ocorrencia: "dataOcorrencia",
+            tipo_encerramento_idtipo_encerramento: "tipoEncerramento",
+            // Adicionar mais mapeamentos conforme necessário
+          };
+
+          const fieldName = fieldMapping[key] || key;
+          validationErrors[fieldName] = Array.isArray(value)
+            ? value[0]
+            : String(value);
+        });
+      }
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+
+    // Atualizar estado de erro e exibir toast
+    setApiError(errorMessage);
+    toast.error(errorMessage);
+
+    // Atualizar erros específicos por campo
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors((prev) => ({ ...prev, ...validationErrors }));
+
+      // Expandir seções relevantes com base nos erros
+      const sectionsToExpand: Record<string, boolean> = {};
+
+      // Lógica para determinar quais seções expandir
+      Object.keys(validationErrors).forEach((field) => {
+        if (["evento", "publicoAtendido"].includes(field)) {
+          sectionsToExpand.dadosGerais = true;
+        } else if (
+          [
+            "residenteBelem",
+            "paisProcedencia",
+            "uf",
+            "municipio",
+            "bairro",
+          ].includes(field)
+        ) {
+          sectionsToExpand.procedencia = true;
+        } else if (
+          [
+            "paciente",
+            "nomeMae",
+            "dataNascimento",
+            "cpf",
+            "identidadeGenero",
+            "raca",
+          ].includes(field)
+        ) {
+          sectionsToExpand.identificacao = true;
+        } else if (
+          [
+            "tipoAtendimento",
+            "sinaisESintomas",
+            "tipoTrauma",
+            "dataOcorrencia",
+          ].includes(field)
+        ) {
+          sectionsToExpand.atendimento = true;
+        } else if (["tipoEncerramento", "dataEncerramento"].includes(field)) {
+          sectionsToExpand.encerramento = true;
+        }
+      });
+
+      // Expandir as seções determinadas
+      setExpandedSections((prev) => ({ ...prev, ...sectionsToExpand }));
+
+      // Rolar até o primeiro campo com erro
+      setTimeout(() => {
+        const firstErrorField = document.querySelector('[data-error="true"]');
+        if (firstErrorField) {
+          firstErrorField.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }
+      }, 100);
+    }
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   // Função para limpar o formulário
   const handleClearForm = () => {
@@ -3260,77 +3269,89 @@ const NotificationForm = () => {
 
           {/* Seção 5: Informações da unidade notificadora */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <SectionHeader
-              icon={<Bell className="h-5 w-5 text-orange-500" />}
-              title="5. Informações da unidade notificadora"
-              isExpanded={expandedSections.unidadeNotificadora}
-              onToggle={() => toggleSection("unidadeNotificadora")}
-            />
-            {expandedSections.unidadeNotificadora && (
-              <div className="p-6 border-t">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Data do Atendimento */}
-                  <div>
-                    <label className="block mb-2 font-medium text-gray-700">
-                      Data do Atendimento
-                    </label>
-                    <CustomDateInput
-                      name="dataAtendimento"
-                      className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
-                      value={formData.dataAtendimento}
-                      onChange={handleChange}
-                    />
-                  </div>
+  <SectionHeader
+    icon={<Bell className="h-5 w-5 text-orange-500" />}
+    title="5. Informações da unidade notificadora"
+    isExpanded={expandedSections.unidadeNotificadora}
+    onToggle={() => toggleSection("unidadeNotificadora")}
+  />
+  {expandedSections.unidadeNotificadora && (
+    <div className="p-6 border-t">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Data do Atendimento */}
+        <div>
+          <label className="block mb-2 font-medium text-gray-700">
+            Data do Atendimento
+          </label>
+          <CustomDateInput
+            name="dataAtendimento"
+            className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+            value={formData.dataAtendimento}
+            onChange={handleChange}
+          />
+        </div>
 
-                  {/* Unidade Notificadora - Componente separado */}
-                  <div>
-                    <UnidadeNotificadoraField
-                      value={formData.unidadeNotificadora}
-                      onChange={(value) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          unidadeNotificadora: value,
-                        }))
-                      }
-                      label="Unidade Notificadora"
-                      placeholder="Buscar unidade notificadora..."
-                    />
-                  </div>
+        {/* Unidade Notificadora - Modificado para mostrar erro */}
+        <div>
+          <label className="block mb-2 font-medium text-gray-700">
+            Unidade Notificadora <span className="text-red-500">*</span>
+          </label>
+          <UnidadeNotificadoraField
+            value={formData.unidadeNotificadora}
+            onChange={(value) =>
+              setFormData((prev) => ({
+                ...prev,
+                unidadeNotificadora: value,
+              }))
+            }
+            label=""
+            placeholder="Buscar unidade notificadora..."
+            hasError={!!errors.unidadeNotificadora} // Passar estado de erro
+            // Aplicar classe de erro
+            className={`${errors.unidadeNotificadora ? 'border-red-500 bg-red-50' : ''}`}
+          />
+          {/* Mostrar mensagem de erro */}
+          {errors.unidadeNotificadora && (
+            <p className="mt-1 text-sm text-red-500">
+              {errors.unidadeNotificadora}
+            </p>
+          )}
+        </div>
 
-                  {/* Nome do Notificador */}
-                  <div>
-                    <label className="block mb-2 font-medium text-gray-700">
-                      Nome do Notificador
-                    </label>
-                    <input
-                      type="text"
-                      name="nomeNotificador"
-                      placeholder="Nome do notificador"
-                      className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
-                      value={formData.nomeNotificador}
-                      onChange={handleChange}
-                    />
-                  </div>
+        {/* Nome do Notificador */}
+        <div>
+          <label className="block mb-2 font-medium text-gray-700">
+            Nome do Notificador
+          </label>
+          <input
+            type="text"
+            name="nomeNotificador"
+            placeholder="Nome do notificador"
+            className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+            value={formData.nomeNotificador}
+            onChange={handleChange}
+          />
+        </div>
 
-                  {/* Contato do Notificador */}
-                  <div>
-                    <BrazilianPhoneInput
-                      name="contatoNotificador"
-                      value={formData.contatoNotificador}
-                      onChange={(value) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          contatoNotificador: value,
-                        }))
-                      }
-                      label="Contato do Notificador"
-                      placeholder="Digite o número de telefone"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+        {/* Contato do Notificador */}
+        <div>
+          <BrazilianPhoneInput
+            name="contatoNotificador"
+            value={formData.contatoNotificador}
+            onChange={(value) =>
+              setFormData((prev) => ({
+                ...prev,
+                contatoNotificador: value,
+              }))
+            }
+            label="Contato do Notificador"
+            placeholder="Digite o número de telefone"
+          />
+        </div>
+      </div>
+    </div>
+  )}
+</div>
 
           {/* Seção 6: Encerramento do Caso */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -3387,26 +3408,37 @@ const NotificationForm = () => {
 
                   {/* Local de Encaminhamento (condicional) */}
                   {isTipoEncerramento("transferido") && (
-                    <div>
-                      <UnidadeNotificadoraField
-                        value={formData.localEncaminhamento}
-                        onChange={(value) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            localEncaminhamento: value,
-                          }))
-                        }
-                        label="Local de Encaminhamento"
-                        placeholder="Buscar estabelecimento para encaminhamento..."
-                        isForEncaminhamento={true} // Add this prop
-                      />
-                      {/* Add debug info */}
-                      <p className="mt-1 text-xs text-blue-400">
-                        ID selecionado:{" "}
-                        {formData.localEncaminhamento || "Nenhum"}
-                      </p>
-                    </div>
-                  )}
+  <div>
+    <label className="block mb-2 font-medium text-gray-700">
+      Local de Encaminhamento <span className="text-red-500">*</span>
+    </label>
+    <UnidadeNotificadoraField
+      value={formData.localEncaminhamento}
+      onChange={(value) =>
+        setFormData((prev) => ({
+          ...prev,
+          localEncaminhamento: value,
+        }))
+      }
+      label=""
+      placeholder="Buscar estabelecimento para encaminhamento..."
+      isForEncaminhamento={true}
+      hasError={!!errors.localEncaminhamento} // Passar estado de erro
+      // Aplicar classe de erro
+      className={`${errors.localEncaminhamento ? 'border-red-500 bg-red-50' : ''}`}
+    />
+    {/* Mostrar mensagem de erro */}
+    {errors.localEncaminhamento && (
+      <p className="mt-1 text-sm text-red-500">
+        {errors.localEncaminhamento}
+      </p>
+    )}
+    {/* ID selecionado */}
+    <p className="mt-1 text-xs text-blue-400">
+      ID selecionado: {formData.localEncaminhamento || "Nenhum"}
+    </p>
+  </div>
+)}
 
                   {/* Local de Encaminhamento para Óbito */}
                   {isTipoEncerramento("óbito") && (

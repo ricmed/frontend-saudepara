@@ -6,7 +6,7 @@ interface NotificacaoDatabase extends DBSchema {
   notificacoes: {
     key: number;
     value: {
-      id?: number;
+      id: number;
       formData: FormData;
       syncStatus: 'pending' | 'synced';
       timestamp: number;
@@ -43,8 +43,8 @@ export class IndexedDBService {
       upgrade(db) {
         // Store para notificações
         const notificacoesStore = db.createObjectStore('notificacoes', {
-          keyPath: 'id',
-          autoIncrement: true
+          keyPath: 'id'
+          // Removido autoIncrement: true pois vamos gerenciar IDs manualmente
         });
         notificacoesStore.createIndex('by-sync-status', 'syncStatus');
 
@@ -62,18 +62,46 @@ export class IndexedDBService {
     });
   }
 
+  // Método para gerar ID temporário negativo para novos registros offline
+  private async generateTemporaryId(): Promise<number> {
+    await this.init();
+    // Buscar o menor ID (mais negativo) atual
+    const allNotificacoes = await this.db!.getAll('notificacoes');
+    const tempIds = allNotificacoes
+      .map(n => n.id as number)
+      .filter(id => id < 0);
+    
+    // Se não houver IDs temporários, começar com -1
+    // Caso contrário, usar (menor ID - 1)
+    return tempIds.length > 0 ? Math.min(...tempIds) - 1 : -1;
+  }
+
   // MÉTODOS PARA NOTIFICAÇÕES
   
   // Salvar uma notificação (nova ou atualização)
   async saveNotificacao(formData: FormData, isEdit: boolean = false, id?: number): Promise<number> {
     await this.init();
     
-    const notificacao = {
-      id: isEdit && id ? id : undefined,
-      formData,
-      syncStatus: 'pending' as const,
-      timestamp: Date.now()
-    };
+    let notificacao;
+    
+    if (isEdit && id) {
+      // Para edição, manter o ID existente
+      notificacao = {
+        id,
+        formData,
+        syncStatus: 'pending' as const,
+        timestamp: Date.now()
+      };
+    } else {
+      // Para novos registros, gerar ID temporário negativo
+      const tempId = await this.generateTemporaryId();
+      notificacao = {
+        id: tempId,
+        formData, 
+        syncStatus: 'pending' as const,
+        timestamp: Date.now()
+      };
+    }
 
     const savedId = await this.db!.put('notificacoes', notificacao);
     return savedId;
@@ -101,6 +129,65 @@ export class IndexedDBService {
       notificacao.syncStatus = 'synced';
       await this.db!.put('notificacoes', notificacao);
     }
+  }
+
+  // Método para atualizar o ID temporário para o ID permanente após sincronização
+  async updateNotificacaoId(tempId: number, permanentId: number): Promise<void> {
+    await this.init();
+    
+    // Obter a notificação com o ID temporário
+    const notificacao = await this.db!.get('notificacoes', tempId);
+    
+    if (notificacao) {
+      // Excluir o registro com ID temporário
+      await this.db!.delete('notificacoes', tempId);
+      
+      // Criar novo registro com ID permanente
+      notificacao.id = permanentId;
+      notificacao.syncStatus = 'synced';
+      
+      await this.db!.put('notificacoes', notificacao);
+    }
+  }
+
+  // Método para sincronizar com o servidor
+  async syncNotificacoes(apiEndpoint: string): Promise<Array<{id: number, success: boolean, error?: any}>> {
+    await this.init();
+    const pendingNotificacoes = await this.getPendingNotificacoes();
+    const results = [];
+    
+    for (const { id, formData } of pendingNotificacoes) {
+      try {
+        // Enviar dados para o servidor
+        const response = await fetch(apiEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        });
+        
+        if (response.ok) {
+          const { id: permanentId } = await response.json();
+          
+          // Se o ID era temporário (negativo), atualize para o ID permanente
+          if (id < 0) {
+            await this.updateNotificacaoId(id, permanentId);
+          } else {
+            // Se já era um ID permanente, apenas marque como sincronizado
+            await this.markNotificacaoAsSynced(id);
+          }
+          
+          results.push({ id, success: true });
+        } else {
+          const errorData = await response.json().catch(() => ({ message: 'Erro desconhecido' }));
+          results.push({ id, success: false, error: errorData });
+        }
+      } catch (error) {
+        console.error(`Falha ao sincronizar notificação ${id}:`, error);
+        results.push({ id, success: false, error });
+      }
+    }
+    
+    return results;
   }
 
   // MÉTODOS PARA OPÇÕES (DROPDOWNS, ETC)
