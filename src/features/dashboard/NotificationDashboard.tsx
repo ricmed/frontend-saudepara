@@ -204,6 +204,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       console.log("Tipos de atendimento disponíveis:", exportOptions.atendimentoOptions);
     }
     
+    if (exportOptions?.eventoOptions?.length > 0) {
+      console.log("Eventos disponíveis:", exportOptions.eventoOptions);
+    }
+    
     // Armazenar as notificações originais para uso posterior
     if (notificacoes && notificacoes.length > 0) {
       originalNotificacoes.current = [...notificacoes];
@@ -329,7 +333,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     return false;
   }, [getAtendimentoDescById]);
 
-  // Função para filtrar notificações com base na categoria selecionada
+  // Função corrigida para filtrar notificações
   const filtrarNotificacoes = useCallback((categoria: string | null): any[] => {
     // Se não houver categoria ou for "Todos", retornar todas as notificações originais
     if (!categoria || categoria === "Todos") {
@@ -361,17 +365,85 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       
       if (isEvento) {
         console.log(`Filtrando por evento: ${categoriaLower}`);
-        // Filtrar por evento
+        
+        // Filtrar por evento - verificar várias estruturas de dados possíveis
         const resultado = originalNotificacoes.current.filter(n => {
-          const eventoId = n?.original?.evento_idevento;
-          if (eventoId) {
-            const evento = exportOptions.eventoOptions.find(
-              (e: any) => String(e.idtipo_evento) === String(eventoId)
-            );
-            return evento?.descricao.toLowerCase() === categoriaLower;
+          // Imprimir estrutura da primeira notificação para debug
+          if (originalNotificacoes.current.indexOf(n) === 0) {
+            console.log("Estrutura da primeira notificação:", JSON.stringify(n, null, 2).slice(0, 500) + "...");
           }
-          return false;
+          
+          // Verificar usando a estrutura esperada
+          const eventoId = n?.original?.evento_idevento;
+          if (eventoId !== undefined) {
+            // Encontrar o evento correspondente por ID
+            const eventoEncontrado = exportOptions.eventoOptions.find(
+              (e: any) => {
+                const matchId = String(e.idtipo_evento) === String(eventoId) || 
+                               String(e.idevento) === String(eventoId);
+                
+                if (matchId && originalNotificacoes.current.indexOf(n) === 0) {
+                  console.log(`Match por ID: eventoId=${eventoId}, evento.idtipo_evento=${e.idtipo_evento}, evento.descricao=${e.descricao}`);
+                }
+                
+                return matchId;
+              }
+            );
+            
+            if (eventoEncontrado && eventoEncontrado.descricao.toLowerCase() === categoriaLower) {
+              return true;
+            }
+          }
+          
+          // Verificar diretamente por descrição do evento (caso o evento esteja embutido)
+          if (n?.original?.evento?.descricao) {
+            const match = n.original.evento.descricao.toLowerCase() === categoriaLower;
+            if (match && originalNotificacoes.current.indexOf(n) === 0) {
+              console.log(`Match por descrição embutida: ${n.original.evento.descricao}`);
+            }
+            if (match) return true;
+          }
+          
+          // Verificar nome do evento diretamente
+          if (n?.eventoNome) {
+            const match = n.eventoNome.toLowerCase() === categoriaLower;
+            if (match && originalNotificacoes.current.indexOf(n) === 0) {
+              console.log(`Match por eventoNome: ${n.eventoNome}`);
+            }
+            if (match) return true;
+          }
+          
+          // Verificar o campo evento_nome se existir
+          if (n?.original?.evento_nome) {
+            const match = n.original.evento_nome.toLowerCase() === categoriaLower;
+            if (match && originalNotificacoes.current.indexOf(n) === 0) {
+              console.log(`Match por evento_nome: ${n.original.evento_nome}`);
+            }
+            if (match) return true;
+          }
+          
+          // Verificar em evento.nome se existir
+          if (n?.original?.evento?.nome) {
+            const match = n.original.evento.nome.toLowerCase() === categoriaLower;
+            if (match && originalNotificacoes.current.indexOf(n) === 0) {
+              console.log(`Match por evento.nome: ${n.original.evento.nome}`);
+            }
+            if (match) return true;
+          }
+          
+          // Como último recurso, verificar no objeto JSON completo
+          const notificacaoStr = JSON.stringify(n).toLowerCase();
+          const containsEvento = notificacaoStr.includes(`"descricao":"${categoriaLower}"`) || 
+                               notificacaoStr.includes(`"nome":"${categoriaLower}"`) ||
+                               notificacaoStr.includes(`"evento_nome":"${categoriaLower}"`);
+          
+          if (containsEvento && originalNotificacoes.current.indexOf(n) === 0) {
+            console.log(`Match por string JSON: encontrou "${categoriaLower}" no objeto`);
+          }
+          
+          return containsEvento;
         });
+        
         console.log(`Encontradas ${resultado.length} notificações para o evento: ${categoriaLower}`);
         return resultado;
       }
@@ -387,6 +459,41 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     console.log(`Encontradas ${resultado.length} notificações para a categoria: ${categoriaLower}`);
     return resultado;
   }, [exportOptions, checkAtendimentoType]);
+
+  // Adicionar função para depuração da estrutura dos dados
+  const debugEventoStructure = useCallback(() => {
+    if (originalNotificacoes.current.length === 0 || !exportOptions?.eventoOptions) {
+      console.log("Sem dados para depurar");
+      return;
+    }
+    
+    console.log("=== DEBUG EVENTO STRUCTURE ===");
+    console.log("Eventos disponíveis:", exportOptions.eventoOptions);
+    
+    // Examinar a primeira notificação
+    const firstNotification = originalNotificacoes.current[0];
+    console.log("Primeira notificação:", firstNotification);
+    
+    // Verificar campos relacionados a eventos
+    console.log("Campos evento na notificação:");
+    console.log("evento_idevento:", firstNotification?.original?.evento_idevento);
+    console.log("evento:", firstNotification?.original?.evento);
+    console.log("eventoNome:", firstNotification?.eventoNome);
+    console.log("evento_nome:", firstNotification?.original?.evento_nome);
+    
+    // Verificar quantas notificações contêm cada evento
+    if (exportOptions.eventoOptions.length > 0) {
+      exportOptions.eventoOptions.forEach((evento: any) => {
+        const eventoNome = evento.descricao.toLowerCase();
+        const matchingByString = originalNotificacoes.current.filter(n => 
+          JSON.stringify(n).toLowerCase().includes(eventoNome)
+        );
+        console.log(`Evento "${evento.descricao}" - matches por string: ${matchingByString.length}`);
+      });
+    }
+    
+    console.log("=== FIM DEBUG ===");
+  }, [exportOptions]);
 
   // Função para processar categoria simples (relação 1:1)
   const processarCategoria = useCallback((
@@ -953,9 +1060,15 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   const handleEventoChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const novoEvento = e.target.value;
     console.log(`Evento alterado para: ${novoEvento}`);
+    
+    // Se for a primeira vez que o usuário seleciona um evento, fazer depuração
+    if (novoEvento !== "Todos" && selectedEvento === "Todos") {
+      debugEventoStructure();
+    }
+    
     setSelectedEvento(novoEvento);
     setSelectedCategory(novoEvento !== "Todos" ? novoEvento : null);
-  }, []);
+  }, [selectedEvento, debugEventoStructure]);
 
   // Handler para cards e charts
   const handleCardClick = useCallback((tipoAtendimento: string) => {
