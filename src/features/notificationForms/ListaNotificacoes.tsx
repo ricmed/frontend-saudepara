@@ -15,6 +15,7 @@ import {
   ArrowRight,
   ChevronFirst,
   ChevronLast,
+  X,
 } from "lucide-react";
 import { CSVLink } from "react-csv";
 import * as XLSX from "xlsx";
@@ -29,6 +30,7 @@ import {
   exportListToPDF,
   ExportOptions,
 } from "@/features/notificationForms/components/exportUtilities";
+import SearchBar from "@/features/notificationForms/components/SearchBar"; // Adicionar o componente de busca
 
 // Tipos
 interface Notificacao {
@@ -79,7 +81,7 @@ interface PaginationMeta {
 
 interface SearchParams {
   term: string;
-  field: "all" | "paciente" | "evento" | "atendimento";
+  field: "all" | "paciente" | "evento" | "atendimento" | "encerramento";
 }
 
 interface ColumnDefinition {
@@ -88,20 +90,28 @@ interface ColumnDefinition {
   sortable?: boolean;
 }
 
-// Colunas disponíveis para exibição
+// Colunas disponíveis para exibição - Removida a coluna CBO
 const allColumns: ColumnDefinition[] = [
   { key: "paciente", label: "Paciente", sortable: true },
   { key: "tipo_evento", label: "Evento", sortable: true },
-  { key: "cbo", label: "CBO", sortable: true }, // Nome correto do campo
   { key: "data_ocorrencia", label: "Data Ocorrência", sortable: true },
   { key: "data_atendimento", label: "Data Atendimento", sortable: true },
-  { key: "tipo_atendimento", label: "Tipo Atendimento", sortable: true },
-  { key: "tipo_encerramento", label: "Tipo Encerramento", sortable: true },
+  { key: "tipo_atendimento", label: "Tipo Atendimento", sortable: false }, // Não mais ordenável
+  { key: "tipo_encerramento", label: "Tipo Encerramento", sortable: false }, // Não mais ordenável
   {
     key: "unidade_notificadora",
     label: "Unidade Notificadora",
     sortable: false,
   },
+];
+
+// Campos de busca disponíveis para a dropdown
+const searchFields = [
+  { value: "all", label: "Todos os campos" },
+  { value: "paciente", label: "Paciente" },
+  { value: "evento", label: "Evento" },
+  { value: "atendimento", label: "Tipo Atendimento" },
+  { value: "encerramento", label: "Tipo Encerramento" },
 ];
 
 const ListaNotificacoes = () => {
@@ -115,6 +125,7 @@ const ListaNotificacoes = () => {
 
   // Estados principais
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
+  const [allNotificacoes, setAllNotificacoes] = useState<Notificacao[]>([]); // Para ordenação local
   const [paginationMeta, setPaginationMeta] = useState<PaginationMeta>({
     total: 0,
     pages: 1,
@@ -128,11 +139,13 @@ const ListaNotificacoes = () => {
     field: "all",
   });
   const debouncedSearchParams = useDebounce(searchParams, 300);
+  const [hasSearched, setHasSearched] = useState(false);
 
   // Paginação
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [tempPage, setTempPage] = useState("1");
+  const [isUsingLocalSort, setIsUsingLocalSort] = useState(false);
 
   // Ordenação
   const [sortKey, setSortKey] = useState<keyof Notificacao>("data_ocorrencia");
@@ -172,45 +185,228 @@ const ListaNotificacoes = () => {
     };
   }, []);
 
+  // Função para buscar todos os dados para ordenação e exportação
+  const fetchAllData = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      let allNotificacoes: Notificacao[] = [];
+      let page = 1;
+      let hasMore = true;
+      const LARGE_PAGE_SIZE = 500; // Usar tamanho de página grande para reduzir o número de requisições
+
+      // Buscar todas as páginas
+      while (hasMore) {
+        const response = await NotificacaoService.getAll(page, LARGE_PAGE_SIZE);
+
+        if (response && response.data && response.data.length > 0) {
+          allNotificacoes = [...allNotificacoes, ...response.data];
+
+          if (
+            page >= response.meta.totalPages ||
+            response.data.length < LARGE_PAGE_SIZE
+          ) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+
+      return allNotificacoes;
+    } catch (error) {
+      console.error("Erro ao buscar todos os dados:", error);
+      setError("Erro ao buscar todas as notificações para ordenação.");
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Carregar dados
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        console.log("Buscando notificações...");
 
-        // Buscar dados com base nos parâmetros atuais
+        // Se estamos usando ordenação local e temos todos os dados
+        if (isUsingLocalSort && allNotificacoes.length > 0) {
+          // Aplicar ordenação
+          const sortedData = [...allNotificacoes].sort((a, b) => {
+            // Função de comparação para diferentes tipos de dados
+            const compareValues = (valA: any, valB: any) => {
+              // Para datas, converter para objetos Date
+              if (typeof valA === 'string' && valA.includes('/') && 
+                  typeof valB === 'string' && valB.includes('/')) {
+                // Formato data brasileira DD/MM/YYYY
+                const partsA = valA.split('/');
+                const partsB = valB.split('/');
+                
+                if (partsA.length === 3 && partsB.length === 3) {
+                  const dateA = new Date(+partsA[2], +partsA[1] - 1, +partsA[0]);
+                  const dateB = new Date(+partsB[2], +partsB[1] - 1, +partsB[0]);
+                  
+                  return sortOrder === "asc" 
+                    ? dateA.getTime() - dateB.getTime() 
+                    : dateB.getTime() - dateA.getTime();
+                }
+              }
+              
+              // Para strings
+              if (typeof valA === "string" && typeof valB === "string") {
+                return sortOrder === "asc"
+                  ? valA.localeCompare(valB, "pt-BR")
+                  : valB.localeCompare(valA, "pt-BR");
+              } else {
+                // Para outros tipos
+                if (valA < valB) return sortOrder === "asc" ? -1 : 1;
+                if (valA > valB) return sortOrder === "asc" ? 1 : -1;
+                return 0;
+              }
+            };
+
+            // Obter os valores para comparação com base na chave de ordenação
+            let valueA, valueB;
+
+            // Lógica para acessar diferentes propriedades conforme a chave
+            if (sortKey === "paciente") {
+              valueA = a.paciente || "";
+              valueB = b.paciente || "";
+            } else if (sortKey === "tipo_evento") {
+              valueA = a.tipoEvento || "";
+              valueB = b.tipoEvento || "";
+            } else if (sortKey === "data_ocorrencia") {
+              valueA = a.dataOcorrencia || "";
+              valueB = b.dataOcorrencia || "";
+            } else if (sortKey === "data_atendimento") {
+              valueA = a.original?.data_atendimento || "";
+              valueB = b.original?.data_atendimento || "";
+            } else if (sortKey === "tipo_atendimento") {
+              valueA = a.tipoAtendimento || "";
+              valueB = b.tipoAtendimento || "";
+            } else if (sortKey === "tipo_encerramento") {
+              valueA = a.tipoEncerramento || "";
+              valueB = b.tipoEncerramento || "";
+            } else {
+              valueA = a[sortKey] || "";
+              valueB = b[sortKey] || "";
+            }
+
+            return compareValues(valueA, valueB);
+          });
+
+          // Aplicar paginação manualmente
+          const startIndex = (currentPage - 1) * itemsPerPage;
+          const endIndex = startIndex + itemsPerPage;
+          setNotificacoes(sortedData.slice(startIndex, endIndex));
+
+          // Atualizar metadados de paginação
+          setPaginationMeta({
+            total: sortedData.length,
+            pages: Math.ceil(sortedData.length / itemsPerPage),
+            currentPage,
+            perPage: itemsPerPage,
+          });
+
+          setIsLoading(false);
+          return;
+        }
+
+        // Caso contrário, usar a API normal com paginação do backend
         let response;
+        
+        // Verificar se há termo de busca com no mínimo 3 caracteres
         if (
           debouncedSearchParams.term &&
           debouncedSearchParams.term.length >= 3
         ) {
-          // Se implementado, usar a busca específica
-          console.log("Buscando com termo:", debouncedSearchParams.term);
-          response = await NotificacaoService.getAll(currentPage, itemsPerPage);
+          setHasSearched(true);
+          console.log(`Buscando por "${debouncedSearchParams.term}" no campo "${debouncedSearchParams.field}"`);
+          
+          // Obter todos os dados primeiro
+          response = await NotificacaoService.getAll(1, 1000);
+          
+          // Filtrar os dados conforme o critério de busca
+          if (response && response.data) {
+            let filteredData = [];
+            const searchTerm = debouncedSearchParams.term.toLowerCase().trim();
+            
+            // Aplicar filtro conforme o campo selecionado
+            if (debouncedSearchParams.field === "paciente") {
+              filteredData = response.data.filter(item => 
+                item.paciente && item.paciente.toLowerCase().includes(searchTerm)
+              );
+            }
+            else if (debouncedSearchParams.field === "evento") {
+              filteredData = response.data.filter(item => 
+                item.tipoEvento && item.tipoEvento.toLowerCase().includes(searchTerm)
+              );
+            }
+            else if (debouncedSearchParams.field === "atendimento") {
+              filteredData = response.data.filter(item => 
+                item.tipoAtendimento && item.tipoAtendimento.toLowerCase().includes(searchTerm)
+              );
+            }
+            else if (debouncedSearchParams.field === "encerramento") {
+              filteredData = response.data.filter(item => 
+                item.tipoEncerramento && item.tipoEncerramento.toLowerCase().includes(searchTerm)
+              );
+            }
+            else {
+              // Buscar em todos os campos
+              filteredData = response.data.filter(item => (
+                (item.paciente && item.paciente.toLowerCase().includes(searchTerm)) ||
+                (item.tipoEvento && item.tipoEvento.toLowerCase().includes(searchTerm)) ||
+                (item.tipoAtendimento && item.tipoAtendimento.toLowerCase().includes(searchTerm)) ||
+                (item.tipoEncerramento && item.tipoEncerramento.toLowerCase().includes(searchTerm)) ||
+                (item.dataOcorrencia && item.dataOcorrencia.toLowerCase().includes(searchTerm))
+              ));
+            }
+            
+            // Calcular o total de páginas com base nos resultados filtrados
+            const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+            
+            // Aplicar paginação manual aos resultados filtrados
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = Math.min(startIndex + itemsPerPage, filteredData.length);
+            
+            // Garantir que não esteja além do número de páginas
+            const safeCurrentPage = Math.min(currentPage, Math.max(1, totalPages));
+            
+            // Se a página mudou, atualize
+            if (safeCurrentPage !== currentPage) {
+              setCurrentPage(safeCurrentPage);
+              setTempPage(safeCurrentPage.toString());
+            }
+            
+            // Criar resposta com dados paginados
+            response = {
+              data: filteredData.slice(startIndex, endIndex),
+              meta: {
+                total: filteredData.length,
+                totalPages: totalPages,
+                page: safeCurrentPage,
+                limit: itemsPerPage
+              }
+            };
+            
+            console.log(`Encontrados ${filteredData.length} resultados para a busca.`);
+          }
         } else {
           console.log("Buscando todas notificações");
           response = await NotificacaoService.getAll(currentPage, itemsPerPage);
+          
+          // Se já houve busca anteriormente e agora o campo está vazio,
+          // resetar a flag
+          if (hasSearched && !debouncedSearchParams.term) {
+            setHasSearched(false);
+          }
         }
 
-        // Adicione AQUI, após a chamada à API
-        console.log("Resposta da API:", response);
-
-        // ADICIONE ESTE LOG para verificar a estrutura exata da resposta
-        console.log(
-          "Estrutura da resposta completa:",
-          JSON.stringify(response, null, 2)
-        );
-
         if (response && response.data) {
-          console.log(
-            "Quantidade de notificações encontradas:",
-            response.data.length
-          );
-          if (response.data.length > 0) {
-            console.log("Primeira notificação:", response.data[0]);
-          }
-
           // Verificar se estamos em uma página válida
           if (
             response.meta &&
@@ -250,43 +446,7 @@ const ListaNotificacoes = () => {
     };
 
     fetchData();
-  }, [currentPage, itemsPerPage, debouncedSearchParams]);
-
-  // Função para buscar todos os dados para exportação
-  const fetchAllData = async () => {
-    try {
-      setIsLoading(true);
-
-      let allNotificacoes: Notificacao[] = [];
-      let page = 1;
-      let hasMore = true;
-
-      // Buscar todas as páginas
-      while (hasMore) {
-        const response = await NotificacaoService.getAll(page, 100);
-
-        if (response && response.data && response.data.length > 0) {
-          allNotificacoes = [...allNotificacoes, ...response.data];
-
-          if (page >= response.meta.totalPages) {
-            hasMore = false;
-          } else {
-            page++;
-          }
-        } else {
-          hasMore = false;
-        }
-      }
-
-      return allNotificacoes;
-    } catch (error) {
-      console.error("Erro ao buscar todos os dados:", error);
-      setError("Erro ao exportar dados. Tente novamente.");
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [currentPage, itemsPerPage, debouncedSearchParams, isUsingLocalSort, sortKey, sortOrder, hasSearched]);
 
   // Funções de manipulação de dados
   const handleDelete = async (id: number) => {
@@ -308,6 +468,11 @@ const ListaNotificacoes = () => {
             currentPage: response.meta.page,
             perPage: response.meta.limit,
           });
+
+          // Se estamos usando ordenação local, atualizar allNotificacoes também
+          if (isUsingLocalSort) {
+            setAllNotificacoes(prev => prev.filter(n => n.id !== id));
+          }
         }
 
         toast.success("Notificação excluída com sucesso");
@@ -328,24 +493,99 @@ const ListaNotificacoes = () => {
     if (safeNewPage >= 1 && safeNewPage <= paginationMeta.pages) {
       setCurrentPage(safeNewPage);
       setTempPage(safeNewPage.toString());
+      
+      // Se estiver usando ordenação local, aplicar paginação manualmente
+      if (isUsingLocalSort && allNotificacoes.length > 0) {
+        const startIndex = (safeNewPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        
+        // Aplicar a ordenação atual
+        const sortedData = [...allNotificacoes].sort((a, b) => {
+          // Lógica de ordenação aqui (simplificada)
+          const valueA = a[sortKey] || "";
+          const valueB = b[sortKey] || "";
+          return sortOrder === "asc" 
+            ? String(valueA).localeCompare(String(valueB)) 
+            : String(valueB).localeCompare(String(valueA));
+        });
+        
+        setNotificacoes(sortedData.slice(startIndex, endIndex));
+      }
     }
   };
 
   // Ordenação
-  const handleSortChange = (key: string | keyof Notificacao) => {
-    if (sortKey === key) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortKey(key as keyof Notificacao);
-      setSortOrder("asc");
+  const handleSortChange = async (key: string | keyof Notificacao) => {
+    try {
+      // Se a coluna não é ordenável, não fazer nada
+      const colDef = allColumns.find(col => col.key === key);
+      if (colDef && colDef.sortable === false) {
+        return;
+      }
+      
+      // Determinar a nova ordem
+      const newSortOrder = sortKey === key && sortOrder === "asc" ? "desc" : "asc";
+      
+      // Se não estamos usando ordenação local ou se é a primeira vez
+      if (!isUsingLocalSort || allNotificacoes.length === 0) {
+        setIsLoading(true);
+        
+        // Confirmação para buscar todos os dados (muitos registros podem demorar)
+        // No ambiente de produção, você pode decidir se quer mostrar esta confirmação
+        // ou fazer a ordenação local automaticamente
+        
+        // Buscar todos os dados - a função fetchAllData usa getAll com um limite grande
+        // para obter todos os registros
+        const allData = await fetchAllData();
+        
+        if (allData && allData.length > 0) {
+          setAllNotificacoes(allData);
+          setIsUsingLocalSort(true);
+          
+          // Atualizar as chaves de ordenação
+          setSortKey(key as keyof Notificacao);
+          setSortOrder(newSortOrder);
+          
+          toast.info("Ordenação ativada com sucesso");
+        } else {
+          // Fallback para ordenação básica se não conseguir buscar todos os dados
+          setSortKey(key as keyof Notificacao);
+          setSortOrder(newSortOrder);
+          
+          // Ordenar apenas os dados da página atual (não é ideal, mas é um fallback)
+          const sortedPageData = [...notificacoes].sort((a, b) => {
+            const valueA = (a[key as keyof Notificacao] || '').toString().toLowerCase();
+            const valueB = (b[key as keyof Notificacao] || '').toString().toLowerCase();
+            
+            return newSortOrder === "asc" 
+              ? valueA.localeCompare(valueB, 'pt-BR')
+              : valueB.localeCompare(valueA, 'pt-BR');
+          });
+          
+          setNotificacoes(sortedPageData);
+        }
+      } else {
+        // Simplesmente atualizar as chaves de ordenação quando já temos todos os dados
+        setSortKey(key as keyof Notificacao);
+        setSortOrder(newSortOrder);
+      }
+      
+      setIsSortingMenuOpen(false);
+    } catch (error) {
+      console.error("Erro ao ordenar:", error);
+      setError("Erro ao ordenar dados. Tente novamente.");
     }
-    setIsSortingMenuOpen(false);
   };
 
   // Colunas
   const handleToggleColumn = (colKey: string) => {
     if (selectedColumns.includes(colKey)) {
-      setSelectedColumns(selectedColumns.filter((key) => key !== colKey));
+      // Não permitir que remova todas as colunas
+      if (selectedColumns.length > 1) {
+        setSelectedColumns(selectedColumns.filter((key) => key !== colKey));
+      } else {
+        toast.warning("É necessário manter pelo menos uma coluna visível");
+      }
     } else {
       setSelectedColumns([...selectedColumns, colKey]);
     }
@@ -453,6 +693,53 @@ const ListaNotificacoes = () => {
         toast.error("Erro na exportação. Tente novamente.");
       }
     }
+  };
+
+  // Funções adicionais de exportação permanecem as mesmas...
+
+  // Componente para exibir menu de colunas
+  const ColumnsMenu = ({ 
+    isOpen, 
+    columns, 
+    selectedColumns, 
+    onToggleColumn 
+  }: { 
+    isOpen: boolean;
+    columns?: ColumnDefinition[];
+    selectedColumns?: string[];
+    onToggleColumn?: (colKey: string) => void;
+  }) => {
+    if (!isOpen) return null;
+
+    // Use the passed props if available, otherwise fallback to the parent component state
+    const columnsToRender = columns || allColumns;
+    const selectedCols = selectedColumns || [];
+    const toggleColumn = onToggleColumn || handleToggleColumn;
+
+    return (
+      <div className="absolute left-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 p-2">
+        {columnsToRender.map((col) => (
+          <div
+            key={col.key}
+            className="flex items-center p-2 hover:bg-gray-50 rounded"
+          >
+            <input
+              type="checkbox"
+              id={`col-${col.key}`}
+              checked={selectedCols.includes(col.key)}
+              onChange={() => toggleColumn(col.key)}
+              className="mr-2"
+            />
+            <label
+              htmlFor={`col-${col.key}`}
+              className="text-sm text-gray-700 cursor-pointer"
+            >
+              {col.label}
+            </label>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   // Função de exportação Excel
@@ -580,42 +867,12 @@ const ListaNotificacoes = () => {
     }
   };
 
-  // Componente para exibir menu de colunas
-  const ColumnsMenu = ({ isOpen }: { isOpen: boolean }) => {
-    if (!isOpen) return null;
-
-    return (
-      <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 p-2">
-        {allColumns.map((col) => (
-          <div
-            key={col.key}
-            className="flex items-center p-2 hover:bg-gray-50 rounded"
-          >
-            <input
-              type="checkbox"
-              id={`col-${col.key}`}
-              checked={selectedColumns.includes(col.key)}
-              onChange={() => handleToggleColumn(col.key)}
-              className="mr-2"
-            />
-            <label
-              htmlFor={`col-${col.key}`}
-              className="text-sm text-gray-700 cursor-pointer"
-            >
-              {col.label}
-            </label>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
   // Componente para exibir menu de exportação
   const ExportMenu = ({ isOpen }: { isOpen: boolean }) => {
     if (!isOpen) return null;
 
     return (
-      <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 p-2">
+      <div className="absolute left-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 p-2">
         <div className="border-b pb-2 mb-2">
           <h3 className="text-sm font-medium text-gray-700 px-2">
             Página Atual
@@ -716,8 +973,14 @@ const ListaNotificacoes = () => {
                     <ChevronDown className="w-4 h-4" />
                   )}
                 </button>
-
-                <ColumnsMenu isOpen={isColumnsMenuOpen} />
+                {isColumnsMenuOpen && (
+                  <ColumnsMenu 
+                    isOpen={isColumnsMenuOpen} 
+                    columns={allColumns}
+                    selectedColumns={selectedColumns}
+                    onToggleColumn={handleToggleColumn}
+                  />
+                )}
               </div>
 
               {/* Botão Ordenação */}
@@ -738,7 +1001,7 @@ const ListaNotificacoes = () => {
                   )}
                 </button>
                 {isSortingMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 p-2">
+                  <div className="absolute left-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 p-2">
                     {allColumns
                       .filter((col) => col.sortable !== false)
                       .map((col) => (
@@ -747,9 +1010,16 @@ const ListaNotificacoes = () => {
                           onClick={() =>
                             handleSortChange(col.key as keyof Notificacao)
                           }
-                          className="block w-full text-left text-sm text-gray-700 hover:bg-gray-50 px-2 py-1 rounded"
+                          className={`block w-full text-left text-sm ${
+                            sortKey === col.key 
+                              ? 'text-blue-600 font-medium'
+                              : 'text-gray-700' 
+                          } hover:bg-gray-50 px-2 py-1 rounded flex items-center justify-between`}
                         >
-                          {col.label}
+                          <span>{col.label}</span>
+                          {sortKey === col.key && (
+                            <span>{sortOrder === "asc" ? "▲" : "▼"}</span>
+                          )}
                         </button>
                       ))}
                   </div>
@@ -774,36 +1044,35 @@ const ListaNotificacoes = () => {
                     <ChevronDown className="w-4 h-4" />
                   )}
                 </button>
-
-                <ExportMenu isOpen={isExportMenuOpen} />
+                {isExportMenuOpen && (
+                  <ExportMenu isOpen={isExportMenuOpen} />
+                )}
               </div>
 
               {/* Campo de busca */}
-              <div className="relative">
-                <div className="flex items-center">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Buscar notificação..."
-                      value={searchParams.term}
-                      onChange={(e) => {
-                        setSearchParams({
-                          ...searchParams,
-                          term: e.target.value,
-                        });
-                        if (e.target.value.length === 0) {
-                          setCurrentPage(1);
-                          setTempPage("1");
-                        }
-                      }}
-                      className="pl-9 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64 text-gray-800"
-                    />
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Search className="h-4 w-4 text-gray-400" />
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <SearchBar 
+                searchParams={searchParams}
+                fields={searchFields}
+                onSearchChange={(newParams) => {
+                  setSearchParams(newParams as SearchParams);
+                  
+                  // Se o termo for limpo, voltar para a primeira página
+                  if (!newParams.term && searchParams.term) {
+                    setCurrentPage(1);
+                    setTempPage("1");
+                  }
+                }}
+                onSearch={() => {
+                  if (searchParams.term.length >= 3) {
+                    setCurrentPage(1);
+                    setTempPage("1");
+                    // Aqui poderíamos acionar manualmente uma busca se necessário
+                  } else if (searchParams.term.length > 0) {
+                    toast.warning("Digite pelo menos 3 caracteres para buscar");
+                  }
+                }}
+                placeholder="Buscar por paciente, evento ou atendimento..."
+              />
 
               {/* Botão Nova Notificação */}
               <button
@@ -857,6 +1126,8 @@ const ListaNotificacoes = () => {
                                   handleSortChange(col.key as keyof Notificacao)
                                 }
                                 className="ml-1 focus:outline-none text-white"
+                                aria-label={sortOrder === "asc" ? "Ordenar decrescente" : "Ordenar crescente"}
+                                title={sortOrder === "asc" ? "Ordenar decrescente" : "Ordenar crescente"}
                               >
                                 {sortKey === col.key ? (
                                   sortOrder === "asc" ? (
