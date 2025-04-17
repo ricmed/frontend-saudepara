@@ -29,7 +29,6 @@ import {
   exportListToPDF,
   ExportOptions,
 } from "@/features/notificationForms/components/exportUtilities";
-import EnhancedNotificationDashboard from "@/features/dashboard/NotificationDashboard";
 
 // Tipos
 interface Notificacao {
@@ -153,9 +152,6 @@ const ListaNotificacoes = () => {
   // Controle de exportação
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
 
-  const [allNotificacoes, setAllNotificacoes] = useState<Notificacao[]>([]);
-  const [isDashboardLoading, setIsDashboardLoading] = useState(true);
-
   // Erro e loading
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -255,101 +251,6 @@ const ListaNotificacoes = () => {
 
     fetchData();
   }, [currentPage, itemsPerPage, debouncedSearchParams]);
-
-  // Adicione este estado para armazenar as opções de exportação
-  const [exportOptions, setExportOptions] = useState<ExportOptions>({
-    eventoOptions: [],
-    publicoOptions: [],
-    paisOptions: [],
-    estadoOptions: [],
-    municipioOptions: [],
-    bairroOptions: [],
-    generoOptions: [],
-    racaOptions: [],
-    escolaridadeOptions: [],
-    atendimentoOptions: [],
-    sintomaOptions: [],
-    hipoteseDiagOptions: [],
-    traumaOptions: [],
-    estabelecimentoOptions: [],
-    encerramentoOptions: [],
-    cboOptions: [],
-  });
-
-  useEffect(() => {
-    const loadOptions = async () => {
-      try {
-        const options = {
-          eventoOptions: await NotificacaoService.getEventoOptions(),
-          publicoOptions: await NotificacaoService.getPublicoOptions(),
-          paisOptions: await NotificacaoService.getPaisOptions(),
-          estadoOptions: await NotificacaoService.getEstadoOptions(),
-          municipioOptions: await NotificacaoService.getMunicipioOptions(),
-          bairroOptions: await NotificacaoService.getBairroOptions(),
-          generoOptions: await NotificacaoService.getGeneroOptions(),
-          racaOptions: await NotificacaoService.getRacaOptions(),
-          escolaridadeOptions:
-            await NotificacaoService.getEscolaridadeOptions(),
-          atendimentoOptions: await NotificacaoService.getAtendimentoOptions(),
-          sintomaOptions: await NotificacaoService.getSintomaOptions(),
-          hipoteseDiagOptions:
-            await NotificacaoService.getHipoteseDiagOptions(),
-          traumaOptions: await NotificacaoService.getTraumaOptions(),
-          estabelecimentoOptions:
-            await NotificacaoService.getEstabelecimentoOptions(),
-          encerramentoOptions:
-            await NotificacaoService.getEncerramentoOptions(),
-          cboOptions: await NotificacaoService.getCboOptions(),
-        };
-        setExportOptions(options);
-      } catch (error) {
-        console.error("Erro ao carregar opções:", error);
-      }
-    };
-
-    loadOptions();
-  }, []);
-
-  useEffect(() => {
-    const loadAllDataForDashboard = async () => {
-      try {
-        setIsDashboardLoading(true);
-
-        let allData: Notificacao[] = [];
-        let page = 1;
-        let hasMore = true;
-
-        // Fetch all pages of data
-        while (hasMore) {
-          const response = await NotificacaoService.getAll(page, 100); // Fetch in larger chunks
-
-          if (response && response.data && response.data.length > 0) {
-            allData = [...allData, ...response.data];
-
-            if (page >= response.meta.totalPages) {
-              hasMore = false;
-            } else {
-              page++;
-            }
-          } else {
-            hasMore = false;
-          }
-        }
-
-        setAllNotificacoes(allData);
-        console.log(`Carregados ${allData.length} registros para o dashboard`);
-      } catch (error) {
-        console.error(
-          "Erro ao carregar todos os dados para o dashboard:",
-          error
-        );
-      } finally {
-        setIsDashboardLoading(false);
-      }
-    };
-
-    loadAllDataForDashboard();
-  }, []);
 
   // Função para buscar todos os dados para exportação
   const fetchAllData = async () => {
@@ -1242,28 +1143,6 @@ const ListaNotificacoes = () => {
               </div>
             </div>
           </div>
-        </div>
-        {/* Adicione o dashboard aqui */}
-        <div className="mt-8">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">
-            Dashboard de Notificações
-          </h2>
-
-          {isDashboardLoading ? (
-            <div className="bg-white p-6 rounded-xl shadow-md flex justify-center items-center h-64">
-              <div className="flex flex-col items-center">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mb-2"></div>
-                <p className="text-gray-600">
-                  Carregando dados completos para o dashboard...
-                </p>
-              </div>
-            </div>
-          ) : (
-            <EnhancedNotificationDashboard
-              notificacoes={allNotificacoes}
-              exportOptions={exportOptions || {}}
-            />
-          )}
         </div>
       </main>
 
