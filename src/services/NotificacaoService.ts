@@ -110,7 +110,8 @@ const TIPO_ENDPOINTS = {
 // Instância do axios
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  // Aumenta timeout para 60s para operações mais demoradas
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json'
   }
@@ -416,7 +417,8 @@ export const NotificacaoService = {
   // Excluir notificação
   async delete(id: number): Promise<void> {
     try {
-      await api.delete(`/${id}`);
+      // Usa timeout maior explicitamente se necessário
+      await api.delete(`/${id}`, { timeout: 60000 });
     } catch (error) {
       return handleApiError(error);
     }

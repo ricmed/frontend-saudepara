@@ -111,9 +111,10 @@ function createCalcularEstatisticas(
   setTotalNotifications: (total: number) => void,
   setStatCounts: (counts: any) => void
 ) {
-  return (dadosFiltrados: any[] = []) => {
-    const dados = dadosFiltrados.length > 0 ? dadosFiltrados : notificacoes;
-    
+  return (dadosFiltrados?: any[]) => {
+    // se vier um array (mesmo vazio), usar; só usar notificacoes quando undefined
+    const dados = dadosFiltrados !== undefined ? dadosFiltrados : notificacoes;
+
     if (!Array.isArray(dados)) {
       console.error("dados não é um array:", dados);
       return false;
@@ -1109,28 +1110,23 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
   // Quando a categoria selecionada mudar, aplicar filtro real
   useEffect(() => {
-    if (!initialProcessingDone.current) {
-      return; // Não aplique filtros antes do processamento inicial
-    }
-    
-    console.log("Aplicando filtro:", selectedCategory);
-    
-    try {
-      setLoading(true);
-      
-      // Filtrar notificações baseado na categoria selecionada
-      const dadosFiltrados = filtrarNotificacoes(selectedCategory);
-      filteredNotificacoes.current = dadosFiltrados;
-      
-      // Recalcular estatísticas com base nas notificações filtradas
+    if (!initialProcessingDone.current) return;
+    setLoading(true);
+    const dadosFiltrados = filtrarNotificacoes(selectedCategory);
+    filteredNotificacoes.current = dadosFiltrados;
+
+    if (dadosFiltrados.length === 0) {
+      // sem notificações: zerar totais e limpar gráficos
+      setTotalNotifications(0);
+      setStatCounts({ clinico:0, trauma:0, surto:0, multiplas:0, qbrn:0 });
+      setFilteredRaca([]); setFilteredEscolaridade([]); setFilteredUnidades([]);
+      setFilteredSintomas([]); setFilteredTipoAtendimento([]); setFilteredPublico([]);
+      setFilteredHipoteses([]); setFilteredTrauma([]); setFilteredGenero([]);
+    } else {
       calcularEstatisticasRef.current && calcularEstatisticasRef.current(dadosFiltrados);
-      
-    } catch (error) {
-      console.error("Erro ao aplicar filtro:", error);
-    } finally {
-      setLoading(false);
     }
-    
+
+    setLoading(false);
   }, [selectedCategory, filtrarNotificacoes]);
 
   // useEffect para processamento inicial de dados
@@ -1453,7 +1449,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           {/* Cards de Resumo */}
           <div
             className={`bg-white p-4 rounded-lg shadow-sm flex items-center gap-4 cursor-pointer hover:shadow-md transition-shadow ${selectedCategory === null ? 'ring-2 ring-blue-400' : ''}`}
-            onClick={() => setSelectedCategory(null)}
+            onClick={() => { setSelectedCategory(null); setSelectedEvento("Todos"); }}
           >
             <div className="p-3 bg-blue-100 text-blue-800 rounded-full">
               <FileText className="h-6 w-6" />
