@@ -35,6 +35,7 @@ import {
   AlertTriangle,
   Bomb
 } from "lucide-react";
+import { NotificacaoService } from '@/services/NotificacaoService';
 
 // Cores padronizadas - voltando para a paleta original com tonalidades de azul
 const COLORS = {
@@ -102,6 +103,80 @@ interface StatCounts {
   qbrn: number;
 }
 
+// Adicione esta função antes do componente EnhancedNotificationDashboard:
+function createCalcularEstatisticas(
+  notificacoes: any[], 
+  getAtendimentoDescById: (id: string | number) => string,
+  processarDadosGraficos: (dados: any[]) => boolean,
+  setTotalNotifications: (total: number) => void,
+  setStatCounts: (counts: any) => void
+) {
+  return (dadosFiltrados: any[] = []) => {
+    const dados = dadosFiltrados.length > 0 ? dadosFiltrados : notificacoes;
+    
+    if (!Array.isArray(dados)) {
+      console.error("dados não é um array:", dados);
+      return false;
+    }
+
+    console.log("Calculando estatísticas para", dados.length, "notificações");
+
+    try {
+      // Total de notificações
+      const total = dados.length;
+      setTotalNotifications(total);
+
+      // Inicializar contagens
+      const counts = {
+        clinico: 0,
+        trauma: 0,
+        surto: 0,
+        multiplas: 0,
+        qbrn: 0
+      };
+
+      // Contar por tipo de atendimento com base nas descrições
+      dados.forEach(n => {
+        // Obter tipo de atendimento
+        const tipoId = n?.original?.tipo_atendimento_idtipo_atendimento;
+        let tipoDesc = "";
+        
+        if (tipoId !== undefined) {
+          tipoDesc = getAtendimentoDescById(tipoId);
+        } else if (n?.original?.tipo_atendimento?.descricao) {
+          tipoDesc = n.original.tipo_atendimento.descricao;
+        } else if (n?.tipoAtendimento) {
+          tipoDesc = n.tipoAtendimento;
+        }
+        
+        // Classificar baseado na descrição (case insensitive)
+        const lowerDesc = tipoDesc.toLowerCase();
+        
+        if (lowerDesc.includes("clínico") || lowerDesc.includes("clinico")) {
+          counts.clinico++;
+        } else if (lowerDesc.includes("trauma")) {
+          counts.trauma++;
+        } else if (lowerDesc.includes("surto")) {
+          counts.surto++;
+        } else if (lowerDesc.includes("múltiplas vítimas") || lowerDesc.includes("multiplas vitimas")) {
+          counts.multiplas++;
+        } else if (lowerDesc.includes("qbrn") || lowerDesc.includes("incidente q")) {
+          counts.qbrn++;
+        }
+      });
+
+      console.log("Contagens calculadas:", counts);
+      setStatCounts(counts);
+
+      // Processar dados para gráficos
+      return processarDadosGraficos(dados);
+    } catch (error) {
+      console.error("Erro ao calcular estatísticas:", error);
+      return false;
+    }
+  };
+}
+
 const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   notificacoes = [],
   exportOptions = {},
@@ -111,6 +186,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   const originalNotificacoes = useRef<any[]>([]);
   const filteredNotificacoes = useRef<any[]>([]);
   const autoRefreshInterval = useRef<NodeJS.Timeout | null>(null);
+  const refreshDataRef = useRef<any>(null);
   
   // Estado para controle de visualização
   const [activeTab, setActiveTab] = useState("graficos");
@@ -122,7 +198,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
-  const [autoRefreshCountdown, setAutoRefreshCountdown] = useState(60); // Modificado para 60 segundos
+  const [autoRefreshCountdown, setAutoRefreshCountdown] = useState(60); // 60 segundos = 1 minuto
 
   // Dados base do dashboard
   const [totalNotifications, setTotalNotifications] = useState(0);
@@ -171,28 +247,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     'incidente qbrn': 'Incidente QBRN'
   };
 
-  // Função para atualizar os dados
-  const refreshData = useCallback(() => {
-    if (loading) return; // Evita atualizações simultâneas
-    
-    console.log("Atualizando dados automaticamente...");
-    setLoading(true);
-    
-    setTimeout(() => {
-      if (selectedCategory) {
-        // Se temos um filtro ativo, reaplicá-lo
-        const dadosFiltrados = filtrarNotificacoes(selectedCategory);
-        filteredNotificacoes.current = dadosFiltrados;
-        calcularEstatisticas(dadosFiltrados);
-      } else {
-        // Sem filtro, processar todos os dados originais
-        filteredNotificacoes.current = originalNotificacoes.current;
-        calcularEstatisticas(originalNotificacoes.current);
-      }
-      setLoading(false);
-      setLastUpdate(new Date().toLocaleString());
-    }, 500);
-  }, [loading, selectedCategory]);
+  // Função corrigida para filtrar notificações
+  // (removida duplicata para evitar erro de declaração)
 
   // DEBUG: Log inicial para ajudar no diagnóstico
   useEffect(() => {
@@ -214,6 +270,29 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     }
   }, [notificacoes, exportOptions]);
   
+  // Monitorar mudanças nas props de notificações
+  useEffect(() => {
+    if (notificacoes && notificacoes.length > 0) {
+      console.log("PROPS ATUALIZADAS: Recebidas", notificacoes.length, "notificações");
+      
+      // Verificar se há alteração no comprimento dos dados
+      if (originalNotificacoes.current.length !== notificacoes.length) {
+        console.log("MUDANÇA DETECTADA: Original:", originalNotificacoes.current.length, 
+                   "Novo:", notificacoes.length);
+        
+        // Atualizar dados e forçar reprocessamento
+        originalNotificacoes.current = [...notificacoes];
+        initialProcessingDone.current = false;
+        
+        // Iniciar o processamento imediatamente
+        calcularEstatisticasRef.current && calcularEstatisticasRef.current(notificacoes);
+        
+        // Atualizar a hora da última atualização
+        setLastUpdate(new Date().toLocaleString());
+      }
+    }
+  }, [notificacoes]);
+  
   // Efeito para gerenciar o auto refresh
   useEffect(() => {
     // Limpar qualquer intervalo existente
@@ -224,7 +303,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
     // Se a atualização automática está habilitada, configurar o intervalo
     if (autoRefreshEnabled) {
-      // Configurar o contador regressivo - Alterado para 60 segundos (1 minuto)
+      // Configurar o contador regressivo - 60 segundos (1 minuto)
       let countdown = 60;
       setAutoRefreshCountdown(countdown);
       
@@ -235,7 +314,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         
         // Quando o contador chegar a zero, atualizar os dados
         if (countdown <= 0) {
-          refreshData();
+          refreshDataRef.current && refreshDataRef.current();
           countdown = 60; // Resetar para 60 segundos
           setAutoRefreshCountdown(countdown);
         }
@@ -251,7 +330,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         autoRefreshInterval.current = null;
       }
     };
-  }, [autoRefreshEnabled, refreshData]);
+  }, [autoRefreshEnabled]);
 
   // Função para obter a cor correta para cada tipo de atendimento
   const getAtendimentoColor = useCallback((tipoAtendimento: string): string => {
@@ -460,42 +539,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     return resultado;
   }, [exportOptions, checkAtendimentoType]);
 
-  // Adicionar função para depuração da estrutura dos dados
-  const debugEventoStructure = useCallback(() => {
-    if (originalNotificacoes.current.length === 0 || !exportOptions?.eventoOptions) {
-      console.log("Sem dados para depurar");
-      return;
-    }
-    
-    console.log("=== DEBUG EVENTO STRUCTURE ===");
-    console.log("Eventos disponíveis:", exportOptions.eventoOptions);
-    
-    // Examinar a primeira notificação
-    const firstNotification = originalNotificacoes.current[0];
-    console.log("Primeira notificação:", firstNotification);
-    
-    // Verificar campos relacionados a eventos
-    console.log("Campos evento na notificação:");
-    console.log("evento_idevento:", firstNotification?.original?.evento_idevento);
-    console.log("evento:", firstNotification?.original?.evento);
-    console.log("eventoNome:", firstNotification?.eventoNome);
-    console.log("evento_nome:", firstNotification?.original?.evento_nome);
-    
-    // Verificar quantas notificações contêm cada evento
-    if (exportOptions.eventoOptions.length > 0) {
-      exportOptions.eventoOptions.forEach((evento: any) => {
-        const eventoNome = evento.descricao.toLowerCase();
-        const matchingByString = originalNotificacoes.current.filter(n => 
-          JSON.stringify(n).toLowerCase().includes(eventoNome)
-        );
-        console.log(`Evento "${evento.descricao}" - matches por string: ${matchingByString.length}`);
-      });
-    }
-    
-    console.log("=== FIM DEBUG ===");
-  }, [exportOptions]);
-
-  // Função para processar categoria simples (relação 1:1)
   const processarCategoria = useCallback((
     dados: any[],
     campoId: string,
@@ -936,6 +979,134 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     }
   }, [notificacoes, processarDadosGraficos, getAtendimentoDescById]);
 
+  // Função para buscar dados frescos do servidor usando o NotificacaoService
+  const fetchFreshData = useCallback(async () => {
+    try {
+      console.log("Buscando dados frescos do servidor via NotificacaoService...");
+      
+      // Usar o serviço para buscar todas as notificações
+      // com um limite alto para garantir que pegamos todos os dados
+      const response = await NotificacaoService.getAll(1, 1000);
+      
+      if (response && response.data) {
+        const freshData = response.data;
+        console.log("Novos dados recebidos:", freshData.length, "notificações");
+        
+        // Atualizar as notificações originais
+        originalNotificacoes.current = [...freshData];
+        
+        // Removido reset que impedia filtro de evento funcionar
+        // initialProcessingDone.current = false;
+        
+        return freshData;
+      } else {
+        console.error("Resposta vazia ou inválida do serviço");
+        return null;
+      }
+    } catch (error) {
+      console.error("Erro ao buscar dados do servidor:", error);
+      return null;
+    }
+  }, []);
+
+  // Função para atualizar os dados
+  const refreshData = useCallback(async () => {
+    if (loading) return; // Evita atualizações simultâneas
+    
+    console.log("Atualizando dados automaticamente...");
+    setLoading(true);
+    
+    try {
+      // Buscar dados frescos do servidor usando o NotificacaoService
+      const freshData = await fetchFreshData();
+      
+      // Se conseguimos novos dados, processar
+      if (freshData) {
+        // Atualizar dados originais
+        if (selectedCategory) {
+          // Se temos um filtro ativo, reaplicá-lo
+          const dadosFiltrados = filtrarNotificacoes(selectedCategory);
+          filteredNotificacoes.current = dadosFiltrados;
+          calcularEstatisticasRef.current && calcularEstatisticasRef.current(dadosFiltrados);
+        } else {
+          // Sem filtro, processar todos os dados originais
+          filteredNotificacoes.current = originalNotificacoes.current;
+          calcularEstatisticasRef.current && calcularEstatisticasRef.current(originalNotificacoes.current);
+        }
+      } else {
+        // Se não conseguirmos novos dados, verificar props
+        console.log("Verificando notificações via props...");
+        if (notificacoes && notificacoes.length > 0 && 
+            notificacoes.length !== originalNotificacoes.current.length) {
+          console.log("Detectada diferença nas notificações:", 
+                     "Original:", originalNotificacoes.current.length, 
+                     "Novas:", notificacoes.length);
+          
+          // Substituir os dados originais pelos novos
+          originalNotificacoes.current = [...notificacoes];
+          initialProcessingDone.current = false;
+        }
+        
+        // Reprocessar o que temos
+        if (selectedCategory) {
+          const dadosFiltrados = filtrarNotificacoes(selectedCategory);
+          filteredNotificacoes.current = dadosFiltrados;
+          calcularEstatisticasRef.current && calcularEstatisticasRef.current(dadosFiltrados);
+        } else {
+          filteredNotificacoes.current = originalNotificacoes.current;
+          calcularEstatisticasRef.current && calcularEstatisticasRef.current(originalNotificacoes.current);
+        }
+      }
+
+      // Reativa processamento inicial para que o filtro de eventos funcione
+      initialProcessingDone.current = true;
+
+    } catch (error) {
+      console.error("Erro na atualização:", error);
+    } finally {
+      setLoading(false);
+      setLastUpdate(new Date().toLocaleString());
+    }
+  }, [loading, selectedCategory, fetchFreshData, notificacoes, filtrarNotificacoes]);
+
+  // Adicionar função para depuração da estrutura dos dados
+  const debugEventoStructure = useCallback(() => {
+    if (originalNotificacoes.current.length === 0 || !exportOptions?.eventoOptions) {
+      console.log("Sem dados para depurar");
+      return;
+    }
+    
+    console.log("=== DEBUG EVENTO STRUCTURE ===");
+    console.log("Eventos disponíveis:", exportOptions.eventoOptions);
+    
+    // Examinar a primeira notificação
+    const firstNotification = originalNotificacoes.current[0];
+    console.log("Primeira notificação:", firstNotification);
+    
+    // Verificar campos relacionados a eventos
+    console.log("Campos evento na notificação:");
+    console.log("evento_idevento:", firstNotification?.original?.evento_idevento);
+    console.log("evento:", firstNotification?.original?.evento);
+    console.log("eventoNome:", firstNotification?.eventoNome);
+    console.log("evento_nome:", firstNotification?.original?.evento_nome);
+    
+    // Verificar quantas notificações contêm cada evento
+    if (exportOptions.eventoOptions.length > 0) {
+      exportOptions.eventoOptions.forEach((evento: any) => {
+        const eventoNome = evento.descricao.toLowerCase();
+        const matchingByString = originalNotificacoes.current.filter(n => 
+          JSON.stringify(n).toLowerCase().includes(eventoNome)
+        );
+        console.log(`Evento "${evento.descricao}" - matches por string: ${matchingByString.length}`);
+      });
+    }
+    
+    console.log("=== FIM DEBUG ===");
+  }, [exportOptions]);
+
+  // Função para processar categoria simples (relação 1:1)
+  
+
   // Quando a categoria selecionada mudar, aplicar filtro real
   useEffect(() => {
     if (!initialProcessingDone.current) {
@@ -952,7 +1123,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       filteredNotificacoes.current = dadosFiltrados;
       
       // Recalcular estatísticas com base nas notificações filtradas
-      calcularEstatisticas(dadosFiltrados);
+      calcularEstatisticasRef.current && calcularEstatisticasRef.current(dadosFiltrados);
       
     } catch (error) {
       console.error("Erro ao aplicar filtro:", error);
@@ -960,7 +1131,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       setLoading(false);
     }
     
-  }, [selectedCategory, filtrarNotificacoes, calcularEstatisticas]);
+  }, [selectedCategory, filtrarNotificacoes]);
 
   // useEffect para processamento inicial de dados
   useEffect(() => {
@@ -1015,7 +1186,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           console.log("Iniciando processamento de dados com", notificacoes.length, "notificações");
           // Processar todas as notificações (sem filtro inicialmente)
           filteredNotificacoes.current = notificacoes;
-          const success = calcularEstatisticas(notificacoes);
+          const success = calcularEstatisticasRef.current && calcularEstatisticasRef.current(notificacoes);
           console.log("Processamento de dados concluído com sucesso:", success);
         }
         
@@ -1042,7 +1213,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     // Iniciar o processamento
     doInitialProcessing();
     
-  }, [notificacoes, calcularEstatisticas]);
+  }, [notificacoes]);
 
   // Usar dados reais para eventos
   const eventoOptions = exportOptions?.eventoOptions?.length > 0 
@@ -1050,8 +1221,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     : ["Todos", "COP30", "Carnaval", "Copa do Mundo Feminina", "Círio de Nazaré"];
 
   const handleRefresh = useCallback(() => {
-    refreshData();
-  }, [refreshData]);
+    refreshDataRef.current && refreshDataRef.current();
+  }, []);
 
   const toggleAutoRefresh = useCallback(() => {
     setAutoRefreshEnabled(prev => !prev);
@@ -1097,6 +1268,34 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   }, []);
 
   const dashboardRef = useRef(null);
+
+  // Adicione refs para as funções
+  const calcularEstatisticasRef = useRef<any>(null);
+  const processarDadosGraficosRef = useRef<any>(null);
+
+  // Inicialize as funções apenas uma vez
+  useEffect(() => {
+    if (!processarDadosGraficosRef.current) {
+      processarDadosGraficosRef.current = (dadosFiltrados: any[]) => {
+        // Chame a função processarDadosGraficos já existente
+        return processarDadosGraficos(dadosFiltrados);
+      };
+    }
+    if (!calcularEstatisticasRef.current) {
+      calcularEstatisticasRef.current = createCalcularEstatisticas(
+        notificacoes,
+        getAtendimentoDescById,
+        processarDadosGraficosRef.current,
+        setTotalNotifications,
+        setStatCounts
+      );
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Executa apenas uma vez
+
+  useEffect(() => {
+    refreshDataRef.current = refreshData;
+  }, [refreshData]);
 
   return (
     <div className="min-h-screen bg-gray-100 text-gray-800 pb-6">
