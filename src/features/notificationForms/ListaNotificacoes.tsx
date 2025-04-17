@@ -1222,6 +1222,14 @@ const ListaNotificacoes = () => {
                               );
                             }
 
+                            if (key === "data_atendimento") {
+                              return (
+                                <td key={key} className="px-6 py-4 whitespace-nowrap">
+                                  {formatDate(notificacao.original?.data_atendimento)}
+                                </td>
+                              );
+                            }
+
                             if (key === "tipo_atendimento") {
                               return (
                                 <td
