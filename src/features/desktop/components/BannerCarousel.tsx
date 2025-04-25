@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from '@/i18n/useTranslations';
+import { Language } from '@/i18n/types';
 
 interface CampanhaItem {
   imagem: string;
@@ -10,9 +12,13 @@ interface CampanhaItem {
 
 interface BannerCarouselProps {
   campanhas?: CampanhaItem[];
+  selectedLanguage?: Language;
 }
 
-export const BannerCarousel: React.FC<BannerCarouselProps> = ({ campanhas }) => {
+export const BannerCarousel: React.FC<BannerCarouselProps> = ({ 
+  campanhas,
+  selectedLanguage 
+}) => {
   const navigate = useNavigate();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [startX, setStartX] = useState<number | null>(null);
@@ -20,6 +26,7 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({ campanhas }) => 
   const [isDragging, setIsDragging] = useState(false);
   const [autoplayPaused, setAutoplayPaused] = useState(false);
   const carouselRef = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation(selectedLanguage || 'pt-BR');
   
   // Dados padrão de campanhas
   const defaultCampanhas: CampanhaItem[] = [
@@ -55,7 +62,45 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({ campanhas }) => 
     }
   ];
 
-  const items = campanhas || defaultCampanhas;
+  // Map default campaigns to translated content
+  const translatedCampanhas = defaultCampanhas.map((campanha, index) => {
+    let translationKey = '';
+    let campaignKey = '';
+    
+    // Match campaign URL path to translation key
+    switch(campanha.link) {
+      case '/campanha-dezembro-vermelho':
+        translationKey = 'redDecember';
+        campaignKey = 'dezembro-vermelho';
+        break;
+      case '/campanha-novembro-azul':
+        translationKey = 'blueNovember';
+        campaignKey = 'novembro-azul';
+        break;
+      case '/setembro-verde':
+        translationKey = 'greenSeptember';
+        campaignKey = 'setembro-verde';
+        break;
+      case '/malaria-zero':
+        translationKey = 'malaria';
+        campaignKey = 'malaria-zero';
+        break;
+      case '/amamentacao':
+        translationKey = 'breastfeeding';
+        campaignKey = 'amamentacao';
+        break;
+      default:
+        return campanha;
+    }
+    
+    return {
+      ...campanha,
+      titulo: t(`campaigns.list.${translationKey}`),
+      descricao: t(`campaigns.list.${translationKey}Desc`),
+    };
+  });
+
+  const items = campanhas || translatedCampanhas;
 
   // Gerencia o autoplay do carrossel
   useEffect(() => {
@@ -198,7 +243,7 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({ campanhas }) => 
                         }
                       }}
                     >
-                      Saiba mais
+                      {t('campaigns.saibaMais')}
                     </button>
                   </div>
                 </div>
@@ -213,7 +258,7 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({ campanhas }) => 
               e.stopPropagation();
               goToPrevSlide();
             }}
-            aria-label="Slide anterior"
+            aria-label={t('carousel.previousSlide')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-6 h-6">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -226,7 +271,7 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({ campanhas }) => 
               e.stopPropagation();
               goToNextSlide();
             }}
-            aria-label="Próximo slide"
+            aria-label={t('carousel.nextSlide')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-6 h-6">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -245,7 +290,7 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({ campanhas }) => 
                   e.stopPropagation();
                   goToSlide(index);
                 }}
-                aria-label={`Ir para slide ${index + 1}`}
+                aria-label={`${t('carousel.goToSlide')} ${index + 1}`}
               />
             ))}
           </div>

@@ -1,17 +1,26 @@
 import React from 'react';
 import { Facebook, Instagram, Youtube } from 'lucide-react';
+import { useTranslation } from '@/i18n/useTranslations';
+import { Language } from '@/i18n/types';
 
-const Footer: React.FC = () => {
+interface FooterProps {
+  selectedLanguage?: Language;
+}
+
+const Footer: React.FC<FooterProps> = ({ selectedLanguage }) => {
+  const { t } = useTranslation(selectedLanguage || 'pt-BR');
+  const currentYear = new Date().getFullYear().toString();
+  
   return (
     <footer className="bg-blue-900 text-white py-12">
       <div className="max-w-6xl mx-auto px-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           <div>
-            <h3 className="text-lg font-medium mb-4">Contato</h3>
+            <h3 className="text-lg font-medium mb-4">{t('footer.contact')}</h3>
             <ul className="space-y-2">
               <li className="flex items-start">
                 <span className="mr-2 text-pink-500">📍</span>
-                <span>Tv. Lomas Valentinas, 2190 – Marco, Belém – PA, CEP: 66093-677</span>
+                <span>{t('footer.address')}</span>
               </li>
               <li className="flex items-start">
                 <span className="mr-2 text-red-500">📞</span>
@@ -40,25 +49,25 @@ const Footer: React.FC = () => {
             </div>
           </div>
           <div>
-            <h3 className="text-lg font-medium mb-4">Horário de Atendimento</h3>
-            <p>Segunda a Sexta: 08:00 às 18:00</p>
-            <p className="mt-4">Secretaria de Estado da Saúde do Pará – SESPA, criada pela lei Nº 400, de 30 de agosto de 1951, como órgão da administração direta do estado.</p>
+            <h3 className="text-lg font-medium mb-4">{t('footer.openingHours')}</h3>
+            <p>{t('footer.weekdayHours')}</p>
+            <p className="mt-4">{t('footer.sespaBrief')}</p>
           </div>
           <div>
-            <h3 className="text-lg font-medium mb-4">Ouvidoria</h3>
-            <p>Tem alguma sugestão ou reclamação?</p>
-            <p className="mt-2">Entre em contato com nossa ouvidoria:</p>
-            <p className="mt-2">📞 0800-123-4567</p>
+            <h3 className="text-lg font-medium mb-4">{t('footer.ombudsman')}</h3>
+            <p>{t('footer.feedbackQuestion')}</p>
+            <p className="mt-2">{t('footer.contactOmbudsman')}</p>
+            <p className="mt-2">📞 0800-280-9209</p>
             <p className="mt-2">✉️ ouvidoria@saude.pa.gov.br</p>
           </div>
           <div>
-            <h3 className="text-lg font-medium mb-4">Portal Saúde Pará</h3>
-            <p>Acesse informações, serviços e notícias sobre saúde pública no estado do Pará.</p>
-            <p className="mt-2">Desenvolvido pela Secretaria de Estado de Saúde Pública do Pará (SESPA).</p>
+            <h3 className="text-lg font-medium mb-4">{t('footer.portalTitle')}</h3>
+            <p>{t('footer.portalDescription')}</p>
+            <p className="mt-2">{t('footer.developedBy')}</p>
           </div>
         </div>
         <div className="text-center text-sm border-t border-white/20 pt-6">
-          <p>© 2025 Secretaria de Estado de Saúde Pública do Pará - Todos os direitos reservados</p>
+          <p>{t('footer.copyright', { year: currentYear })}</p>
         </div>
       </div>
     </footer>

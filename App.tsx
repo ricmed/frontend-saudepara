@@ -123,8 +123,8 @@ function App() {
     <LanguageProvider>
       <Router>
         <Routes>
-          <Route path="/desktop" element={<DesktopPage />} />
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<DesktopPage />} />
+          <Route path="/teste" element={<HomePage />} />
           <Route path="/mapa" element={<MapaLocais />} />
           <Route path="/campanhas" element={<HealthCampaignsPage />} />{" "}
           {/* Updated to use HealthCampaignsPage */}

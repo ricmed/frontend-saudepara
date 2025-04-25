@@ -2,15 +2,15 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Syringe, Utensils, Trees, Building, BriefcaseMedical, Hospital } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslations';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { Language } from "@/i18n/types";
 
 interface LocalizeAquiProps {
   isMobile?: boolean;
+  selectedLanguage: Language;
 }
 
-export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true }) => {
+export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, selectedLanguage }) => {
   const navigate = useNavigate();
-  const { selectedLanguage } = useLanguage();
   const { t } = useTranslation(selectedLanguage);
 
   const pontosDeInteresse = [
@@ -55,7 +55,7 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true }) =
   if (isMobile) {
     return (
       <div className="p-4 bg-white">
-        <h2 className="text-xl font-bold text-center mb-6">Localize aqui</h2>
+        <h2 className="text-xl font-bold text-center mb-6">{t('localize.title')}</h2>
         <div className="grid grid-cols-3 gap-4">
           {pontosDeInteresse.map((ponto, index) => (
             <div
@@ -67,10 +67,10 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true }) =
                 {ponto.icone}
               </div>
               <span className="text-xs text-center font-medium">
-                {t(`points.${ponto.nome}`) || ponto.nome}
+                {t(`points.${ponto.nome}`)}
               </span>
               <p className="text-xs text-center text-gray-500 mt-1">
-                {ponto.descricao}
+                {t(`points.${ponto.nome}.desc`)}
               </p>
             </div>
           ))}
@@ -82,7 +82,7 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true }) =
   return (
     <section className="py-12 bg-gray-50">
       <div className="container mx-auto px-6">
-        <h2 className="text-2xl font-bold text-center text-gray-800 mb-8">Localize</h2>
+        <h2 className="text-2xl font-bold text-center text-gray-800 mb-8">{t('localize.title')}</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
           {pontosDeInteresse.map((ponto, index) => (
             <div
@@ -94,10 +94,10 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true }) =
                 {ponto.icone}
               </div>
               <span className="font-medium">
-                {t(`points.${ponto.nome}`) || ponto.nome}
+                {t(`points.${ponto.nome}`)}
               </span>
               <p className="text-sm text-center text-gray-500 mt-1">
-                {ponto.descricao}
+                {t(`points.${ponto.nome}.desc`)}
               </p>
             </div>
           ))}

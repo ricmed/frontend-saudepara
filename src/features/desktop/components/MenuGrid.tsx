@@ -1,33 +1,40 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building, Heart, Book, MessageCircle } from 'lucide-react';
+import { useTranslation } from '@/i18n/useTranslations';
+import { Language } from '@/i18n/types';
 
 interface MenuGridProps {
   isMobile?: boolean;
+  selectedLanguage?: Language;
 }
 
-export const MenuGrid: React.FC<MenuGridProps> = ({ isMobile = true }) => {
+export const MenuGrid: React.FC<MenuGridProps> = ({ 
+  isMobile = true, 
+  selectedLanguage 
+}) => {
   const navigate = useNavigate();
+  const { t } = useTranslation(selectedLanguage || 'pt-BR');
 
   const menuItems = [
     {
       icon: <Building className={`${isMobile ? 'h-6 w-6' : 'h-10 w-10'} text-[#3B5FFF] mb-${isMobile ? '2' : '3'}`} />,
-      label: 'Locais',
+      label: 'menu.locations',
       onClick: () => navigate('/mapa')
     },
     {
       icon: <Heart className={`${isMobile ? 'h-6 w-6' : 'h-10 w-10'} text-[#3B5FFF] mb-${isMobile ? '2' : '3'}`} />,
-      label: 'Campanhas de Saúde',
+      label: 'menu.campaigns',
       onClick: () => navigate('/campanhas')
     },
     {
       icon: <Book className={`${isMobile ? 'h-6 w-6' : 'h-10 w-10'} text-[#3B5FFF] mb-${isMobile ? '2' : '3'}`} />,
-      label: 'Materiais Educativos',
+      label: 'menu.materials',
       onClick: () => navigate('/materiais')
     },
     {
       icon: <MessageCircle className={`${isMobile ? 'h-6 w-6' : 'h-10 w-10'} text-[#3B5FFF] mb-${isMobile ? '2' : '3'}`} />,
-      label: 'Fale Conosco',
+      label: 'menu.fale_conosco',
       onClick: () => navigate('/contato')
     }
   ];
@@ -42,7 +49,7 @@ export const MenuGrid: React.FC<MenuGridProps> = ({ isMobile = true }) => {
             className="bg-white flex flex-col items-center p-6 rounded-xl shadow-sm cursor-pointer"
           >
             {item.icon}
-            <span className="text-sm font-medium">{item.label}</span>
+            <span className="text-sm font-medium">{t(item.label)}</span>
           </div>
         ))}
       </div>
@@ -59,7 +66,7 @@ export const MenuGrid: React.FC<MenuGridProps> = ({ isMobile = true }) => {
             className="bg-white flex flex-col items-center p-8 rounded-xl shadow-sm hover:shadow-md transition cursor-pointer"
           >
             {item.icon}
-            <span className="text-lg font-medium">{item.label}</span>
+            <span className="text-lg font-medium">{t(item.label)}</span>
           </div>
         ))}
       </div>

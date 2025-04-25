@@ -4,6 +4,8 @@ export const translations: TranslationsType = {
   "pt-BR": {
     // Cabeçalho
     "search.placeholder": "Buscar serviços",
+    "header.secretaryOf": "Secretaria de Estado de",
+    "header.publicHealth": "Saúde Pública",
     
     // Menu Grid
     "menu.locations": "Locais",
@@ -13,6 +15,7 @@ export const translations: TranslationsType = {
     
     // Seção de Pontos
     "section.locate": "Localize aqui",
+    "localize.title": "Localize Aqui",
     "points.vaccination": "Pontos de Vacinação",
     "points.vaccination.desc": "Locais para vacinação",
     "points.food": "Praças de Alimentação",
@@ -25,6 +28,14 @@ export const translations: TranslationsType = {
     "points.health.desc": "Atendimento médico",
     "points.hospitals": "Hospitais de Referência",
     "points.hospitals.desc": "Hospitais principais",
+    "points.hospital": "Hospital",
+    "points.hospital.desc": "Atendimento hospitalar completo com diversas especialidades",
+    "points.ubs": "Unidade Básica de Saúde",
+    "points.ubs.desc": "Atendimento de cuidados primários e preventivos",
+    "points.emergency": "Emergência",
+    "points.emergency.desc": "Atendimento emergencial 24 horas",
+    "points.laboratory": "Laboratório",
+    "points.laboratory.desc": "Exames e testes laboratoriais",
     
     // Navegação
     "nav.home": "Início",
@@ -60,6 +71,12 @@ export const translations: TranslationsType = {
     "department.medications": "Medicamentos",
     "department.maternal": "Saúde Materno-Infantil",
     "department.epidemiology": "Epidemiologia",
+
+    // Botões e carousel
+    "campaigns.saibaMais": "Saiba mais",
+    "carousel.previousSlide": "Slide anterior",
+    "carousel.nextSlide": "Próximo slide",
+    "carousel.goToSlide": "Ir para o slide {number}",
 
     // Campanha de Amamentação
     "campaigns.breastfeeding.title": "Amamentação",
@@ -106,11 +123,51 @@ export const translations: TranslationsType = {
     "campaigns.list.malaria": "Malária Zero",
     "campaigns.list.malariaDesc": "Campanha de prevenção à malária na região amazônica",
     "campaigns.list.breastfeeding": "Amamentação",
-    "campaigns.list.breastfeedingDesc": "Incentivo ao aleitamento materno nas comunidades paraenses"
+    "campaigns.list.breastfeedingDesc": "Incentivo ao aleitamento materno nas comunidades paraenses",
+    
+    // Campanhas de Saúde adicionais
+    "healthCampaigns.viewCampaignButton": "Ver Campanha",
+    "healthCampaigns.addToFavorites": "Adicionar aos favoritos",
+    "healthCampaigns.removeFromFavorites": "Remover dos favoritos",
+    "healthCampaigns.searchPlaceholder": "Pesquisar campanhas...",
+    "healthCampaigns.searchAriaLabel": "Campo de busca para campanhas",
+    "healthCampaigns.clearSearchButton": "Limpar busca",
+    "healthCampaigns.openMenuButton": "Abrir menu",
+    "healthCampaigns.newCampaignButton": "Nova campanha",
+    "healthCampaigns.newButton": "Nova",
+    "healthCampaigns.closeErrorButton": "Fechar mensagem de erro",
+    "healthCampaigns.noResults": "Nenhum resultado encontrado",
+    "healthCampaigns.noCampaigns": "Nenhuma campanha disponível",
+    "healthCampaigns.errorLoading": "Erro ao carregar campanhas",
+    "healthCampaigns.tabs.campanhas": "Campanhas",
+    "healthCampaigns.tabs.favoritos": "Favoritos",
+    "healthCampaigns.tabs.recentes": "Recentes",
+    "healthCampaigns.footerCopyright": "Secretaria de Estado de Saúde Pública do Pará",
+    "healthCampaigns.footer.about": "Sobre",
+    "healthCampaigns.footer.contact": "Contato",
+    "healthCampaigns.footer.privacy": "Privacidade",
+    "healthCampaigns.footer.terms": "Termos",
+
+    // Footer
+    "footer.contact": "Contato",
+    "footer.address": "Tv. Lomas Valentinas, 2190 - Marco, Belém - PA, 66093-677",
+    "footer.openingHours": "Horário de Funcionamento",
+    "footer.weekdayHours": "Segunda a Sexta: 8h às 17h",
+    "footer.sespaBrief": "A SESPA trabalha para garantir a saúde da população paraense.",
+    "footer.ombudsman": "Ouvidoria",
+    "footer.feedbackQuestion": "Tem alguma sugestão ou reclamação?",
+    "footer.contactOmbudsman": "Entre em contato com nossa ouvidoria:",
+    "footer.portalTitle": "Portal Saúde Pará",
+    "footer.portalDescription": "Portal de serviços e informações da Secretaria de Estado de Saúde Pública do Pará.",
+    "footer.developedBy": "Desenvolvido pela Equipe SESPA Tech.",
+    "footer.copyright": "© {year} Secretaria de Estado de Saúde Pública do Pará. Todos os direitos reservados.",
+    "footer.rights": "Todos os direitos reservados"
   },
   "en": {
     // Header
     "search.placeholder": "Search services",
+    "header.secretaryOf": "State Department of",
+    "header.publicHealth": "Public Health",
     
     // Menu Grid
     "menu.locations": "Locations",
@@ -120,6 +177,7 @@ export const translations: TranslationsType = {
     
     // Points Section
     "section.locate": "Find Here",
+    "localize.title": "Find Here",
     "points.vaccination": "Vaccination Points",
     "points.vaccination.desc": "Vaccination locations",
     "points.food": "Food Courts",
@@ -132,6 +190,14 @@ export const translations: TranslationsType = {
     "points.health.desc": "Medical care",
     "points.hospitals": "Reference Hospitals",
     "points.hospitals.desc": "Main hospitals",
+    "points.hospital": "Hospital",
+    "points.hospital.desc": "Complete hospital care with various specialties",
+    "points.ubs": "Basic Health Unit",
+    "points.ubs.desc": "Primary and preventive care services",
+    "points.emergency": "Emergency",
+    "points.emergency.desc": "24-hour emergency care",
+    "points.laboratory": "Laboratory",
+    "points.laboratory.desc": "Laboratory tests and examinations",
     
     // Navigation
     "nav.home": "Home",
@@ -155,6 +221,12 @@ export const translations: TranslationsType = {
     
     // Language Selector
     "language.select": "Select language",
+
+    // Buttons and carousel
+    "campaigns.saibaMais": "Learn more",
+    "carousel.previousSlide": "Previous slide",
+    "carousel.nextSlide": "Next slide",
+    "carousel.goToSlide": "Go to slide {number}",
 
     // Departments
     "department.title": "Notifications Module",
@@ -213,11 +285,51 @@ export const translations: TranslationsType = {
     "campaigns.list.malaria": "Malaria Zero",
     "campaigns.list.malariaDesc": "Malaria prevention campaign in the Amazon region",
     "campaigns.list.breastfeeding": "Breastfeeding",
-    "campaigns.list.breastfeedingDesc": "Promoting breastfeeding in Pará communities"
+    "campaigns.list.breastfeedingDesc": "Promoting breastfeeding in Pará communities",
+    
+    // Additional Health Campaigns
+    "healthCampaigns.viewCampaignButton": "View Campaign",
+    "healthCampaigns.addToFavorites": "Add to favorites",
+    "healthCampaigns.removeFromFavorites": "Remove from favorites",
+    "healthCampaigns.searchPlaceholder": "Search campaigns...",
+    "healthCampaigns.searchAriaLabel": "Search field for campaigns",
+    "healthCampaigns.clearSearchButton": "Clear search",
+    "healthCampaigns.openMenuButton": "Open menu",
+    "healthCampaigns.newCampaignButton": "New campaign",
+    "healthCampaigns.newButton": "New",
+    "healthCampaigns.closeErrorButton": "Close error message",
+    "healthCampaigns.noResults": "No results found",
+    "healthCampaigns.noCampaigns": "No campaigns available",
+    "healthCampaigns.errorLoading": "Error loading campaigns",
+    "healthCampaigns.tabs.campanhas": "Campaigns",
+    "healthCampaigns.tabs.favoritos": "Favorites",
+    "healthCampaigns.tabs.recentes": "Recent",
+    "healthCampaigns.footerCopyright": "State Department of Public Health of Pará",
+    "healthCampaigns.footer.about": "About",
+    "healthCampaigns.footer.contact": "Contact",
+    "healthCampaigns.footer.privacy": "Privacy",
+    "healthCampaigns.footer.terms": "Terms",
+
+    // Footer
+    "footer.contact": "Contact",
+    "footer.address": "Tv. Lomas Valentinas, 2190 - Marco, Belém - PA, 66093-677",
+    "footer.openingHours": "Opening Hours",
+    "footer.weekdayHours": "Monday to Friday: 8am to 5pm",
+    "footer.sespaBrief": "SESPA works to ensure the health of the population of Pará.",
+    "footer.ombudsman": "Ombudsman",
+    "footer.feedbackQuestion": "Do you have any suggestions or complaints?",
+    "footer.contactOmbudsman": "Contact our ombudsman:",
+    "footer.portalTitle": "Pará Health Portal",
+    "footer.portalDescription": "Portal of services and information from the State Department of Public Health of Pará.",
+    "footer.developedBy": "Developed by SESPA Tech Team.",
+    "footer.copyright": "© {year} State Department of Public Health of Pará. All rights reserved.",
+    "footer.rights": "All rights reserved"
   },
   "es": {
     // Encabezado
     "search.placeholder": "Buscar servicios",
+    "header.secretaryOf": "Secretaría de Estado de",
+    "header.publicHealth": "Salud Pública",
     
     // Menú Grid
     "menu.locations": "Ubicaciones",
@@ -227,6 +339,7 @@ export const translations: TranslationsType = {
     
     // Sección de Puntos
     "section.locate": "Encuentra Aquí",
+    "localize.title": "Localice Aquí",
     "points.vaccination": "Puntos de Vacunación",
     "points.vaccination.desc": "Lugares de vacunación",
     "points.food": "Plazas de Alimentación",
@@ -239,6 +352,14 @@ export const translations: TranslationsType = {
     "points.health.desc": "Atención médica",
     "points.hospitals": "Hospitales de Referencia",
     "points.hospitals.desc": "Hospitales principales",
+    "points.hospital": "Hospital",
+    "points.hospital.desc": "Atención hospitalaria completa con diversas especialidades",
+    "points.ubs": "Unidad Básica de Salud",
+    "points.ubs.desc": "Servicios de atención primaria y preventiva",
+    "points.emergency": "Emergencia",
+    "points.emergency.desc": "Atención de emergencia las 24 horas",
+    "points.laboratory": "Laboratorio",
+    "points.laboratory.desc": "Pruebas y exámenes de laboratorio",
     
     // Navegación
     "nav.home": "Inicio",
@@ -262,6 +383,12 @@ export const translations: TranslationsType = {
     
     // Selector de Idiomas
     "language.select": "Seleccionar idioma",
+
+    // Botones y carousel
+    "campaigns.saibaMais": "Saber más",
+    "carousel.previousSlide": "Diapositiva anterior",
+    "carousel.nextSlide": "Siguiente diapositiva",
+    "carousel.goToSlide": "Ir a la diapositiva {number}",
 
     // Departamentos
     "department.title": "Módulo de Notificaciones",
@@ -320,11 +447,51 @@ export const translations: TranslationsType = {
     "campaigns.list.malaria": "Malaria Cero",
     "campaigns.list.malariaDesc": "Campaña de prevención de la malaria en la región amazónica",
     "campaigns.list.breastfeeding": "Lactancia Materna",
-    "campaigns.list.breastfeedingDesc": "Promoción de la lactancia materna en las comunidades de Pará"
+    "campaigns.list.breastfeedingDesc": "Promoción de la lactancia materna en las comunidades de Pará",
+    
+    // Campañas de Salud adicionales
+    "healthCampaigns.viewCampaignButton": "Ver Campaña",
+    "healthCampaigns.addToFavorites": "Añadir a favoritos",
+    "healthCampaigns.removeFromFavorites": "Quitar de favoritos",
+    "healthCampaigns.searchPlaceholder": "Buscar campañas...",
+    "healthCampaigns.searchAriaLabel": "Campo de búsqueda para campañas",
+    "healthCampaigns.clearSearchButton": "Limpiar búsqueda",
+    "healthCampaigns.openMenuButton": "Abrir menú",
+    "healthCampaigns.newCampaignButton": "Nueva campaña",
+    "healthCampaigns.newButton": "Nueva",
+    "healthCampaigns.closeErrorButton": "Cerrar mensaje de error",
+    "healthCampaigns.noResults": "No se encontraron resultados",
+    "healthCampaigns.noCampaigns": "No hay campañas disponibles",
+    "healthCampaigns.errorLoading": "Error al cargar campañas",
+    "healthCampaigns.tabs.campanhas": "Campañas",
+    "healthCampaigns.tabs.favoritos": "Favoritos",
+    "healthCampaigns.tabs.recentes": "Recientes",
+    "healthCampaigns.footerCopyright": "Secretaría de Estado de Salud Pública de Pará",
+    "healthCampaigns.footer.about": "Acerca de",
+    "healthCampaigns.footer.contact": "Contacto",
+    "healthCampaigns.footer.privacy": "Privacidad",
+    "healthCampaigns.footer.terms": "Términos",
+
+    // Footer
+    "footer.contact": "Contacto",
+    "footer.address": "Tv. Lomas Valentinas, 2190 - Marco, Belém - PA, 66093-677",
+    "footer.openingHours": "Horario de Atención",
+    "footer.weekdayHours": "Lunes a Viernes: 8h a 17h",
+    "footer.sespaBrief": "SESPA trabaja para garantizar la salud de la población de Pará.",
+    "footer.ombudsman": "Defensoría",
+    "footer.feedbackQuestion": "¿Tienes alguna sugerencia o queja?",
+    "footer.contactOmbudsman": "Contacta con nuestra defensoría:",
+    "footer.portalTitle": "Portal de Salud Pará",
+    "footer.portalDescription": "Portal de servicios e información de la Secretaría de Estado de Salud Pública de Pará.",
+    "footer.developedBy": "Desarrollado por el Equipo SESPA Tech.",
+    "footer.copyright": "© {year} Secretaría de Estado de Salud Pública de Pará. Todos los derechos reservados.",
+    "footer.rights": "Todos los derechos reservados"
   },
   "zh": {
     // 标题
     "search.placeholder": "搜索服务",
+    "header.secretaryOf": "国家",
+    "header.publicHealth": "公共卫生部",
     
     // 菜单网格
     "menu.locations": "位置",
@@ -334,6 +501,7 @@ export const translations: TranslationsType = {
     
     // 点位部分
     "section.locate": "在此查找",
+    "localize.title": "在此查找",
     "points.vaccination": "疫苗接种点",
     "points.vaccination.desc": "疫苗接种地点",
     "points.food": "美食广场",
@@ -346,6 +514,14 @@ export const translations: TranslationsType = {
     "points.health.desc": "医疗护理",
     "points.hospitals": "参考医院",
     "points.hospitals.desc": "主要医院",
+    "points.hospital": "医院",
+    "points.hospital.desc": "提供各种专科的完整医院护理",
+    "points.ubs": "基础卫生站",
+    "points.ubs.desc": "初级和预防保健服务",
+    "points.emergency": "急诊",
+    "points.emergency.desc": "24小时紧急护理",
+    "points.laboratory": "实验室",
+    "points.laboratory.desc": "实验室测试和检查",
     
     // 导航
     "nav.home": "首页",
@@ -369,6 +545,12 @@ export const translations: TranslationsType = {
     
     // 语言选择器
     "language.select": "选择语言",
+
+    // 按钮和轮播
+    "campaigns.saibaMais": "了解更多",
+    "carousel.previousSlide": "上一张幻灯片",
+    "carousel.nextSlide": "下一张幻灯片",
+    "carousel.goToSlide": "转到幻灯片 {number}",
 
     // 部门
     "department.title": "通知模块",
@@ -427,11 +609,51 @@ export const translations: TranslationsType = {
     "campaigns.list.malaria": "疟疾零计划",
     "campaigns.list.malariaDesc": "亚马逊地区疟疾预防运动",
     "campaigns.list.breastfeeding": "母乳喂养",
-    "campaigns.list.breastfeedingDesc": "在帕拉社区推广母乳喂养"
+    "campaigns.list.breastfeedingDesc": "在帕拉社区推广母乳喂养",
+    
+    // 额外的健康活动
+    "healthCampaigns.viewCampaignButton": "查看活动",
+    "healthCampaigns.addToFavorites": "添加到收藏",
+    "healthCampaigns.removeFromFavorites": "从收藏中移除",
+    "healthCampaigns.searchPlaceholder": "搜索活动...",
+    "healthCampaigns.searchAriaLabel": "活动搜索字段",
+    "healthCampaigns.clearSearchButton": "清除搜索",
+    "healthCampaigns.openMenuButton": "打开菜单",
+    "healthCampaigns.newCampaignButton": "新活动",
+    "healthCampaigns.newButton": "新建",
+    "healthCampaigns.closeErrorButton": "关闭错误消息",
+    "healthCampaigns.noResults": "未找到结果",
+    "healthCampaigns.noCampaigns": "无可用活动",
+    "healthCampaigns.errorLoading": "加载活动时出错",
+    "healthCampaigns.tabs.campanhas": "活动",
+    "healthCampaigns.tabs.favoritos": "收藏",
+    "healthCampaigns.tabs.recentes": "最近",
+    "healthCampaigns.footerCopyright": "帕拉州公共卫生部",
+    "healthCampaigns.footer.about": "关于",
+    "healthCampaigns.footer.contact": "联系",
+    "healthCampaigns.footer.privacy": "隐私",
+    "healthCampaigns.footer.terms": "条款",
+
+    // Footer
+    "footer.contact": "联系方式",
+    "footer.address": "Tv. Lomas Valentinas, 2190 - Marco, Belém - PA, 66093-677",
+    "footer.openingHours": "营业时间",
+    "footer.weekdayHours": "周一至周五：上午8点至下午5点",
+    "footer.sespaBrief": "SESPA致力于保障帕拉州居民的健康。",
+    "footer.ombudsman": "监察员",
+    "footer.feedbackQuestion": "您有任何建议或投诉吗？",
+    "footer.contactOmbudsman": "联系我们的监察员：",
+    "footer.portalTitle": "帕拉健康门户",
+    "footer.portalDescription": "帕拉州公共卫生部的服务和信息门户。",
+    "footer.developedBy": "由SESPA技术团队开发。",
+    "footer.copyright": "© {year} 帕拉州公共卫生部。版权所有。",
+    "footer.rights": "版权所有"
   },
   "fr": {
     // En-tête
     "search.placeholder": "Rechercher des services",
+    "header.secretaryOf": "Département d'État de",
+    "header.publicHealth": "Santé Publique",
     
     // Menu Grille
     "menu.locations": "Emplacements",
@@ -441,6 +663,7 @@ export const translations: TranslationsType = {
     
     // Section Points
     "section.locate": "Trouvez Ici",
+    "localize.title": "Localisez Ici",
     "points.vaccination": "Points de Vaccination",
     "points.vaccination.desc": "Lieux de vaccination",
     "points.food": "Aires de Restauration",
@@ -453,12 +676,26 @@ export const translations: TranslationsType = {
     "points.health.desc": "Soins médicaux",
     "points.hospitals": "Hôpitaux de Référence",
     "points.hospitals.desc": "Hôpitaux principaux",
+    "points.hospital": "Hôpital",
+    "points.hospital.desc": "Soins hospitaliers complets avec diverses spécialités",
+    "points.ubs": "Unité de Santé de Base",
+    "points.ubs.desc": "Services de soins primaires et préventifs",
+    "points.emergency": "Urgence",
+    "points.emergency.desc": "Soins d'urgence 24 heures sur 24",
+    "points.laboratory": "Laboratoire",
+    "points.laboratory.desc": "Tests et examens de laboratoire",
     
     // Navigation
     "nav.home": "Accueil",
     "nav.map": "Carte",
     "nav.campaigns": "Campagnes",
     "nav.entrar": "Connexion",
+
+    // Boutons et carousel
+    "campaigns.saibaMais": "En savoir plus",
+    "carousel.previousSlide": "Diapositive précédente",
+    "carousel.nextSlide": "Diapositive suivante",
+    "carousel.goToSlide": "Aller à la diapositive {number}",
 
     // Bouton FAB
     "fab.notifique": "Notifier ici",
@@ -534,6 +771,44 @@ export const translations: TranslationsType = {
     "campaigns.list.malaria": "Paludisme Zéro",
     "campaigns.list.malariaDesc": "Campagne de prévention du paludisme dans la région amazonienne",
     "campaigns.list.breastfeeding": "Allaitement",
-    "campaigns.list.breastfeedingDesc": "Promotion de l'allaitement dans les communautés du Pará"
+    "campaigns.list.breastfeedingDesc": "Promotion de l'allaitement dans les communautés du Pará",
+    
+    // Campagnes de Santé supplémentaires
+    "healthCampaigns.viewCampaignButton": "Voir la Campagne",
+    "healthCampaigns.addToFavorites": "Ajouter aux favoris",
+    "healthCampaigns.removeFromFavorites": "Retirer des favoris",
+    "healthCampaigns.searchPlaceholder": "Rechercher des campagnes...",
+    "healthCampaigns.searchAriaLabel": "Champ de recherche pour les campagnes",
+    "healthCampaigns.clearSearchButton": "Effacer la recherche",
+    "healthCampaigns.openMenuButton": "Ouvrir le menu",
+    "healthCampaigns.newCampaignButton": "Nouvelle campagne",
+    "healthCampaigns.newButton": "Nouvelle",
+    "healthCampaigns.closeErrorButton": "Fermer le message d'erreur",
+    "healthCampaigns.noResults": "Aucun résultat trouvé",
+    "healthCampaigns.noCampaigns": "Aucune campagne disponible",
+    "healthCampaigns.errorLoading": "Erreur lors du chargement des campagnes",
+    "healthCampaigns.tabs.campanhas": "Campagnes",
+    "healthCampaigns.tabs.favoritos": "Favoris",
+    "healthCampaigns.tabs.recentes": "Récentes",
+    "healthCampaigns.footerCopyright": "Secrétariat d'État à la Santé Publique du Pará",
+    "healthCampaigns.footer.about": "À propos",
+    "healthCampaigns.footer.contact": "Contact",
+    "healthCampaigns.footer.privacy": "Confidentialité",
+    "healthCampaigns.footer.terms": "Conditions",
+    
+    // Footer
+    "footer.contact": "Contact",
+    "footer.address": "Tv. Lomas Valentinas, 2190 - Marco, Belém - PA, 66093-677",
+    "footer.openingHours": "Heures d'Ouverture",
+    "footer.weekdayHours": "Lundi à Vendredi: 8h à 17h",
+    "footer.sespaBrief": "SESPA travaille pour garantir la santé de la population du Pará.",
+    "footer.ombudsman": "Médiateur",
+    "footer.feedbackQuestion": "Avez-vous des suggestions ou des plaintes?",
+    "footer.contactOmbudsman": "Contactez notre médiateur:",
+    "footer.portalTitle": "Portail Santé Pará",
+    "footer.portalDescription": "Portail de services et d'informations du Secrétariat d'État à la Santé Publique du Pará.",
+    "footer.developedBy": "Développé par l'Équipe SESPA Tech.",
+    "footer.copyright": "© {year} Secrétariat d'État à la Santé Publique du Pará. Tous droits réservés.",
+    "footer.rights": "Tous droits réservés"
   }
 };

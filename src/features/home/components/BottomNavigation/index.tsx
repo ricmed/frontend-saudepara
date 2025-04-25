@@ -3,18 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '@/i18n/useTranslations';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Home, Map, Heart, User, FileText } from 'lucide-react';
+import { Language } from '@/i18n/types';
 
 interface BottomNavigationProps {
   currentTab: string;
   onTabChange: (tab: string) => void;
+  selectedLanguage?: Language;
 }
 
 export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   currentTab,
-  onTabChange
+  onTabChange,
+  selectedLanguage: propSelectedLanguage
 }) => {
   const navigate = useNavigate();
-  const { selectedLanguage } = useLanguage(); // Pegando a linguagem do contexto
+  const { selectedLanguage: contextLanguage } = useLanguage(); // Pegando a linguagem do contexto
+  const selectedLanguage = propSelectedLanguage || contextLanguage; // Use prop if provided, otherwise use context
   const { t } = useTranslation(selectedLanguage); // Passando a linguagem para o hook
 
   return (
@@ -73,6 +77,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           }}
         >
           <FileText className="w-6 h-6 text-white" />
+          <span className="text-[8px] text-white">{t("fab.notifique")}</span>
         </button>
 
         <div className="flex-1 flex justify-around items-center">

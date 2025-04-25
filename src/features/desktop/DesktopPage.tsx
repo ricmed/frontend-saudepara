@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useTranslation } from '@/i18n/useTranslations';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 // Importações dos componentes
@@ -18,9 +16,7 @@ const PortalSaudePara: React.FC<PortalSaudeParaProps> = ({ initialTab = "inicio"
   const [currentTab, setCurrentTab] = useState(initialTab);
   
   // Hooks
-  const navigate = useNavigate();
   const { selectedLanguage, setSelectedLanguage } = useLanguage();
-  const { t } = useTranslation(selectedLanguage);
 
   // Handlers
   const handleMenuToggle = () => {
@@ -36,7 +32,6 @@ const PortalSaudePara: React.FC<PortalSaudeParaProps> = ({ initialTab = "inicio"
       {/* Versão Mobile (visível apenas em telas pequenas) */}
       <div className="md:hidden">
         <MobileVersion 
-          isMenuOpen={isMenuOpen}
           onMenuToggle={handleMenuToggle}
           currentTab={currentTab}
           onTabChange={handleTabChange}
@@ -45,7 +40,10 @@ const PortalSaudePara: React.FC<PortalSaudeParaProps> = ({ initialTab = "inicio"
       
       {/* Versão Desktop (visível apenas em telas maiores) */}
       <div className="hidden md:block">
-        <DesktopVersion onMenuToggle={handleMenuToggle} />
+        <DesktopVersion 
+          onMenuToggle={handleMenuToggle} 
+          selectedLanguage={selectedLanguage} 
+        />
       </div>
       
       {/* Menu Lateral */}

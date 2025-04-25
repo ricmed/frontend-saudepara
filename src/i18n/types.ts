@@ -11,115 +11,138 @@ export type CampaignTranslations = Record<Language, Record<string, CampaignTrans
 
 // Para as traduções gerais
 export type TranslationRecord = {
-  // Cabeçalho
-  "search.placeholder": string;
+  // Search
+  'search.placeholder': string;
+  
+  // Header
+  'header.secretaryOf': string;
+  'header.publicHealth': string;
+  
+  // Navigation
+  'nav.home': string;
+  'nav.map': string;
+  'nav.campaigns': string;
+  'nav.entrar': string;
   
   // Menu Grid
-  "menu.locations": string;
-  "menu.campaigns": string;
-  "menu.materials": string;
-  "menu.fale_conosco": string;
+  'menu.locations': string;
+  'menu.emergencies': string;
+  'menu.consultations': string;
+  'menu.exams': string;
+  'menu.campaigns': string;
+  'menu.fale_conosco': string;
+  'menu.faq': string;
+  'menu.servicos': string;
+  'menu.materials': string;
   
-  // Seção de Pontos
-  "section.locate": string;
-  "points.vaccination": string;
-  "points.vaccination.desc": string;
-  "points.food": string;
-  "points.food.desc": string;
-  "points.parks": string;
-  "points.parks.desc": string;
-  "points.cultural": string;
-  "points.cultural.desc": string;
-  "points.health": string;
-  "points.health.desc": string;
-  "points.hospitals": string;
-  "points.hospitals.desc": string;
+  // Localize Aqui
+  'localize.title': string;
+  'localize.viewMap': string;
   
-  // Navegação
-  "nav.home": string;
-  "nav.map": string;
-  "nav.campaigns": string;
-  "nav.entrar": string;
-
-  // Botão FAB
-  "fab.notifique": string;
+  // Points of interest
+  [key: `points.${string}`]: string;
+  [key: `points.${string}.desc`]: string;
+  [key: `pointsDesc.${string}`]: string;
   
-  // Menu Lateral
-  "menu.qualify_establishments": string;
-  "menu.notification": string;
-  "menu.dashboard": string;
-  "menu.educational": string;
-  "menu.apps": string;
-  "menu.security": string;
-  "menu.version": string;
-  "menu.bug": string;
-  "menu.logout": string;
+  // Section
+  'section.locate': string;
   
-  // Seletor de Idiomas
-  "language.select": string;
-
-  // Departamentos
-  "department.title": string;
-  "department.health-surveillance": string;
-  "department.accidents": string;
-  "department.chronic": string;
-  "department.mental-health": string;
-  "department.infectious": string;
-  "department.zoonoses": string;
-  "department.medications": string;
-  "department.maternal": string;
-  "department.epidemiology": string;
-
-  // Campaigns
-  "campaigns.breastfeeding.title": string;
-  "campaigns.breastfeeding.description1": string;
-  "campaigns.breastfeeding.description2": string;
-  "campaigns.redDecember.title": string;
-  "campaigns.redDecember.description1": string;
-  "campaigns.redDecember.description2": string;
-  "campaigns.redDecember.description3": string;
-  "campaigns.redDecember.downloadButton": string;
-  "campaigns.blueNovember.title": string;
-  "campaigns.blueNovember.description1": string;
-  "campaigns.blueNovember.description2": string;
-  "campaigns.blueNovember.description3": string;
-  "campaigns.blueNovember.description4": string;
-  "campaigns.blueNovember.downloadButton1": string;
-  "campaigns.blueNovember.downloadButton2": string;
-  "campaigns.greenSeptember.title": string;
-  "campaigns.greenSeptember.description1": string;
-  "campaigns.greenSeptember.description2": string;
-  "campaigns.malariaZero.title": string;
-  "campaigns.malariaZero.description1": string;
-  "campaigns.malariaZero.description2": string;
-
-  // Health Campaigns Page
-  "healthCampaigns.title": string;
-  "healthCampaigns.backButton": string;
-  "healthCampaigns.listAriaLabel": string;
-  "healthCampaigns.itemAriaLabel": string;
-  "healthCampaigns.redDecember.cardTitle": string;
-  "healthCampaigns.redDecember.cardDescription": string;
-  "healthCampaigns.blueNovember.cardTitle": string;
-  "healthCampaigns.blueNovember.cardDescription": string;
-  "healthCampaigns.greenSeptember.cardTitle": string;
-  "healthCampaigns.greenSeptember.cardDescription": string;
-  "healthCampaigns.malariaZero.cardTitle": string;
-  "healthCampaigns.malariaZero.cardDescription": string;
-  "healthCampaigns.breastfeeding.cardTitle": string;
-  "healthCampaigns.breastfeeding.cardDescription": string;
-
-  // Campaign List Items
-  "campaigns.list.redDecember": string;
-  "campaigns.list.redDecemberDesc": string;
-  "campaigns.list.blueNovember": string;
-  "campaigns.list.blueNovemberDesc": string;
-  "campaigns.list.greenSeptember": string;
-  "campaigns.list.greenSeptemberDesc": string;
-  "campaigns.list.malaria": string;
-  "campaigns.list.malariaDesc": string;
-  "campaigns.list.breastfeeding": string;
-  "campaigns.list.breastfeedingDesc": string;
+  // Carousel navigation
+  'carousel.previousSlide': string;
+  'carousel.nextSlide': string;
+  'carousel.goToSlide': string;
+  
+  // Campaign actions
+  'campaigns.saibaMais': string;
+  
+  // Banner
+  'banner.welcome': string;
+  'banner.subtitle': string;
+  'banner.findService': string;
+  
+  // FAB Button
+  'fab.notifique': string;
+  
+  // Menu Lateral/Side Menu
+  'menu.qualify_establishments': string;
+  'menu.notification': string;
+  'menu.dashboard': string;
+  'menu.educational': string;
+  'menu.apps': string;
+  'menu.security': string;
+  'menu.version': string;
+  'menu.bug': string;
+  'menu.logout': string;
+  
+  // Language Selector
+  'language.select': string;
+  
+  // Departments
+  'department.title': string;
+  'department.health-surveillance': string;
+  'department.accidents': string;
+  'department.chronic': string;
+  'department.mental-health': string;
+  'department.infectious': string;
+  'department.zoonoses': string;
+  'department.medications': string;
+  'department.maternal': string;
+  'department.epidemiology': string;
+  
+  // Health Campaigns
+  'healthCampaigns.title': string;
+  'healthCampaigns.backButton': string;
+  'healthCampaigns.listAriaLabel': string;
+  'healthCampaigns.itemAriaLabel': string;
+  'healthCampaigns.viewCampaignButton': string;
+  'healthCampaigns.searchPlaceholder': string;
+  'healthCampaigns.searchAriaLabel': string;
+  'healthCampaigns.clearSearchButton': string;
+  'healthCampaigns.openMenuButton': string;
+  'healthCampaigns.newCampaignButton': string;
+  'healthCampaigns.newButton': string;
+  'healthCampaigns.closeErrorButton': string;
+  'healthCampaigns.noResults': string;
+  'healthCampaigns.noCampaigns': string;
+  'healthCampaigns.errorLoading': string;
+  'healthCampaigns.tabs.campanhas': string;
+  'healthCampaigns.tabs.favoritos': string;
+  'healthCampaigns.tabs.recentes': string;
+  'healthCampaigns.footerCopyright': string;
+  'healthCampaigns.footer.about': string;
+  'healthCampaigns.footer.contact': string;
+  'healthCampaigns.footer.privacy': string;
+  'healthCampaigns.footer.terms': string;
+  [key: `healthCampaigns.${string}.cardTitle`]: string;
+  [key: `healthCampaigns.${string}.cardDescription`]: string;
+  
+  // Campaign Lists
+  [key: `campaigns.list.${string}`]: string;
+  [key: `campaigns.list.${string}Desc`]: string;
+  
+  // Campaign Details
+  [key: `campaigns.${string}.title`]: string;
+  [key: `campaigns.${string}.description${number}`]: string;
+  [key: `campaigns.${string}.downloadButton${string}`]: string;
+  
+  // Footer
+  'footer.rights': string;
+  'footer.contact': string;
+  'footer.address': string;
+  'footer.openingHours': string;
+  'footer.weekdayHours': string;
+  'footer.sespaBrief': string;
+  'footer.ombudsman': string;
+  'footer.feedbackQuestion': string;
+  'footer.contactOmbudsman': string;
+  'footer.portalTitle': string;
+  'footer.portalDescription': string;
+  'footer.developedBy': string;
+  'footer.copyright': string;
+  
+  // Other pages
+  'campaigns.title': string;
+  'campaigns.description': string;
 }
 
 // Final Translation Type

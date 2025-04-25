@@ -1,6 +1,6 @@
 import { TranslationRecord } from '@/i18n/types';
 
-export type TabType = "campanhas" | "locais" | "perfil";
+export type TabType = "campanhas" | "favoritos" | "recentes";
 
 export interface Campaign {
   id: string;
@@ -9,6 +9,8 @@ export interface Campaign {
   imageUrl: string;
   link: string;
   status?: 'active' | 'completed' | 'upcoming';
+  featured?: boolean;
+  date?: string;
 }
 
 export interface CampaignCardProps {
