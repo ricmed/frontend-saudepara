@@ -1,5 +1,5 @@
 // types.ts
-export type Language = "pt-BR" | "en" | "es" | "zh" | "fr";
+export type Language = "pt-BR" | "en" | "es" | "zh" | "fr" | "ar" | "ru";
 
 // Basic Translation Types
 export interface CampaignTranslation {
@@ -73,6 +73,29 @@ export type TranslationRecord = {
   'menu.version': string;
   'menu.bug': string;
   'menu.logout': string;
+
+  // Auxiliary Apps
+  'apps.components': string;
+  'apps.establishments': string;
+  'apps.qualifications': string;
+  'apps.enablings': string;
+  'apps.closure_types': string;
+  'apps.public_types': string;
+  'apps.event_types': string;
+  'apps.trauma_types': string;
+  'apps.care_types': string;
+  'apps.diagnostic_hypothesis_types': string;
+  'apps.symptom_types': string;
+  'apps.shift': string;
+  'apps.nature': string;
+  'apps.race': string;
+  'apps.education': string;
+  'apps.cbo': string;
+  'apps.countries': string;
+  'apps.states': string;
+  'apps.cities': string;
+  'apps.gender': string;
+  'apps.sexual_orientation': string;
   
   // Language Selector
   'language.select': string;

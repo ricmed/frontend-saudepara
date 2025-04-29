@@ -30,5 +30,17 @@ export const languages: LanguageOption[] = [
     name: "Français",
     fullName: "Français",
     flag: "https://flagcdn.com/fr.svg",
+  },
+  {
+    code: "ar",
+    name: "العربية",
+    fullName: "العربية (Árabe)",
+    flag: "https://flagcdn.com/sa.svg", // Bandeira da Arábia Saudita como referência
+  },
+  {
+    code: "ru",
+    name: "Русский",
+    fullName: "Русский (Russian)",
+    flag: "https://flagcdn.com/ru.svg",
   }
 ];

@@ -77,7 +77,6 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           }}
         >
           <FileText className="w-6 h-6 text-white" />
-          <span className="text-[8px] text-white">{t("fab.notifique")}</span>
         </button>
 
         <div className="flex-1 flex justify-around items-center">
