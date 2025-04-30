@@ -11,7 +11,7 @@ import DezembroVermelho from "@/features/campaigns/pages/details/RedDecemberPage
 import SetembroVerde from "@/features/campaigns/pages/details/GreenSeptemberPage";
 import MalariaZero from "@/features/campaigns/pages/details/MalariaZeroPage";
 import NovembroAzul from "@/features/campaigns/pages/details/BlueNovemberPage";
-import BirthfeedingPage from "@/features/campaigns/pages/details/BirthfeedingPage";
+import JaneiroRoxoPage from "@/features/campaigns/pages/details/JaneiroRoxoPage";
 
 // Features - Componentes
 import ListaComponentes from "@/features/apps/list/ListaComponentes";
@@ -292,7 +292,7 @@ function App() {
             element={<CadastroTipoSintoma />}
           />
           {/* Rotas de Campanhas */}
-          <Route path="/amamentacao" element={<BirthfeedingPage />} />
+          <Route path="/janeiro-roxo" element={<JaneiroRoxoPage />} />
           <Route
             path="/campanha-dezembro-vermelho"
             element={<DezembroVermelho />}

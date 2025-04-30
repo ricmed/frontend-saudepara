@@ -31,6 +31,12 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
   // Dados padrão de campanhas
   const defaultCampanhas: CampanhaItem[] = [
     {
+      imagem: "./images/campaigns/Janeiro Roxo.jpg",
+      titulo: "Campanha Janeiro Roxo 2025",
+      descricao: "Campanha de conscientização sobre a Hanseníase",
+      link: "/janeiro-roxo"
+    },
+    {
       imagem: "./images/campaigns/Dezembro Vermelho.png",
       titulo: "Campanha Dezembro Vermelho 2024",
       descricao: "Conscientização e combate ao HIV/AIDS em todo o Pará",
@@ -53,12 +59,6 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
       titulo: "Malária Zero",
       descricao: "Iniciativa para erradicação da malária na região amazônica",
       link: "/malaria-zero"
-    },
-    {
-      imagem: "./images/campaigns/Amamentação.png",
-      titulo: "Amamentação",
-      descricao: "Incentivo ao aleitamento materno e seus benefícios",
-      link: "/amamentacao"
     }
   ];
 
@@ -85,9 +85,9 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
         translationKey = 'malaria';
         campaignKey = 'malaria-zero';
         break;
-      case '/amamentacao':
-        translationKey = 'breastfeeding';
-        campaignKey = 'amamentacao';
+      case '/janeiro-roxo':
+        translationKey = 'purpleJanuary';
+        campaignKey = 'janeiro-roxo';
         break;
       default:
         return campanha;

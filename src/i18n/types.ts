@@ -189,8 +189,8 @@ export const campaignStructure = {
     translationKey: "malaria",
     route: "/malaria-zero"
   },
-  "amamentacao": {
-    translationKey: "breastfeeding",
-    route: "/amamentacao"
+  "janeiro-roxo": {
+    translationKey: "purpleJanuary",
+    route: "/janeiro-roxo"
   }
 } as const;

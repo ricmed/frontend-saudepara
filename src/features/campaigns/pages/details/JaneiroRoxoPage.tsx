@@ -1,10 +1,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Download } from 'lucide-react';
 import { useTranslation } from "@/i18n/useTranslations";
 import { useLanguage } from '@/contexts/LanguageContext';
 
-export const BirthfeedingPage: React.FC = () => {
+export const JaneiroRoxoPage: React.FC = () => {
   const { selectedLanguage } = useLanguage();
   const { t } = useTranslation(selectedLanguage);
   const navigate = useNavigate();
@@ -28,7 +28,7 @@ export const BirthfeedingPage: React.FC = () => {
             </button>
 
             <h1 className="text-2xl font-bold">
-              {t('campaigns.breastfeeding.title')}
+              {t('campaigns.purpleJanuary.title')}
             </h1>
           </div>
         </div>
@@ -42,8 +42,8 @@ export const BirthfeedingPage: React.FC = () => {
               {/* Imagem */}
               <div className="flex items-center justify-center bg-blue-100 rounded-lg p-4">
                 <img
-                  src="./images/campaigns/Amamentação.png"
-                  alt={t('campaigns.breastfeeding.title')}
+                  src="./images/campaigns/Janeiro Roxo.jpg"
+                  alt={t('campaigns.purpleJanuary.title')}
                   className="w-full max-h-80 md:max-h-96 object-contain transition-all"
                 />
               </div>
@@ -51,24 +51,29 @@ export const BirthfeedingPage: React.FC = () => {
               {/* Conteúdo */}
               <div className="flex flex-col justify-center">
                 <h2 className="text-2xl font-bold mb-4 text-blue-600">
-                  {t('campaigns.breastfeeding.title')}
+                  {t('campaigns.purpleJanuary.title')}
                 </h2>
                 <div className="space-y-4">
                   <p className="text-gray-700">
-                    {t('campaigns.breastfeeding.description1')}
+                    {t('campaigns.purpleJanuary.description1')}
                   </p>
                   <p className="text-gray-700">
-                    {t('campaigns.breastfeeding.description2')}
+                    {t('campaigns.purpleJanuary.description2')}
+                  </p>
+                  <p className="text-gray-700">
+                    {t('campaigns.purpleJanuary.description3')}
                   </p>
                 </div>
               </div>
             </div>
 
             <div className="mt-8 flex justify-center">
-              <button
-                className="px-8 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              <button 
+                className="px-8 py-3 bg-blue-600 text-white rounded-lg flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors"
+                onClick={() => window.open('https://drive.google.com/file/d/15DU5IRnMHhC358fFkNm1BU5kVN7dhMPC/view?usp=drive_link')}
               >
-                {t('campaigns.seeMore')}
+                <Download className="w-5 h-5" />
+                <span>{t('campaigns.purpleJanuary.downloadButton')}</span>
               </button>
             </div>
           </div>
@@ -100,4 +105,4 @@ export const BirthfeedingPage: React.FC = () => {
   );
 };
 
-export default BirthfeedingPage;
+export default JaneiroRoxoPage;

@@ -4,7 +4,7 @@ import { ArrowLeft, Search, Plus, Menu } from 'lucide-react';
 import { useTranslation } from "@/i18n/useTranslations";
 import { useLanguage } from '@/contexts/LanguageContext';
 import { CampaignCard } from '../components/CampaignCard';
-import { HEALTH_CAMPAIGNS, HEADER } from '../constants/campaigns';
+import { HEALTH_CAMPAIGNS } from '../constants/campaigns';
 import { useDebounce } from '@/hooks/useDebounce';
 import { SideMenu } from '@/features/home/components/SideMenu'; // Updated import
 import Paginacao from '@/features/apps/list/paginacao';
