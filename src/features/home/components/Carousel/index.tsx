@@ -16,46 +16,89 @@ export const Carousel: React.FC<CarouselProps> = ({ materials: propMaterials }) 
   const { selectedLanguage } = useLanguage();
   const { t } = useTranslation(selectedLanguage);
   
-  // Materiais padrão com chaves de tradução
+  // Dados padrão de campanhas
   const defaultMaterials: Material[] = [
     {
+      id: "janeiro-roxo",
+      title: "Campanha Janeiro Roxo 2025",
+      desc: "Campanha de conscientização sobre a Hanseníase",
+      image: "./images/campaigns/Janeiro Roxo.jpg",
+      link: "/janeiro-roxo",
+    },
+    {
       id: "dezembro-vermelho",
-      title: t("campaigns.list.redDecember"),
-      desc: t("campaigns.list.redDecemberDesc"),
+      title: "Campanha Dezembro Vermelho 2024",
+      desc: "Conscientização e combate ao HIV/AIDS em todo o Pará",
       image: "./images/campaigns/Dezembro Vermelho.png",
       link: "/campanha-dezembro-vermelho",
     },
     {
       id: "novembro-azul",
-      title: t("campaigns.list.blueNovember"),
-      desc: t("campaigns.list.blueNovemberDesc"),
+      title: "Campanha Novembro Azul 2024",
+      desc: "Conscientização sobre a saúde do homem e prevenção ao câncer de próstata",
       image: "./images/campaigns/Novembro Azul.png",
       link: "/campanha-novembro-azul",
     },
     {
       id: "setembro-verde",
-      title: t("campaigns.list.greenSeptember"),
-      desc: t("campaigns.list.greenSeptemberDesc"),
+      title: "Setembro Verde",
+      desc: "Mês de conscientização sobre a doação de órgãos",
       image: "./images/campaigns/Setembro Verde.png",
       link: "/setembro-verde",
     },
     {
       id: "malaria-zero",
-      title: t("campaigns.list.malaria"),
-      desc: t("campaigns.list.malariaDesc"),
+      title: "Malária Zero",
+      desc: "Iniciativa para erradicação da malária na região amazônica",
       image: "./images/campaigns/Malária Zero.png",
       link: "/malaria-zero",
-    },
-    {
-      id: "amamentacao",
-      title: t("campaigns.list.breastfeeding"),
-      desc: t("campaigns.list.breastfeedingDesc"),
-      image: "./images/campaigns/Amamentação.png",
-      link: "/amamentacao",
-    },
+    }
   ];
 
-  const materials = propMaterials || defaultMaterials;
+  // Mapear as campanhas para o idioma selecionado
+  const translatedMaterials = defaultMaterials.map(material => {
+    // Se forem fornecidos materiais como props, usá-los primeiro
+    if (propMaterials) {
+      const propMaterial = propMaterials.find(pm => pm.id === material.id);
+      if (propMaterial) return propMaterial;
+    }
+
+    let translationKey = '';
+    
+    // Mapear ID da campanha para chave de tradução
+    switch(material.id) {
+      case 'dezembro-vermelho':
+        translationKey = 'redDecember';
+        break;
+      case 'novembro-azul':
+        translationKey = 'blueNovember';
+        break;
+      case 'setembro-verde':
+        translationKey = 'greenSeptember';
+        break;
+      case 'malaria-zero':
+        translationKey = 'malaria';
+        break;
+      case 'janeiro-roxo':
+        translationKey = 'purpleJanuary';
+        break;
+      default:
+        return material;
+    }
+    
+    // Se estiver usando um idioma diferente do português, aplicar traduções
+    if (selectedLanguage !== 'pt-BR') {
+      return {
+        ...material,
+        title: t(`campaigns.list.${translationKey}`),
+        desc: t(`campaigns.list.${translationKey}Desc`),
+      };
+    }
+    
+    return material;
+  });
+
+  const materials = translatedMaterials;
 
   const handleSwipe = () => {
     if (!touchStart || !touchEnd) return;

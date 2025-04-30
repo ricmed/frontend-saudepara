@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from '@/i18n/useTranslations';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { campaignStructure } from '@/i18n/types';
 
 interface CarouselMaterial {
   id: string;
@@ -23,9 +26,18 @@ export const CustomCarousel: React.FC<CustomCarouselProps> = ({ materials: propM
   const [autoplayPaused, setAutoplayPaused] = useState(false);
   
   const navigate = useNavigate();
+  const { selectedLanguage } = useLanguage();
+  const { t } = useTranslation(selectedLanguage);
 
   // Materiais padrão
   const defaultMaterials: CarouselMaterial[] = [
+    {
+      id: "janeiro-roxo",
+      title: "Campanha Janeiro Roxo 2025",
+      desc: "Campanha de conscientização sobre a Hanseníase",
+      image: "./images/campaigns/Janeiro Roxo.jpg",
+      link: "/janeiro-roxo",
+    },
     {
       id: "dezembro-vermelho",
       title: "Campanha Dezembro Vermelho 2024",
@@ -54,16 +66,40 @@ export const CustomCarousel: React.FC<CustomCarouselProps> = ({ materials: propM
       image: "./images/campaigns/Malária Zero.png",
       link: "/malaria-zero",
     },
-    {
-      id: "amamentacao",
-      title: "Amamentação",
-      desc: "Incentivo ao aleitamento materno e seus benefícios",
-      image: "./images/campaigns/Amamentação.png",
-      link: "/amamentacao",
-    },
   ];
 
-  const materials = propMaterials || defaultMaterials;
+  // Aplicar traduções se necessário
+  const getTranslatedMaterials = () => {
+    // Se houver materiais específicos nas props, priorize-os
+    if (propMaterials && propMaterials.length > 0) {
+      return propMaterials;
+    }
+
+    // Se o idioma for português, use os materiais padrão
+    if (selectedLanguage === 'pt-BR') {
+      return defaultMaterials;
+    }
+
+    // Para outros idiomas, traduza os materiais
+    return defaultMaterials.map(material => {
+      // Encontre a chave de tradução correspondente usando o mapeamento em campaignStructure
+      const campaignKey = Object.keys(campaignStructure).find(key => key === material.id);
+      
+      if (campaignKey) {
+        const translationKey = campaignStructure[campaignKey as keyof typeof campaignStructure].translationKey;
+        
+        return {
+          ...material,
+          title: t(`campaigns.list.${translationKey}`),
+          desc: t(`campaigns.list.${translationKey}Desc`)
+        };
+      }
+      
+      return material;
+    });
+  };
+
+  const materials = getTranslatedMaterials();
 
   // Gerencia o deslizar para eventos de toque
   const handleSwipe = () => {
@@ -221,7 +257,7 @@ export const CustomCarousel: React.FC<CustomCarouselProps> = ({ materials: propM
               currentSlide === index ? 'bg-white' : 'bg-white/50'
             }`}
             onClick={() => setCurrentSlide(index)}
-            aria-label={`Ir para slide ${index + 1}`}
+            aria-label={`${t('carousel.goToSlide')} ${index + 1}`}
           />
         ))}
       </div>
