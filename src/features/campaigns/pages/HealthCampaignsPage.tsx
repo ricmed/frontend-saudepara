@@ -6,13 +6,14 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { CampaignCard } from '../components/CampaignCard';
 import { HEALTH_CAMPAIGNS, HEADER } from '../constants/campaigns';
 import { useDebounce } from '@/hooks/useDebounce';
-import SideBarMenuAppsAuxiliares from '@/features/apps/components/SideBarMenuAppsAuxiliares';
+import { SideMenu } from '@/features/home/components/SideMenu'; // Updated import
 import Paginacao from '@/features/apps/list/paginacao';
 import { Campaign } from '../types/campaign.types';
+import { Language } from '@/i18n/types';
 
 export const HealthCampaignsPage = () => {
   const navigate = useNavigate();
-  const { selectedLanguage } = useLanguage();
+  const { selectedLanguage, setSelectedLanguage } = useLanguage(); // Updated property name
   const { t } = useTranslation(selectedLanguage);
   const [searchTerm, setSearchTerm] = useState("");
   const [inputValue, setInputValue] = useState("");
@@ -33,6 +34,14 @@ export const HealthCampaignsPage = () => {
     };
   }, []);
   
+  // Normalize text for search - remove accents and convert to lowercase
+  const normalizeText = (text: string): string => {
+    return text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, ''); // Remove diacritics (accents)
+  };
+
   // Simulate API fetch with loading
   useEffect(() => {
     const fetchCampaigns = async () => {
@@ -46,9 +55,11 @@ export const HealthCampaignsPage = () => {
         let filteredData: Campaign[] = [...HEALTH_CAMPAIGNS];
         
         if (debouncedSearchTerm) {
+          const normalizedSearchTerm = normalizeText(debouncedSearchTerm);
+          
           filteredData = filteredData.filter(campaign => 
-            t(campaign.titleKey).toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-            t(campaign.descriptionKey).toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+            normalizeText(t(campaign.titleKey)).includes(normalizedSearchTerm) ||
+            normalizeText(t(campaign.descriptionKey)).includes(normalizedSearchTerm)
           );
         }
         
@@ -77,7 +88,7 @@ export const HealthCampaignsPage = () => {
   }, [debouncedSearchTerm]);
 
   const handleGoBack = () => {
-    navigate(-1);
+    navigate("/");
   };
 
   const handleCampaignClick = (link: string) => {
@@ -92,6 +103,14 @@ export const HealthCampaignsPage = () => {
   
   // Calculate total pages
   const totalPages = Math.ceil(campaigns.length / itemsPerPage);
+
+  // Handler for language change
+  const handleLanguageChange = (language: Language) => {
+    // Evitar o comportamento padrão que pode causar recarga
+    if (language !== selectedLanguage) {
+      setSelectedLanguage(language);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -151,22 +170,17 @@ export const HealthCampaignsPage = () => {
               )}
             </div>
 
-            <button
-              onClick={() => navigate('/nova-campanha')}
-              className="flex items-center gap-2 px-6 py-2 bg-white text-blue-600 rounded-full hover:bg-gray-100 transition-colors shadow-md"
-              aria-label={t('healthCampaigns.newCampaignButton')}
-            >
-              <Plus className="h-5 w-5" />
-              {t('healthCampaigns.newButton')}
-            </button>
+            {/* Botão "Nova" removido */}
           </div>
         </div>
       </header>
 
-      {/* Sidebar */}
-      <SideBarMenuAppsAuxiliares
+      {/* Sidebar - Replaced with SideMenu */}
+      <SideMenu
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
+        selectedLanguage={selectedLanguage}
+        onLanguageChange={handleLanguageChange}
       />
 
       {/* Main Content */}
