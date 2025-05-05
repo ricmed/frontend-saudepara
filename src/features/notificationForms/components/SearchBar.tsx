@@ -1,13 +1,11 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Search, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Search, X, ChevronDown } from "lucide-react";
+import { SearchParams } from '../types';
 
 interface SearchBarProps {
-  searchParams: {
-    term: string;
-    field: string;
-  };
-  fields: { value: string; label: string }[];
-  onSearchChange: (params: { term: string; field: string }) => void;
+  searchParams: SearchParams;
+  fields: { value: SearchParams['field']; label: string }[];
+  onSearchChange: (params: SearchParams) => void;
   onSearch: () => void;
   placeholder?: string;
 }
