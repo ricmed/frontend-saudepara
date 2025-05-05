@@ -98,3 +98,5 @@ export interface Notificacao {
     estabelecimentoOptions: any[];
     encerramentoOptions: any[];
   }
+
+  export type { FormSectionProps } from './index2';

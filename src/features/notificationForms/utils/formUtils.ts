@@ -1,221 +1,351 @@
-import { FormData } from '../types/FormTypes';
+// src/features/notificationForms/utils/formUtils.ts
+import { FormData, AtendimentoOption, EncerramentoOption } from '@/features/notificationForms/types/index2';
+import type { SectionState } from '@/features/notificationForms/hooks/useSectionExpansion';
 
 /**
- * Formata um CPF: 12345678900 -> 123.456.789-00
+ * Normaliza texto removendo acentos e convertendo para caixa alta
+ */
+export function normalizeText(text: string): string {
+  if (!text) return "";
+  // Remove acentos e converte para caixa alta
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+    .toUpperCase();
+}
+
+/**
+ * Converte todos os textos de um objeto para caixa alta
+ */
+export const toUpperCaseAllStrings = (obj: any): any => {
+  if (!obj) return obj;
+
+  if (typeof obj === "string") {
+    return normalizeText(obj);
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map((item) => toUpperCaseAllStrings(item));
+  }
+
+  if (typeof obj === "object") {
+    const result: any = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        result[key] = toUpperCaseAllStrings(obj[key]);
+      }
+    }
+    return result;
+  }
+
+  return obj;
+};
+
+/**
+ * Formata CPF para exibição (XXX.XXX.XXX-XX)
  */
 export const formatCPF = (cpf: string): string => {
-  // Remove qualquer formatação existente
-  const cleanCPF = cpf.replace(/\D/g, '');
-  
+  // Remove caracteres não numéricos e limita a 11 dígitos
+  return cpf.replace(/\D/g, "").slice(0, 11);
+};
+
+/**
+ * Exibe CPF formatado
+ */
+export const displayFormattedCPF = (cpf: string): string => {
+  // Remove caracteres não numéricos e limita a 11 dígitos
+  const cleanCPF = cpf.replace(/\D/g, "").slice(0, 11);
+
+  // Se o CPF não tiver 11 dígitos, retorna ele apenas limpo
   if (cleanCPF.length !== 11) return cleanCPF;
-  
-  return cleanCPF.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+
+  // Formata como XXX.XXX.XXX-XX
+  return `${cleanCPF.substring(0, 3)}.${cleanCPF.substring(3, 6)}.${cleanCPF.substring(6, 9)}-${cleanCPF.substring(9)}`;
 };
 
 /**
- * Valida um CPF
+ * Formata contato telefônico
  */
-export const validateCPF = (cpf: string): boolean => {
-  // Remove qualquer formatação
-  const cleanCPF = cpf.replace(/\D/g, '');
-  
-  if (cleanCPF.length !== 11) return false;
-  
-  // Verifica se todos os dígitos são iguais
-  if (/^(\d)\1+$/.test(cleanCPF)) return false;
-  
-  // Validação dos dígitos verificadores
-  let sum = 0;
-  let remainder;
-  
-  for (let i = 1; i <= 9; i++) {
-    sum += parseInt(cleanCPF.substring(i - 1, i)) * (11 - i);
-  }
-  
-  remainder = (sum * 10) % 11;
-  if (remainder === 10 || remainder === 11) remainder = 0;
-  if (remainder !== parseInt(cleanCPF.substring(9, 10))) return false;
-  
-  sum = 0;
-  for (let i = 1; i <= 10; i++) {
-    sum += parseInt(cleanCPF.substring(i - 1, i)) * (12 - i);
-  }
-  
-  remainder = (sum * 10) % 11;
-  if (remainder === 10 || remainder === 11) remainder = 0;
-  if (remainder !== parseInt(cleanCPF.substring(10, 11))) return false;
-  
-  return true;
+export const formatContato = (contato: string): string => {
+  // Apenas limitando o tamanho máximo para 15 caracteres
+  return contato.slice(0, 15);
 };
 
 /**
- * Calcula a idade a partir da data de nascimento
+ * Formata contato local 
  */
-export const calculateAge = (birthDate: string): number => {
-  if (!birthDate) return 0;
-  
+export const formatContatoLocal = (contato: string): string => {
+  // Remove caracteres não numéricos e limita a 11 dígitos
+  return contato.replace(/\D/g, "").slice(0, 11);
+};
+
+/**
+ * Calcula idade com base na data de nascimento
+ */
+export const calculateAge = (birthdate: string): number => {
+  if (!birthdate) return 0;
+
+  const birthDate = new Date(birthdate);
   const today = new Date();
-  const birth = new Date(birthDate);
-  
-  let age = today.getFullYear() - birth.getFullYear();
-  const monthDiff = today.getMonth() - birth.getMonth();
-  
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDifference = today.getMonth() - birthDate.getMonth();
+
+  if (
+    monthDifference < 0 ||
+    (monthDifference === 0 && today.getDate() < birthDate.getDate())
+  ) {
     age--;
   }
-  
+
   return age;
 };
 
 /**
- * Atualiza a idade automaticamente quando a data de nascimento é alterada
+ * Compara duas datas e verifica se a primeira é igual ou depois da segunda
  */
-export const updateAgeFromBirthDate = (formData: FormData): FormData => {
-  if (!formData.dataNascimento) return formData;
-  
-  const age = calculateAge(formData.dataNascimento);
-  return {
-    ...formData,
-    idade: age.toString()
-  };
+export const compareDates = (date1: string, date2: string): boolean => {
+  if (!date1 || !date2) return true; // Se alguma data estiver faltando, a validação passa
+
+  const d1 = new Date(date1);
+  const d2 = new Date(date2);
+
+  // Verificar se ambas as datas são válidas
+  if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return true;
+
+  // Retorna true se date1 for igual ou depois de date2 (caso válido)
+  return d1 >= d2;
 };
 
 /**
- * Valida se uma seção específica do formulário está completa
+ * Normaliza dados do formulário para garantir consistência
  */
-export const validateFormSection = (
-  formData: FormData,
-  section: 'dadosGerais' | 'procedencia' | 'identificacao' | 'atendimento' | 'unidadeNotificadora' | 'encerramento'
-): { isValid: boolean; errors: string[] } => {
-  const errors: string[] = [];
+export const normalizarDadosResidencia = (data: FormData): FormData => {
+  // Clone os dados para não modificar o original diretamente
+  const normalizados = { ...data };
 
-  switch (section) {
-    case 'dadosGerais':
-      if (!formData.evento) errors.push("Evento é obrigatório");
-      if (!formData.publicoAtendido) errors.push("Público Atendido é obrigatório");
-      break;
-      
-    case 'procedencia':
-      if (!formData.residenteBelem) errors.push("Residência em Belém é obrigatória");
-      
-      if (formData.residenteBelem === "1" && !formData.bairro) {
-        errors.push("Bairro é obrigatório para residentes de Belém");
-      }
-      
-      if (formData.residenteBelem === "2") {
-        if (!formData.uf) errors.push("UF é obrigatória");
-        if (!formData.municipio) errors.push("Município é obrigatório");
-      }
-      
-      if (formData.residenteBelem === "3") {
-        if (!formData.paisProcedencia) errors.push("País de Procedência é obrigatório");
-        if (!formData.localHospedagem) errors.push("Local de Hospedagem é obrigatório");
-      }
-      break;
-      
-    case 'identificacao':
-      if (!formData.paciente) errors.push("Nome do paciente é obrigatório");
-      if (!formData.dataNascimento && !formData.idade) errors.push("Data de Nascimento ou Idade é obrigatória");
-      if (!formData.identidadeGenero) errors.push("Identidade de Gênero é obrigatória");
-      if (!formData.raca) errors.push("Raça é obrigatória");
-      
-      if (formData.identidadeGenero === "1" && !formData.gestante) {
-        errors.push("Campo Gestante é obrigatório para mulheres cisgênero");
-      }
-      break;
-      
-    case 'atendimento':
-      if (!formData.tipoAtendimento) errors.push("Tipo de Atendimento é obrigatório");
-      
-      if (formData.tipoAtendimento === "1") {
-        if (formData.sinaisESintomas.length === 0) errors.push("Pelo menos um Sinal ou Sintoma deve ser selecionado");
-        if (!formData.dataInicioSintomas) errors.push("Data de Início dos Sintomas é obrigatória");
-      }
-      
-      if (formData.tipoAtendimento === "2") {
-        if (formData.tipoTrauma.length === 0) errors.push("Pelo menos um Tipo de Trauma deve ser selecionado");
-        if (!formData.dataOcorrencia) errors.push("Data da Ocorrência é obrigatória");
-      }
-      
-      if (["3", "4", "5"].includes(formData.tipoAtendimento) && !formData.relacionadoSurto) {
-        errors.push("Campo 'Relacionado a Surto' é obrigatório");
-      }
-      break;
-      
-    case 'unidadeNotificadora':
-      if (!formData.dataAtendimento) errors.push("Data de Atendimento é obrigatória");
-      if (!formData.unidadeNotificadora) errors.push("Unidade Notificadora é obrigatória");
-      if (!formData.nomeNotificador) errors.push("Nome do Notificador é obrigatório");
-      if (!formData.contatoNotificador) errors.push("Contato do Notificador é obrigatório");
-      break;
-      
-    case 'encerramento':
-      // Encerramento é opcional, mas se tiver dados, valida
-      if (formData.dataEncerramento || formData.tipoEncerramento || formData.localEncaminhamento) {
-        if (!formData.dataEncerramento) errors.push("Data de Encerramento é obrigatória");
-        if (!formData.tipoEncerramento) errors.push("Tipo de Encerramento é obrigatório");
-        
-        if (formData.tipoEncerramento === "4" && !formData.localEncaminhamento) {
-          errors.push("Local de Encaminhamento é obrigatório para transferências");
-        }
-        
-        if (formData.tipoEncerramento === "5" && !formData.localEncaminhamento) {
-          errors.push("Local de Encaminhamento é obrigatório para óbitos");
-        }
-      }
-      break;
+  // Se é brasileiro
+  if (parseInt(normalizados.paisProcedencia) === 105) {
+    // Residente em Belém
+    if (normalizados.residenteBelem === "1") {
+      // Já está correto, apenas limpar outros campos
+      normalizados.uf = "";
+      normalizados.municipio = "";
+      normalizados.localHospedagem = "";
+      normalizados.contatoLocal = "";
+    }
+    // Não residente em Belém (outro município brasileiro)
+    else if (normalizados.residenteBelem === "2") {
+      // Limpar campos não aplicáveis
+      normalizados.bairro = "";
+      normalizados.localHospedagem = "";
+      normalizados.contatoLocal = "";
+    }
+  }
+  // Se estrangeiro (país não é Brasil)
+  else if (parseInt(normalizados.paisProcedencia) !== 105) {
+    // Forçar opção "Estrangeiro"
+    normalizados.residenteBelem = "3";
+    // Limpar campos brasileiros
+    normalizados.bairro = "";
+    normalizados.uf = "";
+    normalizados.municipio = "";
   }
 
-  return {
-    isValid: errors.length === 0,
-    errors
-  };
+  return normalizados;
 };
 
 /**
- * Valida o formulário completo
+ * Verificar se o tipo de atendimento contém determinado texto
  */
-export const validateForm = (formData: FormData): { isValid: boolean; errors: Record<string, string[]> } => {
-  const sections = ['dadosGerais', 'procedencia', 'identificacao', 'atendimento', 'unidadeNotificadora', 'encerramento'] as const;
-  const errors: Record<string, string[]> = {};
-  let isValid = true;
+export const isTipoAtendimento = (tipo: string, tipoAtendimento: string, atendimentoOptions: any[]): boolean => {
+  // Se não há tipo selecionado, retorna falso
+  if (!tipoAtendimento) return false;
 
-  sections.forEach(section => {
-    const validation = validateFormSection(formData, section);
-    if (!validation.isValid) {
-      errors[section] = validation.errors;
-      isValid = false;
+  // Encontra a opção selecionada
+  const selectedOption = atendimentoOptions.find(
+    (option) => option.idtipo_atendimento.toString() === tipoAtendimento.toString()
+  );
+
+  if (!selectedOption) return false;
+
+  // Normalizar ambos os textos antes de comparar
+  const normalizedDescription = selectedOption.descricao;
+  const normalizedTipo = normalizeText(tipo);
+
+  // Verificar se a descrição contém o texto procurado
+  return normalizedDescription.includes(normalizedTipo);
+};
+
+/**
+ * Verificar se o tipo de encerramento contém determinado texto
+ */
+export const isTipoEncerramento = (tipo: string, tipoEncerramento: string, encerramentoOptions: any[]): boolean => {
+  // Se não há tipo selecionado, retorna falso
+  if (!tipoEncerramento) return false;
+
+  // Encontra a opção selecionada
+  const selectedOption = encerramentoOptions.find(
+    (option) => option.idtipo_encerramento.toString() === tipoEncerramento.toString()
+  );
+
+  if (!selectedOption) return false;
+
+  // Normalizar ambos os textos antes de comparar
+  const normalizedDescription = selectedOption.descricao;
+  const normalizedTipo = normalizeText(tipo);
+
+  // Verificar se a descrição contém o texto procurado
+  return normalizedDescription.includes(normalizedTipo);
+};
+
+/**
+ * Validar campos obrigatórios e outras regras de validação
+ */
+export const validateForm = (
+  formData: FormData, 
+  errors: Record<string, string>,
+  setErrors: React.Dispatch<React.SetStateAction<Record<string, string>>>,
+  setExpandedSections: React.Dispatch<React.SetStateAction<SectionState>>,
+  expandedSections: SectionState,
+  atendimentoOptions: AtendimentoOption[],
+  encerramentoOptions: EncerramentoOption[]
+): boolean => {
+  // Verificar se tem ID do paciente
+  if (!formData.pacienteId) {
+    const newErrors: Record<string, string> = {
+      paciente: "É necessário selecionar ou criar um paciente válido com ID",
+    };
+    setErrors((prev) => ({ ...prev, ...newErrors }));
+    setExpandedSections((prev) => ({ ...prev, identificacao: true }));
+    return false;
+  }
+
+  // Verificar relações entre datas se ambas estiverem presentes
+  if (formData.dataAtendimento && formData.dataInicioSintomas) {
+    if (!compareDates(formData.dataAtendimento, formData.dataInicioSintomas)) {
+      const newErrors: Record<string, string> = {
+        dataAtendimento:
+          "A data de atendimento não pode ser anterior à data de início dos sintomas",
+      };
+      setErrors((prev) => ({ ...prev, ...newErrors }));
+      setExpandedSections((prev) => ({ ...prev, unidadeNotificadora: true }));
+      return false;
     }
+  }
+
+  // Verificar campos obrigatórios
+  const requiredFields: Array<{
+    field: keyof FormData;
+    label: string;
+    message?: string;
+  }> = [
+    { field: "evento", label: "Evento" },
+    { field: "publicoAtendido", label: "Público Atendido" },
+    { field: "residenteBelem", label: "Residente em Belém" },
+    { field: "paciente", label: "Paciente" },
+    { field: "paisProcedencia", label: "País de procedência" },
+    { field: "tipoAtendimento", label: "Tipo de Atendimento" },
+    { field: "dataOcorrencia", label: "Data da Ocorrência" },
+    { field: "tipoEncerramento", label: "Tipo de Encerramento" },
+    { field: "unidadeNotificadora", label: "Unidade Notificadora" },
+  ];
+
+  const newErrors: Record<string, string> = {};
+  const missingFields = requiredFields.filter((item) => !formData[item.field]);
+
+  // Adicionar mensagens de erro para cada campo faltante
+  missingFields.forEach((item) => {
+    newErrors[item.field] = item.message || `O campo ${item.label} é obrigatório`;
   });
 
-  return { isValid, errors };
-};
+  // Adicionar validações específicas para sintomas e traumas baseadas no tipo de atendimento
+  if (
+    isTipoAtendimento("CLINICO", formData.tipoAtendimento, atendimentoOptions) ||
+    isTipoAtendimento("SURTO", formData.tipoAtendimento, atendimentoOptions) ||
+    isTipoAtendimento("INCIDENTE QBRN", formData.tipoAtendimento, atendimentoOptions)
+  ) {
+    if (formData.sinaisESintomas.length === 0) {
+      newErrors.sinaisESintomas = "Selecione pelo menos um sinal ou sintoma";
+    }
+  }
 
-/**
- * Prepara os dados do formulário para envio (remove campos de controle da interface)
- */
-export const prepareFormDataForSubmission = (formData: FormData): Omit<FormData, 'profissaoSearch' | 'showProfissaoOptions'> => {
-  // Cria uma cópia sem os campos de controle da UI
-  const { profissaoSearch, showProfissaoOptions, ...dataToSubmit } = formData;
-  return dataToSubmit;
-};
+  if (
+    isTipoAtendimento("TRAUMA", formData.tipoAtendimento, atendimentoOptions) ||
+    isTipoAtendimento("MULTIPLAS VITIMAS", formData.tipoAtendimento, atendimentoOptions)
+  ) {
+    if (formData.tipoTrauma.length === 0) {
+      newErrors.tipoTrauma = "Selecione pelo menos um tipo de trauma";
+    }
+  }
 
-/**
- * Formata uma data do formato yyyy-mm-dd para dd/mm/yyyy
- */
-export const formatDate = (date: string): string => {
-  if (!date) return '';
-  
-  const [year, month, day] = date.split('-');
-  return `${day}/${month}/${year}`;
-};
+  // Validar se unidadeNotificadora é um número válido
+  if (formData.unidadeNotificadora && !/^\d+$/.test(formData.unidadeNotificadora)) {
+    newErrors.unidadeNotificadora = "Selecione uma unidade notificadora válida";
+  }
 
-/**
- * Converte uma data do formato dd/mm/yyyy para yyyy-mm-dd
- */
-export const parseDate = (date: string): string => {
-  if (!date) return '';
-  
-  const [day, month, year] = date.split('/');
-  return `${year}-${month}-${day}`;
+  // Verificar se tipoEncerramento é "Transferido" e se localEncaminhamento está preenchido
+  if (
+    isTipoEncerramento("transferido", formData.tipoEncerramento, encerramentoOptions) && 
+    !formData.localEncaminhamento
+  ) {
+    newErrors.localEncaminhamento = "O local de encaminhamento é obrigatório para transferência";
+  }
+
+  // Atualizar o estado com os erros encontrados
+  setErrors(newErrors);
+
+  // Se houver erros, expandir as seções relevantes
+  if (Object.keys(newErrors).length > 0) {
+    // Expandir seções com erros
+    const newExpandedSections = { ...expandedSections };
+
+    if (newErrors.evento || newErrors.publicoAtendido) {
+      newExpandedSections.dadosGerais = true;
+    }
+
+    if (
+      newErrors.residenteBelem ||
+      newErrors.bairro ||
+      newErrors.municipio ||
+      newErrors.uf ||
+      newErrors.paisProcedencia
+    ) {
+      newExpandedSections.procedencia = true;
+    }
+
+    if (
+      newErrors.paciente ||
+      newErrors.dataNascimento ||
+      newErrors.identidadeGenero ||
+      newErrors.raca
+    ) {
+      newExpandedSections.identificacao = true;
+    }
+
+    if (
+      newErrors.tipoAtendimento ||
+      newErrors.sinaisESintomas ||
+      newErrors.tipoTrauma ||
+      newErrors.dataOcorrencia ||
+      newErrors.dataInicioSintomas
+    ) {
+      newExpandedSections.atendimento = true;
+    }
+
+    if (
+      newErrors.tipoEncerramento ||
+      newErrors.unidadeNotificadora ||
+      newErrors.dataAtendimento ||
+      newErrors.localEncaminhamento
+    ) {
+      newExpandedSections.encerramento = true;
+      newExpandedSections.unidadeNotificadora = true;
+    }
+
+    setExpandedSections(newExpandedSections);
+    return false;
+  }
+
+  return true;
 };
