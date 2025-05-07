@@ -35,6 +35,7 @@ const NotificationForm: React.FC = () => {
     formData,
     setFormData,
     errors,
+    setErrors,
     isLoading,
     isSaving,
     isSuccess,
@@ -271,11 +272,11 @@ const NotificationForm: React.FC = () => {
             paisOptions={paisOptions}
           />
 
-          {/* Seção 3: Identificação do indivíduo */}
           <PersonIdentificationSection
             formData={formData}
             setFormData={setFormData}
             errors={errors}
+            setErrors={setErrors}
             handleChange={handleChange}
             handleContatoLocalChange={handleContatoLocalChange}
             isExpanded={expandedSections.identificacao}

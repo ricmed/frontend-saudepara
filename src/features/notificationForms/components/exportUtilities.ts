@@ -3,6 +3,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
+import { PDFDocument } from 'pdf-lib';
 
 // Interface para os dados exportados
 interface ExportData {
@@ -1359,7 +1360,7 @@ export const exportListToCSV = (
   }
 };
 
-// Exportar lista para PDF
+// Exportar lista para PDF (tabela em paisagem + fichas em retrato)
 export const exportListToPDF = (
   notificacoes: NotificacaoItem[],
   exportOptions?: ExportOptions
@@ -1373,47 +1374,55 @@ export const exportListToPDF = (
     // Formatar dados para PDF
     const formattedData = notificacoes.map(item => formatNotificacaoForExport(item, exportOptions));
     
-    // Criar documento PDF
-    const doc = new jsPDF({
+    // Criar dois documentos separados com orientações diferentes
+    // 1. Documento para tabela resumida (paisagem)
+    const tabelaDoc = new jsPDF({
       orientation: 'landscape',
       unit: 'mm',
       format: 'a4'
     });
     
-    // Configurar título e informações do documento
-    doc.setFontSize(16);
-    doc.setTextColor(63, 81, 181); // Azul da interface
-    doc.text("Relatório de Notificações", 15, 15);
-    
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
-    doc.text(`Gerado em: ${new Date().toLocaleDateString("pt-BR")}`, 15, 22);
-    doc.text(`Total de registros: ${notificacoes.length}`, 15, 27);
-    
-    // Campos essenciais para a tabela resumida
-    const essentialFields = [
-      "Nome do Paciente",
-      "Data de Nascimento",
-      "Evento",
-      "Tipo de Atendimento",
-      "Data da Ocorrência",
-      "Tipo de Encerramento"
-    ];
-    
-    // Preparar dados para a tabela resumida
-    const tableData = formattedData.map(item => {
-      const row: Record<string, string> = {};
-      essentialFields.forEach(field => {
-        row[field] = String(item[field] || "");
-      });
-      return row;
+    // 2. Documento para fichas detalhadas (retrato)
+    const fichasDoc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
     });
     
-    // Adicionar tabela resumida
-    doc.autoTable({
-      startY: 35,
-      head: [essentialFields],
-      body: tableData.map(item => essentialFields.map(field => item[field])),
+    // PARTE 1: TABELA RESUMIDA EM PAISAGEM
+    // Configurar título e informações do documento
+    tabelaDoc.setFontSize(16);
+    tabelaDoc.setTextColor(63, 81, 181); // Azul da interface
+    tabelaDoc.text("Relatório de Notificações", 15, 15);
+    
+    tabelaDoc.setFontSize(10);
+    tabelaDoc.setTextColor(0, 0, 0);
+    tabelaDoc.text(`Gerado em: ${new Date().toLocaleDateString("pt-BR")}`, 15, 22);
+    tabelaDoc.text(`Total de registros: ${notificacoes.length}`, 15, 27);
+    
+    // Selecionar campos relevantes para tabela inicial (mais completa, mas legível)
+    const tabelaInicialFields = [
+      "Nome do Paciente", 
+      "Idade",
+      "Tipo de Atendimento", 
+      "Data da Ocorrência",
+      "Evento",
+      "Sinais e Sintomas",
+      "Tipo de Encerramento",
+      "Unidade Notificadora"
+    ];
+    
+    // Tabela inicial expandida com mais colunas
+    tabelaDoc.autoTable({
+      startY: 32,
+      head: [tabelaInicialFields],
+      body: formattedData.map(item => tabelaInicialFields.map(field => {
+        // Limitar tamanho de textos longos para manter a tabela legível
+        const value = String(item[field] || "");
+        return field === "Sinais e Sintomas" && value.length > 40 ? 
+          value.substring(0, 37) + "..." : 
+          value;
+      })),
       headStyles: {
         fillColor: [63, 81, 181],
         textColor: [255, 255, 255],
@@ -1422,38 +1431,252 @@ export const exportListToPDF = (
       alternateRowStyles: {
         fillColor: [245, 245, 245]
       },
-      margin: { top: 35 },
-      didDrawPage: (_data) => {
-        // Adicionar número de página
-        const pageNumber = doc.getNumberOfPages();
-        doc.setFontSize(8);
-        doc.setTextColor(100, 100, 100);
-        doc.text(
-          `Página ${pageNumber}`,
-          doc.internal.pageSize.getWidth() - 15,
-          doc.internal.pageSize.getHeight() - 10,
-          { align: 'right' }
-        );
+      styles: {
+        fontSize: 9,
+        cellPadding: 3,
+        overflow: 'linebreak'
       },
+      columnStyles: {
+        0: { cellWidth: 40 }, // Nome do Paciente
+        1: { cellWidth: 10 }, // Idade
+        2: { cellWidth: 25 }, // Tipo de Atendimento
+        3: { cellWidth: 22 }, // Data da Ocorrência
+        4: { cellWidth: 25 }, // Evento
+        5: { cellWidth: 50 }, // Sinais e Sintomas
+        6: { cellWidth: 25 }, // Tipo de Encerramento
+        7: { cellWidth: 40 }  // Unidade Notificadora
+      },
+      didDrawPage: (data) => {
+        // Adicionar rodapé à página da tabela
+        addFooter(tabelaDoc, 1, 1 + notificacoes.length); // 1 página de tabela + N páginas de fichas
+      }
     });
     
-    // Atualizar rodapé na primeira página
-    doc.setPage(1);
-    doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
-    doc.text(
-      `Página 1 de ${doc.getNumberOfPages()}`,
-      doc.internal.pageSize.getWidth() - 15,
-      doc.internal.pageSize.getHeight() - 10,
-      { align: 'right' }
-    );
+    // PARTE 2: FICHAS DETALHADAS EM RETRATO
+    // Definir seções agrupadas para as fichas detalhadas
+    const sections = [
+      {
+        title: "Dados Gerais",
+        fields: ["Evento", "Público Atendido"]
+      },
+      {
+        title: "Identificação do Paciente",
+        fields: ["Nome do Paciente", "Nome da Mãe", "Data de Nascimento", "Idade", 
+                "CPF", "Identidade de Gênero", "Gestante", "Raça", "Escolaridade", 
+                "Profissão", "Contato Telefônico"]
+      },
+      {
+        title: "Procedência",
+        fields: ["Residente em Belém", "País de Procedência", "UF", "Município", "Bairro", 
+                "Local de Hospedagem", "Contato do Local"]
+      },
+      {
+        title: "Atendimento e Sintomas",
+        fields: ["Tipo de Atendimento", "Data da Ocorrência", "Data do Atendimento",
+                "Data de Início dos Sintomas", "Sinais e Sintomas", "Observação dos Sintomas"]
+      },
+      {
+        title: "Diagnóstico",
+        fields: ["Hipótese Diagnóstica", "Observação da Hipótese", "Tipo de Trauma", 
+                "Observação do Trauma", "Relacionado a Surto", "Observação do Incidente"]
+      },
+      {
+        title: "Encerramento e Notificação",
+        fields: ["Data de Encerramento", "Tipo de Encerramento", "Local de Encaminhamento",
+                "Unidade Notificadora", "Nome do Notificador", "Contato do Notificador"]
+      }
+    ];
+    
+    // Adicionar ficha detalhada para cada notificação em páginas separadas
+    formattedData.forEach((item, index) => {
+      if (index > 0) {
+        // Adicionar nova página para cada ficha após a primeira
+        fichasDoc.addPage();
+      }
+      
+      // Cabeçalho da ficha
+      fichasDoc.setFontSize(14);
+      fichasDoc.setTextColor(63, 81, 181);
+      fichasDoc.text(`Ficha de Notificação #${index + 1}`, 15, 15);
+      
+      fichasDoc.setFontSize(12);
+      fichasDoc.text(`Paciente: ${item["Nome do Paciente"] || "Não informado"}`, 15, 22);
+      
+      let yPos = 30;
+      
+      // Adicionar cada seção
+      sections.forEach(section => {
+        // Título da seção
+        fichasDoc.setFillColor(230, 230, 250); // Azul claro
+        fichasDoc.rect(15, yPos, 180, 8, 'F');
+        
+        fichasDoc.setFontSize(11);
+        fichasDoc.setTextColor(63, 81, 181);
+        fichasDoc.text(section.title, 18, yPos + 5.5);
+        
+        yPos += 10;
+        
+        // Conteúdo da seção
+        const sectionData = section.fields
+          .filter(field => item[field] !== undefined && item[field] !== null && String(item[field]).trim() !== '')
+          .map(field => [field, String(item[field] || '')]);
+        
+        if (sectionData.length > 0) {
+          // Verificar se a próxima tabela cabe na página atual, caso contrário adicionar nova página
+          if (yPos > fichasDoc.internal.pageSize.height - 40) {
+            fichasDoc.addPage();
+            yPos = 15;
+          }
+          
+          fichasDoc.autoTable({
+            startY: yPos,
+            head: [], // Sem cabeçalho
+            body: sectionData,
+            theme: 'grid',
+            styles: {
+              fontSize: 9,
+              cellPadding: 3,
+            },
+            columnStyles: {
+              0: { fontStyle: 'bold', cellWidth: 60 },
+              1: { cellWidth: 'auto' }
+            },
+            margin: { left: 15, right: 15 }
+          });
+          
+          yPos = (fichasDoc as any).lastAutoTable.finalY + 10;
+        }
+      });
+      
+      // Adicionar rodapé para cada página de ficha
+      addFooter(fichasDoc, index + 2, 1 + notificacoes.length);
+    });
+    
+    // Função auxiliar para adicionar rodapé com numeração correta
+    function addFooter(doc: any, pageNumber: number, totalPages: number) {
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text(
+        `Página ${pageNumber} de ${totalPages}`,
+        doc.internal.pageSize.getWidth() - 15,
+        doc.internal.pageSize.getHeight() - 10,
+        { align: 'right' }
+      );
+    }
     
     // Nome do arquivo
     const currentDate = new Date().toISOString().split('T')[0];
     const fileName = `notificacoes_lista_${currentDate}.pdf`;
     
-    // Salvar o PDF
-    doc.save(fileName);
+    // ABORDAGEM 1: Usar jspdf-merger para combinar os PDFs (mais confiável)
+    combineAndExportPDFs();
+    
+    // Função para combinar e exportar os PDFs usando jspdf diretamente
+    async function combineAndExportPDFs() {
+      try {
+        // Método 1: Tentar com pdf-lib
+        await mergeWithPDFLib();
+      } catch (e) {
+        console.error("Erro ao mesclar com PDF-lib:", e);
+        
+        // Método 2: Se falhar, tentar com jsPDF.addPage (mais básico)
+        try {
+          const combinedDoc = new jsPDF();
+          
+          // Remover primeira página vazia
+          combinedDoc.deletePage(1);
+          
+          // Adicionar a página da tabela (em paisagem)
+          const tabelaPdfOutput = tabelaDoc.output('arraybuffer');
+          const tabelaPdfBlob = new Blob([tabelaPdfOutput], { type: 'application/pdf' });
+          const tabelaPdfUrl = URL.createObjectURL(tabelaPdfBlob);
+          combinedDoc.addPage('landscape');
+          combinedDoc.setPage(1);
+          combinedDoc.addFileToVFS('tabela.pdf', tabelaPdfOutput.toString());
+          
+          // Adicionar as páginas das fichas (em retrato)
+          const fichasPdfOutput = fichasDoc.output('arraybuffer');
+          
+          // Para cada página em fichasDoc
+          const fichasPagesCount = fichasDoc.getNumberOfPages();
+          for (let i = 1; i <= fichasPagesCount; i++) {
+            combinedDoc.addPage('portrait');
+            // Não é possível copiar o conteúdo diretamente sem bibliotecas adicionais
+          }
+          
+          combinedDoc.save(fileName);
+        } catch (err) {
+          console.error("Erro ao tentar método alternativo de mesclagem:", err);
+          // Método 3: Último recurso, salvar os dois PDFs separadamente
+          fallbackSave();
+        }
+      }
+    }
+    
+    // Função para mesclar usando pdf-lib
+    async function mergeWithPDFLib() {
+      // Obter os bytes dos documentos
+      const tabelaBytes = tabelaDoc.output('arraybuffer');
+      const fichasBytes = fichasDoc.output('arraybuffer');
+      
+      // Criar novo documento
+      const mergedPdf = await PDFDocument.create();
+      
+      // Carregar documentos fonte
+      const tabelaPdf = await PDFDocument.load(tabelaBytes);
+      const fichasPdf = await PDFDocument.load(fichasBytes);
+      
+      // Copiar todas as páginas
+      // Primeiro da tabela (em paisagem)
+      const tabelaPageIndices = Array.from({ length: tabelaPdf.getPageCount() }, (_, i) => i);
+      const tabelaPages = await mergedPdf.copyPages(tabelaPdf, tabelaPageIndices);
+      
+      // Depois das fichas (em retrato)
+      const fichasPageIndices = Array.from({ length: fichasPdf.getPageCount() }, (_, i) => i);
+      const fichasPages = await mergedPdf.copyPages(fichasPdf, fichasPageIndices);
+      
+      // Adicionar as páginas na ordem correta
+      // Primeiro as páginas da tabela
+      tabelaPages.forEach(page => mergedPdf.addPage(page));
+      
+      // Depois as páginas das fichas
+      fichasPages.forEach(page => mergedPdf.addPage(page));
+      
+      // Salvar o documento final
+      const mergedBytes = await mergedPdf.save();
+      
+      // Criar um blob e fazer o download
+      const blob = new Blob([mergedBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      
+      // Limpar
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 100);
+    }
+    
+    // Função alternativa caso falhe a mesclagem
+    function fallbackSave() {
+      console.warn("Não foi possível mesclar os documentos, salvando separadamente...");
+      
+      // Salvar documento principal (tabela)
+      tabelaDoc.save(`tabela_${fileName}`);
+      
+      // Salvar documento de fichas
+      const fichasFileName = `fichas_${fileName}`;
+      fichasDoc.save(fichasFileName);
+      
+      alert("Não foi possível gerar um único PDF. Foram gerados dois arquivos separados: um com a tabela resumida e outro com as fichas detalhadas.");
+    }
+    
   } catch (error) {
     console.error("Erro ao exportar lista para PDF:", error);
     throw error;

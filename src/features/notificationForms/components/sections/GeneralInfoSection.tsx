@@ -5,7 +5,12 @@ import { FormSectionProps } from '@/features/notificationForms/types/index2';
 import SectionHeader from '../shared/SectionHeader';
 import FormField from '../shared/FormField';
 
-const GeneralInfoSection: React.FC<FormSectionProps> = ({
+interface GeneralInfoSectionProps extends FormSectionProps {
+  eventoOptions?: Array<{ idtipo_evento: number; descricao: string }>;
+  publicoOptions?: Array<{ idtipo_publico: number; descricao: string }>;
+}
+
+const GeneralInfoSection: React.FC<GeneralInfoSectionProps> = ({
   formData,
   errors,
   handleChange,

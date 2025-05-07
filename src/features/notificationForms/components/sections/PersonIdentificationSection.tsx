@@ -1,5 +1,6 @@
 // src/features/notificationForms/components/sections/PersonIdentificationSection.tsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { User, Search, X, HelpCircle } from 'lucide-react';
 import { FormSectionProps } from '@/features/notificationForms/types/index2';
 import SectionHeader from '../shared/SectionHeader';
@@ -8,6 +9,7 @@ import CustomDateInput from '@/features/notificationForms/components/CustomDateI
 import CboInput from '@/features/notificationForms/components/CboInput';
 import PhoneInput from '@/features/notificationForms/components/PhoneInput';
 import { displayFormattedCPF } from '../../utils/formUtils';
+import { PacienteService } from '@/services/PacienteService';
 
 interface PersonIdentificationSectionProps extends FormSectionProps {
   pacienteSuggestions: any[];
@@ -23,6 +25,7 @@ interface PersonIdentificationSectionProps extends FormSectionProps {
   generoOptions: any[];
   racaOptions: any[];
   escolaridadeOptions: any[];
+  setErrors: (errors: any) => void;
 }
 
 const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = ({
@@ -44,8 +47,72 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
   setShowGenderHelp,
   generoOptions,
   racaOptions,
-  escolaridadeOptions
+  escolaridadeOptions,
+  setErrors
 }) => {
+  const [typingTimer, setTypingTimer] = useState<NodeJS.Timeout | null>(null);
+
+  // Função auxiliar para formatar CPF (remover caracteres não numéricos)
+  const formatCPF = (cpf: string) => {
+    return cpf.replace(/\D/g, "").slice(0, 11);
+  };
+
+  // Função para verificar CPF existente usando o serviço
+  const handleCPFChangeWithValidation = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value;
+    // Remove formatação para armazenar apenas os dígitos
+    const formattedCPF = formatCPF(rawValue);
+
+    setFormData((prev) => ({
+      ...prev,
+      cpf: formattedCPF,
+    }));
+
+    // Limpar erro anterior, se houver
+    if (errors.cpf) {
+      const newErrors = { ...errors };
+      delete newErrors.cpf;
+      setErrors(newErrors);
+    }
+    
+    // Verificar CPF existente se tiver 11 dígitos
+    if (formattedCPF.length === 11) {
+      // Limpar timeout anterior para não fazer múltiplas solicitações
+      if (typingTimer) {
+        clearTimeout(typingTimer);
+      }
+      
+      // Configurar novo timer para verificar apenas quando o usuário parar de digitar
+      const timer = setTimeout(async () => {
+        try {
+          // Verificar se o CPF está disponível
+          const isAvailable = await PacienteService.checkCpfAvailable(formattedCPF);
+          
+          if (!isAvailable) {
+            // CPF não está disponível (já existe)
+            setErrors((prev: Record<string, string>) => ({
+              ...prev,
+              cpf: "CPF já cadastrado no sistema",
+            }));
+          }
+        } catch (error) {
+          console.error("Erro ao verificar CPF:", error);
+        }
+      }, 300); // 300ms de delay
+      
+      setTypingTimer(timer);
+    }
+  };
+
+  // Limpar o timer quando o componente for desmontado
+  useEffect(() => {
+    return () => {
+      if (typingTimer) {
+        clearTimeout(typingTimer);
+      }
+    };
+  }, [typingTimer]);
+
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
       <SectionHeader
@@ -254,7 +321,7 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
                 value={
                   formData.cpf ? displayFormattedCPF(formData.cpf) : ""
                 }
-                onChange={handleCPFChange}
+                onChange={handleCPFChangeWithValidation}
                 maxLength={14}
                 data-error={errors.cpf ? "true" : "false"}
               />

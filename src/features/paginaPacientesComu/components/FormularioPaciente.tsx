@@ -30,6 +30,7 @@ import { toast } from "react-toastify";
 // Interface para as props do componente
 interface FormularioPacienteProps {
   isModal?: boolean;
+  isNewPatient?: boolean; // Nova prop para indicar explicitamente que é um novo paciente
   onPacienteSalvo?: (paciente: Omit<Paciente, "idpaciente">) => void;
   onClose?: () => void;
   pacienteId?: number; // ID para edição, se aplicável
@@ -96,12 +97,14 @@ const toUpperCaseAllStrings = (obj: any): any => {
 
 const FormularioPaciente = ({
   isModal = false,
+  isNewPatient = false, // Definir valor padrão
   onPacienteSalvo,
   onClose,
   pacienteId: propPacienteId,
 }: FormularioPacienteProps) => {
   const { id } = useParams();
-  const pacienteId = propPacienteId || (id ? parseInt(id) : undefined);
+  // Se isNewPatient for true, ignorar qualquer pacienteId
+  const pacienteId = isNewPatient ? undefined : (propPacienteId || (id ? parseInt(id) : undefined));
   const initialFormData: PacienteFormData = {
     nome: "",
     nome_mae: "",
@@ -303,19 +306,29 @@ const FormularioPaciente = ({
     }
   }, [formData.data_nascimento]);
 
+  // Efeito para resetar o formulário quando isNewPatient for true
+  useEffect(() => {
+    if (isNewPatient) {
+      // Resetar explicitamente para o estado inicial quando for um novo paciente
+      setFormData(initialFormData);
+      setErrors({});
+      setApiError(null);
+      setIsSuccess(false);
+      setOriginalCpf(""); // Importante também resetar o CPF original
+      console.log("Formulário resetado para novo paciente");
+    }
+  }, [isNewPatient]);
+
   // Função para verificar se o CPF já existe
   const searchCpfExists = async (cpf: string): Promise<boolean> => {
     // Não verificar CPFs vazios ou incompletos
     if (!cpf || cpf.length !== 11) return false;
     
     try {
-      const server = import.meta.env.VITE_API_SERVER;
-      const port = import.meta.env.VITE_API_PORT;
-      const response = await axios.get(
-        `${server}:${port}/api/paciente/check-cpf/${cpf}`
-      );
-      
-      return response.data.exists;
+      // Use a função do serviço, mas inverta o resultado
+      // já que checkCpfAvailable retorna true se o CPF está DISPONÍVEL (não existe)
+      const isAvailable = await PacienteService.checkCpfAvailable(cpf);
+      return !isAvailable; // Inverte para ter true quando o CPF JÁ EXISTE
     } catch (error) {
       console.error("Erro ao verificar CPF:", error);
       return false;
@@ -522,12 +535,13 @@ const FormularioPaciente = ({
     const rawValue = e.target.value;
     // Remove formatação para armazenar apenas os dígitos no estado
     const formattedCPF = formatCPF(rawValue);
-
+  
     setFormData((prev) => ({
       ...prev,
       cpf: formattedCPF,
     }));
-
+  
+    // Limpar erro anterior, se houver
     if (errors.cpf) {
       setErrors((prev) => {
         const newErrors = { ...prev };
@@ -538,12 +552,34 @@ const FormularioPaciente = ({
     
     // Verificar CPF existente se tiver 11 dígitos e for diferente do original
     if (formattedCPF.length === 11 && formattedCPF !== originalCpf) {
-      const exists = await searchCpfExists(formattedCPF);
-      
-      if (exists) {
-        setErrors((prev) => ({
+      try {
+        // Adicionar indicador visual de verificação em andamento
+        setErrors(prev => ({
           ...prev,
-          cpf: "O CPF digitado já existe",
+          cpf: "Verificando CPF..."
+        }));
+        
+        const exists = await searchCpfExists(formattedCPF);
+        
+        if (exists) {
+          setErrors((prev) => ({
+            ...prev,
+            cpf: "O CPF digitado já existe",
+          }));
+          console.log("CPF existente detectado:", formattedCPF);
+        } else {
+          // Limpar o erro se o CPF não existir
+          setErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors.cpf;
+            return newErrors;
+          });
+        }
+      } catch (error) {
+        console.error("Erro ao verificar CPF:", error);
+        setErrors(prev => ({
+          ...prev,
+          cpf: "Erro ao verificar CPF"
         }));
       }
     }

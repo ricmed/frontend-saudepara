@@ -455,33 +455,32 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       if (formattedData) {
         // Normalizar dados para garantir consistência
         const normalizarDadosResidencia = (dados: any) => {
-          // Criar uma cópia dos dados para não modificar o original
-          const normalizado = { ...dados };
-          
-          // Normalizar campos de residência
-          if (normalizado.residente_belem !== undefined) {
-            normalizado.residenteBelem = normalizado.residente_belem.toString();
-          }
-          
-          // Normalizar IDs para strings nos campos de localização
-          if (normalizado.tipo_pais_idtipo_pais !== undefined) {
-            normalizado.paisProcedencia = normalizado.tipo_pais_idtipo_pais.toString();
-          }
-          
-          if (normalizado.tipo_estado_idtipo_estado !== undefined) {
-            normalizado.uf = normalizado.tipo_estado_idtipo_estado.toString();
-          }
-          
-          if (normalizado.tipo_municipio_idtipo_municipio !== undefined) {
-            normalizado.municipio = normalizado.tipo_municipio_idtipo_municipio.toString();
-          }
-          
-          if (normalizado.tipo_bairro_idtipo_bairro !== undefined) {
-            normalizado.bairro = normalizado.tipo_bairro_idtipo_bairro.toString();
-          }
-          
-          return normalizado;
-        };
+            // Criar uma cópia dos dados para não modificar o original
+            const normalizado = { ...dados };
+            
+            // Normalizar IDs para strings nos campos de localização primeiro
+            if (normalizado.tipo_pais_idtipo_pais !== undefined) {
+              normalizado.paisProcedencia = normalizado.tipo_pais_idtipo_pais.toString();
+            }
+            
+            // Se é estrangeiro (país não é Brasil - ID 105)
+            if (normalizado.paisProcedencia && normalizado.paisProcedencia !== "105") {
+              // Forçar opção "Estrangeiro" independentemente do que estiver no banco
+              normalizado.residenteBelem = "3";
+              console.log("Detectado país estrangeiro, corrigindo para ESTRANGEIRO");
+              
+              // Limpar campos brasileiros
+              normalizado.bairro = "";
+              normalizado.uf = "";
+              normalizado.municipio = "";
+            } 
+            // Se não é estrangeiro, manter o valor original
+            else if (normalizado.residente_belem !== undefined) {
+              normalizado.residenteBelem = normalizado.residente_belem.toString();
+            }
+            
+            return normalizado;
+          };
         
         const dadosNormalizados = normalizarDadosResidencia(formattedData);
         console.log("Dados normalizados:", dadosNormalizados);

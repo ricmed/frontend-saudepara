@@ -42,6 +42,9 @@ const ModalBuscaPaciente = ({
 
   // Estado para controlar o que é exibido no modal
   const [modalView, setModalView] = useState<"search" | "form">("search");
+  
+  // Estado para controlar se é um novo paciente
+  const [isNewPatientMode, setIsNewPatientMode] = useState(false);
 
   // Estado para armazenar os dados do formulário do paciente selecionado
   const [formData, setFormData] = useState({
@@ -67,6 +70,7 @@ const ModalBuscaPaciente = ({
         setError(null);
         setCurrentPage(1);
         setModalView("search");
+        setIsNewPatientMode(false);
       }, 300);
 
       return () => clearTimeout(timer);
@@ -147,6 +151,8 @@ const ModalBuscaPaciente = ({
   // Selecionar um paciente e fechar o modal
   const handleSelectPaciente = (paciente: Paciente) => {
     console.log("Paciente selecionado:", paciente); // Para debug
+    
+    setIsNewPatientMode(false); // Não é um novo paciente
 
     // Formatar a data de nascimento corretamente
     let formattedDate = "";
@@ -184,6 +190,21 @@ const ModalBuscaPaciente = ({
   const handleCreatePaciente = () => {
     setModalView("form");
     setError(null);
+    setIsNewPatientMode(true); // Marcar explicitamente como novo paciente
+
+    // Resetar os dados do formulário quando criar um novo paciente
+    setFormData({
+      paciente: "",
+      nomeMae: "",
+      dataNascimento: "",
+      cpf: "",
+      identidadeGenero: "",
+      raca: "",
+      escolaridade: "",
+      profissao: "",
+      contatoTelefonico: "",
+      idade: "",
+    });
   };
 
   // Quando o paciente é salvo no formulário
@@ -560,7 +581,9 @@ const ModalBuscaPaciente = ({
                 </button>
               </div>
               <FormularioPaciente
+                key={isNewPatientMode ? "new-patient" : "edit-patient"} // Forçar recriação do componente
                 isModal={true}
+                isNewPatient={isNewPatientMode} // Nova prop para indicar explicitamente que é um novo paciente
                 onPacienteSalvo={handlePacienteSalvo}
                 onClose={onClose}
               />

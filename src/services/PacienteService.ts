@@ -422,24 +422,23 @@ export const PacienteService = {
     try {
       // Verificar se o CPF está formatado corretamente
       if (!cpf || cpf.length !== 11) {
-        throw new Error('CPF deve ter 11 dígitos');
+        return true; // CPF inválido considerado como disponível
       }
       
-      // Estrutura para verificação de duplicidade, seguindo o padrão do backend
-      const payload = {
-        cpf: cpf.trim(),
-        excludeId: excludeId
-      };
+      // Usar o mesmo padrão do resto do código (caminho GET)
+      let url = `${API_BASE_URL}/api/paciente/check-cpf/${cpf}`;
+      if (excludeId) {
+        url += `?excludeId=${excludeId}`;
+      }
       
-      // Endpoint deve ser ajustado conforme implementação do backend
-      // Este é um exemplo, use o endpoint correto
-      const response = await api.post('/check-cpf', payload);
+      const response = await axios.get(url);
       
-      // Assumindo que a API retorna { available: true/false }
-      return response.data.available;
+      // Se a API retorna {exists: true/false}, precisamos inverter
+      // para manter compatível com o nome do método (available = !exists)
+      return !response.data.exists;
     } catch (error) {
       console.error('Erro ao verificar disponibilidade de CPF:', error);
-      // Em caso de erro, é mais seguro assumir que não está disponível
+      // Em caso de erro, assumimos que não está disponível por segurança
       return false;
     }
   }
