@@ -16,6 +16,8 @@ interface AttendanceInfoSectionProps extends FormSectionProps {
   sintomaOptions: any[];
   traumaOptions: any[];
   hipoteseDiagOptions: any[];
+  hipoteseDiagFiltradas: any[]; // Nova propriedade
+  isLoadingHipoteses: boolean;  // Nova propriedade
   isTipoAtendimentoFunc: (tipo: string) => boolean;
 }
 
@@ -35,6 +37,8 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
   sintomaOptions,
   traumaOptions,
   hipoteseDiagOptions,
+  hipoteseDiagFiltradas,
+  isLoadingHipoteses,
   isTipoAtendimentoFunc
 }) => {
   return (
@@ -227,31 +231,60 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
               <label className="block mb-2 font-medium text-gray-700">
                 Hipótese Diagnóstica
               </label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {hipoteseDiagOptions.map((option) => (
-                  <label
-                    key={option.idtipo_hipotese_diag}
-                    className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer transition-all duration-200 hover:border-blue-400 hover:bg-blue-50/50 group"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={formData.hipoteseDiagnostica.includes(
-                        option.idtipo_hipotese_diag.toString()
-                      )}
-                      onChange={() => handleCheckboxChange && 
-                        handleCheckboxChange(
-                          "hipoteseDiagnostica",
+              
+              {isLoadingHipoteses ? (
+                <div className="flex items-center justify-center p-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                  <span className="ml-2 text-sm text-gray-600">Carregando hipóteses diagnósticas...</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {formData.sinaisESintomas.length > 0 && hipoteseDiagFiltradas.length > 0 && (
+                    <div className="md:col-span-3 mb-2 text-xs text-gray-500">
+                      Mostrando hipóteses diagnósticas ordenadas por relevância com base nos sintomas selecionados.
+                    </div>
+                  )}
+                  
+                  {hipoteseDiagFiltradas.map((option) => (
+                    <label
+                      key={option.idtipo_hipotese_diag}
+                      className={`flex items-center gap-3 p-3 border ${
+                        option.qtdSintomas ? 'border-yellow-200' : 'border-gray-200'
+                      } rounded-lg cursor-pointer transition-all duration-200 hover:border-blue-400 hover:bg-blue-50/50 group`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={formData.hipoteseDiagnostica.includes(
                           option.idtipo_hipotese_diag.toString()
-                        )
-                      }
-                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 transition-all duration-200 group-hover:border-blue-400"
-                    />
-                    <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors duration-200">
-                      {option.descricao}
-                    </span>
-                  </label>
-                ))}
-              </div>
+                        )}
+                        onChange={() => handleCheckboxChange && 
+                          handleCheckboxChange(
+                            "hipoteseDiagnostica",
+                            option.idtipo_hipotese_diag.toString()
+                          )
+                        }
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 transition-all duration-200 group-hover:border-blue-400"
+                      />
+                      <div className="flex flex-col">
+                        <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors duration-200">
+                          {option.descricao}
+                        </span>
+                        {option.qtdSintomas && (
+                          <span className="text-xs text-yellow-600">
+                            {option.qtdSintomas} {option.qtdSintomas === 1 ? 'sintoma relacionado' : 'sintomas relacionados'}
+                          </span>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                  
+                  {hipoteseDiagFiltradas.length === 0 && formData.sinaisESintomas.length > 0 && (
+                    <div className="md:col-span-3 text-center p-3 text-gray-500 italic border border-dashed border-gray-300 rounded-lg">
+                      Nenhuma hipótese diagnóstica encontrada para os sintomas selecionados.
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Observação da Hipótese para TODOS os tipos */}

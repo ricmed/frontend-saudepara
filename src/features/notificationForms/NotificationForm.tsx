@@ -9,7 +9,7 @@ import {
   Loader,
   FileChartColumnIncreasing,
   Files,
-  ArchiveX
+  ArchiveX,
 } from "lucide-react";
 import ModalBuscaPaciente from "@/features/paginaPacientesComu/components/ModalBuscaPaciente";
 import SideMenu from "@/features/apps/components/SideMenu";
@@ -53,21 +53,21 @@ const NotificationForm: React.FC = () => {
     handleExport,
     toggleExportDropdown,
     criarNovoPaciente,
-    
+      
     // Dados de pacientes
     pacienteSuggestions,
     showSuggestions,
     isCreatingNewPatient,
     isPatientModalOpen,
     setIsPatientModalOpen,
-    
+      
     // Dados de exportação
     isExportDropdownOpen,
-    
+      
     // Campo de ajuda de gênero
     showGenderHelp,
     setShowGenderHelp,
-    
+      
     // Opções de dropdown
     eventoOptions,
     publicoOptions,
@@ -84,20 +84,24 @@ const NotificationForm: React.FC = () => {
     traumaOptions,
     encerramentoOptions,
     estabelecimentoOptions,
-    
+      
     // Estado dos municípios
     isLoadingMunicipios,
     ufError,
-    
+      
     // Filtros de busca
     searchSintomas,
     setSearchSintomas,
     searchTrauma,
     setSearchTrauma,
-    
+      
     // Helpers para condicionais
     isTipoAtendimentoFunc,
-    isTipoEncerramentoFunc
+    isTipoEncerramentoFunc,
+  
+    // Adicionar estas duas variáveis
+    hipoteseDiagFiltradas, 
+    isLoadingHipoteses,
   } = useNotificationForm(isEditMode, id);
 
   // Tela de carregamento
@@ -212,7 +216,7 @@ const NotificationForm: React.FC = () => {
             </div>
           </div>
         )}
-        
+
         {isSuccess && (
           <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
             <div className="flex items-center gap-2 text-green-600">
@@ -242,7 +246,11 @@ const NotificationForm: React.FC = () => {
         )}
 
         {/* Formulário */}
-        <form id="notification-form" onSubmit={handleSubmit} className="space-y-4">
+        <form
+          id="notification-form"
+          onSubmit={handleSubmit}
+          className="space-y-4"
+        >
           {/* Seção 1: Dados Gerais */}
           <GeneralInfoSection
             formData={formData}
@@ -251,7 +259,7 @@ const NotificationForm: React.FC = () => {
             handleChange={handleChange}
             handleContatoLocalChange={handleContatoLocalChange}
             isExpanded={expandedSections.dadosGerais}
-            toggleSection={() => toggleSection('dadosGerais')}
+            toggleSection={() => toggleSection("dadosGerais")}
             eventoOptions={eventoOptions}
             publicoOptions={publicoOptions}
             isLoadingMunicipios={isLoadingMunicipios}
@@ -266,7 +274,7 @@ const NotificationForm: React.FC = () => {
             handleChange={handleChange}
             handleContatoLocalChange={handleContatoLocalChange}
             isExpanded={expandedSections.procedencia}
-            toggleSection={() => toggleSection('procedencia')}
+            toggleSection={() => toggleSection("procedencia")}
             isLoadingMunicipios={isLoadingMunicipios}
             ufError={ufError || undefined}
             paisOptions={paisOptions}
@@ -280,7 +288,7 @@ const NotificationForm: React.FC = () => {
             handleChange={handleChange}
             handleContatoLocalChange={handleContatoLocalChange}
             isExpanded={expandedSections.identificacao}
-            toggleSection={() => toggleSection('identificacao')}
+            toggleSection={() => toggleSection("identificacao")}
             pacienteSuggestions={pacienteSuggestions}
             showSuggestions={showSuggestions}
             isCreatingNewPatient={isCreatingNewPatient}
@@ -307,7 +315,7 @@ const NotificationForm: React.FC = () => {
             handleCheckboxChange={handleCheckboxChange}
             handleContatoLocalChange={handleContatoLocalChange}
             isExpanded={expandedSections.atendimento}
-            toggleSection={() => toggleSection('atendimento')}
+            toggleSection={() => toggleSection("atendimento")}
             searchSintomas={searchSintomas}
             setSearchSintomas={setSearchSintomas}
             searchTrauma={searchTrauma}
@@ -316,6 +324,8 @@ const NotificationForm: React.FC = () => {
             sintomaOptions={sintomaOptions}
             traumaOptions={traumaOptions}
             hipoteseDiagOptions={hipoteseDiagOptions}
+            hipoteseDiagFiltradas={hipoteseDiagFiltradas} // Nova prop
+            isLoadingHipoteses={isLoadingHipoteses} // Nova prop
             isTipoAtendimentoFunc={isTipoAtendimentoFunc}
             isLoadingMunicipios={isLoadingMunicipios}
             paisOptions={paisOptions}
@@ -329,7 +339,7 @@ const NotificationForm: React.FC = () => {
             handleChange={handleChange}
             handleContatoLocalChange={handleContatoLocalChange}
             isExpanded={expandedSections.unidadeNotificadora}
-            toggleSection={() => toggleSection('unidadeNotificadora')}
+            toggleSection={() => toggleSection("unidadeNotificadora")}
             isLoadingMunicipios={isLoadingMunicipios}
             paisOptions={paisOptions}
           />
@@ -342,7 +352,7 @@ const NotificationForm: React.FC = () => {
             handleChange={handleChange}
             handleContatoLocalChange={handleContatoLocalChange}
             isExpanded={expandedSections.encerramento}
-            toggleSection={() => toggleSection('encerramento')}
+            toggleSection={() => toggleSection("encerramento")}
             encerramentoOptions={encerramentoOptions}
             isTipoEncerramentoFunc={isTipoEncerramentoFunc}
             isLoadingMunicipios={isLoadingMunicipios}

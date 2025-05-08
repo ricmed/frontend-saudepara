@@ -41,6 +41,12 @@ import { useSectionExpansion } from './useSectionExpansion';
 import { NotificacaoService } from '@/services/NotificacaoService';
 import { Paciente, PacienteService } from '@/services/PacienteService';
 import { salvarNotificacaoCompleta } from '@/utils/notificacaoAdapter';
+import { ListaSindromicaService } from '@/services/ListaSindromicaService';
+
+// Definir interface para hipótese filtrada com informação de relevância
+interface HipoteseFiltrada extends HipoteseDiagOption {
+  qtdSintomas?: number; // Quantidade de sintomas relacionados
+}
 
 // Initial form data
 const initialFormData: FormData = {
@@ -147,6 +153,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
   
   // Estados para ajuda de identidade de gênero
   const [showGenderHelp, setShowGenderHelp] = useState<boolean>(false);
+
+  // Estados para hipóteses diagnósticas filtradas
+  const [hipoteseDiagFiltradas, setHipoteseDiagFiltradas] = useState<HipoteseFiltrada[]>([]);
+  const [isLoadingHipoteses, setIsLoadingHipoteses] = useState<boolean>(false);
 
   // Usar o hook de expansão de seções
   const sectionExpansion = useSectionExpansion();
@@ -1272,6 +1282,87 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     };
   }, []);
 
+  // Atualizar hipóteses diagnósticas quando sintomas mudam
+  useEffect(() => {
+    const fetchHipoteses = async () => {
+      // Se não temos sintomas selecionados ou não é um tipo de atendimento que usa sintomas, 
+      // mostrar todas as hipóteses
+      if (
+        formData.sinaisESintomas.length === 0 || 
+        !(isTipoAtendimento("CLINICO", formData.tipoAtendimento, atendimentoOptions) ||
+          isTipoAtendimento("SURTO", formData.tipoAtendimento, atendimentoOptions) ||
+          isTipoAtendimento("INCIDENTE QBRN", formData.tipoAtendimento, atendimentoOptions))
+      ) {
+        setHipoteseDiagFiltradas(hipoteseDiagOptions);
+        return;
+      }
+
+      try {
+        setIsLoadingHipoteses(true);
+        
+        // Buscar hipóteses relacionadas aos sintomas selecionados
+        const hipotesesDaApi = await ListaSindromicaService.getHipotesesPorSintomas(formData.sinaisESintomas);
+        
+        if (hipotesesDaApi.length === 0) {
+          // Se não encontrou nenhuma hipótese relacionada, mostrar todas as opções
+          setHipoteseDiagFiltradas(hipoteseDiagOptions);
+        } else {
+          // Mapear as hipóteses da API para o formato esperado pelo componente,
+          // mantendo a ordenação da API (que já está por relevância)
+          const hipotesesFiltradas = hipotesesDaApi.map(hipoteseApi => {
+            // Encontrar a hipótese correspondente nas opções originais para ter a descrição completa
+            const hipoteseOriginal = hipoteseDiagOptions.find(
+              h => h.idtipo_hipotese_diag === hipoteseApi.id
+            );
+            
+            // Se encontrou, retornar com informações adicionais
+            if (hipoteseOriginal) {
+              return {
+                ...hipoteseOriginal,
+                qtdSintomas: hipoteseApi.qtd // Adicionar a quantidade de sintomas relacionados
+              };
+            }
+            
+            // Se não encontrou, criar um objeto com as informações da API
+            return {
+              idtipo_hipotese_diag: hipoteseApi.id,
+              descricao: hipoteseApi.hipotese,
+              qtdSintomas: hipoteseApi.qtd
+            };
+          });
+          
+          setHipoteseDiagFiltradas(hipotesesFiltradas);
+          
+          // Remover hipóteses diagnósticas que não estão mais disponíveis
+          const hipotesesValidas = new Set(hipotesesFiltradas.map(
+            h => h.idtipo_hipotese_diag.toString()
+          ));
+          
+          // Filtrar as hipóteses selecionadas para manter apenas as válidas
+          const hipotesesSelecionadasValidas = formData.hipoteseDiagnostica.filter(
+            id => hipotesesValidas.has(id)
+          );
+          
+          // Se a seleção mudou, atualizar o formData
+          if (hipotesesSelecionadasValidas.length !== formData.hipoteseDiagnostica.length) {
+            setFormData(prev => ({
+              ...prev,
+              hipoteseDiagnostica: hipotesesSelecionadasValidas
+            }));
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao buscar hipóteses diagnósticas:', error);
+        // Em caso de erro, mostrar todas as hipóteses
+        setHipoteseDiagFiltradas(hipoteseDiagOptions);
+      } finally {
+        setIsLoadingHipoteses(false);
+      }
+    };
+
+    fetchHipoteses();
+  }, [formData.sinaisESintomas, formData.tipoAtendimento, hipoteseDiagOptions]);
+
   // Retornar todos os estados e funções necessários
   return {
     formData,
@@ -1336,6 +1427,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     setSearchSintomas,
     searchTrauma,
     setSearchTrauma,
+    
+    // Hipóteses diagnósticas filtradas
+    hipoteseDiagFiltradas,
+    isLoadingHipoteses,
     
     // Helpers para condicionais
     isTipoAtendimentoFunc: (tipo: string) => isTipoAtendimento(tipo, formData.tipoAtendimento, atendimentoOptions),
