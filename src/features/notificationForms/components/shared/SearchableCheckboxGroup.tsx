@@ -32,6 +32,23 @@ const SearchableCheckboxGroup: React.FC<SearchableCheckboxGroupProps> = ({
       option.label.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Função para obter todas as opções selecionadas com seus rótulos
+  const getSelectedOptions = () => {
+    return options.filter(option => selectedValues.includes(option.id.toString()));
+  };
+
+  // Função para limpar todas as seleções
+  const handleClearAll = () => {
+    // Como o onChange atual só lida com um item por vez, precisamos
+    // chamar o onChange para cada item selecionado para desmarcá-los
+    const selected = getSelectedOptions();
+    if (selected.length > 0 && window.confirm(`Deseja remover todos os ${selected.length} itens selecionados?`)) {
+      selected.forEach(item => {
+        onChange(item.id.toString());
+      });
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
@@ -58,6 +75,40 @@ const SearchableCheckboxGroup: React.FC<SearchableCheckboxGroupProps> = ({
           )}
         </div>
       </div>
+
+      {/* Tags para itens selecionados */}
+      {selectedValues.length > 0 && (
+        <div className="mb-3">
+          <div className="flex flex-wrap gap-2 items-center">
+            {getSelectedOptions().map((option) => (
+              <div
+                key={option.id}
+                className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-xs"
+              >
+                <span>{option.label}</span>
+                <button
+                  type="button"
+                  onClick={() => onChange(option.id.toString())}
+                  className="text-blue-500 hover:text-blue-700 focus:outline-none"
+                  aria-label={`Remover ${option.label}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+            
+            {selectedValues.length > 1 && (
+              <button
+                type="button"
+                onClick={handleClearAll}
+                className="ml-2 text-xs text-gray-500 hover:text-red-500 focus:outline-none"
+              >
+                Limpar todos
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {error && (
         <p className="mt-1 mb-2 text-sm text-red-500">{error}</p>

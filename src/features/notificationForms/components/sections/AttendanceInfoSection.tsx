@@ -1,6 +1,6 @@
 // src/features/notificationForms/components/sections/AttendanceInfoSection.tsx
-import React from 'react';
-import { ListChecks } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ListChecks, Search, X } from 'lucide-react';
 import { FormSectionProps } from '@/features/notificationForms/types/index2';
 import SectionHeader from '../shared/SectionHeader';
 import FormField from '../shared/FormField';
@@ -41,6 +41,41 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
   isLoadingHipoteses,
   isTipoAtendimentoFunc
 }) => {
+  // Estado para pesquisa de hipóteses diagnósticas
+  const [searchHipotese, setSearchHipotese] = useState('');
+  
+  // Estado para controlar se mostra todas as hipóteses ou apenas as relacionadas
+  const [showAllHipoteses, setShowAllHipoteses] = useState(false);
+  
+  // Filtra as hipóteses diagnósticas com base na pesquisa
+  const filteredHipoteses = hipoteseDiagFiltradas.filter(
+    option => 
+      searchHipotese === '' || 
+      option.descricao.toLowerCase().includes(searchHipotese.toLowerCase())
+  );
+
+  // Limpa todas as hipóteses selecionadas
+  const handleClearAllHipoteses = () => {
+    if (formData.hipoteseDiagnostica.length > 0 && 
+        window.confirm(`Deseja remover todas as ${formData.hipoteseDiagnostica.length} hipóteses selecionadas?`)) {
+      setFormData({
+        ...formData,
+        hipoteseDiagnostica: []
+      });
+    }
+  };
+
+  // Obtém as hipóteses selecionadas com seus rótulos
+  const getSelectedHipoteses = () => {
+    return formData.hipoteseDiagnostica.map(id => {
+      const option = hipoteseDiagOptions.find(opt => opt.idtipo_hipotese_diag.toString() === id);
+      return {
+        id,
+        label: option ? option.descricao : id
+      };
+    });
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
       <SectionHeader
@@ -228,9 +263,69 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
 
             {/* Hipótese Diagnóstica para TODOS os tipos */}
             <div className="md:col-span-2">
-              <label className="block mb-2 font-medium text-gray-700">
-                Hipótese Diagnóstica
-              </label>
+              {/* Hipóteses diagnósticas */}
+              <div className="flex items-center justify-between mb-2">
+                <label className="font-medium text-gray-700">
+                  Hipótese Diagnóstica
+                </label>
+                
+                {/* Campo de pesquisa para hipóteses diagnósticas */}
+                <div className="relative w-64">
+                  <input
+                    type="text"
+                    placeholder="Pesquisar hipóteses..."
+                    value={searchHipotese}
+                    onChange={(e) => setSearchHipotese(e.target.value)}
+                    className="w-full p-2 pl-8 text-sm border border-gray-200 rounded-lg hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                    disabled={isLoadingHipoteses}
+                  />
+                  <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  {searchHipotese && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchHipotese('')}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                    >
+                      <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              {/* Tags para hipóteses selecionadas */}
+              {formData.hipoteseDiagnostica.length > 0 && (
+                <div className="mb-3">
+                  <div className="flex flex-wrap gap-2 items-center">
+                    {getSelectedHipoteses().map((hipotese) => (
+                      <div
+                        key={hipotese.id}
+                        className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-xs"
+                      >
+                        <span>{hipotese.label}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCheckboxChange && 
+                            handleCheckboxChange("hipoteseDiagnostica", hipotese.id)}
+                          className="text-blue-500 hover:text-blue-700 focus:outline-none"
+                          aria-label={`Remover ${hipotese.label}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                    
+                    {formData.hipoteseDiagnostica.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={handleClearAllHipoteses}
+                        className="ml-2 text-xs text-gray-500 hover:text-red-500 focus:outline-none"
+                      >
+                        Limpar todos
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
               
               {isLoadingHipoteses ? (
                 <div className="flex items-center justify-center p-4">
@@ -238,52 +333,156 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                   <span className="ml-2 text-sm text-gray-600">Carregando hipóteses diagnósticas...</span>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {formData.sinaisESintomas.length > 0 && hipoteseDiagFiltradas.length > 0 && (
-                    <div className="md:col-span-3 mb-2 text-xs text-gray-500">
-                      Mostrando hipóteses diagnósticas ordenadas por relevância com base nos sintomas selecionados.
-                    </div>
-                  )}
-                  
-                  {hipoteseDiagFiltradas.map((option) => (
-                    <label
-                      key={option.idtipo_hipotese_diag}
-                      className={`flex items-center gap-3 p-3 border ${
-                        option.qtdSintomas ? 'border-yellow-200' : 'border-gray-200'
-                      } rounded-lg cursor-pointer transition-all duration-200 hover:border-blue-400 hover:bg-blue-50/50 group`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={formData.hipoteseDiagnostica.includes(
-                          option.idtipo_hipotese_diag.toString()
-                        )}
-                        onChange={() => handleCheckboxChange && 
-                          handleCheckboxChange(
-                            "hipoteseDiagnostica",
-                            option.idtipo_hipotese_diag.toString()
-                          )
-                        }
-                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 transition-all duration-200 group-hover:border-blue-400"
-                      />
-                      <div className="flex flex-col">
-                        <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors duration-200">
-                          {option.descricao}
-                        </span>
-                        {option.qtdSintomas && (
-                          <span className="text-xs text-yellow-600">
-                            {option.qtdSintomas} {option.qtdSintomas === 1 ? 'sintoma relacionado' : 'sintomas relacionados'}
-                          </span>
-                        )}
+                <>
+                  {/* Botão para mostrar todas as hipóteses */}
+                  {formData.sinaisESintomas.length > 0 && hipoteseDiagFiltradas.length > 0 && !showAllHipoteses && (
+                    <div className="flex justify-between items-center mb-3">
+                      <div className="text-xs text-gray-500">
+                        Mostrando hipóteses diagnósticas ordenadas por relevância com base nos sintomas selecionados.
                       </div>
-                    </label>
-                  ))}
-                  
-                  {hipoteseDiagFiltradas.length === 0 && formData.sinaisESintomas.length > 0 && (
-                    <div className="md:col-span-3 text-center p-3 text-gray-500 italic border border-dashed border-gray-300 rounded-lg">
-                      Nenhuma hipótese diagnóstica encontrada para os sintomas selecionados.
+                      <button 
+                        type="button"
+                        onClick={() => setShowAllHipoteses(true)}
+                        className="text-xs text-blue-600 hover:text-blue-800 focus:outline-none flex items-center gap-1"
+                      >
+                        <span>Ver todas as hipóteses</span>
+                      </button>
                     </div>
                   )}
-                </div>
+                  
+                  {showAllHipoteses && (
+                    <div className="flex justify-between items-center mb-3">
+                      <div className="text-xs text-gray-500">
+                        Mostrando todas as hipóteses diagnósticas disponíveis.
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => setShowAllHipoteses(false)}
+                        className="text-xs text-blue-600 hover:text-blue-800 focus:outline-none flex items-center gap-1"
+                      >
+                        <span>Ver apenas hipóteses relacionadas</span>
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {(() => {
+                      // Determina quais hipóteses mostrar com base no estado e na pesquisa
+                      let hipotesesToShow = [];
+                      
+                      if (showAllHipoteses) {
+                        // Mostrar todas as hipóteses (filtradas pela pesquisa)
+                        // Primeiro, enriquecemos todas as hipóteses com a informação de qtdSintomas
+                        const hipotesesEnriquecidas = hipoteseDiagOptions.map(option => {
+                          // Procura se esta hipótese está no array de hipóteses filtradas (relacionadas aos sintomas)
+                          const matchingSintomaOption = hipoteseDiagFiltradas.find(
+                            h => h.idtipo_hipotese_diag === option.idtipo_hipotese_diag
+                          );
+                          
+                          // Se estiver, usa a qtdSintomas dele, senão é 0
+                          return {
+                            ...option,
+                            qtdSintomas: matchingSintomaOption ? matchingSintomaOption.qtdSintomas : 0
+                          };
+                        });
+                        
+                        // Agora ordenamos pelo número de sintomas relacionados (do maior para o menor)
+                        hipotesesToShow = hipotesesEnriquecidas
+                          .sort((a, b) => (b.qtdSintomas || 0) - (a.qtdSintomas || 0))
+                          .filter(option => 
+                            searchHipotese === '' || 
+                            option.descricao.toLowerCase().includes(searchHipotese.toLowerCase())
+                          );
+                      } else {
+                        // Mostrar apenas hipóteses relacionadas (filtradas pela pesquisa)
+                        hipotesesToShow = filteredHipoteses;
+                      }
+                      
+                      if (hipotesesToShow.length > 0) {
+                        return hipotesesToShow.map((option) => {
+                          // Verifica se esta opção está no array hipoteseDiagFiltradas
+                          const matchingSintomaOption = hipoteseDiagFiltradas.find(
+                            h => h.idtipo_hipotese_diag === option.idtipo_hipotese_diag
+                          );
+                          
+                          // Se estiver no array, usa a qtdSintomas dele, senão é 0
+                          const qtdSintomas = matchingSintomaOption ? matchingSintomaOption.qtdSintomas : 0;
+                          
+                          return (
+                            <label
+                              key={option.idtipo_hipotese_diag}
+                              className={`flex items-center gap-3 p-3 border ${
+                                qtdSintomas ? 'border-yellow-200' : 'border-gray-200'
+                              } rounded-lg cursor-pointer transition-all duration-200 hover:border-blue-400 hover:bg-blue-50/50 group`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={formData.hipoteseDiagnostica.includes(
+                                  option.idtipo_hipotese_diag.toString()
+                                )}
+                                onChange={() => handleCheckboxChange && 
+                                  handleCheckboxChange(
+                                    "hipoteseDiagnostica",
+                                    option.idtipo_hipotese_diag.toString()
+                                  )
+                                }
+                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 transition-all duration-200 group-hover:border-blue-400"
+                              />
+                              <div className="flex flex-col">
+                                <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors duration-200">
+                                  {option.descricao}
+                                </span>
+                                {qtdSintomas ? (
+                                  <span className="text-xs text-yellow-600">
+                                    {qtdSintomas} {qtdSintomas === 1 ? 'sintoma relacionado' : 'sintomas relacionados'}
+                                  </span>
+                                ) : showAllHipoteses && (
+                                  <span className="text-xs text-gray-400">
+                                    Nenhum sintoma relacionado
+                                  </span>
+                                )}
+                              </div>
+                            </label>
+                          );
+                        });
+                      } else if (searchHipotese) {
+                        return (
+                          <div className="md:col-span-3 text-center p-3 text-gray-500 italic border border-dashed border-gray-300 rounded-lg">
+                            Nenhuma hipótese diagnóstica encontrada para "{searchHipotese}".
+                          </div>
+                        );
+                      } else if (formData.sinaisESintomas.length > 0 && hipoteseDiagFiltradas.length === 0) {
+                        return (
+                          <div className="md:col-span-3 text-center p-3 text-gray-500 italic border border-dashed border-gray-300 rounded-lg">
+                            Nenhuma hipótese diagnóstica encontrada para os sintomas selecionados.
+                            <div className="mt-2">
+                              <button 
+                                type="button"
+                                onClick={() => setShowAllHipoteses(true)}
+                                className="text-sm text-blue-600 hover:text-blue-800 focus:outline-none"
+                              >
+                                Ver todas as hipóteses disponíveis
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="md:col-span-3 text-center p-3 text-gray-500 italic border border-dashed border-gray-300 rounded-lg">
+                            Selecione sintomas para ver hipóteses diagnósticas relacionadas ou
+                            <button 
+                              type="button"
+                              onClick={() => setShowAllHipoteses(true)}
+                              className="ml-1 text-blue-600 hover:text-blue-800 focus:outline-none"
+                            >
+                              veja todas as hipóteses disponíveis
+                            </button>.
+                          </div>
+                        );
+                      }
+                    })()}
+                  </div>
+                </>
               )}
             </div>
 
