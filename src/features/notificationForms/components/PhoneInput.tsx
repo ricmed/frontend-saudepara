@@ -9,6 +9,16 @@ interface CountryCode {
   dial_code: string;
 }
 
+// Logger para rastrear as transformações do número de telefone
+const phoneLogger = {
+  enable: false, // Desabilitado por padrão
+  log: (stage: string, data: any) => {
+    if (phoneLogger.enable) {
+      console.log(`[PHONE ${stage}]`, data);
+    }
+  }
+};
+
 // Lista completa de países com DDI
 const countryCodes: CountryCode[] = [
   { name: "Afeganistão", code: "AF", dial_code: "+93" },
@@ -245,13 +255,41 @@ const countryCodes: CountryCode[] = [
 const phonePatterns = {
   // Para cada país, define os tamanhos esperados para números locais (sem o DDI)
   // e também o formato de exibição
-  BR: { lengths: [10, 11], formats: [
-    { length: 10, format: (n: string) => `(${n.slice(0, 2)}) ${n.slice(2, 6)}-${n.slice(6)}` }, // Fixo
-    { length: 11, format: (n: string) => `(${n.slice(0, 2)}) ${n.slice(2, 7)}-${n.slice(7)}` } // Celular
-  ]},
-  US: { lengths: [10], formats: [
-    { length: 10, format: (n: string) => `(${n.slice(0, 3)}) ${n.slice(3, 6)}-${n.slice(6)}` }
-  ]},
+  BR: { 
+    lengths: [10, 11], 
+    formats: [
+      { length: 10, format: (n: string) => `(${n.slice(0, 2)}) ${n.slice(2, 6)}-${n.slice(6)}` }, // Fixo
+      { length: 11, format: (n: string) => `(${n.slice(0, 2)}) ${n.slice(2, 7)}-${n.slice(7)}` } // Celular
+    ],
+    // Adicionar verificação específica para Brasil - DDD válidos
+    validate: (number: string) => {
+      // Lista de DDDs válidos do Brasil
+      const validDDDs = [
+        "11", "12", "13", "14", "15", "16", "17", "18", "19",
+        "21", "22", "24", "27", "28",
+        "31", "32", "33", "34", "35", "37", "38",
+        "41", "42", "43", "44", "45", "46", "47", "48", "49",
+        "51", "53", "54", "55",
+        "61", "62", "63", "64", "65", "66", "67", "68", "69",
+        "71", "73", "74", "75", "77", "79",
+        "81", "82", "83", "84", "85", "86", "87", "88", "89",
+        "91", "92", "93", "94", "95", "96", "97", "98", "99"
+      ];
+      
+      // Se o número tem pelo menos 2 dígitos, verificar se começa com um DDD válido
+      if (number.length >= 2) {
+        const possibleDDD = number.substring(0, 2);
+        return validDDDs.includes(possibleDDD);
+      }
+      return false;
+    }
+  },
+  US: { 
+    lengths: [10], 
+    formats: [
+      { length: 10, format: (n: string) => `(${n.slice(0, 3)}) ${n.slice(3, 6)}-${n.slice(6)}` }
+    ]
+  },
   GB: { lengths: [10], formats: [
     { length: 10, format: (n: string) => `${n.slice(0, 4)} ${n.slice(4, 7)} ${n.slice(7)}` }
   ]},
@@ -267,6 +305,8 @@ interface PhoneInputProps {
   placeholder?: string;
   className?: string;
   label?: string;
+  defaultCountry?: string; // Novo: país padrão (código ISO)
+  debug?: boolean; // Nova prop para habilitar logs de debug
 }
 
 const PhoneInput: React.FC<PhoneInputProps> = ({
@@ -278,19 +318,23 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
   placeholder = "Digite o número de telefone",
   className = "",
   label = "Contato Telefônico",
+  defaultCountry = "BR", // Brasil como padrão
+  debug = false
 }) => {
+  // Habilitar logs para debug se solicitado
+  phoneLogger.enable = debug;
+
   // Refs para controlar o ciclo de renderização
   const isInternalChangeRef = useRef(false);
   const previousValueRef = useRef(value);
   const initialLoadRef = useRef(true);
+  const userSelectedCountryRef = useRef(false); // Nova ref para controlar se o usuário já selecionou um país
 
   // Estado interno
   const [internalPhoneNumber, setInternalPhoneNumber] = useState("");
 
-  // NÃO configurar país padrão - será determinado pelo valor inicial
-  const [selectedCountry, setSelectedCountry] = useState<CountryCode | null>(
-    null
-  );
+  // Estado para o país selecionado
+  const [selectedCountry, setSelectedCountry] = useState<CountryCode | null>(null);
 
   // UI states
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
@@ -306,66 +350,68 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
   const detectCountryFromNumber = (phoneNumber: string) => {
     if (!phoneNumber) return null;
 
-    console.log("Detectando país a partir de:", phoneNumber);
+    phoneLogger.log("DETECTING COUNTRY FROM", phoneNumber);
 
-    // Verificar formato +XX XXXXX ou apenas +XX
+    // 1. Se o número começa com +, é explicitamente um DDI
     if (phoneNumber.startsWith("+")) {
-      // Remover espaços e caracteres não numéricos do código DDI
       const cleanedPhone = phoneNumber.replace(/\s+/g, " ").trim();
       const dialCodePart = cleanedPhone.includes(" ")
         ? cleanedPhone.split(" ")[0]
         : cleanedPhone;
 
-      console.log("Código DDI extraído:", dialCodePart);
+      phoneLogger.log("EXPLICIT DDI", dialCodePart);
 
       // Buscar correspondência exata
       const country = countryCodes.find((c) => c.dial_code === dialCodePart);
       if (country) {
-        console.log("País encontrado exato:", country.name);
+        phoneLogger.log("COUNTRY FOUND EXACT", country.name);
         return country;
       }
 
-      // Buscar por prefixo se não encontrou exato
-      // Ordenar códigos DDI do mais longo para o mais curto para priorizar códigos mais específicos
+      // Buscar por prefixo DDI
       const sortedCountryCodes = [...countryCodes].sort((a, b) => 
         b.dial_code.length - a.dial_code.length
       );
       
       for (const c of sortedCountryCodes) {
         if (dialCodePart.startsWith(c.dial_code)) {
-          console.log("País encontrado por prefixo:", c.name);
+          phoneLogger.log("COUNTRY FOUND BY PREFIX", c.name);
           return c;
         }
       }
     }
-
-    // Verificar se o número começa com o código do país sem o +
-    // Por exemplo, se começa com "55" para Brasil
-    const numericPhone = phoneNumber.replace(/\D/g, '');
-    for (const pattern of countryCodes) {
-      const dialDigits = pattern.dial_code.replace(/\D/g, '');
-      if (numericPhone.startsWith(dialDigits)) {
-        // Verificar se o tamanho restante do número faz sentido para este país
-        const nationalPart = numericPhone.substring(dialDigits.length);
-        // Verificar alguns padrões de tamanho comuns
-        if ([8, 9, 10, 11].includes(nationalPart.length)) {
-          console.log("País encontrado pelo prefixo numérico:", pattern.name);
-          return pattern;
-        }
-      }
-    }
-
-    // Se temos o ddi como prop, usá-lo
+    
+    // 2. Se temos um DDI explícito na prop, usar isso
     if (ddi) {
       const country = countryCodes.find((c) => c.dial_code === `+${ddi}`);
       if (country) {
-        console.log("País encontrado via prop ddi:", country.name);
+        phoneLogger.log("COUNTRY FOUND VIA PROP DDI", country.name);
         return country;
       }
     }
+    
+    // 3. Se o usuário já selecionou explicitamente um país antes, manter esse país
+    if (userSelectedCountryRef.current && selectedCountry) {
+      phoneLogger.log("KEEPING USER SELECTED COUNTRY", selectedCountry.name);
+      return selectedCountry;
+    }
 
-    // Caso não tenha encontrado
-    return null;
+    // 4. Verificar se o número segue o padrão do país padrão (Brasil)
+    const defaultCountryObj = countryCodes.find(c => c.code === defaultCountry);
+    const numericPhone = phoneNumber.replace(/\D/g, '');
+    
+    if (defaultCountryObj && defaultCountry === "BR") {
+      // Verificar se parece ser um número brasileiro (tem 10 ou 11 dígitos e começa com DDD válido)
+      if ((numericPhone.length === 10 || numericPhone.length === 11) && 
+           phonePatterns.BR.validate(numericPhone)) {
+        phoneLogger.log("NUMBER RECOGNIZED AS BRAZILIAN BY PATTERN", numericPhone);
+        return defaultCountryObj;
+      }
+    }
+
+    // Se nenhum país foi identificado, usar o padrão
+    phoneLogger.log("USING DEFAULT COUNTRY", defaultCountryObj?.name || "Brasil");
+    return defaultCountryObj || countryCodes.find(c => c.code === "BR") || countryCodes[0];
   };
 
   // Normalizar texto (remover acentos e converter para minúsculas)
@@ -378,62 +424,69 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
 
   // Inicialização - deve acontecer uma única vez no carregamento
   useEffect(() => {
-    if (value && initialLoadRef.current) {
-      console.log("Inicializando com valor:", value);
+    if (initialLoadRef.current) {
+      phoneLogger.log("INITIALIZING COMPONENT", { value, ddi, defaultCountry });
       initialLoadRef.current = false;
 
-      // Primeiro tentar detectar país do número fornecido
-      const detectedCountry = detectCountryFromNumber(value);
-
-      if (detectedCountry) {
-        console.log("País detectado na inicialização:", detectedCountry.name);
-        setSelectedCountry(detectedCountry);
-
-        // Extrair o número sem o código do país
-        const parts = value.split(" ");
-        if (parts.length > 1) {
-          const phoneNumber = parts.slice(1).join(" ");
-          setInternalPhoneNumber(phoneNumber);
-        } else {
-          // Se não tem espaço, tenta extrair o número nacional
-          const dialDigits = detectedCountry.dial_code.replace(/\D/g, '');
-          const numericPhone = value.replace(/\D/g, '');
-          if (numericPhone.startsWith(dialDigits)) {
-            setInternalPhoneNumber(numericPhone.substring(dialDigits.length));
-          } else {
-            setInternalPhoneNumber(value);
-          }
-        }
-      } else {
-        // Se não conseguiu detectar do número, verificar se temos ddi na prop
-        const defaultCountry = ddi
-          ? countryCodes.find((c) => c.dial_code === `+${ddi}`)
-          : countryCodes.find((c) => c.code === "BR");
-
-        // Se ainda não encontrou, usar Brasil como padrão
-        const finalCountry =
-          defaultCountry ||
-          countryCodes.find((c) => c.code === "BR") ||
-          countryCodes[0];
-
-        console.log("Usando país pelo DDI:", finalCountry.name);
-        setSelectedCountry(finalCountry);
-        setInternalPhoneNumber(value);
+      // Determinar o país inicial
+      let initialCountry: CountryCode | null = null;
+      
+      // 1. Tentar detectar do valor fornecido
+      if (value) {
+        initialCountry = detectCountryFromNumber(value);
+        phoneLogger.log("COUNTRY DETECTED FROM INITIAL VALUE", initialCountry?.name);
       }
-    } else if (!selectedCountry) {
-      // Se não tiver país selecionado nem valor, usar Brasil como padrão
-      const defaultCountry =
-        countryCodes.find((c) => c.code === "BR") || countryCodes[0];
-      console.log("Definindo país padrão:", defaultCountry.name);
-      setSelectedCountry(defaultCountry);
+      
+      // 2. Se não detectou, usar o DDI da prop
+      if (!initialCountry && ddi) {
+        const found = countryCodes.find((c) => c.dial_code === `+${ddi}`);
+        initialCountry = found || null;
+        phoneLogger.log("COUNTRY DETECTED FROM DDI PROP", initialCountry?.name);
+      }
+      
+      // 3. Se ainda não tem país, usar o defaultCountry
+      if (!initialCountry) {
+        initialCountry = countryCodes.find((c) => c.code === defaultCountry) || 
+                         countryCodes.find((c) => c.code === "BR") || 
+                         countryCodes[0];
+        phoneLogger.log("USING DEFAULT COUNTRY", initialCountry.name);
+      }
+      
+      setSelectedCountry(initialCountry);
+      
+      // Extrair o número nacional se tiver valor inicial
+      if (value && initialCountry) {
+        const dialCodeClean = initialCountry.dial_code.replace(/\D/g, '');
+        
+        // Se começa com + ou com o DDI, extrair a parte nacional
+        if (value.startsWith('+') && value.includes(' ')) {
+          // Formato +XX XXXXX
+          const parts = value.split(' ');
+          if (parts.length > 1) {
+            const phoneNumber = parts.slice(1).join(' ');
+            setInternalPhoneNumber(phoneNumber.replace(/\D/g, ''));
+            phoneLogger.log("EXTRACTED NUMBER FROM +XX FORMAT", phoneNumber);
+          }
+        } else if (value.replace(/\D/g, '').startsWith(dialCodeClean)) {
+          // Formato sem +, mas começa com DDI (ex: 5591981901220)
+          const numericPhone = value.replace(/\D/g, '');
+          const nationalPart = numericPhone.substring(dialCodeClean.length);
+          setInternalPhoneNumber(nationalPart);
+          phoneLogger.log("EXTRACTED NUMBER FROM NUMERIC FORMAT", nationalPart);
+        } else {
+          // Assumir que é apenas o número nacional
+          setInternalPhoneNumber(value.replace(/\D/g, ''));
+          phoneLogger.log("ASSUMING NATIONAL NUMBER", value);
+        }
+      }
     }
-  }, [value, ddi, selectedCountry]); // Adicionei selectedCountry como dependência
+  }, [value, ddi, defaultCountry]);
 
-  // Efeito para processar mudanças no valor que vêm do componente pai
+  // Efeito para processar mudanças externas no valor
   useEffect(() => {
     // Pular se a inicialização já foi feita ou se a mudança foi interna
     if (!initialLoadRef.current && isInternalChangeRef.current) {
-      console.log("Pulando processamento (mudança interna)");
+      phoneLogger.log("SKIPPING EXTERNAL CHANGE (INTERNAL CHANGE)", value);
       return;
     }
 
@@ -442,81 +495,96 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
       previousValueRef.current = value;
 
       if (value) {
-        console.log("Processando valor externo:", value);
+        phoneLogger.log("PROCESSING EXTERNAL VALUE", value);
 
-        // Detectar país
-        const detectedCountry = detectCountryFromNumber(value);
-        if (detectedCountry) {
-          console.log("País detectado na atualização:", detectedCountry.name);
-          setSelectedCountry(detectedCountry);
+        // Detectar país, mas preservar seleção do usuário
+        if (!userSelectedCountryRef.current) {
+          const detectedCountry = detectCountryFromNumber(value);
+          if (detectedCountry) {
+            phoneLogger.log("COUNTRY DETECTED FROM UPDATE", detectedCountry.name);
+            setSelectedCountry(detectedCountry);
+          }
+        }
 
-          // Extrair o número sem o código do país
-          if (value.includes(" ")) {
-            const parts = value.split(" ");
+        // Extrair o número nacional
+        if (selectedCountry) {
+          const dialCodeClean = selectedCountry.dial_code.replace(/\D/g, '');
+          
+          if (value.startsWith('+') && value.includes(' ')) {
+            // Formato +XX XXXXX
+            const parts = value.split(' ');
             if (parts.length > 1) {
-              const phoneNumber = parts.slice(1).join(" ");
-              setInternalPhoneNumber(phoneNumber);
+              const phoneNumber = parts.slice(1).join(' ');
+              setInternalPhoneNumber(phoneNumber.replace(/\D/g, ''));
+              phoneLogger.log("EXTRACTED NUMBER FROM UPDATE +XX FORMAT", phoneNumber);
             }
-          } else {
-            // Se não tem espaço, tenta extrair o número nacional
-            const dialDigits = detectedCountry.dial_code.replace(/\D/g, '');
+          } else if (value.replace(/\D/g, '').startsWith(dialCodeClean)) {
+            // Formato sem +, mas começa com DDI
             const numericPhone = value.replace(/\D/g, '');
-            if (numericPhone.startsWith(dialDigits)) {
-              setInternalPhoneNumber(numericPhone.substring(dialDigits.length));
-            }
+            const nationalPart = numericPhone.substring(dialCodeClean.length);
+            setInternalPhoneNumber(nationalPart);
+            phoneLogger.log("EXTRACTED NUMBER FROM UPDATE NUMERIC FORMAT", nationalPart);
+          } else {
+            // Assumir que é apenas o número nacional
+            setInternalPhoneNumber(value.replace(/\D/g, ''));
+            phoneLogger.log("ASSUMING UPDATE NATIONAL NUMBER", value);
           }
         }
       } else {
-        console.log("Valor vazio, limpando número interno");
+        phoneLogger.log("EMPTY VALUE, CLEARING INTERNAL NUMBER", "");
         setInternalPhoneNumber("");
       }
     }
-  }, [value]);
+  }, [value, selectedCountry]);
 
-  // Função que formata e notifica o componente pai de mudanças
+  // PONTO CRÍTICO: Função que formata e notifica o componente pai de mudanças
+  // Esta função garante que o DDI seja sempre incluído no formato "+XX YYYYY"
   const notifyParentOfChange = (country: CountryCode, phone: string) => {
     if (!country) {
       console.error("País inválido");
       return;
     }
     
-    // Garantir que só temos dígitos numéricos e limitar a 15
-    const cleanPhone = phone.replace(/\D/g, "").slice(0, 15);
+    // Garantir que só temos dígitos numéricos no telefone nacional
+    const cleanPhone = phone.replace(/\D/g, "");
     
-    // Remover o + para obter apenas os dígitos
-    const dialCode = country.dial_code.replace(/^\+/, '');
+    // Remover o + para obter apenas os dígitos do DDI
+    const dialDigits = country.dial_code.replace(/[+\s]/g, '');
     
-    // Aplicar formatação específica baseada no país
-    let formattedNationalNumber = cleanPhone;
-    const countryCode = country.code;
+    // Determinar o número máximo de caracteres permitidos
+    // 15 caracteres total - comprimento do DDI = máx. para o número nacional
+    const maxNationalDigits = 15 - dialDigits.length;
     
-    // Verificar se temos formatação específica para este país
-    if (countryCode in phonePatterns) {
-      const pattern = phonePatterns[countryCode as keyof typeof phonePatterns];
-      // Encontrar o formato apropriado para o tamanho do número
-      const format = pattern.formats.find(f => f.length === cleanPhone.length);
-      if (format) {
-        formattedNationalNumber = format.format(cleanPhone);
-      }
-    }
+    // Limitar o número nacional ao máximo permitido
+    const limitedPhone = cleanPhone.slice(0, maxNationalDigits);
     
-    // Formatar incluindo o + no DDI
-    const fullNumber = cleanPhone ? `+${dialCode} ${cleanPhone.trim()}` : "";
+    // IMPORTANTE: Garantir que o formato +XX YYYYY seja preservado
+    // Este é o formato que deve ser salvo no banco de dados
+    const fullNumber = limitedPhone ? `+${dialDigits} ${limitedPhone}` : "";
     
-    console.log("Notificando mudança:", fullNumber, "com país:", country.name);
+    phoneLogger.log("NOTIFYING PARENT", {
+      countryName: country.name,
+      dialCode: dialDigits,
+      nationalNumber: limitedPhone,
+      fullNumber: fullNumber
+    });
     
     // Marcar que esta mudança é interna para evitar loops
     isInternalChangeRef.current = true;
     previousValueRef.current = fullNumber;
     
-    // Notificar o pai
+    // Notificar o pai com o número completo (incluindo DDI)
     onChange(fullNumber);
     
-    // Além de enviar o número formatado, envie também o código do país
-  if (onChangeWithCode && cleanPhone.trim()) {
-    // Enviar também o código do país, não apenas o DDI
-    onChangeWithCode(dialCode, cleanPhone.trim(), country.code);
-  }
+    // Enviar também informações separadas se necessário
+    if (onChangeWithCode && limitedPhone.trim()) {
+      onChangeWithCode(dialDigits, limitedPhone.trim(), country.code);
+      phoneLogger.log("NOTIFYING PARENT WITH CODE DETAILS", {
+        dialCode: dialDigits,
+        phoneNumber: limitedPhone.trim(),
+        countryCode: country.code
+      });
+    }
     
     // Resetar a flag após um curto período
     setTimeout(() => {
@@ -526,15 +594,14 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
 
   // Handler para mudanças no input do telefone
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Obter valor digitado
-    let newPhone = e.target.value;
-
-    // Remover caracteres não numéricos
-    newPhone = newPhone.replace(/\D/g, "");
-
-    // Limitar a 15 dígitos
-    newPhone = newPhone.slice(0, 15);
-
+    // Obter valor digitado e remover formatação
+    let newPhone = e.target.value.replace(/\D/g, "");
+    
+    phoneLogger.log("PHONE INPUT CHANGED", {
+      raw: e.target.value,
+      cleaned: newPhone
+    });
+    
     // Atualizar o valor interno
     setInternalPhoneNumber(newPhone);
 
@@ -552,7 +619,8 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
     }
   };
 
-  // Handler para seleção de país
+  // PONTO CRÍTICO: Handler para seleção de país
+  // Este handler garante que o país selecionado pelo usuário seja mantido
   const handleCountrySelect = (
     country: CountryCode,
     e: React.MouseEvent<HTMLButtonElement>
@@ -560,11 +628,18 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
     e.preventDefault();
     e.stopPropagation();
 
-    console.log("País selecionado:", country.name, country.dial_code);
+    phoneLogger.log("COUNTRY SELECTED BY USER", {
+      name: country.name,
+      dialCode: country.dial_code
+    });
 
     setSelectedCountry(country);
     setIsDropdownOpen(false);
     setSearchQuery("");
+    
+    // IMPORTANTE: Marcar que o usuário selecionou explicitamente um país
+    // Isso impede que o país seja alterado automaticamente depois
+    userSelectedCountryRef.current = true;
 
     // Notificar o pai imediatamente com o novo código de país
     if (internalPhoneNumber.trim()) {
@@ -635,10 +710,10 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
     }
   }, [isDropdownOpen]);
 
+  // PONTO CRÍTICO: Atualizar o país quando a prop DDI mudar
   useEffect(() => {
-    // Verificar se a prop ddi mudou e não é uma mudança interna
     if (ddi && !isInternalChangeRef.current) {
-      console.log("DDI mudou externamente:", ddi);
+      phoneLogger.log("DDI CHANGED EXTERNALLY", ddi);
       const dialCode = `+${ddi}`;
       const country = countryCodes.find((c) => c.dial_code === dialCode);
 
@@ -646,18 +721,15 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
         country &&
         (!selectedCountry || country.dial_code !== selectedCountry.dial_code)
       ) {
-        console.log("Atualizando país pelo novo DDI:", country.name);
+        phoneLogger.log("UPDATING COUNTRY FROM NEW DDI", country.name);
         setSelectedCountry(country);
+        
+        // Reset da flag de seleção do usuário
+        userSelectedCountryRef.current = false;
 
-        // Manter o número de telefone, apenas atualizar o país
+        // Notificar com o novo país
         if (internalPhoneNumber) {
-          // Desativar a notificação ao pai temporariamente para evitar loops
-          const tempNumber = internalPhoneNumber;
-          setInternalPhoneNumber("");
-          setTimeout(() => {
-            setInternalPhoneNumber(tempNumber);
-            notifyParentOfChange(country, tempNumber);
-          }, 50);
+          notifyParentOfChange(country, internalPhoneNumber);
         }
       }
     }
@@ -768,6 +840,7 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
     // Verificar se temos formatação específica para este país
     if (countryCode in phonePatterns) {
       const pattern = phonePatterns[countryCode as keyof typeof phonePatterns];
+      
       // Encontrar o formato apropriado para o tamanho do número
       const format = pattern.formats.find(f => f.length === number.length);
       if (format) {
@@ -790,6 +863,19 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
     ? formatVisualPhoneNumber(internalPhoneNumber, selectedCountry.code) 
     : internalPhoneNumber;
 
+  // Log de saída para valores de estado atual (útil para debug)
+  useEffect(() => {
+    if (debug) {
+      phoneLogger.log("CURRENT STATE", {
+        selectedCountry: selectedCountry?.name,
+        dialCode: selectedCountry?.dial_code,
+        internalPhoneNumber,
+        displayNumber,
+        formattedForExport: selectedCountry ? `+${selectedCountry.dial_code.replace(/[+\s]/g, '')} ${internalPhoneNumber}` : ""
+      });
+    }
+  }, [selectedCountry, internalPhoneNumber, displayNumber, debug]);
+
   return (
     <div className="w-full">
       {label && (
@@ -802,6 +888,7 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
           type="button"
           onClick={toggleDropdown}
           className="flex items-center h-full px-4 py-3 bg-gray-50 border border-gray-200 border-r-0 rounded-l-lg hover:bg-gray-100 transition-colors"
+          aria-label="Selecionar código de país"
         >
           {selectedCountry && (
             <>
@@ -828,11 +915,19 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
           onChange={handlePhoneChange}
           placeholder={placeholder}
           className={`flex-1 p-3 border border-gray-200 rounded-r-lg text-sm ${className}`}
+          aria-label="Número de telefone (sem DDI)"
         />
 
         {/* Renderiza o dropdown usando portal */}
         {renderDropdown()}
       </div>
+      
+      {/* Exibir o formato completo que será salvo (útil apenas para debug) */}
+      {debug && selectedCountry && internalPhoneNumber && (
+        <div className="mt-1 text-xs text-gray-500">
+          Formato salvo: +{selectedCountry.dial_code.replace(/[+\s]/g, '')} {internalPhoneNumber}
+        </div>
+      )}
     </div>
   );
 };

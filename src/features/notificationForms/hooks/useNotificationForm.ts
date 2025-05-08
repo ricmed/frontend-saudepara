@@ -495,6 +495,22 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         const dadosNormalizados = normalizarDadosResidencia(formattedData);
         console.log("Dados normalizados:", dadosNormalizados);
 
+        // Combinar DDI e número de telefone no formato correto
+        if (dadosNormalizados.paciente?.ddi && dadosNormalizados.paciente?.contato) {
+          console.log("[PHONE DEBUG] Combinando DDI e telefone:", {
+            ddi: dadosNormalizados.paciente.ddi,
+            contato: dadosNormalizados.paciente.contato
+          });
+          
+          // Remover caracteres não numéricos do DDI (garantir que não tem +)
+          const cleanDDI = dadosNormalizados.paciente.ddi.replace(/\D/g, '');
+          
+          // Criar o número completo no formato +XX YYYYY
+          dadosNormalizados.contatoTelefonico = `+${cleanDDI} ${dadosNormalizados.paciente.contato}`;
+          
+          console.log("[PHONE DEBUG] Número completo gerado:", dadosNormalizados.contatoTelefonico);
+        }
+
         // Armazenar o CPF original para comparações
         setOriginalCpf(dadosNormalizados.cpf || "");
 
@@ -746,7 +762,9 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       profissao: pacienteUpperCase.cbo_idcbo
         ? pacienteUpperCase.cbo_idcbo.toString()
         : "",
-      contatoTelefonico: pacienteUpperCase.contato || "",
+      contatoTelefonico: (pacienteUpperCase.ddi && pacienteUpperCase.contato) 
+        ? `+${pacienteUpperCase.ddi.replace(/\D/g, '')} ${pacienteUpperCase.contato}` 
+        : pacienteUpperCase.contato || "",
     }));
 
     // Limpar erros ao selecionar um paciente

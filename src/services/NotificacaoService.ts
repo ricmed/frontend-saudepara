@@ -223,7 +223,7 @@ export const NotificacaoService = {
   },
 
   async getPaisOptions(): Promise<PaisOption[]> {
-    return this.fetchOptions<PaisOption>(TIPO_ENDPOINTS.PAIS);
+    return this.fetchOptions<PaisOption>(TIPO_ENDPOINTS.PAIS, 300); // Especificar limite de 300
   },
 
   async getEstadoOptions(): Promise<EstadoOption[]> {
