@@ -1296,7 +1296,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         setHipoteseDiagFiltradas(hipoteseDiagOptions);
         return;
       }
-
+  
       try {
         setIsLoadingHipoteses(true);
         
@@ -1331,8 +1331,48 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
             };
           });
           
-          setHipoteseDiagFiltradas(hipotesesFiltradas);
+          // INÍCIO DA MODIFICAÇÃO: Adicionar hipóteses já selecionadas à lista, mesmo que não tenham relação com sintomas
           
+          // Criar conjunto com os IDs das hipóteses que já estão filtradas
+          const hipotesesFiltradasIds = new Set(hipotesesFiltradas.map(h => h.idtipo_hipotese_diag.toString()));
+          
+          // Para cada hipótese selecionada que não está na lista filtrada, adicionar à lista
+          const hipotesesAdicionaisSelecionadas = formData.hipoteseDiagnostica
+            .filter(id => !hipotesesFiltradasIds.has(id)) // Pegar apenas as que não estão já na lista filtrada
+            .map(id => {
+              // Encontrar a hipótese nas opções originais
+              const hipoteseOriginal = hipoteseDiagOptions.find(
+                h => h.idtipo_hipotese_diag.toString() === id
+              );
+              
+              // Se encontrou, adicionar com qtdSintomas = 0 (sem relação com sintomas)
+              if (hipoteseOriginal) {
+                return {
+                  ...hipoteseOriginal,
+                  qtdSintomas: 0 // Indicar que não tem sintomas relacionados
+                };
+              }
+              
+              // Se não encontrou nas opções (improvável), criar um objeto básico
+              return {
+                idtipo_hipotese_diag: parseInt(id),
+                descricao: `Hipótese ${id}`, // Descrição genérica
+                qtdSintomas: 0
+              };
+            });
+          
+          // Combinar as hipóteses relacionadas com as selecionadas adicionais
+          const todasHipotesesAMostrar = [
+            ...hipotesesFiltradas,          // Primeiro as relacionadas por sintomas (ordenadas por relevância)
+            ...hipotesesAdicionaisSelecionadas // Depois as selecionadas sem relação
+          ];
+          
+          setHipoteseDiagFiltradas(todasHipotesesAMostrar);
+          
+          // FIM DA MODIFICAÇÃO
+          
+          // Remover o código que removia automaticamente as hipóteses selecionadas
+          /*
           // Remover hipóteses diagnósticas que não estão mais disponíveis
           const hipotesesValidas = new Set(hipotesesFiltradas.map(
             h => h.idtipo_hipotese_diag.toString()
@@ -1350,6 +1390,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
               hipoteseDiagnostica: hipotesesSelecionadasValidas
             }));
           }
+          */
         }
       } catch (error) {
         console.error('Erro ao buscar hipóteses diagnósticas:', error);
@@ -1359,7 +1400,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         setIsLoadingHipoteses(false);
       }
     };
-
+  
     fetchHipoteses();
   }, [formData.sinaisESintomas, formData.tipoAtendimento, hipoteseDiagOptions]);
 

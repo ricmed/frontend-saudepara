@@ -6,6 +6,11 @@ interface HipoteseSindromica {
   hipotese: string; // Descrição da hipótese
 }
 
+interface SintomaRelacionado {
+  id: number;       // ID do sintoma
+  sintoma: string;  // Descrição do sintoma
+}
+
 export class ListaSindromicaService {
   static async getHipotesesPorSintomas(sintomasIds: string[]): Promise<HipoteseSindromica[]> {
     try {
@@ -28,6 +33,28 @@ export class ListaSindromicaService {
       return response.data || [];
     } catch (error) {
       console.error('Erro ao buscar hipóteses diagnósticas:', error);
+      return [];
+    }
+  }
+
+  static async getSintomasPorHipotese(hipoteseId: string): Promise<SintomaRelacionado[]> {
+    try {
+      // Validação básica
+      if (!hipoteseId) {
+        return [];
+      }
+
+      const server = import.meta.env.VITE_API_SERVER;
+      const port = import.meta.env.VITE_API_PORT;
+      
+      // Endpoint para buscar sintomas relacionados a uma hipótese
+      const response = await axios.get(`${server}:${port}/api/lista-sindromica/sintomas`, {
+        params: { hipotese_id: hipoteseId }
+      });
+      
+      return response.data || [];
+    } catch (error) {
+      console.error('Erro ao buscar sintomas relacionados à hipótese:', error);
       return [];
     }
   }
