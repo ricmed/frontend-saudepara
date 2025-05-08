@@ -60,45 +60,70 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
   // Função para verificar CPF existente usando o serviço
   const handleCPFChangeWithValidation = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
-    // Remove formatação para armazenar apenas os dígitos
     const formattedCPF = formatCPF(rawValue);
-
+  
     setFormData((prev) => ({
       ...prev,
       cpf: formattedCPF,
     }));
-
-    // Limpar erro anterior, se houver
+  
+    // Limpar erro anterior
     if (errors.cpf) {
-      const newErrors = { ...errors };
-      delete newErrors.cpf;
-      setErrors(newErrors);
+      setErrors((prev: Record<string, string>) => {
+        const newErrors = { ...prev };
+        delete newErrors.cpf;
+        return newErrors;
+      });
     }
     
-    // Verificar CPF existente se tiver 11 dígitos
+    // Só verificar com 11 dígitos
     if (formattedCPF.length === 11) {
-      // Limpar timeout anterior para não fazer múltiplas solicitações
+      // Limpar timeout anterior
       if (typingTimer) {
         clearTimeout(typingTimer);
       }
       
-      // Configurar novo timer para verificar apenas quando o usuário parar de digitar
+      // Usar um timer para debounce
       const timer = setTimeout(async () => {
         try {
-          // Verificar se o CPF está disponível
-          const isAvailable = await PacienteService.checkCpfAvailable(formattedCPF);
+          // Adicionar feedback visual durante a verificação
+          setErrors((prev: Record<string, string>) => ({
+            ...prev,
+            cpf: "Verificando CPF..."
+          }));
           
-          if (!isAvailable) {
-            // CPF não está disponível (já existe)
+          // Fazer chamada direta ao backend para depurar
+          const server = import.meta.env.VITE_API_SERVER;
+          const port = import.meta.env.VITE_API_PORT;
+          
+          // Usar axios diretamente para ver a resposta completa
+          const response = await axios.get(`${server}:${port}/api/paciente/check-cpf/${formattedCPF}`);
+          console.log("Resposta da API para verificação de CPF:", response.data);
+          
+          // Verificar se a estrutura da resposta contém a propriedade 'exists'
+          if (response.data && response.data.exists === true) {
             setErrors((prev: Record<string, string>) => ({
               ...prev,
-              cpf: "CPF já cadastrado no sistema",
+              cpf: "CPF já cadastrado no sistema"
             }));
+          } else {
+            // Limpar o erro de verificação
+            setErrors((prev: Record<string, string>) => {
+              const newErrors = { ...prev };
+              delete newErrors.cpf;
+              return newErrors;
+            });
           }
         } catch (error) {
           console.error("Erro ao verificar CPF:", error);
+          // Limpar mensagem de verificação
+          setErrors((prev: Record<string, string>) => {
+            const newErrors = { ...prev };
+            delete newErrors.cpf;
+            return newErrors;
+          });
         }
-      }, 300); // 300ms de delay
+      }, 300);
       
       setTypingTimer(timer);
     }

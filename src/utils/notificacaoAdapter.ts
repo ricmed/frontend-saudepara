@@ -4,7 +4,7 @@ interface NotificacaoGenerica {
 }
 
 // Interface para os dados do formulário frontend
-import { FormData } from "@/features/notificationForms/NotificationForm";
+import { FormData } from '@/features/notificationForms/types/index2';
 import axios from "axios";
 // import indexedDBService from '@/services/indexedDB'; // COMENTADO - SERÁ USADO NO FUTURO
 // import syncService from '@/services/syncService';    // COMENTADO - SERÁ USADO NO FUTURO

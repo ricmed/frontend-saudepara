@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { FormData } from '@/features/notificationForms/NotificationForm';
+import { FormData } from '@/features/notificationForms/types/index2';
 import { formatFromBackend, formatToBackend, formatListResponse } from '@/utils/notificacaoAdapter';
 
 // Interfaces para os tipos de dados usados nos dropdowns e checkboxes
