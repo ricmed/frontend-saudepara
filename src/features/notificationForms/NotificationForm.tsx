@@ -1,5 +1,5 @@
 // src/features/notificationForms/NotificationForm.tsx
-import React from "react";
+import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Save,
@@ -10,9 +10,13 @@ import {
   FileChartColumnIncreasing,
   Files,
   ArchiveX,
+  Menu,
 } from "lucide-react";
 import ModalBuscaPaciente from "@/features/paginaPacientesComu/components/ModalBuscaPaciente";
-import SideMenu from "@/features/apps/components/SideMenu";
+// Atualizar a importação do SideMenu
+import SideMenu from "@/features/home/components/SideMenu";
+// Adicionar importação do contexto de linguagem
+import { useLanguage } from "@/contexts/LanguageContext";
 
 // Import custom hooks
 import { useNotificationForm } from "./hooks/useNotificationForm";
@@ -29,6 +33,11 @@ const NotificationForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isEditMode = !!id;
+  
+  // Adicionar estado para controle do SideMenu
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // Adicionar contexto de idioma
+  const { selectedLanguage, setSelectedLanguage } = useLanguage();
 
   // Use the main form hook
   const {
@@ -122,6 +131,15 @@ const NotificationForm: React.FC = () => {
       <header className="bg-gradient-to-r from-blue-600 to-blue-800 p-6 shadow-lg sticky top-0 z-10">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4 text-white">
+            {/* Adicionar botão para abrir o SideMenu */}
+            <button
+              onClick={() => setIsMenuOpen(true)}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              title="Menu"
+            >
+              <Menu className="h-6 w-6 text-white" />
+            </button>
+            
             <button
               onClick={() => navigate("/lista-comunicacao")}
               className="p-2 hover:bg-white/10 rounded-lg transition-colors"
@@ -203,6 +221,14 @@ const NotificationForm: React.FC = () => {
           </div>
         </div>
       </header>
+
+      {/* Adicionar o SideMenu com as props corretas */}
+      <SideMenu 
+        isOpen={isMenuOpen} 
+        onClose={() => setIsMenuOpen(false)}
+        selectedLanguage={selectedLanguage}
+        onLanguageChange={(language) => setSelectedLanguage(language)}
+      />
 
       <main className="max-w-5xl mx-auto p-6">
         {/* Mensagens de erro e sucesso */}

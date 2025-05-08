@@ -1,7 +1,8 @@
 // src/features/notificationForms/ListaNotificacoes.tsx
 import React, { useRef } from "react";
 import { CSVLink } from "react-csv";
-import SideMenu from "@/features/apps/components/SideMenu";
+// Atualizar a importação do SideMenu
+import SideMenu from "@/features/home/components/SideMenu";
 import TableHeader from "./components/TableHeader";
 import NotificationTable from "./components/NotificationTable";
 import Pagination from "./components/Pagination";
@@ -10,6 +11,8 @@ import { useTableControls } from "./hooks/useTableControls";
 import { allColumns, searchFields } from "./types";
 import type { SearchParams } from "./types";
 import { formatDate } from "./utils";
+// Adicionar importação do contexto de linguagem
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const ListaNotificacoes: React.FC = () => {
   // Custom hooks para gerenciar estado e lógica
@@ -19,6 +22,9 @@ const ListaNotificacoes: React.FC = () => {
   // Refs para CSVLink
   const csvLinkRef = useRef<any>(null);
   const csvLinkAllRef = useRef<any>(null);
+  
+  // Adicionar contexto de idioma
+  const { selectedLanguage, setSelectedLanguage } = useLanguage();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -48,10 +54,12 @@ const ListaNotificacoes: React.FC = () => {
         searchFields={searchFields as { value: SearchParams['field']; label: string }[]}
       />
 
-      {/* SideMenu */}
+      {/* SideMenu atualizado com as props corretas */}
       <SideMenu 
         isOpen={tableControls.isMenuOpen} 
-        onClose={() => tableControls.setIsMenuOpen(false)} 
+        onClose={() => tableControls.setIsMenuOpen(false)}
+        selectedLanguage={selectedLanguage}
+        onLanguageChange={(language) => setSelectedLanguage(language)}
       />
 
       {/* Conteúdo principal */}

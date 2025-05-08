@@ -21,8 +21,10 @@ import { CSVLink } from "react-csv";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import SideMenu from "@/features/apps/components/SideMenu";
+// Atualizando a importação do SideMenu
+import SideMenu from "@/features/home/components/SideMenu";
 import ModalBuscaPaciente from "@/features/paginaPacientesComu/components/ModalBuscaPaciente";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 // Tipos
 interface PaginationMeta {
@@ -139,6 +141,8 @@ const ListaPacientes = () => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [csvLinkRef, setCsvLinkRef] = useState<any>(null);
   const csvLinkAllRef = useRef<any>(null);
+  // Adicionando contexto de idioma
+  const { selectedLanguage, setSelectedLanguage } = useLanguage();
 
   // Estado para controlar o SideMenu
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -923,8 +927,13 @@ const ListaPacientes = () => {
         </div>
       </header>
 
-      {/* SideMenu */}
-      <SideMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
+      {/* SideMenu atualizado */}
+      <SideMenu 
+        isOpen={isMenuOpen} 
+        onClose={() => setIsMenuOpen(false)}
+        selectedLanguage={selectedLanguage}
+        onLanguageChange={(language) => setSelectedLanguage(language)}
+      />
 
       {/* Conteúdo principal */}
       <main className="max-w-7xl mx-auto px-4 py-8">

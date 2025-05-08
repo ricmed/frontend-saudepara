@@ -15,7 +15,8 @@ import {
   AlertCircle,
   CheckCircle,
   HelpCircle,
-  Loader
+  Loader,
+  Menu
 } from "lucide-react";
 import CboInput from "@/features/notificationForms/components/CboInput";
 import PhoneInput from "@/features/notificationForms/components/PhoneInput";
@@ -26,6 +27,9 @@ import {
   OptionItem,
 } from "@/services/PacienteService";
 import { toast } from "react-toastify";
+// Adicionando import do SideMenu
+import SideMenu from "@/features/home/components/SideMenu";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 // Interface para as props do componente
 interface FormularioPacienteProps {
@@ -146,6 +150,11 @@ const FormularioPaciente = ({
 
   // Estado para mostrar/esconder o popover de ajuda de identidade de gênero
   const [showGenderHelp, setShowGenderHelp] = useState<boolean>(false);
+
+  // Adicionando estado para o SideMenu
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // Adicionando contexto de idioma
+  const { selectedLanguage, setSelectedLanguage } = useLanguage();
 
   // Carregar as opções de dropdown do banco de dados
   useEffect(() => {
@@ -872,6 +881,15 @@ const FormularioPaciente = ({
         <header className="bg-gradient-to-r from-blue-600 to-blue-800 p-6 shadow-lg sticky top-0 z-10">
           <div className="max-w-5xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-4 text-white">
+              {/* Adicionar botão de menu apenas quando não for modal */}
+              <button
+                onClick={() => setIsMenuOpen(true)}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                title="Menu"
+              >
+                <Menu className="h-6 w-6 text-white" />
+              </button>
+              
               <button
                 onClick={() => window.history.back()}
                 className="p-2 hover:bg-white/10 rounded-lg transition-colors"
@@ -931,6 +949,16 @@ const FormularioPaciente = ({
             </div>
           </div>
         </header>
+      )}
+
+      {/* Adicionar SideMenu */}
+      {!isModal && (
+        <SideMenu 
+          isOpen={isMenuOpen} 
+          onClose={() => setIsMenuOpen(false)}
+          selectedLanguage={selectedLanguage}
+          onLanguageChange={(language) => setSelectedLanguage(language)}
+        />
       )}
 
       {/* Título do modal (se for modal) */}

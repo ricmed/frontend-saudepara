@@ -27,7 +27,7 @@ import {
   Calendar,
   HeartPulse,
   Stethoscope,
-  Thermometer
+  Thermometer,
 } from "lucide-react";
 
 interface SideMenuProps {
@@ -153,7 +153,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       icon: <MapPin className="h-6 w-6 text-white" />,
       nome: t("apps.sexual_orientation"),
       link: "/orientacao-sexual/lista",
-    }
+    },
   ];
 
   // Main menu items
@@ -223,7 +223,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
           {/* Logo */}
           <div className="flex items-center justify-between mb-6">
             <img
-              src="./images/logos/lateral completo.png"
+              src="/images/logos/lateral completo.png"
               alt="Logo Saúde Pará"
               className="bg-white rounded p-1"
             />
@@ -237,7 +237,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                   className="flex items-center gap-3 text-white py-3 px-2 hover:bg-blue-800 rounded-lg cursor-pointer"
                   onClick={() => {
                     if (item.submenu) {
-                      navigate("/apps-auxiliares")
+                      navigate("/apps-auxiliares");
                     } else {
                       item.onClick();
                       onClose();
@@ -247,7 +247,8 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                     if (item.submenu) setShowAppsSubmenu(true);
                   }}
                   onMouseLeave={() => {
-                    if (item.submenu && !showAppsSubmenu) setShowAppsSubmenu(false);
+                    if (item.submenu && !showAppsSubmenu)
+                      setShowAppsSubmenu(false);
                   }}
                 >
                   <span className="text-white">{item.icon}</span>
@@ -257,13 +258,15 @@ export const SideMenu: React.FC<SideMenuProps> = ({
 
                 {/* Apps Submenu */}
                 {item.submenu && showAppsSubmenu && (
-                  <div 
+                  <div
                     className="fixed top-0 left-64 w-64 h-full bg-blue-900 z-60 overflow-y-auto"
                     onMouseEnter={() => setShowAppsSubmenu(true)}
                     onMouseLeave={() => setShowAppsSubmenu(false)}
                   >
                     <div className="p-4 flex items-center h-[70px] border-b border-blue-800">
-                      <h2 className="text-xl font-bold text-white">Aplicativos Auxiliares</h2>
+                      <h2 className="text-xl font-bold text-white">
+                        Aplicativos Auxiliares
+                      </h2>
                     </div>
                     <div>
                       {appsMenuItems.map((appItem) => (
@@ -273,7 +276,9 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                           className="flex items-center w-full gap-3 p-3 hover:bg-blue-800 transition-colors"
                         >
                           {appItem.icon}
-                          <span className="text-white text-sm">{appItem.nome}</span>
+                          <span className="text-white text-sm">
+                            {appItem.nome}
+                          </span>
                         </button>
                       ))}
                     </div>
@@ -295,10 +300,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
 
       {/* Overlay */}
       {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40" 
-          onClick={onClose} 
-        />
+        <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} />
       )}
     </>
   );

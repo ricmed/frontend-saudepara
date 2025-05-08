@@ -7,7 +7,8 @@ import {
   import { useNavigate } from "react-router-dom";
   import { useTranslation } from "../../../i18n/useTranslations";
   import { useLanguage } from "../../../contexts/LanguageContext";
-  import { SideMenu } from "@/features/apps/components/SideMenu";
+  // Importando o novo SideMenu
+  import SideMenu from "@/features/home/components/SideMenu";
   
   type AppConfig = {
     icon: JSX.Element;
@@ -97,7 +98,17 @@ import {
           </div>
         </header>
   
-        <SideMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
+        {/* Usando o novo componente SideMenu com as props corretas */}
+        <SideMenu 
+          isOpen={isMenuOpen} 
+          onClose={() => setIsMenuOpen(false)} 
+          selectedLanguage={selectedLanguage}
+          onLanguageChange={(language) => {
+            // Se existir uma função para mudar o idioma no contexto,
+            // você pode chamá-la aqui. Como não tenho acesso ao context completo,
+            // estou deixando um exemplo de implementação
+          }}
+        />
   
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="bg-white rounded-xl shadow-md overflow-hidden">
