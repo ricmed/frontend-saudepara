@@ -184,7 +184,7 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
   // Limpa todas as hipóteses selecionadas
   const handleClearAllHipoteses = () => {
     if (formData.hipoteseDiagnostica.length > 0 && 
-        window.confirm(`Deseja remover todas as ${formData.hipoteseDiagnostica.length} hipóteses selecionadas?`)) {
+        window.confirm(`Deseja remover a hipótese diagnóstica selecionada?`)) {
       setFormData({
         ...formData,
         hipoteseDiagnostica: []
@@ -202,6 +202,16 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
       };
     });
   };
+
+  // Efeito para definir "relacionadoSurto" automaticamente quando o tipo for "SURTO"
+  useEffect(() => {
+    if (isTipoAtendimentoFunc("SURTO") && !formData.relacionadoSurto) {
+      setFormData({
+        ...formData,
+        relacionadoSurto: "S" // Define como "Sim" automaticamente
+      });
+    }
+  }, [formData.tipoAtendimento]);
 
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -395,7 +405,7 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
 
                 <div className="flex items-center justify-between mb-2">
                   <label className="font-medium text-gray-700">
-                    Hipótese Diagnóstica
+                    Hipótese Diagnóstica (selecione apenas uma)
                   </label>
                   
                   {/* Campo de pesquisa para hipóteses diagnósticas */}
@@ -443,13 +453,13 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                         </div>
                       ))}
                       
-                      {formData.hipoteseDiagnostica.length > 1 && (
+                      {formData.hipoteseDiagnostica.length > 0 && (
                         <button
                           type="button"
                           onClick={handleClearAllHipoteses}
                           className="ml-2 text-xs text-gray-500 hover:text-red-500 focus:outline-none"
                         >
-                          Limpar todos
+                          Limpar
                         </button>
                       )}
                     </div>
@@ -537,19 +547,28 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                             // Se estiver no array, usa a qtdSintomas dele, senão é 0
                             const qtdSintomas = matchingSintomaOption ? matchingSintomaOption.qtdSintomas : 0;
                             
+                            // Verificamos se esta opção está selecionada
+                            const isChecked = formData.hipoteseDiagnostica.includes(option.idtipo_hipotese_diag.toString());
+                            
                             return (
                               <HipoteseDiagItem
                                 key={option.idtipo_hipotese_diag}
                                 option={option}
                                 qtdSintomas={qtdSintomas}
                                 formData={formData}
-                                checked={formData.hipoteseDiagnostica.includes(option.idtipo_hipotese_diag.toString())}
-                                onChange={() => handleCheckboxChange && 
-                                  handleCheckboxChange(
-                                    "hipoteseDiagnostica",
-                                    option.idtipo_hipotese_diag.toString()
-                                  )
-                                }
+                                checked={isChecked}
+                                onChange={() => {
+                                  // Se já estava selecionada, desmarcar
+                                  if (isChecked) {
+                                    handleCheckboxChange && handleCheckboxChange("hipoteseDiagnostica", option.idtipo_hipotese_diag.toString());
+                                  } else {
+                                    // Se não estava selecionada, substituir a seleção atual (se houver) por esta
+                                    handleCheckboxChange && setFormData({
+                                      ...formData,
+                                      hipoteseDiagnostica: [option.idtipo_hipotese_diag.toString()]
+                                    });
+                                  }
+                                }}
                                 showAllHipoteses={showAllHipoteses}
                               />
                             );
@@ -596,19 +615,17 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
               </div>
             )}
 
-            {/* Observação da Hipótese para TODOS os tipos, EXCETO TRAUMA e MULTIPLAS VITIMAS */}
-            {!isTipoAtendimentoFunc("TRAUMA") && !isTipoAtendimentoFunc("MULTIPLAS VITIMAS") && (
-              <div className="md:col-span-2">
-                <FormField
-                  label="Observação da Hipótese"
-                  name="observacaoHipotese"
-                  value={formData.observacaoHipotese}
-                  onChange={handleChange}
-                  type="textarea"
-                  placeholder="Informações adicionais sobre a hipótese diagnóstica..."
-                />
-              </div>
-            )}
+            {/* Observação da Hipótese para TODOS os tipos de atendimento */}
+            <div className="md:col-span-2">
+              <FormField
+                label="Observação da Hipótese"
+                name="observacaoHipotese"
+                value={formData.observacaoHipotese}
+                onChange={handleChange}
+                type="textarea"
+                placeholder="Informações adicionais sobre a hipótese diagnóstica..."
+              />
+            </div>
           </div>
         </div>
       )}

@@ -165,7 +165,7 @@ const NotificationForm: React.FC = () => {
                 Exportar
               </button>
 
-              {/* Dropdown de Exportação - Apenas PDF e PNG */}
+              {/* Dropdown de Exportação - Apenas PDF */}
               {isExportDropdownOpen && (
                 <div className="absolute right-0 mt-2 w-48 rounded-md shadow-xl bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
                   <div className="py-1" role="menu" aria-orientation="vertical">
@@ -175,13 +175,6 @@ const NotificationForm: React.FC = () => {
                       role="menuitem"
                     >
                       <Files className="h-4 w-4" /> PDF
-                    </button>
-                    <button
-                      onClick={() => handleExport("PNG")}
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left flex items-center gap-2"
-                      role="menuitem"
-                    >
-                      <FileChartColumnIncreasing className="h-4 w-4" /> PNG
                     </button>
                   </div>
                 </div>
