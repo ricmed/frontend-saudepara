@@ -148,7 +148,10 @@ const TableHeader: React.FC<TableHeaderProps> = ({
               fields={searchFields}
               onSearchChange={onSearchChange}
               onSearch={onSearch}
+              realTimeSearch={true}
               placeholder="Buscar por paciente, evento ou atendimento..."
+              minSearchLength={3}
+              debounceTime={300}
             />
 
             {/* Botão Nova Notificação */}
@@ -157,7 +160,7 @@ const TableHeader: React.FC<TableHeaderProps> = ({
               className="px-4 py-2 bg-white text-blue-600 rounded-md hover:bg-gray-100 transition-colors flex items-center gap-2"
             >
               <Plus className="h-5 w-5" />
-              Nova Notificação
+              Nova Comunicação de Caso
             </button>
           </div>
         </div>

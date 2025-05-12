@@ -251,17 +251,15 @@ const countryCodes: CountryCode[] = [
   { name: "Zimbábue", code: "ZW", dial_code: "+263" },
 ];
 
-// Definição dos padrões de tamanho de número de telefone por país
+// Sistema aprimorado de padrões de formatação para números de telefone
 const phonePatterns = {
-  // Para cada país, define os tamanhos esperados para números locais (sem o DDI)
-  // e também o formato de exibição
+  // Brasil
   BR: { 
     lengths: [10, 11], 
     formats: [
       { length: 10, format: (n: string) => `(${n.slice(0, 2)}) ${n.slice(2, 6)}-${n.slice(6)}` }, // Fixo
       { length: 11, format: (n: string) => `(${n.slice(0, 2)}) ${n.slice(2, 7)}-${n.slice(7)}` } // Celular
     ],
-    // Adicionar verificação específica para Brasil - DDD válidos
     validate: (number: string) => {
       // Lista de DDDs válidos do Brasil
       const validDDDs = [
@@ -276,7 +274,6 @@ const phonePatterns = {
         "91", "92", "93", "94", "95", "96", "97", "98", "99"
       ];
       
-      // Se o número tem pelo menos 2 dígitos, verificar se começa com um DDD válido
       if (number.length >= 2) {
         const possibleDDD = number.substring(0, 2);
         return validDDDs.includes(possibleDDD);
@@ -284,16 +281,139 @@ const phonePatterns = {
       return false;
     }
   },
+  // Estados Unidos e Canadá
   US: { 
     lengths: [10], 
     formats: [
       { length: 10, format: (n: string) => `(${n.slice(0, 3)}) ${n.slice(3, 6)}-${n.slice(6)}` }
     ]
   },
-  GB: { lengths: [10], formats: [
-    { length: 10, format: (n: string) => `${n.slice(0, 4)} ${n.slice(4, 7)} ${n.slice(7)}` }
-  ]},
-  // Outros países podem ser adicionados seguindo o mesmo padrão
+  CA: { 
+    lengths: [10], 
+    formats: [
+      { length: 10, format: (n: string) => `(${n.slice(0, 3)}) ${n.slice(3, 6)}-${n.slice(6)}` }
+    ]
+  },
+  // Reino Unido
+  GB: { 
+    lengths: [10, 11], 
+    formats: [
+      { length: 10, format: (n: string) => `${n.slice(0, 3)} ${n.slice(3, 6)} ${n.slice(6)}` },
+      { length: 11, format: (n: string) => `${n.slice(0, 4)} ${n.slice(4, 7)} ${n.slice(7)}` }
+    ]
+  },
+  // Alemanha
+  DE: {
+    lengths: [10, 11],
+    formats: [
+      { length: 10, format: (n: string) => `${n.slice(0, 3)} ${n.slice(3, 6)} ${n.slice(6)}` },
+      { length: 11, format: (n: string) => `${n.slice(0, 4)} ${n.slice(4, 7)} ${n.slice(7)}` }
+    ]
+  },
+  // França
+  FR: {
+    lengths: [9],
+    formats: [
+      { length: 9, format: (n: string) => `${n.slice(0, 1)} ${n.slice(1, 3)} ${n.slice(3, 5)} ${n.slice(5, 7)} ${n.slice(7)}` }
+    ]
+  },
+  // Espanha
+  ES: {
+    lengths: [9],
+    formats: [
+      { length: 9, format: (n: string) => `${n.slice(0, 3)} ${n.slice(3, 6)} ${n.slice(6)}` }
+    ]
+  },
+  // Portugal
+  PT: {
+    lengths: [9],
+    formats: [
+      { length: 9, format: (n: string) => `${n.slice(0, 3)} ${n.slice(3, 6)} ${n.slice(6)}` }
+    ]
+  },
+  // Itália
+  IT: {
+    lengths: [9, 10],
+    formats: [
+      { length: 9, format: (n: string) => `${n.slice(0, 3)} ${n.slice(3, 6)} ${n.slice(6)}` },
+      { length: 10, format: (n: string) => `${n.slice(0, 3)} ${n.slice(3, 6)} ${n.slice(6)}` }
+    ]
+  },
+  // Japão
+  JP: {
+    lengths: [10, 11],
+    formats: [
+      { length: 10, format: (n: string) => `${n.slice(0, 2)}-${n.slice(2, 6)}-${n.slice(6)}` },
+      { length: 11, format: (n: string) => `${n.slice(0, 3)}-${n.slice(3, 7)}-${n.slice(7)}` }
+    ]
+  },
+  // China
+  CN: {
+    lengths: [11],
+    formats: [
+      { length: 11, format: (n: string) => `${n.slice(0, 3)} ${n.slice(3, 7)} ${n.slice(7)}` }
+    ]
+  },
+  // Austrália
+  AU: {
+    lengths: [9, 10],
+    formats: [
+      { length: 9, format: (n: string) => `${n.slice(0, 3)} ${n.slice(3, 6)} ${n.slice(6)}` },
+      { length: 10, format: (n: string) => `${n.slice(0, 4)} ${n.slice(4, 7)} ${n.slice(7)}` }
+    ]
+  },
+  // Índia
+  IN: {
+    lengths: [10],
+    formats: [
+      { length: 10, format: (n: string) => `${n.slice(0, 5)} ${n.slice(5)}` }
+    ]
+  },
+  // Rússia
+  RU: {
+    lengths: [10],
+    formats: [
+      { length: 10, format: (n: string) => `${n.slice(0, 3)} ${n.slice(3, 6)}-${n.slice(6, 8)}-${n.slice(8)}` }
+    ]
+  },
+  // México
+  MX: {
+    lengths: [10],
+    formats: [
+      { length: 10, format: (n: string) => `${n.slice(0, 3)} ${n.slice(3, 6)} ${n.slice(6)}` }
+    ]
+  },
+  // Argentina
+  AR: {
+    lengths: [10],
+    formats: [
+      { length: 10, format: (n: string) => `${n.slice(0, 3)} ${n.slice(3, 6)}-${n.slice(6)}` }
+    ]
+  },
+  // Chile
+  CL: {
+    lengths: [9],
+    formats: [
+      { length: 9, format: (n: string) => `${n.slice(0, 1)} ${n.slice(1, 5)} ${n.slice(5)}` }
+    ]
+  },
+  // Colômbia
+  CO: {
+    lengths: [10],
+    formats: [
+      { length: 10, format: (n: string) => `${n.slice(0, 3)} ${n.slice(3, 6)} ${n.slice(6)}` }
+    ]
+  }
+};
+
+// Padrão de formatação global para países sem definição específica
+const globalPattern = {
+  format: (n: string) => {
+    if (n.length <= 3) return n;
+    if (n.length <= 6) return `${n.slice(0, 3)} ${n.slice(3)}`;
+    if (n.length <= 9) return `${n.slice(0, 3)} ${n.slice(3, 6)} ${n.slice(6)}`;
+    return `${n.slice(0, 3)} ${n.slice(3, 6)} ${n.slice(6, 9)} ${n.slice(9)}`;
+  }
 };
 
 interface PhoneInputProps {
@@ -345,6 +465,16 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef({ x: 0, y: 0 });
+
+  // Calcular o total de caracteres atual (DDI + número nacional)
+  const calculateTotalChars = () => {
+    if (!selectedCountry) return 0;
+    const dialDigits = selectedCountry.dial_code.replace(/[+\s]/g, '');
+    return dialDigits.length + internalPhoneNumber.length;
+  };
+
+  const totalChars = calculateTotalChars();
+  const isExceeding = totalChars > 15;
 
   // Função melhorada para detectar o país a partir do código de discagem
   const detectCountryFromNumber = (phoneNumber: string) => {
@@ -537,8 +667,8 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
     }
   }, [value, selectedCountry]);
 
-  // PONTO CRÍTICO: Função que formata e notifica o componente pai de mudanças
-  // Esta função garante que o DDI seja sempre incluído no formato "+XX YYYYY"
+  // IMPLEMENTAÇÃO MELHORADA: Função que formata e notifica o componente pai de mudanças
+  // Garante que o número total (DDI + número) não ultrapasse 15 caracteres
   const notifyParentOfChange = (country: CountryCode, phone: string) => {
     if (!country) {
       console.error("País inválido");
@@ -551,8 +681,7 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
     // Remover o + para obter apenas os dígitos do DDI
     const dialDigits = country.dial_code.replace(/[+\s]/g, '');
     
-    // Determinar o número máximo de caracteres permitidos
-    // 15 caracteres total - comprimento do DDI = máx. para o número nacional
+    // IMPORTANTE: Limitar para máximo de 15 caracteres no total (DDI + número)
     const maxNationalDigits = 15 - dialDigits.length;
     
     // Limitar o número nacional ao máximo permitido
@@ -566,8 +695,14 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
       countryName: country.name,
       dialCode: dialDigits,
       nationalNumber: limitedPhone,
-      fullNumber: fullNumber
+      fullNumber: fullNumber,
+      totalLength: (dialDigits.length + limitedPhone.length)
     });
+    
+    // Verificar e logging do limite de 15 caracteres
+    if (dialDigits.length + limitedPhone.length > 15) {
+      console.warn(`Número excede 15 caracteres. DDI: ${dialDigits.length}, Número: ${limitedPhone.length}, Total: ${dialDigits.length + limitedPhone.length}`);
+    }
     
     // Marcar que esta mudança é interna para evitar loops
     isInternalChangeRef.current = true;
@@ -596,6 +731,17 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Obter valor digitado e remover formatação
     let newPhone = e.target.value.replace(/\D/g, "");
+    
+    // Verificar se o total de caracteres (DDI + número) excederia o limite
+    if (selectedCountry) {
+      const dialDigits = selectedCountry.dial_code.replace(/[+\s]/g, '');
+      const maxNationalDigits = 15 - dialDigits.length;
+      
+      // Se o novo valor exceder o limite, truncar
+      if (newPhone.length > maxNationalDigits) {
+        newPhone = newPhone.substring(0, maxNationalDigits);
+      }
+    }
     
     phoneLogger.log("PHONE INPUT CHANGED", {
       raw: e.target.value,
@@ -832,7 +978,7 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
     );
   };
 
-  // Função aprimorada para formatação visual do número no input
+  // FUNÇÃO MELHORADA: Formatação visual do número baseada no país
   const formatVisualPhoneNumber = (number: string, countryCode: string) => {
     // Se não tiver número ou país, retornar como está
     if (!number || !countryCode) return number;
@@ -848,14 +994,8 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
       }
     }
     
-    // Formatação padrão se não encontrar específica
-    if (number.length > 6) {
-      return `${number.slice(0, 3)} ${number.slice(3, 6)} ${number.slice(6)}`;
-    } else if (number.length > 3) {
-      return `${number.slice(0, 3)} ${number.slice(3)}`;
-    }
-    
-    return number;
+    // Formatação global para países sem definição específica
+    return globalPattern.format(number);
   };
 
   // Versão visual formatada do número para exibição
@@ -871,10 +1011,12 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
         dialCode: selectedCountry?.dial_code,
         internalPhoneNumber,
         displayNumber,
-        formattedForExport: selectedCountry ? `+${selectedCountry.dial_code.replace(/[+\s]/g, '')} ${internalPhoneNumber}` : ""
+        formattedForExport: selectedCountry ? `+${selectedCountry.dial_code.replace(/[+\s]/g, '')} ${internalPhoneNumber}` : "",
+        totalCharacters: totalChars,
+        exceeding15Limit: isExceeding
       });
     }
-  }, [selectedCountry, internalPhoneNumber, displayNumber, debug]);
+  }, [selectedCountry, internalPhoneNumber, displayNumber, debug, totalChars, isExceeding]);
 
   return (
     <div className="w-full">
@@ -906,7 +1048,7 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
           <ChevronDown className="ml-2 h-4 w-4 text-gray-400" />
         </button>
 
-        {/* Input para o número de telefone - usando a versão formatada para exibição */}
+        {/* Input para o número de telefone - sem borda vermelha para excedido */}
         <input
           type="tel"
           inputMode="numeric"
@@ -922,10 +1064,12 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
         {renderDropdown()}
       </div>
       
-      {/* Exibir o formato completo que será salvo (útil apenas para debug) */}
+      {/* Somente exibir informações de debug quando solicitado */}
       {debug && selectedCountry && internalPhoneNumber && (
-        <div className="mt-1 text-xs text-gray-500">
+        <div className="mt-1 text-xs text-gray-600">
           Formato salvo: +{selectedCountry.dial_code.replace(/[+\s]/g, '')} {internalPhoneNumber}
+          <br/>
+          Caracteres: {totalChars}/15
         </div>
       )}
     </div>

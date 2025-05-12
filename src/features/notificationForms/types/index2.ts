@@ -153,6 +153,7 @@ export interface FormSectionProps {
   isLoadingMunicipios: boolean;
   ufError?: string;
   paisOptions: PaisOption[];
+  handleValidationError: (name: string, error: string | null) => void;
 }
 
 export interface SectionHeaderProps {

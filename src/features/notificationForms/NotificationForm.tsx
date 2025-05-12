@@ -62,6 +62,7 @@ const NotificationForm: React.FC = () => {
     handleExport,
     toggleExportDropdown,
     criarNovoPaciente,
+    handleValidationError, // Add this new function
       
     // Dados de pacientes
     pacienteSuggestions,
@@ -283,6 +284,7 @@ const NotificationForm: React.FC = () => {
             publicoOptions={publicoOptions}
             isLoadingMunicipios={isLoadingMunicipios}
             paisOptions={paisOptions}
+            handleValidationError={handleValidationError}
           />
 
           {/* Seção 2: Procedência do indivíduo */}
@@ -297,6 +299,7 @@ const NotificationForm: React.FC = () => {
             isLoadingMunicipios={isLoadingMunicipios}
             ufError={ufError || undefined}
             paisOptions={paisOptions}
+            handleValidationError={handleValidationError}
           />
 
           <PersonIdentificationSection
@@ -323,6 +326,7 @@ const NotificationForm: React.FC = () => {
             escolaridadeOptions={escolaridadeOptions}
             isLoadingMunicipios={isLoadingMunicipios}
             paisOptions={paisOptions}
+            handleValidationError={handleValidationError}
           />
 
           {/* Seção 4: Informações do atendimento */}
@@ -348,6 +352,7 @@ const NotificationForm: React.FC = () => {
             isTipoAtendimentoFunc={isTipoAtendimentoFunc}
             isLoadingMunicipios={isLoadingMunicipios}
             paisOptions={paisOptions}
+            handleValidationError={handleValidationError}
           />
 
           {/* Seção 5: Informações da unidade notificadora */}
@@ -361,6 +366,7 @@ const NotificationForm: React.FC = () => {
             toggleSection={() => toggleSection("unidadeNotificadora")}
             isLoadingMunicipios={isLoadingMunicipios}
             paisOptions={paisOptions}
+            handleValidationError={handleValidationError}
           />
 
           {/* Seção 6: Encerramento do Caso */}
@@ -376,6 +382,7 @@ const NotificationForm: React.FC = () => {
             isTipoEncerramentoFunc={isTipoEncerramentoFunc}
             isLoadingMunicipios={isLoadingMunicipios}
             paisOptions={paisOptions}
+            handleValidationError={handleValidationError}
           />
 
           {/* Botões de ação na parte inferior do formulário (centralizados) */}

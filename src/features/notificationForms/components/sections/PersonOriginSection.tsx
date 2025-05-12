@@ -19,17 +19,6 @@ const PersonOriginSection: React.FC<FormSectionProps> = ({
   isLoadingMunicipios,
   ufError,
 }) => {
-  // Create a wrapper function to handle the event type mismatch
-  const handleContatoLocalChangeWrapper = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
-  ) => {
-    // If it's an input element, pass it to the original handler
-    if (e.target instanceof HTMLInputElement) {
-      handleContatoLocalChange(e as React.ChangeEvent<HTMLInputElement>);
-    }
-  };
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
       <SectionHeader
@@ -133,7 +122,7 @@ const PersonOriginSection: React.FC<FormSectionProps> = ({
                     label="Local de Hospedagem"
                     name="localHospedagem"
                     value={formData.localHospedagem}
-                    onChange={handleContatoLocalChangeWrapper}
+                    onChange={handleChange}
                     placeholder="Informe o nome do local de hospedagem"
                   />
                 </div>
@@ -143,47 +132,12 @@ const PersonOriginSection: React.FC<FormSectionProps> = ({
                     name="contatoLocal"
                     value={formData.contatoLocal}
                     onChange={(value) => {
-                      // Extrair o número nacional da string completa
-                      const numericOnly = value.replace(/\D/g, "");
-
-                      // Remover o prefixo 55 do Brasil se presente
-                      const nationalNumber = numericOnly.startsWith("55")
-                        ? numericOnly.substring(2)
-                        : numericOnly;
-
-                      // Formatar no estilo brasileiro durante a digitação
-                      let formattedNumber = nationalNumber;
-
-                      // Formatação para número com DDD (10 dígitos = fixo, 11 dígitos = celular)
-                      if (nationalNumber.length >= 2) {
-                        // Começar com o DDD entre parênteses
-                        formattedNumber = `(${nationalNumber.slice(0, 2)})`;
-
-                        // Adicionar espaço após o DDD
-                        if (nationalNumber.length > 2) {
-                          formattedNumber += ` ${nationalNumber.slice(2)}`;
-                        }
-
-                        // Adicionar hífen para telefone fixo ou celular
-                        if (
-                          nationalNumber.length >= 6 &&
-                          nationalNumber.length <= 10
-                        ) {
-                          // Telefone fixo
-                          formattedNumber = `(${nationalNumber.slice(0, 2)}) ${nationalNumber.slice(2, 6)}-${nationalNumber.slice(6)}`;
-                        } else if (nationalNumber.length >= 7) {
-                          // Celular
-                          formattedNumber = `(${nationalNumber.slice(0, 2)}) ${nationalNumber.slice(2, 7)}-${nationalNumber.slice(7)}`;
-                        }
-                      }
-
-                      // Atualizar o estado com o número formatado
                       setFormData((prev) => ({
                         ...prev,
-                        contatoLocal: formattedNumber,
+                        contatoLocal: value,
                       }));
                     }}
-                    placeholder="Telefone com DDD"
+                    placeholder="Celular ou telefone fixo com DDD"
                   />
                 </div>
               </>
@@ -212,63 +166,30 @@ const PersonOriginSection: React.FC<FormSectionProps> = ({
                   />
                 </div>
                 <div>
+                  <FormField
+                    label="Local de Hospedagem"
+                    name="localHospedagem"
+                    value={formData.localHospedagem}
+                    onChange={handleChange}
+                    placeholder="Informe o nome do local de hospedagem"
+                  />
+                </div>
+                <div>
                   <PhoneInput
                     label="Contato do Local da Hospedagem"
                     name="contatoLocal"
                     value={formData.contatoLocal}
                     onChange={(value) => {
-                      // Extrair o número nacional da string completa
-                      const numericOnly = value.replace(/\D/g, "");
-
-                      // Remover o prefixo 55 do Brasil se presente
-                      const nationalNumber = numericOnly.startsWith("55")
-                        ? numericOnly.substring(2)
-                        : numericOnly;
-
-                      // Formatar no estilo brasileiro durante a digitação
-                      let formattedNumber = nationalNumber;
-
-                      // Formatação para número com DDD (10 dígitos = fixo, 11 dígitos = celular)
-                      if (nationalNumber.length >= 2) {
-                        // Começar com o DDD entre parênteses
-                        formattedNumber = `(${nationalNumber.slice(0, 2)})`;
-
-                        // Adicionar espaço após o DDD
-                        if (nationalNumber.length > 2) {
-                          formattedNumber += ` ${nationalNumber.slice(2)}`;
-                        }
-
-                        // Adicionar hífen para telefone fixo ou celular
-                        if (
-                          nationalNumber.length >= 6 &&
-                          nationalNumber.length <= 10
-                        ) {
-                          // Telefone fixo
-                          formattedNumber = `(${nationalNumber.slice(0, 2)}) ${nationalNumber.slice(2, 6)}-${nationalNumber.slice(6)}`;
-                        } else if (nationalNumber.length >= 7) {
-                          // Celular
-                          formattedNumber = `(${nationalNumber.slice(0, 2)}) ${nationalNumber.slice(2, 7)}-${nationalNumber.slice(7)}`;
-                        }
-                      }
-
-                      // Atualizar o estado com o número formatado
                       setFormData((prev) => ({
                         ...prev,
-                        contatoLocal: formattedNumber,
+                        contatoLocal: value,
                       }));
                     }}
-                    placeholder="Telefone com DDD"
+                    placeholder="Celular ou telefone fixo com DDD"
                   />
-                </div>
-                <div>
-                  <FormField
-                    label="Contato do Local da Hospedagem"
-                    name="contatoLocal"
-                    value={formData.contatoLocal}
-                    onChange={handleContatoLocalChangeWrapper}
-                    placeholder="Apenas números (máx 11 dígitos)"
-                    error={errors.contatoLocal}
-                  />
+                  {errors.contatoLocal && (
+                    <p className="mt-1 text-sm text-red-500">{errors.contatoLocal}</p>
+                  )}
                 </div>
               </>
             )}

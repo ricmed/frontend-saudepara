@@ -146,6 +146,8 @@ interface AttendanceInfoSectionProps extends FormSectionProps {
   hipoteseDiagFiltradas: any[]; // Nova propriedade
   isLoadingHipoteses: boolean;  // Nova propriedade
   isTipoAtendimentoFunc: (tipo: string) => boolean;
+  setErrors?: (errors: any) => void; // Adding setErrors prop
+  handleValidationError: (name: string, error: string | null) => void; // Nova prop
 }
 
 const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
@@ -166,7 +168,9 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
   hipoteseDiagOptions,
   hipoteseDiagFiltradas,
   isLoadingHipoteses,
-  isTipoAtendimentoFunc
+  isTipoAtendimentoFunc,
+  setErrors = () => {}, // Default value for setErrors
+  handleValidationError
 }) => {
   // Estado para pesquisa de hipóteses diagnósticas
   const [searchHipotese, setSearchHipotese] = useState('');
@@ -278,12 +282,9 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                     value={formData.dataInicioSintomas}
                     onChange={handleChange}
                     data-error={errors.dataInicioSintomas ? "true" : "false"}
+                    error={errors.dataInicioSintomas}
+                    onValidationError={handleValidationError}
                   />
-                  {errors.dataInicioSintomas && (
-                    <p className="mt-1 text-sm text-red-500">
-                      {errors.dataInicioSintomas}
-                    </p>
-                  )}
                 </div>
 
                 <div className="md:col-span-2">
@@ -333,6 +334,8 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                     value={formData.dataOcorrencia}
                     onChange={handleChange}
                     data-error={errors.dataOcorrencia ? "true" : "false"}
+                    error={errors.dataOcorrencia}
+                    onValidationError={handleValidationError}
                   />
                   {errors.dataOcorrencia && (
                     <p className="mt-1 text-sm text-red-500">
@@ -341,7 +344,6 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                   )}
                 </div>
 
-                {/* Observação do Trauma */}
                 <div className="md:col-span-2">
                   <FormField
                     label="Observação"
@@ -389,6 +391,8 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                   value={formData.dataOcorrencia}
                   onChange={handleChange}
                   data-error={errors.dataOcorrencia ? "true" : "false"}
+                  error={errors.dataOcorrencia}
+                  onValidationError={handleValidationError}
                 />
                 {errors.dataOcorrencia && (
                   <p className="mt-1 text-sm text-red-500">

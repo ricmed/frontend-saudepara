@@ -671,6 +671,22 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     }
   };
 
+  // Função para receber erros de validação de componentes
+  const handleValidationError = (name: string, error: string | null) => {
+    if (error) {
+      // Adicionar erro ao estado de erros
+      setErrors(prev => ({
+        ...prev,
+        [name]: error
+      }));
+    } else if (errors[name]) {
+      // Remover o erro se foi resolvido
+      const newErrors = { ...errors };
+      delete newErrors[name];
+      setErrors(newErrors);
+    }
+  };
+
   // Handler para mudança no campo paciente
   const handlePacienteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { value } = e.target;
@@ -883,6 +899,25 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     // Limpar estados de feedback
     setApiError(null);
     setIsSuccess(false);
+
+    // Verificar explicitamente se há erros de data
+    if (errors.dataOcorrencia || errors.dataInicioSintomas || errors.dataAtendimento || errors.dataEncerramento) {
+      // Destacar a seção com erro
+      const secaoComErro = errors.dataOcorrencia || errors.dataInicioSintomas 
+        ? 'atendimento' 
+        : errors.dataAtendimento 
+          ? 'unidadeNotificadora' 
+          : 'encerramento';
+      
+      setExpandedSections(prev => ({
+        ...prev,
+        [secaoComErro]: true
+      }));
+      
+      // Exibir mensagem de erro
+      toast.error("Há problemas com as datas informadas. Por favor, corrija os erros destacados.");
+      return; // Impedir submissão
+    }
 
     // Verifica se tem paciente
     if (!formData.paciente.trim()) {
@@ -1445,6 +1480,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     handleExport,
     toggleExportDropdown,
     criarNovoPaciente,
+    handleValidationError,
     
     // Dados de pacientes
     pacienteSuggestions,

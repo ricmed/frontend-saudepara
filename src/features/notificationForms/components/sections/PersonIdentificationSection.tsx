@@ -51,6 +51,7 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
   setErrors
 }) => {
   const [typingTimer, setTypingTimer] = useState<NodeJS.Timeout | null>(null);
+  const [isValidCPF, setIsValidCPF] = useState<boolean>(false);
 
   // Função auxiliar para formatar CPF (remover caracteres não numéricos)
   const formatCPF = (cpf: string) => {
@@ -61,12 +62,15 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
   const handleCPFChangeWithValidation = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
     const formattedCPF = formatCPF(rawValue);
-  
+
     setFormData((prev) => ({
       ...prev,
       cpf: formattedCPF,
     }));
-  
+
+    // Resetar estados de validação
+    setIsValidCPF(false);
+    
     // Limpar erro anterior
     if (errors.cpf) {
       setErrors((prev: Record<string, string>) => {
@@ -76,7 +80,7 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
       });
     }
     
-    // Só verificar com 11 dígitos
+    // Só verificar com 11 dígitos - caso contrário não é um CPF válido
     if (formattedCPF.length === 11) {
       // Limpar timeout anterior
       if (typingTimer) {
@@ -102,11 +106,16 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
           
           // Verificar se a estrutura da resposta contém a propriedade 'exists'
           if (response.data && response.data.exists === true) {
+            // Se o CPF já existe no sistema, mostramos erro
+            setIsValidCPF(false);
             setErrors((prev: Record<string, string>) => ({
               ...prev,
               cpf: "CPF já cadastrado no sistema"
             }));
           } else {
+            // CPF não existe no sistema - é VÁLIDO para uso
+            setIsValidCPF(true);
+            
             // Limpar o erro de verificação
             setErrors((prev: Record<string, string>) => {
               const newErrors = { ...prev };
@@ -116,6 +125,8 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
           }
         } catch (error) {
           console.error("Erro ao verificar CPF:", error);
+          setIsValidCPF(false);
+          
           // Limpar mensagem de verificação
           setErrors((prev: Record<string, string>) => {
             const newErrors = { ...prev };
@@ -334,24 +345,48 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
               <label className="block mb-2 font-medium text-gray-700">
                 CPF
               </label>
-              <input
-                type="text"
-                name="cpf"
-                placeholder="000.000.000-00"
-                className={`w-full p-3 border ${
-                  errors.cpf
-                    ? "border-red-500 bg-red-50"
-                    : "border-gray-200"
-                } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
-                value={
-                  formData.cpf ? displayFormattedCPF(formData.cpf) : ""
-                }
-                onChange={handleCPFChangeWithValidation}
-                maxLength={14}
-                data-error={errors.cpf ? "true" : "false"}
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  name="cpf"
+                  placeholder="000.000.000-00"
+                  className={`w-full p-3 border ${
+                    errors.cpf
+                      ? "border-red-500 bg-red-50"
+                      : isValidCPF
+                        ? "border-green-500 bg-green-50"
+                        : "border-gray-200"
+                  } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
+                  value={
+                    formData.cpf ? displayFormattedCPF(formData.cpf) : ""
+                  }
+                  onChange={handleCPFChangeWithValidation}
+                  maxLength={14}
+                  data-error={errors.cpf ? "true" : "false"}
+                  data-valid={isValidCPF ? "true" : "false"}
+                />
+                {isValidCPF && (
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                    <svg 
+                      className="h-5 w-5 text-green-500" 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      viewBox="0 0 20 20" 
+                      fill="currentColor"
+                    >
+                      <path 
+                        fillRule="evenodd" 
+                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" 
+                        clipRule="evenodd" 
+                      />
+                    </svg>
+                  </div>
+                )}
+              </div>
               {errors.cpf && (
                 <p className="mt-1 text-sm text-red-500">{errors.cpf}</p>
+              )}
+              {isValidCPF && (
+                <p className="mt-1 text-sm text-green-500">CPF válido e disponível para cadastro</p>
               )}
             </div>
 
