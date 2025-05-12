@@ -33,31 +33,61 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
   const dateInputRef = useRef<HTMLInputElement>(null);
   const textInputRef = useRef<HTMLInputElement>(null);
   const [isDateValid, setIsDateValid] = useState(true);
-  const [localError, setLocalError] = useState<string>("");
-  const [isBlocking, setIsBlocking] = useState(false); // Flag para evitar atualizações em cascata
+  const [localError, setLocalError] = useState<string | null>(null);
+  
+  // Estado para controlar se o botão de incremento deve estar desabilitado
+  const [isAtMaxDate, setIsAtMaxDate] = useState(false);
 
   // Verificar data máxima - usando a data atual por padrão (impede datas futuras)
   const today = new Date();
+  // Importante: não ajustar para o final do dia, mas usar exatamente a data atual
   const formattedToday = today.toISOString().split('T')[0]; // YYYY-MM-DD
   const effectiveMaxDate = maxDate || formattedToday;
 
   // Sincronizar o valor manual com o valor do componente pai
   useEffect(() => {
-    if (isBlocking) return; // Impedir modificações em cascata
-    
     if (value) {
-      setManualInputValue(formatDateForDisplay(value));
-      setIsDateValid(true);
-      setLocalError(""); // Limpar erros locais quando o valor é atualizado externamente
-      
-      // Comunicar ao componente pai que não há erro
-      if (onValidationError) {
-        onValidationError(name, null);
+      try {
+        const [year, month, day] = value.split("-");
+        setManualInputValue(`${day}/${month}/${year}`);
+        setIsDateValid(true);
+        setLocalError(null);
+        
+        // Verificar se a data atual é a data máxima permitida (para desabilitar o botão de incremento)
+        // Este é o ponto crítico - verificamos se já estamos na data atual
+        const maxLimit = new Date(effectiveMaxDate);
+        const currentDate = new Date(value);
+        
+        // Importante: sempre comparar apenas data, sem horas
+        maxLimit.setHours(0, 0, 0, 0);
+        currentDate.setHours(0, 0, 0, 0);
+        
+        // Uso de comparação usando strings e timestamps para garantir precisão
+        const isMax = 
+          currentDate.getTime() >= maxLimit.getTime() || 
+          currentDate.toISOString().split('T')[0] === maxLimit.toISOString().split('T')[0];
+        
+        console.log('Verificando datas:', {
+          current: currentDate.toISOString().split('T')[0],
+          max: maxLimit.toISOString().split('T')[0],
+          isMax
+        });
+        
+        setIsAtMaxDate(isMax);
+        
+        // Comunicar ao componente pai que não há erro
+        if (onValidationError) {
+          onValidationError(name, null);
+        }
+      } catch (error) {
+        setManualInputValue("");
+        setIsAtMaxDate(false);
       }
     } else {
       setManualInputValue("");
+      setIsAtMaxDate(false);
     }
-  }, [value, name, onValidationError, isBlocking]);
+  }, [value, name, onValidationError, effectiveMaxDate]);
 
   // Formatar a data do formato ISO para o formato de exibição DD/MM/YYYY
   const formatDateForDisplay = (isoDate: string): string => {
@@ -103,29 +133,57 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
     // Validar contra data máxima (impedir datas futuras)
     if (effectiveMaxDate) {
       const maxLimit = new Date(effectiveMaxDate);
-      maxLimit.setHours(23, 59, 59, 999); // Fim do dia para comparação correta
+      // Use apenas a data, sem hora, para comparação precisa
+      date.setHours(0, 0, 0, 0);
+      maxLimit.setHours(0, 0, 0, 0);
+      
       if (date > maxLimit) return false;
     }
     
     // Validar contra data mínima se fornecida
     if (minDate) {
       const minLimit = new Date(minDate);
-      if (date < minLimit) return false;
+      minLimit.setHours(0, 0, 0, 0);
+      const dateToCompare = new Date(isoDate);
+      dateToCompare.setHours(0, 0, 0, 0);
+      if (dateToCompare < minLimit) return false;
     }
     
     return true;
   };
 
+  // Verificar se a data atual é a data máxima permitida
+  const checkIsAtMaxDate = (dateValue: string): boolean => {
+    if (!dateValue) return false;
+    
+    const dateToCheck = new Date(dateValue);
+    const maxLimit = new Date(effectiveMaxDate);
+    
+    // Comparar apenas as datas (sem hora)
+    dateToCheck.setHours(0, 0, 0, 0);
+    maxLimit.setHours(0, 0, 0, 0);
+    
+    // Verificação estrita: considerar como data máxima se for igual ou posterior à data atual
+    const result = dateToCheck.getTime() >= maxLimit.getTime();
+    
+    console.log('checkIsAtMaxDate:', {
+      date: dateToCheck.toISOString().split('T')[0],
+      max: maxLimit.toISOString().split('T')[0],
+      result
+    });
+    
+    return result;
+  };
+
   // Manipular alterações na entrada manual
   const handleManualChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
-    setManualInputValue(inputValue);
-
-    // Limpar mensagem de erro local ao digitar
+    
+    // Limpar erro ao digitar
     if (localError) {
-      setLocalError("");
+      setLocalError(null);
       
-      // Limpar erro no componente pai apenas se temos uma função de callback
+      // Comunicar ao componente pai que não há erro
       if (onValidationError) {
         onValidationError(name, null);
       }
@@ -133,6 +191,8 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
 
     // Verificar se o campo está vazio
     if (!inputValue || inputValue === '') {
+      setManualInputValue("");
+      setIsAtMaxDate(false);
       const syntheticEvent = {
         target: {
           name,
@@ -144,9 +204,7 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
         }
       } as React.ChangeEvent<HTMLInputElement>;
       
-      setIsBlocking(true); // Bloquear loop de atualização
       onChange(syntheticEvent);
-      setTimeout(() => setIsBlocking(false), 0);
       return;
     }
     
@@ -164,19 +222,19 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
       formatted = `${cleaned.substring(0, 2)}/${cleaned.substring(2, 4)}/${cleaned.substring(4, 8)}`;
     }
     
-    if (formatted !== inputValue) {
-      setManualInputValue(formatted);
-    }
+    // Atualizar o valor exibido
+    setManualInputValue(formatted);
     
-    // Converter para formato ISO e notificar o componente pai se tiver o formato completo
+    // Validação antecipada para detectar datas futuras durante a digitação
     if (formatted.length === 10) {
       const isoDate = convertToIsoDate(formatted);
-      
-      // Verificar se a data é válida e não está no futuro
       const dateValid = isValidDate(formatted);
-      setIsDateValid(dateValid);
       
       if (dateValid) {
+        // Atualizar o estado de isAtMaxDate
+        const isMax = checkIsAtMaxDate(isoDate);
+        setIsAtMaxDate(isMax);
+        
         // Criar um evento sintético para simular input nativo
         const syntheticEvent = {
           target: {
@@ -189,49 +247,82 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
           }
         } as React.ChangeEvent<HTMLInputElement>;
         
-        setIsBlocking(true); // Bloquear loop de atualização
+        setIsDateValid(true);
         onChange(syntheticEvent);
-        setTimeout(() => setIsBlocking(false), 0);
       } else {
         // Verificar qual erro específico ocorreu
         const isoDate = convertToIsoDate(formatted);
         const date = new Date(isoDate);
         
         if (!isNaN(date.getTime())) {
-          if (date > new Date(effectiveMaxDate)) {
+          const maxDate = new Date(effectiveMaxDate);
+          date.setHours(0, 0, 0, 0);
+          maxDate.setHours(0, 0, 0, 0);
+          
+          if (date > maxDate) {
             const errorMsg = "A data não pode ser futura.";
             setLocalError(errorMsg);
+            setIsDateValid(false);
+            setIsAtMaxDate(false);
             
             // Comunicar erro ao componente pai
             if (onValidationError) {
               onValidationError(name, errorMsg);
             }
             
-            // IMPORTANTE: Não limpar o valor do input
-            // Manter o valor para que o usuário possa editá-lo
-          } else if (minDate && date < new Date(minDate)) {
-            const errorMsg = `A data deve ser após ${formatDateForDisplay(minDate)}.`;
-            setLocalError(errorMsg);
+            // Rejeitar o valor e manter o campo vazio
+            const syntheticEvent = {
+              target: {
+                name,
+                value: ""
+              },
+              currentTarget: {
+                name,
+                value: ""
+              }
+            } as React.ChangeEvent<HTMLInputElement>;
             
-            // Comunicar erro ao componente pai
-            if (onValidationError) {
-              onValidationError(name, errorMsg);
+            onChange(syntheticEvent);
+          } else if (minDate) {
+            const minLimit = new Date(minDate);
+            minLimit.setHours(0, 0, 0, 0);
+            
+            if (date < minLimit) {
+              const errorMsg = `A data deve ser após ${formatDateForDisplay(minDate)}.`;
+              setLocalError(errorMsg);
+              setIsDateValid(false);
+              setIsAtMaxDate(false);
+              
+              // Comunicar erro ao componente pai
+              if (onValidationError) {
+                onValidationError(name, errorMsg);
+              }
+              
+              // Rejeitar o valor e manter o campo vazio
+              const syntheticEvent = {
+                target: {
+                  name,
+                  value: ""
+                },
+                currentTarget: {
+                  name,
+                  value: ""
+                }
+              } as React.ChangeEvent<HTMLInputElement>;
+              
+              onChange(syntheticEvent);
             }
-            
-            // IMPORTANTE: Não limpar o valor do input
-            // Manter o valor para que o usuário possa editá-lo
           }
         } else {
           const errorMsg = "Data inválida.";
           setLocalError(errorMsg);
+          setIsDateValid(false);
+          setIsAtMaxDate(false);
           
           // Comunicar erro ao componente pai
           if (onValidationError) {
             onValidationError(name, errorMsg);
           }
-          
-          // IMPORTANTE: Não limpar o valor do input
-          // Manter o valor para que o usuário possa editá-lo
         }
       }
     }
@@ -245,14 +336,17 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
     const match = manualInputValue.match(datePattern);
     
     if (!match) {
-      // Se não estiver no formato correto, mostrar erro mas não limpar o valor
+      // Se não estiver no formato correto, mostrar erro mas manter valor
       const errorMsg = "Formato de data inválido.";
       setLocalError(errorMsg);
+      setIsDateValid(false);
+      setIsAtMaxDate(false);
       
       // Comunicar erro ao componente pai
       if (onValidationError) {
         onValidationError(name, errorMsg);
       }
+      
       return;
     }
     
@@ -269,60 +363,117 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
       dayNum <= new Date(yearNum, monthNum, 0).getDate();
     
     if (!isDateValid) {
-      // Se a data não for válida, mostrar erro mas não limpar o valor
+      // Se a data não for válida, mostrar erro e manter valor
       const errorMsg = "Data inválida.";
       setLocalError(errorMsg);
+      setIsAtMaxDate(false);
       
       // Comunicar erro ao componente pai
       if (onValidationError) {
         onValidationError(name, errorMsg);
       }
+      
+      // Manter o campo com a data inválida para que o usuário possa corrigir
+      // mas enviar valor vazio para o formulário
+      const syntheticEvent = {
+        target: {
+          name,
+          value: ""
+        },
+        currentTarget: {
+          name,
+          value: ""
+        }
+      } as React.ChangeEvent<HTMLInputElement>;
+      
+      onChange(syntheticEvent);
+      
       return;
     }
     
     // Verificar se a data está no futuro
-    const formattedIsoDate = convertToIsoDate(manualInputValue);
-    const inputDate = new Date(formattedIsoDate);
+    const isoDate = convertToIsoDate(manualInputValue);
+    const inputDate = new Date(isoDate);
     const maxDate = new Date(effectiveMaxDate);
-    maxDate.setHours(23, 59, 59, 999); // Fim do dia para comparação correta
+    
+    // Comparar apenas as datas, sem horas
+    inputDate.setHours(0, 0, 0, 0);
+    maxDate.setHours(0, 0, 0, 0);
     
     if (inputDate > maxDate) {
+      // Mostrar erro para data futura
       const errorMsg = "A data não pode ser futura.";
       setLocalError(errorMsg);
+      setIsAtMaxDate(false);
       
       // Comunicar erro ao componente pai
       if (onValidationError) {
         onValidationError(name, errorMsg);
       }
+      
+      // Enviar valor vazio para o formulário - mantendo o valor visual
+      const syntheticEvent = {
+        target: {
+          name,
+          value: ""
+        },
+        currentTarget: {
+          name,
+          value: ""
+        }
+      } as React.ChangeEvent<HTMLInputElement>;
+      
+      onChange(syntheticEvent);
+      
       return;
     }
     
     // Verificar data mínima, se especificada
     if (minDate) {
       const minLimit = new Date(minDate);
+      minLimit.setHours(0, 0, 0, 0);
+      
       if (inputDate < minLimit) {
         const errorMsg = `A data deve ser após ${formatDateForDisplay(minDate)}.`;
         setLocalError(errorMsg);
+        setIsAtMaxDate(false);
         
         // Comunicar erro ao componente pai
         if (onValidationError) {
           onValidationError(name, errorMsg);
         }
+        
+        // Enviar valor vazio para o formulário - mantendo o valor visual
+        const syntheticEvent = {
+          target: {
+            name,
+            value: ""
+          },
+          currentTarget: {
+            name,
+            value: ""
+          }
+        } as React.ChangeEvent<HTMLInputElement>;
+        
+        onChange(syntheticEvent);
+        
         return;
       }
     }
     
     // Se chegou aqui, a data é válida
-    setLocalError("");
+    setLocalError(null);
     setIsDateValid(true);
+    
+    // Atualizar o estado de isAtMaxDate
+    setIsAtMaxDate(checkIsAtMaxDate(isoDate));
     
     // Comunicar ao componente pai que não há erro
     if (onValidationError) {
       onValidationError(name, null);
     }
     
-    // Atualizar o valor no formato ISO
-    const isoDate = convertToIsoDate(manualInputValue);
+    // Enviar valor válido para o formulário
     const syntheticEvent = {
       target: {
         name,
@@ -334,59 +485,118 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
       }
     } as React.ChangeEvent<HTMLInputElement>;
     
-    setIsBlocking(true); // Bloquear loop de atualização
     onChange(syntheticEvent);
-    setTimeout(() => setIsBlocking(false), 0);
   };
   
   // Manipular alterações no input de data nativo
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const dateValue = e.target.value;
     
-    // Verificar se a data não está no futuro
-    if (dateValue) {
-      const inputDate = new Date(dateValue);
-      const maxDate = new Date(effectiveMaxDate);
-      maxDate.setHours(23, 59, 59, 999); // Fim do dia para comparação correta
+    if (!dateValue) {
+      setManualInputValue("");
+      setLocalError(null);
+      setIsDateValid(true);
+      setIsAtMaxDate(false);
       
-      if (inputDate > maxDate) {
-        const errorMsg = "A data não pode ser futura.";
+      if (onValidationError) {
+        onValidationError(name, null);
+      }
+      
+      onChange(e);
+      return;
+    }
+    
+    // Verificar se a data não está no futuro
+    const inputDate = new Date(dateValue);
+    const maxDate = new Date(effectiveMaxDate);
+    
+    // Comparar apenas as datas, sem horas
+    inputDate.setHours(0, 0, 0, 0);
+    maxDate.setHours(0, 0, 0, 0);
+    
+    if (inputDate > maxDate) {
+      const errorMsg = "A data não pode ser futura.";
+      setLocalError(errorMsg);
+      setIsAtMaxDate(false);
+      
+      // Comunicar erro ao componente pai
+      if (onValidationError) {
+        onValidationError(name, errorMsg);
+      }
+      
+      // Manter o valor exibido mas enviar vazio para o formulário
+      setManualInputValue(formatDateForDisplay(dateValue));
+      const syntheticEvent = {
+        target: {
+          name,
+          value: ""
+        },
+        currentTarget: {
+          name,
+          value: ""
+        }
+      } as React.ChangeEvent<HTMLInputElement>;
+      
+      onChange(syntheticEvent);
+      
+      return;
+    }
+    
+    // Verificar data mínima, se especificada
+    if (minDate) {
+      const minLimit = new Date(minDate);
+      minLimit.setHours(0, 0, 0, 0);
+      
+      if (inputDate < minLimit) {
+        const errorMsg = `A data deve ser após ${formatDateForDisplay(minDate)}.`;
         setLocalError(errorMsg);
+        setIsAtMaxDate(false);
         
         // Comunicar erro ao componente pai
         if (onValidationError) {
           onValidationError(name, errorMsg);
         }
-        return;
-      }
-      
-      // Verificar data mínima, se especificada
-      if (minDate) {
-        const minLimit = new Date(minDate);
-        if (inputDate < minLimit) {
-          const errorMsg = `A data deve ser após ${formatDateForDisplay(minDate)}.`;
-          setLocalError(errorMsg);
-          
-          // Comunicar erro ao componente pai
-          if (onValidationError) {
-            onValidationError(name, errorMsg);
+        
+        // Manter o valor exibido mas enviar vazio para o formulário
+        setManualInputValue(formatDateForDisplay(dateValue));
+        const syntheticEvent = {
+          target: {
+            name,
+            value: ""
+          },
+          currentTarget: {
+            name,
+            value: ""
           }
-          return;
-        }
-      }
-      
-      setLocalError("");
-      
-      // Comunicar ao componente pai que não há erro
-      if (onValidationError) {
-        onValidationError(name, null);
+        } as React.ChangeEvent<HTMLInputElement>;
+        
+        onChange(syntheticEvent);
+        
+        return;
       }
     }
     
+    // Atualizar o valor de exibição para o formato DD/MM/YYYY
+    try {
+      const [year, month, day] = dateValue.split("-");
+      setManualInputValue(`${day}/${month}/${year}`);
+    } catch (error) {
+      console.error("Erro ao formatar data:", error);
+    }
+    
+    // Atualizar o estado de isAtMaxDate
+    setIsAtMaxDate(checkIsAtMaxDate(dateValue));
+    
+    setLocalError(null);
+    setIsDateValid(true);
+    
+    // Comunicar ao componente pai que não há erro
+    if (onValidationError) {
+      onValidationError(name, null);
+    }
+    
     // Passar o evento para o componente pai
-    setIsBlocking(true); // Bloquear loop de atualização
     onChange(e);
-    setTimeout(() => setIsBlocking(false), 0);
   };
   
   // Abrir o seletor de data nativo quando o ícone de calendário é clicado
@@ -400,7 +610,7 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
   
   // Adiantar um dia
   const incrementDay = () => {
-    if (disabled) return;
+    if (disabled || isAtMaxDate) return;
     
     if (value) {
       const date = new Date(value);
@@ -408,7 +618,10 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
       
       // Verificar se não excede a data máxima
       const maxDate = new Date(effectiveMaxDate);
-      maxDate.setHours(23, 59, 59, 999); // Fim do dia para comparação correta
+      
+      // Comparar apenas as datas, sem horas
+      date.setHours(0, 0, 0, 0);
+      maxDate.setHours(0, 0, 0, 0);
       
       if (date > maxDate) {
         const errorMsg = "A data não pode ser futura.";
@@ -418,10 +631,16 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
         if (onValidationError) {
           onValidationError(name, errorMsg);
         }
+        
         return;
       }
       
       const isoDate = date.toISOString().split('T')[0];
+      
+      // Verificar se após o incremento estaremos na data máxima
+      const willBeAtMax = checkIsAtMaxDate(isoDate);
+      setIsAtMaxDate(willBeAtMax);
+      
       const syntheticEvent = {
         target: {
           name,
@@ -433,13 +652,30 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
         }
       } as React.ChangeEvent<HTMLInputElement>;
       
-      setIsBlocking(true); // Bloquear loop de atualização
       onChange(syntheticEvent);
-      setTimeout(() => setIsBlocking(false), 0);
     } else {
       // Se não houver data, usar a data atual
       const date = new Date();
+      date.setHours(0, 0, 0, 0); // Usar apenas a data, sem horas
+      
+      // Verificar se data atual já é a data máxima
+      const maxDate = new Date(effectiveMaxDate);
+      maxDate.setHours(0, 0, 0, 0);
+      
+      // Se a data atual já for a máxima, desabilitar o botão
+      if (date.getTime() >= maxDate.getTime()) {
+        setIsAtMaxDate(true);
+        date.setTime(maxDate.getTime());
+      } else {
+        setIsAtMaxDate(false);
+      }
+      
       const isoDate = date.toISOString().split('T')[0];
+      
+      // Verificar se após o incremento estaremos na data máxima
+      const willBeAtMax = checkIsAtMaxDate(isoDate);
+      setIsAtMaxDate(willBeAtMax);
+      
       const syntheticEvent = {
         target: {
           name,
@@ -451,15 +687,16 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
         }
       } as React.ChangeEvent<HTMLInputElement>;
       
-      setIsBlocking(true); // Bloquear loop de atualização
       onChange(syntheticEvent);
-      setTimeout(() => setIsBlocking(false), 0);
     }
   };
   
   // Retroceder um dia
   const decrementDay = () => {
     if (disabled) return;
+    
+    // Ao decrementar, nunca estaremos na data máxima
+    setIsAtMaxDate(false);
     
     if (value) {
       const date = new Date(value);
@@ -468,6 +705,9 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
       // Verificar data mínima, se especificada
       if (minDate) {
         const minLimit = new Date(minDate);
+        minLimit.setHours(0, 0, 0, 0);
+        date.setHours(0, 0, 0, 0);
+        
         if (date < minLimit) {
           const errorMsg = `A data deve ser após ${formatDateForDisplay(minDate)}.`;
           setLocalError(errorMsg);
@@ -476,6 +716,7 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
           if (onValidationError) {
             onValidationError(name, errorMsg);
           }
+          
           return;
         }
       }
@@ -492,9 +733,7 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
         }
       } as React.ChangeEvent<HTMLInputElement>;
       
-      setIsBlocking(true); // Bloquear loop de atualização
       onChange(syntheticEvent);
-      setTimeout(() => setIsBlocking(false), 0);
     } else {
       // Se não houver data, usar a data atual - 1
       const date = new Date();
@@ -503,6 +742,9 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
       // Verificar data mínima, se especificada
       if (minDate) {
         const minLimit = new Date(minDate);
+        minLimit.setHours(0, 0, 0, 0);
+        date.setHours(0, 0, 0, 0);
+        
         if (date < minLimit) {
           const errorMsg = `A data deve ser após ${formatDateForDisplay(minDate)}.`;
           setLocalError(errorMsg);
@@ -511,6 +753,7 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
           if (onValidationError) {
             onValidationError(name, errorMsg);
           }
+          
           return;
         }
       }
@@ -527,14 +770,11 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
         }
       } as React.ChangeEvent<HTMLInputElement>;
       
-      setIsBlocking(true); // Bloquear loop de atualização
       onChange(syntheticEvent);
-      setTimeout(() => setIsBlocking(false), 0);
     }
   };
 
   // Determinar qual mensagem de erro mostrar (priorizar erros externos)
-  // IMPORTANTE: Mostrar apenas UMA mensagem de erro
   const displayError = error || localError;
   
   // Determinar a classe de erro para o input
@@ -557,6 +797,7 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
             placeholder={placeholder || "DD/MM/YYYY"}
             disabled={disabled}
             required={required}
+            autoComplete="off"
             data-error={dataError || (displayError ? "true" : "false")}
             maxLength={10}
             style={{ backgroundColor: disabled ? "#f3f4f6" : "white" }}
@@ -594,9 +835,11 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
           <button
             type="button"
             onClick={incrementDay}
-            disabled={disabled}
-            className="text-gray-500 hover:text-blue-600 focus:outline-none disabled:opacity-50 p-1"
-            title="Próximo dia"
+            disabled={disabled || isAtMaxDate}
+            className={`text-gray-500 hover:text-blue-600 focus:outline-none p-1 ${
+              disabled || isAtMaxDate ? "opacity-50 cursor-not-allowed" : ""
+            }`}
+            title={isAtMaxDate ? "Não é possível avançar além da data atual" : "Próximo dia"}
           >
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
