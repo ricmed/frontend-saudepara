@@ -33,9 +33,225 @@ import {
   Briefcase,
   Award,
   AlertTriangle,
-  Bomb
+  Bomb,
+  BookOpen,
+  BarChart2,
+  PieChart as PieChartIcon
 } from "lucide-react";
 import { NotificacaoService } from '@/services/NotificacaoService';
+import { jsPDF } from 'jspdf';
+import domtoimage from 'dom-to-image';
+import { saveAs } from 'file-saver';
+
+// Funções de exportação para diferentes formatos
+const exportChartAsPNG = (chartId: string, title: string): void => {
+  const element = document.getElementById(chartId);
+  if (!element) {
+    alert('Elemento não encontrado!');
+    return;
+  }
+  
+  domtoimage.toPng(element)
+    .then((dataUrl) => {
+      const link = document.createElement('a');
+      link.download = `${title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.png`;
+      link.href = dataUrl;
+      link.click();
+    })
+    .catch((error) => {
+      console.error('Erro ao exportar PNG:', error);
+      alert('Erro ao exportar imagem');
+    });
+};
+
+const exportChartAsPDF = (chartId: string, title: string): void => {
+  const element = document.getElementById(chartId);
+  if (!element) {
+    alert('Elemento não encontrado!');
+    return;
+  }
+  
+  domtoimage.toPng(element)
+    .then((dataUrl) => {
+      const pdf = new jsPDF('l', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      // Adicionar título
+      pdf.setFontSize(16);
+      pdf.text(title, 10, 10);
+      
+      // Adicionar data
+      pdf.setFontSize(10);
+      pdf.text(`Exportado em: ${new Date().toLocaleDateString()}`, 10, 20);
+      
+      // Adicionar imagem
+      pdf.addImage(dataUrl, 'PNG', 10, 30, pdfWidth - 20, (pdfHeight - 40));
+      
+      // Salvar PDF
+      pdf.save(`${title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`);
+    })
+    .catch((error) => {
+      console.error('Erro ao exportar PDF:', error);
+      alert('Erro ao exportar PDF');
+    });
+};
+
+const exportChartAsWord = (chartId: string, data: ChartDataItem[], title: string): void => {
+  const element = document.getElementById(chartId);
+  if (!element) {
+    alert('Elemento não encontrado!');
+    return;
+  }
+  
+  domtoimage.toPng(element)
+    .then((dataUrl) => {
+      // Criar um documento básico HTML que pode ser aberto no Word
+      const htmlContent = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" 
+              xmlns:w="urn:schemas-microsoft-com:office:word" 
+              xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta charset="utf-8">
+          <title>${title}</title>
+        </head>
+        <body>
+          <h1>${title}</h1>
+          <p>Exportado em: ${new Date().toLocaleDateString()}</p>
+          <div>
+            <img src="${dataUrl}" style="max-width:100%;" alt="${title}">
+          </div>
+          <div>
+            <h2>Dados do gráfico</h2>
+            <table border="1" cellspacing="0" cellpadding="5">
+              <tr>
+                <th>Categoria</th>
+                <th>Valor</th>
+              </tr>
+              ${data.map(item => `
+                <tr>
+                  <td>${item.name}</td>
+                  <td>${item.value}</td>
+                </tr>
+              `).join('')}
+            </table>
+          </div>
+        </body>
+        </html>
+      `;
+      
+      const blob = new Blob([htmlContent], {type: 'application/msword;charset=utf-8'});
+      saveAs(blob, `${title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.doc`);
+    })
+    .catch((error) => {
+      console.error('Erro ao exportar Word:', error);
+      alert('Erro ao exportar Word');
+    });
+};
+
+const exportChartAsCSV = (data: ChartDataItem[], title: string): void => {
+  try {
+    // Criar cabeçalhos
+    const headers = ['Categoria', 'Valor'];
+    
+    // Criar linhas
+    const rows = [
+      headers.join(','),
+      ...data.map(item => `"${item.name.replace(/"/g, '""')}",${item.value}`)
+    ];
+    
+    // Juntar linhas
+    const csvContent = rows.join('\n');
+    
+    // Criar blob e link para download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.csv`;
+    link.click();
+  } catch (error) {
+    console.error('Erro ao exportar CSV:', error);
+    alert('Erro ao exportar CSV');
+  }
+};
+
+// Interface para as props do componente GraphExportMenu
+interface GraphExportMenuProps {
+  chartId: string;
+  chartType: string;
+  chartData: ChartDataItem[];
+  chartTitle: string;
+}
+
+// Componente de menu de exportação para cada gráfico
+const GraphExportMenu: React.FC<GraphExportMenuProps> = ({ chartId, chartType, chartData, chartTitle }) => {
+  const [showMenu, setShowMenu] = useState(false);
+  
+  const handleExport = (format: string) => {
+    switch (format) {
+      case 'png':
+        exportChartAsPNG(chartId, chartTitle);
+        break;
+      case 'pdf':
+        exportChartAsPDF(chartId, chartTitle);
+        break;
+      case 'word':
+        exportChartAsWord(chartId, chartData, chartTitle);
+        break;
+      case 'csv':
+        exportChartAsCSV(chartData, chartTitle);
+        break;
+      default:
+        break;
+    }
+    setShowMenu(false);
+  };
+  
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setShowMenu(!showMenu)}
+        className="p-1 text-gray-500 hover:text-blue-500 transition-colors"
+        title="Exportar gráfico"
+      >
+        <Download className="h-4 w-4" />
+      </button>
+      
+      {showMenu && (
+        <div className="absolute right-0 mt-1 bg-white rounded shadow-lg py-1 z-20 min-w-40">
+          <button 
+            className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+            onClick={() => handleExport('png')}
+          >
+            <FileImage className="h-4 w-4 text-green-500" />
+            Exportar PNG
+          </button>
+          <button 
+            className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+            onClick={() => handleExport('pdf')}
+          >
+            <FileSearch2 className="h-4 w-4 text-red-500" />
+            Exportar PDF
+          </button>
+          <button 
+            className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+            onClick={() => handleExport('word')}
+          >
+            <File className="h-4 w-4 text-blue-500" />
+            Exportar Word
+          </button>
+          <button 
+            className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+            onClick={() => handleExport('csv')}
+          >
+            <File className="h-4 w-4 text-gray-500" />
+            Exportar CSV
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // Cores padronizadas - voltando para a paleta original com tonalidades de azul
 const COLORS = {
@@ -77,8 +293,31 @@ const COLORS = {
     surto: "#FFC857",       // Amarelo (mantido para destaque)
     multiplas: "#665FDF",   // Roxo azulado
     qbrn: "#FF9A3C"         // Laranja (mantido para destaque)
-  }
+  },
+  // Cores para as hipóteses diagnósticas alarmantes
+  alarmante: "#f44336",     // Vermelho para hipóteses alarmantes
+  alerta: "#ff9800",        // Laranja para alertas
+  normal: "#3b5bdb",        // Azul para casos normais
 };
+
+// Lista de hipóteses de notificação compulsória imediata para MS, SES e SMS
+// Baseado na Portaria nº 204/2016 do Ministério da Saúde e na lista fornecida
+const HIPOTESES_ALARMANTES = [
+  "BOTULISMO", "CÓLERA", "DIFTERIA", "DOENÇA DE CHAGAS AGUDA", 
+  "FEBRE AMARELA", "FEBRE DO NILO OCIDENTAL", "DOENÇA MENINGOCÓCICA", 
+  "OUTRAS MENINGITES", "SARAMPO", "RUBÉOLA", "PARALISIA FLÁCIDA AGUDA",
+  "DENGUE", "ZIKA VÍRUS", "COVID 19"
+];
+
+// Lista de hipóteses de notificação compulsória imediata para MS e SES
+// ou notificação semanal mas com necessidade de monitoramento rigoroso
+const HIPOTESES_ALERTA = [
+  "TÉTANO ACIDENTAL", "COQUELUCHE", "MALÁRIA", "LEPTOSPIROSE", 
+  "INFLUENZA SAZONAL", "FEBRE TIFÓIDE", "LEISHMANIOSE VISCERAL",
+  "HANSENIASE", "VARICELA", "HERPES ZOSTER", "LEISHMANIOSE TEG. AMERICANA", 
+  "CHIKUNGUNYA", "TUBERCULOSE", "ROTAVIROSE", 
+  "DOENÇAS DE TRANSMISSÃO HÍDRICA E ALIMENTAR", "CAXUMBA"
+];
 
 // Interface para as props do dashboard
 interface DashboardProps {
@@ -91,6 +330,7 @@ interface ChartDataItem {
   name: string;
   value: number;
   fill: string;
+  isAlarmante?: boolean;
   original?: any; // Dado original para filtragem
 }
 
@@ -101,81 +341,6 @@ interface StatCounts {
   surto: number;
   multiplas: number;
   qbrn: number;
-}
-
-// Adicione esta função antes do componente EnhancedNotificationDashboard:
-function createCalcularEstatisticas(
-  notificacoes: any[], 
-  getAtendimentoDescById: (id: string | number) => string,
-  processarDadosGraficos: (dados: any[]) => boolean,
-  setTotalNotifications: (total: number) => void,
-  setStatCounts: (counts: any) => void
-) {
-  return (dadosFiltrados?: any[]) => {
-    // se vier um array (mesmo vazio), usar; só usar notificacoes quando undefined
-    const dados = dadosFiltrados !== undefined ? dadosFiltrados : notificacoes;
-
-    if (!Array.isArray(dados)) {
-      console.error("dados não é um array:", dados);
-      return false;
-    }
-
-    console.log("Calculando estatísticas para", dados.length, "notificações");
-
-    try {
-      // Total de notificações
-      const total = dados.length;
-      setTotalNotifications(total);
-
-      // Inicializar contagens
-      const counts = {
-        clinico: 0,
-        trauma: 0,
-        surto: 0,
-        multiplas: 0,
-        qbrn: 0
-      };
-
-      // Contar por tipo de atendimento com base nas descrições
-      dados.forEach(n => {
-        // Obter tipo de atendimento
-        const tipoId = n?.original?.tipo_atendimento_idtipo_atendimento;
-        let tipoDesc = "";
-        
-        if (tipoId !== undefined) {
-          tipoDesc = getAtendimentoDescById(tipoId);
-        } else if (n?.original?.tipo_atendimento?.descricao) {
-          tipoDesc = n.original.tipo_atendimento.descricao;
-        } else if (n?.tipoAtendimento) {
-          tipoDesc = n.tipoAtendimento;
-        }
-        
-        // Classificar baseado na descrição (case insensitive)
-        const lowerDesc = tipoDesc.toLowerCase();
-        
-        if (lowerDesc.includes("clínico") || lowerDesc.includes("clinico")) {
-          counts.clinico++;
-        } else if (lowerDesc.includes("trauma")) {
-          counts.trauma++;
-        } else if (lowerDesc.includes("surto")) {
-          counts.surto++;
-        } else if (lowerDesc.includes("múltiplas vítimas") || lowerDesc.includes("multiplas vitimas")) {
-          counts.multiplas++;
-        } else if (lowerDesc.includes("qbrn") || lowerDesc.includes("incidente q")) {
-          counts.qbrn++;
-        }
-      });
-
-      console.log("Contagens calculadas:", counts);
-      setStatCounts(counts);
-
-      // Processar dados para gráficos
-      return processarDadosGraficos(dados);
-    } catch (error) {
-      console.error("Erro ao calcular estatísticas:", error);
-      return false;
-    }
-  };
 }
 
 const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
@@ -247,91 +412,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     'qbrn': 'Incidente QBRN',
     'incidente qbrn': 'Incidente QBRN'
   };
-
-  // Função corrigida para filtrar notificações
-  // (removida duplicata para evitar erro de declaração)
-
-  // DEBUG: Log inicial para ajudar no diagnóstico
-  useEffect(() => {
-    console.log("Dashboard recebeu notificações:", notificacoes?.length);
-    console.log("Amostra das primeiras 2 notificações:", notificacoes?.slice(0, 2));
-    console.log("Export options recebidas:", exportOptions);
-    
-    if (exportOptions?.atendimentoOptions?.length > 0) {
-      console.log("Tipos de atendimento disponíveis:", exportOptions.atendimentoOptions);
-    }
-    
-    if (exportOptions?.eventoOptions?.length > 0) {
-      console.log("Eventos disponíveis:", exportOptions.eventoOptions);
-    }
-    
-    // Armazenar as notificações originais para uso posterior
-    if (notificacoes && notificacoes.length > 0) {
-      originalNotificacoes.current = [...notificacoes];
-    }
-  }, [notificacoes, exportOptions]);
-  
-  // Monitorar mudanças nas props de notificações
-  useEffect(() => {
-    if (notificacoes && notificacoes.length > 0) {
-      console.log("PROPS ATUALIZADAS: Recebidas", notificacoes.length, "notificações");
-      
-      // Verificar se há alteração no comprimento dos dados
-      if (originalNotificacoes.current.length !== notificacoes.length) {
-        console.log("MUDANÇA DETECTADA: Original:", originalNotificacoes.current.length, 
-                   "Novo:", notificacoes.length);
-        
-        // Atualizar dados e forçar reprocessamento
-        originalNotificacoes.current = [...notificacoes];
-        initialProcessingDone.current = false;
-        
-        // Iniciar o processamento imediatamente
-        calcularEstatisticasRef.current && calcularEstatisticasRef.current(notificacoes);
-        
-        // Atualizar a hora da última atualização
-        setLastUpdate(new Date().toLocaleString());
-      }
-    }
-  }, [notificacoes]);
-  
-  // Efeito para gerenciar o auto refresh
-  useEffect(() => {
-    // Limpar qualquer intervalo existente
-    if (autoRefreshInterval.current) {
-      clearInterval(autoRefreshInterval.current);
-      autoRefreshInterval.current = null;
-    }
-
-    // Se a atualização automática está habilitada, configurar o intervalo
-    if (autoRefreshEnabled) {
-      // Configurar o contador regressivo - 60 segundos (1 minuto)
-      let countdown = 60;
-      setAutoRefreshCountdown(countdown);
-      
-      // Atualizar o contador a cada segundo
-      const countdownTimer = setInterval(() => {
-        countdown -= 1;
-        setAutoRefreshCountdown(countdown);
-        
-        // Quando o contador chegar a zero, atualizar os dados
-        if (countdown <= 0) {
-          refreshDataRef.current && refreshDataRef.current();
-          countdown = 60; // Resetar para 60 segundos
-          setAutoRefreshCountdown(countdown);
-        }
-      }, 1000);
-      
-      autoRefreshInterval.current = countdownTimer;
-    }
-
-    // Limpar o intervalo ao desmontar
-    return () => {
-      if (autoRefreshInterval.current) {
-        clearInterval(autoRefreshInterval.current);
-        autoRefreshInterval.current = null;
-      }
-    };
-  }, [autoRefreshEnabled]);
 
   // Função para obter a cor correta para cada tipo de atendimento
   const getAtendimentoColor = useCallback((tipoAtendimento: string): string => {
@@ -413,7 +493,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     return false;
   }, [getAtendimentoDescById]);
 
-  // Função corrigida para filtrar notificações
+  // Função para filtrar notificações
   const filtrarNotificacoes = useCallback((categoria: string | null): any[] => {
     // Se não houver categoria ou for "Todos", retornar todas as notificações originais
     if (!categoria || categoria === "Todos") {
@@ -448,11 +528,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         
         // Filtrar por evento - verificar várias estruturas de dados possíveis
         const resultado = originalNotificacoes.current.filter(n => {
-          // Imprimir estrutura da primeira notificação para debug
-          if (originalNotificacoes.current.indexOf(n) === 0) {
-            console.log("Estrutura da primeira notificação:", JSON.stringify(n, null, 2).slice(0, 500) + "...");
-          }
-          
           // Verificar usando a estrutura esperada
           const eventoId = n?.original?.evento_idevento;
           if (eventoId !== undefined) {
@@ -461,11 +536,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
               (e: any) => {
                 const matchId = String(e.idtipo_evento) === String(eventoId) || 
                                String(e.idevento) === String(eventoId);
-                
-                if (matchId && originalNotificacoes.current.indexOf(n) === 0) {
-                  console.log(`Match por ID: eventoId=${eventoId}, evento.idtipo_evento=${e.idtipo_evento}, evento.descricao=${e.descricao}`);
-                }
-                
                 return matchId;
               }
             );
@@ -478,36 +548,24 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           // Verificar diretamente por descrição do evento (caso o evento esteja embutido)
           if (n?.original?.evento?.descricao) {
             const match = n.original.evento.descricao.toLowerCase() === categoriaLower;
-            if (match && originalNotificacoes.current.indexOf(n) === 0) {
-              console.log(`Match por descrição embutida: ${n.original.evento.descricao}`);
-            }
             if (match) return true;
           }
           
           // Verificar nome do evento diretamente
           if (n?.eventoNome) {
             const match = n.eventoNome.toLowerCase() === categoriaLower;
-            if (match && originalNotificacoes.current.indexOf(n) === 0) {
-              console.log(`Match por eventoNome: ${n.eventoNome}`);
-            }
             if (match) return true;
           }
           
           // Verificar o campo evento_nome se existir
           if (n?.original?.evento_nome) {
             const match = n.original.evento_nome.toLowerCase() === categoriaLower;
-            if (match && originalNotificacoes.current.indexOf(n) === 0) {
-              console.log(`Match por evento_nome: ${n.original.evento_nome}`);
-            }
             if (match) return true;
           }
           
           // Verificar em evento.nome se existir
           if (n?.original?.evento?.nome) {
             const match = n.original.evento.nome.toLowerCase() === categoriaLower;
-            if (match && originalNotificacoes.current.indexOf(n) === 0) {
-              console.log(`Match por evento.nome: ${n.original.evento.nome}`);
-            }
             if (match) return true;
           }
           
@@ -516,10 +574,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           const containsEvento = notificacaoStr.includes(`"descricao":"${categoriaLower}"`) || 
                                notificacaoStr.includes(`"nome":"${categoriaLower}"`) ||
                                notificacaoStr.includes(`"evento_nome":"${categoriaLower}"`);
-          
-          if (containsEvento && originalNotificacoes.current.indexOf(n) === 0) {
-            console.log(`Match por string JSON: encontrou "${categoriaLower}" no objeto`);
-          }
           
           return containsEvento;
         });
@@ -539,6 +593,40 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     console.log(`Encontradas ${resultado.length} notificações para a categoria: ${categoriaLower}`);
     return resultado;
   }, [exportOptions, checkAtendimentoType]);
+
+  // Função para determinar se uma hipótese é alarmante
+  const isHipotesisAlarmante = useCallback((hipotese: string): boolean => {
+    const hipoteseUpper = hipotese.toUpperCase();
+    // Verificar correspondência exata ou parcial com as hipóteses alarmantes
+    return HIPOTESES_ALARMANTES.some(alarmante => 
+      hipoteseUpper.includes(alarmante) || alarmante.includes(hipoteseUpper)
+    );
+  }, []);
+
+  // Função para determinar se uma hipótese está em alerta (média gravidade)
+  const isHipotesisAlerta = useCallback((hipotese: string): boolean => {
+    const hipoteseUpper = hipotese.toUpperCase();
+    // Verificar correspondência exata ou parcial com as hipóteses em alerta
+    return HIPOTESES_ALERTA.some(alerta => 
+      hipoteseUpper.includes(alerta) || alerta.includes(hipoteseUpper)
+    );
+  }, []);
+
+  // Função para obter a cor adequada para cada hipótese diagnóstica
+  const getHipotesisColor = useCallback((hipotese: string, value: number): string => {
+    // Se for uma hipótese alarmante, mesmo com 1 caso já é vermelho
+    if (isHipotesisAlarmante(hipotese)) {
+      return COLORS.alarmante;
+    }
+    
+    // Se for uma hipótese de alerta, usar a cor de alerta
+    if (isHipotesisAlerta(hipotese)) {
+      return COLORS.alerta;
+    }
+    
+    // Casos normais, usar a paleta padrão
+    return COLORS.normal;
+  }, [isHipotesisAlarmante, isHipotesisAlerta]);
 
   const processarCategoria = useCallback((
     dados: any[],
@@ -586,6 +674,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           valor = getPropSafely(item, 'tipoAtendimento');
         } else if (campoId.includes('tipo_publico')) {
           valor = getPropSafely(item, 'publicoAtendido');
+        } else if (campoId.includes('tipo_hipotese_diag')) {
+          valor = getPropSafely(item, 'hipoteseDiagnostica') || getPropSafely(item, 'original.hipotese_diagnostica');
         }
       }
   
@@ -641,10 +731,18 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         }
       }
       
-      // Usar cores específicas para tipos de atendimento ou paleta adequada para o tipo de gráfico
+      // Definir a cor baseada no tipo de dado
       let fill;
+      let isAlarmante = false;
+      
       if (campoId.includes('tipo_atendimento')) {
+        // Cores específicas para tipos de atendimento
         fill = getAtendimentoColor(descricao);
+      } else if (campoId.includes('tipo_hipotese_diag')) {
+        // Cores específicas para hipóteses diagnósticas
+        fill = getHipotesisColor(descricao, data.count);
+        // Verificar se é uma hipótese alarmante
+        isAlarmante = isHipotesisAlarmante(descricao);
       } else {
         // Usar paleta apropriada para o tipo de gráfico (pizza ou normal)
         const paletaCores = tipoCores === 'pie' ? COLORS.pie : COLORS.blue;
@@ -655,6 +753,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         name: descricao,
         value: data.count,
         fill: fill,
+        isAlarmante: isAlarmante,
         original: data.items
       });
   
@@ -663,7 +762,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   
     console.log(`Resultados processados para ${campoId}:`, resultado.length, "itens");
     return resultado;
-  }, [getAtendimentoColor]);
+  }, [getAtendimentoColor, getHipotesisColor, isHipotesisAlarmante]);
 
   // Função para processar categorias muitos-para-muitos
   const processarCategoriaMuitosParaMuitos = useCallback((
@@ -872,7 +971,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         }
       }
 
-      const hipoteseePorNotificacao = processarCategoria(
+      const hipotesePorNotificacao = processarCategoria(
         dadosFiltrados,
         "original.tipo_hipotese_diag_idtipo_hipotese_diag",
         exportOptions.hipoteseDiagOptions || [],
@@ -881,10 +980,19 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         COLORS.blue,
         'normal'
       );
-      if (hipoteseePorNotificacao.length > 0) {
-        setFilteredHipoteses(hipoteseePorNotificacao);
+      if (hipotesePorNotificacao.length > 0) {
+        // Ordenar hipóteses: primeiro alarmantes, depois valor
+        const sortedHipoteses = hipotesePorNotificacao.sort((a, b) => {
+          // Primeiro ordenar por alarmante (alarmantes primeiro)
+          if (a.isAlarmante && !b.isAlarmante) return -1;
+          if (!a.isAlarmante && b.isAlarmante) return 1;
+          // Depois por valor (maior primeiro)
+          return b.value - a.value;
+        });
+        
+        setFilteredHipoteses(sortedHipoteses);
         if (originalHipoteses.length === 0) {
-          setOriginalHipoteses(hipoteseePorNotificacao);
+          setOriginalHipoteses(sortedHipoteses);
         }
       }
 
@@ -996,9 +1104,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         // Atualizar as notificações originais
         originalNotificacoes.current = [...freshData];
         
-        // Removido reset que impedia filtro de evento funcionar
-        // initialProcessingDone.current = false;
-        
         return freshData;
       } else {
         console.error("Resposta vazia ou inválida do serviço");
@@ -1028,11 +1133,11 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           // Se temos um filtro ativo, reaplicá-lo
           const dadosFiltrados = filtrarNotificacoes(selectedCategory);
           filteredNotificacoes.current = dadosFiltrados;
-          calcularEstatisticasRef.current && calcularEstatisticasRef.current(dadosFiltrados);
+          calcularEstatisticas(dadosFiltrados);
         } else {
           // Sem filtro, processar todos os dados originais
           filteredNotificacoes.current = originalNotificacoes.current;
-          calcularEstatisticasRef.current && calcularEstatisticasRef.current(originalNotificacoes.current);
+          calcularEstatisticas(originalNotificacoes.current);
         }
       } else {
         // Se não conseguirmos novos dados, verificar props
@@ -1052,10 +1157,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         if (selectedCategory) {
           const dadosFiltrados = filtrarNotificacoes(selectedCategory);
           filteredNotificacoes.current = dadosFiltrados;
-          calcularEstatisticasRef.current && calcularEstatisticasRef.current(dadosFiltrados);
+          calcularEstatisticas(dadosFiltrados);
         } else {
           filteredNotificacoes.current = originalNotificacoes.current;
-          calcularEstatisticasRef.current && calcularEstatisticasRef.current(originalNotificacoes.current);
+          calcularEstatisticas(originalNotificacoes.current);
         }
       }
 
@@ -1068,45 +1173,46 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       setLoading(false);
       setLastUpdate(new Date().toLocaleString());
     }
-  }, [loading, selectedCategory, fetchFreshData, notificacoes, filtrarNotificacoes]);
+  }, [loading, selectedCategory, fetchFreshData, notificacoes, filtrarNotificacoes, calcularEstatisticas]);
 
-  // Adicionar função para depuração da estrutura dos dados
-  const debugEventoStructure = useCallback(() => {
-    if (originalNotificacoes.current.length === 0 || !exportOptions?.eventoOptions) {
-      console.log("Sem dados para depurar");
-      return;
+  // Efeito para gerenciar o auto refresh
+  useEffect(() => {
+    // Limpar qualquer intervalo existente
+    if (autoRefreshInterval.current) {
+      clearInterval(autoRefreshInterval.current);
+      autoRefreshInterval.current = null;
     }
-    
-    console.log("=== DEBUG EVENTO STRUCTURE ===");
-    console.log("Eventos disponíveis:", exportOptions.eventoOptions);
-    
-    // Examinar a primeira notificação
-    const firstNotification = originalNotificacoes.current[0];
-    console.log("Primeira notificação:", firstNotification);
-    
-    // Verificar campos relacionados a eventos
-    console.log("Campos evento na notificação:");
-    console.log("evento_idevento:", firstNotification?.original?.evento_idevento);
-    console.log("evento:", firstNotification?.original?.evento);
-    console.log("eventoNome:", firstNotification?.eventoNome);
-    console.log("evento_nome:", firstNotification?.original?.evento_nome);
-    
-    // Verificar quantas notificações contêm cada evento
-    if (exportOptions.eventoOptions.length > 0) {
-      exportOptions.eventoOptions.forEach((evento: any) => {
-        const eventoNome = evento.descricao.toLowerCase();
-        const matchingByString = originalNotificacoes.current.filter(n => 
-          JSON.stringify(n).toLowerCase().includes(eventoNome)
-        );
-        console.log(`Evento "${evento.descricao}" - matches por string: ${matchingByString.length}`);
-      });
-    }
-    
-    console.log("=== FIM DEBUG ===");
-  }, [exportOptions]);
 
-  // Função para processar categoria simples (relação 1:1)
-  
+    // Se a atualização automática está habilitada, configurar o intervalo
+    if (autoRefreshEnabled) {
+      // Configurar o contador regressivo - 60 segundos (1 minuto)
+      let countdown = 60;
+      setAutoRefreshCountdown(countdown);
+      
+      // Atualizar o contador a cada segundo
+      const countdownTimer = setInterval(() => {
+        countdown -= 1;
+        setAutoRefreshCountdown(countdown);
+        
+        // Quando o contador chegar a zero, atualizar os dados
+        if (countdown <= 0) {
+          refreshDataRef.current && refreshDataRef.current();
+          countdown = 60; // Resetar para 60 segundos
+          setAutoRefreshCountdown(countdown);
+        }
+      }, 1000);
+      
+      autoRefreshInterval.current = countdownTimer;
+    }
+
+    // Limpar o intervalo ao desmontar
+    return () => {
+      if (autoRefreshInterval.current) {
+        clearInterval(autoRefreshInterval.current);
+        autoRefreshInterval.current = null;
+      }
+    };
+  }, [autoRefreshEnabled]);
 
   // Quando a categoria selecionada mudar, aplicar filtro real
   useEffect(() => {
@@ -1123,11 +1229,11 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       setFilteredSintomas([]); setFilteredTipoAtendimento([]); setFilteredPublico([]);
       setFilteredHipoteses([]); setFilteredTrauma([]); setFilteredGenero([]);
     } else {
-      calcularEstatisticasRef.current && calcularEstatisticasRef.current(dadosFiltrados);
+      calcularEstatisticas(dadosFiltrados);
     }
 
     setLoading(false);
-  }, [selectedCategory, filtrarNotificacoes]);
+  }, [selectedCategory, filtrarNotificacoes, calcularEstatisticas]);
 
   // useEffect para processamento inicial de dados
   useEffect(() => {
@@ -1182,7 +1288,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           console.log("Iniciando processamento de dados com", notificacoes.length, "notificações");
           // Processar todas as notificações (sem filtro inicialmente)
           filteredNotificacoes.current = notificacoes;
-          const success = calcularEstatisticasRef.current && calcularEstatisticasRef.current(notificacoes);
+          const success = calcularEstatisticas(notificacoes);
           console.log("Processamento de dados concluído com sucesso:", success);
         }
         
@@ -1209,7 +1315,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     // Iniciar o processamento
     doInitialProcessing();
     
-  }, [notificacoes]);
+  }, [notificacoes, calcularEstatisticas]);
 
   // Usar dados reais para eventos
   const eventoOptions = exportOptions?.eventoOptions?.length > 0 
@@ -1228,14 +1334,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     const novoEvento = e.target.value;
     console.log(`Evento alterado para: ${novoEvento}`);
     
-    // Se for a primeira vez que o usuário seleciona um evento, fazer depuração
-    if (novoEvento !== "Todos" && selectedEvento === "Todos") {
-      debugEventoStructure();
-    }
-    
     setSelectedEvento(novoEvento);
     setSelectedCategory(novoEvento !== "Todos" ? novoEvento : null);
-  }, [selectedEvento, debugEventoStructure]);
+  }, []);
 
   // Handler para cards e charts
   const handleCardClick = useCallback((tipoAtendimento: string) => {
@@ -1263,35 +1364,30 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     window.history.back();
   }, []);
 
-  const dashboardRef = useRef(null);
-
-  // Adicione refs para as funções
-  const calcularEstatisticasRef = useRef<any>(null);
-  const processarDadosGraficosRef = useRef<any>(null);
-
-  // Inicialize as funções apenas uma vez
-  useEffect(() => {
-    if (!processarDadosGraficosRef.current) {
-      processarDadosGraficosRef.current = (dadosFiltrados: any[]) => {
-        // Chame a função processarDadosGraficos já existente
-        return processarDadosGraficos(dadosFiltrados);
-      };
-    }
-    if (!calcularEstatisticasRef.current) {
-      calcularEstatisticasRef.current = createCalcularEstatisticas(
-        notificacoes,
-        getAtendimentoDescById,
-        processarDadosGraficosRef.current,
-        setTotalNotifications,
-        setStatCounts
-      );
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Executa apenas uma vez
-
   useEffect(() => {
     refreshDataRef.current = refreshData;
   }, [refreshData]);
+
+  // Definir um tipo para as chaves do objeto chartType
+  type ChartTypes = 'tipoAtendimento' | 'publico' | 'genero' | 'raca' | 'hipoteses' | 'sintomas';
+  
+  // Estado para controlar o tipo de gráfico (barras ou pizza)
+  const [chartType, setChartType] = useState({
+    tipoAtendimento: 'bar',
+    publico: 'pie',
+    genero: 'pie',
+    raca: 'bar',
+    hipoteses: 'bar',
+    sintomas: 'bar'
+  });
+  
+  // Função para alternar o tipo de gráfico
+  const toggleChartType = useCallback((chartName: ChartTypes): void => {
+    setChartType(prev => ({
+      ...prev,
+      [chartName]: prev[chartName] === 'bar' ? 'pie' : 'bar'
+    }));
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-100 text-gray-800 pb-6">
@@ -1443,7 +1539,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       {/* Conteúdo principal baseado na aba selecionada */}
       {activeTab === "graficos" && (
         <main
-          ref={dashboardRef}
           className="max-w-7xl mx-auto p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mt-2"
         >
           {/* Cards de Resumo */}
@@ -1541,50 +1636,114 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
           {/* Gráfico de Público Atendido */}
           <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-3">
-            <div className="flex items-center gap-2 mb-4">
-              <Briefcase className="h-5 w-5 text-yellow-700" />
-              <h3 className="text-sm font-medium text-gray-700">
-                Distribuição por Público Atendido
-              </h3>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-yellow-700" />
+                <h3 className="text-sm font-medium text-gray-700">
+                  Distribuição por Público Atendido
+                </h3>
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => toggleChartType('publico')}
+                  className="p-1 text-gray-500 hover:text-blue-500 transition-colors"
+                  title="Alternar tipo de gráfico"
+                >
+                  {chartType.publico === 'bar' ? 
+                    <PieChartIcon className="h-4 w-4" /> : 
+                    <BarChart2 className="h-4 w-4" />}
+                </button>
+                <GraphExportMenu 
+                  chartId="chart-publico" 
+                  chartType={chartType.publico}
+                  chartData={filteredPublico}
+                  chartTitle="Distribuição por Público Atendido"
+                />
+              </div>
             </div>
-            <div className="h-64">
+            <div className="h-64" id="chart-publico">
               {filteredPublico.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={filteredPublico}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={true}
-                      outerRadius={80}
-                      innerRadius={40}
-                      fill="#8884d8"
-                      dataKey="value"
-                      label={({ name, percent }) =>
-                        `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`
-                      }
-                      onClick={(data) => {
-                        if (data && data.name) {
-                          handleCardClick(data.name);
+                  {chartType.publico === 'pie' ? (
+                    <PieChart>
+                      <Pie
+                        data={filteredPublico}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={true}
+                        outerRadius={80}
+                        innerRadius={40}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label={({ name, percent }) =>
+                          `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`
                         }
-                      }}
-                      cursor="pointer"
+                        onClick={(data) => {
+                          if (data && data.name) {
+                            handleCardClick(data.name);
+                          }
+                        }}
+                        cursor="pointer"
+                      >
+                        {filteredPublico.map((entry, i) => (
+                          <Cell 
+                            key={`cell-${i}`} 
+                            fill={entry.fill}
+                            stroke={selectedCategory === entry.name ? "#000" : "none"}
+                            strokeWidth={selectedCategory === entry.name ? 2 : 0}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#fff",
+                          border: "1px solid #ddd",
+                        }}
+                        formatter={(value) => [
+                          value.toLocaleString(),
+                          "Notificações",
+                        ]}
+                      />
+                    </PieChart>
+                  ) : (
+                    <BarChart
+                      data={filteredPublico}
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                     >
-                      {filteredPublico.map((entry, i) => (
-                        <Cell key={`cell-${i}`} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "#fff",
-                        border: "1px solid #ddd",
-                      }}
-                      formatter={(value) => [
-                        value.toLocaleString(),
-                        "Notificações",
-                      ]}
-                    />
-                  </PieChart>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="name" stroke="#666" />
+                      <YAxis stroke="#666" />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#fff",
+                          border: "1px solid #ddd",
+                        }}
+                        formatter={(value) => [
+                          value.toLocaleString(),
+                          "Notificações",
+                        ]}
+                      />
+                      <Bar
+                        dataKey="value"
+                        radius={[4, 4, 0, 0]}
+                        onClick={(data) => {
+                          if (data && data.name) {
+                            handleCardClick(data.name);
+                          }
+                        }}
+                        cursor="pointer"
+                      >
+                        {filteredPublico.map((entry, i) => (
+                          <Cell 
+                            key={`cell-${i}`} 
+                            fill={entry.fill}
+                            stroke={selectedCategory === entry.name ? "#000" : "none"}
+                            strokeWidth={selectedCategory === entry.name ? 2 : 0}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  )}
                 </ResponsiveContainer>
               ) : (
                 <div className="h-64 flex items-center justify-center text-gray-500">
@@ -1596,47 +1755,113 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
           {/* Gráfico de Tipo de Atendimento - AGORA COMO BARRAS */}
           <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-3">
-            <div className="flex items-center gap-2 mb-4">
-              <User className="h-5 w-5 text-blue-700" />
-              <h3 className="text-sm font-medium text-gray-700">
-                Distribuição por Tipo de Atendimento
-              </h3>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <User className="h-5 w-5 text-blue-700" />
+                <h3 className="text-sm font-medium text-gray-700">
+                  Distribuição por Tipo de Atendimento
+                </h3>
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => toggleChartType('tipoAtendimento')}
+                  className="p-1 text-gray-500 hover:text-blue-500 transition-colors"
+                  title="Alternar tipo de gráfico"
+                >
+                  {chartType.tipoAtendimento === 'bar' ? 
+                    <PieChartIcon className="h-4 w-4" /> : 
+                    <BarChart2 className="h-4 w-4" />}
+                </button>
+                <GraphExportMenu 
+                  chartId="chart-tipo-atendimento" 
+                  chartType={chartType.tipoAtendimento}
+                  chartData={filteredTipoAtendimento}
+                  chartTitle="Distribuição por Tipo de Atendimento"
+                />
+              </div>
             </div>
-            <div className="h-64">
+            <div className="h-64" id="chart-tipo-atendimento">
               {filteredTipoAtendimento.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={filteredTipoAtendimento}
-                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="name" stroke="#666" />
-                    <YAxis stroke="#666" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "#fff",
-                        border: "1px solid #ddd",
-                      }}
-                      formatter={(value) => [
-                        value.toLocaleString(),
-                        "Notificações",
-                      ]}
-                    />
-                    <Bar
-                      dataKey="value"
-                      radius={[4, 4, 0, 0]}
-                      onClick={(data) => {
-                        if (data && data.name) {
-                          handleCardClick(data.name);
-                        }
-                      }}
-                      cursor="pointer"
+                  {chartType.tipoAtendimento === 'bar' ? (
+                    <BarChart
+                      data={filteredTipoAtendimento}
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                     >
-                      {filteredTipoAtendimento.map((entry, i) => (
-                        <Cell key={`cell-${i}`} fill={entry.fill} />
-                      ))}
-                    </Bar>
-                  </BarChart>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="name" stroke="#666" />
+                      <YAxis stroke="#666" />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#fff",
+                          border: "1px solid #ddd",
+                        }}
+                        formatter={(value) => [
+                          value.toLocaleString(),
+                          "Notificações",
+                        ]}
+                      />
+                      <Bar
+                        dataKey="value"
+                        radius={[4, 4, 0, 0]}
+                        onClick={(data) => {
+                          if (data && data.name) {
+                            handleCardClick(data.name);
+                          }
+                        }}
+                        cursor="pointer"
+                      >
+                        {filteredTipoAtendimento.map((entry, i) => (
+                          <Cell 
+                            key={`cell-${i}`} 
+                            fill={entry.fill}
+                            stroke={selectedCategory === entry.name ? "#000" : "none"}
+                            strokeWidth={selectedCategory === entry.name ? 2 : 0}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  ) : (
+                    <PieChart>
+                      <Pie
+                        data={filteredTipoAtendimento}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={true}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label={({ name, percent }) =>
+                          `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`
+                        }
+                        onClick={(data) => {
+                          if (data && data.name) {
+                            handleCardClick(data.name);
+                          }
+                        }}
+                        cursor="pointer"
+                      >
+                        {filteredTipoAtendimento.map((entry, i) => (
+                          <Cell 
+                            key={`cell-${i}`} 
+                            fill={entry.fill}
+                            stroke={selectedCategory === entry.name ? "#000" : "none"}
+                            strokeWidth={selectedCategory === entry.name ? 2 : 0}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#fff",
+                          border: "1px solid #ddd",
+                        }}
+                        formatter={(value) => [
+                          value.toLocaleString(),
+                          "Notificações",
+                        ]}
+                      />
+                    </PieChart>
+                  )}
                 </ResponsiveContainer>
               ) : (
                 <div className="h-64 flex items-center justify-center text-gray-500">
@@ -1648,49 +1873,113 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
           {/* Gráfico de Identidade de Gênero */}
           <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-3">
-            <div className="flex items-center gap-2 mb-4">
-              <User className="h-5 w-5 text-blue-700" />
-              <h3 className="text-sm font-medium text-gray-700">
-                Distribuição por Sexo
-              </h3>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <User className="h-5 w-5 text-blue-700" />
+                <h3 className="text-sm font-medium text-gray-700">
+                  Distribuição por Sexo
+                </h3>
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => toggleChartType('genero')}
+                  className="p-1 text-gray-500 hover:text-blue-500 transition-colors"
+                  title="Alternar tipo de gráfico"
+                >
+                  {chartType.genero === 'bar' ? 
+                    <PieChartIcon className="h-4 w-4" /> : 
+                    <BarChart2 className="h-4 w-4" />}
+                </button>
+                <GraphExportMenu 
+                  chartId="chart-genero" 
+                  chartType={chartType.genero}
+                  chartData={filteredGenero}
+                  chartTitle="Distribuição por Sexo"
+                />
+              </div>
             </div>
-            <div className="h-64">
+            <div className="h-64" id="chart-genero">
               {filteredGenero.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={filteredGenero}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                      label={({ name, percent }) =>
-                        `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`
-                      }
-                      cursor="pointer"
-                      onClick={(data) => {
-                        if (data && data.name) {
-                          handleCardClick(data.name);
+                  {chartType.genero === 'pie' ? (
+                    <PieChart>
+                      <Pie
+                        data={filteredGenero}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label={({ name, percent }) =>
+                          `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`
                         }
-                      }}
+                        cursor="pointer"
+                        onClick={(data) => {
+                          if (data && data.name) {
+                            handleCardClick(data.name);
+                          }
+                        }}
+                      >
+                        {filteredGenero.map((entry, i) => (
+                          <Cell 
+                            key={`cell-${i}`} 
+                            fill={entry.fill}
+                            stroke={selectedCategory === entry.name ? "#000" : "none"}
+                            strokeWidth={selectedCategory === entry.name ? 2 : 0}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#fff",
+                          border: "1px solid #ddd",
+                        }}
+                        formatter={(value) => [
+                          value.toLocaleString(),
+                          "Notificações",
+                        ]}
+                      />
+                    </PieChart>
+                  ) : (
+                    <BarChart
+                      data={filteredGenero}
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                     >
-                      {filteredGenero.map((entry, i) => (
-                        <Cell key={`cell-${i}`} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "#fff",
-                        border: "1px solid #ddd",
-                      }}
-                      formatter={(value) => [
-                        value.toLocaleString(),
-                        "Notificações",
-                      ]}
-                    />
-                  </PieChart>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="name" stroke="#666" />
+                      <YAxis stroke="#666" />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#fff",
+                          border: "1px solid #ddd",
+                        }}
+                        formatter={(value) => [
+                          value.toLocaleString(),
+                          "Notificações",
+                        ]}
+                      />
+                      <Bar
+                        dataKey="value"
+                        radius={[4, 4, 0, 0]}
+                        onClick={(data) => {
+                          if (data && data.name) {
+                            handleCardClick(data.name);
+                          }
+                        }}
+                        cursor="pointer"
+                      >
+                        {filteredGenero.map((entry, i) => (
+                          <Cell 
+                            key={`cell-${i}`} 
+                            fill={entry.fill}
+                            stroke={selectedCategory === entry.name ? "#000" : "none"}
+                            strokeWidth={selectedCategory === entry.name ? 2 : 0}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  )}
                 </ResponsiveContainer>
               ) : (
                 <div className="h-64 flex items-center justify-center text-gray-500">
@@ -1702,22 +1991,171 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
           {/* Gráfico de Raça */}
           <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-3">
-            <div className="flex items-center gap-2 mb-4">
-              <Award className="h-5 w-5 text-green-700" />
-              <h3 className="text-sm font-medium text-gray-700">
-                Distribuição por Raça e Cor
-              </h3>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Award className="h-5 w-5 text-green-700" />
+                <h3 className="text-sm font-medium text-gray-700">
+                  Distribuição por Raça e Cor
+                </h3>
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => toggleChartType('raca')}
+                  className="p-1 text-gray-500 hover:text-blue-500 transition-colors"
+                  title="Alternar tipo de gráfico"
+                >
+                  {chartType.raca === 'bar' ? 
+                    <PieChartIcon className="h-4 w-4" /> : 
+                    <BarChart2 className="h-4 w-4" />}
+                </button>
+                <GraphExportMenu 
+                  chartId="chart-raca" 
+                  chartType={chartType.raca}
+                  chartData={filteredRaca}
+                  chartTitle="Distribuição por Raça e Cor"
+                />
+              </div>
             </div>
-            <div className="h-64">
+            <div className="h-64" id="chart-raca">
               {filteredRaca.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
+                  {chartType.raca === 'bar' ? (
+                    <BarChart
+                      data={filteredRaca}
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="name" stroke="#666" />
+                      <YAxis stroke="#666" />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#fff",
+                          border: "1px solid #ddd",
+                        }}
+                        formatter={(value) => [
+                          value.toLocaleString(),
+                          "Notificações",
+                        ]}
+                      />
+                      <Bar
+                        dataKey="value"
+                        radius={[4, 4, 0, 0]}
+                        onClick={(data) => {
+                          if (data && data.name) {
+                            handleCardClick(data.name);
+                          }
+                        }}
+                        cursor="pointer"
+                      >
+                        {filteredRaca.map((entry, i) => (
+                          <Cell 
+                            key={`cell-${i}`} 
+                            fill={entry.fill}
+                            stroke={selectedCategory === entry.name ? "#000" : "none"}
+                            strokeWidth={selectedCategory === entry.name ? 2 : 0}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  ) : (
+                    <PieChart>
+                      <Pie
+                        data={filteredRaca}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={true}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label={({ name, percent }) =>
+                          `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`
+                        }
+                        onClick={(data) => {
+                          if (data && data.name) {
+                            handleCardClick(data.name);
+                          }
+                        }}
+                        cursor="pointer"
+                      >
+                        {filteredRaca.map((entry, i) => (
+                          <Cell 
+                            key={`cell-${i}`} 
+                            fill={entry.fill}
+                            stroke={selectedCategory === entry.name ? "#000" : "none"}
+                            strokeWidth={selectedCategory === entry.name ? 2 : 0}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#fff",
+                          border: "1px solid #ddd",
+                        }}
+                        formatter={(value) => [
+                          value.toLocaleString(),
+                          "Notificações",
+                        ]}
+                      />
+                    </PieChart>
+                  )}
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-64 flex items-center justify-center text-gray-500">
+                  Não há dados disponíveis para exibir
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Hipóteses Diagnósticas */}
+          <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-purple-700" />
+                <h3 className="text-sm font-medium text-gray-700">
+                  Hipóteses Diagnósticas
+                </h3>
+              </div>
+              <div className="flex gap-2">
+                <GraphExportMenu 
+                  chartId="chart-hipoteses" 
+                  chartType="bar"
+                  chartData={filteredHipoteses.slice(0, 15)}
+                  chartTitle="Hipóteses Diagnósticas"
+                />
+                <div className="flex ml-2 space-x-2 text-xs">
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 rounded-full bg-red-500 mr-1"></div>
+                    <span>Alta Prioridade</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 rounded-full bg-orange-500 mr-1"></div>
+                    <span>Monitoramento</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 rounded-full bg-blue-500 mr-1"></div>
+                    <span>Regular</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="h-96" id="chart-hipoteses">
+              {filteredHipoteses.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
                   <BarChart
-                    data={filteredRaca}
-                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    data={filteredHipoteses.slice(0, 15)}
+                    layout="vertical"
+                    margin={{ top: 5, right: 30, left: 140, bottom: 5 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="name" stroke="#666" />
-                    <YAxis stroke="#666" />
+                    <XAxis type="number" stroke="#666" />
+                    <YAxis
+                      dataKey="name"
+                      type="category"
+                      stroke="#666"
+                      width={140}
+                      tick={{ fontSize: 10 }}
+                    />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: "#fff",
@@ -1730,7 +2168,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                     />
                     <Bar
                       dataKey="value"
-                      radius={[4, 4, 0, 0]}
                       onClick={(data) => {
                         if (data && data.name) {
                           handleCardClick(data.name);
@@ -1738,8 +2175,15 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                       }}
                       cursor="pointer"
                     >
-                      {filteredRaca.map((entry, i) => (
-                        <Cell key={`cell-${i}`} fill={entry.fill} />
+                      {filteredHipoteses.slice(0, 15).map((entry, i) => (
+                        <Cell 
+                          key={`cell-${i}`} 
+                          fill={entry.fill}
+                          // Adicionar uma borda especial para as hipóteses alarmantes
+                          // E também destacar a seleção atual
+                          stroke={selectedCategory === entry.name ? "#000" : (entry.isAlarmante ? "#b71c1c" : "none")}
+                          strokeWidth={selectedCategory === entry.name ? 2 : (entry.isAlarmante ? 2 : 0)}
+                        />
                       ))}
                     </Bar>
                   </BarChart>
@@ -1750,17 +2194,33 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 </div>
               )}
             </div>
+            <div className="mt-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-xs text-gray-600">
+                <span className="text-red-500 font-bold">⚠️ Atenção: </span>
+                As hipóteses em <span className="text-red-500 font-bold">vermelho</span> requerem notificação imediata e vigilância rigorosa mesmo com um único caso.
+                As hipóteses em <span className="text-orange-500 font-bold">laranja</span> requerem monitoramento cuidadoso.
+                Todas seguem a classificação de vigilância epidemiológica do Ministério da Saúde.
+              </p>
+            </div>
           </div>
-
+          
           {/* Principais Sintomas */}
           <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Heart className="h-5 w-5 text-red-700" />
-              <h3 className="text-sm font-medium text-gray-700">
-                Principais Sinais e Sintomas
-              </h3>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Heart className="h-5 w-5 text-red-700" />
+                <h3 className="text-sm font-medium text-gray-700">
+                  Principais Sinais e Sintomas
+                </h3>
+              </div>
+              <GraphExportMenu 
+                chartId="chart-sintomas" 
+                chartType="bar"
+                chartData={filteredSintomas.slice(0, 10)}
+                chartTitle="Principais Sinais e Sintomas"
+              />
             </div>
-            <div className="h-64">
+            <div className="h-64" id="chart-sintomas">
               {filteredSintomas.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
@@ -1797,7 +2257,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                       cursor="pointer"
                     >
                       {filteredSintomas.slice(0, 10).map((entry, i) => (
-                        <Cell key={`cell-${i}`} fill={entry.fill} />
+                        <Cell 
+                          key={`cell-${i}`} 
+                          fill={entry.fill}
+                          stroke={selectedCategory === entry.name ? "#000" : "none"}
+                          strokeWidth={selectedCategory === entry.name ? 2 : 0}
+                        />
                       ))}
                     </Bar>
                   </BarChart>
