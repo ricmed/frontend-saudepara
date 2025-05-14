@@ -88,7 +88,7 @@ const CadastroPais = () => {
       }
 
       setSuccess(true);
-      setTimeout(() => navigate('/pais/lista', { replace: true }), 1500);
+      setTimeout(() => navigate('/private/pais', { replace: true }), 1500);
       
     } catch (err) {
       console.error('Erro ao salvar:', err);
@@ -103,10 +103,10 @@ const CadastroPais = () => {
     
     if (hasChanges) {
       if (window.confirm('Deseja realmente cancelar? As alterações serão perdidas.')) {
-        navigate('/pais/lista');
+        navigate('/private/pais');
       }
     } else {
-      navigate('/pais/lista');
+      navigate('/private/pais');
     }
   };
 

@@ -120,7 +120,7 @@ const ListaEscolaridade = () => {
           setSearchTerm(value);
         }}
         searchValue={inputValue}
-        onNewClick={() => navigate("/escolaridade/cadastro")}
+        onNewClick={() => navigate("/private/escolaridade/nova")}
         isProcessing={false}
         onMenuOpen={() => setIsMenuOpen(true)}
       />
@@ -140,7 +140,7 @@ const ListaEscolaridade = () => {
           searchTerm={searchTerm}
           renderActions={(escolaridade) => (
             <ActionButtons
-              onEdit={() => navigate(`/escolaridade/editar/${escolaridade.idtipo_escolaridade}`)}
+              onEdit={() => navigate(`/private/escolaridade/editar/${escolaridade.idtipo_escolaridade}`)}
               onDelete={() => handleDelete(escolaridade.idtipo_escolaridade)}
               isProcessing={processingId === escolaridade.idtipo_escolaridade}
               itemName={escolaridade.descricao}

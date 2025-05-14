@@ -145,7 +145,7 @@ const CadastroMunicipio = () => {
       }
 
       setSuccess(true);
-      setTimeout(() => navigate('/municipio/lista', { replace: true }), 1500);
+      setTimeout(() => navigate('/private/municipio', { replace: true }), 1500);
       
     } catch (err) {
       console.error('Erro ao salvar:', err);
@@ -156,7 +156,7 @@ const CadastroMunicipio = () => {
   };
 
   const handleCancel = () => {
-    navigate('/municipio/lista');
+    navigate('/private/municipio');
   };
 
   return (

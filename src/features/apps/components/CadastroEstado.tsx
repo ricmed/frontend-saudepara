@@ -117,7 +117,7 @@ const CadastroEstado = () => {
       }
 
       setSuccess(true);
-      setTimeout(() => navigate('/estado/lista', { replace: true }), 1500);
+      setTimeout(() => navigate('/private/estado', { replace: true }), 1500);
       
     } catch (err) {
       console.error('Erro ao salvar:', err);
@@ -128,7 +128,7 @@ const CadastroEstado = () => {
   };
 
   const handleCancel = () => {
-    navigate('/estado/lista');
+    navigate('/private/estado');
   };
 
   return (

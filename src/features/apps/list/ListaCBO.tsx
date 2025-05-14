@@ -115,7 +115,7 @@ const ListaCBOs = () => {
           setSearchTerm(value);
         }}
         searchValue={inputValue}
-        onNewClick={() => navigate("/cbo/cadastro")}
+        onNewClick={() => navigate("/private/cbo/nova")}
         isProcessing={false}
         onMenuOpen={() => setIsMenuOpen(true)}
       />
@@ -134,7 +134,7 @@ const ListaCBOs = () => {
           searchTerm={searchTerm}
           renderActions={(cbo) => (
             <ActionButtons
-              onEdit={() => navigate(`/cbo/editar/${cbo.idtipo_cbo}`)}
+              onEdit={() => navigate(`/private/cbo/editar/${cbo.idtipo_cbo}`)}
               onDelete={() => handleDelete(cbo.idtipo_cbo)}
               isProcessing={processingId === cbo.idtipo_cbo}
               itemName={cbo.descricao}

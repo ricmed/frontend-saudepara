@@ -81,7 +81,7 @@ const CadastroRaca = () => {
       }
 
       setSuccess(true);
-      setTimeout(() => navigate('/raca/lista', { replace: true }), 1500);
+      setTimeout(() => navigate('/private/raca', { replace: true }), 1500);
       
     } catch (err: any) {
       setError(err.message || 'Erro ao salvar raça. Verifique os dados e tente novamente.');
@@ -91,7 +91,7 @@ const CadastroRaca = () => {
   };
 
   const handleCancel = () => {
-    navigate('/raca/lista');
+    navigate('/private/raca');
   };
 
   return (

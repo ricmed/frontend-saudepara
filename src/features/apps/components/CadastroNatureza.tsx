@@ -89,7 +89,7 @@ const CadastroNatureza = () => {
       }
   
       setSuccess(true);
-      setTimeout(() => navigate("/naturezas", { replace: true }), 1500);
+      setTimeout(() => navigate("/private/naturezas", { replace: true }), 1500);
     } catch (err: any) {
       setError(err.message || 'Erro ao salvar natureza. Verifique os dados e tente novamente.');
     } finally {
@@ -98,7 +98,7 @@ const CadastroNatureza = () => {
   };
 
   const handleCancel = () => {
-    navigate('/naturezas');
+    navigate('/private/naturezas');
   };
   
   return (

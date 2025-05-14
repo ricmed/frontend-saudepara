@@ -145,7 +145,7 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
                   className="hover:bg-gray-50 transition-colors cursor-pointer"
                   onClick={() =>
                     navigate(
-                      `/formulario-comunicacao/editar/${notificacao.id}`
+                      `/private/comunicacao-de-caso/editar/${notificacao.id}`
                     )
                   }
                 >
@@ -169,7 +169,7 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
                         onClick={(e) => {
                           e.stopPropagation();
                           navigate(
-                            `/formulario-comunicacao/editar/${notificacao.id}`
+                            `/private/comunicacao-de-caso/editar/${notificacao.id}`
                           );
                         }}
                         className="text-blue-600 hover:text-blue-900 flex items-center"

@@ -105,7 +105,7 @@ const ListaGenero = () => {
           setSearchTerm(value);
         }}
         searchValue={inputValue}
-        onNewClick={() => navigate("/genero/cadastro")}
+        onNewClick={() => navigate("/private/genero/nova")}
         isProcessing={false}
         onMenuOpen={() => setIsMenuOpen(true)}
       />
@@ -126,7 +126,7 @@ const ListaGenero = () => {
           searchTerm={searchTerm}
           renderActions={(tipo) => (
             <ActionButtons
-              onEdit={() => navigate(`/genero/editar/${tipo.idtipo_genero}`)}
+              onEdit={() => navigate(`/private/genero/editar/${tipo.idtipo_genero}`)}
               onDelete={() => handleDelete(tipo.idtipo_genero)}
               isProcessing={processingId === tipo.idtipo_genero}
               itemName={tipo.descricao}

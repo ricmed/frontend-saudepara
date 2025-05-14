@@ -88,7 +88,7 @@ const CadastroTipoTrauma = () => {
       }
 
       setSuccess(true);
-      setTimeout(() => navigate('/lista-tipos-trauma', { replace: true }), 1500);
+      setTimeout(() => navigate('/private/trauma', { replace: true }), 1500);
       
     } catch (err) {
       console.error('Erro ao salvar:', err);
@@ -99,7 +99,7 @@ const CadastroTipoTrauma = () => {
   };
 
   const handleCancel = () => {
-    navigate('/lista-tipos-trauma');
+    navigate('/private/trauma');
   };
 
   return (

@@ -111,7 +111,7 @@ const ListaNatureza = () => {
           setSearchTerm(value.trim());
         }}
         searchValue={inputValue}
-        onNewClick={() => navigate("/cadastrar-natureza")}
+        onNewClick={() => navigate("/private/naturezas/nova")}
         isProcessing={false}
         onMenuOpen={() => setIsMenuOpen(true)}
       />
@@ -132,7 +132,7 @@ const ListaNatureza = () => {
           searchTerm={searchTerm}
           renderActions={(natureza) => (
             <ActionButtons
-              onEdit={() => navigate(`/editar-natureza/${natureza.idtipo_natureza}`)}
+              onEdit={() => navigate(`/private/naturezas/editar/${natureza.idtipo_natureza}`)}
               onDelete={() => handleDelete(natureza.idtipo_natureza)}
               isProcessing={processingId === natureza.idtipo_natureza}
               itemName={natureza.descricao}

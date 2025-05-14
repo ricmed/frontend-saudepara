@@ -28,107 +28,107 @@ const PaginaAppsAuxiliares = () => {
     {
       icon: <Building2 className="h-8 w-8 text-white" />,
       nome: "Componentes",
-      link: "/lista-componentes",
+      link: "/private/componente",
     },
     {
       icon: <FileSpreadsheet className="h-8 w-8 text-white" />,
       nome: "Tipos de Estabelecimentos",
-      link: "/estabelecimentos/lista",
+      link: "/private/tipo-estabelecimentos/lista",
     },
     {
       icon: <Award className="h-8 w-8 text-white" />,
       nome: "Qualificações",
-      link: "/qualificacao/lista",
+      link: "/private/qualificacao",
     },
     {
       icon: <FileCheck className="h-8 w-8 text-white" />,
       nome: "Habilitações",
-      link: "/lista-habilitacoes",
+      link: "/private/habilitacao",
     },
     {
       icon: <CheckCircle className="h-8 w-8 text-white" />,
       nome: "Tipos de Encerramento",
-      link: "/lista-tipos-encerramento",
+      link: "/private/encerramento",
     },
     {
       icon: <Users className="h-8 w-8 text-white" />,
       nome: "Tipos de Público",
-      link: "/lista-tipos-publico",
+      link: "/private/publico",
     },
     {
       icon: <Calendar className="h-8 w-8 text-white" />,
       nome: "Tipos de Evento",
-      link: "/lista-tipos-evento",
+      link: "/private/evento",
     },
     {
       icon: <AlertTriangle className="h-8 w-8 text-white" />,
       nome: "Tipos de Trauma",
-      link: "/lista-tipos-trauma",
+      link: "/private/trauma",
     },
     {
       icon: <HeartPulse className="h-8 w-8 text-white" />,
       nome: "Tipos de Atendimento",
-      link: "/lista-tipos-atendimento",
+      link: "/private/atendimento",
     },
     {
       icon: <Stethoscope className="h-8 w-8 text-white" />,
       nome: "Tipos de Hipótese Diagnóstica",
-      link: "/lista-tipos-hipotese-diag",
+      link: "/private/hipotese-diagnostica",
     },
     {
       icon: <Thermometer className="h-8 w-8 text-white" />,
       nome: "Tipos de Sintoma",
-      link: "/lista-tipos-sintoma",
+      link: "/private/sintoma",
     },
     {
       icon: <HomeIcon className="h-8 w-8 text-white" />,
       nome: "Tipos de Bairro",
-      link: "/bairro/lista",
+      link: "/private/bairro",
     },
     {
       icon: <Clock className="h-8 w-8 text-white" />,
       nome: "Turno",
-      link: "/turnos",
+      link: "/private/turnos",
     },
     {
       icon: <Leaf className="h-8 w-8 text-white" />,
       nome: "Natureza",
-      link: "/naturezas",
+      link: "/private/naturezas",
     },
     {
       icon: <UserSquare className="h-8 w-8 text-white" />,
       nome: "Raça",
-      link: "/raca/lista",
+      link: "/private/raca",
     },
     {
       icon: <GraduationCap className="h-8 w-8 text-white" />,
       nome: "Escolaridade", 
-      link: "/escolaridade/lista",
+      link: "/private/escolaridade",
     },
     {
       icon: <Building2 className="h-8 w-8 text-white" />,
       nome: "CBO",
-      link: "/cbo/lista",
+      link: "/private/cbo",
     },
     {
       icon: <MapPin className="h-8 w-8 text-white" />,
       nome: "Países",
-      link: "/pais/lista",
+      link: "/private/pais",
     },
     {
       icon: <Map className="h-8 w-8 text-white" />,
       nome: "Estados",
-      link: "/estado/lista",
+      link: "/private/estado",
     },
     {
       icon: <MapPin className="h-8 w-8 text-white" />,
       nome: "Municípios",
-      link: "/municipio/lista",
+      link: "/private/municipio",
     },
     {
       icon: <MapPin className="h-8 w-8 text-white" />,
       nome: "Gênero Sexual",
-      link: "/genero/lista",
+      link: "/private/genero",
     }
   ];
 

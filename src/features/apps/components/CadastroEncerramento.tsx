@@ -83,7 +83,7 @@ const CadastroTipoEncerramento = () => {
       }
 
       setSuccess(true);
-      setTimeout(() => navigate('/lista-tipos-encerramento', { replace: true }), 1500);
+      setTimeout(() => navigate('/private/encerramento', { replace: true }), 1500);
       
     } catch (err) {
       console.error('Erro ao salvar:', err);
@@ -94,7 +94,7 @@ const CadastroTipoEncerramento = () => {
   };
 
   const handleCancel = () => {
-    navigate('/lista-tipos-encerramento');
+    navigate('/private/encerramento');
   };
 
   return (

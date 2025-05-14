@@ -105,7 +105,7 @@ const ListaRaca = () => {
           setSearchTerm(value);
         }}
         searchValue={inputValue}
-        onNewClick={() => navigate("/raca/cadastrar")}
+        onNewClick={() => navigate("/private/raca/nova")}
         isProcessing={false}
         onMenuOpen={() => setIsMenuOpen(true)}
       />
@@ -126,7 +126,7 @@ const ListaRaca = () => {
           searchTerm={searchTerm}
           renderActions={(tipo) => (
             <ActionButtons
-              onEdit={() => navigate(`/raca/editar/${tipo.idtipo_raca}`)}
+              onEdit={() => navigate(`/private/raca/editar/${tipo.idtipo_raca}`)}
               onDelete={() => handleDelete(tipo.idtipo_raca)}
               isProcessing={processingId === tipo.idtipo_raca}
               itemName={tipo.descricao}

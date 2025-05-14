@@ -718,7 +718,7 @@ const ListaPacientes = () => {
 
   // Selecionar um paciente da busca avançada
   const handleSelectPaciente = (paciente: Paciente) => {
-    navigate(`/pacientes/editar/${paciente.idpaciente}`);
+    navigate(`/private/pacientes/editar/${paciente.idpaciente}`);
   };
 
   // Componente para exibir menu de colunas
@@ -822,7 +822,7 @@ const ListaPacientes = () => {
                 <Menu className="h-6 w-6" />
               </button>
               <button
-                onClick={() => navigate("/modulo-pacientes-ficha")}
+                onClick={() => navigate("/private/pagina-paciente-ficha")}
                 className="p-2 hover:bg-blue-700 rounded-full transition-colors"
               >
                 <ArrowLeft className="h-6 w-6" />
@@ -916,7 +916,7 @@ const ListaPacientes = () => {
 
               {/* Botão Novo */}
               <button
-                onClick={() => navigate("/pacientes/cadastro")}
+                onClick={() => navigate("/private/pacientes/nova")}
                 className="px-4 py-2 bg-white text-blue-600 rounded-md hover:bg-gray-100 transition-colors flex items-center gap-2"
               >
                 <Plus className="h-5 w-5" />
@@ -1018,7 +1018,7 @@ const ListaPacientes = () => {
                         key={paciente.idpaciente}
                         className="hover:bg-gray-50 transition-colors cursor-pointer"
                         onClick={() =>
-                          navigate(`/pacientes/editar/${paciente.idpaciente}`)
+                          navigate(`/private/pacientes/editar/${paciente.idpaciente}`)
                         }
                       >
                         {allColumns
@@ -1130,7 +1130,7 @@ const ListaPacientes = () => {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 navigate(
-                                  `/pacientes/editar/${paciente.idpaciente}`
+                                  `/private/pacientes/editar/${paciente.idpaciente}`
                                 );
                               }}
                               className="text-blue-600 hover:text-blue-900 flex items-center"

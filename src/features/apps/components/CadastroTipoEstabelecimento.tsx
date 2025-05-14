@@ -96,7 +96,7 @@ const CadastroTipoEstabelecimento = () => {
       }
 
       setSuccess(true);
-      setTimeout(() => navigate("/estabelecimentos", { replace: true }), 1500);
+      setTimeout(() => navigate("/private/tipo-estabelecimentos", { replace: true }), 1500);
       
     } catch (err) {
       console.error('Erro ao salvar:', err);

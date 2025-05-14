@@ -83,7 +83,7 @@ const CadastroComponente = () => {
       }
 
       setSuccess(true);
-      setTimeout(() => navigate('/lista-componentes', { replace: true }), 1500);
+      setTimeout(() => navigate('/private/componente', { replace: true }), 1500);
       
     } catch (err) {
       console.error('Erro ao salvar:', err);
@@ -94,7 +94,7 @@ const CadastroComponente = () => {
   };
 
   const handleCancel = () => {
-    navigate('/lista-componentes');
+    navigate('/private/componente');
   };
 
   return (

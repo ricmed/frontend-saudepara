@@ -88,7 +88,7 @@ const CadastroTipoAtendimento = () => {
       }
 
       setSuccess(true);
-      setTimeout(() => navigate('/lista-tipos-atendimento', { replace: true }), 1500);
+      setTimeout(() => navigate('/private/atendimento', { replace: true }), 1500);
       
     } catch (err) {
       console.error('Erro ao salvar:', err);
@@ -99,7 +99,7 @@ const CadastroTipoAtendimento = () => {
   };
 
   const handleCancel = () => {
-    navigate('/lista-tipos-atendimento');
+    navigate('/private/atendimento');
   };
 
   return (

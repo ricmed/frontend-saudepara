@@ -88,7 +88,7 @@ const CadastroTipoHipoteseDiag = () => {
       }
 
       setSuccess(true);
-      setTimeout(() => navigate('/lista-tipos-hipotese-diag', { replace: true }), 1500);
+      setTimeout(() => navigate('/private/hipotese-diagnostica', { replace: true }), 1500);
       
     } catch (err) {
       console.error('Erro ao salvar:', err);
@@ -99,7 +99,7 @@ const CadastroTipoHipoteseDiag = () => {
   };
 
   const handleCancel = () => {
-    navigate('/lista-tipos-hipotese-diag');
+    navigate('/private/hipotese-diagnostica');
   };
 
   return (

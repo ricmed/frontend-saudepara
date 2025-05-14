@@ -129,166 +129,166 @@ function App() {
           <Route path="/campanhas" element={<HealthCampaignsPage />} />{" "}
           {/* Updated to use HealthCampaignsPage */}
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/apps-auxiliares" element={<PaginaAppsAuxiliares />} />
+          <Route path="/private/apps-auxiliares" element={<PaginaAppsAuxiliares />} />
           {/* Rotas de Qualificações */}
           <Route
-            path="/qualificacao/lista"
+            path="/private/qualificacao"
             element={<RelatorioQualificacao />}
           />
           <Route
-            path="/qualificacao/cadastro"
+            path="/private/qualificacao/nova"
             element={<CadastroQualificacao />}
           />
           <Route
-            path="/qualificacao/editar/:id"
+            path="/private/qualificacao/editar/:id"
             element={<CadastroQualificacao />}
           />
           {/* Rotas de Habilitações */}
-          <Route path="/lista-habilitacoes" element={<ListaHabilitacoes />} />
+          <Route path="/private/habilitacao" element={<ListaHabilitacoes />} />
           <Route
-            path="/cadastrar-habilitacao"
+            path="/private/habilitacao/nova"
             element={<CadastroHabilitacao />}
           />
           <Route
-            path="/editar-habilitacao/:id"
+            path="/private/habilitacao/editar/:id"
             element={<CadastroHabilitacao />}
           />
           {/* Rotas de Estabelecimentos */}
           <Route
-            path="/estabelecimentos"
+            path="/private/tipo-estabelecimentos"
             element={<RelatorioEstabelecimento />}
           />
           <Route
-            path="/cadastrar-estabelecimento"
+            path="/private/tipo-estabelecimentos/nova"
             element={<CadastroEstabelecimento />}
           />
           <Route
-            path="/editar-estabelecimento/:id"
+            path="/private/tipo-estabelecimentos/editar/:id"
             element={<CadastroEstabelecimento />}
           />
           {/* Rotas de Turnos */}
-          <Route path="/turnos" element={<ListaTurnos />} />
-          <Route path="/cadastrar-turno" element={<CadastroTurno />} />
-          <Route path="/editar-turno/:id" element={<CadastroTurno />} />
+          <Route path="/private/turnos" element={<ListaTurnos />} />
+          <Route path="/private/turnos/nova" element={<CadastroTurno />} />
+          <Route path="/private/turnos/editar/:id" element={<CadastroTurno />} />
           {/* Rotas de Natureza */}
-          <Route path="/naturezas" element={<ListaNaturezas />} />
-          <Route path="/cadastrar-natureza" element={<CadastroNatureza />} />
-          <Route path="/editar-natureza/:id" element={<CadastroNatureza />} />
+          <Route path="/private/naturezas" element={<ListaNaturezas />} />
+          <Route path="/private/naturezas/nova" element={<CadastroNatureza />} />
+          <Route path="/private/naturezas/editar/:id" element={<CadastroNatureza />} />
           {/* Rotas de Raça */}
-          <Route path="/raca/lista" element={<ListaRacas />} />
-          <Route path="/raca/cadastrar" element={<CadastroRaca />} />
-          <Route path="/raca/editar/:id" element={<CadastroRaca />} />
+          <Route path="/private/raca" element={<ListaRacas />} />
+          <Route path="/private/raca/nova" element={<CadastroRaca />} />
+          <Route path="/private/raca/editar/:id" element={<CadastroRaca />} />
           {/* Rotas de CBO */}
-          <Route path="/cbo/lista" element={<ListaCBO />} />
-          <Route path="/cbo/cadastro" element={<CadastroCBO />} />
-          <Route path="/cbo/editar/:id" element={<CadastroCBO />} />
+          <Route path="/private/cbo" element={<ListaCBO />} />
+          <Route path="/private/cbo/nova" element={<CadastroCBO />} />
+          <Route path="/private/cbo/editar/:id" element={<CadastroCBO />} />
           {/* Rotas de Escolaridade */}
-          <Route path="escolaridade/lista" element={<ListaEscolaridade />} />
+          <Route path="/private/escolaridade" element={<ListaEscolaridade />} />
           <Route
-            path="escolaridade/cadastro"
+            path="/private/escolaridade/nova"
             element={<CadastroEscolaridade />}
           />
           <Route
-            path="escolaridade/editar/:id"
+            path="/private/escolaridade/editar/:id"
             element={<CadastroEscolaridade />}
           />
           {/* Rotas de Estados */}
-          <Route path="/estado/lista" element={<ListaEstados />} />
-          <Route path="/estado/cadastro" element={<CadastroEstado />} />
-          <Route path="/estado/editar/:id" element={<CadastroEstado />} />
+          <Route path="/private/estado" element={<ListaEstados />} />
+          <Route path="/private/estado/nova" element={<CadastroEstado />} />
+          <Route path="/private/estado/editar/:id" element={<CadastroEstado />} />
           {/* Rotas de Municipios */}
-          <Route path="/municipio/lista" element={<ListaMunicipios />} />
-          <Route path="/municipio/cadastro" element={<CadastroMunicipio />} />
-          <Route path="/municipio/editar/:id" element={<CadastroMunicipio />} />
+          <Route path="/private/municipio" element={<ListaMunicipios />} />
+          <Route path="/private/municipio/nova" element={<CadastroMunicipio />} />
+          <Route path="/private/municipio/editar/:id" element={<CadastroMunicipio />} />
           {/* Rotas de Paises */}
-          <Route path="/pais/lista" element={<ListaPaises />} />
-          <Route path="/pais/cadastro" element={<CadastroPais />} />
-          <Route path="/pais/editar/:id" element={<CadastroPais />} />
+          <Route path="/private/pais" element={<ListaPaises />} />
+          <Route path="/private/pais/nova" element={<CadastroPais />} />
+          <Route path="/private/pais/editar/:id" element={<CadastroPais />} />
           {/* Rotas de Generos */}
-          <Route path="/genero/lista" element={<ListaGeneros />} />
-          <Route path="/genero/cadastro" element={<CadastroGenero />} />
-          <Route path="/genero/editar/:id" element={<CadastroGenero />} />
+          <Route path="/private/genero" element={<ListaGeneros />} />
+          <Route path="/private/genero/nova" element={<CadastroGenero />} />
+          <Route path="/private/genero/editar/:id" element={<CadastroGenero />} />
           {/* Rotas de Bairros */}
-          <Route path="/bairro/lista" element={<ListaBairros />} />
-          <Route path="/bairro/cadastro" element={<CadastroBairro />} />
-          <Route path="/bairro/editar/:id" element={<CadastroBairro />} />
+          <Route path="/private/bairro" element={<ListaBairros />} />
+          <Route path="/private/bairro/nova" element={<CadastroBairro />} />
+          <Route path="/private/bairro/editar/:id" element={<CadastroBairro />} />
           {/* Rotas de Tipos de Encerramento */}
           <Route
-            path="/lista-tipos-encerramento"
+            path="/private/encerramento"
             element={<ListaTiposEncerramento />}
           />
           <Route
-            path="/cadastrar-tipo-encerramento"
+            path="/private/encerramento/nova"
             element={<CadastroTipoEncerramento />}
           />
           <Route
-            path="/editar-tipo-encerramento/:id"
+            path="/private/encerramento/editar/:id"
             element={<CadastroTipoEncerramento />}
           />
           {/* Rotas de Tipos de Público */}
-          <Route path="/lista-tipos-publico" element={<ListaTiposPublico />} />
+          <Route path="/private/publico" element={<ListaTiposPublico />} />
           <Route
-            path="/cadastrar-tipo-publico"
+            path="/private/publico/nova"
             element={<CadastroTipoPublico />}
           />
           <Route
-            path="/editar-tipo-publico/:id"
+            path="/private/publico/editar/:id"
             element={<CadastroTipoPublico />}
           />
           {/* Rotas de Tipos de Evento */}
-          <Route path="/lista-tipos-evento" element={<ListaTiposEvento />} />
+          <Route path="/private/evento" element={<ListaTiposEvento />} />
           <Route
-            path="/cadastrar-tipo-evento"
+            path="/private/evento/nova"
             element={<CadastroTipoEvento />}
           />
           <Route
-            path="/editar-tipo-evento/:id"
+            path="/private/evento/editar/:id"
             element={<CadastroTipoEvento />}
           />
           {/* Rotas de Tipos de Trauma */}
-          <Route path="/lista-tipos-trauma" element={<ListaTiposTrauma />} />
+          <Route path="/private/trauma" element={<ListaTiposTrauma />} />
           <Route
-            path="/cadastrar-tipo-trauma"
+            path="/private/trauma/nova"
             element={<CadastroTipoTrauma />}
           />
           <Route
-            path="/editar-tipo-trauma/:id"
+            path="/private/trauma/editar/:id"
             element={<CadastroTipoTrauma />}
           />
           {/* Rotas de Tipos de Atendimento */}
           <Route
-            path="/lista-tipos-atendimento"
+            path="/private/atendimento"
             element={<ListaTiposAtendimento />}
           />
           <Route
-            path="/cadastrar-tipo-atendimento"
+            path="/private/atendimento/nova"
             element={<CadastroTipoAtendimento />}
           />
           <Route
-            path="/editar-tipo-atendimento/:id"
+            path="/private/atendimento/editar/:id"
             element={<CadastroTipoAtendimento />}
           />
           {/* Rotas de Tipos de Hipótese Diagnóstica */}
           <Route
-            path="/lista-tipos-hipotese-diag"
+            path="/private/hipotese-diagnostica"
             element={<ListaTiposHipoteseDiag />}
           />
           <Route
-            path="/cadastrar-tipo-hipotese-diag"
+            path="/private/hipotese-diagnostica/nova"
             element={<CadastroTipoHipoteseDiag />}
           />
           <Route
-            path="/editar-tipo-hipotese-diag/:id"
+            path="/private/hipotese-diagnostica/editar/:id"
             element={<CadastroTipoHipoteseDiag />}
           />
           {/* Rotas de Tipos de Sintoma */}
-          <Route path="/lista-tipos-sintoma" element={<ListaTiposSintoma />} />
+          <Route path="/private/sintoma" element={<ListaTiposSintoma />} />
           <Route
-            path="/cadastrar-tipo-sintoma"
+            path="/private/sintoma/nova"
             element={<CadastroTipoSintoma />}
           />
           <Route
-            path="/editar-tipo-sintoma/:id"
+            path="/private/sintoma/editar/:id"
             element={<CadastroTipoSintoma />}
           />
           {/* Rotas de Campanhas */}
@@ -301,60 +301,57 @@ function App() {
           <Route path="/malaria-zero" element={<MalariaZero />} />
           <Route path="/campanha-novembro-azul" element={<NovembroAzul />} />
           {/* Rotas de Componentes */}
-          <Route path="/ficha-comunicacao" element={<NotificationForm />} />
-          <Route path="/lista-componentes" element={<ListaComponentes />} />
+          <Route path="/private/componente" element={<ListaComponentes />} />
           <Route
-            path="/cadastrar-componente"
+            path="/private/componente/nova"
             element={<CadastroComponente />}
           />
           <Route
-            path="/editar-componente/:id"
+            path="/private/componente/editar/:id"
             element={<CadastroComponente />}
           />
           {/* Rotas de Estabelecimentos */}
           <Route
-            path="/estabelecimentos/lista"
+            path="/private/tipo-estabelecimentos/lista"
             element={<ListaEstabelecimentos />}
           />
           <Route
-            path="/cadastrar-estabelecimento"
+            path="/private/tipo-estabelecimentos/nova"
             element={<CadastroEstabelecimento />}
           />
           <Route
-            path="/editar-estabelecimento/:id"
+            path="/private/tipo-estabelecimentos/editar/:id"
             element={<CadastroEstabelecimento />}
           />
           {/* Nova rota para seu relatório */}
           <Route
-            path="/relatorio-estabelecimentos"
+            path="/private/relatorio-estabelecimentos"
             element={<RelatorioEstabelecimento />}
           />
           <Route
-            path="/qualificar-estabelecimentos"
+            path="/private/relatorio-estabelecimentos/nova"
             element={<QualificarEstabelecimentos />}
           />
           <Route
-            path="/editar-o-estabelecimento/:id"
+            path="/private/relatorio-estabelecimentos/editar/:id"
             element={<QualificarEstabelecimentos />}
           />
           {/* Rotas de Pacientes - Atualizado */}
-          <Route path="/pacientes" element={<ListaPacientes />} />
-          <Route path="/pacientes/lista" element={<ListaPacientes />} />
-          <Route path="/pacientes/cadastro" element={<FormularioPaciente />} />
+          <Route path="/private/pacientes" element={<ListaPacientes />} />
+          <Route path="/private/pacientes/nova" element={<FormularioPaciente />} />
           <Route
-            path="/pacientes/editar/:id"
+            path="/private/pacientes/editar/:id"
             element={<FormularioPaciente />}
           />
           <Route
-            path="/modulo-pacientes-ficha"
+            path="/private/pagina-paciente-ficha"
             element={<PaginaPacientesFicha />}
           />
           {/* Rotas de Notificações */}
-          <Route path="/lista-comunicacao" element={<ListaNotificacoes />} />
-          <Route path="/formulario-comunicacao" element={<NotificationForm />} />
-          <Route path="/formulario-comunicacao/nova" element={<NotificationForm />} />
+          <Route path="/private/comunicacao-de-caso" element={<ListaNotificacoes />} />
+          <Route path="/private/comunicacao-de-caso/nova" element={<NotificationForm />} />
           <Route
-            path="/formulario-comunicacao/editar/:id"
+            path="/private/comunicacao-de-caso/editar/:id"
             element={<NotificationForm />}
           />
           {/* Rotas de Dashboard */}

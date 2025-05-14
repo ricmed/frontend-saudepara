@@ -33,12 +33,12 @@ import {
       {
         icon: <UserCircle className="h-8 w-8 text-white" />,
         nome: "Dados dos Pacientes",
-        link: "/pacientes/lista",
+        link: "/private/pacientes",
       },
       {
         icon: <FileText className="h-8 w-8 text-white" />,
         nome: "Ficha de Comunicação",
-        link: "/lista-comunicacao",
+        link: "/private/comunicacao-de-caso",
       }
     ];
   

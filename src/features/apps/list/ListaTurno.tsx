@@ -102,7 +102,7 @@ const ListaTurnos = () => {
           setSearchTerm(value);
         }}
         searchValue={inputValue}
-        onNewClick={() => navigate("/cadastrar-turno")}
+        onNewClick={() => navigate("/private/turnos/nova")}
         isProcessing={false}
         onMenuOpen={() => setIsMenuOpen(true)}
       />
@@ -123,7 +123,7 @@ const ListaTurnos = () => {
           searchTerm={searchTerm}
           renderActions={(turno) => (
             <ActionButtons
-              onEdit={() => navigate(`/editar-turno/${turno.id_turno}`)}
+              onEdit={() => navigate(`/private/turnos/editar/${turno.id_turno}`)}
               onDelete={() => handleDelete(turno.id_turno)}
               isProcessing={processingId === turno.id_turno}
               itemName={turno.descricao}

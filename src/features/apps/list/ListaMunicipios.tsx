@@ -237,7 +237,7 @@ const ListaMunicipios = () => {
           setSearchTerm(value);
         }}
         searchValue={inputValue}
-        onNewClick={() => navigate("/municipio/cadastro")}
+        onNewClick={() => navigate("/private/municipio/nova")}
         isProcessing={false}
         onMenuOpen={() => setIsMenuOpen(true)}
         extraFilter={renderEstadoFilter}
@@ -259,7 +259,7 @@ const ListaMunicipios = () => {
           searchTerm={searchTerm}
           renderActions={(municipio) => (
             <ActionButtons
-              onEdit={() => navigate(`/municipio/editar/${municipio.idtipo_municipio}`)}
+              onEdit={() => navigate(`/private/municipio/editar/${municipio.idtipo_municipio}`)}
               onDelete={() => handleDelete(municipio.idtipo_municipio)}
               isProcessing={processingId === municipio.idtipo_municipio}
               itemName={municipio.descricao}

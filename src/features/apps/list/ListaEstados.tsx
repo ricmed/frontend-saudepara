@@ -123,7 +123,7 @@ const ListaEstados = () => {
           setSearchTerm(value);
         }}
         searchValue={inputValue}
-        onNewClick={() => navigate("/estado/cadastro")}
+        onNewClick={() => navigate("/private/estado/nova")}
         isProcessing={false}
         onMenuOpen={() => setIsMenuOpen(true)}
       />
@@ -144,7 +144,7 @@ const ListaEstados = () => {
           searchTerm={searchTerm}
           renderActions={(estado) => (
             <ActionButtons
-              onEdit={() => navigate(`/estado/editar/${estado.idtipo_estado}`)}
+              onEdit={() => navigate(`/private/estado/editar/${estado.idtipo_estado}`)}
               onDelete={() => handleDelete(estado.idtipo_estado)}
               isProcessing={processingId === estado.idtipo_estado}
               itemName={estado.descricao}

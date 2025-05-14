@@ -113,7 +113,7 @@ const ListaHabilitacoes = () => {
           setSearchTerm(value);
         }}
         searchValue={inputValue}
-        onNewClick={() => navigate("/cadastrar-habilitacao")}
+        onNewClick={() => navigate("/private/habilitacao/nova")}
         isProcessing={false}
         onMenuOpen={() => setIsMenuOpen(true)}
       />
@@ -134,7 +134,7 @@ const ListaHabilitacoes = () => {
           searchTerm={searchTerm}
           renderActions={(hab) => (
             <ActionButtons
-              onEdit={() => navigate(`/editar-habilitacao/${hab.idtipo_habilitacao}`)}
+              onEdit={() => navigate(`/private/habilitacao/editar/${hab.idtipo_habilitacao}`)}
               onDelete={() => handleDelete(hab.idtipo_habilitacao)}
               isProcessing={processingId === hab.idtipo_habilitacao}
               itemName={hab.descricao}

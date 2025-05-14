@@ -123,7 +123,7 @@ const CadastroCBO = () => {
      }
 
      setSuccess(true);
-     setTimeout(() => navigate('/cbo/lista', { replace: true }), 1500);
+     setTimeout(() => navigate('/private/cbo', { replace: true }), 1500);
      
    } catch (err: any) {
      console.error('Erro ao salvar:', err);
@@ -138,7 +138,7 @@ const CadastroCBO = () => {
  };
 
  const handleCancel = () => {
-   navigate('/cbo/lista');
+   navigate('/private/cbo');
  };
 
  return (

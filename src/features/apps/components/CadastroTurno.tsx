@@ -96,7 +96,7 @@ const CadastroTurno = () => {
       }
 
       setSuccess(true);
-      setTimeout(() => navigate("/turnos", { replace: true }), 1500);
+      setTimeout(() => navigate("/private/turnos", { replace: true }), 1500);
       
     } catch (err) {
       console.error('Erro ao salvar:', err);
@@ -107,7 +107,7 @@ const CadastroTurno = () => {
   };
 
   const handleCancel = () => {
-    navigate('/turnos');
+    navigate('/private/turnos');
   };
 
   return (

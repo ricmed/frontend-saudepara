@@ -109,7 +109,7 @@ const CadastroHabilitacao = () => {
       }
 
       setSuccess(true);
-      setTimeout(() => navigate("/lista-habilitacoes", { replace: true }), 1500);
+      setTimeout(() => navigate("/private/habilitacao", { replace: true }), 1500);
       
     } catch (err) {
       console.error('Erro ao salvar:', err);
@@ -120,7 +120,7 @@ const CadastroHabilitacao = () => {
   };
 
   const handleCancel = () => {
-    navigate('/lista-habilitacoes');
+    navigate('/private/habilitacao');
   };
 
   return (

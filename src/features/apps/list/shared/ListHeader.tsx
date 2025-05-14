@@ -38,7 +38,7 @@ const ListHeader = ({
             </button>
 
             <button
-              onClick={() => navigate("/apps-auxiliares")}
+              onClick={() => navigate("/private/apps-auxiliares")}
               className="p-2 hover:bg-blue-700 rounded-full transition-colors"
               disabled={isProcessing}
               aria-label="Voltar"

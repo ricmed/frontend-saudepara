@@ -142,7 +142,7 @@ const NotificationForm: React.FC = () => {
             </button>
             
             <button
-              onClick={() => navigate("/lista-comunicacao")}
+              onClick={() => navigate("/private/comunicacao-de-caso")}
               className="p-2 hover:bg-white/10 rounded-lg transition-colors"
               title="Voltar"
             >
@@ -206,7 +206,7 @@ const NotificationForm: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => navigate("/lista-comunicacao")}
+              onClick={() => navigate("/private/comunicacao-de-caso")}
               className="inline-flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
             >
               <X className="h-4 w-4" />
@@ -409,7 +409,7 @@ const NotificationForm: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => navigate("/lista-comunicacao")}
+              onClick={() => navigate("/private/comunicacao-de-caso")}
               className="inline-flex items-center gap-2 px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
             >
               <X className="h-4 w-4" />

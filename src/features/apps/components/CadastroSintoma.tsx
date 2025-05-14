@@ -88,7 +88,7 @@ const CadastroTipoSintoma = () => {
       }
 
       setSuccess(true);
-      setTimeout(() => navigate('/lista-tipos-sintoma', { replace: true }), 1500);
+      setTimeout(() => navigate('/private/sintoma', { replace: true }), 1500);
       
     } catch (err) {
       console.error('Erro ao salvar:', err);
@@ -99,7 +99,7 @@ const CadastroTipoSintoma = () => {
   };
 
   const handleCancel = () => {
-    navigate('/lista-tipos-sintoma');
+    navigate('/private/sintoma');
   };
 
   return (

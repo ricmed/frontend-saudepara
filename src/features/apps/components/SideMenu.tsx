@@ -29,7 +29,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({ isOpen, onClose }) => {
     {
       icon: <Award />,
       label: t("menu.qualify_establishments"),
-      onClick: () => navigate("/qualificar-estabelecimentos"),
+      onClick: () => navigate("/private/relatorio-estabelecimentos/nova"),
     },
     {
       icon: <FileText />,
@@ -49,7 +49,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({ isOpen, onClose }) => {
     {
       icon: <Building2 />,
       label: t("menu.apps"),
-      onClick: () => navigate("/apps-auxiliares"),
+      onClick: () => navigate("/private/apps-auxiliares"),
     },
     {
       icon: <Lock />,

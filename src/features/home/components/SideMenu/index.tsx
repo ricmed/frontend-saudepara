@@ -52,12 +52,12 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     {
       icon: <Building2 className="h-6 w-6 text-white" />,
       nome: t("apps.components"),
-      link: "/lista-componentes",
+      link: "/private/componente",
     },
     {
       icon: <FileSpreadsheet className="h-6 w-6 text-white" />,
       nome: t("apps.establishments"),
-      link: "/estabelecimentos/lista",
+      link: "/private/tipo-estabelecimentos/lista",
     },
     {
       icon: <Award className="h-6 w-6 text-white" />,
@@ -67,87 +67,87 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     {
       icon: <FileCheck className="h-6 w-6 text-white" />,
       nome: t("apps.enablings"),
-      link: "/lista-habilitacoes",
+      link: "/private/habilitacao",
     },
     {
       icon: <CheckCircle className="h-6 w-6 text-white" />,
       nome: t("apps.closure_types"),
-      link: "/lista-tipos-encerramento",
+      link: "/private/encerramento",
     },
     {
       icon: <Users className="h-6 w-6 text-white" />,
       nome: t("apps.public_types"),
-      link: "/lista-tipos-publico",
+      link: "/private/publico",
     },
     {
       icon: <Calendar className="h-6 w-6 text-white" />,
       nome: t("apps.event_types"),
-      link: "/lista-tipos-evento",
+      link: "/private/evento",
     },
     {
       icon: <AlertTriangle className="h-6 w-6 text-white" />,
       nome: t("apps.trauma_types"),
-      link: "/lista-tipos-trauma",
+      link: "/private/trauma",
     },
     {
       icon: <HeartPulse className="h-6 w-6 text-white" />,
       nome: t("apps.care_types"),
-      link: "/lista-tipos-atendimento",
+      link: "/private/atendimento",
     },
     {
       icon: <Stethoscope className="h-6 w-6 text-white" />,
       nome: t("apps.diagnostic_hypothesis_types"),
-      link: "/lista-tipos-hipotese-diag",
+      link: "/private/hipotese-diagnostica",
     },
     {
       icon: <Thermometer className="h-6 w-6 text-white" />,
       nome: t("apps.symptom_types"),
-      link: "/lista-tipos-sintoma",
+      link: "/private/sintoma",
     },
     {
       icon: <Clock className="h-6 w-6 text-white" />,
       nome: t("apps.shift"),
-      link: "/turnos",
+      link: "/private/turnos",
     },
     {
       icon: <Leaf className="h-6 w-6 text-white" />,
       nome: t("apps.nature"),
-      link: "/naturezas",
+      link: "/private/naturezas",
     },
     {
       icon: <UserSquare className="h-6 w-6 text-white" />,
       nome: t("apps.race"),
-      link: "/raca/lista",
+      link: "/private/raca",
     },
     {
       icon: <GraduationCap className="h-6 w-6 text-white" />,
       nome: t("apps.education"),
-      link: "/escolaridade/lista",
+      link: "/private/escolaridade",
     },
     {
       icon: <Building2 className="h-6 w-6 text-white" />,
       nome: t("apps.cbo"),
-      link: "/cbo/lista",
+      link: "/private/cbo",
     },
     {
       icon: <MapPin className="h-6 w-6 text-white" />,
       nome: t("apps.countries"),
-      link: "/pais/lista",
+      link: "/private/pais",
     },
     {
       icon: <Map className="h-6 w-6 text-white" />,
       nome: t("apps.states"),
-      link: "/estado/lista",
+      link: "/private/estado",
     },
     {
       icon: <MapPin className="h-6 w-6 text-white" />,
       nome: t("apps.cities"),
-      link: "/municipio/lista",
+      link: "/private/municipio",
     },
     {
       icon: <MapPin className="h-6 w-6 text-white" />,
       nome: t("apps.gender"),
-      link: "/genero/lista",
+      link: "/private/genero",
     },
     {
       icon: <MapPin className="h-6 w-6 text-white" />,
@@ -161,12 +161,12 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     {
       icon: <Award />,
       label: t("menu.qualify_establishments"),
-      onClick: () => navigate("/relatorio-estabelecimentos"),
+      onClick: () => navigate("/private/relatorio-estabelecimentos"),
     },
     {
       icon: <FileText />,
       label: t("menu.notification"),
-      onClick: () => navigate("/modulo-pacientes-ficha"),
+      onClick: () => navigate("/private/pagina-paciente-ficha"),
     },
     {
       icon: <ChartSpline />,
@@ -237,7 +237,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                   className="flex items-center gap-3 text-white py-3 px-2 hover:bg-blue-800 rounded-lg cursor-pointer"
                   onClick={() => {
                     if (item.submenu) {
-                      navigate("/apps-auxiliares");
+                      navigate("/private/apps-auxiliares");
                     } else {
                       item.onClick();
                       onClose();

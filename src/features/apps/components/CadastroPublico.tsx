@@ -88,7 +88,7 @@ const CadastroTipoPublico = () => {
       }
 
       setSuccess(true);
-      setTimeout(() => navigate('/lista-tipos-publico', { replace: true }), 1500);
+      setTimeout(() => navigate('/private/publico', { replace: true }), 1500);
       
     } catch (err) {
       console.error('Erro ao salvar:', err);
@@ -99,7 +99,7 @@ const CadastroTipoPublico = () => {
   };
 
   const handleCancel = () => {
-    navigate('/lista-tipos-publico');
+    navigate('/private/publico');
   };
 
   return (

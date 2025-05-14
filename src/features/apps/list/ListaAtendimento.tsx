@@ -163,7 +163,7 @@ const ListaTiposAtendimento = () => {
             </div>
 
             <button
-              onClick={() => navigate("/cadastrar-tipo-atendimento")}
+              onClick={() => navigate("/private/atendimento/nova")}
               className="flex items-center gap-2 px-6 py-2 bg-white text-blue-600 rounded-full hover:bg-gray-100 transition-colors shadow-md"
               aria-label="Novo tipo de atendimento"
             >
@@ -238,7 +238,7 @@ const ListaTiposAtendimento = () => {
                               <button
                                 onClick={() =>
                                   navigate(
-                                    `/editar-tipo-atendimento/${tipoAtendimento.idtipo_atendimento}`
+                                    `/private/atendimento/editar/${tipoAtendimento.idtipo_atendimento}`
                                   )
                                 }
                                 className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"

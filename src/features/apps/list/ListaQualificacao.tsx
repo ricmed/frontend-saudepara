@@ -158,7 +158,7 @@ const ListaQualificacao = () => {
           setSearchTerm(value);
         }}
         searchValue={inputValue}
-        onNewClick={() => navigate("/qualificacao/cadastro")}
+        onNewClick={() => navigate("/private/qualificacao/nova")}
         isProcessing={false}
         onMenuOpen={() => setIsMenuOpen(true)}
       />
@@ -179,7 +179,7 @@ const ListaQualificacao = () => {
           searchTerm={searchTerm}
           renderActions={(qualificacao) => (
             <ActionButtons
-              onEdit={() => navigate(`/qualificacao/editar/${qualificacao.idtipo_qualificacao}`)}
+              onEdit={() => navigate(`/private/qualificacao/editar/${qualificacao.idtipo_qualificacao}`)}
               onDelete={() => handleDelete(qualificacao.idtipo_qualificacao)}
               isProcessing={processingId === qualificacao.idtipo_qualificacao}
               itemName={qualificacao.descricao}

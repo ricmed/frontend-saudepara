@@ -128,7 +128,7 @@ const CadastroQualificacao = () => {
       }
 
       setSuccess(true);
-      setTimeout(() => navigate("/qualificacao/lista"), 1500);
+      setTimeout(() => navigate("/private/qualificacao"), 1500);
     } catch (err) {
       console.error("Erro ao salvar:", err);
       setError(
@@ -140,7 +140,7 @@ const CadastroQualificacao = () => {
   };
 
   const handleCancel = () => {
-    navigate('/qualificacao/lista');
+    navigate('/private/qualificacao');
   };
 
   return (

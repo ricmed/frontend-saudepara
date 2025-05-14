@@ -121,7 +121,7 @@ const ListaPaises = () => {
           setSearchTerm(value);
         }}
         searchValue={inputValue}
-        onNewClick={() => navigate("/pais/cadastro")}
+        onNewClick={() => navigate("/private/pais/nova")}
         isProcessing={false}
         onMenuOpen={() => setIsMenuOpen(true)}
       />
@@ -142,7 +142,7 @@ const ListaPaises = () => {
           searchTerm={searchTerm}
           renderActions={(pais) => (
             <ActionButtons
-              onEdit={() => navigate(`/pais/editar/${pais.idtipo_pais}`)}
+              onEdit={() => navigate(`/private/pais/editar/${pais.idtipo_pais}`)}
               onDelete={() => handleDelete(pais.idtipo_pais)}
               isProcessing={processingId === pais.idtipo_pais}
               itemName={pais.descricao}

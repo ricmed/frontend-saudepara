@@ -150,7 +150,7 @@ const ListaComponentes = () => {
             </div>
 
             <button
-              onClick={() => navigate("/cadastrar-componente")}
+              onClick={() => navigate("/private/componente/nova")}
               className="flex items-center gap-2 px-6 py-2 bg-white text-blue-600 rounded-full hover:bg-gray-100 transition-colors shadow-md"
               aria-label="Novo componente"
             >
@@ -225,7 +225,7 @@ const ListaComponentes = () => {
                               <button
                                 onClick={() =>
                                   navigate(
-                                    `/editar-componente/${componente.idcomponente}`
+                                    `/private/componente/editar/${componente.idcomponente}`
                                   )
                                 }
                                 className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"

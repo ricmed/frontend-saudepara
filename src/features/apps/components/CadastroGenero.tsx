@@ -81,7 +81,7 @@ const CadastroGenero = () => {
       }
 
       setSuccess(true);
-      setTimeout(() => navigate('/genero/lista', { replace: true }), 1500);
+      setTimeout(() => navigate('/private/genero', { replace: true }), 1500);
       
     } catch (err: any) {
       setError(err.message || 'Erro ao salvar gênero. Verifique os dados e tente novamente.');
@@ -91,7 +91,7 @@ const CadastroGenero = () => {
   };
 
   const handleCancel = () => {
-    navigate('/genero/lista');
+    navigate('/private/genero');
   };
 
   return (

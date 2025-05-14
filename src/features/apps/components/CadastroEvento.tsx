@@ -88,7 +88,7 @@ const CadastroTipoEvento = () => {
       }
 
       setSuccess(true);
-      setTimeout(() => navigate('/lista-tipos-evento', { replace: true }), 1500);
+      setTimeout(() => navigate('/private/evento', { replace: true }), 1500);
       
     } catch (err) {
       console.error('Erro ao salvar:', err);
@@ -99,7 +99,7 @@ const CadastroTipoEvento = () => {
   };
 
   const handleCancel = () => {
-    navigate('/lista-tipos-evento');
+    navigate('/private/evento');
   };
 
   return (

@@ -525,7 +525,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     } catch (error) {
       console.error("Erro ao carregar notificação:", error);
       toast.error("Erro ao carregar dados da notificação");
-      navigate("/lista-comunicacao"); // Voltar se ocorrer erro
+      navigate("/private/comunicacao-de-caso"); // Voltar se ocorrer erro
     } finally {
       setIsLoading(false);
     }
@@ -1083,7 +1083,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
       // Redirecionar para página de listagem ou detalhes após um breve delay
       setTimeout(() => {
-        navigate("/lista-comunicacao");
+        navigate("/private/comunicacao-de-caso");
       }, 1500);
     } catch (error: any) {
       console.error("Erro ao salvar notificação:", error);

@@ -163,7 +163,7 @@ const ListaTiposPublico = () => {
             </div>
 
             <button
-              onClick={() => navigate("/cadastrar-tipo-publico")}
+              onClick={() => navigate("/private/publico/nova")}
               className="flex items-center gap-2 px-6 py-2 bg-white text-blue-600 rounded-full hover:bg-gray-100 transition-colors shadow-md"
               aria-label="Novo tipo de público"
             >
@@ -238,7 +238,7 @@ const ListaTiposPublico = () => {
                               <button
                                 onClick={() =>
                                   navigate(
-                                    `/editar-tipo-publico/${tipoPublico.idtipo_publico}`
+                                    `/private/publico/editar/${tipoPublico.idtipo_publico}`
                                   )
                                 }
                                 className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"

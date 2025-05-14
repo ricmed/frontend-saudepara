@@ -71,7 +71,7 @@ const CadastroEscolaridade = () => {
       }
 
       setSuccess(true);
-      setTimeout(() => navigate('/escolaridade/lista', { replace: true }), 1500);
+      setTimeout(() => navigate('/private/escolaridade', { replace: true }), 1500);
       
     } catch (err) {
       console.error('Erro ao salvar:', err);
@@ -82,7 +82,7 @@ const CadastroEscolaridade = () => {
   };
 
   const handleCancel = () => {
-    navigate('/escolaridade/lista');
+    navigate('/private/escolaridade');
   };
 
   return (

@@ -108,7 +108,7 @@ const ListaEstabelecimentos = () => {
           setSearchTerm(value);
         }}
         searchValue={inputValue}
-        onNewClick={() => navigate("/cadastrar-estabelecimento")}
+        onNewClick={() => navigate("/private/tipo-estabelecimentos/nova")}
         isProcessing={false}
         onMenuOpen={() => setIsMenuOpen(true)}
       />
@@ -129,7 +129,7 @@ const ListaEstabelecimentos = () => {
           searchTerm={searchTerm}
           renderActions={(est) => (
             <ActionButtons
-              onEdit={() => navigate(`/editar-estabelecimento/${est.idtipo_estabelecimento}`)}
+              onEdit={() => navigate(`/private/tipo-estabelecimentos/editar/${est.idtipo_estabelecimento}`)}
               onDelete={() => handleDelete(est.idtipo_estabelecimento)}
               isProcessing={processingId === est.idtipo_estabelecimento}
               itemName={est.descricao}

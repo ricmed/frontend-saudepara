@@ -163,7 +163,7 @@ const ListaTiposEncerramento = () => {
             </div>
 
             <button
-              onClick={() => navigate("/cadastrar-tipo-encerramento")}
+              onClick={() => navigate("/private/encerramento/nova")}
               className="flex items-center gap-2 px-6 py-2 bg-white text-blue-600 rounded-full hover:bg-gray-100 transition-colors shadow-md"
               aria-label="Novo tipo de encerramento"
             >
@@ -238,7 +238,7 @@ const ListaTiposEncerramento = () => {
                               <button
                                 onClick={() =>
                                   navigate(
-                                    `/editar-tipo-encerramento/${tipoEncerramento.idtipo_encerramento}`
+                                    `/private/encerramento/editar/${tipoEncerramento.idtipo_encerramento}`
                                   )
                                 }
                                 className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"

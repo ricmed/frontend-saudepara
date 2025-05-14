@@ -510,7 +510,7 @@ export function RelatorioEstabelecimento() {
 
               {/* Botão Novo */}
               <button
-                onClick={() => navigate("/qualificar-estabelecimentos")}
+                onClick={() => navigate("/private/relatorio-estabelecimentos/nova")}
                 className="px-4 py-2 bg-white text-blue-600 rounded-md hover:bg-gray-100 transition-colors flex items-center gap-2"
               >
                 <Plus className="h-5 w-5" />
@@ -556,7 +556,7 @@ export function RelatorioEstabelecimento() {
                   searchTerm={debouncedSearchParams.term}
                   columns={allColumns}
                   selectedColumns={selectedColumns}
-                  onEdit={(id) => navigate(`/editar-o-estabelecimento/${id}`)}
+                  onEdit={(id) => navigate(`/private/relatorio-estabelecimentos/editar/${id}`)}
                   onDelete={handleDelete}
                 />
               </table>
