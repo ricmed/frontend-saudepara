@@ -1232,6 +1232,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         updatedData.sinaisESintomas = [];
         updatedData.dataInicioSintomas = "";
         updatedData.observacaoSintomas = "";
+        updatedData.hipoteseDiagnostica = [];
       }
 
       setFormData(updatedData);

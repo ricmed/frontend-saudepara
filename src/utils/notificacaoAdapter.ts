@@ -403,10 +403,10 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
     ...(trimmedData.observacaoSintomas && {
       observacao_sintomas: trimmedData.observacaoSintomas || "",
     }),
-    ...(trimmedData.hipoteseDiagnostica.length > 0 && {
-      tipo_hipotese_diag_idtipo_hipotese_diag:
-        parseInt(trimmedData.hipoteseDiagnostica[0]) || null,
-    }),
+    tipo_hipotese_diag_idtipo_hipotese_diag: 
+  trimmedData.hipoteseDiagnostica.length > 0
+    ? parseInt(trimmedData.hipoteseDiagnostica[0]) || null
+    : null,
   ...(trimmedData.observacaoHipotese && {
     observacao_hiposete: trimmedData.observacaoHipotese || "",
   }),
