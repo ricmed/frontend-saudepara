@@ -214,10 +214,6 @@ export const PacienteService = {
         throw new Error('O nome do paciente é obrigatório');
       }
       
-      if (!data.data_nascimento) {
-        throw new Error('A data de nascimento é obrigatória');
-      }
-      
       if (!data.tipo_genero_idtipo_genero) {
         throw new Error('O tipo de gênero é obrigatório');
       }

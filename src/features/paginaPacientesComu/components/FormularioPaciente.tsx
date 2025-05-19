@@ -262,7 +262,7 @@ const FormularioPaciente = ({
             cbo_idcbo: pacienteUpperCase.cbo_idcbo || null,
             ddi: pacienteUpperCase.ddi || "55",
             contato: pacienteUpperCase.contato || "",
-            idade: calculatedAge,
+            idade: pacienteUpperCase.idade ? pacienteUpperCase.idade.toString() : calculatedAge,
           });
         })
         .catch((error) => {
@@ -612,27 +612,25 @@ const FormularioPaciente = ({
     }
 
     // Validar data_nascimento
-    if (!formData.data_nascimento) {
-      newErrors.data_nascimento = "O campo data de nascimento é obrigatório";
-    } else {
-      const date = new Date(formData.data_nascimento);
-      if (isNaN(date.getTime())) {
-        newErrors.data_nascimento = "Data de nascimento inválida";
-      } else {
-        // Verificar se a data de nascimento não resulta em idade maior que 120 anos
-        const age = parseInt(calculateAge(formData.data_nascimento));
-        if (age > 120) {
-          newErrors.data_nascimento = "A idade não pode ser maior que 120 anos";
-        }
-        
-        // Verificar se a data não é futura
-        const today = new Date();
-        today.setHours(0, 0, 0, 0); // Zerar horas para comparação justa
-        if (date > today) {
-          newErrors.data_nascimento = "A data de nascimento não pode ser futura";
-        }
-      }
+    if (formData.data_nascimento && formData.data_nascimento.trim() !== '') {
+  const date = new Date(formData.data_nascimento);
+  if (isNaN(date.getTime())) {
+    newErrors.data_nascimento = "Data de nascimento inválida";
+  } else {
+    // Verificar se a data de nascimento não resulta em idade maior que 120 anos
+    const age = parseInt(calculateAge(formData.data_nascimento));
+    if (age > 120) {
+      newErrors.data_nascimento = "A idade não pode ser maior que 120 anos";
     }
+    
+    // Verificar se a data não é futura
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Zerar horas para comparação justa
+    if (date > today) {
+      newErrors.data_nascimento = "A data de nascimento não pode ser futura";
+    }
+  }
+}
 
     // Validar idade quando não há data de nascimento
     if (!formData.data_nascimento && formData.idade) {
@@ -725,13 +723,16 @@ const FormularioPaciente = ({
     const result: any = {
       nome: nome,
       nome_mae: nome_mae,
-      data_nascimento: formData.data_nascimento,
+      data_nascimento: (!formData.data_nascimento || formData.data_nascimento.trim() === '')
+    ? null 
+    : formData.data_nascimento,
       cpf: formData.cpf || null,
       tipo_genero_idtipo_genero: formData.tipo_genero_idtipo_genero as number,
       gestante: formData.gestante || null,
       tipo_raca_idtipo_raca: formData.tipo_raca_idtipo_raca as number,
       ddi: formData.ddi,
       contato: formData.contato || null,
+      ...((!formData.data_nascimento || formData.data_nascimento.trim() === '') && formData.idade ? { idade: parseInt(formData.idade) } : {}),
 
       // Definir explicitamente como null quando vazio
       escolaridade_idescolaridade:
@@ -1089,7 +1090,7 @@ const FormularioPaciente = ({
                   {/* Data de Nascimento */}
                   <div>
                     <label className="block mb-2 font-medium text-gray-700">
-                      Data de Nascimento <span className="text-red-500">*</span>
+                      Data de Nascimento
                     </label>
                     <CustomDateInput
                       name="data_nascimento"
@@ -1102,7 +1103,7 @@ const FormularioPaciente = ({
                       onChange={handleChange}
                       disabled={isLoading || isLoadingOptions}
                       placeholder="DD/MM/AAAA"
-                      required={true}
+                      required={false}
                       data-error={errors.data_nascimento ? "true" : "false"}
                       error={errors.data_nascimento}
                       // Impedir datas futuras

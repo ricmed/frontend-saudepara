@@ -1021,7 +1021,8 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         const pacienteData = {
           nome: formData.paciente,
           nome_mae: formData.nomeMae || "",
-          data_nascimento: formData.dataNascimento || undefined,
+          // Incluir data_nascimento apenas se existir
+          ...(formData.dataNascimento ? { data_nascimento: formData.dataNascimento } : {}),
           cpf: formData.cpf || "",
           contato: formData.contatoTelefonico || "",
           tipo_genero_idtipo_genero: formData.identidadeGenero
@@ -1037,6 +1038,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
             ? parseInt(formData.profissao)
             : undefined,
           ddi: formData.ddi || "55",
+          // Adicionar idade somente se não houver data de nascimento
+          ...((!formData.dataNascimento || formData.dataNascimento.trim() === '') && formData.idade
+              ? { idade: parseInt(formData.idade) }
+              : {}),
         };
 
         // Usar o serviço para atualizar o paciente

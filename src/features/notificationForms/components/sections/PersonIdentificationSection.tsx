@@ -265,7 +265,7 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
             {/* Data de Nascimento */}
             <div>
               <label className="block mb-2 font-medium text-gray-700">
-                Data de Nascimento <span className="text-red-500">*</span>
+                Data de Nascimento
               </label>
               <CustomDateInput
                 name="dataNascimento"
