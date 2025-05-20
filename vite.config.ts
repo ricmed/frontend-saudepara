@@ -99,5 +99,19 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
       '~': path.resolve(__dirname, './src'),
     },
-  }
+  },
+  server: {
+    port: 5173,
+    proxy: {
+      // Todas as requisições que começarem com /api serão redirecionadas
+      // para o backend em localhost:4000
+      '/api-auth': {
+        target: 'https://app.hml.saude.pa.gov.br/',
+        changeOrigin: true,
+        secure: false,
+        // opcional: se quiser reescrever a rota, mas aqui não é preciso:
+        // rewrite: path => path.replace(/^\/api/, '/api')
+      },
+    },
+  },
 });

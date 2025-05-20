@@ -8,20 +8,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get('/api/protected/profile', { withCredentials: true })
+    axios.get('/api-auth/protected/profile', { withCredentials: true })
       .then(res => setUser(res.data))
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
   }, []);
 
   const login = async (username: string, password: string) => {
-    await axios.post('/api/auth/login', { username, password }, { withCredentials: true });
-    const res = await axios.get('/api/protected/profile', { withCredentials: true });
+    await axios.post('/api-auth/auth/login', { username, password }, { withCredentials: true });
+    const res = await axios.get('/api-auth/protected/profile', { withCredentials: true });
     setUser(res.data);
   };
 
   const logout = async () => {
-    await axios.post('/api/auth/logout', {}, { withCredentials: true });
+    await axios.post('/api-auth/auth/logout', {}, { withCredentials: true });
     setUser(null);
   };
 
