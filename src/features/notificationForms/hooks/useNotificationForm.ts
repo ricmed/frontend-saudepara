@@ -87,7 +87,6 @@ const initialFormData: FormData = {
   hipoteseDiagnostica: [],
   observacaoHipotese: "",
   tipoTrauma: [],
-  dataOcorrencia: "",
   observacaoTrauma: "",
   relacionadoSurto: "",
   observacaoIncidente: "",
@@ -901,9 +900,9 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     setIsSuccess(false);
 
     // Verificar explicitamente se há erros de data
-    if (errors.dataOcorrencia || errors.dataInicioSintomas || errors.dataAtendimento || errors.dataEncerramento) {
+    if (errors.dataInicioSintomas || errors.dataAtendimento || errors.dataEncerramento) {
       // Destacar a seção com erro
-      const secaoComErro = errors.dataOcorrencia || errors.dataInicioSintomas 
+      const secaoComErro = errors.dataInicioSintomas 
         ? 'atendimento' 
         : errors.dataAtendimento 
           ? 'unidadeNotificadora' 
@@ -1121,7 +1120,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
               tipo_municipio_idtipo_municipio: "municipio",
               tipo_bairro_idtipo_bairro: "bairro",
               tipo_atendimento_idtipo_atendimento: "tipoAtendimento",
-              data_ocorrencia: "dataOcorrencia",
               tipo_encerramento_idtipo_encerramento: "tipoEncerramento",
               // Adicionar mais mapeamentos conforme necessário
             };

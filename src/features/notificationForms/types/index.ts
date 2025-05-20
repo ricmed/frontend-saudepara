@@ -3,7 +3,6 @@ export interface Notificacao {
     // Campos formatados retornados pela API
     id: number;
     paciente: string;
-    dataOcorrencia: string;
     tipoAtendimento: string;
     tipoEvento: string;
     tipoEncerramento: string;
@@ -11,7 +10,6 @@ export interface Notificacao {
     // Campo que contém todos os dados originais detalhados
     original?: {
       idnotificacao: number;
-      data_ocorrencia: string;
       data_atendimento?: string;
       paciente: {
         idpaciente: number;
@@ -60,7 +58,6 @@ export interface Notificacao {
   export const allColumns: ColumnDefinition[] = [
     { key: "paciente", label: "Paciente", sortable: true },
     { key: "tipo_evento", label: "Evento", sortable: true },
-    { key: "data_ocorrencia", label: "Data Ocorrência", sortable: true },
     { key: "data_atendimento", label: "Data Atendimento", sortable: true },
     { key: "tipo_atendimento", label: "Tipo Atendimento", sortable: false },
     { key: "tipo_encerramento", label: "Tipo Encerramento", sortable: false },

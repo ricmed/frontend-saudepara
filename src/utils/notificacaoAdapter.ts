@@ -188,7 +188,6 @@ if (backendData.contato_notificador) {
     tipoTrauma: backendData.tipo_trauma_idtipo_trauma
       ? [backendData.tipo_trauma_idtipo_trauma.toString()]
       : [],
-    dataOcorrencia: processarData(backendData.data_ocorrencia),
     observacaoTrauma: backendData.observacao_trauma || "",
     relacionadoSurto,
     observacaoIncidente: backendData.observavao_incidente || "",
@@ -368,7 +367,6 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
   ? parseInt(trimmedData.paisProcedencia) || null 
   : 105, // Brasil para opções 1 e 2
     tipo_atendimento_idtipo_atendimento: parseInt(trimmedData.tipoAtendimento) || null,
-    data_ocorrencia: processarDataParaUTC(trimmedData.dataOcorrencia) || new Date().toISOString().split("T")[0],
     surto,
     estabelecimento_idestabelecimento: parseInt(trimmedData.unidadeNotificadora) || null,
     tipo_encerramento_idtipo_encerramento: parseInt(trimmedData.tipoEncerramento) || null,
@@ -491,7 +489,7 @@ export const salvarNotificacaoCompleta = async (
   if (!formData.residenteBelem) console.warn("Campo obrigatório ausente: residenteBelem");
   if (!formData.paisProcedencia) console.warn("Campo obrigatório ausente: paisProcedencia");
   if (!formData.tipoAtendimento) console.warn("Campo obrigatório ausente: tipoAtendimento");
-  if (!formData.dataOcorrencia) console.warn("Campo obrigatório ausente: dataOcorrencia");
+  // Removed warning for missing dataOcorrencia
   if (!formData.tipoEncerramento) console.warn("Campo obrigatório ausente: tipoEncerramento");
   
   // Formatar dados para o backend

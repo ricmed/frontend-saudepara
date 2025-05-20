@@ -246,7 +246,6 @@ export const validateForm = (
     { field: "paciente", label: "Paciente" },
     { field: "paisProcedencia", label: "País de procedência" },
     { field: "tipoAtendimento", label: "Tipo de Atendimento" },
-    { field: "dataOcorrencia", label: "Data da Ocorrência" },
     { field: "tipoEncerramento", label: "Tipo de Encerramento" },
     { field: "unidadeNotificadora", label: "Unidade Notificadora" },
   ];
@@ -327,7 +326,6 @@ export const validateForm = (
       newErrors.tipoAtendimento ||
       newErrors.sinaisESintomas ||
       newErrors.tipoTrauma ||
-      newErrors.dataOcorrencia ||
       newErrors.dataInicioSintomas
     ) {
       newExpandedSections.atendimento = true;

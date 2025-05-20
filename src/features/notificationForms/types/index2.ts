@@ -41,7 +41,6 @@ export interface FormData {
   hipoteseDiagnostica: string[];
   observacaoHipotese: string;
   tipoTrauma: string[];
-  dataOcorrencia: string;
   observacaoTrauma: string;
   relacionadoSurto: string;
   observacaoIncidente: string;

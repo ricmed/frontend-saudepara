@@ -1,4 +1,3 @@
-// src/features/notificationForms/components/sections/AttendanceInfoSection.tsx
 import React, { useState, useEffect } from 'react';
 import { ListChecks, Search, X } from 'lucide-react';
 import { FormSectionProps } from '@/features/notificationForms/types/index2';
@@ -319,31 +318,6 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                   />
                 </div>
 
-                {/* Data da Ocorrência */}
-                <div>
-                  <label className="block mb-2 font-medium text-gray-700">
-                    Data da Ocorrência <span className="text-red-500">*</span>
-                  </label>
-                  <CustomDateInput
-                    name="dataOcorrencia"
-                    className={`w-full p-3 border ${
-                      errors.dataOcorrencia
-                        ? "border-red-500 bg-red-50"
-                        : "border-gray-200"
-                    } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
-                    value={formData.dataOcorrencia}
-                    onChange={handleChange}
-                    data-error={errors.dataOcorrencia ? "true" : "false"}
-                    error={errors.dataOcorrencia}
-                    onValidationError={handleValidationError}
-                  />
-                  {errors.dataOcorrencia && (
-                    <p className="mt-1 text-sm text-red-500">
-                      {errors.dataOcorrencia}
-                    </p>
-                  )}
-                </div>
-
                 <div className="md:col-span-2">
                   <FormField
                     label="Observação"
@@ -372,34 +346,6 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                   />
                 </div>
               </>
-            )}
-
-            {/* Data da Ocorrência para outros tipos */}
-            {!isTipoAtendimentoFunc("TRAUMA") &&
-              !isTipoAtendimentoFunc("MULTIPLAS VITIMAS") && (
-              <div>
-                <label className="block mb-2 font-medium text-gray-700">
-                  Data da Ocorrência <span className="text-red-500">*</span>
-                </label>
-                <CustomDateInput
-                  name="dataOcorrencia"
-                  className={`w-full p-3 border ${
-                    errors.dataOcorrencia
-                      ? "border-red-500 bg-red-50"
-                      : "border-gray-200"
-                  } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
-                  value={formData.dataOcorrencia}
-                  onChange={handleChange}
-                  data-error={errors.dataOcorrencia ? "true" : "false"}
-                  error={errors.dataOcorrencia}
-                  onValidationError={handleValidationError}
-                />
-                {errors.dataOcorrencia && (
-                  <p className="mt-1 text-sm text-red-500">
-                    {errors.dataOcorrencia}
-                  </p>
-                )}
-              </div>
             )}
 
             {/* Hipótese Diagnóstica para TODOS os tipos EXCETO TRAUMA e MULTIPLAS VITIMAS */}
