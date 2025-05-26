@@ -2,13 +2,10 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import {
-  User,
   Save,
   Plus,
   X,
   ArrowLeft,
-  Calendar,
-  Phone,
   UserCircle,
   ChevronDown,
   ChevronUp,
@@ -140,12 +137,9 @@ const FormularioPaciente = ({
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [originalCpf, setOriginalCpf] = useState<string>(""); // Armazenar CPF original para validação
-
   // Estado para controlar seções expandidas
   const [expandedSections, setExpandedSections] = useState({
-    dados_pessoais: true,
-    dados_complementares: true,
-    contato: true,
+    identificacao_individuo: true, // Única seção sempre expandida por padrão
   });
 
   // Estado para mostrar/esconder o popover de ajuda de identidade de gênero
@@ -593,7 +587,6 @@ const FormularioPaciente = ({
       }
     }
   };
-
   // Validar o formulário antes de enviar
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -607,30 +600,27 @@ const FormularioPaciente = ({
 
     // Validar nome_mae (opcional)
     if (formData.nome_mae && formData.nome_mae.length > 100) {
-      newErrors.nome_mae =
-        "O campo nome da mãe deve ter no máximo 100 caracteres";
+      newErrors.nome_mae = "O campo nome da mãe deve ter no máximo 100 caracteres";
     }
 
     // Validar data_nascimento
     if (formData.data_nascimento && formData.data_nascimento.trim() !== '') {
-  const date = new Date(formData.data_nascimento);
-  if (isNaN(date.getTime())) {
-    newErrors.data_nascimento = "Data de nascimento inválida";
-  } else {
-    // Verificar se a data de nascimento não resulta em idade maior que 120 anos
-    const age = parseInt(calculateAge(formData.data_nascimento));
-    if (age > 120) {
-      newErrors.data_nascimento = "A idade não pode ser maior que 120 anos";
+      const date = new Date(formData.data_nascimento);
+      if (isNaN(date.getTime())) {
+        newErrors.data_nascimento = "Data de nascimento inválida";
+      } else {
+        const age = parseInt(calculateAge(formData.data_nascimento));
+        if (age > 120) {
+          newErrors.data_nascimento = "A idade não pode ser maior que 120 anos";
+        }
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (date > today) {
+          newErrors.data_nascimento = "A data de nascimento não pode ser futura";
+        }
+      }
     }
-    
-    // Verificar se a data não é futura
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Zerar horas para comparação justa
-    if (date > today) {
-      newErrors.data_nascimento = "A data de nascimento não pode ser futura";
-    }
-  }
-}
 
     // Validar idade quando não há data de nascimento
     if (!formData.data_nascimento && formData.idade) {
@@ -651,56 +641,39 @@ const FormularioPaciente = ({
 
     // Validar tipo de gênero
     if (!formData.tipo_genero_idtipo_genero) {
-      newErrors.tipo_genero_idtipo_genero =
-        "O campo tipo de gênero é obrigatório";
+      newErrors.tipo_genero_idtipo_genero = "O campo identidade de gênero é obrigatório";
     }
 
     // Validar tipo de raça
     if (!formData.tipo_raca_idtipo_raca) {
-      newErrors.tipo_raca_idtipo_raca = "O campo tipo de raça é obrigatório";
+      newErrors.tipo_raca_idtipo_raca = "O campo raça é obrigatório";
     }
 
     // Validar contato (opcional)
     if (formData.contato && formData.contato.length > 15) {
       newErrors.contato = "O contato deve ter no máximo 15 caracteres";
-    }
-
-    setErrors(newErrors);
+    }    setErrors(newErrors);
     
-    // Se houver erros, expandir as seções relevantes e fazer scroll
+    // Se houver erros, fazer scroll para o resumo
     if (Object.keys(newErrors).length > 0) {
-      // Expandir seções com erros
-      const newExpandedSections = { ...expandedSections };
+      // Expandir a única seção
+      setExpandedSections({
+        identificacao_individuo: true
+      });
       
-      if (newErrors.nome || newErrors.nome_mae || newErrors.data_nascimento || 
-          newErrors.idade || newErrors.cpf) {
-        newExpandedSections.dados_pessoais = true;
-      }
-      
-      if (newErrors.tipo_genero_idtipo_genero || newErrors.tipo_raca_idtipo_raca || 
-          newErrors.escolaridade_idescolaridade) {
-        newExpandedSections.dados_complementares = true;
-      }
-      
-      if (newErrors.contato) {
-        newExpandedSections.contato = true;
-      }
-      
-      setExpandedSections(newExpandedSections);
-      
-      // Depois de expandir as seções, scroll para o primeiro erro
+      // Scroll para o resumo de erros
       setTimeout(() => {
-        const firstErrorField = document.querySelector('[data-error="true"]');
-        if (firstErrorField) {
-          firstErrorField.scrollIntoView({
-            behavior: "smooth",
-            block: "center",
+        const errorSummary = document.getElementById('error-summary');
+        if (errorSummary) {
+          errorSummary.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
           });
         }
-      }, 100);
+      }, 150);
       
-      // Exibir toast com resumo
-      toast.error("Corrija os erros no formulário para continuar");
+      // Toast com contagem de erros
+      toast.error(`${Object.keys(newErrors).length} erro(s) encontrado(s). Verifique o resumo acima.`);
     }
     
     return Object.keys(newErrors).length === 0;
@@ -824,26 +797,14 @@ const FormularioPaciente = ({
         
         setApiError(errorMessage);
         toast.error(errorMessage);
-        
-        // Adicionar erros de validação de campos específicos
+          // Adicionar erros de validação de campos específicos
         if (Object.keys(validationErrors).length > 0) {
           setErrors(prev => ({...prev, ...validationErrors}));
           
-          // Expandir seções com erros
-          const sectionsToExpand = { ...expandedSections };
-          
-          // Determinar quais seções expandir com base nos erros
-          Object.keys(validationErrors).forEach(field => {
-            if (["nome", "nome_mae", "data_nascimento", "idade", "cpf"].includes(field)) {
-              sectionsToExpand.dados_pessoais = true;
-            } else if (["tipo_genero_idtipo_genero", "tipo_raca_idtipo_raca", "escolaridade_idescolaridade"].includes(field)) {
-              sectionsToExpand.dados_complementares = true;
-            } else if (["contato", "ddi"].includes(field)) {
-              sectionsToExpand.contato = true;
-            }
+          // Expandir a única seção com erros
+          setExpandedSections({
+            identificacao_individuo: true
           });
-          
-          setExpandedSections(sectionsToExpand);
           
           // Rolar até o primeiro campo com erro
           setTimeout(() => {
@@ -862,7 +823,109 @@ const FormularioPaciente = ({
     }
   };
 
-  // Substitua o handleSubmit pela nova implementação
+  // ========================================
+  // COMPONENTE DE RESUMO DE ERROS
+  // ========================================
+  const ErrorSummary = ({ errors, onFieldClick }: { errors: Record<string, string>, onFieldClick: (fieldName: string) => void }) => {
+    const errorEntries = Object.entries(errors);
+    
+    if (errorEntries.length === 0) return null;
+
+    // Mapear nomes dos campos para labels amigáveis
+    const fieldLabels: Record<string, string> = {
+      nome: "Nome",
+      nome_mae: "Nome da Mãe", 
+      data_nascimento: "Data de Nascimento",
+      idade: "Idade",
+      cpf: "CPF",
+      tipo_genero_idtipo_genero: "Identidade de Gênero",
+      gestante: "Gestante",
+      tipo_raca_idtipo_raca: "Raça",
+      escolaridade_idescolaridade: "Escolaridade",
+      cbo_idcbo: "Profissão/Ocupação",
+      contato: "Contato Telefônico",
+      ddi: "DDI"
+    };
+
+    return (
+      <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-400 rounded-r-lg shadow-sm" id="error-summary">
+        <div className="flex items-start">
+          <div className="flex-shrink-0">
+            <AlertCircle className="h-5 w-5 text-red-400" />
+          </div>
+          <div className="ml-3 w-full">
+            <h3 className="text-sm font-medium text-red-800">
+              {errorEntries.length === 1 
+                ? "Há 1 erro que precisa ser corrigido:"
+                : `Há ${errorEntries.length} erros que precisam ser corrigidos:`
+              }
+            </h3>
+            <div className="mt-2">
+              <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
+                {errorEntries.map(([fieldName, errorMessage]) => (
+                  <li key={fieldName} className="flex items-start">
+                    <button
+                      type="button"
+                      onClick={() => onFieldClick(fieldName)}
+                      className="text-left hover:underline focus:underline focus:outline-none"
+                    >
+                      <span className="font-medium">
+                        {fieldLabels[fieldName] || fieldName}:
+                      </span>{" "}
+                      {errorMessage}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="mt-3">
+              <p className="text-xs text-red-600">
+                💡 Clique em qualquer erro acima para ir diretamente ao campo
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  // ========================================
+  // FUNÇÃO PARA SCROLL PARA CAMPO ESPECÍFICO
+  // ========================================
+  const scrollToField = (fieldName: string) => {
+    // Expandir a seção se necessário
+    if (!expandedSections.identificacao_individuo) {
+      setExpandedSections(prev => ({
+        ...prev,
+        identificacao_individuo: true
+      }));
+    }
+    
+    // Aguardar expansão e fazer scroll
+    setTimeout(() => {
+      const element = document.querySelector(`[name="${fieldName}"]`) || 
+                     document.querySelector(`[data-field="${fieldName}"]`);
+      
+      if (element) {
+        element.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
+        });
+        
+        // Destacar temporariamente o campo
+        (element as HTMLElement).style.transform = 'scale(1.02)';
+        (element as HTMLElement).style.transition = 'transform 0.2s ease';
+        
+        setTimeout(() => {
+          (element as HTMLElement).style.transform = 'scale(1)';
+          if ((element as HTMLElement).focus) {
+            (element as HTMLElement).focus();
+          }
+        }, 200);
+      }
+    }, 100);
+  };
+
+  // Handler para submissão do formulário
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     handleCrearPacienteComDadosLimpos();
@@ -1011,9 +1074,7 @@ const FormularioPaciente = ({
               </div>
             </div>
           </div>
-        )}
-
-        {/* Mensagem de sucesso */}
+        )}        {/* Mensagem de sucesso */}
         {isSuccess && !isModal && (
           <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
             <div className="flex items-center gap-2 text-green-600">
@@ -1027,16 +1088,20 @@ const FormularioPaciente = ({
           </div>
         )}
 
-        <form id="paciente-form" onSubmit={handleSubmit} className="space-y-4">
-          {/* Seção 1: Dados Pessoais */}
+        {/* Resumo de Erros */}
+        <ErrorSummary 
+          errors={errors} 
+          onFieldClick={scrollToField}
+        />        <form id="paciente-form" onSubmit={handleSubmit} className="space-y-4">
+          {/* Seção Única: Identificação do Indivíduo */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <SectionHeader
-              icon={<User className="h-5 w-5 text-blue-500" />}
-              title="1. Dados Pessoais"
-              isExpanded={expandedSections.dados_pessoais}
-              onToggle={() => toggleSection("dados_pessoais")}
+              icon={<UserCircle className="h-5 w-5 text-blue-500" />}
+              title="3. Identificação do Indivíduo"
+              isExpanded={expandedSections.identificacao_individuo}
+              onToggle={() => toggleSection("identificacao_individuo")}
             />
-            {expandedSections.dados_pessoais && (
+            {expandedSections.identificacao_individuo && (
               <div className="p-6 border-t">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Nome */}
@@ -1047,7 +1112,7 @@ const FormularioPaciente = ({
                     <input
                       type="text"
                       name="nome"
-                      placeholder="Nome completo do paciente"
+                      placeholder="Nome do paciente"
                       className={`w-full p-3 border ${
                         errors.nome ? "border-red-500 bg-red-50" : "border-gray-200"
                       } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
@@ -1106,7 +1171,6 @@ const FormularioPaciente = ({
                       required={false}
                       data-error={errors.data_nascimento ? "true" : "false"}
                       error={errors.data_nascimento}
-                      // Impedir datas futuras
                       maxDate={new Date().toISOString().split('T')[0]}
                     />
                   </div>
@@ -1124,21 +1188,23 @@ const FormularioPaciente = ({
                           ? "Calculada automaticamente"
                           : "Digite a idade"
                       }
-                      className={`w-full p-3 border ${errors.idade ? "border-red-500 bg-red-50" : "border-gray-200"} rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none ${
-                        formData.data_nascimento
-                          ? "bg-gray-100 text-gray-700"
-                          : ""
+                      className={`w-full p-3 border rounded-lg text-sm transition-colors outline-none ${
+                        errors.idade 
+                          ? "border-red-500 bg-red-50" 
+                          : formData.data_nascimento
+                            ? "border-gray-300 bg-gray-200 text-gray-600 cursor-not-allowed opacity-75"
+                            : "border-gray-200 bg-white hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                       }`}
                       value={formData.idade || ""}
                       onChange={handleChange}
-                      disabled={Boolean(formData.data_nascimento)} // Importante: converter explicitamente para booleano
+                      disabled={Boolean(formData.data_nascimento)}
                       min="0"
                       max="120"
                       data-error={errors.idade ? "true" : "false"}
                     />
                     {formData.data_nascimento ? (
-                      <p className="mt-1 text-xs text-gray-500">
-                        Idade calculada a partir da data de nascimento
+                      <p className="mt-1 text-xs text-gray-600 font-medium">
+                        ⚠️ Idade calculada a partir da data de nascimento: {formData.idade} anos
                       </p>
                     ) : (
                       <p className="mt-1 text-xs text-gray-500">
@@ -1176,22 +1242,7 @@ const FormularioPaciente = ({
                       <p className="mt-1 text-sm text-red-500">{errors.cpf}</p>
                     )}
                   </div>
-                </div>
-              </div>
-            )}
-          </div>
 
-          {/* Seção 2: Dados Complementares */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <SectionHeader
-              icon={<UserCircle className="h-5 w-5 text-purple-500" />}
-              title="2. Dados Complementares"
-              isExpanded={expandedSections.dados_complementares}
-              onToggle={() => toggleSection("dados_complementares")}
-            />
-            {expandedSections.dados_complementares && (
-              <div className="p-6 border-t">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Identidade de Gênero */}
                   <div>
                     <div className="flex items-center gap-2 mb-2">
@@ -1377,12 +1428,8 @@ const FormularioPaciente = ({
                       name="cbo_idcbo"
                       value={formData.cbo_idcbo?.toString() || ""}
                       onChange={(value) => {
-                        console.log(
-                          `Alterando cbo_idcbo para: "${value}" (${typeof value})`
-                        );
                         setFormData((prev) => ({
                           ...prev,
-                          // Garantir que valores vazios sejam null, não 0 ou string vazia
                           cbo_idcbo:
                             value && value.trim() !== ""
                               ? parseInt(value)
@@ -1394,36 +1441,19 @@ const FormularioPaciente = ({
                       disabled={isLoading || isLoadingOptions}
                     />
                   </div>
-                </div>
-              </div>
-            )}
-          </div>
 
-          {/* Seção 3: Contato */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <SectionHeader
-              icon={<Phone className="h-5 w-5 text-green-500" />}
-              title="3. Contato"
-              isExpanded={expandedSections.contato}
-              onToggle={() => toggleSection("contato")}
-            />
-            {expandedSections.contato && (
-              <div className="p-6 border-t">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Contato Telefônico */}
                   <div>
                     <PhoneInput
                       name="contato"
                       value={formData.contato}
-                      ddi={formData.ddi} // Adicione esta linha para passar o DDI atual
+                      ddi={formData.ddi}
                       onChange={(value) => {
-                        // Este callback continuará funcionando para compatibilidade
                         setFormData((prev) => ({
                           ...prev,
                           contato: value,
                         }));
                         
-                        // Limpar erro se existir
                         if (errors.contato) {
                           setErrors(prev => {
                             const newErrors = {...prev};
@@ -1433,14 +1463,12 @@ const FormularioPaciente = ({
                         }
                       }}
                       onChangeWithCode={(ddiValue, phoneNumber) => {
-                        // Novo callback para atualizar separadamente o DDI e o número
                         setFormData((prev) => ({
                           ...prev,
-                          ddi: ddiValue, // Atualiza o DDI no estado
-                          contato: phoneNumber, // Atualiza apenas o número no estado
+                          ddi: ddiValue,
+                          contato: phoneNumber,
                         }));
                         
-                        // Limpar erro se existir
                         if (errors.contato) {
                           setErrors(prev => {
                             const newErrors = {...prev};

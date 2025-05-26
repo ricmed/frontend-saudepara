@@ -26,7 +26,7 @@ const CaseClosureSection: React.FC<CaseClosureSectionProps> = ({
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
       <SectionHeader
         icon={<ArchiveX className="h-5 w-5 text-gray-700" />}
-        title="6. Encerramento do Caso"
+        title="6. Desfecho do Caso"
         isExpanded={isExpanded}
         onToggle={toggleSection}
       />
@@ -37,7 +37,7 @@ const CaseClosureSection: React.FC<CaseClosureSectionProps> = ({
             {/* Data de Encerramento */}
             <div>
               <label className="block mb-2 font-medium text-gray-700">
-                Data de Encerramento
+                Data de Desfecho
               </label>
               <CustomDateInput
                 name="dataEncerramento"
@@ -49,7 +49,7 @@ const CaseClosureSection: React.FC<CaseClosureSectionProps> = ({
 
             {/* Tipo de Encerramento */}
             <FormField
-              label="Tipo de Encerramento"
+              label="Desfecho"
               name="tipoEncerramento"
               value={formData.tipoEncerramento}
               onChange={handleChange}
