@@ -1,7 +1,7 @@
 // src/features/notificationForms/ListaNotificacoes.tsx
 import React, { useRef } from "react";
 import { CSVLink } from "react-csv";
-// Atualizar a importação do SideMenu
+import { Download, Table, FileText, Files } from "lucide-react";
 import SideMenu from "@/features/home/components/SideMenu";
 import TableHeader from "./components/TableHeader";
 import NotificationTable from "./components/NotificationTable";
@@ -9,9 +9,8 @@ import Pagination from "./components/Pagination";
 import { useNotifications } from "./hooks/useNotifications";
 import { useTableControls } from "./hooks/useTableControls";
 import { allColumns, searchFields } from "./types";
-import type { SearchParams } from "./types";
+import type { SearchParams, PDFExportType, PDFExportOption } from "./types";
 import { formatDate } from "./utils";
-// Adicionar importação do contexto de linguagem
 import { useLanguage } from "@/contexts/LanguageContext";
 
 const ListaNotificacoes: React.FC = () => {
@@ -25,6 +24,11 @@ const ListaNotificacoes: React.FC = () => {
   
   // Adicionar contexto de idioma
   const { selectedLanguage, setSelectedLanguage } = useLanguage();
+
+  // Função para lidar com exportação PDF
+  const handlePdfExport = (pdfType: PDFExportType) => {
+    notifications.handleExport('pdf', 'all', pdfType);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -60,10 +64,9 @@ const ListaNotificacoes: React.FC = () => {
         onClose={() => tableControls.setIsMenuOpen(false)}
         selectedLanguage={selectedLanguage}
         onLanguageChange={(language) => setSelectedLanguage(language)}
-      />
-
-      {/* Conteúdo principal */}
+      />      {/* Conteúdo principal */}
       <main className="max-w-7xl mx-auto px-4 py-8">
+
         <div className="overflow-x-auto">
           {/* Tabela de Notificações */}
           <NotificationTable 

@@ -1,71 +1,177 @@
-// src/features/notificationForms/components/ExportMenu.tsx
-import React from 'react';
-import { Download } from 'lucide-react';
+// CompactExportMenu.tsx - Versão compacta e eficiente
+import React, { useState } from 'react';
+import { 
+  Download, 
+  FileSpreadsheet, 
+  FileText, 
+  FileImage,
+  Table,
+  FileCheck,
+  Layers,
+  ChevronDown
+} from 'lucide-react';
+import { PDFExportType } from '@/features/notificationForms/components/exportUtilities';
 
-interface ExportMenuProps {
+interface CompactExportMenuProps {
   isOpen: boolean;
-  onExport: (format: 'csv' | 'excel' | 'pdf', type: 'page' | 'all') => void;
+  onExport: (format: 'csv' | 'excel' | 'pdf', type: 'page' | 'all', pdfType?: PDFExportType) => void;
+  isLoading: boolean;
 }
 
-const ExportMenu: React.FC<ExportMenuProps> = ({ isOpen, onExport }) => {
+const CompactExportMenu: React.FC<CompactExportMenuProps> = ({
+  isOpen,
+  onExport,
+  isLoading
+}) => {
+  const [selectedPdfType, setSelectedPdfType] = useState<PDFExportType>('both');
+  const [showPdfOptions, setShowPdfOptions] = useState(false);
+
   if (!isOpen) return null;
 
+  const pdfTypes = [
+    { type: 'table' as PDFExportType, name: 'Tabela', icon: Table },
+    { type: 'forms' as PDFExportType, name: 'Fichas', icon: FileCheck },
+    { type: 'both' as PDFExportType, name: 'Completo', icon: Layers }
+  ];
+
+  const currentPdfType = pdfTypes.find(type => type.type === selectedPdfType) || pdfTypes[2];
+
   return (
-    <div className="absolute left-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 p-2">
-      <div className="border-b pb-2 mb-2">
-        <h3 className="text-sm font-medium text-gray-700 px-2">
-          Página Atual
-        </h3>
-        <button
-          onClick={() => onExport('csv', 'page')}
-          className="w-full text-left px-2 py-1.5 text-gray-700 hover:bg-gray-50 rounded flex items-center gap-2"
-        >
-          <Download className="h-4 w-4" />
-          CSV (página atual)
-        </button>
-        <button
-          onClick={() => onExport('excel', 'page')}
-          className="w-full text-left px-2 py-1.5 text-gray-700 hover:bg-gray-50 rounded flex items-center gap-2"
-        >
-          <Download className="h-4 w-4" />
-          Excel (página atual)
-        </button>
-        <button
-          onClick={() => onExport('pdf', 'page')}
-          className="w-full text-left px-2 py-1.5 text-gray-700 hover:bg-gray-50 rounded flex items-center gap-2"
-        >
-          <Download className="h-4 w-4" />
-          PDF (página atual)
-        </button>
+    <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+      {/* Header Compacto */}
+      <div className="px-4 py-2 bg-blue-600 text-white rounded-t-lg">
+        <div className="flex items-center">
+          <Download className="h-4 w-4 mr-2" />
+          <span className="font-medium text-sm">Exportar Dados</span>
+        </div>
       </div>
-      <div>
-        <h3 className="text-sm font-medium text-gray-700 px-2">
-          Todos os Dados
-        </h3>
-        <button
-          onClick={() => onExport('csv', 'all')}
-          className="w-full text-left px-2 py-1.5 text-gray-700 hover:bg-gray-50 rounded flex items-center gap-2"
-        >
-          <Download className="h-4 w-4" />
-          CSV (todos os dados)
-        </button>
-        <button
-          onClick={() => onExport('excel', 'all')}
-          className="w-full text-left px-2 py-1.5 text-gray-700 hover:bg-gray-50 rounded flex items-center gap-2"
-        >
-          <Download className="h-4 w-4" />
-          Excel (todos os dados)
-        </button>
-        <button
-          onClick={() => onExport('pdf', 'all')}
-          className="w-full text-left px-2 py-1.5 text-gray-700 hover:bg-gray-50 rounded flex items-center gap-2"
-        >
-          <Download className="h-4 w-4" />
-          PDF (todos os dados)
-        </button>
+
+      <div className="p-3 space-y-3">
+        {/* Excel */}
+        <div className="flex items-center justify-between p-2 bg-green-50 rounded border border-green-200">
+          <div className="flex items-center">
+            <FileSpreadsheet className="h-4 w-4 text-green-600 mr-2" />
+            <span className="text-sm font-medium text-gray-900">Excel</span>
+          </div>
+          <div className="flex space-x-1">
+            <button
+              onClick={() => onExport('excel', 'page')}
+              disabled={isLoading}
+              className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+            >
+              Página
+            </button>
+            <button
+              onClick={() => onExport('excel', 'all')}
+              disabled={isLoading}
+              className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+            >
+              Todos
+            </button>
+          </div>
+        </div>
+
+        {/* CSV */}
+        <div className="flex items-center justify-between p-2 bg-blue-50 rounded border border-blue-200">
+          <div className="flex items-center">
+            <FileText className="h-4 w-4 text-blue-600 mr-2" />
+            <span className="text-sm font-medium text-gray-900">CSV</span>
+          </div>
+          <div className="flex space-x-1">
+            <button
+              onClick={() => onExport('csv', 'page')}
+              disabled={isLoading}
+              className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            >
+              Página
+            </button>
+            <button
+              onClick={() => onExport('csv', 'all')}
+              disabled={isLoading}
+              className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            >
+              Todos
+            </button>
+          </div>
+        </div>
+
+        {/* PDF */}
+        <div className="bg-red-50 rounded border border-red-200">
+          {/* PDF Header */}
+          <div className="flex items-center justify-between p-2">
+            <div className="flex items-center">
+              <FileImage className="h-4 w-4 text-red-600 mr-2" />
+              <span className="text-sm font-medium text-gray-900">PDF</span>
+            </div>
+            <button
+              onClick={() => setShowPdfOptions(!showPdfOptions)}
+              className="flex items-center text-xs text-red-700 hover:text-red-800"
+            >
+              <currentPdfType.icon className="h-3 w-3 mr-1" />
+              {currentPdfType.name}
+              <ChevronDown className={`h-3 w-3 ml-1 transition-transform ${showPdfOptions ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+
+          {/* PDF Options */}
+          {showPdfOptions && (
+            <div className="px-2 pb-2 space-y-1">
+              {pdfTypes.map((type) => {
+                const IconComponent = type.icon;
+                const isSelected = selectedPdfType === type.type;
+                
+                return (
+                  <button
+                    key={type.type}
+                    onClick={() => {
+                      setSelectedPdfType(type.type);
+                      setShowPdfOptions(false);
+                    }}
+                    className={`w-full flex items-center p-1.5 rounded text-left text-xs transition-colors ${
+                      isSelected 
+                        ? 'bg-red-100 text-red-900' 
+                        : 'hover:bg-white text-gray-700'
+                    }`}
+                  >
+                    <IconComponent className="h-3 w-3 mr-2" />
+                    {type.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* PDF Export Buttons */}
+          <div className="flex justify-end space-x-1 p-2 pt-0">
+            <button
+              onClick={() => onExport('pdf', 'page', selectedPdfType)}
+              disabled={isLoading}
+              className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+            >
+              Página
+            </button>
+            <button
+              onClick={() => onExport('pdf', 'all', selectedPdfType)}
+              disabled={isLoading}
+              className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+            >
+              Todos
+            </button>
+          </div>
+        </div>
+
+        {/* Loading */}
+        {isLoading && (
+          <div className="text-center py-2 bg-gray-50 rounded">
+            <div className="inline-flex items-center text-xs text-gray-600">
+              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-1"></div>
+              Exportando...
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-export default ExportMenu;
+export default CompactExportMenu;

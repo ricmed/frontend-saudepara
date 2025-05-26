@@ -96,4 +96,13 @@ export interface Notificacao {
     encerramentoOptions: any[];
   }
 
+  export type PDFExportType = 'table' | 'forms' | 'both';
+
+export interface PDFExportOption {
+  type: PDFExportType;
+  label: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
   export type { FormSectionProps } from './index2';

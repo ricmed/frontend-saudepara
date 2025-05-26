@@ -1,6 +1,7 @@
 // src/features/notificationForms/hooks/useTableControls.ts
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
+import { PDFExportType } from '@/features/notificationForms/components/exportUtilities';
 
 export const useTableControls = () => {
   // Menus de controle
@@ -8,6 +9,10 @@ export const useTableControls = () => {
   const [isColumnsMenuOpen, setIsColumnsMenuOpen] = useState(false);
   const [isSortingMenuOpen, setIsSortingMenuOpen] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  
+  // Novos estados para controle de exportação PDF
+  const [isPdfOptionsOpen, setIsPdfOptionsOpen] = useState(false);
+  const [selectedPdfType, setSelectedPdfType] = useState<PDFExportType>('both');
   
   // Controle de colunas
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
@@ -20,7 +25,6 @@ export const useTableControls = () => {
 
   // Ref para detectar cliques fora dos menus
   const menuRef = useRef<HTMLDivElement>(null);
-
   // Monitorar cliques fora dos menus para fechá-los
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -28,6 +32,7 @@ export const useTableControls = () => {
         setIsColumnsMenuOpen(false);
         setIsSortingMenuOpen(false);
         setIsExportMenuOpen(false);
+        setIsPdfOptionsOpen(false);
       }
     }
 
@@ -50,26 +55,38 @@ export const useTableControls = () => {
       setSelectedColumns([...selectedColumns, colKey]);
     }
   };
-
   // Funções para alternar menus
   const toggleColumnsMenu = () => {
     setIsColumnsMenuOpen(!isColumnsMenuOpen);
     setIsSortingMenuOpen(false);
     setIsExportMenuOpen(false);
+    setIsPdfOptionsOpen(false);
   };
 
   const toggleSortingMenu = () => {
     setIsSortingMenuOpen(!isSortingMenuOpen);
     setIsColumnsMenuOpen(false);
     setIsExportMenuOpen(false);
+    setIsPdfOptionsOpen(false);
   };
 
   const toggleExportMenu = () => {
     setIsExportMenuOpen(!isExportMenuOpen);
     setIsSortingMenuOpen(false);
     setIsColumnsMenuOpen(false);
+    setIsPdfOptionsOpen(false);
   };
 
+  // Nova função para alternar opções de PDF
+  const togglePdfOptions = () => {
+    setIsPdfOptionsOpen(!isPdfOptionsOpen);
+  };
+
+  // Nova função para definir tipo de PDF
+  const handlePdfTypeSelect = (pdfType: PDFExportType) => {
+    setSelectedPdfType(pdfType);
+    setIsPdfOptionsOpen(false);
+  };
   return {
     // Estados
     isMenuOpen,
@@ -79,11 +96,19 @@ export const useTableControls = () => {
     selectedColumns,
     menuRef,
     
+    // Novos estados para PDF
+    isPdfOptionsOpen,
+    selectedPdfType,
+    
     // Funções
     setIsMenuOpen,
     handleToggleColumn,
     toggleColumnsMenu,
     toggleSortingMenu,
-    toggleExportMenu
+    toggleExportMenu,
+    
+    // Novas funções para PDF
+    togglePdfOptions,
+    handlePdfTypeSelect
   };
 };

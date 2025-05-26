@@ -8,7 +8,8 @@ import { adjustDatesForExport, compareValues, getValueForSorting } from '../util
 import { 
   exportListToExcel, 
   exportListToCSV, 
-  exportListToPDF,
+  exportListToPDFWithOptions,
+  PDFExportType,
   ExportOptions
 } from '@/features/notificationForms/components/exportUtilities';
 
@@ -355,9 +356,12 @@ export const useNotifications = () => {
       setError("Erro ao ordenar dados. Tente novamente.");
     }
   };
-
   // Funções de exportação
-  const handleExport = async (format: 'csv' | 'excel' | 'pdf', type: 'page' | 'all') => {
+  const handleExport = async (
+    format: 'csv' | 'excel' | 'pdf', 
+    type: 'page' | 'all',
+    pdfType?: PDFExportType // Novo parâmetro opcional para PDF
+  ) => {
     try {
       // Mostrar loader ou feedback visual
       setIsLoading(true);
@@ -402,8 +406,17 @@ export const useNotifications = () => {
         exportListToExcel(formattedData, options);
         toast.success(`Dados exportados com sucesso para Excel`);
       } else if (format === 'pdf') {
-        exportListToPDF(formattedData, options);
-        toast.success(`PDF exportado com sucesso`);
+        // Usar a nova função com opções de PDF
+        exportListToPDFWithOptions(formattedData, options, pdfType || 'both');
+        
+        // Mensagens específicas baseadas no tipo de PDF
+        const pdfMessages = {
+          'table': 'PDF da tabela resumida exportado com sucesso',
+          'forms': 'PDF das fichas detalhadas exportado com sucesso',
+          'both': 'PDF completo (tabela + fichas) exportado com sucesso'
+        };
+        
+        toast.success(pdfMessages[pdfType || 'both']);
       }
 
     } catch (error) {

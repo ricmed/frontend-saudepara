@@ -895,7 +895,6 @@ const prepareDataForExport = (
     "Tipo de Trauma": Array.isArray(formData.tipoTrauma)
       ? getTraumaLabels(formData.tipoTrauma)
       : "",
-    "Data da Ocorrência": formatarDataUniversal(formData.dataOcorrencia),
     "Observação do Trauma": formData.observacaoTrauma,
     "Relacionado a Surto":
       formData.relacionadoSurto === "1"
@@ -2126,7 +2125,7 @@ export const exportListToPDF = (
         tabelaPageIndices
       );
 
-      // Depois das fichas (em retrato)
+      // Depois as fichas (em retrato)
       const fichasPageIndices = Array.from(
         { length: fichasPdf.getPageCount() },
         (_, i) => i
@@ -2184,5 +2183,333 @@ export const exportListToPDF = (
   } catch (error) {
     console.error("Erro ao exportar lista para PDF:", error);
     throw error;
+  }
+};
+
+// ===================================================================
+// PARTE 5: NOVAS OPÇÕES DE EXPORTAÇÃO PDF
+// ===================================================================
+
+// Tipo para definir o tipo de exportação PDF
+export type PDFExportType = 'table' | 'forms' | 'both';
+
+// Exportar lista APENAS como tabela resumida (paisagem)
+export const exportListToPDFTableOnly = (
+  notificacoes: NotificacaoItem[],
+  exportOptions?: ExportOptions
+): void => {
+  try {
+    if (!notificacoes || notificacoes.length === 0) {
+      console.warn("Não há dados para exportar");
+      return;
+    }
+
+    // Formatar dados para PDF
+    const formattedData = notificacoes.map((item) =>
+      formatNotificacaoForExport(item, exportOptions)
+    );
+
+    // Criar documento em paisagem
+    const doc = new jsPDF({
+      orientation: "landscape",
+      unit: "mm",
+      format: "a4",
+    });
+
+    // Configurar título e informações do documento
+    doc.setFontSize(16);
+    doc.setTextColor(63, 81, 181);
+    doc.text("Relatório de Notificações - Tabela Resumida", 15, 15);
+
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.text(
+      `Gerado em: ${new Date().toLocaleDateString("pt-BR")}`,
+      15,
+      22
+    );
+    doc.text(`Total de registros: ${notificacoes.length}`, 15, 27);
+
+    // Selecionar campos para tabela (versão expandida mas ainda legível)
+    const tabelaFields = [
+      "Nome do Paciente",
+      "Idade",
+      "Tipo de Atendimento",
+      "Data da Ocorrência",
+      "Evento",
+      "Sinais e Sintomas",
+      "Tipo de Encerramento",
+      "Unidade Notificadora",
+    ];
+
+    // Criar tabela
+    doc.autoTable({
+      startY: 32,
+      head: [tabelaFields],
+      body: formattedData.map((item) =>
+        tabelaFields.map((field) => {
+          const value = String(item[field] || "");
+          // Limitar tamanho de textos longos para manter legibilidade
+          return field === "Sinais e Sintomas" && value.length > 40
+            ? value.substring(0, 37) + "..."
+            : value;
+        })
+      ),
+      headStyles: {
+        fillColor: [63, 81, 181],
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 245],
+      },
+      styles: {
+        fontSize: 9,
+        cellPadding: 3,
+        overflow: "linebreak",
+      },
+      columnStyles: {
+        0: { cellWidth: 40 }, // Nome do Paciente
+        1: { cellWidth: 10 }, // Idade
+        2: { cellWidth: 25 }, // Tipo de Atendimento
+        3: { cellWidth: 22 }, // Data da Ocorrência
+        4: { cellWidth: 25 }, // Evento
+        5: { cellWidth: 50 }, // Sinais e Sintomas
+        6: { cellWidth: 25 }, // Tipo de Encerramento
+        7: { cellWidth: 40 }, // Unidade Notificadora
+      },
+      didDrawPage: (data) => {
+        // Adicionar rodapé
+        const pageCount = doc.getNumberOfPages();
+        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100);
+        doc.text(
+          `Página ${data.pageNumber} de ${pageCount}`,
+          doc.internal.pageSize.getWidth() - 15,
+          doc.internal.pageSize.getHeight() - 10,
+          { align: "right" }
+        );
+      },
+    });
+
+    // Nome do arquivo
+    const currentDate = new Date().toISOString().split("T")[0];
+    const fileName = `tabela_notificacoes_${currentDate}.pdf`;
+
+    // Salvar o documento
+    doc.save(fileName);
+    
+  } catch (error) {
+    console.error("Erro ao exportar tabela PDF:", error);
+    throw error;
+  }
+};
+
+// Exportar lista APENAS como fichas detalhadas (retrato)
+export const exportListToPDFFormsOnly = (
+  notificacoes: NotificacaoItem[],
+  exportOptions?: ExportOptions
+): void => {
+  try {
+    if (!notificacoes || notificacoes.length === 0) {
+      console.warn("Não há dados para exportar");
+      return;
+    }
+
+    // Formatar dados para PDF
+    const formattedData = notificacoes.map((item) =>
+      formatNotificacaoForExport(item, exportOptions)
+    );
+
+    // Criar documento em retrato
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    // Definir seções para as fichas
+    const sections = [
+      {
+        title: "Dados Gerais",
+        fields: ["Evento", "Público Atendido"],
+      },
+      {
+        title: "Identificação do Paciente",
+        fields: [
+          "Nome do Paciente",
+          "Nome da Mãe",
+          "Data de Nascimento",
+          "Idade",
+          "CPF",
+          "Identidade de Gênero",
+          "Gestante",
+          "Raça",
+          "Escolaridade",
+          "Profissão",
+          "DDI Paciente",
+          "Contato Telefônico",
+        ],
+      },
+      {
+        title: "Procedência",
+        fields: [
+          "Residente em Belém",
+          "País de Procedência",
+          "UF",
+          "Município",
+          "Bairro",
+          "Local de Hospedagem",
+          "DDI Local",
+          "Contato do Local",
+        ],
+      },
+      {
+        title: "Atendimento e Sintomas",
+        fields: [
+          "Tipo de Atendimento",
+          "Data da Ocorrência",
+          "Data do Atendimento",
+          "Data de Início dos Sintomas",
+          "Sinais e Sintomas",
+          "Observação dos Sintomas",
+        ],
+      },
+      {
+        title: "Diagnóstico",
+        fields: [
+          "Hipótese Diagnóstica",
+          "Observação da Hipótese",
+          "Tipo de Trauma",
+          "Observação do Trauma",
+          "Relacionado a Surto",
+          "Observação do Incidente",
+        ],
+      },
+      {
+        title: "Encerramento e Notificação",
+        fields: [
+          "Data de Encerramento",
+          "Tipo de Encerramento",
+          "Local de Encaminhamento",
+          "Unidade Notificadora",
+          "Nome do Notificador",
+          "DDI Notificador",
+          "Contato do Notificador",
+        ],
+      },
+    ];
+
+    // Adicionar ficha para cada notificação
+    formattedData.forEach((item, index) => {
+      if (index > 0) {
+        doc.addPage();
+      }
+
+      // Cabeçalho da ficha
+      doc.setFontSize(14);
+      doc.setTextColor(63, 81, 181);
+      doc.text(`Ficha de Notificação #${index + 1}`, 15, 15);
+
+      doc.setFontSize(12);
+      doc.text(
+        `Paciente: ${item["Nome do Paciente"] || "Não informado"}`,
+        15,
+        22
+      );
+
+      let yPos = 30;
+
+      // Adicionar cada seção
+      sections.forEach((section) => {
+        // Verificar se há espaço suficiente na página
+        if (yPos > doc.internal.pageSize.height - 60) {
+          doc.addPage();
+          yPos = 15;
+        }
+
+        // Título da seção
+        doc.setFillColor(230, 230, 250);
+        doc.rect(15, yPos, 180, 8, "F");
+
+        doc.setFontSize(11);
+        doc.setTextColor(63, 81, 181);
+        doc.text(section.title, 18, yPos + 5.5);
+
+        yPos += 10;
+
+        // Conteúdo da seção
+        const sectionData = section.fields
+          .filter(
+            (field) =>
+              item[field] !== undefined &&
+              item[field] !== null &&
+              String(item[field]).trim() !== ""
+          )
+          .map((field) => [field, String(item[field] || "")]);
+
+        if (sectionData.length > 0) {
+          doc.autoTable({
+            startY: yPos,
+            head: [],
+            body: sectionData,
+            theme: "grid",
+            styles: {
+              fontSize: 9,
+              cellPadding: 3,
+            },
+            columnStyles: {
+              0: { fontStyle: "bold", cellWidth: 60 },
+              1: { cellWidth: "auto" },
+            },
+            margin: { left: 15, right: 15 },
+          });
+
+          yPos = (doc as any).lastAutoTable.finalY + 10;
+        }
+      });
+
+      // Adicionar rodapé
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text(
+        `Ficha ${index + 1} de ${formattedData.length}`,
+        doc.internal.pageSize.getWidth() - 15,
+        doc.internal.pageSize.getHeight() - 10,
+        { align: "right" }
+      );
+    });
+
+    // Nome do arquivo
+    const currentDate = new Date().toISOString().split("T")[0];
+    const fileName = `fichas_notificacoes_${currentDate}.pdf`;
+
+    // Salvar o documento
+    doc.save(fileName);
+    
+  } catch (error) {
+    console.error("Erro ao exportar fichas PDF:", error);
+    throw error;
+  }
+};
+
+// Modificar a função original para aceitar o tipo de exportação
+export const exportListToPDFWithOptions = (
+  notificacoes: NotificacaoItem[],
+  exportOptions?: ExportOptions,
+  pdfType: PDFExportType = 'both'
+): void => {
+  switch (pdfType) {
+    case 'table':
+      exportListToPDFTableOnly(notificacoes, exportOptions);
+      break;
+    case 'forms':
+      exportListToPDFFormsOnly(notificacoes, exportOptions);
+      break;
+    case 'both':
+    default:
+      // Manter a função original que combina ambos
+      exportListToPDF(notificacoes, exportOptions);
+      break;
   }
 };
