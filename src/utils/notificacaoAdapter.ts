@@ -60,7 +60,7 @@ export const formatFromBackend = async (
   // Log de depuração para visualizar a estrutura completa dos dados
   console.log("Dados recebidos do backend:", JSON.stringify(backendData, null, 2));
 
-  // Converter valores de surto e residente_belem para o formato do formulário
+  // Converter valores de residente_belem para o formato do formulário
   const residenteBelem =
     backendData.residente_belem === "S"
       ? "1"
@@ -71,8 +71,6 @@ export const formatFromBackend = async (
   // Mapear o campo tipo_bairro_idtipo_bairro para bairro
   const bairroId = backendData.tipo_bairro_idtipo_bairro ?
     backendData.tipo_bairro_idtipo_bairro.toString() : "";
-
-  const relacionadoSurto = backendData.surto === "S" ? "1" : "2";
 
   // Buscar sintomas com método melhorado e aguardar resultado
   const sinaisESintomas = await extractSintomasStrings(backendData);
@@ -189,7 +187,7 @@ if (backendData.contato_notificador) {
       ? [backendData.tipo_trauma_idtipo_trauma.toString()]
       : [],
     observacaoTrauma: backendData.observacao_trauma || "",
-    relacionadoSurto,
+    relacionadoSurto: "", // REMOVIDO: campo relacionadoSurto não é mais usado
     observacaoIncidente: backendData.observavao_incidente || "",
 
     // Seção 5: Informações da unidade notificadora
@@ -332,8 +330,6 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
   ? "S"
   : "N"; // Tanto "2" (não residente BR) quanto "3" (estrangeiro) mapeiam para "N"
 
-  const surto = trimmedData.relacionadoSurto === "1" ? "S" : "N";
-
   const pacienteId = trimmedData.pacienteId ? Number(trimmedData.pacienteId) : null;
 
   // Processar o local de encaminhamento (conforme esperado pelo backend)
@@ -367,7 +363,6 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
   ? parseInt(trimmedData.paisProcedencia) || null 
   : 105, // Brasil para opções 1 e 2
     tipo_atendimento_idtipo_atendimento: parseInt(trimmedData.tipoAtendimento) || null,
-    surto,
     estabelecimento_idestabelecimento: parseInt(trimmedData.unidadeNotificadora) || null,
     tipo_encerramento_idtipo_encerramento: parseInt(trimmedData.tipoEncerramento) || null,
 

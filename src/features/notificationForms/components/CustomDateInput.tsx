@@ -9,9 +9,10 @@ interface CustomDateInputProps {
   disabled?: boolean;
   required?: boolean;
   'data-error'?: string;
-  error?: string; // Adicionado suporte específico para mensagem de erro
-  maxDate?: string; // Permite definir uma data máxima (padrão é a data atual)
-  minDate?: string; // Permite definir uma data mínima
+  error?: string;
+  maxDate?: string;
+  minDate?: string;
+  onValidationError?: (name: string, error: string | null) => void;
 }
 
 const CustomDateInput: React.FC<CustomDateInputProps> = ({
@@ -25,17 +26,22 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
   'data-error': dataError,
   error,
   maxDate,
-  minDate
+  minDate,
+  onValidationError
 }) => {
   const [manualInputValue, setManualInputValue] = useState("");
   const dateInputRef = useRef<HTMLInputElement>(null);
   const textInputRef = useRef<HTMLInputElement>(null);
   const [isDateValid, setIsDateValid] = useState(true);
   const [localError, setLocalError] = useState<string>("");
+  
+  // NOVA ADIÇÃO: Estado para controlar erros persistentes
+  const [persistentError, setPersistentError] = useState<string>("");
+  const [shouldClearError, setShouldClearError] = useState(false);
 
   // Verificar data máxima - usando a data atual por padrão (impede datas futuras)
   const today = new Date();
-  const formattedToday = today.toISOString().split('T')[0]; // YYYY-MM-DD
+  const formattedToday = today.toISOString().split('T')[0];
   const effectiveMaxDate = maxDate || formattedToday;
 
   // Sincronizar o valor manual com o valor do componente pai
@@ -43,11 +49,32 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
     if (value) {
       setManualInputValue(formatDateForDisplay(value));
       setIsDateValid(true);
-      setLocalError(""); // Limpar erros locais quando o valor é atualizado externamente
+      
+      // MODIFICAÇÃO: Só limpar erros se o usuário digitou uma data válida manualmente
+      if (shouldClearError) {
+        setLocalError("");
+        setPersistentError("");
+        setShouldClearError(false);
+        
+        if (onValidationError) {
+          onValidationError(name, null);
+        }
+      }
     } else {
       setManualInputValue("");
+      // MODIFICAÇÃO: Não limpar erros automaticamente quando o valor é limpo
+      // Só limpar se foi uma limpeza manual (não automática por data inválida)
+      if (shouldClearError) {
+        setLocalError("");
+        setPersistentError("");
+        setShouldClearError(false);
+        
+        if (onValidationError) {
+          onValidationError(name, null);
+        }
+      }
     }
-  }, [value]);
+  }, [value, name, onValidationError, shouldClearError]);
 
   // Formatar a data do formato ISO para o formato de exibição DD/MM/YYYY
   const formatDateForDisplay = (isoDate: string): string => {
@@ -65,13 +92,11 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
   const convertToIsoDate = (displayDate: string): string => {
     if (!displayDate) return "";
     
-    // Verificar se o formato é DD/MM/YYYY
     const datePattern = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
     const match = displayDate.match(datePattern);
     
     if (match) {
       const [_, day, month, year] = match;
-      // Garantir que dia e mês tenham dois dígitos
       const formattedDay = day.padStart(2, '0');
       const formattedMonth = month.padStart(2, '0');
       return `${year}-${formattedMonth}-${formattedDay}`;
@@ -82,7 +107,7 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
 
   // Verificar se uma data é válida e não está no futuro
   const isValidDate = (dateString: string): boolean => {
-    if (!dateString) return true; // Data vazia é considerada válida
+    if (!dateString) return true;
     
     const isoDate = convertToIsoDate(dateString);
     if (!isoDate) return false;
@@ -90,13 +115,11 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
     const date = new Date(isoDate);
     if (isNaN(date.getTime())) return false;
     
-    // Validar contra data máxima (impedir datas futuras)
     if (effectiveMaxDate) {
       const maxLimit = new Date(effectiveMaxDate);
       if (date > maxLimit) return false;
     }
     
-    // Validar contra data mínima se fornecida
     if (minDate) {
       const minLimit = new Date(minDate);
       if (date < minLimit) return false;
@@ -105,27 +128,33 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
     return true;
   };
 
+  // NOVA FUNÇÃO: Limpar erros manualmente
+  const clearErrorsManually = () => {
+    setShouldClearError(true);
+    setLocalError("");
+    setPersistentError("");
+    
+    if (onValidationError) {
+      onValidationError(name, null);
+    }
+  };
+
   // Manipular alterações na entrada manual
   const handleManualChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
     setManualInputValue(inputValue);
-    setLocalError(""); // Limpar mensagem de erro ao digitar
-
-    // Verificar se o campo está vazio e notificar o componente pai
+    
+    // MODIFICAÇÃO: Quando o usuário limpa manualmente, limpar erros
     if (!inputValue || inputValue === '') {
+      clearErrorsManually();
+      
       const syntheticEvent = {
-        target: {
-          name,
-          value: ""
-        },
-        currentTarget: {
-          name,
-          value: ""
-        }
+        target: { name, value: "" },
+        currentTarget: { name, value: "" }
       } as React.ChangeEvent<HTMLInputElement>;
       
       onChange(syntheticEvent);
-      return; // Importante para parar a execução da função
+      return;
     }
     
     // Aplicar formatação automática enquanto digita (XX/XX/XXXX)
@@ -149,39 +178,19 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
     // Converter para formato ISO e notificar o componente pai se tiver o formato completo
     if (inputValue.length === 10) {
       const isoDate = convertToIsoDate(formatted);
-      
-      // Verificar se a data é válida e não está no futuro
       const dateValid = isValidDate(formatted);
       setIsDateValid(dateValid);
       
       if (dateValid) {
-        // Criar um evento sintético para simular input nativo
+        // MODIFICAÇÃO: Marcar que deve limpar erros na próxima atualização
+        setShouldClearError(true);
+        
         const syntheticEvent = {
-          target: {
-            name,
-            value: isoDate
-          },
-          currentTarget: {
-            name,
-            value: isoDate
-          }
+          target: { name, value: isoDate },
+          currentTarget: { name, value: isoDate }
         } as React.ChangeEvent<HTMLInputElement>;
         
         onChange(syntheticEvent);
-      } else {
-        // Verificar qual erro específico ocorreu
-        const isoDate = convertToIsoDate(formatted);
-        const date = new Date(isoDate);
-        
-        if (!isNaN(date.getTime())) {
-          if (date > new Date(effectiveMaxDate)) {
-            setLocalError("A data não pode ser futura.");
-          } else if (minDate && date < new Date(minDate)) {
-            setLocalError(`A data deve ser após ${formatDateForDisplay(minDate)}.`);
-          }
-        } else {
-          setLocalError("Data inválida.");
-        }
       }
     }
   };
@@ -194,9 +203,16 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
     const match = manualInputValue.match(datePattern);
     
     if (!match) {
-      // Se não estiver no formato correto, limpar o valor
       setManualInputValue("");
-      setLocalError("Formato de data inválido.");
+      const errorMsg = "Formato de data inválido.";
+      
+      // MODIFICAÇÃO: Usar erro persistente
+      setLocalError(errorMsg);
+      setPersistentError(errorMsg);
+      
+      if (onValidationError) {
+        onValidationError(name, errorMsg);
+      }
       return;
     }
     
@@ -205,7 +221,6 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
     const monthNum = parseInt(month, 10);
     const yearNum = parseInt(year, 10);
     
-    // Verificar se a data é válida
     const isDateValid = 
       monthNum >= 1 && 
       monthNum <= 12 && 
@@ -213,20 +228,20 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
       dayNum <= new Date(yearNum, monthNum, 0).getDate();
     
     if (!isDateValid) {
-      // Se a data não for válida, limpar o valor
       setManualInputValue("");
-      setLocalError("Data inválida.");
+      const errorMsg = "Data inválida.";
       
-      // Notificar o componente pai para limpar o valor
+      // MODIFICAÇÃO: Usar erro persistente
+      setLocalError(errorMsg);
+      setPersistentError(errorMsg);
+      
+      if (onValidationError) {
+        onValidationError(name, errorMsg);
+      }
+      
       const syntheticEvent = {
-        target: {
-          name,
-          value: ""
-        },
-        currentTarget: {
-          name,
-          value: ""
-        }
+        target: { name, value: "" },
+        currentTarget: { name, value: "" }
       } as React.ChangeEvent<HTMLInputElement>;
       
       onChange(syntheticEvent);
@@ -239,7 +254,28 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
     const maxDate = new Date(effectiveMaxDate);
     
     if (inputDate > maxDate) {
-      setLocalError("A data não pode ser futura.");
+      // MODIFICAÇÃO PRINCIPAL: Não limpar o valor imediatamente, manter erro persistente
+      const errorMsg = "A data não pode ser futura.";
+      setLocalError(errorMsg);
+      setPersistentError(errorMsg);
+      
+      if (onValidationError) {
+        onValidationError(name, errorMsg);
+      }
+      
+      // MODIFICAÇÃO: Limpar o valor apenas no backend, manter visualmente para o usuário ver o erro
+      const syntheticEvent = {
+        target: { name, value: "" },
+        currentTarget: { name, value: "" }
+      } as React.ChangeEvent<HTMLInputElement>;
+      
+      onChange(syntheticEvent);
+      
+      // NOVA ADIÇÃO: Usar setTimeout para limpar a exibição visual após um delay
+      setTimeout(() => {
+        setManualInputValue("");
+      }, 100); // Pequeno delay para manter a mensagem visível
+      
       return;
     }
     
@@ -247,13 +283,21 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
     if (minDate) {
       const minLimit = new Date(minDate);
       if (inputDate < minLimit) {
-        setLocalError(`A data deve ser após ${formatDateForDisplay(minDate)}.`);
+        const errorMsg = `A data deve ser após ${formatDateForDisplay(minDate)}.`;
+        
+        // MODIFICAÇÃO: Usar erro persistente
+        setLocalError(errorMsg);
+        setPersistentError(errorMsg);
+        
+        if (onValidationError) {
+          onValidationError(name, errorMsg);
+        }
         return;
       }
     }
     
     // Se chegou aqui, a data é válida
-    setLocalError("");
+    setShouldClearError(true);
     setIsDateValid(true);
   };
   
@@ -261,29 +305,43 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const dateValue = e.target.value;
     
-    // Verificar se a data não está no futuro
     if (dateValue) {
       const inputDate = new Date(dateValue);
       const maxDate = new Date(effectiveMaxDate);
       
       if (inputDate > maxDate) {
-        setLocalError("A data não pode ser futura.");
+        const errorMsg = "A data não pode ser futura.";
+        
+        // MODIFICAÇÃO: Usar erro persistente
+        setLocalError(errorMsg);
+        setPersistentError(errorMsg);
+        
+        if (onValidationError) {
+          onValidationError(name, errorMsg);
+        }
         return;
       }
       
-      // Verificar data mínima, se especificada
       if (minDate) {
         const minLimit = new Date(minDate);
         if (inputDate < minLimit) {
-          setLocalError(`A data deve ser após ${formatDateForDisplay(minDate)}.`);
+          const errorMsg = `A data deve ser após ${formatDateForDisplay(minDate)}.`;
+          
+          // MODIFICAÇÃO: Usar erro persistente
+          setLocalError(errorMsg);
+          setPersistentError(errorMsg);
+          
+          if (onValidationError) {
+            onValidationError(name, errorMsg);
+          }
           return;
         }
       }
       
-      setLocalError("");
+      // MODIFICAÇÃO: Data válida, marcar para limpar erros
+      setShouldClearError(true);
     }
     
-    // Passar o evento para o componente pai
     onChange(e);
   };
   
@@ -304,39 +362,33 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
       const date = new Date(value);
       date.setDate(date.getDate() + 1);
       
-      // Verificar se não excede a data máxima
       const maxDate = new Date(effectiveMaxDate);
       if (date > maxDate) {
-        setLocalError("A data não pode ser futura.");
+        const errorMsg = "A data não pode ser futura.";
+        
+        // MODIFICAÇÃO: Usar erro persistente
+        setLocalError(errorMsg);
+        setPersistentError(errorMsg);
+        
+        if (onValidationError) {
+          onValidationError(name, errorMsg);
+        }
         return;
       }
       
       const isoDate = date.toISOString().split('T')[0];
       const syntheticEvent = {
-        target: {
-          name,
-          value: isoDate
-        },
-        currentTarget: {
-          name,
-          value: isoDate
-        }
+        target: { name, value: isoDate },
+        currentTarget: { name, value: isoDate }
       } as React.ChangeEvent<HTMLInputElement>;
       
       onChange(syntheticEvent);
     } else {
-      // Se não houver data, usar a data atual
       const date = new Date();
       const isoDate = date.toISOString().split('T')[0];
       const syntheticEvent = {
-        target: {
-          name,
-          value: isoDate
-        },
-        currentTarget: {
-          name,
-          value: isoDate
-        }
+        target: { name, value: isoDate },
+        currentTarget: { name, value: isoDate }
       } as React.ChangeEvent<HTMLInputElement>;
       
       onChange(syntheticEvent);
@@ -351,69 +403,68 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
       const date = new Date(value);
       date.setDate(date.getDate() - 1);
       
-      // Verificar data mínima, se especificada
       if (minDate) {
         const minLimit = new Date(minDate);
         if (date < minLimit) {
-          setLocalError(`A data deve ser após ${formatDateForDisplay(minDate)}.`);
+          const errorMsg = `A data deve ser após ${formatDateForDisplay(minDate)}.`;
+          
+          // MODIFICAÇÃO: Usar erro persistente  
+          setLocalError(errorMsg);
+          setPersistentError(errorMsg);
+          
+          if (onValidationError) {
+            onValidationError(name, errorMsg);
+          }
           return;
         }
       }
       
       const isoDate = date.toISOString().split('T')[0];
       const syntheticEvent = {
-        target: {
-          name,
-          value: isoDate
-        },
-        currentTarget: {
-          name,
-          value: isoDate
-        }
+        target: { name, value: isoDate },
+        currentTarget: { name, value: isoDate }
       } as React.ChangeEvent<HTMLInputElement>;
       
       onChange(syntheticEvent);
     } else {
-      // Se não houver data, usar a data atual - 1
       const date = new Date();
       date.setDate(date.getDate() - 1);
       
-      // Verificar data mínima, se especificada
       if (minDate) {
         const minLimit = new Date(minDate);
         if (date < minLimit) {
-          setLocalError(`A data deve ser após ${formatDateForDisplay(minDate)}.`);
+          const errorMsg = `A data deve ser após ${formatDateForDisplay(minDate)}.`;
+          
+          // MODIFICAÇÃO: Usar erro persistente
+          setLocalError(errorMsg);
+          setPersistentError(errorMsg);
+          
+          if (onValidationError) {
+            onValidationError(name, errorMsg);
+          }
           return;
         }
       }
       
       const isoDate = date.toISOString().split('T')[0];
       const syntheticEvent = {
-        target: {
-          name,
-          value: isoDate
-        },
-        currentTarget: {
-          name,
-          value: isoDate
-        }
+        target: { name, value: isoDate },
+        currentTarget: { name, value: isoDate }
       } as React.ChangeEvent<HTMLInputElement>;
       
       onChange(syntheticEvent);
     }
   };
 
-  // Determinar qual mensagem de erro mostrar (priorizar erros externos)
-  const displayError = error || localError;
+  // MODIFICAÇÃO: Determinar qual mensagem de erro mostrar (priorizar erro persistente)
+  const displayError = error || persistentError || localError;
   
-  // Determinar a classe de erro para o input
   const inputErrorClass = (displayError || dataError === "true")
     ? "border-red-500 bg-red-50"
     : "border-gray-200";
 
   return (
     <div className="relative">
-      {/* Input de texto para entrada manual (visível) */}
       <div className="flex items-center">
         <div className="relative flex-grow">
           <input
@@ -422,7 +473,7 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
             value={manualInputValue}
             onChange={handleManualChange}
             onBlur={validateDate}
-            className={`${className} pr-10 ${inputErrorClass}`} // Adicionar padding à direita para o ícone
+            className={`${className} pr-10 ${inputErrorClass}`}
             placeholder={placeholder || "DD/MM/YYYY"}
             disabled={disabled}
             required={required}
@@ -431,14 +482,12 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
             style={{ backgroundColor: disabled ? "#f3f4f6" : "white" }}
           />
           
-          {/* Ícone de calendário para abrir o seletor de data */}
           <button
             type="button"
             onClick={openDatePicker}
             className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
             disabled={disabled}
           >
-            {/* Ícone de calendário (SVG inline) */}
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
               width="16" 
@@ -458,7 +507,6 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
           </button>
         </div>
         
-        {/* Botões para incrementar/decrementar a data */}
         <div className="flex flex-col ml-1">
           <button
             type="button"
@@ -505,21 +553,35 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
         </div>
       </div>
       
-      {/* Exibir mensagem de erro se houver */}
+      {/* NOVA ADIÇÃO: Botão para limpar erro manualmente */}
       {displayError && (
-        <p className="mt-1 text-sm text-red-500">{displayError}</p>
+        <div className="mt-1 flex items-center justify-between">
+          <p className="text-sm text-red-500 flex items-center gap-1 flex-1">
+            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            {displayError}
+          </p>
+          <button
+            type="button"
+            onClick={clearErrorsManually}
+            className="ml-2 text-xs text-gray-500 hover:text-gray-700 focus:outline-none"
+            title="Limpar erro"
+          >
+            ✕
+          </button>
+        </div>
       )}
       
-      {/* Input de data nativo (oculto) - será usado apenas para acionar o seletor de data */}
       <input
         ref={dateInputRef}
         type="date"
         name={name}
         value={value}
-        max={effectiveMaxDate} // Impedir datas futuras no controle nativo também
-        min={minDate} // Aplicar data mínima, se fornecida
+        max={effectiveMaxDate}
+        min={minDate}
         onChange={handleDateChange}
-        className="sr-only" // Visualmente oculto, mas ainda funcional
+        className="sr-only"
         disabled={disabled}
       />
     </div>

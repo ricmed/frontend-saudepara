@@ -309,11 +309,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       });
       setGeneroOptions(generosOrdenados);
 
-      // Ordenação específica para tipo de atendimento
+      // Ordenação específica para tipo de atendimento (REMOVIDO "Surto")
       const ordenacaoAtendimento = [
         "Clínico",
         "Trauma",
-        "Surto",
         "Múltiplas vítimas",
         "Incidente QBRN",
       ].map((item) => normalizeText(item));
@@ -1218,10 +1217,9 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       // Cria uma cópia dos dados atuais do formulário
       const updatedData = { ...formData };
 
-      // Caso clínico, surto ou incidente QBRN - limpa campos de trauma
+      // Caso clínico ou incidente QBRN - limpa campos de trauma
       if (
         isTipoAtendimento("CLINICO", formData.tipoAtendimento, atendimentoOptions) ||
-        isTipoAtendimento("SURTO", formData.tipoAtendimento, atendimentoOptions) ||
         isTipoAtendimento("INCIDENTE QBRN", formData.tipoAtendimento, atendimentoOptions)
       ) {
         updatedData.tipoTrauma = [];
@@ -1347,7 +1345,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       if (
         formData.sinaisESintomas.length === 0 || 
         !(isTipoAtendimento("CLINICO", formData.tipoAtendimento, atendimentoOptions) ||
-          isTipoAtendimento("SURTO", formData.tipoAtendimento, atendimentoOptions) ||
           isTipoAtendimento("INCIDENTE QBRN", formData.tipoAtendimento, atendimentoOptions))
       ) {
         setHipoteseDiagFiltradas(hipoteseDiagOptions);
@@ -1388,8 +1385,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
             };
           });
           
-          // INÍCIO DA MODIFICAÇÃO: Adicionar hipóteses já selecionadas à lista, mesmo que não tenham relação com sintomas
-          
           // Criar conjunto com os IDs das hipóteses que já estão filtradas
           const hipotesesFiltradasIds = new Set(hipotesesFiltradas.map(h => h.idtipo_hipotese_diag.toString()));
           
@@ -1425,29 +1420,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           ];
           
           setHipoteseDiagFiltradas(todasHipotesesAMostrar);
-          
-          // FIM DA MODIFICAÇÃO
-          
-          // Remover o código que removia automaticamente as hipóteses selecionadas
-          /*
-          // Remover hipóteses diagnósticas que não estão mais disponíveis
-          const hipotesesValidas = new Set(hipotesesFiltradas.map(
-            h => h.idtipo_hipotese_diag.toString()
-          ));
-          
-          // Filtrar as hipóteses selecionadas para manter apenas as válidas
-          const hipotesesSelecionadasValidas = formData.hipoteseDiagnostica.filter(
-            id => hipotesesValidas.has(id)
-          );
-          
-          // Se a seleção mudou, atualizar o formData
-          if (hipotesesSelecionadasValidas.length !== formData.hipoteseDiagnostica.length) {
-            setFormData(prev => ({
-              ...prev,
-              hipoteseDiagnostica: hipotesesSelecionadasValidas
-            }));
-          }
-          */
         }
       } catch (error) {
         console.error('Erro ao buscar hipóteses diagnósticas:', error);

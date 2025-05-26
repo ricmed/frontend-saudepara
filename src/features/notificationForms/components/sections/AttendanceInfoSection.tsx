@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ListChecks, Search, X } from 'lucide-react';
+import { ListChecks, Search, X, Info } from 'lucide-react';
 import { FormSectionProps } from '@/features/notificationForms/types/index2';
 import SectionHeader from '../shared/SectionHeader';
 import FormField from '../shared/FormField';
@@ -20,14 +20,10 @@ const SintomasRelacionados = ({
   formData: any;
   sintomaOptions: any[];
 }) => {
-  // Estado para controlar a visibilidade do popup
   const [showRelatedSymptoms, setShowRelatedSymptoms] = useState(false);
-  
-  // Estado para armazenar os sintomas relacionados
   const [relatedSymptoms, setRelatedSymptoms] = useState<{id: string, descricao: string}[]>([]);
   const [isLoadingRelated, setIsLoadingRelated] = useState(true);
   
-  // Efeito para buscar os sintomas relacionados quando o popup é aberto
   useEffect(() => {
     if (!showRelatedSymptoms) return;
     
@@ -35,10 +31,8 @@ const SintomasRelacionados = ({
       try {
         setIsLoadingRelated(true);
         
-        // Buscar sintomas relacionados da API
         const response = await ListaSindromicaService.getSintomasPorHipotese(hipoteseId);
         
-        // Mapear para o formato esperado
         const sintomas = response.map((sintoma: any) => ({
           id: sintoma.id.toString(),
           descricao: sintoma.sintoma
@@ -48,7 +42,6 @@ const SintomasRelacionados = ({
       } catch (error) {
         console.error('Erro ao buscar sintomas relacionados:', error);
         
-        // Em caso de erro, tentar inferir os sintomas a partir dos selecionados
         const sintomasInferidos = sintomaOptions
           .filter(sintoma => formData.sinaisESintomas.includes(sintoma.idtipo_sintoma.toString()))
           .map(sintoma => ({
@@ -84,7 +77,6 @@ const SintomasRelacionados = ({
         <span role="img" aria-label="Sintomas">🩺</span>
       </button>
       
-      {/* Popup com sintomas relacionados */}
       {showRelatedSymptoms && (
         <div className="absolute z-10 top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3 max-w-xs w-60 text-xs text-gray-700">
           <div className="font-medium mb-1 text-gray-900">Sintomas relacionados:</div>
@@ -99,7 +91,6 @@ const SintomasRelacionados = ({
           ) : (
             <ul className="list-disc pl-4 space-y-1 max-h-40 overflow-y-auto">
               {relatedSymptoms.map(sintoma => {
-                // Verificar se este sintoma está selecionado
                 const isSelecionado = formData.sinaisESintomas.includes(sintoma.id);
                 
                 return (
@@ -142,11 +133,11 @@ interface AttendanceInfoSectionProps extends FormSectionProps {
   sintomaOptions: any[];
   traumaOptions: any[];
   hipoteseDiagOptions: any[];
-  hipoteseDiagFiltradas: any[]; // Nova propriedade
-  isLoadingHipoteses: boolean;  // Nova propriedade
+  hipoteseDiagFiltradas: any[];
+  isLoadingHipoteses: boolean;
   isTipoAtendimentoFunc: (tipo: string) => boolean;
-  setErrors?: (errors: any) => void; // Adding setErrors prop
-  handleValidationError: (name: string, error: string | null) => void; // Nova prop
+  setErrors?: (errors: any) => void;
+  handleValidationError: (name: string, error: string | null) => void;
 }
 
 const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
@@ -168,23 +159,19 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
   hipoteseDiagFiltradas,
   isLoadingHipoteses,
   isTipoAtendimentoFunc,
-  setErrors = () => {}, // Default value for setErrors
+  setErrors = () => {},
   handleValidationError
 }) => {
-  // Estado para pesquisa de hipóteses diagnósticas
   const [searchHipotese, setSearchHipotese] = useState('');
-  
-  // Estado para controlar se mostra todas as hipóteses ou apenas as relacionadas
   const [showAllHipoteses, setShowAllHipoteses] = useState(false);
+  const [showDateHelp, setShowDateHelp] = useState(false);
   
-  // Filtra as hipóteses diagnósticas com base na pesquisa
   const filteredHipoteses = hipoteseDiagFiltradas.filter(
     option => 
       searchHipotese === '' || 
       option.descricao.toLowerCase().includes(searchHipotese.toLowerCase())
   );
 
-  // Limpa todas as hipóteses selecionadas
   const handleClearAllHipoteses = () => {
     if (formData.hipoteseDiagnostica.length > 0 && 
         window.confirm(`Deseja remover a hipótese diagnóstica selecionada?`)) {
@@ -195,7 +182,6 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
     }
   };
 
-  // Obtém as hipóteses selecionadas com seus rótulos
   const getSelectedHipoteses = () => {
     return formData.hipoteseDiagnostica.map(id => {
       const option = hipoteseDiagOptions.find(opt => opt.idtipo_hipotese_diag.toString() === id);
@@ -205,16 +191,6 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
       };
     });
   };
-
-  // Efeito para definir "relacionadoSurto" automaticamente quando o tipo for "SURTO"
-  useEffect(() => {
-    if (isTipoAtendimentoFunc("SURTO") && !formData.relacionadoSurto) {
-      setFormData({
-        ...formData,
-        relacionadoSurto: "S" // Define como "Sim" automaticamente
-      });
-    }
-  }, [formData.tipoAtendimento]);
 
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -245,9 +221,8 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
               }
             />
 
-            {/* Sinais e Sintomas para CLINICO, SURTO, INCIDENTE QBRN */}
+            {/* Sinais e Sintomas para CLINICO e INCIDENTE QBRN */}
             {(isTipoAtendimentoFunc("CLINICO") ||
-              isTipoAtendimentoFunc("SURTO") ||
               isTipoAtendimentoFunc("INCIDENTE QBRN")) && (
               <div className="md:col-span-2">
                 <SearchableCheckboxGroup
@@ -267,10 +242,50 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
             {/* Data de Início dos Sintomas e Observação apenas para CLINICO */}
             {isTipoAtendimentoFunc("CLINICO") && (
               <>
-                <div>
+                <div className="relative">
                   <label className="block mb-2 font-medium text-gray-700">
-                    Data de Início dos Sintomas
+                    <span className="flex items-center gap-2">
+                      Data de Início dos Sintomas
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setShowDateHelp(!showDateHelp);
+                        }}
+                        className="text-blue-500 hover:text-blue-700 transition-colors inline-flex items-center"
+                        title="Informações sobre este campo"
+                      >
+                        <Info className="h-4 w-4" />
+                      </button>
+                    </span>
                   </label>
+                  
+                  {showDateHelp && (
+                    <div className="absolute z-50 left-0 mt-1 w-72">
+                      <div className="bg-white border border-gray-200 rounded-lg shadow-xl">
+                        <div className="bg-blue-50 border-b border-blue-100 px-4 py-2 rounded-t-lg">
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium text-blue-900 text-sm">Informação</span>
+                            <button
+                              type="button"
+                              onClick={() => setShowDateHelp(false)}
+                              className="text-blue-600 hover:text-blue-800 transition-colors"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="p-4">
+                          <p className="text-sm text-gray-700">
+                            <strong className="text-gray-900">Importante:</strong> A data de início dos sintomas não pode ser futura. 
+                            A mensagem de erro permanecerá visível até que uma data válida seja inserida ou o campo seja limpo manualmente.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="absolute -top-2 left-4 w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-b-8 border-b-white"></div>
+                    </div>
+                  )}
+                  
                   <CustomDateInput
                     name="dataInicioSintomas"
                     className={`w-full p-3 border ${
@@ -303,7 +318,6 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
             {(isTipoAtendimentoFunc("TRAUMA") ||
               isTipoAtendimentoFunc("MULTIPLAS VITIMAS")) && (
               <>
-                {/* Tipo de Trauma com campo de pesquisa */}
                 <div className="md:col-span-2">
                   <SearchableCheckboxGroup
                     label="Tipo de Trauma"
@@ -331,9 +345,8 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
               </>
             )}
 
-            {/* Observação do Incidente para SURTO ou INCIDENTE QBRN */}
-            {(isTipoAtendimentoFunc("SURTO") ||
-              isTipoAtendimentoFunc("INCIDENTE QBRN")) && (
+            {/* Observação do Incidente para INCIDENTE QBRN */}
+            {isTipoAtendimentoFunc("INCIDENTE QBRN") && (
               <>
                 <div className="md:col-span-2">
                   <FormField
@@ -351,14 +364,11 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
             {/* Hipótese Diagnóstica para TODOS os tipos EXCETO TRAUMA e MULTIPLAS VITIMAS */}
             {!isTipoAtendimentoFunc("TRAUMA") && !isTipoAtendimentoFunc("MULTIPLAS VITIMAS") && (
               <div className="md:col-span-2">
-                {/* Estado para controlar se mostra todas as hipóteses já está definido na função principal */}
-
                 <div className="flex items-center justify-between mb-2">
                   <label className="font-medium text-gray-700">
                     Hipótese Diagnóstica (selecione apenas uma)
                   </label>
                   
-                  {/* Campo de pesquisa para hipóteses diagnósticas */}
                   <div className="relative w-64">
                     <input
                       type="text"
@@ -381,7 +391,6 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                   </div>
                 </div>
                 
-                {/* Tags para hipóteses selecionadas */}
                 {formData.hipoteseDiagnostica.length > 0 && (
                   <div className="mb-3">
                     <div className="flex flex-wrap gap-2 items-center">
@@ -423,7 +432,6 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                   </div>
                 ) : (
                   <>
-                    {/* Botão para mostrar todas as hipóteses */}
                     {formData.sinaisESintomas.length > 0 && hipoteseDiagFiltradas.length > 0 && !showAllHipoteses && (
                       <div className="flex justify-between items-center mb-3">
                         <div className="text-xs text-gray-500">
@@ -456,26 +464,20 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
 
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                       {(() => {
-                        // Determina quais hipóteses mostrar com base no estado e na pesquisa
                         let hipotesesToShow = [];
                         
                         if (showAllHipoteses) {
-                          // Mostrar todas as hipóteses (filtradas pela pesquisa)
-                          // Primeiro, enriquecemos todas as hipóteses com a informação de qtdSintomas
                           const hipotesesEnriquecidas = hipoteseDiagOptions.map(option => {
-                            // Procura se esta hipótese está no array de hipóteses filtradas (relacionadas aos sintomas)
                             const matchingSintomaOption = hipoteseDiagFiltradas.find(
                               h => h.idtipo_hipotese_diag === option.idtipo_hipotese_diag
                             );
                             
-                            // Se estiver, usa a qtdSintomas dele, senão é 0
                             return {
                               ...option,
                               qtdSintomas: matchingSintomaOption ? matchingSintomaOption.qtdSintomas : 0
                             };
                           });
                           
-                          // Agora ordenamos pelo número de sintomas relacionados (do maior para o menor)
                           hipotesesToShow = hipotesesEnriquecidas
                             .sort((a, b) => (b.qtdSintomas || 0) - (a.qtdSintomas || 0))
                             .filter(option => 
@@ -483,21 +485,16 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                               option.descricao.toLowerCase().includes(searchHipotese.toLowerCase())
                             );
                         } else {
-                          // Mostrar apenas hipóteses relacionadas (filtradas pela pesquisa)
                           hipotesesToShow = filteredHipoteses;
                         }
                         
                         if (hipotesesToShow.length > 0) {
                           return hipotesesToShow.map((option) => {
-                            // Verifica se esta opção está no array hipoteseDiagFiltradas
                             const matchingSintomaOption = hipoteseDiagFiltradas.find(
                               h => h.idtipo_hipotese_diag === option.idtipo_hipotese_diag
                             );
                             
-                            // Se estiver no array, usa a qtdSintomas dele, senão é 0
                             const qtdSintomas = matchingSintomaOption ? matchingSintomaOption.qtdSintomas : 0;
-                            
-                            // Verificamos se esta opção está selecionada
                             const isChecked = formData.hipoteseDiagnostica.includes(option.idtipo_hipotese_diag.toString());
                             
                             return (
@@ -508,11 +505,9 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                                 formData={formData}
                                 checked={isChecked}
                                 onChange={() => {
-                                  // Se já estava selecionada, desmarcar
                                   if (isChecked) {
                                     handleCheckboxChange && handleCheckboxChange("hipoteseDiagnostica", option.idtipo_hipotese_diag.toString());
                                   } else {
-                                    // Se não estava selecionada, substituir a seleção atual (se houver) por esta
                                     handleCheckboxChange && setFormData({
                                       ...formData,
                                       hipoteseDiagnostica: [option.idtipo_hipotese_diag.toString()]
