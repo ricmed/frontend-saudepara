@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../keycloak/AuthProvider';
 import { User, Lock } from 'lucide-react';
@@ -10,26 +10,48 @@ import { useLanguage } from '@/contexts/LanguageContext';
 const LoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const { login } = useAuth();
+  const [error, setError] = useState('');
+  const { user, login, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { selectedLanguage, setSelectedLanguage } = useLanguage();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await login(username, password);
+  // Se já estiver logado, redireciona
+  useEffect(() => {
+    if (user && !loading) {
       const from = location.state?.from?.pathname || '/';
       navigate(from);
+    }
+  }, [user, loading, navigate, location]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    
+    try {
+      await login(username, password);
+      // O useEffect acima vai redirecionar quando user for atualizado
     } catch (err) {
-      alert('Falha no login');
+      setError('Usuário ou senha inválidos');
     }
   };
 
   const handleMenuToggle = () => {
     setIsMenuOpen(!isMenuOpen);
   };
+
+  // Mostra loading enquanto verifica autenticação
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Verificando autenticação...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -47,6 +69,12 @@ const LoginPage = () => {
               Entre com suas credenciais para acessar
             </p>
           </div>
+          
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+              <span className="block sm:inline">{error}</span>
+            </div>
+          )}
           
           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
             <div className="rounded-md shadow-sm -space-y-px">
