@@ -37,7 +37,7 @@ const CaseClosureSection: React.FC<CaseClosureSectionProps> = ({
             {/* Data de Encerramento */}
             <div>
               <label className="block mb-2 font-medium text-gray-700">
-                Data de Desfecho
+                Data do Desfecho
               </label>
               <CustomDateInput
                 name="dataEncerramento"
