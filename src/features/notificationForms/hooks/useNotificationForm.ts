@@ -889,7 +889,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
   const toggleExportDropdown = () => {
     setIsExportDropdownOpen(!isExportDropdownOpen);
   };
-
   // Função para submeter o formulário
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -898,27 +897,43 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     setApiError(null);
     setIsSuccess(false);
 
-    // Verificar explicitamente se há erros de data
-    if (errors.dataInicioSintomas || errors.dataAtendimento || errors.dataEncerramento) {
-      // Destacar a seção com erro
-      const secaoComErro = errors.dataInicioSintomas 
-        ? 'atendimento' 
-        : errors.dataAtendimento 
-          ? 'unidadeNotificadora' 
-          : 'encerramento';
-      
-      setExpandedSections(prev => ({
-        ...prev,
-        [secaoComErro]: true
-      }));
-      
-      // Exibir mensagem de erro
-      toast.error("Há problemas com as datas informadas. Por favor, corrija os erros destacados.");
-      return; // Impedir submissão
+    console.log("=== INICIANDO VALIDAÇÃO DO FORMULÁRIO ===");
+
+    // ========================================
+    // VALIDAÇÃO PRINCIPAL - COLETAR TODOS OS ERROS
+    // ========================================
+    
+    // IMPORTANTE: Chamar validateForm PRIMEIRO para coletar todos os erros
+    const isValid = validateForm(
+      formData, 
+      errors, 
+      setErrors, 
+      setExpandedSections, 
+      expandedSections,
+      atendimentoOptions,
+      encerramentoOptions
+    );
+
+    // Se a validação falhou, mostrar toast e impedir submissão
+    if (!isValid) {
+      // Aguardar um frame para que o estado seja atualizado
+      setTimeout(() => {
+        const currentErrors = Object.keys(errors).length;
+        console.log(`Validação falhou. Total de erros: ${currentErrors}`);
+        toast.error(`${currentErrors} erro(s) encontrado(s). Verifique o resumo acima.`);
+      }, 100);
+      return;
     }
+
+    console.log("Validação passou. Procedendo com criação/atualização do paciente...");
+
+    // ========================================
+    // VERIFICAÇÕES DE PACIENTE (APÓS VALIDAÇÃO)
+    // ========================================
 
     // Verifica se tem paciente
     if (!formData.paciente.trim()) {
+      console.log("Nome do paciente ausente");
       toast.error("O nome do paciente é obrigatório");
       setErrors((prev) => ({
         ...prev,
@@ -938,6 +953,12 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         const port = import.meta.env.VITE_API_PORT;
 
         toast.info("Criando novo paciente automaticamente...");
+        console.log("Criando novo paciente com dados:", {
+          nome: formData.paciente,
+          nomeMae: formData.nomeMae,
+          dataNascimento: formData.dataNascimento,
+          cpf: formData.cpf
+        });
 
         // Criar payload de novo paciente com os dados disponíveis
         const novoPaciente = {
@@ -1015,6 +1036,8 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     // Se já tem ID de paciente, atualizar dados do paciente
     else if (formData.pacienteId) {
       try {
+        console.log("Atualizando dados do paciente ID:", formData.pacienteId);
+        
         // Atualizar os dados do paciente antes de salvar a notificação
         const pacienteData = {
           nome: formData.paciente,
@@ -1051,33 +1074,30 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       }
     }
 
-    // Validar o formulário
-    const isValid = validateForm(
-      formData, 
-      errors, 
-      setErrors, 
-      setExpandedSections, 
-      expandedSections,
-      atendimentoOptions,
-      encerramentoOptions
-    );
-    
-    if (!isValid) return;
+    // ========================================
+    // SALVAMENTO DA NOTIFICAÇÃO
+    // ========================================    // ========================================
+    // SALVAMENTO DA NOTIFICAÇÃO
+    // ========================================
 
     setIsSaving(true);
     try {
+      console.log("Iniciando salvamento da notificação...");
+      
       // Converter todos os dados para caixa alta antes de enviar
       const formDataUpperCase = toUpperCaseAllStrings(formData);
 
       // Usar a função importada salvarNotificacaoCompleta
       if (isEditMode && id) {
         // Para atualização
+        console.log("Atualizando notificação ID:", id);
         await salvarNotificacaoCompleta(formDataUpperCase, true, Number(id));
         console.log("Notificação atualizada com sucesso");
         setIsSuccess(true);
         toast.success("Notificação atualizada com sucesso");
       } else {
         // Para criação
+        console.log("Criando nova notificação");
         await salvarNotificacaoCompleta(formDataUpperCase, false);
         console.log("Notificação criada com sucesso");
         setIsSuccess(true);

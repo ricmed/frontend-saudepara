@@ -29,6 +29,9 @@ import AttendanceInfoSection from "./components/sections/AttendanceInfoSection";
 import NotifierInfoSection from "./components/sections/NotifierInfoSection";
 import CaseClosureSection from "./components/sections/CaseClosureSection";
 
+// Import do novo componente de resumo de erros
+import ErrorSummary, { scrollToField } from "./components/ErrorSummary";
+
 const NotificationForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -104,15 +107,26 @@ const NotificationForm: React.FC = () => {
     setSearchSintomas,
     searchTrauma,
     setSearchTrauma,
-      
-    // Helpers para condicionais
+        // Helpers para condicionais
     isTipoAtendimentoFunc,
     isTipoEncerramentoFunc,
   
     // Adicionar estas duas variáveis
     hipoteseDiagFiltradas, 
     isLoadingHipoteses,
-  } = useNotificationForm(isEditMode, id);
+  } = useNotificationForm(isEditMode, id);  // ========================================
+  // FUNÇÃO PARA SCROLL PARA CAMPO ESPECÍFICO
+  // ========================================
+  const handleScrollToField = (fieldName: string) => {
+    scrollToField(fieldName, expandedSections as unknown as Record<string, boolean>, (section: string) => {
+      toggleSection(section as keyof typeof expandedSections);
+    });
+  };
+
+  // Wrapper function for toggleSection to handle type compatibility
+  const handleToggleSection = (section: string) => {
+    toggleSection(section as keyof typeof expandedSections);
+  };
 
   // Tela de carregamento
   if (isLoading) {
@@ -225,7 +239,7 @@ const NotificationForm: React.FC = () => {
       />
 
       <main className="max-w-5xl mx-auto p-6">
-        {/* Mensagens de erro e sucesso */}
+        {/* Mensagem de erro da API */}
         {apiError && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
             <div className="flex items-start gap-2 text-red-600">
@@ -237,6 +251,7 @@ const NotificationForm: React.FC = () => {
           </div>
         )}
 
+        {/* Mensagem de sucesso */}
         {isSuccess && (
           <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
             <div className="flex items-center gap-2 text-green-600">
@@ -247,23 +262,13 @@ const NotificationForm: React.FC = () => {
               </p>
             </div>
           </div>
-        )}
-
-        {/* Resumo de erros */}
-        {Object.keys(errors).length > 0 && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <h3 className="text-red-700 font-medium mb-2">
-              Corrija os seguintes erros para continuar:
-            </h3>
-            <ul className="list-disc pl-5 space-y-1">
-              {Object.entries(errors).map(([field, message]) => (
-                <li key={field} className="text-red-600 text-sm">
-                  {message}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        )}        {/* NOVO: Resumo de Erros com Navegação */}
+        <ErrorSummary 
+          errors={errors} 
+          onFieldClick={handleScrollToField}
+          expandedSections={expandedSections as unknown as Record<string, boolean>}
+          toggleSection={handleToggleSection}
+        />
 
         {/* Formulário */}
         <form
