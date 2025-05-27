@@ -2105,6 +2105,75 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 </div>
               )}
             </div>
+          </div>          {/* Principais Sintomas */}
+          <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Heart className="h-5 w-5 text-red-700" />
+                <h3 className="text-sm font-medium text-gray-700">
+                  Principais Sinais e Sintomas
+                </h3>
+              </div>
+              <GraphExportMenu 
+                chartId="chart-sintomas" 
+                chartType="bar"
+                chartData={filteredSintomas.slice(0, 10)}
+                chartTitle="Principais Sinais e Sintomas"
+              />
+            </div>
+            <div className="h-64" id="chart-sintomas">
+              {filteredSintomas.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={filteredSintomas.slice(0, 10)}
+                    layout="vertical"
+                    margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis type="number" stroke="#666" />
+                    <YAxis
+                      dataKey="name"
+                      type="category"
+                      stroke="#666"
+                      width={100}
+                      tick={{ fontSize: 10 }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#fff",
+                        border: "1px solid #ddd",
+                      }}
+                      formatter={(value) => [
+                        value.toLocaleString(),
+                        "Notificações",
+                      ]}
+                    />
+                    <Bar
+                      dataKey="value"
+                      onClick={(data) => {
+                        if (data && data.name) {
+                          handleCardClick(data.name);
+                        }
+                      }}
+                      cursor="pointer"
+                    >
+                      {filteredSintomas.slice(0, 10).map((entry, i) => (
+                        <Cell 
+                          key={`cell-${i}`} 
+                          fill={entry.fill}
+                          stroke={selectedCategory === entry.name ? "#000" : "none"}
+                          strokeWidth={selectedCategory === entry.name ? 2 : 0}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-64 flex items-center justify-center text-gray-500">
+                  Não há dados disponíveis para exibir
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Hipóteses Diagnósticas */}
@@ -2201,77 +2270,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 As hipóteses em <span className="text-orange-500 font-bold">laranja</span> requerem monitoramento cuidadoso.
                 Todas seguem a classificação de vigilância epidemiológica do Ministério da Saúde.
               </p>
-            </div>
-          </div>
-          
-          {/* Principais Sintomas */}
-          <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Heart className="h-5 w-5 text-red-700" />
-                <h3 className="text-sm font-medium text-gray-700">
-                  Principais Sinais e Sintomas
-                </h3>
-              </div>
-              <GraphExportMenu 
-                chartId="chart-sintomas" 
-                chartType="bar"
-                chartData={filteredSintomas.slice(0, 10)}
-                chartTitle="Principais Sinais e Sintomas"
-              />
-            </div>
-            <div className="h-64" id="chart-sintomas">
-              {filteredSintomas.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={filteredSintomas.slice(0, 10)}
-                    layout="vertical"
-                    margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis type="number" stroke="#666" />
-                    <YAxis
-                      dataKey="name"
-                      type="category"
-                      stroke="#666"
-                      width={100}
-                      tick={{ fontSize: 10 }}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "#fff",
-                        border: "1px solid #ddd",
-                      }}
-                      formatter={(value) => [
-                        value.toLocaleString(),
-                        "Notificações",
-                      ]}
-                    />
-                    <Bar
-                      dataKey="value"
-                      onClick={(data) => {
-                        if (data && data.name) {
-                          handleCardClick(data.name);
-                        }
-                      }}
-                      cursor="pointer"
-                    >
-                      {filteredSintomas.slice(0, 10).map((entry, i) => (
-                        <Cell 
-                          key={`cell-${i}`} 
-                          fill={entry.fill}
-                          stroke={selectedCategory === entry.name ? "#000" : "none"}
-                          strokeWidth={selectedCategory === entry.name ? 2 : 0}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-64 flex items-center justify-center text-gray-500">
-                  Não há dados disponíveis para exibir
-                </div>
-              )}
             </div>
           </div>
         </main>
