@@ -219,12 +219,10 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                   label: option.descricao
                 })) || []
               }
-            />
-
-            {/* Sinais e Sintomas para CLINICO e INCIDENTE QBRN */}
+            />            {/* Sinais e Sintomas para CLINICO e INCIDENTE QBRN */}
             {(isTipoAtendimentoFunc("CLINICO") ||
               isTipoAtendimentoFunc("INCIDENTE QBRN")) && (
-              <div className="md:col-span-2">
+              <div className="md:col-span-2" data-field="sinaisESintomas">
                 <SearchableCheckboxGroup
                   label="Sinais e Sintomas"
                   options={sintomaOptions.map(option => ({
@@ -312,13 +310,11 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                   />
                 </div>
               </>
-            )}
-
-            {/* Trauma ou múltiplas vítimas */}
+            )}            {/* Trauma ou múltiplas vítimas */}
             {(isTipoAtendimentoFunc("TRAUMA") ||
               isTipoAtendimentoFunc("MULTIPLAS VITIMAS")) && (
               <>
-                <div className="md:col-span-2">
+                <div className="md:col-span-2" data-field="tipoTrauma">
                   <SearchableCheckboxGroup
                     label="Tipo de Trauma"
                     options={traumaOptions.map(option => ({
@@ -359,11 +355,9 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                   />
                 </div>
               </>
-            )}
-
-            {/* Hipótese Diagnóstica para TODOS os tipos EXCETO TRAUMA e MULTIPLAS VITIMAS */}
+            )}            {/* Hipótese Diagnóstica para TODOS os tipos EXCETO TRAUMA e MULTIPLAS VITIMAS */}
             {!isTipoAtendimentoFunc("TRAUMA") && !isTipoAtendimentoFunc("MULTIPLAS VITIMAS") && (
-              <div className="md:col-span-2">
+              <div className="md:col-span-2" data-field="hipoteseDiagnostica">
                 <div className="flex items-center justify-between mb-2">
                   <label className="font-medium text-gray-700">
                     Hipótese Diagnóstica (selecione apenas uma)

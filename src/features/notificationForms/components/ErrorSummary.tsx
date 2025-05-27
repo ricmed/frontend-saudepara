@@ -189,7 +189,7 @@ export const scrollToField = (
   expandedSections: Record<string, boolean>,
   toggleSection: (section: string) => void
 ) => {
-  // Mapear campo para seção (mesmo mapeamento do componente)
+  // Mapear campo para seção
   const fieldToSection: Record<string, string> = {
     // Seção 1: Dados Gerais
     evento: "dadosGerais",
@@ -252,12 +252,64 @@ export const scrollToField = (
   setTimeout(() => {
     let element: Element | null = null;
     
+    console.log(`🔍 Procurando elemento para campo: ${fieldName}`);
+    
     // ========================================
     // BUSCA ESPECÍFICA PARA CAMPOS ESPECIAIS
     // ========================================
-    
+      // Sinais e Sintomas (SearchableCheckboxGroup)
+    if (fieldName === 'sinaisESintomas') {
+      // Múltiplas estratégias de busca para sintomas
+      element = document.querySelector(`[data-field="sinaisESintomas"]`) ||
+                document.querySelector(`div:has(label:contains("Sinais e Sintomas"))`) ||
+                document.querySelector(`label[for*="sintoma"]`) ||
+                document.querySelector(`input[placeholder*="sintoma"]`) ||
+                document.querySelector(`div[class*="sintoma"]`) ||
+                // Buscar por texto do label
+                Array.from(document.querySelectorAll('label')).find(label => 
+                  label.textContent?.includes('Sinais e Sintomas')
+                )?.closest('div') ||
+                // Buscar pelo container do SearchableCheckboxGroup que contém checkboxes
+                Array.from(document.querySelectorAll('div')).find(div => {
+                  const label = div.querySelector('label');
+                  return label && label.textContent?.includes('Sinais e Sintomas');
+                }) || null;
+      
+      console.log('🔍 Procurando Sinais e Sintomas:', element);
+    }
+    // Tipo de Trauma (SearchableCheckboxGroup)
+    else if (fieldName === 'tipoTrauma') {
+      // Múltiplas estratégias de busca para trauma
+      element = document.querySelector(`[data-field="tipoTrauma"]`) ||
+                document.querySelector(`div:has(label:contains("Tipo de Trauma"))`) ||
+                document.querySelector(`label[for*="trauma"]`) ||
+                document.querySelector(`input[placeholder*="trauma"]`) ||
+                document.querySelector(`div[class*="trauma"]`) ||
+                // Buscar por texto do label
+                Array.from(document.querySelectorAll('label')).find(label => 
+                  label.textContent?.includes('Tipo de Trauma')
+                )?.closest('div') ||
+                // Buscar pelo container do SearchableCheckboxGroup que contém checkboxes
+                Array.from(document.querySelectorAll('div')).find(div => {
+                  const label = div.querySelector('label');
+                  return label && label.textContent?.includes('Tipo de Trauma');
+                }) || null;
+      
+      console.log('🔍 Procurando Tipo de Trauma:', element);
+    }
+    // Hipótese Diagnóstica (grid de checkboxes)
+    else if (fieldName === 'hipoteseDiagnostica') {
+      element = document.querySelector(`[data-field="hipoteseDiagnostica"]`) ||
+                Array.from(document.querySelectorAll('label')).find(label => 
+                  label.textContent?.includes('Hipótese Diagnóstica')
+                )?.closest('div') ||
+                // Buscar pelo grid de hipóteses
+                document.querySelector(`div[class*="grid"] input[type="checkbox"]`)?.closest('div') || null;
+      
+      console.log('🔍 Procurando Hipótese Diagnóstica:', element);
+    }
     // Unidade Notificadora
-    if (fieldName === 'unidadeNotificadora') {
+    else if (fieldName === 'unidadeNotificadora') {
       element = document.querySelector(`[data-field-type="unidade"]`) ||
                 document.querySelector(`input[placeholder*="unidade notificadora"]`) ||
                 document.querySelector(`[data-field="unidadeNotificadora"]`);
@@ -291,29 +343,42 @@ export const scrollToField = (
       
       // Destacar temporariamente o campo
       (element as HTMLElement).style.transform = 'scale(1.02)';
-      (element as HTMLElement).style.transition = 'transform 0.2s ease';
-      (element as HTMLElement).style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.3)';
+      (element as HTMLElement).style.transition = 'transform 0.3s ease, box-shadow 0.3s ease';
+      (element as HTMLElement).style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.4)';
+      (element as HTMLElement).style.borderRadius = '8px';
       
       setTimeout(() => {
         (element as HTMLElement).style.transform = 'scale(1)';
         (element as HTMLElement).style.boxShadow = '';
         
         // Tentar focar no elemento se possível
-        if ((element as HTMLElement).focus) {
+        const focusableElement = element.querySelector('input, select, textarea, button') as HTMLElement;
+        if (focusableElement && focusableElement.focus) {
+          focusableElement.focus();
+        } else if ((element as HTMLElement).focus) {
           (element as HTMLElement).focus();
         } else if ((element as HTMLElement).click) {
-          // Para campos como UnidadeNotificadoraField, tentar um clique
+          // Para campos como SearchableCheckboxGroup, tentar um clique
           (element as HTMLElement).click();
         }
-      }, 300);
+      }, 400);
     } else {
       console.log(`❌ Elemento não encontrado para campo: ${fieldName}`);
       
       // Debug: listar todos os elementos possíveis
-      console.log('🔍 Elementos disponíveis com data-field-type:', 
+      console.log('🔍 Debug - Elementos disponíveis:');
+      console.log('- Labels com "Sintomas":', 
+        Array.from(document.querySelectorAll('label')).filter(l => 
+          l.textContent?.toLowerCase().includes('sintoma')
+        ));
+      console.log('- Labels com "Trauma":', 
+        Array.from(document.querySelectorAll('label')).filter(l => 
+          l.textContent?.toLowerCase().includes('trauma')
+        ));
+      console.log('- Elementos com data-field:', 
+        document.querySelectorAll('[data-field]'));
+      console.log('- Elementos com data-field-type:', 
         document.querySelectorAll('[data-field-type]'));
-      console.log('🔍 Elementos disponíveis com name:', 
-        document.querySelectorAll(`[name*="${fieldName}"]`));
     }
   }, 100);
 };
