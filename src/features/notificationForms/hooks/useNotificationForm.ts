@@ -1,4 +1,4 @@
-// src/features/notificationForms/hooks/useNotificationForm.ts
+//
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -709,7 +709,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       });
     }
   };
-
   // Selecionar paciente da lista de sugestões
   const handleSelectPaciente = (paciente: Paciente) => {
     // Converter todos os campos de texto para caixa alta
@@ -720,9 +719,18 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
     // Formatar a data corretamente
     let formattedDate = "";
-    if (pacienteUpperCase.data_nascimento) {
+    let calculatedAge = "";
+      if (pacienteUpperCase.data_nascimento) {
       const date = new Date(pacienteUpperCase.data_nascimento);
       formattedDate = date.toISOString().split("T")[0]; // Formato YYYY-MM-DD
+      
+      // SEMPRE calcular idade a partir da data de nascimento se ela existir
+      calculatedAge = calculateAge(formattedDate).toString();
+      console.log("Paciente selecionado - Data:", formattedDate, "Idade calculada:", calculatedAge);
+    } else if (pacienteUpperCase.idade) {
+      // Só usar idade armazenada se não houver data de nascimento
+      calculatedAge = pacienteUpperCase.idade.toString();
+      console.log("Paciente selecionado - Sem data, usando idade armazenada:", calculatedAge);
     }
 
     // Verificar explicitamente se o nome_mae não é um CPF
@@ -767,7 +775,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       pacienteId: pacienteUpperCase.idpaciente,
       nomeMae: nomeDaMae,
       dataNascimento: formattedDate,
-      idade: calculateAge(pacienteUpperCase.data_nascimento).toString(),
+      idade: calculatedAge, // Usar idade calculada ou armazenada conforme lógica acima
       cpf: pacienteUpperCase.cpf || "",
       identidadeGenero:
         pacienteUpperCase.tipo_genero_idtipo_genero?.toString() || "",
@@ -1036,34 +1044,43 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     // Se já tem ID de paciente, atualizar dados do paciente
     else if (formData.pacienteId) {
       try {
-        console.log("Atualizando dados do paciente ID:", formData.pacienteId);
-        
-        // Atualizar os dados do paciente antes de salvar a notificação
-        const pacienteData = {
+        console.log("Atualizando dados do paciente ID:", formData.pacienteId);        // Atualizar os dados do paciente antes de salvar a notificação
+        const pacienteData: any = {
           nome: formData.paciente,
           nome_mae: formData.nomeMae || "",
-          // Incluir data_nascimento apenas se existir
-          ...(formData.dataNascimento ? { data_nascimento: formData.dataNascimento } : {}),
           cpf: formData.cpf || "",
           contato: formData.contatoTelefonico || "",
-          tipo_genero_idtipo_genero: formData.identidadeGenero
-            ? parseInt(formData.identidadeGenero)
-            : undefined,
-          tipo_raca_idtipo_raca: formData.raca
-            ? parseInt(formData.raca)
-            : undefined,
-          escolaridade_idescolaridade: formData.escolaridade
-            ? parseInt(formData.escolaridade)
-            : undefined,
-          cbo_idcbo: formData.profissao
-            ? parseInt(formData.profissao)
-            : undefined,
           ddi: formData.ddi || "55",
-          // Adicionar idade somente se não houver data de nascimento
-          ...((!formData.dataNascimento || formData.dataNascimento.trim() === '') && formData.idade
-              ? { idade: parseInt(formData.idade) }
-              : {}),
         };
+
+        // CORREÇÃO: SEMPRE enviar data_nascimento (null se vazio)
+        if (formData.dataNascimento && formData.dataNascimento.trim() !== '') {
+          pacienteData.data_nascimento = formData.dataNascimento;
+        } else {
+          pacienteData.data_nascimento = null;
+        }
+
+        // CORREÇÃO: SEMPRE enviar idade quando não há data de nascimento
+        if ((!formData.dataNascimento || formData.dataNascimento.trim() === '') && formData.idade) {
+          pacienteData.idade = parseInt(formData.idade);
+        } else {
+          pacienteData.idade = null;
+        }
+
+        if (formData.identidadeGenero) {
+          pacienteData.tipo_genero_idtipo_genero = parseInt(formData.identidadeGenero);
+        }
+        if (formData.raca) {
+          pacienteData.tipo_raca_idtipo_raca = parseInt(formData.raca);
+        }
+        if (formData.escolaridade) {
+          pacienteData.escolaridade_idescolaridade = parseInt(formData.escolaridade);
+        }
+        if (formData.profissao) {
+          pacienteData.cbo_idcbo = parseInt(formData.profissao);
+        }
+
+        console.log("Dados do paciente para atualização:", pacienteData);
 
         // Usar o serviço para atualizar o paciente
         await PacienteService.update(formData.pacienteId, pacienteData);
@@ -1176,19 +1193,22 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       loadNotificacao(id);
     }
   }, [isEditMode, id]);
-
   // Efeito para calcular idade automaticamente quando a data de nascimento mudar
   useEffect(() => {
-    if (formData.dataNascimento) {
+    console.log("useEffect idade - dataNascimento mudou:", formData.dataNascimento);
+    
+    if (formData.dataNascimento && formData.dataNascimento.trim() !== "") {
       const calculatedAge = calculateAge(formData.dataNascimento);
+      console.log("Idade calculada:", calculatedAge);
 
       // Verificar se a idade calculada é válida (não maior que 120)
       if (calculatedAge > 120) {
+        console.log("Idade inválida (>120), limpando campos");
         // Limpar a data de nascimento se for inválida
         setFormData((prev) => ({
           ...prev,
-          dataNascimento: "", // Limpar data inválida
-          idade: "", // Limpar idade também
+          dataNascimento: "", 
+          idade: "", 
         }));
 
         // Mostrar mensagem de erro
@@ -1198,10 +1218,18 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         }));
       } else {
         // Se a idade for válida, atualizar normalmente
-        setFormData((prev) => ({
-          ...prev,
-          idade: calculatedAge.toString(),
-        }));
+        console.log("Atualizando idade para:", calculatedAge);
+        setFormData((prev) => {
+          // Só atualizar se a idade calculada for diferente da atual
+          if (prev.idade !== calculatedAge.toString()) {
+            console.log("Idade alterada de", prev.idade, "para", calculatedAge.toString());
+            return {
+              ...prev,
+              idade: calculatedAge.toString(),
+            };
+          }
+          return prev;
+        });
 
         // Limpar erro se existir
         if (errors.dataNascimento) {
@@ -1213,13 +1241,14 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         }
       }
     } else {
-      // Quando data de nascimento for limpa, limpar idade também
+      // Quando data de nascimento for limpa, só limpar idade se ela foi calculada automaticamente
+      console.log("Data de nascimento vazia, limpando idade");
       setFormData((prev) => ({
         ...prev,
         idade: "",
       }));
     }
-  }, [formData.dataNascimento]);
+  }, [formData.dataNascimento]); // Importante: não incluir 'errors' como dependência para evitar loops
 
   // Efeito para atualizar municípios quando o estado muda
   useEffect(() => {

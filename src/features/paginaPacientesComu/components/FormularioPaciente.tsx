@@ -227,19 +227,19 @@ const FormularioPaciente = ({
             escolaridadeId = Number(
               pacienteUpperCase.escolaridade_idescolaridade
             );
-          }
-
-          // Formatar a data de nascimento e calcular a idade
+          }          // Formatar a data de nascimento e calcular a idade
           const formattedDate = pacienteUpperCase.data_nascimento
             ? new Date(pacienteUpperCase.data_nascimento)
                 .toISOString()
                 .split("T")[0]
             : "";
 
-          // Calcular a idade se tiver data de nascimento
-          const calculatedAge = formattedDate
-            ? calculateAge(formattedDate)
-            : "";
+          // SEMPRE priorizar cálculo pela data de nascimento se existir
+          const finalAge = formattedDate 
+            ? calculateAge(formattedDate).toString()  // Se tem data, SEMPRE calcular
+            : (pacienteUpperCase.idade ? pacienteUpperCase.idade.toString() : ""); // Só usar idade armazenada se não houver data
+
+          console.log("Paciente carregado - Data:", formattedDate, "Idade final:", finalAge);
 
           setFormData({
             nome: pacienteUpperCase.nome || "",
@@ -256,7 +256,7 @@ const FormularioPaciente = ({
             cbo_idcbo: pacienteUpperCase.cbo_idcbo || null,
             ddi: pacienteUpperCase.ddi || "55",
             contato: pacienteUpperCase.contato || "",
-            idade: pacienteUpperCase.idade ? pacienteUpperCase.idade.toString() : calculatedAge,
+            idade: finalAge, // Usar idade calculada ou armazenada conforme lógica acima
           });
         })
         .catch((error) => {
@@ -270,10 +270,12 @@ const FormularioPaciente = ({
         });
     }
   }, [pacienteId]);
-
   useEffect(() => {
+    console.log("useEffect idade - data_nascimento mudou:", formData.data_nascimento);
+    
     // Se a data de nascimento está vazia, limpar a idade e habilitar o campo
-    if (!formData.data_nascimento) {
+    if (!formData.data_nascimento || formData.data_nascimento.trim() === '') {
+      console.log("Data de nascimento vazia, limpando idade");
       setFormData((prev) => ({
         ...prev,
         idade: "",
@@ -282,10 +284,12 @@ const FormularioPaciente = ({
     // Se a data de nascimento existe, calcular a idade
     else {
       const calculatedAge = calculateAge(formData.data_nascimento);
+      console.log("Idade calculada:", calculatedAge);
 
       // Verificar se a idade é válida (não maior que 120)
       const age = parseInt(calculatedAge);
       if (!isNaN(age) && age > 120) {
+        console.log("Idade inválida (>120), definindo erro");
         setErrors((prev) => ({
           ...prev,
           data_nascimento: "A idade não pode ser maior que 120 anos",
@@ -293,10 +297,17 @@ const FormularioPaciente = ({
         return;
       }
 
-      setFormData((prev) => ({
-        ...prev,
-        idade: calculatedAge,
-      }));
+      // Atualizar idade apenas se for diferente da atual
+      setFormData((prev) => {
+        if (prev.idade !== calculatedAge) {
+          console.log("Atualizando idade de", prev.idade, "para", calculatedAge);
+          return {
+            ...prev,
+            idade: calculatedAge,
+          };
+        }
+        return prev;
+      });
 
       // Limpar erro de data de nascimento se existir
       if (errors.data_nascimento) {
@@ -307,7 +318,7 @@ const FormularioPaciente = ({
         });
       }
     }
-  }, [formData.data_nascimento]);
+  }, [formData.data_nascimento]); // Não incluir 'errors' como dependência para evitar loops
 
   // Efeito para resetar o formulário quando isNewPatient for true
   useEffect(() => {
@@ -437,11 +448,10 @@ const FormularioPaciente = ({
       setFormData((prev) => ({
         ...prev,
         [name]: limitedValue,
-      }));
-    } else if (name === "data_nascimento") {
+      }));    } else if (name === "data_nascimento") {
       // Usar uma verificação mais rigorosa para considerar o campo vazio
       if (!value || value === "" || value.trim() === "") {
-        console.log("Campo de data limpo:", value); // Debugging temporário
+        console.log("Campo de data limpo:", value);
         setFormData((prev) => ({
           ...prev,
           [name]: "",
@@ -470,8 +480,9 @@ const FormularioPaciente = ({
           return;
         }
         
-        // Se tem data, calcular a idade automaticamente
+        // CORREÇÃO: Sempre calcular idade a partir da data, não deixar idade manual
         const age = calculateAge(value);
+        console.log("Nova data selecionada:", value, "Idade calculada:", age);
 
         // Verificar se a idade é válida (não maior que 120)
         const ageNum = parseInt(age);
@@ -483,15 +494,17 @@ const FormularioPaciente = ({
           return;
         }
 
+        // SEMPRE atualizar a idade quando a data de nascimento mudar
         setFormData((prev) => ({
           ...prev,
           [name]: value,
-          idade: age,
+          idade: age, // SEMPRE usar idade calculada
         }));
-      }
-    } else if (name === "idade") {
+        
+        console.log("Data de nascimento atualizada para:", value, "Idade:", age);
+      }    } else if (name === "idade") {
       // Se a idade for alterada manualmente (apenas quando data_nascimento estiver vazia)
-      if (!formData.data_nascimento) {
+      if (!formData.data_nascimento || formData.data_nascimento.trim() === '') {
         const ageValue = value === "" ? "" : value;
         const ageNum = parseInt(ageValue);
 
@@ -505,6 +518,10 @@ const FormularioPaciente = ({
         }
 
         setFormData((prev) => ({ ...prev, idade: ageValue }));
+        console.log("Idade manual alterada para:", ageValue);
+      } else {
+        // Se há data de nascimento, não permitir alteração manual da idade
+        console.log("Tentativa de alterar idade manualmente ignorada - data de nascimento presente");
       }
     } else {
       // Campos de texto simples - converter para caixa alta

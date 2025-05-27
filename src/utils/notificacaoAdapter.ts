@@ -75,13 +75,13 @@ export const formatFromBackend = async (
   // Buscar sintomas com método melhorado e aguardar resultado
   const sinaisESintomas = await extractSintomasStrings(backendData);
   console.log("Sintomas extraídos:", sinaisESintomas);
-
   // Buscar local de encaminhamento
   let localEncaminhamento = extractLocalEncaminhamento(backendData);
-
-  // Calcular idade a partir da data de nascimento se disponível
-  let idade = backendData.paciente?.idade?.toString() || "";
-  if (!idade && backendData.paciente?.data_nascimento) {
+  
+  // SEMPRE priorizar cálculo pela data de nascimento se existir
+  let idade = "";
+  if (backendData.paciente?.data_nascimento) {
+    // Se tem data de nascimento, SEMPRE calcular a idade a partir dela
     const birthDate = convertUTCDateToLocal(backendData.paciente.data_nascimento);
     const today = new Date();
     const todayUTC = new Date(
@@ -97,6 +97,12 @@ export const formatFromBackend = async (
     ) {
       idade = String(parseInt(idade) - 1);
     }
+    
+    console.log("Idade calculada a partir da data de nascimento:", idade);
+  } else if (backendData.paciente?.idade) {
+    // Só usar idade armazenada se NÃO houver data de nascimento
+    idade = backendData.paciente.idade.toString();
+    console.log("Usando idade armazenada (sem data de nascimento):", idade);
   }
 
   // Processar contatos telefônicos - versão melhorada
