@@ -17,7 +17,6 @@ import {
   ChevronFirst,
   ChevronLast,
 } from "lucide-react";
-import { CSVLink } from "react-csv";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -48,33 +47,33 @@ interface ColumnDefinition {
 // Adicione esta função ao seu componente
 const formatPhoneNumber = (phone: string | null | undefined) => {
   if (!phone) return "";
-  
+
   // Remove todos os caracteres não numéricos
-  const cleaned = phone.replace(/\D/g, '');
-  
+  const cleaned = phone.replace(/\D/g, "");
+
   // DDIs mais comuns
   const ddiPatterns = [
-    { ddi: '55', country: 'BR', lengths: [10, 11] }, // Brasil
-    { ddi: '1', country: 'US', lengths: [10] },      // EUA/Canadá
-    { ddi: '351', country: 'PT', lengths: [9] },     // Portugal
-    { ddi: '34', country: 'ES', lengths: [9] },      // Espanha
-    { ddi: '44', country: 'GB', lengths: [10] },     // Reino Unido
-    { ddi: '49', country: 'DE', lengths: [10, 11] }, // Alemanha
-    { ddi: '33', country: 'FR', lengths: [9] },      // França
-    { ddi: '39', country: 'IT', lengths: [9, 10] },  // Itália
-    { ddi: '81', country: 'JP', lengths: [10] },     // Japão
-    { ddi: '86', country: 'CN', lengths: [11] },     // China
-    { ddi: '91', country: 'IN', lengths: [10] }      // Índia
+    { ddi: "55", country: "BR", lengths: [10, 11] }, // Brasil
+    { ddi: "1", country: "US", lengths: [10] }, // EUA/Canadá
+    { ddi: "351", country: "PT", lengths: [9] }, // Portugal
+    { ddi: "34", country: "ES", lengths: [9] }, // Espanha
+    { ddi: "44", country: "GB", lengths: [10] }, // Reino Unido
+    { ddi: "49", country: "DE", lengths: [10, 11] }, // Alemanha
+    { ddi: "33", country: "FR", lengths: [9] }, // França
+    { ddi: "39", country: "IT", lengths: [9, 10] }, // Itália
+    { ddi: "81", country: "JP", lengths: [10] }, // Japão
+    { ddi: "86", country: "CN", lengths: [11] }, // China
+    { ddi: "91", country: "IN", lengths: [10] }, // Índia
     // Você pode adicionar mais países conforme necessário
   ];
-  
+
   // Ordenamos do DDI mais longo para o mais curto para evitar detecções parciais erradas
   ddiPatterns.sort((a, b) => b.ddi.length - a.ddi.length);
-  
+
   // Tenta identificar o DDI
   let foundPattern = null;
   let nationalNumber = cleaned;
-  
+
   for (const pattern of ddiPatterns) {
     if (cleaned.startsWith(pattern.ddi)) {
       const possibleNationalNumber = cleaned.substring(pattern.ddi.length);
@@ -85,41 +84,47 @@ const formatPhoneNumber = (phone: string | null | undefined) => {
       }
     }
   }
-  
+
   // Se encontrou um DDI válido
   if (foundPattern) {
     // Formatação específica para o Brasil
-    if (foundPattern.country === 'BR') {
-      if (nationalNumber.length === 11) { // Celular
+    if (foundPattern.country === "BR") {
+      if (nationalNumber.length === 11) {
+        // Celular
         return `+${foundPattern.ddi} (${nationalNumber.slice(0, 2)}) ${nationalNumber.slice(2, 7)}-${nationalNumber.slice(7)}`;
-      } else if (nationalNumber.length === 10) { // Fixo
+      } else if (nationalNumber.length === 10) {
+        // Fixo
         return `+${foundPattern.ddi} (${nationalNumber.slice(0, 2)}) ${nationalNumber.slice(2, 6)}-${nationalNumber.slice(6)}`;
       }
     }
     // EUA/Canadá
-    else if (foundPattern.country === 'US') {
+    else if (foundPattern.country === "US") {
       return `+${foundPattern.ddi} (${nationalNumber.slice(0, 3)}) ${nationalNumber.slice(3, 6)}-${nationalNumber.slice(6)}`;
     }
     // Reino Unido
-    else if (foundPattern.country === 'GB') {
+    else if (foundPattern.country === "GB") {
       return `+${foundPattern.ddi} ${nationalNumber.slice(0, 4)} ${nationalNumber.slice(4)}`;
     }
-    
+
     // Formato genérico para outros países
     return `+${foundPattern.ddi} ${nationalNumber}`;
   }
-  
+
   // Se não tiver DDI, assume formato brasileiro
-  if (cleaned.length === 11) { // Celular brasileiro com DDD
+  if (cleaned.length === 11) {
+    // Celular brasileiro com DDD
     return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
-  } else if (cleaned.length === 10) { // Fixo brasileiro com DDD
+  } else if (cleaned.length === 10) {
+    // Fixo brasileiro com DDD
     return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`;
-  } else if (cleaned.length === 9 && cleaned.startsWith('9')) { // Celular sem DDD
+  } else if (cleaned.length === 9 && cleaned.startsWith("9")) {
+    // Celular sem DDD
     return `${cleaned.slice(0, 5)}-${cleaned.slice(5)}`;
-  } else if (cleaned.length === 8) { // Fixo sem DDD
+  } else if (cleaned.length === 8) {
+    // Fixo sem DDD
     return `${cleaned.slice(0, 4)}-${cleaned.slice(4)}`;
   }
-  
+
   // Retorna como está se não encaixar em nenhum padrão
   return phone;
 };
@@ -136,11 +141,8 @@ const allColumns: ColumnDefinition[] = [
   { key: "contato", label: "Contato", sortable: false },
 ];
 
-const ListaPacientes = () => {
-  const navigate = useNavigate();
+const ListaPacientes = () => {  const navigate = useNavigate();
   const menuRef = useRef<HTMLDivElement>(null);
-  const [csvLinkRef, setCsvLinkRef] = useState<any>(null);
-  const csvLinkAllRef = useRef<any>(null);
   // Adicionando contexto de idioma
   const { selectedLanguage, setSelectedLanguage } = useLanguage();
 
@@ -172,9 +174,7 @@ const ListaPacientes = () => {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [tempPage, setTempPage] = useState("1");
   const [isUsingLocalSort, setIsUsingLocalSort] = useState(false);
-
   // Ordenação
-  const [sortKey, setSortKey] = useState<keyof Paciente>("nome");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   // Removendo o menu de ordenação
   const [isColumnsMenuOpen, setIsColumnsMenuOpen] = useState(false);
@@ -213,20 +213,23 @@ const ListaPacientes = () => {
   const fetchAllData = async (): Promise<Paciente[]> => {
     try {
       setError(null);
-      
+
       let allPacientes: Paciente[] = [];
       let page = 1;
       let hasMore = true;
       const LARGE_PAGE_SIZE = 500; // Usar um tamanho de página grande para reduzir o número de requisições
-  
+
       // Buscar todas as páginas
       while (hasMore) {
         const response = await PacienteService.getAll(page, LARGE_PAGE_SIZE);
-  
+
         if (response && response.data && response.data.length > 0) {
           allPacientes = [...allPacientes, ...response.data];
-  
-          if (page >= response.pagination.pages || response.data.length < LARGE_PAGE_SIZE) {
+
+          if (
+            page >= response.pagination.pages ||
+            response.data.length < LARGE_PAGE_SIZE
+          ) {
             hasMore = false;
           } else {
             page++;
@@ -235,7 +238,7 @@ const ListaPacientes = () => {
           hasMore = false;
         }
       }
-  
+
       return allPacientes;
     } catch (error) {
       console.error("Erro ao buscar todos os dados:", error);
@@ -249,22 +252,25 @@ const ListaPacientes = () => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-  
+
         // Se estamos usando ordenação local e temos todos os dados
         if (isUsingLocalSort && allPacientes.length > 0) {
           // Aplicar paginação manualmente
           const startIndex = (currentPage - 1) * itemsPerPage;
           const endIndex = startIndex + itemsPerPage;
           setPacientes(allPacientes.slice(startIndex, endIndex));
-          
+
           // Já temos a paginação calculada, então não precisamos fazer mais nada
           setIsLoading(false);
           return;
         }
-  
+
         // Caso contrário, usar a API normal com paginação do backend
         let response;
-        if (debouncedSearchParams.term && debouncedSearchParams.term.length >= 3) {
+        if (
+          debouncedSearchParams.term &&
+          debouncedSearchParams.term.length >= 3
+        ) {
           response = await PacienteService.search(
             debouncedSearchParams.term,
             currentPage,
@@ -273,28 +279,31 @@ const ListaPacientes = () => {
         } else {
           response = await PacienteService.getAll(currentPage, itemsPerPage);
         }
-  
+
         if (response && response.data) {
           // Verificar se estamos em uma página válida
-          if (response.pagination.pages > 0 && currentPage > response.pagination.pages) {
+          if (
+            response.pagination.pages > 0 &&
+            currentPage > response.pagination.pages
+          ) {
             setCurrentPage(1);
             setTempPage("1");
             setIsLoading(false);
             return;
           }
-  
+
           // Ordenar os dados da página atual
           const sortedData = [...response.data].sort((a, b) => {
-            const valueA = (a.nome || '').toLowerCase();
-            const valueB = (b.nome || '').toLowerCase();
-            
+            const valueA = (a.nome || "").toLowerCase();
+            const valueB = (b.nome || "").toLowerCase();
+
             if (sortOrder === "asc") {
-              return valueA.localeCompare(valueB, 'pt-BR');
+              return valueA.localeCompare(valueB, "pt-BR");
             } else {
-              return valueB.localeCompare(valueA, 'pt-BR');
+              return valueB.localeCompare(valueA, "pt-BR");
             }
           });
-  
+
           setPacientes(sortedData);
           setPaginationMeta({
             total: response.pagination.total,
@@ -311,7 +320,7 @@ const ListaPacientes = () => {
         setIsLoading(false);
       }
     };
-  
+
     fetchData();
   }, [currentPage, itemsPerPage, debouncedSearchParams, isUsingLocalSort]);
 
@@ -320,19 +329,19 @@ const ListaPacientes = () => {
     if (allPacientes.length > 0) {
       // Verificar se a página atual é válida
       const totalPages = Math.ceil(allPacientes.length / itemsPerPage);
-      
+
       let newPage = currentPage;
       if (totalPages > 0 && currentPage > totalPages) {
         newPage = 1;
         setCurrentPage(1);
         setTempPage("1");
       }
-      
+
       // Aplicar paginação
       const startIndex = (newPage - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
       setPacientes(allPacientes.slice(startIndex, endIndex));
-      
+
       // Atualizar metadados de paginação
       setPaginationMeta({
         total: allPacientes.length,
@@ -380,18 +389,18 @@ const ListaPacientes = () => {
   const handlePageChange = (newPage: number) => {
     // Garantir que a página nunca seja maior que o total de páginas
     const safeNewPage = Math.min(newPage, paginationMeta.pages);
-  
+
     if (safeNewPage >= 1 && safeNewPage <= paginationMeta.pages) {
       // Se estiver usando ordenação local e tivermos todos os dados
       if (isUsingLocalSort && allPacientes.length > 0) {
         setCurrentPage(safeNewPage);
         setTempPage(safeNewPage.toString());
-        
+
         // Aplicar paginação manualmente
         const startIndex = (safeNewPage - 1) * itemsPerPage;
         const endIndex = startIndex + itemsPerPage;
         setPacientes(allPacientes.slice(startIndex, endIndex));
-      } 
+      }
       // Caso contrário, apenas atualiza a página e deixa o useEffect cuidar do resto
       else {
         setCurrentPage(safeNewPage);
@@ -404,37 +413,37 @@ const ListaPacientes = () => {
   const handleSortChange = async () => {
     try {
       setIsLoading(true);
-      
+
       // Alternar a ordem de classificação
       const newSortOrder = sortOrder === "asc" ? "desc" : "asc";
       setSortOrder(newSortOrder);
-      
+
       // Se ainda não estamos usando ordenação local, carregue todos os pacientes automaticamente
       if (!isUsingLocalSort && allPacientes.length === 0) {
         // Buscar todos os pacientes sem pedir confirmação
         const fetchedPacientes = await fetchAllData();
-        
+
         if (fetchedPacientes.length > 0) {
           // Ordenar todos os pacientes
           const sortedData = [...fetchedPacientes].sort((a, b) => {
-            const valueA = (a.nome || '').toLowerCase();
-            const valueB = (b.nome || '').toLowerCase();
-            
+            const valueA = (a.nome || "").toLowerCase();
+            const valueB = (b.nome || "").toLowerCase();
+
             if (newSortOrder === "asc") {
-              return valueA.localeCompare(valueB, 'pt-BR');
+              return valueA.localeCompare(valueB, "pt-BR");
             } else {
-              return valueB.localeCompare(valueA, 'pt-BR');
+              return valueB.localeCompare(valueA, "pt-BR");
             }
           });
-          
+
           // Atualizar o estado com todos os pacientes ordenados
           setAllPacientes(sortedData);
-          
+
           // Aplicar paginação manualmente
           const startIndex = (currentPage - 1) * itemsPerPage;
           const endIndex = startIndex + itemsPerPage;
           setPacientes(sortedData.slice(startIndex, endIndex));
-          
+
           // Atualizar metadados de paginação
           setPaginationMeta({
             total: sortedData.length,
@@ -442,28 +451,28 @@ const ListaPacientes = () => {
             currentPage: currentPage,
             perPage: itemsPerPage,
           });
-          
+
           // Ativar modo de ordenação local
           setIsUsingLocalSort(true);
         }
-      } 
+      }
       // Se já temos todos os pacientes e estamos no modo de ordenação local
       else if (isUsingLocalSort && allPacientes.length > 0) {
         // Ordenar todos os pacientes
         const sortedData = [...allPacientes].sort((a, b) => {
-          const valueA = (a.nome || '').toLowerCase();
-          const valueB = (b.nome || '').toLowerCase();
-          
+          const valueA = (a.nome || "").toLowerCase();
+          const valueB = (b.nome || "").toLowerCase();
+
           if (newSortOrder === "asc") {
-            return valueA.localeCompare(valueB, 'pt-BR');
+            return valueA.localeCompare(valueB, "pt-BR");
           } else {
-            return valueB.localeCompare(valueA, 'pt-BR');
+            return valueB.localeCompare(valueA, "pt-BR");
           }
         });
-        
+
         // Atualizar o estado com todos os pacientes ordenados
         setAllPacientes(sortedData);
-        
+
         // Aplicar paginação manualmente
         const startIndex = (currentPage - 1) * itemsPerPage;
         const endIndex = startIndex + itemsPerPage;
@@ -472,16 +481,16 @@ const ListaPacientes = () => {
       // Ordenação apenas da página atual (fallback)
       else {
         const sortedPageData = [...pacientes].sort((a, b) => {
-          const valueA = (a.nome || '').toLowerCase();
-          const valueB = (b.nome || '').toLowerCase();
-          
+          const valueA = (a.nome || "").toLowerCase();
+          const valueB = (b.nome || "").toLowerCase();
+
           if (newSortOrder === "asc") {
-            return valueA.localeCompare(valueB, 'pt-BR');
+            return valueA.localeCompare(valueB, "pt-BR");
           } else {
-            return valueB.localeCompare(valueA, 'pt-BR');
+            return valueB.localeCompare(valueA, "pt-BR");
           }
         });
-        
+
         setPacientes(sortedPageData);
       }
     } catch (error) {
@@ -498,184 +507,225 @@ const ListaPacientes = () => {
     } else {
       setSelectedColumns([...selectedColumns, colKey]);
     }
-  };
-
-  // Funções de exportação
-  const handleExportCSV = (type: "page" | "all") => {
+  };  // Funções de exportação
+  const handleExportCSV = async (type: "page" | "all") => {
     try {
-      const dataToExport = type === "page" ? pacientes : allPacientes;
+      let dataToExport = pacientes;
+      
+      if (type === "all") {
+        if (allPacientes.length === 0) {
+          const allData = await fetchAllData();
+          dataToExport = allData;
+        } else {
+          dataToExport = allPacientes;
+        }
+      }
+      
       if (!dataToExport.length) return;
 
-      // Formatar os dados para CSV usando todas as colunas selecionadas
-      const formattedData = dataToExport.map((paciente) => {
-        const data: any = {};
-        
-        allColumns.forEach(col => {
-          if (selectedColumns.includes(col.key)) {
-            if (col.key === "data_nascimento") {
-              data[col.label] = formatDate(paciente.data_nascimento);
-            } else if (col.key === "cpf") {
-              data[col.label] = formatCPF(paciente.cpf);
-            } else if (col.key === "tipo_genero") {
-              data[col.label] = paciente.tipo_genero?.descricao || "";
-            } else if (col.key === "tipo_raca") {
-              data[col.label] = paciente.tipo_raca?.descricao || "";
-            } else if (col.key === "tipo_escolaridade") {
-              data[col.label] = paciente.tipo_escolaridade?.descricao || "";
-            } else if (col.key === "contato") {
-              data[col.label] = `${paciente.idpaciente} - ${formatPhoneNumber(paciente.contato)}`;
-            } else {
-              data[col.label] = paciente[col.key as keyof Paciente] || "";
-            }
-          }
-        });
-        
-        return data;
-      });
+      // Incluir campos disponíveis do paciente
+      const formattedData = dataToExport.map((paciente) => ({
+        "ID": paciente.idpaciente || "",
+        "Nome": paciente.nome || "",
+        "Nome da Mãe": paciente.nome_mae || "",
+        "Data de Nascimento": formatDate(paciente.data_nascimento),
+        "Idade": calculateAge(paciente.data_nascimento),
+        "CPF": formatCPF(paciente.cpf),
+        "Identidade de Gênero": paciente.tipo_genero?.descricao || "",
+        "Raça/Cor": paciente.tipo_raca?.descricao || "",
+        "Escolaridade": paciente.tipo_escolaridade?.descricao || "",
+        "Contato Telefônico": formatPhoneNumber(paciente.contato)
+      }));
 
-      if (type === "page" && csvLinkRef) {
-        csvLinkRef.link.click();
-      } else if (type === "all" && csvLinkAllRef.current) {
-        csvLinkAllRef.current.data = formattedData;
-        csvLinkAllRef.current.link.click();
-      }
+      // Criar CSV
+      const csvHeader = Object.keys(formattedData[0]).join(",") + "\n";
+      const csvContent = formattedData.map(row => 
+        Object.values(row).map(val => `"${String(val).replace(/"/g, '""')}"`).join(",")
+      ).join("\n");
+      
+      const fullCsv = "\uFEFF" + csvHeader + csvContent;
+      
+      // Download
+      const blob = new Blob([fullCsv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `pacientes_completo_${type === "page" ? "pagina_atual" : "todos"}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
       setIsExportMenuOpen(false);
     } catch (error) {
       setError("Erro ao exportar CSV. Tente novamente.");
     }
-  };
-
-  // Função de exportação Excel
-  const handleExportExcel = (type: "page" | "all") => {
+  };  // Função de exportação Excel
+  const handleExportExcel = async (type: "page" | "all") => {
     try {
-      const dataToExport = type === "page" ? pacientes : allPacientes;
+      let dataToExport = pacientes;
+      
+      if (type === "all") {
+        if (allPacientes.length === 0) {
+          const allData = await fetchAllData();
+          dataToExport = allData;
+        } else {
+          dataToExport = allPacientes;
+        }
+      }
+      
       if (!dataToExport.length) return;
 
-      // Formatar os dados para Excel usando todas as colunas selecionadas
-      const formattedData = dataToExport.map((paciente) => {
-        const data: any = {};
-        
-        allColumns.forEach(col => {
-          if (selectedColumns.includes(col.key)) {
-            if (col.key === "data_nascimento") {
-              data[col.label] = formatDate(paciente.data_nascimento);
-            } else if (col.key === "cpf") {
-              data[col.label] = formatCPF(paciente.cpf);
-            } else if (col.key === "tipo_genero") {
-              data[col.label] = paciente.tipo_genero?.descricao || "";
-            } else if (col.key === "tipo_raca") {
-              data[col.label] = paciente.tipo_raca?.descricao || "";
-            } else if (col.key === "tipo_escolaridade") {
-              data[col.label] = paciente.tipo_escolaridade?.descricao || "";
-            } else if (col.key === "contato") {
-              data[col.label] = `${paciente.idpaciente} - ${formatPhoneNumber(paciente.contato)}`;
-            } else {
-              data[col.label] = paciente[col.key as keyof Paciente] || "";
-            }
-          }
-        });
-        
-        return data;
-      });
+      // Incluir campos disponíveis do paciente
+      const formattedData = dataToExport.map((paciente) => ({
+        "ID": paciente.idpaciente || "",
+        "Nome": paciente.nome || "",
+        "Nome da Mãe": paciente.nome_mae || "",
+        "Data de Nascimento": formatDate(paciente.data_nascimento),
+        "Idade": calculateAge(paciente.data_nascimento),
+        "CPF": formatCPF(paciente.cpf),
+        "Identidade de Gênero": paciente.tipo_genero?.descricao || "",
+        "Raça/Cor": paciente.tipo_raca?.descricao || "",
+        "Escolaridade": paciente.tipo_escolaridade?.descricao || "",
+        "Contato Telefônico": formatPhoneNumber(paciente.contato)
+      }));
 
       const worksheet = XLSX.utils.json_to_sheet(formattedData);
+      
+      // Ajustar largura das colunas
+      const columnWidths = [
+        { wch: 8 },  // ID
+        { wch: 30 }, // Nome
+        { wch: 30 }, // Nome da Mãe
+        { wch: 15 }, // Data Nascimento
+        { wch: 8 },  // Idade
+        { wch: 15 }, // CPF
+        { wch: 20 }, // Gênero
+        { wch: 15 }, // Raça
+        { wch: 25 }, // Escolaridade
+        { wch: 18 }  // Contato
+      ];
+      
+      worksheet["!cols"] = columnWidths;
+      
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Pacientes");
       XLSX.writeFile(
         workbook,
-        `pacientes_${type === "page" ? "pagina_atual" : "completo"}.xlsx`
+        `pacientes_completo_${type === "page" ? "pagina_atual" : "todos"}.xlsx`
       );
       setIsExportMenuOpen(false);
     } catch (error) {
       setError("Erro ao exportar Excel. Tente novamente.");
     }
-  };
-
-  // Função de exportação PDF
-  const handleExportPDF = (type: "page" | "all") => {
+  };  // Função de exportação PDF
+  const handleExportPDF = async (type: "page" | "all") => {
     try {
-      const dataToExport = type === "page" ? pacientes : allPacientes;
+      let dataToExport = pacientes;
+      
+      if (type === "all") {
+        if (allPacientes.length === 0) {
+          const allData = await fetchAllData();
+          dataToExport = allData;
+        } else {
+          dataToExport = allPacientes;
+        }
+      }
+      
       if (!dataToExport.length) return;
 
       const doc = new jsPDF();
       doc.setFontSize(16);
-      doc.text("Relatório de Pacientes", 14, 15);
+      doc.text("Relatório Completo de Pacientes", 14, 15);
       doc.setFontSize(10);
       doc.text(`Gerado em: ${new Date().toLocaleDateString("pt-BR")}`, 14, 22);
-      doc.text(
-        `Tipo: ${type === "page" ? "Página Atual" : "Dados Completos"}`,
-        14,
-        29
-      );
+      doc.text(`Tipo: ${type === "page" ? "Página Atual" : "Dados Completos"}`, 14, 29);
 
-      // Usar todas as colunas disponíveis para PDF
-      const tableColumn = allColumns
-        .filter((col) => selectedColumns.includes(col.key))
-        .map((col) => col.label);
+      // Dados organizados em seções para melhor legibilidade no PDF
+      dataToExport.forEach((paciente, index) => {
+        if (index > 0) {
+          doc.addPage();
+        }
 
-      const tableRows = dataToExport.map((paciente) =>
-        allColumns
-          .filter((col) => selectedColumns.includes(col.key))
-          .map((col) => {
-            const key = col.key as keyof Paciente;
+        let yPos = 40;
+        
+        // Cabeçalho do paciente
+        doc.setFontSize(14);
+        doc.setTextColor(63, 81, 181);
+        doc.text(`Paciente #${index + 1}: ${paciente.nome || 'Sem nome'}`, 14, yPos);
+        yPos += 10;
 
-            if (key === "data_nascimento") {
-              return formatDate(paciente[key] as string);
-            }
+        // Seção 1: Dados Pessoais
+        doc.setFillColor(230, 230, 250);
+        doc.rect(14, yPos, 182, 8, "F");
+        doc.setFontSize(12);
+        doc.setTextColor(63, 81, 181);
+        doc.text("DADOS PESSOAIS", 16, yPos + 5.5);
+        yPos += 12;
 
-            if (key === "cpf") {
-              return formatCPF(paciente[key] as string | null);
-            }
+        const dadosPessoais = [
+          ["ID", paciente.idpaciente || ""],
+          ["Nome", paciente.nome || ""],
+          ["Nome da Mãe", paciente.nome_mae || ""],
+          ["Data de Nascimento", formatDate(paciente.data_nascimento)],
+          ["Idade", calculateAge(paciente.data_nascimento)],
+          ["CPF", formatCPF(paciente.cpf)],
+          ["Identidade de Gênero", paciente.tipo_genero?.descricao || ""],
+          ["Raça/Cor", paciente.tipo_raca?.descricao || ""],
+          ["Escolaridade", paciente.tipo_escolaridade?.descricao || ""]
+        ];
 
-            if (key === "tipo_genero") {
-              return paciente.tipo_genero?.descricao || "";
-            }
+        autoTable(doc, {
+          startY: yPos,
+          body: dadosPessoais.filter(([key, value]) => value),
+          theme: "grid",
+          styles: { fontSize: 9, cellPadding: 3 },
+          columnStyles: {
+            0: { fontStyle: "bold", cellWidth: 50 },
+            1: { cellWidth: "auto" }
+          },
+          margin: { left: 14, right: 14 }
+        });
 
-            if (key === "tipo_raca") {
-              return paciente.tipo_raca?.descricao || "";
-            }
+        yPos = (doc as any).lastAutoTable.finalY + 10;
 
-            if (key === "tipo_escolaridade") {
-              return paciente.tipo_escolaridade?.descricao || "";
-            }
-            
-            if (key === "contato") {
-              return `${paciente.idpaciente} - ${formatPhoneNumber(paciente.contato)}`;
-            }
+        // Seção 2: Contato
+        if (paciente.contato) {
+          doc.setFillColor(230, 230, 250);
+          doc.rect(14, yPos, 182, 8, "F");
+          doc.setTextColor(63, 81, 181);
+          doc.text("CONTATO", 16, yPos + 5.5);
+          yPos += 12;
 
-            const value = paciente[key];
-            return value !== undefined && value !== null ? String(value) : "";
-          })
-      );
+          const dadosContato = [
+            ["Contato Telefônico", formatPhoneNumber(paciente.contato)]
+          ];
 
-      // Gera a tabela
-      autoTable(doc, {
-        head: [tableColumn],
-        body: tableRows,
-        startY: 35,
-        theme: "grid",
-        styles: {
-          fontSize: 8,
-          cellPadding: 2,
-          overflow: "linebreak",
-        },
-        headStyles: {
-          fillColor: [63, 81, 181], // Cor azul como na imagem fornecida
-          textColor: 255,
-          fontSize: 8,
-          fontStyle: "bold",
-        },
-        alternateRowStyles: {
-          fillColor: [245, 245, 245],
-        },
+          autoTable(doc, {
+            startY: yPos,
+            body: dadosContato.filter(([key, value]) => value),
+            theme: "grid",
+            styles: { fontSize: 9, cellPadding: 3 },
+            columnStyles: {
+              0: { fontStyle: "bold", cellWidth: 50 },
+              1: { cellWidth: "auto" }
+            },
+            margin: { left: 14, right: 14 }
+          });
+        }
+
+        // Rodapé
+        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100);
+        doc.text(
+          `Paciente ${index + 1} de ${dataToExport.length}`,
+          doc.internal.pageSize.getWidth() - 14,
+          doc.internal.pageSize.getHeight() - 10,
+          { align: "right" }
+        );
       });
 
-      // Rodapé com total
-      const finalY = (doc as any).lastAutoTable.finalY || 35;
-      doc.text(`Total de registros: ${dataToExport.length}`, 14, finalY + 10);
-      doc.save(
-        `pacientes_${type === "page" ? "pagina_atual" : "completo"}.pdf`
-      );
+      doc.save(`pacientes_completo_${type === "page" ? "pagina_atual" : "todos"}.pdf`);
       setIsExportMenuOpen(false);
     } catch (error) {
       setError("Erro ao gerar PDF. Tente novamente.");
@@ -756,52 +806,82 @@ const ListaPacientes = () => {
     if (!isOpen) return null;
 
     return (
-      <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 p-2">
-        <div className="border-b pb-2 mb-2">
-          <h3 className="text-sm font-medium text-gray-700 px-2">
-            Página Atual
-          </h3>
-          <button
-            onClick={() => handleExportCSV("page")}
-            className="w-full text-left text-sm text-gray-700 hover:bg-gray-50 px-2 py-1 rounded"
-          >
-            CSV
-          </button>
-          <button
-            onClick={() => handleExportExcel("page")}
-            className="w-full text-left text-sm text-gray-700 hover:bg-gray-50 px-2 py-1 rounded"
-          >
-            Excel
-          </button>
-          <button
-            onClick={() => handleExportPDF("page")}
-            className="w-full text-left text-sm text-gray-700 hover:bg-gray-50 px-2 py-1 rounded"
-          >
-            PDF
-          </button>
+      <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 p-3">
+        <div className="flex items-center mb-3">
+          <Download className="h-4 w-4 text-blue-600 mr-2" />
+          <h3 className="text-sm font-medium text-gray-700">Exportar Dados</h3>
         </div>
-        <div>
-          <h3 className="text-sm font-medium text-gray-700 px-2">
-            Todos os Dados
-          </h3>
-          <button
-            onClick={() => handleExportCSV("all")}
-            className="w-full text-left text-sm text-gray-700 hover:bg-gray-50 px-2 py-1 rounded"
-          >
-            CSV
-          </button>
-          <button
-            onClick={() => handleExportExcel("all")}
-            className="w-full text-left text-sm text-gray-700 hover:bg-gray-50 px-2 py-1 rounded"
-          >
-            Excel
-          </button>
-          <button
-            onClick={() => handleExportPDF("all")}
-            className="w-full text-left text-sm text-gray-700 hover:bg-gray-50 px-2 py-1 rounded"
-          >
-            PDF
-          </button>
+
+        {/* Excel */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-green-500 rounded mr-2 flex items-center justify-center">
+              <span className="text-white text-xs font-bold">E</span>
+            </div>
+            <span className="text-sm text-gray-700">Excel</span>
+          </div>
+          <div className="flex gap-1">
+            <button
+              onClick={() => handleExportExcel("page")}
+              className="px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600"
+            >
+              Página
+            </button>
+            <button
+              onClick={() => handleExportExcel("all")}
+              className="px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600"
+            >
+              Todos
+            </button>
+          </div>
+        </div>
+
+        {/* CSV */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-blue-500 rounded mr-2 flex items-center justify-center">
+              <span className="text-white text-xs font-bold">C</span>
+            </div>
+            <span className="text-sm text-gray-700">CSV</span>
+          </div>
+          <div className="flex gap-1">
+            <button
+              onClick={() => handleExportCSV("page")}
+              className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
+            >
+              Página
+            </button>
+            <button
+              onClick={() => handleExportCSV("all")}
+              className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
+            >
+              Todos
+            </button>
+          </div>
+        </div>
+
+        {/* PDF */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-red-500 rounded mr-2 flex items-center justify-center">
+              <span className="text-white text-xs font-bold">P</span>
+            </div>
+            <span className="text-sm text-gray-700">PDF</span>
+          </div>
+          <div className="flex gap-1">
+            <button
+              onClick={() => handleExportPDF("page")}
+              className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
+            >
+              Página
+            </button>
+            <button
+              onClick={() => handleExportPDF("all")}
+              className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
+            >
+              Todos
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -928,8 +1008,8 @@ const ListaPacientes = () => {
       </header>
 
       {/* SideMenu atualizado */}
-      <SideMenu 
-        isOpen={isMenuOpen} 
+      <SideMenu
+        isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
         selectedLanguage={selectedLanguage}
         onLanguageChange={(language) => setSelectedLanguage(language)}
@@ -971,8 +1051,16 @@ const ListaPacientes = () => {
                               <button
                                 onClick={handleSortChange}
                                 className="ml-1 focus:outline-none text-white"
-                                aria-label={sortOrder === "asc" ? "Ordenar decrescente" : "Ordenar crescente"}
-                                title={sortOrder === "asc" ? "Ordenar decrescente" : "Ordenar crescente"}
+                                aria-label={
+                                  sortOrder === "asc"
+                                    ? "Ordenar decrescente"
+                                    : "Ordenar crescente"
+                                }
+                                title={
+                                  sortOrder === "asc"
+                                    ? "Ordenar decrescente"
+                                    : "Ordenar crescente"
+                                }
                               >
                                 {sortOrder === "asc" ? (
                                   <span>▲</span>
@@ -1018,7 +1106,9 @@ const ListaPacientes = () => {
                         key={paciente.idpaciente}
                         className="hover:bg-gray-50 transition-colors cursor-pointer"
                         onClick={() =>
-                          navigate(`/private/pacientes/editar/${paciente.idpaciente}`)
+                          navigate(
+                            `/private/pacientes/editar/${paciente.idpaciente}`
+                          )
                         }
                       >
                         {allColumns
@@ -1102,11 +1192,18 @@ const ListaPacientes = () => {
 
                             if (key === "contato") {
                               return (
-                                <td key={key} className="px-6 py-4 whitespace-nowrap">
+                                <td
+                                  key={key}
+                                  className="px-6 py-4 whitespace-nowrap"
+                                >
                                   {paciente.contato ? (
-                                    <span className="font-medium">{formatPhoneNumber(paciente.contato)}</span>
+                                    <span className="font-medium">
+                                      {formatPhoneNumber(paciente.contato)}
+                                    </span>
                                   ) : (
-                                    <span className="text-gray-400">Sem contato</span>
+                                    <span className="text-gray-400">
+                                      Sem contato
+                                    </span>
                                   )}
                                 </td>
                               );
@@ -1268,52 +1365,13 @@ const ListaPacientes = () => {
               </div>
             </div>
           </div>
-        </div>
-      </main>
+        </div>      </main>
 
       {/* Modal de busca avançada */}
       <ModalBuscaPaciente
         isOpen={isBuscaModalOpen}
         onClose={() => setIsBuscaModalOpen(false)}
         onSelectPaciente={handleSelectPaciente}
-      />
-
-      {/* Links invisíveis para exportação CSV */}
-      <CSVLink
-        data={pacientes.map((paciente) => {
-          const data: any = {};
-        
-          allColumns.forEach(col => {
-            if (selectedColumns.includes(col.key)) {
-              if (col.key === "data_nascimento") {
-                data[col.label] = formatDate(paciente.data_nascimento);
-              } else if (col.key === "cpf") {
-                data[col.label] = formatCPF(paciente.cpf);
-              } else if (col.key === "tipo_genero") {
-                data[col.label] = paciente.tipo_genero?.descricao || "";
-              } else if (col.key === "tipo_raca") {
-                data[col.label] = paciente.tipo_raca?.descricao || "";
-              } else if (col.key === "tipo_escolaridade") {
-                data[col.label] = paciente.tipo_escolaridade?.descricao || "";
-              } else if (col.key === "contato") {
-                data[col.label] = `${paciente.idpaciente} - ${formatPhoneNumber(paciente.contato)}`;
-              } else {
-                data[col.label] = paciente[col.key as keyof Paciente] || "";
-              }
-            }
-          });
-          
-          return data;
-        })}
-        filename="pacientes_pagina_atual.csv"
-        style={{ display: "none" }}
-        ref={(ref: any) => setCsvLinkRef(ref)}
-      />
-      <CSVLink
-        data={[]}
-        filename="pacientes_completo.csv"
-        style={{ display: "none" }}
-        ref={csvLinkAllRef}
       />
     </div>
   );

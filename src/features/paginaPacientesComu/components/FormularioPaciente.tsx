@@ -3,7 +3,6 @@ import { useParams } from "react-router-dom";
 import axios from "axios";
 import {
   Save,
-  Plus,
   X,
   ArrowLeft,
   UserCircle,
@@ -13,7 +12,8 @@ import {
   CheckCircle,
   HelpCircle,
   Loader,
-  Menu
+  Menu,
+  ArchiveX
 } from "lucide-react";
 import CboInput from "@/features/notificationForms/components/CboInput";
 import PhoneInput from "@/features/notificationForms/components/PhoneInput";
@@ -965,19 +965,13 @@ const FormularioPaciente = ({
               <h1 className="text-2xl font-semibold">
                 {pacienteId ? "Editar Paciente" : "Cadastro de Paciente"}
               </h1>
-            </div>
-
-            <div className="flex items-center gap-3">
+            </div>            <div className="flex items-center gap-3">
               {/* Botões de Ação (CABEÇALHO) */}
               <button
                 type="submit"
                 form="paciente-form"
                 disabled={isSaving || isLoadingOptions}
-                className={`inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors ${
-                  isSaving || isLoadingOptions
-                    ? "opacity-70 cursor-not-allowed"
-                    : ""
-                }`}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
               >
                 {isSaving ? (
                   <Loader className="h-4 w-4 animate-spin" />
@@ -990,22 +984,16 @@ const FormularioPaciente = ({
                 type="button"
                 onClick={handleReset}
                 disabled={isSaving || isLoadingOptions}
-                className={`inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors ${
-                  isSaving || isLoadingOptions
-                    ? "opacity-70 cursor-not-allowed"
-                    : ""
-                }`}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
               >
-                <Plus className="h-4 w-4" />
-                Novo Registro
+                <ArchiveX className="h-4 w-4" />
+                Limpar
               </button>
               <button
                 type="button"
                 onClick={() => window.history.back()}
                 disabled={isSaving}
-                className={`inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors ${
-                  isSaving ? "opacity-70 cursor-not-allowed" : ""
-                }`}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
               >
                 <X className="h-4 w-4" />
                 Cancelar
@@ -1490,18 +1478,12 @@ const FormularioPaciente = ({
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Botões de Ação (Inferiores) */}
-          <div className="flex justify-center gap-4 mt-8 pb-8">
+          </div>          {/* Botões de Ação (Inferiores) */}
+          <div className="mt-8 flex justify-center space-x-4">
             <button
               type="submit"
               disabled={isSaving || isLoadingOptions}
-              className={`inline-flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors ${
-                isSaving || isLoadingOptions
-                  ? "opacity-70 cursor-not-allowed"
-                  : ""
-              }`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {isSaving ? (
                 <Loader className="h-4 w-4 animate-spin" />
@@ -1515,14 +1497,10 @@ const FormularioPaciente = ({
                 type="button"
                 onClick={handleReset}
                 disabled={isSaving || isLoadingOptions}
-                className={`inline-flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors ${
-                  isSaving || isLoadingOptions
-                    ? "opacity-70 cursor-not-allowed"
-                    : ""
-                }`}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
               >
-                <Plus className="h-4 w-4" />
-                Novo Registro
+                <ArchiveX className="h-4 w-4" />
+                Limpar
               </button>
             )}
             <button
@@ -1531,12 +1509,10 @@ const FormularioPaciente = ({
                 isModal ? () => onClose?.() : () => window.history.back()
               }
               disabled={isSaving}
-              className={`inline-flex items-center gap-2 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors ${
-                isSaving ? "opacity-70 cursor-not-allowed" : ""
-              }`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
             >
               <X className="h-4 w-4" />
-              {isModal ? "Cancelar" : "Voltar"}
+              {isModal ? "Cancelar" : "Cancelar"}
             </button>
           </div>
         </form>
