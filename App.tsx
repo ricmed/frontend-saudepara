@@ -4,6 +4,7 @@ import AccessDenied from "@/paginas/AccessDenied";
 import HealthCampaignsPage from "@/features/campaigns/pages/HealthCampaignsPage";
 import ProtectedRoute from "@/keycloak/ProtectedRoute";
 import DesktopPage from "@/features/desktop/DesktopPage";
+import UserProfile from "@/keycloak/pages/UserProfile";
 import NotificationDashboard from "@/features/dashboard/NotificationDashboard";
 // Features - Campanhas
 import DezembroVermelho from "@/features/campaigns/pages/details/RedDecemberPage";
@@ -211,6 +212,7 @@ function App() {
               <Route path="/private/comunicacao-de-caso/editar/:id" element={<NotificationForm />} />
             </Route>
           </Route>
+          <Route path="/perfil" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
           {/* Rotas Públicas */}
           <Route path="/" element={<DesktopPage />} />
           <Route path="/teste" element={<HomePage />} />
