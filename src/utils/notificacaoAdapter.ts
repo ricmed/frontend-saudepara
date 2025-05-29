@@ -371,6 +371,8 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
     tipo_atendimento_idtipo_atendimento: parseInt(trimmedData.tipoAtendimento) || null,
     estabelecimento_idestabelecimento: parseInt(trimmedData.unidadeNotificadora) || null,
     tipo_encerramento_idtipo_encerramento: parseInt(trimmedData.tipoEncerramento) || null,
+    // Adiciona campo surto com valor padrão
+    surto: "N",
 
     // IMPORTANTE: Adicione estes campos sempre, mesmo que vazios
     observavao_incidente: trimmedData.observacaoIncidente || "",

@@ -165,36 +165,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     toggleSection 
   } = sectionExpansion;
 
-  // Funções para busca de pacientes
-  const searchPacienteByName = useCallback(
-    debounce(async (name: string) => {
-      if (name.length < 3) {
-        setPacienteSuggestions([]);
-        setShowSuggestions(false);
-        return;
-      }
-
-      try {
-        const server = import.meta.env.VITE_API_SERVER;
-        const port = import.meta.env.VITE_API_PORT;
-        const response = await axios.get(
-          `${server}:${port}/api/paciente/search?nome=${encodeURIComponent(name)}`
-        );
-
-        // Converter todos os pacientes para caixa alta
-        const pacientes = response.data.map((p: Paciente) =>
-          toUpperCaseAllStrings(p)
-        );
-        setPacienteSuggestions(pacientes);
-        setShowSuggestions(true);
-      } catch (error) {
-        console.error("Erro ao buscar pacientes:", error);
-        setPacienteSuggestions([]);
-      }
-    }, 500),
-    []
-  );
-
   // Verificar se CPF já existe
   const searchCpfExists = async (cpf: string): Promise<boolean> => {
     // Não verificar CPFs vazios ou incompletos
@@ -697,8 +667,11 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       pacienteId: undefined, // Limpar o ID porque estamos digitando um novo nome
     }));
 
-    // Buscar pacientes com nome similar
-    searchPacienteByName(normalizedValue);
+    // Limpar sugestões se estiverem sendo mostradas
+    if (showSuggestions) {
+      setShowSuggestions(false);
+      setPacienteSuggestions([]);
+    }
 
     // Limpar erro se existir
     if (errors.paciente) {
@@ -954,7 +927,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       return;
     }
 
-    // Se tem nome de paciente, mas não tem ID, criar paciente automaticamente
+    // Create patient automatically if name exists without ID
     if (formData.paciente.trim() && !formData.pacienteId) {
       try {
         const server = import.meta.env.VITE_API_SERVER;

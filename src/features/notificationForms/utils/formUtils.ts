@@ -261,10 +261,6 @@ export const validateForm = (
     newErrors.paciente = "O nome do paciente é obrigatório";
   }
 
-  if (!formData.pacienteId) {
-    newErrors.paciente = "É necessário selecionar ou criar um paciente válido com ID";
-  }
-
   // Validações opcionais mas importantes
   if (formData.cpf && formData.cpf.length > 0 && formData.cpf.length !== 11) {
     newErrors.cpf = "CPF deve ter 11 dígitos";
