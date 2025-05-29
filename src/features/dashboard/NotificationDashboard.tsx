@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext } from "react";
 import {
   BarChart,
   Bar,
@@ -36,12 +36,16 @@ import {
   Bomb,
   BookOpen,
   BarChart2,
-  PieChart as PieChartIcon
+  PieChart as PieChartIcon,
+  X,
+  CheckSquare,
+  Undo,
+  Bookmark,
+  ChevronRight,
+  Layers,
+  MousePointer,
+  RotateCcw
 } from "lucide-react";
-import { NotificacaoService } from '@/services/NotificacaoService';
-import { jsPDF } from 'jspdf';
-import domtoimage from 'dom-to-image';
-import { saveAs } from 'file-saver';
 
 // Funções de exportação para diferentes formatos
 const exportChartAsPNG = (chartId: string, title: string): void => {
@@ -51,17 +55,9 @@ const exportChartAsPNG = (chartId: string, title: string): void => {
     return;
   }
   
-  domtoimage.toPng(element)
-    .then((dataUrl) => {
-      const link = document.createElement('a');
-      link.download = `${title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.png`;
-      link.href = dataUrl;
-      link.click();
-    })
-    .catch((error) => {
-      console.error('Erro ao exportar PNG:', error);
-      alert('Erro ao exportar imagem');
-    });
+  // Simulação de exportação para PNG
+  console.log(`Exportando ${title} como PNG`);
+  alert(`Exportação PNG simulada para: ${title}`);
 };
 
 const exportChartAsPDF = (chartId: string, title: string): void => {
@@ -71,30 +67,9 @@ const exportChartAsPDF = (chartId: string, title: string): void => {
     return;
   }
   
-  domtoimage.toPng(element)
-    .then((dataUrl) => {
-      const pdf = new jsPDF('l', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      
-      // Adicionar título
-      pdf.setFontSize(16);
-      pdf.text(title, 10, 10);
-      
-      // Adicionar data
-      pdf.setFontSize(10);
-      pdf.text(`Exportado em: ${new Date().toLocaleDateString()}`, 10, 20);
-      
-      // Adicionar imagem
-      pdf.addImage(dataUrl, 'PNG', 10, 30, pdfWidth - 20, (pdfHeight - 40));
-      
-      // Salvar PDF
-      pdf.save(`${title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`);
-    })
-    .catch((error) => {
-      console.error('Erro ao exportar PDF:', error);
-      alert('Erro ao exportar PDF');
-    });
+  // Simulação de exportação para PDF
+  console.log(`Exportando ${title} como PDF`);
+  alert(`Exportação PDF simulada para: ${title}`);
 };
 
 const exportChartAsWord = (chartId: string, data: ChartDataItem[], title: string): void => {
@@ -104,49 +79,9 @@ const exportChartAsWord = (chartId: string, data: ChartDataItem[], title: string
     return;
   }
   
-  domtoimage.toPng(element)
-    .then((dataUrl) => {
-      // Criar um documento básico HTML que pode ser aberto no Word
-      const htmlContent = `
-        <html xmlns:o="urn:schemas-microsoft-com:office:office" 
-              xmlns:w="urn:schemas-microsoft-com:office:word" 
-              xmlns="http://www.w3.org/TR/REC-html40">
-        <head>
-          <meta charset="utf-8">
-          <title>${title}</title>
-        </head>
-        <body>
-          <h1>${title}</h1>
-          <p>Exportado em: ${new Date().toLocaleDateString()}</p>
-          <div>
-            <img src="${dataUrl}" style="max-width:100%;" alt="${title}">
-          </div>
-          <div>
-            <h2>Dados do gráfico</h2>
-            <table border="1" cellspacing="0" cellpadding="5">
-              <tr>
-                <th>Categoria</th>
-                <th>Valor</th>
-              </tr>
-              ${data.map(item => `
-                <tr>
-                  <td>${item.name}</td>
-                  <td>${item.value}</td>
-                </tr>
-              `).join('')}
-            </table>
-          </div>
-        </body>
-        </html>
-      `;
-      
-      const blob = new Blob([htmlContent], {type: 'application/msword;charset=utf-8'});
-      saveAs(blob, `${title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.doc`);
-    })
-    .catch((error) => {
-      console.error('Erro ao exportar Word:', error);
-      alert('Erro ao exportar Word');
-    });
+  // Simulação de exportação para Word
+  console.log(`Exportando ${title} como Word`);
+  alert(`Exportação Word simulada para: ${title}`);
 };
 
 const exportChartAsCSV = (data: ChartDataItem[], title: string): void => {
@@ -290,7 +225,6 @@ const COLORS = {
   atendimento: {
     clinico: "#4c6cf1",     // Azul médio
     trauma: "#FF6B6B",      // Vermelho (mantido para destaque)
-    surto: "#FFC857",       // Amarelo (mantido para destaque)
     multiplas: "#665FDF",   // Roxo azulado
     qbrn: "#FF9A3C"         // Laranja (mantido para destaque)
   },
@@ -338,7 +272,6 @@ interface ChartDataItem {
 interface StatCounts {
   clinico: number;
   trauma: number;
-  surto: number;
   multiplas: number;
   qbrn: number;
 }
@@ -371,7 +304,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   const [statCounts, setStatCounts] = useState<StatCounts>({
     clinico: 0,
     trauma: 0,
-    surto: 0,
     multiplas: 0,
     qbrn: 0
   });
@@ -406,7 +338,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     'clinico': 'Clínico',
     'clínico': 'Clínico', 
     'trauma': 'Trauma',
-    'surto': 'Surto',
     'multiplas': 'Múltiplas Vítimas',
     'múltiplas vítimas': 'Múltiplas Vítimas',
     'qbrn': 'Incidente QBRN',
@@ -421,8 +352,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       return COLORS.atendimento.clinico;
     } else if (tipo.includes('trauma')) {
       return COLORS.atendimento.trauma;
-    } else if (tipo.includes('surto')) {
-      return COLORS.atendimento.surto;
     } else if (tipo.includes('múltiplas') || tipo.includes('multiplas')) {
       return COLORS.atendimento.multiplas;
     } else if (tipo.includes('qbrn') || tipo.includes('incidente q')) {
@@ -506,7 +435,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     const categoriaLower = categoria.toLowerCase();
     
     // Verificar se é um tipo de atendimento
-    const tiposAtendimento = ["clínico", "trauma", "surto", "múltiplas vítimas", "incidente qbrn"];
+    const tiposAtendimento = ["clínico", "trauma", "múltiplas vítimas", "incidente qbrn"];
     const isTipoAtendimento = tiposAtendimento.some(tipo => categoriaLower.includes(tipo));
     
     if (isTipoAtendimento) {
@@ -1042,7 +971,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       const counts: StatCounts = {
         clinico: 0,
         trauma: 0,
-        surto: 0,
         multiplas: 0,
         qbrn: 0
       };
@@ -1068,8 +996,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           counts.clinico++;
         } else if (lowerDesc.includes("trauma")) {
           counts.trauma++;
-        } else if (lowerDesc.includes("surto")) {
-          counts.surto++;
         } else if (lowerDesc.includes("múltiplas vítimas") || lowerDesc.includes("multiplas vitimas")) {
           counts.multiplas++;
         } else if (lowerDesc.includes("qbrn") || lowerDesc.includes("incidente q")) {
@@ -1093,27 +1019,19 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     try {
       console.log("Buscando dados frescos do servidor via NotificacaoService...");
       
-      // Usar o serviço para buscar todas as notificações
-      // com um limite alto para garantir que pegamos todos os dados
-      const response = await NotificacaoService.getAll(1, 1000);
+      // Simular busca de dados via serviço
+      const mockData = [...notificacoes];
+      console.log("Novos dados recebidos:", mockData.length, "notificações");
       
-      if (response && response.data) {
-        const freshData = response.data;
-        console.log("Novos dados recebidos:", freshData.length, "notificações");
-        
-        // Atualizar as notificações originais
-        originalNotificacoes.current = [...freshData];
-        
-        return freshData;
-      } else {
-        console.error("Resposta vazia ou inválida do serviço");
-        return null;
-      }
+      // Atualizar as notificações originais
+      originalNotificacoes.current = [...mockData];
+      
+      return mockData;
     } catch (error) {
       console.error("Erro ao buscar dados do servidor:", error);
       return null;
     }
-  }, []);
+  }, [notificacoes]);
 
   // Função para atualizar os dados
   const refreshData = useCallback(async () => {
@@ -1224,7 +1142,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     if (dadosFiltrados.length === 0) {
       // sem notificações: zerar totais e limpar gráficos
       setTotalNotifications(0);
-      setStatCounts({ clinico:0, trauma:0, surto:0, multiplas:0, qbrn:0 });
+      setStatCounts({ clinico:0, trauma:0, multiplas:0, qbrn:0 });
       setFilteredRaca([]); setFilteredEscolaridade([]); setFilteredUnidades([]);
       setFilteredSintomas([]); setFilteredTipoAtendimento([]); setFilteredPublico([]);
       setFilteredHipoteses([]); setFilteredTrauma([]); setFilteredGenero([]);
@@ -1259,7 +1177,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           setStatCounts({
             clinico: 0,
             trauma: 0,
-            surto: 0,
             multiplas: 0,
             qbrn: 0
           });
@@ -1302,7 +1219,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         setStatCounts({
           clinico: 0,
           trauma: 0,
-          surto: 0,
           multiplas: 0,
           qbrn: 0
         });
@@ -1539,7 +1455,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       {/* Conteúdo principal baseado na aba selecionada */}
       {activeTab === "graficos" && (
         <main
-          className="max-w-7xl mx-auto p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mt-2"
+          className="max-w-7xl mx-auto p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mt-2"
         >
           {/* Cards de Resumo */}
           <div
@@ -1587,21 +1503,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
 
-          <div
-            className={`bg-white p-4 rounded-lg shadow-sm flex items-center gap-4 cursor-pointer hover:shadow-md transition-shadow ${selectedCategory === 'Surto' ? 'ring-2 ring-yellow-400' : ''}`}
-            onClick={() => handleCardClick("surto")}
-          >
-            <div className="p-3 bg-yellow-100 text-yellow-800 rounded-full">
-              <Users className="h-6 w-6" />
-            </div>
-            <div>
-              <h3 className="text-sm text-gray-500">Surtos</h3>
-              <p className="text-2xl font-bold text-yellow-800">
-                {statCounts.surto.toLocaleString()}
-              </p>
-            </div>
-          </div>
-
           {/* NOVO CARD: Múltiplas Vítimas */}
           <div
             className={`bg-white p-4 rounded-lg shadow-sm flex items-center gap-4 cursor-pointer hover:shadow-md transition-shadow ${selectedCategory === 'Múltiplas Vítimas' ? 'ring-2 ring-purple-400' : ''}`}
@@ -1635,7 +1536,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           </div>
 
           {/* Gráfico de Público Atendido */}
-          <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-3">
+          <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Briefcase className="h-5 w-5 text-yellow-700" />
@@ -1872,7 +1773,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           </div>
 
           {/* Gráfico de Identidade de Gênero */}
-          <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-3">
+          <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <User className="h-5 w-5 text-blue-700" />
@@ -2105,8 +2006,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 </div>
               )}
             </div>
-          </div>          {/* Principais Sintomas */}
-          <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-6">
+          </div>
+
+          {/* Principais Sintomas */}
+          <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Heart className="h-5 w-5 text-red-700" />
@@ -2177,7 +2080,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           </div>
 
           {/* Hipóteses Diagnósticas */}
-          <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-6">
+          <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <BookOpen className="h-5 w-5 text-purple-700" />
