@@ -53,7 +53,7 @@ export const translations: TranslationsType = {
     "menu.version": "Versão",
     "menu.bug": "Relate um Bug",
     "menu.logout": "Sair",
-    "menu.login": "Fazer Login",
+    "menu.login": "Entrar",
     
     // Seletor de Idiomas
     "language.select": "Selecionar idioma",
@@ -238,7 +238,7 @@ export const translations: TranslationsType = {
     "menu.version": "Version",
     "menu.bug": "Report a Bug",
     "menu.logout": "Logout",
-    "menu.login": "Login",
+    "menu.login": "Log In",
     
     // Language Selector
     "language.select": "Select language",
@@ -799,7 +799,7 @@ export const translations: TranslationsType = {
     "menu.version": "Version",
     "menu.bug": "Signaler un Bug",
     "menu.logout": "Déconnexion",
-    "menu.login": "Connexion",
+    "menu.login": "Se connecter",
     
     // Sélecteur de Langue
     "language.select": "Sélectionner la langue",
@@ -974,7 +974,7 @@ export const translations: TranslationsType = {
     "menu.version": "الإصدار",
     "menu.bug": "الإبلاغ عن خطأ",
     "menu.logout": "تسجيل الخروج",
-    "menu.login": "تسجيل الدخول",
+    "menu.login":"تسجيل الدخول",
     "language.select": "اختر اللغة",
     "department.title": "وحدة الإشعارات",
     "department.health-surveillance": "المراقبة الصحية",
