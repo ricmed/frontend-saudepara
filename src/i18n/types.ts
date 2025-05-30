@@ -73,6 +73,7 @@ export type TranslationRecord = {
   'menu.version': string;
   'menu.bug': string;
   'menu.logout': string;
+  'menu.login': string;
 
   // Auxiliary Apps
   'apps.components': string;
@@ -136,6 +137,7 @@ export type TranslationRecord = {
   'healthCampaigns.footer.contact': string;
   'healthCampaigns.footer.privacy': string;
   'healthCampaigns.footer.terms': string;
+  'healthCampaigns.addToFavorites': string;
   [key: `healthCampaigns.${string}.cardTitle`]: string;
   [key: `healthCampaigns.${string}.cardDescription`]: string;
   

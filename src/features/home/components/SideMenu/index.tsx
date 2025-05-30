@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/i18n/useTranslations";
 import { Language } from "@/i18n/types";
 import { LanguageSelector } from "@/components/LanguageSelector";
+import { useAuth } from '@/keycloak/AuthProvider';
+import UserProfileHeader from "@/keycloak/components/UserProfileHeader";
 import {
   FileText,
   ChartSpline,
@@ -45,6 +47,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
 }) => {
   const navigate = useNavigate();
   const { t } = useTranslation(selectedLanguage);
+  const { logout } = useAuth();
   const [showAppsSubmenu, setShowAppsSubmenu] = useState(false);
 
   // List of auxiliary apps
@@ -202,7 +205,11 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     {
       icon: <LogOut className="rotate-180" />,
       label: t("menu.logout"),
-      onClick: () => {},
+      onClick: () => {
+        logout();
+        navigate("/login");
+        onClose();
+      },
     },
   ];
 
@@ -228,7 +235,8 @@ export const SideMenu: React.FC<SideMenuProps> = ({
               className="bg-white rounded p-1"
             />
           </div>
-
+{/* User Profile Header */}
+  <UserProfileHeader selectedLanguage={selectedLanguage} />
           {/* Itens do Menu */}
           <div className="flex-grow">
             {menuItems.map((item, i) => (

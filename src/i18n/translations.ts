@@ -53,6 +53,7 @@ export const translations: TranslationsType = {
     "menu.version": "Versão",
     "menu.bug": "Relate um Bug",
     "menu.logout": "Sair",
+    "menu.login": "Fazer Login",
     
     // Seletor de Idiomas
     "language.select": "Selecionar idioma",
@@ -237,6 +238,7 @@ export const translations: TranslationsType = {
     "menu.version": "Version",
     "menu.bug": "Report a Bug",
     "menu.logout": "Logout",
+    "menu.login": "Login",
     
     // Language Selector
     "language.select": "Select language",
@@ -421,6 +423,7 @@ export const translations: TranslationsType = {
     "menu.version": "Versión",
     "menu.bug": "Reportar un Error",
     "menu.logout": "Salir",
+    "menu.login": "Iniciar Sesión",
     
     // Selector de Idiomas
     "language.select": "Seleccionar idioma",
@@ -605,6 +608,7 @@ export const translations: TranslationsType = {
     "menu.version": "版本",
     "menu.bug": "报告错误",
     "menu.logout": "退出",
+    "menu.login": "登录",
     
     // 语言选择器
     "language.select": "选择语言",
@@ -795,6 +799,7 @@ export const translations: TranslationsType = {
     "menu.version": "Version",
     "menu.bug": "Signaler un Bug",
     "menu.logout": "Déconnexion",
+    "menu.login": "Connexion",
     
     // Sélecteur de Langue
     "language.select": "Sélectionner la langue",
@@ -969,6 +974,7 @@ export const translations: TranslationsType = {
     "menu.version": "الإصدار",
     "menu.bug": "الإبلاغ عن خطأ",
     "menu.logout": "تسجيل الخروج",
+    "menu.login": "تسجيل الدخول",
     "language.select": "اختر اللغة",
     "department.title": "وحدة الإشعارات",
     "department.health-surveillance": "المراقبة الصحية",
@@ -1135,6 +1141,7 @@ export const translations: TranslationsType = {
     "menu.version": "Версия",
     "menu.bug": "Сообщить об ошибке",
     "menu.logout": "Выйти",
+    "menu.login": "Войти",
     "language.select": "Выберите язык",
     "department.title": "Модуль уведомлений",
     "department.health-surveillance": "Санитарный надзор",
