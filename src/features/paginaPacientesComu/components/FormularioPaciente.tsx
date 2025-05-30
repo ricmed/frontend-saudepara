@@ -27,6 +27,8 @@ import { toast } from "react-toastify";
 // Adicionando import do SideMenu
 import SideMenu from "@/features/home/components/SideMenu";
 import { useLanguage } from "@/contexts/LanguageContext";
+import syncService from '@/services/syncService';
+import ConnectionStatus from '@/components/ConnectionStatus';
 
 // Interface para as props do componente
 interface FormularioPacienteProps {
@@ -330,24 +332,7 @@ const FormularioPaciente = ({
       setIsSuccess(false);
       setOriginalCpf(""); // Importante também resetar o CPF original
       console.log("Formulário resetado para novo paciente");
-    }
-  }, [isNewPatient]);
-
-  // Função para verificar se o CPF já existe
-  const searchCpfExists = async (cpf: string): Promise<boolean> => {
-    // Não verificar CPFs vazios ou incompletos
-    if (!cpf || cpf.length !== 11) return false;
-    
-    try {
-      // Use a função do serviço, mas inverta o resultado
-      // já que checkCpfAvailable retorna true se o CPF está DISPONÍVEL (não existe)
-      const isAvailable = await PacienteService.checkCpfAvailable(cpf);
-      return !isAvailable; // Inverte para ter true quando o CPF JÁ EXISTE
-    } catch (error) {
-      console.error("Erro ao verificar CPF:", error);
-      return false;
-    }
-  };
+    }  }, [isNewPatient]);
 
   // Função para alternar a expansão de uma seção
   const toggleSection = (section: keyof typeof expandedSections) => {
@@ -550,7 +535,6 @@ const FormularioPaciente = ({
     // Formata como XXX.XXX.XXX-XX
     return `${cleanCPF.substring(0, 3)}.${cleanCPF.substring(3, 6)}.${cleanCPF.substring(6, 9)}-${cleanCPF.substring(9)}`;
   };
-
   const handleCPFChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
     // Remove formatação para armazenar apenas os dígitos no estado
@@ -579,7 +563,7 @@ const FormularioPaciente = ({
           cpf: "Verificando CPF..."
         }));
         
-        const exists = await searchCpfExists(formattedCPF);
+        const exists = await syncService.checkCpfExists(formattedCPF);
         
         if (exists) {
           setErrors((prev) => ({
@@ -750,18 +734,12 @@ const FormularioPaciente = ({
 
       try {
         // Converter dados do formulário para o formato da API
-        const pacienteData = convertFormDataToApiFormat();
-
-        // Garantir que todos os dados de texto estejam em caixa alta
+        const pacienteData = convertFormDataToApiFormat();        // Garantir que todos os dados de texto estejam em caixa alta
         const pacienteUpperCase = toUpperCaseAllStrings(pacienteData);
         console.log("Dados para salvar em caixa alta:", pacienteUpperCase);
 
-        // Criar ou atualizar paciente
-        if (pacienteId) {
-          await PacienteService.update(pacienteId, pacienteUpperCase);
-        } else {
-          await PacienteService.create(pacienteUpperCase);
-        }
+        // Criar ou atualizar paciente usando syncService
+        await syncService.savePaciente(pacienteUpperCase);
 
         // Sucesso!
         setIsSuccess(true);
@@ -1040,9 +1018,10 @@ const FormularioPaciente = ({
             </h2>
           </div>
         </div>
-      )}
-
-      <main className={isModal ? "p-4" : "max-w-5xl mx-auto p-6"}>
+      )}      <main className={isModal ? "p-4" : "max-w-5xl mx-auto p-6"}>
+        {/* Connection Status - só exibir se não for modal */}
+        {!isModal && <ConnectionStatus />}
+        
         {/* Estado de carregamento das opções */}
         {isLoadingOptions && (
           <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">

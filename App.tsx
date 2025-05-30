@@ -1,4 +1,9 @@
 import { BrowserRouter as Router, Routes, Route, Outlet } from "react-router-dom";
+
+import { useEffect } from 'react';
+import indexedDBService from '@/services/indexedDB';
+import syncService from '@/services/syncService';
+
 import MapaLocais from "@/features/maps";
 import AccessDenied from "@/paginas/AccessDenied";
 import HealthCampaignsPage from "@/features/campaigns/pages/HealthCampaignsPage";
@@ -101,6 +106,26 @@ const ProtectedLayout = () => {
 };
 
 function App() {
+  // *** ADICIONAR ESTE useEffect PARA INICIALIZAR SISTEMA OFFLINE ***
+  useEffect(() => {
+    const initializeOffline = async () => {
+      try {
+        await indexedDBService.init();
+        syncService.startPeriodicSync(); // Iniciar sync periódico
+        console.log('✅ Sistema offline inicializado');
+      } catch (error) {
+        console.error('❌ Erro ao inicializar offline:', error);
+      }
+    };
+
+    initializeOffline();
+
+    // Cleanup no unmount
+    return () => {
+      syncService.stopPeriodicSync();
+    };
+  }, []);
+  
   return (
     <LanguageProvider>
       <Router>

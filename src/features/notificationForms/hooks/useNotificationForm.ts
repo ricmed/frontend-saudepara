@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import axios from 'axios';
 import { debounce } from 'lodash';
+import syncService from '@/services/syncService';
+import indexedDBService from '@/services/indexedDB';
 import { 
   FormData, 
   EventoOption, 
@@ -109,12 +111,15 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
   // Estado para o formulário
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  
-  // Estado para controle de carregamento e erros da API
+    // Estado para controle de carregamento e erros da API
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  
+  // Estados para offline
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [pendingCount, setPendingCount] = useState({ notificacoes: 0, pacientes: 0 });
   
   // Estado para busca de pacientes
   const [pacienteSuggestions, setPacienteSuggestions] = useState<Paciente[]>([]);
@@ -156,7 +161,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
   // Estados para hipóteses diagnósticas filtradas
   const [hipoteseDiagFiltradas, setHipoteseDiagFiltradas] = useState<HipoteseFiltrada[]>([]);
   const [isLoadingHipoteses, setIsLoadingHipoteses] = useState<boolean>(false);
-
   // Usar o hook de expansão de seções
   const sectionExpansion = useSectionExpansion();
   const { 
@@ -164,6 +168,59 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     setExpandedSections,
     toggleSection 
   } = sectionExpansion;
+
+  // Monitoramento de conexão
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Contador de pendentes
+  useEffect(() => {
+    const updateCount = async () => {
+      try {
+        const count = await syncService.getPendingCount();
+        setPendingCount(count);
+      } catch (error) {
+        console.error('Erro ao atualizar contador:', error);
+      }
+    };
+
+    updateCount();
+    const interval = setInterval(updateCount, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Função de sincronização manual
+  const handleForceSync = async () => {
+    if (!isOnline) {
+      setApiError("Você está offline. Não é possível sincronizar agora.");
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      await syncService.forceSyncData();
+      
+      // Atualizar contador após sync
+      const count = await syncService.getPendingCount();
+      setPendingCount(count);
+      
+      toast.success("Dados sincronizados com sucesso!");
+    } catch (error) {
+      setApiError("Erro ao sincronizar dados");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Verificar se CPF já existe
   const searchCpfExists = async (cpf: string): Promise<boolean> => {
@@ -967,51 +1024,86 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         // Atualizar o formData com o ID do paciente criado
         formData.pacienteId = response.data.idpaciente;
 
-        console.log("Paciente criado automaticamente com ID:", response.data.idpaciente);
-      } catch (error: any) {
+        console.log("Paciente criado automaticamente com ID:", response.data.idpaciente);      } catch (error: any) {
         console.error("Erro ao criar paciente automaticamente:", error);
 
-        // Mostrar mensagem de erro mais específica
-        let errorMessage = "Erro ao criar o paciente. Verifique os dados e tente novamente.";
+        // ✅ VERIFICAR SE É ERRO DE REDE PARA USAR SISTEMA OFFLINE
+        const isNetworkError = (
+          error?.code === 'ERR_NETWORK' ||
+          error?.code === 'ERR_INTERNET_DISCONNECTED' ||
+          error?.message?.includes('Network Error') ||
+          error?.message?.includes('Failed to fetch') ||
+          !navigator.onLine
+        );
 
-        // Se o erro contém informações da API, mostrar essas informações
-        if (error.response && error.response.data && error.response.data.message) {
-          errorMessage = error.response.data.message;
-        } else if (error.message) {
-          errorMessage = error.message;
-        }
-
-        toast.error(errorMessage);
-        setApiError(errorMessage);
-
-        // Destacar campos específicos com erro, se a API retornar essa informação
-        if (error.response && error.response.data && error.response.data.errors) {
-          const backendErrors = error.response.data.errors;
-
-          // Mapear erros do backend para os campos do formulário
-          const mappedErrors: Record<string, string> = {};
-
-          Object.entries(backendErrors).forEach(([key, value]) => {
-            // Mapear nome dos campos do backend para nomes no nosso formData
-            const fieldMapping: Record<string, string> = {
-              nome: "paciente",
-              cpf: "cpf",
-              data_nascimento: "dataNascimento",
-              // adicionar outros mapeamentos conforme necessário
+        if (isNetworkError) {
+          console.log('🔄 Erro de rede na criação de paciente, salvando offline...');
+          
+          try {
+            // ✅ CRIAR PACIENTE OFFLINE
+            const pacienteData = {
+              nome: formData.paciente.toUpperCase(),
+              nome_mae: formData.nomeMae?.toUpperCase() || "",
+              data_nascimento: formData.dataNascimento || null,
+              cpf: formData.cpf || "",
+              contato: formData.contatoTelefonico || "",
+              ddi: formData.ddi || "55",
+              tipo_genero_idtipo_genero: formData.identidadeGenero ? parseInt(formData.identidadeGenero) : 2,
+              tipo_raca_idtipo_raca: formData.raca ? parseInt(formData.raca) : 1,
+              escolaridade_idescolaridade: formData.escolaridade ? parseInt(formData.escolaridade) : 11,
+              cbo_idcbo: formData.profissao ? parseInt(formData.profissao) : null
             };
 
-            const fieldName = fieldMapping[key] || key;
-            mappedErrors[fieldName] = Array.isArray(value) ? value[0] : String(value);
-          });
+            const pacienteId = await indexedDBService.savePaciente(pacienteData);
+            
+            // ✅ ATUALIZAR FORMDATA COM ID TEMPORÁRIO DO PACIENTE
+            setFormData(prev => ({ ...prev, pacienteId: pacienteId }));
+            
+            console.log('👤 Paciente criado offline com ID:', pacienteId);
+            
+            // ✅ CONTINUAR PARA SALVAR NOTIFICAÇÃO OFFLINE (não fazer return aqui)
+              } catch (offlineError: any) {
+            console.error('❌ Erro ao criar paciente offline:', offlineError);
+            setApiError(`Erro ao salvar paciente offline: ${offlineError.message}`);
+            setIsSaving(false);
+            return;
+          }
+        } else {
+          // ✅ ERROS NÃO DE REDE (validação, etc) - TRATAMENTO ORIGINAL
+          let errorMessage = "Erro ao criar o paciente. Verifique os dados e tente novamente.";
 
-          setErrors((prev) => ({ ...prev, ...mappedErrors }));
+          if (error.response && error.response.data && error.response.data.message) {
+            errorMessage = error.response.data.message;
+          } else if (error.message) {
+            errorMessage = error.message;
+          }
 
-          // Expandir a seção de identificação do paciente
-          setExpandedSections((prev) => ({ ...prev, identificacao: true }));
+          toast.error(errorMessage);
+          setApiError(errorMessage);
+
+          // Mapear erros específicos se disponíveis
+          if (error.response && error.response.data && error.response.data.errors) {
+            const backendErrors = error.response.data.errors;
+            const mappedErrors: Record<string, string> = {};
+
+            Object.entries(backendErrors).forEach(([key, value]) => {
+              const fieldMapping: Record<string, string> = {
+                nome: "paciente",
+                cpf: "cpf", 
+                data_nascimento: "dataNascimento",
+              };
+
+              const fieldName = fieldMapping[key] || key;
+              mappedErrors[fieldName] = Array.isArray(value) ? value[0] : String(value);
+            });
+
+            setErrors((prev) => ({ ...prev, ...mappedErrors }));
+            setExpandedSections((prev) => ({ ...prev, identificacao: true }));
+          }
+
+          setIsSaving(false);
+          return;
         }
-
-        setIsSaving(false);
-        return; // Impedir envio do formulário
       }
     }
     // Se já tem ID de paciente, atualizar dados do paciente
@@ -1077,21 +1169,33 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       // Converter todos os dados para caixa alta antes de enviar
       const formDataUpperCase = toUpperCaseAllStrings(formData);
 
-      // Usar a função importada salvarNotificacaoCompleta
+      // Usar sistema offline para criação ou online para edição
       if (isEditMode && id) {
-        // Para atualização
+        // Para edição, verificar se está online
+        if (!isOnline) {
+          setApiError("Não é possível editar notificações offline. Conecte-se à internet.");
+          setIsSaving(false);
+          return;
+        }
+
+        // Para atualização, usar método original
         console.log("Atualizando notificação ID:", id);
         await salvarNotificacaoCompleta(formDataUpperCase, true, Number(id));
         console.log("Notificação atualizada com sucesso");
         setIsSuccess(true);
         toast.success("Notificação atualizada com sucesso");
       } else {
-        // Para criação
-        console.log("Criando nova notificação");
-        await salvarNotificacaoCompleta(formDataUpperCase, false);
-        console.log("Notificação criada com sucesso");
+        // Para criação, usar sistema offline
+        console.log("Criando nova notificação via sistema offline");
+        await syncService.saveNotificacao(formDataUpperCase);
+        console.log("Notificação salva (online ou offline conforme disponibilidade)");
         setIsSuccess(true);
-        toast.success("Notificação criada com sucesso");
+        
+        // Atualizar contador de pendentes
+        const count = await syncService.getPendingCount();
+        setPendingCount(count);
+        
+        toast.success(isOnline ? "Notificação criada com sucesso" : "Notificação salva offline");
       }
 
       // Redirecionar para página de listagem ou detalhes após um breve delay
@@ -1524,9 +1628,12 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     // Hipóteses diagnósticas filtradas
     hipoteseDiagFiltradas,
     isLoadingHipoteses,
-    
-    // Helpers para condicionais
     isTipoAtendimentoFunc: (tipo: string) => isTipoAtendimento(tipo, formData.tipoAtendimento, atendimentoOptions),
-    isTipoEncerramentoFunc: (tipo: string) => isTipoEncerramento(tipo, formData.tipoEncerramento, encerramentoOptions)
+    isTipoEncerramentoFunc: (tipo: string) => isTipoEncerramento(tipo, formData.tipoEncerramento, encerramentoOptions),
+
+    // Novos retornos para offline
+    isOnline,
+    pendingCount,
+    handleForceSync
   };
 };

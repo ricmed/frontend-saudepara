@@ -17,6 +17,7 @@ import ModalBuscaPaciente from "@/features/paginaPacientesComu/components/ModalB
 import SideMenu from "@/features/home/components/SideMenu";
 // Adicionar importação do contexto de linguagem
 import { useLanguage } from "@/contexts/LanguageContext";
+import ConnectionStatus from "@/components/ConnectionStatus";
 
 // Import custom hooks
 import { useNotificationForm } from "./hooks/useNotificationForm";
@@ -268,6 +269,12 @@ const NotificationForm: React.FC = () => {
           onFieldClick={handleScrollToField}
           expandedSections={expandedSections as unknown as Record<string, boolean>}
           toggleSection={handleToggleSection}
+        />
+
+        {/* Adicionar o status de conexão */}
+        <ConnectionStatus 
+          showForceSync={true}
+          className="mb-4"
         />
 
         {/* Formulário */}

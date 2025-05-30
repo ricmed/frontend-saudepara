@@ -1,7 +1,7 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { FormData } from '@/features/notificationForms/NotificationForm';
+import { FormData } from '@/features/notificationForms/types/index2';
 
-// Estrutura do banco de dados
+// ✅ CORRIGIDO: Interface com tipos de índices consistentes
 interface NotificacaoDatabase extends DBSchema {
   notificacoes: {
     key: number;
@@ -23,105 +23,255 @@ interface NotificacaoDatabase extends DBSchema {
   };
   pacientes: {
     key: number;
-    value: any; // Usando "any" para compatibilidade com o tipo Paciente existente
-    indexes: { 'by-nome': string };
+    value: any;
+    // ✅ CORRIGIDO: Todos os índices como string (mais compatível)
+    indexes: { 'by-nome': string; 'by-cpf': string; 'by-synced': string };
   };
 }
 
-const DB_VERSION = 1;
-const DB_NAME = 'notificacao-offline-db';
-const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 dias em milissegundos
+const DB_VERSION = 2;
+const DB_NAME = 'NotificacaoOfflineDB';
+const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 dias
 
 export class IndexedDBService {
   private db: IDBPDatabase<NotificacaoDatabase> | null = null;
 
-  // Inicializar o banco de dados
   async init(): Promise<void> {
     if (this.db) return;
 
-    this.db = await openDB<NotificacaoDatabase>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        // Store para notificações
-        const notificacoesStore = db.createObjectStore('notificacoes', {
-          keyPath: 'id'
-          // Removido autoIncrement: true pois vamos gerenciar IDs manualmente
-        });
-        notificacoesStore.createIndex('by-sync-status', 'syncStatus');
+    try {
+      console.log(`🔧 Inicializando IndexedDB: ${DB_NAME} v${DB_VERSION}`);
+      
+      this.db = await openDB<NotificacaoDatabase>(DB_NAME, DB_VERSION, {
+        upgrade(db, oldVersion, newVersion) {
+          console.log(`📈 Upgrade DB: v${oldVersion} → v${newVersion}`);
+          
+          // Store para notificações
+          if (!db.objectStoreNames.contains('notificacoes')) {
+            console.log('🆕 Criando store: notificacoes');
+            const notificacoesStore = db.createObjectStore('notificacoes', {
+              keyPath: 'id'
+            });
+            notificacoesStore.createIndex('by-sync-status', 'syncStatus');
+          }
 
-        // Store para opções (dropdowns, etc)
-        db.createObjectStore('opcoes', {
-          keyPath: 'tipo'
-        });
+          // Store para opções
+          if (!db.objectStoreNames.contains('opcoes')) {
+            console.log('🆕 Criando store: opcoes');
+            db.createObjectStore('opcoes', {
+              keyPath: 'tipo'
+            });
+          }
 
-        // Store para pacientes
-        const pacientesStore = db.createObjectStore('pacientes', {
-          keyPath: 'idpaciente'
-        });
-        pacientesStore.createIndex('by-nome', 'nome');
+          // Store para pacientes
+          if (!db.objectStoreNames.contains('pacientes')) {
+            console.log('🆕 Criando store: pacientes');
+            const pacientesStore = db.createObjectStore('pacientes', {
+              keyPath: 'idpaciente'
+            });
+            pacientesStore.createIndex('by-nome', 'nome');
+            pacientesStore.createIndex('by-cpf', 'cpf');
+            pacientesStore.createIndex('by-synced', 'synced');
+          }
+        },
+        
+        blocked() {
+          console.warn('⚠️ IndexedDB bloqueado por outra aba/processo');
+        },
+        
+        blocking: () => {
+          console.warn('⚠️ IndexedDB bloqueando para upgrade');
+          if (this.db) {
+            this.db.close();
+            this.db = null;
+          }
+        },
+        
+        terminated: () => {
+          console.error('❌ IndexedDB conexão terminada');
+          this.db = null;
+        }
+      });
+
+      console.log('✅ IndexedDB inicializado com sucesso!');
+      
+    } catch (error) {
+      console.error('❌ Erro ao inicializar IndexedDB:', error);
+      
+      if (error instanceof Error && error.name === 'VersionError') {
+        console.log('🔄 VersionError detectado, tentando resetar banco...');
+        await this.resetDatabase();
+        return;
       }
-    });
+      
+      throw error;
+    }
   }
 
-  // Método para gerar ID temporário negativo para novos registros offline
+  async resetDatabase(): Promise<void> {
+    try {
+      console.log('🗑️ Resetando banco de dados...');
+      
+      if (this.db) {
+        this.db.close();
+        this.db = null;
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        const deleteReq = indexedDB.deleteDatabase(DB_NAME);
+        deleteReq.onsuccess = () => {
+          console.log('✅ Banco deletado com sucesso');
+          resolve();
+        };
+        deleteReq.onerror = () => reject(deleteReq.error);
+        deleteReq.onblocked = () => {
+          console.warn('⚠️ Delete bloqueado - outras abas podem estar abertas');
+          setTimeout(() => resolve(), 1000);
+        };
+      });
+
+      await this.init();
+      
+    } catch (error) {
+      console.error('❌ Erro ao resetar banco:', error);
+      throw error;
+    }
+  }
+
   private async generateTemporaryId(): Promise<number> {
     await this.init();
-    // Buscar o menor ID (mais negativo) atual
-    const allNotificacoes = await this.db!.getAll('notificacoes');
-    const tempIds = allNotificacoes
-      .map(n => n.id as number)
-      .filter(id => id < 0);
     
-    // Se não houver IDs temporários, começar com -1
-    // Caso contrário, usar (menor ID - 1)
-    return tempIds.length > 0 ? Math.min(...tempIds) - 1 : -1;
+    try {
+      const allNotificacoes = await this.db!.getAll('notificacoes');
+      const tempIds = allNotificacoes
+        .map(n => n.id as number)
+        .filter(id => id < 0);
+      
+      return tempIds.length > 0 ? Math.min(...tempIds) - 1 : -1;
+    } catch (error) {
+      console.warn('Erro ao gerar ID temporário, usando timestamp:', error);
+      return -Date.now();
+    }
   }
 
-  // MÉTODOS PARA NOTIFICAÇÕES
-  
-  // Salvar uma notificação (nova ou atualização)
   async saveNotificacao(formData: FormData, isEdit: boolean = false, id?: number): Promise<number> {
     await this.init();
     
-    let notificacao;
-    
-    if (isEdit && id) {
-      // Para edição, manter o ID existente
-      notificacao = {
-        id,
-        formData,
-        syncStatus: 'pending' as const,
-        timestamp: Date.now()
-      };
-    } else {
-      // Para novos registros, gerar ID temporário negativo
-      const tempId = await this.generateTemporaryId();
-      notificacao = {
-        id: tempId,
-        formData, 
-        syncStatus: 'pending' as const,
-        timestamp: Date.now()
-      };
-    }
+    try {
+      let notificacao;
+      
+      if (isEdit && id) {
+        notificacao = {
+          id,
+          formData,
+          syncStatus: 'pending' as const,
+          timestamp: Date.now()
+        };
+      } else {
+        const tempId = await this.generateTemporaryId();
+        notificacao = {
+          id: tempId,
+          formData, 
+          syncStatus: 'pending' as const,
+          timestamp: Date.now()
+        };
+      }
 
-    const savedId = await this.db!.put('notificacoes', notificacao);
-    return savedId;
+      await this.db!.put('notificacoes', notificacao);
+      console.log(`💾 Notificação salva offline: ID ${notificacao.id}`);
+      return notificacao.id;
+      
+    } catch (error) {
+      console.error('❌ Erro ao salvar notificação:', error);
+      throw error;
+    }
   }
 
-  // Obter uma notificação pelo ID
+  async savePaciente(paciente: any): Promise<number> {
+    await this.init();
+    
+    try {
+      if (!paciente.idpaciente) {
+        paciente.idpaciente = -Date.now();
+      }
+      
+      if (paciente.nome) {
+        paciente.nome = paciente.nome.toUpperCase();
+      }
+      
+      // ✅ CORRIGIDO: Usar string para compatibilidade com índice
+      paciente.synced = 'false'; // string 'false'
+      paciente.savedAt = Date.now();
+      
+      await this.db!.put('pacientes', paciente);
+      console.log(`👤 Paciente salvo offline: ${paciente.nome} (ID: ${paciente.idpaciente})`);
+      return paciente.idpaciente;
+      
+    } catch (error) {
+      console.error('❌ Erro ao salvar paciente:', error);
+      throw error;
+    }
+  }
+
+  async checkCpfExists(cpf: string): Promise<boolean> {
+    await this.init();
+    
+    if (!cpf || cpf.length !== 11) return false;
+    
+    try {
+      const pacienteComCpf = await this.db!.getFromIndex('pacientes', 'by-cpf', cpf);
+      if (pacienteComCpf) return true;
+      
+      const allPacientes = await this.db!.getAll('pacientes');
+      return allPacientes.some(paciente => paciente.cpf === cpf);
+      
+    } catch (error) {
+      console.warn('Erro na verificação de CPF, usando busca manual:', error);
+      const allPacientes = await this.db!.getAll('pacientes');
+      return allPacientes.some(paciente => paciente.cpf === cpf);
+    }
+  }
+
+  async getPendingCount(): Promise<{ notificacoes: number; pacientes: number }> {
+    await this.init();
+    
+    try {
+      const pendingNotificacoes = await this.getPendingNotificacoes();
+      
+      let unsyncedPacientes: any[] = [];
+      try {
+        // ✅ CORRIGIDO: Buscar por string 'false'
+        unsyncedPacientes = await this.db!.getAllFromIndex('pacientes', 'by-synced', 'false');
+      } catch (error) {
+        const allPacientes = await this.db!.getAll('pacientes');
+        unsyncedPacientes = allPacientes.filter(p => 
+          p.synced === 'false' || p.synced === false || p.synced === undefined
+        );
+      }
+      
+      return {
+        notificacoes: pendingNotificacoes.length,
+        pacientes: unsyncedPacientes.length
+      };
+      
+    } catch (error) {
+      console.error('Erro ao obter contadores:', error);
+      return { notificacoes: 0, pacientes: 0 };
+    }
+  }
+
   async getNotificacao(id: number): Promise<FormData | null> {
     await this.init();
     const notificacao = await this.db!.get('notificacoes', id);
     return notificacao ? notificacao.formData : null;
   }
 
-  // Obter todas as notificações pendentes de sincronização
   async getPendingNotificacoes(): Promise<Array<{ id: number; formData: FormData }>> {
     await this.init();
     const pending = await this.db!.getAllFromIndex('notificacoes', 'by-sync-status', 'pending');
     return pending.map(item => ({ id: item.id as number, formData: item.formData }));
   }
-  
-  // Marcar notificação como sincronizada
+
   async markNotificacaoAsSynced(id: number): Promise<void> {
     await this.init();
     const notificacao = await this.db!.get('notificacoes', id);
@@ -131,83 +281,52 @@ export class IndexedDBService {
     }
   }
 
-  // Método para atualizar o ID temporário para o ID permanente após sincronização
-  async updateNotificacaoId(tempId: number, permanentId: number): Promise<void> {
+  async markPacienteAsSynced(idpaciente: number): Promise<void> {
     await this.init();
-    
-    // Obter a notificação com o ID temporário
-    const notificacao = await this.db!.get('notificacoes', tempId);
-    
-    if (notificacao) {
-      // Excluir o registro com ID temporário
-      await this.db!.delete('notificacoes', tempId);
-      
-      // Criar novo registro com ID permanente
-      notificacao.id = permanentId;
-      notificacao.syncStatus = 'synced';
-      
-      await this.db!.put('notificacoes', notificacao);
+    const paciente = await this.db!.get('pacientes', idpaciente);
+    if (paciente) {
+      // ✅ CORRIGIDO: Usar string 'true'
+      paciente.synced = 'true';
+      paciente.syncedAt = Date.now();
+      await this.db!.put('pacientes', paciente);
     }
   }
 
-  // Método para sincronizar com o servidor
-  async syncNotificacoes(apiEndpoint: string): Promise<Array<{id: number, success: boolean, error?: any}>> {
+  async getUnsyncedPacientes(): Promise<any[]> {
     await this.init();
-    const pendingNotificacoes = await this.getPendingNotificacoes();
-    const results = [];
-    
-    for (const { id, formData } of pendingNotificacoes) {
-      try {
-        // Enviar dados para o servidor
-        const response = await fetch(apiEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
-        });
-        
-        if (response.ok) {
-          const { id: permanentId } = await response.json();
-          
-          // Se o ID era temporário (negativo), atualize para o ID permanente
-          if (id < 0) {
-            await this.updateNotificacaoId(id, permanentId);
-          } else {
-            // Se já era um ID permanente, apenas marque como sincronizado
-            await this.markNotificacaoAsSynced(id);
-          }
-          
-          results.push({ id, success: true });
-        } else {
-          const errorData = await response.json().catch(() => ({ message: 'Erro desconhecido' }));
-          results.push({ id, success: false, error: errorData });
-        }
-      } catch (error) {
-        console.error(`Falha ao sincronizar notificação ${id}:`, error);
-        results.push({ id, success: false, error });
-      }
+    try {
+      // ✅ CORRIGIDO: Buscar por string 'false'
+      return await this.db!.getAllFromIndex('pacientes', 'by-synced', 'false');
+    } catch (error) {
+      const allPacientes = await this.db!.getAll('pacientes');
+      return allPacientes.filter(p => 
+        p.synced === 'false' || p.synced === false || p.synced === undefined
+      );
     }
-    
-    return results;
   }
 
-  // MÉTODOS PARA OPÇÕES (DROPDOWNS, ETC)
-  
-  // Armazenar opções de dropdown
+  async searchPacientesExtended(query: string): Promise<any[]> {
+    await this.init();
+    
+    const searchTerm = query.toLowerCase();
+    const allPacientes = await this.db!.getAll('pacientes');
+    
+    return allPacientes.filter(paciente => 
+      (paciente.nome && paciente.nome.toLowerCase().includes(searchTerm)) ||
+      (paciente.cpf && paciente.cpf.includes(query)) ||
+      (paciente.nome_mae && paciente.nome_mae.toLowerCase().includes(searchTerm))
+    );
+  }
+
   async saveOpcoes(tipo: string, data: any[]): Promise<void> {
     await this.init();
-    await this.db!.put('opcoes', {
-      tipo,
-      data,
-      timestamp: Date.now()
-    });
+    await this.db!.put('opcoes', { tipo, data, timestamp: Date.now() });
   }
 
-  // Obter opções de dropdown
   async getOpcoes(tipo: string): Promise<any[] | null> {
     await this.init();
     const opcoes = await this.db!.get('opcoes', tipo);
     
-    // Verificar se as opções existem e não estão expiradas
     if (opcoes && (Date.now() - opcoes.timestamp) < CACHE_DURATION) {
       return opcoes.data;
     }
@@ -215,56 +334,15 @@ export class IndexedDBService {
     return null;
   }
 
-  // MÉTODOS PARA PACIENTES
-  
-  // Salvar um paciente
-  async savePaciente(paciente: any): Promise<number> {
-    await this.init();
-    
-    // Garantir que o nome esteja em caixa alta para consistência na busca
-    if (paciente.nome) {
-      paciente.nome = paciente.nome.toUpperCase();
-    }
-    
-    await this.db!.put('pacientes', paciente);
-    return paciente.idpaciente;
-  }
-
-  // Obter um paciente pelo ID
-  async getPaciente(id: number): Promise<any | null> {
-    await this.init();
-    return await this.db!.get('pacientes', id);
-  }
-
-  // Buscar pacientes pelo nome
-  async searchPacientes(nome: string): Promise<any[]> {
-    await this.init();
-    
-    // Normalizar a busca para caixa alta
-    const searchTerm = nome.toUpperCase();
-    
-    // Obter todos os pacientes e filtrar no código
-    // Não é o mais eficiente, mas funciona para casos offline
-    const allPacientes = await this.db!.getAll('pacientes');
-    
-    return allPacientes.filter(paciente => 
-      paciente.nome && paciente.nome.includes(searchTerm)
-    );
-  }
-
-  // Método para limpar dados antigos e manter o banco de dados enxuto
   async cleanup(): Promise<void> {
     await this.init();
     
-    // Limpar notificações sincronizadas com mais de 30 dias
     const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
-    
     const allNotificacoes = await this.db!.getAll('notificacoes');
     const oldSyncedNotificacoes = allNotificacoes.filter(n => 
       n.syncStatus === 'synced' && n.timestamp < thirtyDaysAgo
     );
     
-    // Excluir notificações antigas
     const tx = this.db!.transaction('notificacoes', 'readwrite');
     for (const n of oldSyncedNotificacoes) {
       if (n.id) await tx.store.delete(n.id);
@@ -273,6 +351,5 @@ export class IndexedDBService {
   }
 }
 
-// Exportar uma instância para uso em toda a aplicação
 const indexedDBService = new IndexedDBService();
 export default indexedDBService;

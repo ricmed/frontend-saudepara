@@ -39,17 +39,28 @@ export default defineConfig({
       },
       workbox: {
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
+        // *** ADICIONEI OFFLINE FALLBACK E MELHOREI O CACHE ***
+        skipWaiting: true,
+        clientsClaim: true,
         runtimeCaching: [
+          // *** SUAS APIs EXISTENTES COM FALLBACK OFFLINE ***
           {
             urlPattern: /^https:\/\/app-api\.hml\.saude\.pa\.gov\.br\/.*$/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-hml-cache',
               expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 7 // 1 semana
+                maxEntries: 200, // Aumentei para mais dados
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 dias para COP30
               },
-              networkTimeoutSeconds: 10
+              networkTimeoutSeconds: 5, // Reduzi timeout para detectar offline mais rápido
+              // *** FALLBACK OFFLINE ***
+              backgroundSync: {
+                name: 'api-sync',
+                options: {
+                  maxRetentionTime: 24 * 60 // 24 horas
+                }
+              }
             }
           },
           {
@@ -58,10 +69,10 @@ export default defineConfig({
             options: {
               cacheName: 'app-hml-cache',
               expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 7 // 1 semana
+                maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 dias
               },
-              networkTimeoutSeconds: 10
+              networkTimeoutSeconds: 5
             }
           },
           {
@@ -70,12 +81,26 @@ export default defineConfig({
             options: {
               cacheName: 'app-trn-cache',
               expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 7 // 1 semana
+                maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 dias
               },
-              networkTimeoutSeconds: 10
+              networkTimeoutSeconds: 5
             }
           },
+          // *** CACHE PARA LOCALHOST (DESENVOLVIMENTO) ***
+          {
+            urlPattern: /^http:\/\/localhost:\d+\/api\/.*$/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'api-dev-cache',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 // 1 dia no dev
+              },
+              networkTimeoutSeconds: 3
+            }
+          },
+          // *** SEUS CACHES DE ASSETS EXISTENTES ***
           {
             urlPattern: /\.(js|css|png|jpg|jpeg|svg|ico)$/,
             handler: 'StaleWhileRevalidate',
