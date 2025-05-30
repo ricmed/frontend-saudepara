@@ -12,6 +12,12 @@ export const translations: TranslationsType = {
     "menu.campaigns": "Campanhas de Saúde",
     "menu.materials": "Materiais Educativos",
     "menu.fale_conosco": "Fale Conosco",
+
+        // Logout Confirmation
+    "logout.confirmation.title": "Deseja sair?",
+    "logout.confirmation.confirm": "Sim, sair",
+    "logout.confirmation.cancel": "Cancelar",
+    "logout.confirmation.message": "Você tem certeza de que deseja sair?",
     
     // Seção de Pontos
     "section.locate": "Localize aqui",
@@ -198,6 +204,12 @@ export const translations: TranslationsType = {
     "menu.materials": "Educational Materials",
     "menu.fale_conosco": "Contact Us",
     
+        // Logout Confirmation
+    "logout.confirmation.title": "Do you want to log out?",
+    "logout.confirmation.confirm": "Yes, log out",
+    "logout.confirmation.cancel": "Cancel",
+    "logout.confirmation.message": "Are you sure you want to log out?",
+
     // Points Section
     "section.locate": "Find Here",
     "localize.title": "Find Here",
@@ -383,6 +395,12 @@ export const translations: TranslationsType = {
     "menu.materials": "Materiales Educativos",
     "menu.fale_conosco": "Contáctenos",
     
+    // Logout Confirmation
+    "logout.confirmation.title": "¿Desea salir?",
+    "logout.confirmation.confirm": "Sí, salir",
+    "logout.confirmation.cancel":  "Cancelar",
+    "logout.confirmation.message": "¿Está seguro de que desea salir?",
+
     // Sección de Puntos
     "section.locate": "Encuentra Aquí",
     "localize.title": "Localice Aquí",
@@ -568,6 +586,12 @@ export const translations: TranslationsType = {
     "menu.materials": "教育材料",
     "menu.fale_conosco": "联系我们",
     
+    // Logout Confirmation
+    "logout.confirmation.title": "您想要退出吗？",
+    "logout.confirmation.confirm": "是的，退出",
+    "logout.confirmation.cancel": "取消",
+    "logout.confirmation.message": "您确定要退出吗？",
+
     // 点位部分
     "section.locate": "在此查找",
     "localize.title": "在此查找",
@@ -752,6 +776,12 @@ export const translations: TranslationsType = {
     "menu.campaigns": "Campagnes de Santé",
     "menu.materials": "Matériel Éducatif",
     "menu.fale_conosco": "Contactez-nous",
+
+        // Logout Confirmation
+    "logout.confirmation.title": "Voulez-vous vous déconnecter ?",
+    "logout.confirmation.confirm": "Oui, se déconnecter",
+    "logout.confirmation.cancel": "Annuler",
+    "logout.confirmation.message": "Êtes-vous sûr de vouloir vous déconnecter ?",
     
     // Section Points
     "section.locate": "Trouvez Ici",
@@ -927,6 +957,11 @@ export const translations: TranslationsType = {
     "footer.rights": "Tous droits réservés"
   },
   "ar": {
+        // Logout Confirmation
+    "logout.confirmation.title": "هل تريد تسجيل الخروج؟",
+    "logout.confirmation.confirm": "نعم، تسجيل الخروج",
+    "logout.confirmation.cancel": "إلغاء",
+    "logout.confirmation.message": "هل أنت متأكد أنك تريد تسجيل الخروج؟",
     // مثال على الترجمات العربية
     "search.placeholder": "ابحث عن الخدمات",
     "header.secretaryOf": "وزارة الدولة لـ",
@@ -1094,6 +1129,11 @@ export const translations: TranslationsType = {
     "footer.rights": "جميع الحقوق محفوظة"
   },
   "ru": {
+        // Logout Confirmation
+    "logout.confirmation.title": "Вы хотите выйти?",
+    "logout.confirmation.confirm": "Да, выйти",
+    "logout.confirmation.cancel": "Отмена",
+    "logout.confirmation.message": "Вы уверены, что хотите выйти?",
     // Пример переводов на русский язык
     "search.placeholder": "Поиск услуг",
     "header.secretaryOf": "Государственный департамент",

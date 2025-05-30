@@ -63,6 +63,14 @@ export type TranslationRecord = {
   // FAB Button
   'fab.notifique': string;
   
+
+  //logout
+  'logout.confirmation.title': string;
+  'logout.confirmation.message': string;
+  'logout.confirmation.confirm': string;
+  'logout.confirmation.cancel': string;
+
+
   // Menu Lateral/Side Menu
   'menu.qualify_establishments': string;
   'menu.notification': string;
