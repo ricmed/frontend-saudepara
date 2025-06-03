@@ -151,5 +151,6 @@ export const adminEs = {
   "admin.reports.user": "Usuario",
   "admin.reports.justNow": "Ahora mismo",
   "admin.reports.hoursAgo": "hace {{hours}} horas",
-  "admin.reports.daysAgo": "hace {{days}} días"
+  "admin.reports.daysAgo": "hace {{days}} días",
+  "menu.manage_users": "Gestionar Usuarios",
 };

@@ -179,5 +179,6 @@ export const adminEn = {
   "admin.reports.user": "User",
   "admin.reports.justNow": "Just now",
   "admin.reports.hoursAgo": "{{hours}} hours ago",
-  "admin.reports.daysAgo": "{{days}} days ago"
+  "admin.reports.daysAgo": "{{days}} days ago",
+  "menu.manage_users": "Manage Users",
 };

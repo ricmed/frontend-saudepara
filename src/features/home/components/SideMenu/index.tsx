@@ -30,6 +30,7 @@ import {
   HeartPulse,
   Stethoscope,
   Thermometer,
+  UserCog, // Novo ícone para gerenciar usuários
 } from "lucide-react";
 
 interface SideMenuProps {
@@ -49,6 +50,13 @@ export const SideMenu: React.FC<SideMenuProps> = ({
   const { t } = useTranslation(selectedLanguage);
   const { user } = useAuth();
   const [showAppsSubmenu, setShowAppsSubmenu] = useState(false);
+
+  // Função para verificar se o usuário é admin
+  const isAdmin = () => {
+    if (!user) return false;
+    // Baseado no ProtectedRoute, as roles estão em user.roles
+    return user.roles?.includes('admin');
+  };
 
   // List of auxiliary apps
   const appsMenuItems = [
@@ -202,6 +210,13 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       label: t("menu.bug"),
       onClick: () => {},
     },
+    // Menu de Gerenciar Usuários - apenas para admins logados
+    ...(user && isAdmin() ? [{
+      icon: <UserCog />,
+      label: t("menu.manage_users"), // Adicionar esta tradução
+      onClick: () => navigate("/admin"),
+    }] : []),
+    // Menu de Logout - apenas para usuários logados
     ...(user ? [{
       icon: <LogOut className="rotate-180" />,
       label: t("menu.logout"),

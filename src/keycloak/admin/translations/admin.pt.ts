@@ -179,5 +179,6 @@ export const adminPt = {
   "admin.reports.user": "Usuário",
   "admin.reports.justNow": "Agora mesmo",
   "admin.reports.hoursAgo": "há {{hours}} horas",
-  "admin.reports.daysAgo": "há {{days}} dias"
+  "admin.reports.daysAgo": "há {{days}} dias",
+  "menu.manage_users": "Gerenciar Usuários",
 };
