@@ -131,6 +131,7 @@ export default defineConfig({
       // Todas as requisições que começarem com /api serão redirecionadas
       // para o backend em localhost:4000
       '/api-auth': {
+        //target: 'http://localhost:4000/',
         target: 'https://app.hml.saude.pa.gov.br/',
         changeOrigin: true,
         secure: false,

@@ -1,7 +1,9 @@
 import { TranslationsType } from './types';
+import { adminTranslations } from '../keycloak/admin/translations';
 
 export const translations: TranslationsType = {
   "pt-BR": {
+    ...adminTranslations.pt,
     // Cabeçalho
     "search.placeholder": "Buscar serviços",
     "header.secretaryOf": "Secretaria de Estado de",
@@ -193,6 +195,7 @@ export const translations: TranslationsType = {
     "footer.rights": "Todos os direitos reservados"
   },
   "en": {
+    ...adminTranslations.en,
     // Header
     "search.placeholder": "Search services",
     "header.secretaryOf": "State Department of",
@@ -384,6 +387,7 @@ export const translations: TranslationsType = {
     "footer.rights": "All rights reserved"
   },
   "es": {
+    ...adminTranslations.es,
     // Encabezado
     "search.placeholder": "Buscar servicios",
     "header.secretaryOf": "Secretaría de Estado de",

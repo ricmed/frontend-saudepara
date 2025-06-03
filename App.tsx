@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Outlet } from "react-router-dom";
-
+import AdminRoutes from "@/keycloak/admin/AdminRoutes";
 import { useEffect } from 'react';
 import indexedDBService from '@/services/indexedDB';
 import syncService from '@/services/syncService';
@@ -256,6 +256,7 @@ function App() {
           <Route path="/campanha-novembro-azul" element={<NovembroAzul />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/access-denied" element={<AccessDenied />} />
+          <Route path="/admin/*" element={<AdminRoutes />}></Route>
         </Routes>
       </Router>
     </LanguageProvider>
