@@ -58,6 +58,18 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     return user.roles?.includes('admin');
   };
 
+  // Função para verificar se o usuário é notificador
+  const isNotificador = () => {
+    if (!user) return false;
+    return user.roles?.includes('notificador');
+  };
+
+  // Função para verificar se o usuário é qualificador
+  const isQualificador = () => {
+    if (!user) return false;
+    return user.roles?.includes('qualificador');
+  };
+
   // List of auxiliary apps
   const appsMenuItems = [
     {
@@ -169,16 +181,18 @@ export const SideMenu: React.FC<SideMenuProps> = ({
 
   // Main menu items
   const menuItems = [
-    {
+    // Menu Qualificar Estabelecimentos - apenas para qualificadores
+    ...(user && isQualificador() ? [{
       icon: <Award />,
       label: t("menu.qualify_establishments"),
       onClick: () => navigate("/private/relatorio-estabelecimentos"),
-    },
-    {
+    }] : []),
+    // Menu Notificação - apenas para notificadores
+    ...(user && isNotificador() ? [{
       icon: <FileText />,
       label: t("menu.notification"),
       onClick: () => navigate("/private/pagina-paciente-ficha"),
-    },
+    }] : []),
     {
       icon: <ChartSpline />,
       label: t("menu.dashboard"),
@@ -189,12 +203,13 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       label: t("menu.educational"),
       onClick: () => {},
     },
-    {
+    // Menu de Apps Auxiliares - apenas para admins logados
+    ...(user && isAdmin() ? [{
       icon: <Building2 />,
       label: t("menu.apps"),
       submenu: true,
       onClick: () => {},
-    },
+    }] : []),
     {
       icon: <Lock />,
       label: t("menu.security"),
