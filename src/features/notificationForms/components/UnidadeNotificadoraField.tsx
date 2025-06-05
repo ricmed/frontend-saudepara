@@ -280,10 +280,19 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   // Função para buscar estabelecimento por ID
   const fetchEstabelecimentoById = async (id: string) => {
     if (!id) return;
-    
-    // Log the ID we're trying to fetch - this helps debug issues
-    console.log(`Buscando estabelecimento ID: ${id} para ${isForEncaminhamento ? 'encaminhamento' : 'unidade notificadora'}`);
-    
+    // Primeiro tenta do IndexedDB
+    try {
+      const cached: any[] = (await indexedDBService.getOpcoes("estabelecimentos")) || [];
+      const found = cached.find(item => String(item.idestabelecimento) === id);
+      if (found) {
+        setSelectedEstabelecimento(found);
+        setDisplayValue(found.nome);
+        return;
+      }
+    } catch (e) {
+      console.warn("Erro ao ler estabelecimento do cache:", e);
+    }
+    // 2) Se não encontrou no cache, chama a API
     try {
       setLoadingUnidades(true);
       const apiUrl = `https://app.trn.saude.pa.gov.br:443/api/estabelecimentos/${id}`;
@@ -301,8 +310,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
       }
     } catch (error) {
       console.error('Erro ao buscar estabelecimento por ID:', error);
-      setSelectedEstabelecimento(null);
-      setDisplayValue("");
+      return;
     } finally {
       setLoadingUnidades(false);
     }
@@ -497,8 +505,10 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   };
 
   const handleEstabelecimentoSelect = (estabelecimento: Estabelecimento) => {
-    setSelectedEstabelecimento(estabelecimento);
+    // Definir valor local e notificar imediatamente
     setDisplayValue(estabelecimento.nome);
+    onChange(estabelecimento.idestabelecimento.toString());
+    setSelectedEstabelecimento(estabelecimento);
     setSearchQuery("");
     setIsManuallyEditing(false); // Sair do modo de edição manual
     
@@ -506,7 +516,6 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
     const idToSend = estabelecimento.idestabelecimento.toString();
     console.log(`Selecionado ${isForEncaminhamento ? 'encaminhamento' : 'unidade'}: ${estabelecimento.nome} (ID: ${idToSend})`);
     
-    onChange(idToSend);
     closeDropdown();
   };
 
