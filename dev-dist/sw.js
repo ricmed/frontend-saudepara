@@ -67,7 +67,7 @@ if (!self.define) {
     });
   };
 }
-define(['./workbox-25659a9f'], (function (workbox) { 'use strict';
+define(['./workbox-f68b4228'], (function (workbox) { 'use strict';
 
   self.skipWaiting();
   workbox.clientsClaim();
@@ -79,7 +79,7 @@ define(['./workbox-25659a9f'], (function (workbox) { 'use strict';
    */
   workbox.precacheAndRoute([{
     "url": "index.html",
-    "revision": "0.dbbr8efko6"
+    "revision": "0.20k6ihrie78"
   }], {});
   workbox.cleanupOutdatedCaches();
   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("index.html"), {
@@ -87,26 +87,36 @@ define(['./workbox-25659a9f'], (function (workbox) { 'use strict';
   }));
   workbox.registerRoute(/^https:\/\/app-api\.hml\.saude\.pa\.gov\.br\/.*$/i, new workbox.NetworkFirst({
     "cacheName": "api-hml-cache",
-    "networkTimeoutSeconds": 10,
+    "networkTimeoutSeconds": 5,
     plugins: [new workbox.ExpirationPlugin({
-      maxEntries: 100,
-      maxAgeSeconds: 604800
+      maxEntries: 200,
+      maxAgeSeconds: 2592000
+    }), new workbox.BackgroundSyncPlugin("api-sync", {
+      maxRetentionTime: 1440
     })]
   }), 'GET');
   workbox.registerRoute(/^https:\/\/app\.hml\.saude\.pa\.gov\.br\/.*$/i, new workbox.NetworkFirst({
     "cacheName": "app-hml-cache",
-    "networkTimeoutSeconds": 10,
+    "networkTimeoutSeconds": 5,
     plugins: [new workbox.ExpirationPlugin({
-      maxEntries: 100,
-      maxAgeSeconds: 604800
+      maxEntries: 200,
+      maxAgeSeconds: 2592000
     })]
   }), 'GET');
   workbox.registerRoute(/^https:\/\/app\.trn\.saude\.pa\.gov\.br\/.*$/i, new workbox.NetworkFirst({
     "cacheName": "app-trn-cache",
-    "networkTimeoutSeconds": 10,
+    "networkTimeoutSeconds": 5,
+    plugins: [new workbox.ExpirationPlugin({
+      maxEntries: 200,
+      maxAgeSeconds: 2592000
+    })]
+  }), 'GET');
+  workbox.registerRoute(/^http:\/\/localhost:\d+\/api\/.*$/i, new workbox.NetworkFirst({
+    "cacheName": "api-dev-cache",
+    "networkTimeoutSeconds": 3,
     plugins: [new workbox.ExpirationPlugin({
       maxEntries: 100,
-      maxAgeSeconds: 604800
+      maxAgeSeconds: 86400
     })]
   }), 'GET');
   workbox.registerRoute(/\.(js|css|png|jpg|jpeg|svg|ico)$/, new workbox.StaleWhileRevalidate({

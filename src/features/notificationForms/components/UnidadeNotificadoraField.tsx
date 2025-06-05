@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import axios from "axios";
 import { Search, X, AlertCircle } from "lucide-react";
 import { createPortal } from "react-dom";
+import indexedDBService from '@/services/indexedDB';
 
 interface Estabelecimento {
   idestabelecimento: number;
@@ -75,7 +76,6 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
     setErrorUnidades(errorMessage);
     setLoadingUnidades(false);
   };
-
   // Função para buscar as unidades notificadoras do backend - with caching
   const fetchUnidadesNotificadoras = async (searchTerm = "") => {
     try {
@@ -117,80 +117,151 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
         return;
       }
       
-      // Preparar parâmetros para a API
-      const params: any = {
-        limit: 11000, // Buscar todas as unidades disponíveis
-        orderBy: 'nome',
-        orderDir: 'asc',
-        ativo: 'S'
-      };
-      
-      // Se houver um termo de busca, adicionar aos parâmetros
-      if (searchTerm) {
-        params.search = searchTerm;
-        params.searchField = 'nome';
-      }
-      
-      console.log('Buscando estabelecimentos com params:', params);
-      
-      // URL completa da API - AJUSTE PARA SEU AMBIENTE
-      const apiUrl = 'https://app.hml.saude.pa.gov.br:443/api/estabelecimentos';
-      
-      try {
-        // Fazer a requisição à API com a URL completa
-        const response = await axios.get(apiUrl, { 
-          params,
-          headers: {
-            'Accept': 'application/json'
+      let estabelecimentosAtivos: Estabelecimento[] = [];
+
+      // ✅ VERIFICAR CACHE OFFLINE PRIMEIRO
+      if (!navigator.onLine) {
+        console.log('📱 Modo offline: buscando estabelecimentos em cache...');
+        
+        const cachedEstabelecimentos = await indexedDBService.getOpcoes('estabelecimentos');
+        
+        if (cachedEstabelecimentos && cachedEstabelecimentos.length > 0) {
+          // ✅ FILTRAR LOCALMENTE PELOS PARÂMETROS DE BUSCA
+          estabelecimentosAtivos = cachedEstabelecimentos.filter((est: any) => {
+            let matches = true;
+            
+            // Filtrar por busca de texto
+            if (searchTerm) {
+              const searchLower = searchTerm.toLowerCase();
+              const nome = (est.nome || '').toLowerCase();
+              matches = matches && nome.includes(searchLower);
+            }
+            
+            // Filtrar por ativo
+            matches = matches && est.ativo === 'S';
+            
+            return matches;
+          });
+          
+          // ✅ ORDENAR LOCALMENTE
+          estabelecimentosAtivos.sort((a: any, b: any) => {
+            const aVal = (a.nome || '').toLowerCase();
+            const bVal = (b.nome || '').toLowerCase();
+            return aVal.localeCompare(bVal);
+          });
+          
+          console.log(`✅ Estabelecimentos filtrados offline: ${estabelecimentosAtivos.length} registros`);
+        } else {
+          throw new Error('Nenhum estabelecimento encontrado offline. Baixe os dados primeiro.');
+        }
+      } else {
+        // ✅ MODO ONLINE: usar API normal com fallback
+        try {
+          // Preparar parâmetros para a API
+          const params: any = {
+            limit: 11000, // Buscar todas as unidades disponíveis
+            orderBy: 'nome',
+            orderDir: 'asc',
+            ativo: 'S'
+          };
+          
+          // Se houver um termo de busca, adicionar aos parâmetros
+          if (searchTerm) {
+            params.search = searchTerm;
+            params.searchField = 'nome';
           }
-        });
-        
-        console.log('Resposta da API de estabelecimentos:', response);
-        
-        let estabelecimentosAtivos: Estabelecimento[] = [];
-        
-        // A resposta do backend tem formato { data: [...], pagination: {...} }
-        if (response && response.data && response.data.data) {
-          // Adicional filtro no cliente para garantir apenas estabelecimentos ativos
-          estabelecimentosAtivos = response.data.data.filter((est: any) => 
-            est.ativo === 'S'
-          );
-        } else if (response && response.data && Array.isArray(response.data)) {
-          // Caso a API retorne diretamente um array (sem o wrapper data)
-          estabelecimentosAtivos = response.data.filter((est: any) => 
-            est.ativo === 'S'
-          );
-        } else {
-          console.warn('Formato de resposta inesperado:', response);
-          estabelecimentosAtivos = [];
+          
+          console.log('Buscando estabelecimentos com params:', params);
+          
+          // URL completa da API - AJUSTE PARA SEU AMBIENTE
+          const apiUrl = 'https://app.hml.saude.pa.gov.br:443/api/estabelecimentos';
+          
+          // Fazer a requisição à API com a URL completa
+          const response = await axios.get(apiUrl, { 
+            params,
+            headers: {
+              'Accept': 'application/json'
+            }
+          });
+          
+          console.log('Resposta da API de estabelecimentos:', response);
+          
+          // A resposta do backend tem formato { data: [...], pagination: {...} }
+          if (response && response.data && response.data.data) {
+            // Adicional filtro no cliente para garantir apenas estabelecimentos ativos
+            estabelecimentosAtivos = response.data.data.filter((est: any) => 
+              est.ativo === 'S'
+            );
+          } else if (response && response.data && Array.isArray(response.data)) {
+            // Caso a API retorne diretamente um array (sem o wrapper data)
+            estabelecimentosAtivos = response.data.filter((est: any) => 
+              est.ativo === 'S'
+            );
+          } else {
+            console.warn('Formato de resposta inesperado:', response);
+            estabelecimentosAtivos = [];
+          }
+          
+          // ✅ SALVAR NO CACHE (só dados básicos, não busca específica)
+          if (searchTerm.length <= 5) {
+            const existingEstabelecimentos = await indexedDBService.getOpcoes('estabelecimentos') || [];
+            const mergedEstabelecimentos = [...existingEstabelecimentos];
+            
+            estabelecimentosAtivos.forEach((newEst: any) => {
+              if (!mergedEstabelecimentos.find((existing: any) => existing.idestabelecimento === newEst.idestabelecimento)) {
+                mergedEstabelecimentos.push(newEst);
+              }
+            });
+            
+            await indexedDBService.saveOpcoes('estabelecimentos', mergedEstabelecimentos);
+          }
+          
+        } catch (apiError: any) {
+          console.warn('⚠️ API de estabelecimentos falhou, tentando cache...');
+          
+          const cachedEstabelecimentos = await indexedDBService.getOpcoes('estabelecimentos');
+          if (cachedEstabelecimentos && cachedEstabelecimentos.length > 0) {
+            estabelecimentosAtivos = cachedEstabelecimentos.filter((est: any) => {
+              let matches = true;
+              
+              if (searchTerm) {
+                const searchLower = searchTerm.toLowerCase();
+                matches = matches && (est.nome || '').toLowerCase().includes(searchLower);
+              }
+              
+              matches = matches && est.ativo === 'S';
+              return matches;
+            });
+            
+            console.log(`✅ Usando cache offline: ${estabelecimentosAtivos.length} estabelecimentos`);
+          } else {
+            // Handle 400 error case specifically
+            if (apiError.response && apiError.response.status === 400) {
+              setErrorUnidades("Digite pelo menos 3 caracteres para pesquisar");
+            } else {
+              // Other error handling
+              handleApiError(apiError);
+            }
+            return;
+          }
         }
-        
-        // Store all results in cache before filtering
-        estabelecimentosCache.current[cacheKey] = estabelecimentosAtivos;
-        
-        // Filtrar por estabelecimentos específicos se fornecidos
-        if (specificEstablishments && specificEstablishments.length > 0) {
-          estabelecimentosAtivos = estabelecimentosAtivos.filter(est => 
-            specificEstablishments.some(name => 
-              est.nome.toUpperCase().includes(name.toUpperCase())
-            )
-          );
-          console.log(`Filtered to ${estabelecimentosAtivos.length} specific establishments: ${specificEstablishments.join(', ')}`);
-        }
-        
-        setUnidadesNotificadoras(estabelecimentosAtivos);
-        console.log(`Encontrados ${estabelecimentosAtivos.length} estabelecimentos ativos`);
-        
-      } catch (apiError: any) {
-        // Handle 400 error case specifically
-        if (apiError.response && apiError.response.status === 400) {
-          setErrorUnidades("Digite pelo menos 3 caracteres para pesquisar");
-        } else {
-          // Other error handling
-          handleApiError(apiError);
-        }
-        return;
       }
+      
+      // Store all results in cache before filtering
+      estabelecimentosCache.current[cacheKey] = estabelecimentosAtivos;
+      
+      // Filtrar por estabelecimentos específicos se fornecidos
+      if (specificEstablishments && specificEstablishments.length > 0) {
+        estabelecimentosAtivos = estabelecimentosAtivos.filter(est => 
+          specificEstablishments.some(name => 
+            est.nome.toUpperCase().includes(name.toUpperCase())
+          )
+        );
+        console.log(`Filtered to ${estabelecimentosAtivos.length} specific establishments: ${specificEstablishments.join(', ')}`);
+      }
+      
+      setUnidadesNotificadoras(estabelecimentosAtivos);
+      console.log(`Encontrados ${estabelecimentosAtivos.length} estabelecimentos ativos`);
       
       setLoadingUnidades(false);
     } catch (error: any) {

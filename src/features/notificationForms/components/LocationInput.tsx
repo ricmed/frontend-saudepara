@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Search, X } from "lucide-react";
 import axios from 'axios';
+import indexedDBService from '@/services/indexedDB';
 
 // Função para remover acentos e converter para maiúsculas
 function normalizeText(text: string): string {
@@ -191,7 +192,6 @@ const LocationInput: React.FC<LocationInputProps> = ({
       dropdownRef.current.style.setProperty('max-height', '300px');
     }
   };
-
   // Improved function to fetch municipalities
   const fetchMunicipiosByEstado = async (estadoId: string) => {
     if (!apiEndpoint || !estadoId) return;
@@ -209,35 +209,63 @@ const LocationInput: React.FC<LocationInputProps> = ({
     setIsLoading(true);
     debugLog(`Fetching municipalities for state ID: ${estadoId}`);
     
-    const server = import.meta.env.VITE_API_SERVER || "";
-    const port = import.meta.env.VITE_API_PORT || "";
-    const baseUrl = server && port ? `${server}:${port}/` : "/";
-    
-    // Use only the primary parameter format most likely to work
-    const url = `${baseUrl}${apiEndpoint}?tipo_estado_idtipo_estado=${estadoId}&limit=1000`;
-    
+    let municipios: LocationOption[] = [];
+
     try {
-      debugLog(`Making request to: ${url}`);
-      const response = await axios.get(url, { signal });
-      
-      let municipios: LocationOption[] = [];
-      
-      if (response.data && Array.isArray(response.data)) {
-        municipios = response.data;
-      } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
-        municipios = response.data.data;
+      // ✅ VERIFICAR CACHE OFFLINE PRIMEIRO
+      if (!navigator.onLine) {
+        console.log('📱 Modo offline: buscando municípios em cache...');
+        
+        const allMunicipios = await indexedDBService.getOpcoes('municipios');
+        if (allMunicipios && allMunicipios.length > 0) {
+          // Filtrar municípios do estado selecionado
+          municipios = allMunicipios.filter((municipio: any) => 
+            Number(municipio.tipo_estado_idtipo_estado) === Number(estadoId)
+          );
+          console.log(`✅ Encontrados ${municipios.length} municípios offline para estado ${estadoId}`);
+        } else {
+          throw new Error('Nenhum município encontrado offline. Baixe os dados primeiro.');
+        }
+      } else {
+        // ✅ MODO ONLINE: usar API normal com fallback
+        try {
+          const server = import.meta.env.VITE_API_SERVER || "";
+          const port = import.meta.env.VITE_API_PORT || "";
+          const baseUrl = server && port ? `${server}:${port}/` : "/";
+          const url = `${baseUrl}${apiEndpoint}?tipo_estado_idtipo_estado=${estadoId}&limit=1000`;
+          
+          debugLog(`Making request to: ${url}`);
+          const response = await axios.get(url, { signal });
+          
+          if (response.data && Array.isArray(response.data)) {
+            municipios = response.data;
+          } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
+            municipios = response.data.data;
+          }
+          
+        } catch (apiError) {
+          console.warn('⚠️ API de municípios falhou, tentando cache...');
+          
+          const allMunicipios = await indexedDBService.getOpcoes('municipios');
+          if (allMunicipios && allMunicipios.length > 0) {
+            municipios = allMunicipios.filter((municipio: any) => 
+              Number(municipio.tipo_estado_idtipo_estado) === Number(estadoId)
+            );
+            console.log(`✅ Usando cache offline: ${municipios.length} municípios`);
+          } else {
+            throw apiError;
+          }
+        }
       }
-      
-      debugLog(`Success! Found ${municipios.length} municipalities`);
-      
+
       // Check if we're still processing the same state
       if (lastParentValueRef.current === estadoId) {
-        // Normalizar os municípios recebidos
         const normalizedMunicipios = normalizeOptions(municipios);
         setLocalOptions(normalizedMunicipios);
       } else {
         debugLog(`State changed during request, discarding results`);
       }
+      
     } catch (error: unknown) {
       // Don't show error if it was a cancellation
       if (
@@ -250,41 +278,8 @@ const LocationInput: React.FC<LocationInputProps> = ({
         return;
       }
       
-      const errorMessage = error && typeof error === 'object' && 'message' in error 
-        ? error.message as string
-        : 'Unknown error';
-      debugLog(`Error fetching municipalities: ${errorMessage}`, error);
-      
-      // Try with alternative parameter format only in case of failure
-      try {
-        const fallbackUrl = `${baseUrl}${apiEndpoint}?estado_id=${estadoId}&limit=1000`;
-        debugLog(`Trying alternative format: ${fallbackUrl}`);
-        
-        const fallbackResponse = await axios.get(fallbackUrl, { signal });
-        let fallbackMunicipios: LocationOption[] = [];
-        
-        if (fallbackResponse.data && Array.isArray(fallbackResponse.data)) {
-          fallbackMunicipios = fallbackResponse.data;
-        } else if (fallbackResponse.data?.data && Array.isArray(fallbackResponse.data.data)) {
-          fallbackMunicipios = fallbackResponse.data.data;
-        }
-        
-        if (fallbackMunicipios.length > 0) {
-          debugLog(`Fallback successful! Found ${fallbackMunicipios.length} municipalities`);
-          // Normalizar os municípios recebidos pelo fallback
-          const normalizedMunicipios = normalizeOptions(fallbackMunicipios);
-          setLocalOptions(normalizedMunicipios);
-        } else {
-          debugLog(`Fallback failed - no municipalities found`);
-          setLocalOptions([]);
-        }
-      } catch (fallbackError: unknown) {
-        const errorMessage = fallbackError && typeof fallbackError === 'object' && 'message' in fallbackError 
-          ? fallbackError.message as string
-          : 'Unknown error';
-        debugLog(`Fallback error: ${errorMessage}`);
-        setLocalOptions([]);
-      }
+      debugLog(`Error fetching municipalities: ${error}`, error);
+      setLocalOptions([]);
     } finally {
       // Only update state if we're still processing the same state
       if (lastParentValueRef.current === estadoId) {
@@ -292,7 +287,6 @@ const LocationInput: React.FC<LocationInputProps> = ({
       }
     }
   };
-
   // Fetch all options (for countries or states)
   const fetchOptions = async (query = "") => {
     if (!apiEndpoint) return;
@@ -307,43 +301,98 @@ const LocationInput: React.FC<LocationInputProps> = ({
     setIsLoading(true);
     debugLog(`Fetching all ${name} options`);
     
-    const server = import.meta.env.VITE_API_SERVER || "";
-    const port = import.meta.env.VITE_API_PORT || "";
-    const baseUrl = server && port ? `${server}:${port}/` : "/";
-    
+    let options: LocationOption[] = [];
+
     try {
-      // For search with term or general search
-      let url = `${baseUrl}${apiEndpoint}`;
-      
-      // Use a larger limit for countries to ensure all are loaded
-      const limit = name === "paisProcedencia" ? 300 : 1000;
-      
-      if (query) {
-        // Normalizar a consulta antes de enviar para a API
-        const normalizedQuery = normalizeText(query);
-        url += `?descricao=${encodeURIComponent(normalizedQuery)}&limit=${limit}`;
+      // ✅ VERIFICAR CACHE OFFLINE PRIMEIRO
+      if (!navigator.onLine) {
+        console.log(`📱 [${name}] Modo offline: buscando em cache...`);
+        
+        const cacheKey = name === 'uf' ? 'estados' : 
+                        name === 'paisProcedencia' ? 'paises' :
+                        'municipios';
+        const cachedOptions = await indexedDBService.getOpcoes(cacheKey);
+        
+        if (cachedOptions && cachedOptions.length > 0) {
+          options = cachedOptions;
+          
+          // Filtrar por query se necessário
+          if (query) {
+            const normalizedQuery = normalizeText(query);
+            options = options.filter((option: any) => 
+              normalizeText(option.descricao || option.nome || '').includes(normalizedQuery)
+            );
+          }
+          
+          console.log(`✅ [${name}] ${options.length} registros encontrados em cache`);
+        } else {
+          throw new Error(`Nenhum dado encontrado offline para ${name}. Baixe os dados primeiro.`);
+        }
       } else {
-        url += `?limit=${limit}`;
+        // ✅ MODO ONLINE: usar API normal com fallback
+        try {
+          const server = import.meta.env.VITE_API_SERVER || "";
+          const port = import.meta.env.VITE_API_PORT || "";
+          const baseUrl = server && port ? `${server}:${port}/` : "/";
+          
+          let url = `${baseUrl}${apiEndpoint}`;
+          const limit = name === "paisProcedencia" ? 300 : 1000;
+          
+          if (query) {
+            const normalizedQuery = normalizeText(query);
+            url += `?descricao=${encodeURIComponent(normalizedQuery)}&limit=${limit}`;
+          } else {
+            url += `?limit=${limit}`;
+          }
+          
+          debugLog(`Making request: ${url}`);
+          const response = await axios.get(url, { signal });
+          
+          if (response.data && Array.isArray(response.data)) {
+            options = response.data;
+          } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
+            options = response.data.data;
+          }
+          
+          // ✅ SALVAR NO CACHE PARA USO FUTURO
+          if (!query) { // Só salva busca geral, não buscas específicas
+            const cacheKey = name === 'uf' ? 'estados' : 
+                            name === 'paisProcedencia' ? 'paises' :
+                            'municipios';
+            await indexedDBService.saveOpcoes(cacheKey, options);
+          }
+          
+        } catch (apiError) {
+          console.warn(`⚠️ [${name}] API falhou, tentando cache...`);
+          
+          const cacheKey = name === 'uf' ? 'estados' : 
+                          name === 'paisProcedencia' ? 'paises' :
+                          'municipios';
+          const cachedOptions = await indexedDBService.getOpcoes(cacheKey);
+          
+          if (cachedOptions && cachedOptions.length > 0) {
+            options = cachedOptions;
+            
+            // Filtrar por query se necessário
+            if (query) {
+              const normalizedQuery = normalizeText(query);
+              options = options.filter((option: any) => 
+                normalizeText(option.descricao || option.nome || '').includes(normalizedQuery)
+              );
+            }
+            
+            console.log(`✅ [${name}] Usando cache offline: ${options.length} registros`);
+          } else {
+            throw apiError;
+          }
+        }
       }
-      
-      debugLog(`Making request: ${url}`);
-      
-      const response = await axios.get(url, { signal });
-      
-      let options: LocationOption[] = [];
-      
-      if (response.data && Array.isArray(response.data)) {
-        options = response.data;
-      } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
-        options = response.data.data;
-      }
-      
+
       debugLog(`Received ${options.length} results`);
-      // Normalizar as opções recebidas
       const normalizedOptions = normalizeOptions(options);
       setLocalOptions(normalizedOptions);
+      
     } catch (error: unknown) {
-      // Don't show error if it was a cancellation
       if (
         error && 
         typeof error === 'object' && 

@@ -2,13 +2,14 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Search, X } from "lucide-react";
 import axios from 'axios';
+import indexedDBService from '@/services/indexedDB'; // Import do IndexedDB
 
 // Função para remover acentos e converter para maiúsculas
 function normalizeText(text: string): string {
   if (!text) return "";
-  // Remove acentos e converte para caixa alta
-  return text.normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")  // Remove acentos
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toUpperCase();
 }
 
@@ -43,11 +44,11 @@ const BairroInput: React.FC<BairroInputProps> = ({
   const [options, setOptions] = useState<Bairro[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  
-  // Reference for fetch abort controller
+
+  // Reference para AbortController das requisições API
   const abortControllerRef = useRef<AbortController | null>(null);
-  
-  // Para armazenar a posição atual de scroll
+
+  // Armazena posição de scroll para posicionar dropdown corretamente
   const [scrollPosition, setScrollPosition] = useState({ x: 0, y: 0 });
 
   const debugLog = (message: string, data?: any) => {
@@ -60,230 +61,187 @@ const BairroInput: React.FC<BairroInputProps> = ({
     }
   };
 
-  // Fetch bairros from API
+  // ─────────────────────────────────────────────────────────────────
+  // 1. Função para carregar bairros → usa IndexedDB quando offline
+  // ─────────────────────────────────────────────────────────────────
   const fetchBairros = async (query = "") => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
-    
-    // Create new controller for this request
     abortControllerRef.current = new AbortController();
     const { signal } = abortControllerRef.current;
-    
-    setIsLoading(true);
-    debugLog(`Buscando bairros${query ? ` com filtro: ${query}` : ''}`);
-    
-    const server = import.meta.env.VITE_API_SERVER || "";
-    const port = import.meta.env.VITE_API_PORT || "";
-    const baseUrl = server && port ? `${server}:${port}/` : "/";
-    
-    try {
-      let url = `${baseUrl}api/tipo-bairro`;
-      
-      if (query && query.length >= 3) {
-        // Normalizar a consulta antes de enviar para a API
-        const normalizedQuery = normalizeText(query);
-        url += `/search?descricao=${encodeURIComponent(normalizedQuery)}&limit=100`;
-      } else {
-        url += `?limit=100`;
-      }
-      
-      debugLog(`Requisição: ${url}`);
-      
-      const response = await axios.get(url, { signal });
-      
-      let bairros: Bairro[] = [];
-      
-      if (response.data && Array.isArray(response.data)) {
-        bairros = response.data;
-      } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
-        bairros = response.data.data;
-      }
-      
-      // Normalizar as descrições para caixa alta e sem acentos
-      const normalizedBairros = bairros.map(bairro => ({
-        ...bairro,
-        descricao: normalizeText(bairro.descricao)
-      }));
-      
-      // Ordenar por descrição
-      const sortedBairros = normalizedBairros.sort((a, b) => 
-        a.descricao.localeCompare(b.descricao, 'pt-BR')
-      );
-      
-      debugLog(`Recebidos ${sortedBairros.length} bairros`);
-      setOptions(sortedBairros);
-    } catch (error: unknown) {
-      // Ignore cancelations
-      if (
-        error && 
-        typeof error === 'object' && 
-        'name' in error && 
-        (error.name === 'CanceledError' || error.name === 'AbortError')
-      ) {
-        debugLog(`Requisição cancelada`);
-        return;
-      }
-      
-      debugLog('Erro ao buscar bairros', error);
-      setOptions([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
-  // Fetch specific bairro by ID
-  const fetchBairroById = async (id: string) => {
+    setIsLoading(true);
+    debugLog(`Buscando bairros${query ? ` com filtro: "${query}"` : ''}`);
+
+    const estaOffline = !navigator.onLine;
+
+    if (estaOffline) {
+      debugLog("Modo offline: buscando bairros no cache...");
+      const todosBairros: Bairro[] = (await indexedDBService.getOpcoes('bairros')) || [];
+      let filtrados = todosBairros;
+      if (query && query.length >= 3) {
+        const normalizedSearch = normalizeText(query);
+        filtrados = todosBairros.filter(bairro =>
+          bairro.descricao.includes(normalizedSearch)
+        );
+      }
+      setOptions(sortAndNormalize(filtrados));
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      setIsLoading(true);
       const server = import.meta.env.VITE_API_SERVER || "";
       const port = import.meta.env.VITE_API_PORT || "";
       const baseUrl = server && port ? `${server}:${port}/` : "/";
-      
-      const url = `${baseUrl}api/tipo-bairro/${id}`;
-      debugLog(`Buscando bairro por ID: ${url}`);
-      
-      const response = await axios.get(url);
-      
-      if (response.data && response.data.idtipo_bairro) {
-        // Normalizar a descrição do bairro
-        const bairro = {
-          ...response.data,
-          descricao: normalizeText(response.data.descricao)
-        };
-        
-        debugLog(`Bairro encontrado: ${bairro.descricao}`);
-        return bairro;
+
+      let url = `${baseUrl}api/tipo-bairro?limit=100`;
+      if (query && query.length >= 3) {
+        const normalizedQuery = normalizeText(query);
+        url = `${baseUrl}api/tipo-bairro/search?descricao=${encodeURIComponent(normalizedQuery)}&limit=100`;
       }
-      
-      debugLog(`Bairro com ID ${id} não encontrado`);
-      return null;
-    } catch (error: unknown) {
-      debugLog(`Erro ao buscar bairro por ID: ${id}`, error);
-      return null;
+
+      debugLog(`Requisição à API: ${url}`);
+      const response = await axios.get(url, { signal });
+
+      let bairrosAPI: Bairro[] = [];
+      if (response.data && Array.isArray(response.data)) {
+        bairrosAPI = response.data;
+      } else if (response.data?.data && Array.isArray(response.data.data)) {
+        bairrosAPI = response.data.data;
+      }
+
+      const normalizedBairros = sortAndNormalize(bairrosAPI);
+      await indexedDBService.saveOpcoes('bairros', normalizedBairros);
+
+      debugLog(`Recebidos ${normalizedBairros.length} bairros da API, salvos no cache`);
+      setOptions(normalizedBairros);
+    } catch (error: any) {
+      if (error.name === 'CanceledError' || error.name === 'AbortError') {
+        debugLog("Requisição cancelada");
+        return;
+      }
+      debugLog("Erro na API, tentando fallback no cache", error);
+      const todosBairros: Bairro[] = (await indexedDBService.getOpcoes('bairros')) || [];
+      setOptions(sortAndNormalize(todosBairros));
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Função para atualizar a posição do dropdown
-  const updateDropdownPosition = () => {
-    if (!inputRef.current || !dropdownRef.current) return;
-    
-    const rect = inputRef.current.getBoundingClientRect();
-    const viewportHeight = window.innerHeight;
-    const viewportWidth = window.innerWidth;
-    
-    // Verificar se estamos em dispositivo móvel
-    const isMobile = viewportWidth <= 768;
-    
-    // Em dispositivos móveis, posicionar em relação à viewport
-    if (isMobile) {
-      // Calcular espaço disponível abaixo do input
-      const spaceBelow = viewportHeight - rect.bottom;
-      // Altura máxima para o dropdown
-      const maxDropdownHeight = Math.min(300, viewportHeight * 0.6);
-      
-      // Garantir que o dropdown não exceda a largura da tela
-      const leftPosition = Math.max(0, rect.left);
-      const adjustedWidth = Math.min(rect.width, viewportWidth - leftPosition);
-      
-      // Se não houver espaço suficiente abaixo, posicionar acima se possível
-      if (spaceBelow < 150 && rect.top > 150) {
-        dropdownRef.current.style.setProperty('bottom', `${viewportHeight - rect.top}px`);
-        dropdownRef.current.style.setProperty('top', 'auto');
-        dropdownRef.current.style.setProperty('max-height', `${Math.min(rect.top - 10, maxDropdownHeight)}px`);
-      } else {
-        // Posicionar abaixo com altura máxima apropriada
-        dropdownRef.current.style.setProperty('top', `${rect.bottom}px`);
-        dropdownRef.current.style.setProperty('bottom', 'auto');
-        dropdownRef.current.style.setProperty('max-height', `${Math.min(spaceBelow - 10, maxDropdownHeight)}px`);
+  // ─────────────────────────────────────────────────────────────────
+  // 2. Função auxiliar para ordenação e normalização de texto
+  // ─────────────────────────────────────────────────────────────────
+  function sortAndNormalize(arr: Bairro[]): Bairro[] {
+    const normalized = arr.map(bairro => ({
+      ...bairro,
+      descricao: normalizeText(bairro.descricao)
+    }));
+    return normalized.sort((a, b) =>
+      a.descricao.localeCompare(b.descricao, 'pt-BR')
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // 3. Busca de um único bairro por ID → tenta cache primeiro, depois API
+  // ─────────────────────────────────────────────────────────────────
+  const fetchBairroById = async (id: string): Promise<Bairro | null> => {
+    setIsLoading(true);
+    debugLog(`Buscando bairro por ID: ${id} (cache primeiro)`);
+
+    const todosBairros: Bairro[] = (await indexedDBService.getOpcoes('bairros')) || [];
+    const encontradoCache = todosBairros.find(b => b.idtipo_bairro.toString() === id);
+    if (encontradoCache) {
+      debugLog(`Encontrado no cache: ${encontradoCache.descricao}`);
+      setIsLoading(false);
+      return encontradoCache;
+    }
+
+    if (!navigator.onLine) {
+      setIsLoading(false);
+      return null;
+    }
+
+    try {
+      const server = import.meta.env.VITE_API_SERVER || "";
+      const port = import.meta.env.VITE_API_PORT || "";
+      const baseUrl = server && port ? `${server}:${port}/` : "/";
+      const url = `${baseUrl}api/tipo-bairro/${id}`;
+
+      debugLog(`Requisição API por ID: ${url}`);
+      const response = await axios.get(url);
+
+      if (response.data?.idtipo_bairro) {
+        const normalizado: Bairro = {
+          ...response.data,
+          descricao: normalizeText(response.data.descricao)
+        };
+        const jaTemCache = (await indexedDBService.getOpcoes('bairros')) || [];
+        await indexedDBService.saveOpcoes(
+          'bairros',
+          [...jaTemCache, normalizado].sort((a, b) =>
+            a.descricao.localeCompare(b.descricao, 'pt-BR')
+          )
+        );
+        setIsLoading(false);
+        return normalizado;
       }
-      
-      // Definir posição horizontal - garantir que esteja visível na tela
-      dropdownRef.current.style.setProperty('left', `${leftPosition}px`);
-      dropdownRef.current.style.setProperty('width', `${adjustedWidth}px`);
-      
-      // Usar posicionamento fixo em dispositivos móveis para evitar problemas com scroll
-      dropdownRef.current.style.setProperty('position', 'fixed');
-      
-      // Garantir que o z-index seja alto o suficiente
-      dropdownRef.current.style.setProperty('z-index', '9999');
-      
-      // Adicionar animação sutil para UX mais suave
-      dropdownRef.current.style.setProperty('transition', 'opacity 0.2s, transform 0.2s');
-      dropdownRef.current.style.setProperty('opacity', '1');
-      dropdownRef.current.style.setProperty('transform', 'translateY(0)');
-    } else {
-      // Em desktop, usar posicionamento absoluto em relação ao documento
-      dropdownRef.current.style.setProperty('position', 'absolute');
-      dropdownRef.current.style.setProperty('top', `${rect.bottom + window.scrollY}px`);
-      dropdownRef.current.style.setProperty('left', `${rect.left + window.scrollX}px`);
-      dropdownRef.current.style.setProperty('width', `${rect.width}px`);
-      dropdownRef.current.style.setProperty('max-height', '300px');
+      setIsLoading(false);
+      return null;
+    } catch (error) {
+      debugLog(`Erro API ao buscar bairro por ID: ${id}`, error);
+      setIsLoading(false);
+      return null;
     }
   };
 
-  // Filter options based on search term
-  const filteredOptions = useMemo(() => {
-    // Se não há termo de busca, mostrar todos
-    if (!searchQuery) return options;
-    
-    // Normalizar o termo de pesquisa
-    const normalizedSearch = normalizeText(searchQuery);
-    return options.filter(option => option.descricao.includes(normalizedSearch));
-  }, [options, searchQuery]);
-
-  // Load selected option if there's a value
+  // ─────────────────────────────────────────────────────────────────
+  // 4. Popula `options` e seleciona valor existente (on mount / value change)
+  // ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     const loadSelectedOption = async () => {
       if (value) {
-        // First try to find in current options
         const foundOption = options.find(opt => opt.idtipo_bairro.toString() === value);
-        
         if (foundOption) {
-          debugLog(`Opção encontrada localmente: ${foundOption.descricao}`);
+          debugLog(`Opção encontrada localmente (options): ${foundOption.descricao}`);
           setSelectedOption(foundOption);
           setDisplayValue(foundOption.descricao);
+          return;
+        }
+        debugLog(`Buscando bairro por ID porque não estava em options: ${value}`);
+        const option = await fetchBairroById(value);
+        if (option) {
+          setSelectedOption(option);
+          setDisplayValue(option.descricao);
         } else {
-          // If not found locally, fetch from API
-          debugLog(`Buscando bairro por ID na API: ${value}`);
-          const option = await fetchBairroById(value);
-          
-          if (option) {
-            setSelectedOption(option);
-            setDisplayValue(option.descricao);
-          } else {
-            // If also failed on API, clear selection
-            setSelectedOption(null);
-            setDisplayValue("");
-          }
+          setSelectedOption(null);
+          setDisplayValue("");
         }
       } else if (value === "") {
-        // Clear selection when value is explicitly empty
         setSelectedOption(null);
         setDisplayValue("");
       }
     };
-    
     loadSelectedOption();
   }, [value, options]);
 
-  // Handler to close dropdown when clicking outside
+  // ─────────────────────────────────────────────────────────────────
+  // 5. Fecha dropdown quando clica fora
+  // ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
-        inputRef.current && 
+        inputRef.current &&
         !inputRef.current.contains(event.target as Node) &&
-        dropdownRef.current && 
+        dropdownRef.current &&
         !dropdownRef.current.contains(event.target as Node)
       ) {
         closeDropdown();
       }
     };
-    
+
     if (isDropdownOpen) {
-      // Pequeno timeout para evitar que o mesmo clique que abriu o dropdown o feche imediatamente
       setTimeout(() => {
         document.addEventListener("mousedown", handleClickOutside);
       }, 100);
@@ -291,43 +249,43 @@ const BairroInput: React.FC<BairroInputProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isDropdownOpen]);
 
-  // Fechar dropdown com segurança
   const closeDropdown = () => {
     setIsDropdownOpen(false);
     setSearchQuery("");
   };
 
-  // Update dropdown position when opened or window is resized
+  // ─────────────────────────────────────────────────────────────────
+  // 6. Quando abre o dropdown, inicia carregamento (Offline → API)
+  // ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (isDropdownOpen) {
       updateDropdownPosition();
-      // Buscar dados quando o dropdown é aberto
-      fetchBairros(searchQuery);
-      
-      // Monitorar redimensionamento da janela
+      fetchBairros("");
+
       window.addEventListener('resize', updateDropdownPosition);
-      // Monitorar scroll
       window.addEventListener('scroll', updateDropdownPosition);
-      
       return () => {
         window.removeEventListener('resize', updateDropdownPosition);
         window.removeEventListener('scroll', updateDropdownPosition);
       };
     }
-  }, [isDropdownOpen, searchQuery]);
-  
-  // Debounce para pesquisa - apenas pesquisar com 3+ caracteres
+  }, [isDropdownOpen]);
+
+  // ─────────────────────────────────────────────────────────────────
+  // 7. Debounce para pesquisa: só pesquisa quando ≥ 3 caracteres
+  // ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (isDropdownOpen && searchQuery.length >= 3) {
       const timer = setTimeout(() => {
         fetchBairros(searchQuery);
       }, 300);
-      
       return () => clearTimeout(timer);
     }
   }, [searchQuery, isDropdownOpen]);
 
-  // Cancel pending requests when unmounting component
+  // ─────────────────────────────────────────────────────────────────
+  // 8. Cancela requisição pendente ao desmontar componente
+  // ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
@@ -336,30 +294,25 @@ const BairroInput: React.FC<BairroInputProps> = ({
     };
   }, []);
 
+  // ─────────────────────────────────────────────────────────────────
+  // 9. Manipuladores de UI
+  // ─────────────────────────────────────────────────────────────────
   const handleFocus = () => {
     if (disabled) return;
-    
-    // Armazenar posição atual de scroll
     setScrollPosition({
       x: window.scrollX,
       y: window.scrollY
     });
-    
-    // Limpar a consulta de pesquisa ao focar
     setSearchQuery("");
-    
-    // Abrir dropdown
     setIsDropdownOpen(true);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const query = e.target.value;
-    setSearchQuery(query);
+    setSearchQuery(e.target.value);
   };
 
   const handleOptionSelect = (option: Bairro) => {
     debugLog(`Opção selecionada: ${option.descricao} (${option.idtipo_bairro})`);
-    
     setSelectedOption(option);
     setDisplayValue(option.descricao);
     setSearchQuery("");
@@ -368,18 +321,71 @@ const BairroInput: React.FC<BairroInputProps> = ({
   };
 
   const handleClear = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent opening dropdown when clearing
+    e.stopPropagation();
     debugLog('Seleção limpa');
     setDisplayValue("");
     setSearchQuery("");
     setSelectedOption(null);
-    onChange(""); // Ensure returns an empty string
+    onChange("");
   };
 
-  // Render dropdown in a portal outside DOM hierarchy
+  // ─────────────────────────────────────────────────────────────────
+  // 10. Posiciona o dropdown (considerando mobile/desktop)
+  // ─────────────────────────────────────────────────────────────────
+  const updateDropdownPosition = () => {
+    if (!inputRef.current || !dropdownRef.current) return;
+    const rect = inputRef.current.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const isMobile = viewportWidth <= 768;
+
+    if (isMobile) {
+      const spaceBelow = viewportHeight - rect.bottom;
+      const maxDropdownHeight = Math.min(300, viewportHeight * 0.6);
+      const leftPosition = Math.max(0, rect.left);
+      const adjustedWidth = Math.min(rect.width, viewportWidth - leftPosition);
+
+      if (spaceBelow < 150 && rect.top > 150) {
+        dropdownRef.current.style.setProperty('bottom', `${viewportHeight - rect.top}px`);
+        dropdownRef.current.style.setProperty('top', 'auto');
+        dropdownRef.current.style.setProperty('max-height', `${Math.min(rect.top - 10, maxDropdownHeight)}px`);
+      } else {
+        dropdownRef.current.style.setProperty('top', `${rect.bottom}px`);
+        dropdownRef.current.style.setProperty('bottom', 'auto');
+        dropdownRef.current.style.setProperty('max-height', `${Math.min(spaceBelow - 10, maxDropdownHeight)}px`);
+      }
+
+      dropdownRef.current.style.setProperty('left', `${leftPosition}px`);
+      dropdownRef.current.style.setProperty('width', `${adjustedWidth}px`);
+      dropdownRef.current.style.setProperty('position', 'fixed');
+      dropdownRef.current.style.setProperty('z-index', '9999');
+      dropdownRef.current.style.setProperty('transition', 'opacity 0.2s, transform 0.2s');
+      dropdownRef.current.style.setProperty('opacity', '1');
+      dropdownRef.current.style.setProperty('transform', 'translateY(0)');
+    } else {
+      dropdownRef.current.style.setProperty('position', 'absolute');
+      dropdownRef.current.style.setProperty('top', `${rect.bottom + window.scrollY}px`);
+      dropdownRef.current.style.setProperty('left', `${rect.left + window.scrollX}px`);
+      dropdownRef.current.style.setProperty('width', `${rect.width}px`);
+      dropdownRef.current.style.setProperty('max-height', '300px');
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────
+  // 11. Filtra opções em memória (já normalizadas) conforme o termo
+  // ─────────────────────────────────────────────────────────────────
+  const filteredOptions = useMemo(() => {
+    if (!searchQuery) return options;
+    const normalizedSearch = normalizeText(searchQuery);
+    return options.filter(option => option.descricao.includes(normalizedSearch));
+  }, [options, searchQuery]);
+
+  // ─────────────────────────────────────────────────────────────────
+  // 12. Renderiza o dropdown em portal
+  // ─────────────────────────────────────────────────────────────────
   const renderDropdown = () => {
     if (!isDropdownOpen) return null;
-    
+
     return createPortal(
       <div 
         ref={dropdownRef}
@@ -405,6 +411,7 @@ const BairroInput: React.FC<BairroInputProps> = ({
               <button 
                 className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 onClick={() => setSearchQuery("")}
+                type="button"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -426,7 +433,9 @@ const BairroInput: React.FC<BairroInputProps> = ({
                   key={option.idtipo_bairro}
                   type="button"
                   className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 ${
-                    selectedOption?.idtipo_bairro === option.idtipo_bairro ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                    selectedOption?.idtipo_bairro === option.idtipo_bairro 
+                      ? 'bg-blue-50 text-blue-700' 
+                      : 'text-gray-700'
                   }`}
                   onClick={() => handleOptionSelect(option)}
                 >
@@ -446,6 +455,7 @@ const BairroInput: React.FC<BairroInputProps> = ({
           <button
             className="w-full py-2 text-sm text-center bg-gray-100 hover:bg-gray-200 rounded-md"
             onClick={closeDropdown}
+            type="button"
           >
             Fechar
           </button>
@@ -464,9 +474,14 @@ const BairroInput: React.FC<BairroInputProps> = ({
           type="text"
           name="bairro"
           placeholder={isLoading ? "Carregando..." : placeholder}
-          className={`w-full p-3 pl-3 pr-10 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none ${disabled ? 'opacity-60 cursor-not-allowed bg-gray-50' : ''}`}
+          className={`
+            w-full p-3 pl-3 pr-10 border border-gray-200 rounded-lg text-sm
+            bg-white transition-colors hover:border-blue-400 focus:border-blue-500
+            focus:ring-2 focus:ring-blue-200 outline-none
+            ${disabled ? 'opacity-60 cursor-not-allowed bg-gray-50' : ''}
+          `}
           value={displayValue}
-          readOnly={true}  // Make the main input read-only
+          readOnly={true}
           onFocus={handleFocus}
           onClick={handleFocus}
           disabled={disabled || isLoading}
@@ -488,7 +503,7 @@ const BairroInput: React.FC<BairroInputProps> = ({
         </div>
       </div>
       
-      {/* Render dropdown using portal */}
+      {/* Render dropdown usando portal */}
       {renderDropdown()}
     </div>
   );

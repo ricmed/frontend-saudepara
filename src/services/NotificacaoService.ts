@@ -32,7 +32,7 @@ export interface MunicipioOption extends BaseOption {
 }
 
 export interface BairroOption extends BaseOption {
-  idtipo_bairro: number;  // Corrigido de idbairro para idtipo_bairro
+  idtipo_bairro: number; 
 }
 
 export interface GeneroOption extends BaseOption {
@@ -212,38 +212,59 @@ export const NotificacaoService = {
       ] as unknown as T[];
     }
   },
-
   // Métodos para buscar cada tipo de opção
   async getEventoOptions(): Promise<EventoOption[]> {
-    return this.fetchOptions<EventoOption>(TIPO_ENDPOINTS.EVENTO);
+    return NotificacaoService.fetchOptions<EventoOption>(TIPO_ENDPOINTS.EVENTO);
   },
 
   async getPublicoOptions(): Promise<PublicoOption[]> {
-    return this.fetchOptions<PublicoOption>(TIPO_ENDPOINTS.PUBLICO);
+    return NotificacaoService.fetchOptions<PublicoOption>(TIPO_ENDPOINTS.PUBLICO);
   },
 
   async getPaisOptions(): Promise<PaisOption[]> {
-    return this.fetchOptions<PaisOption>(TIPO_ENDPOINTS.PAIS, 300); // Especificar limite de 300
+    return NotificacaoService.fetchOptions<PaisOption>(TIPO_ENDPOINTS.PAIS, 300); // Especificar limite de 300
   },
 
   async getEstadoOptions(): Promise<EstadoOption[]> {
-    return this.fetchOptions<EstadoOption>(TIPO_ENDPOINTS.ESTADO);
+    return NotificacaoService.fetchOptions<EstadoOption>(TIPO_ENDPOINTS.ESTADO);
   },
-
   async getMunicipioOptions(estadoId?: number): Promise<MunicipioOption[]> {
+    // Se não tiver estadoId, baixar TODOS os municípios para uso offline
     if (!estadoId) {
-      return [];
+      try {
+        const endpoint = `${TIPO_ENDPOINTS.MUNICIPIO}?limit=10000`;
+        const response = await axios.get(endpoint);
+        
+        let municipios = [];
+        if (Array.isArray(response.data)) {
+          municipios = response.data;
+        } else if (response.data?.data && Array.isArray(response.data.data)) {
+          municipios = response.data.data;
+        } else if (response.data) {
+          const possibleData = response.data.data || response.data.items;
+          if (Array.isArray(possibleData)) {
+            municipios = possibleData;
+          }
+        }
+        
+        console.log(`✅ Baixados ${municipios.length} municípios (todos os estados)`);
+        return municipios;
+      } catch (error) {
+        console.error('Erro ao baixar todos os municípios:', error);
+        return [];
+      }
     }
     
+    // Resto do código existente para busca por estado específico
     try {
       // Implementar um timeout e cancelamento de requisições anteriores
       // para evitar race conditions
-      if (this.municipioAbortController) {
-        this.municipioAbortController.abort();
+      if (NotificacaoService.municipioAbortController) {
+        NotificacaoService.municipioAbortController.abort();
       }
       
-      this.municipioAbortController = new AbortController();
-      const signal = this.municipioAbortController.signal;
+      NotificacaoService.municipioAbortController = new AbortController();
+      const signal = NotificacaoService.municipioAbortController.signal;
       
       // Garantir que o estadoId seja um número
       const idEstado = Number(estadoId);
@@ -297,29 +318,26 @@ export const NotificacaoService = {
       return [];
     } finally {
       // Limpar o controlador após a conclusão
-      this.municipioAbortController = null;
+      NotificacaoService.municipioAbortController = null;
     }
-  },
-
-  async getBairroOptions(): Promise<BairroOption[]> {
-    return this.fetchOptions<BairroOption>(TIPO_ENDPOINTS.BAIRRO, 100);
+  },  async getBairroOptions(): Promise<BairroOption[]> {
+    return NotificacaoService.fetchOptions<BairroOption>(TIPO_ENDPOINTS.BAIRRO, 1000);
   },
 
   async getGeneroOptions(): Promise<GeneroOption[]> {
-    return this.fetchOptions<GeneroOption>(TIPO_ENDPOINTS.GENERO);
+    return NotificacaoService.fetchOptions<GeneroOption>(TIPO_ENDPOINTS.GENERO);
   },
 
   async getRacaOptions(): Promise<RacaOption[]> {
-    return this.fetchOptions<RacaOption>(TIPO_ENDPOINTS.RACA);
+    return NotificacaoService.fetchOptions<RacaOption>(TIPO_ENDPOINTS.RACA);
   },
 
   async getEscolaridadeOptions(): Promise<EscolaridadeOption[]> {
-    return this.fetchOptions<EscolaridadeOption>(TIPO_ENDPOINTS.ESCOLARIDADE);
+    return NotificacaoService.fetchOptions<EscolaridadeOption>(TIPO_ENDPOINTS.ESCOLARIDADE);
   },
-
   async getCboOptions(): Promise<BaseOption[]> {
     try {
-      const response = await axios.get(`${server}:${port}/api/tipo-cbo?limit=10000`);
+      const response = await axios.get(`${server}:${port}/api/tipo-cbo?limit=20000`);
       
       // Verificar diferentes formatos de resposta
       const data = response.data?.data || response.data || [];
@@ -335,29 +353,26 @@ export const NotificacaoService = {
       return [];
     }
   },
-
   async getAtendimentoOptions(): Promise<AtendimentoOption[]> {
-    return this.fetchOptions<AtendimentoOption>(TIPO_ENDPOINTS.ATENDIMENTO);
+    return NotificacaoService.fetchOptions<AtendimentoOption>(TIPO_ENDPOINTS.ATENDIMENTO);
   },
-
   async getSintomaOptions(): Promise<SintomaOption[]> {
-    return this.fetchOptions<SintomaOption>(TIPO_ENDPOINTS.SINTOMA, 200);
+    return NotificacaoService.fetchOptions<SintomaOption>(TIPO_ENDPOINTS.SINTOMA, 500);
   },
 
   async getHipoteseDiagOptions(): Promise<HipoteseDiagOption[]> {
-    return this.fetchOptions<HipoteseDiagOption>(TIPO_ENDPOINTS.HIPOTESE_DIAG);
+    return NotificacaoService.fetchOptions<HipoteseDiagOption>(TIPO_ENDPOINTS.HIPOTESE_DIAG, 200);
   },
 
   async getTraumaOptions(): Promise<TraumaOption[]> {
-    return this.fetchOptions<TraumaOption>(TIPO_ENDPOINTS.TRAUMA);
+    return NotificacaoService.fetchOptions<TraumaOption>(TIPO_ENDPOINTS.TRAUMA);
   },
-
   async getEstabelecimentoOptions(): Promise<EstabelecimentoOption[]> {
-    return this.fetchOptions<EstabelecimentoOption>(TIPO_ENDPOINTS.ESTABELECIMENTO);
-  },
+  return NotificacaoService.fetchOptions<EstabelecimentoOption>(TIPO_ENDPOINTS.ESTABELECIMENTO, 11000);
+},
 
   async getEncerramentoOptions(): Promise<EncerramentoOption[]> {
-    return this.fetchOptions<EncerramentoOption>(TIPO_ENDPOINTS.ENCERRAMENTO);
+    return NotificacaoService.fetchOptions<EncerramentoOption>(TIPO_ENDPOINTS.ENCERRAMENTO);
   },
 
   // Obter notificação por ID
