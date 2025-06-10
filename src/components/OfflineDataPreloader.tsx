@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, Check, AlertCircle, Wifi, Database, Loader } from 'lucide-react';
+import { Download, Check, AlertCircle, Wifi, Database, Loader, X, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { NotificacaoService } from '@/services/NotificacaoService';
 import indexedDBService from '@/services/indexedDB';
@@ -16,6 +16,7 @@ interface DataItem {
   loaded: boolean;
   loading: boolean;
   error?: string;
+  recordCount?: number;
 }
 
 const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({ 
@@ -25,7 +26,9 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [totalSize, setTotalSize] = useState(0);  const [dataItems, setDataItems] = useState<DataItem[]>([
+  const [totalSize, setTotalSize] = useState(0);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [dataItems, setDataItems] = useState<DataItem[]>([
     { key: 'eventos', name: 'Tipos de Evento', fetchFn: NotificacaoService.getEventoOptions, loaded: false, loading: false },
     { key: 'publicos', name: 'Tipos de Público', fetchFn: NotificacaoService.getPublicoOptions, loaded: false, loading: false },
     { key: 'paises', name: 'Países', fetchFn: NotificacaoService.getPaisOptions, loaded: false, loading: false },
@@ -34,7 +37,8 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
     { key: 'bairros', name: 'Bairros', fetchFn: NotificacaoService.getBairroOptions, loaded: false, loading: false },
     { key: 'generos', name: 'Gêneros', fetchFn: NotificacaoService.getGeneroOptions, loaded: false, loading: false },
     { key: 'racas', name: 'Raças', fetchFn: NotificacaoService.getRacaOptions, loaded: false, loading: false },
-    { key: 'escolaridades', name: 'Escolaridades', fetchFn: NotificacaoService.getEscolaridadeOptions, loaded: false, loading: false },    { key: 'atendimentos', name: 'Tipos de Atendimento', fetchFn: NotificacaoService.getAtendimentoOptions, loaded: false, loading: false },
+    { key: 'escolaridades', name: 'Escolaridades', fetchFn: NotificacaoService.getEscolaridadeOptions, loaded: false, loading: false },
+    { key: 'atendimentos', name: 'Tipos de Atendimento', fetchFn: NotificacaoService.getAtendimentoOptions, loaded: false, loading: false },
     { key: 'sintomas', name: 'Sintomas', fetchFn: NotificacaoService.getSintomaOptions, loaded: false, loading: false },
     { key: 'hipoteses', name: 'Hipóteses Diagnósticas', fetchFn: NotificacaoService.getHipoteseDiagOptions, loaded: false, loading: false },
     { key: 'traumas', name: 'Tipos de Trauma', fetchFn: NotificacaoService.getTraumaOptions, loaded: false, loading: false },
@@ -44,93 +48,109 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
       key: 'cbos', 
       name: 'CBOs/Profissões', 
       fetchFn: async () => {
-        try {
-          const server = import.meta.env.VITE_API_SERVER;
-          const port = import.meta.env.VITE_API_PORT;
-          const response = await fetch(`${server}:${port}/api/tipo-cbo?limit=5000`);
-          const data = await response.json();
-          return data?.data || data || [];
-        } catch (error) {
-          console.error('Erro ao buscar CBOs:', error);
-          return [];
-        }
+        const server = import.meta.env.VITE_API_SERVER;
+        const port = import.meta.env.VITE_API_PORT;
+        const response = await fetch(`${server}:${port}/api/tipo-cbo?limit=5000`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        return data?.data || data || [];
       }, 
       loaded: false, 
-      loading: false 
-    },    { 
+      loading: false
+    },
+    { 
       key: 'lista-sindromica', 
       name: 'Lista Sindrômica', 
       fetchFn: async () => {
-        try {
-          const server = import.meta.env.VITE_API_SERVER;
-          const port = import.meta.env.VITE_API_PORT;
-          // NOVO: rota que retorna todas as hipóteses com seus sintomas
-          const response = await fetch(`${server}:${port}/api/lista-sindromica/all`);
-          if (!response.ok) {
-            throw new Error(`Status HTTP ${response.status}`);
-          }
-          // Esperamos receber um JSON no formato:
-          // [ { id, hipotese, sintomas: [ { id, sintoma }, ... ] }, ... ]
-          const todasHipoteses: Array<{
-            id: number;
-            hipotese: string;
-            sintomas: Array<{ id: number; sintoma: string }>;
-          }> = await response.json();
-          return todasHipoteses;
-        } catch (error) {
-          console.warn('Falha ao baixar lista sindrômica completa:', error);
-          return [];
-        }
+        const server = import.meta.env.VITE_API_SERVER;
+        const port = import.meta.env.VITE_API_PORT;
+        const response = await fetch(`${server}:${port}/api/lista-sindromica/all`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return await response.json();
       }, 
       loaded: false, 
-      loading: false 
+      loading: false
     }
   ]);
 
-  // Verificar quais dados já estão em cache ao carregar o componente
+  // Monitorar status da conexão
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Verificar dados em cache ao carregar
   useEffect(() => {
     checkCachedData();
   }, []);
-
   const checkCachedData = async () => {
     const updatedItems = await Promise.all(
       dataItems.map(async (item) => {
         try {
           const cachedData = await indexedDBService.getOpcoes(item.key);
-          return { ...item, loaded: !!cachedData };
+          const hasValidData = cachedData && Array.isArray(cachedData) && cachedData.length > 0;
+          return { 
+            ...item, 
+            loaded: Boolean(hasValidData),
+            recordCount: hasValidData ? cachedData.length : 0
+          };
         } catch {
-          return { ...item, loaded: false };
+          return { ...item, loaded: false, recordCount: 0 };
         }
       })
     );
     setDataItems(updatedItems);
     
-    // Calcular tamanho total estimado
-    const loadedCount = updatedItems.filter(item => item.loaded).length;
-    setProgress((loadedCount / updatedItems.length) * 100);
+    // Calcular progresso simples - todos os itens têm peso igual
+    const loadedItems = updatedItems.filter(item => item.loaded).length;
+    const totalItems = updatedItems.length;
+    const progress = totalItems > 0 ? (loadedItems / totalItems) * 100 : 0;
+    
+    setProgress(progress);
+    
+    // Calcular tamanho total
+    const totalRecords = updatedItems.reduce((sum, item) => sum + (item.recordCount || 0), 0);
+    setTotalSize(totalRecords);
   };
   const downloadAllData = async () => {
     if (isDownloading) return;
     
+    // Verificar conectividade antes de iniciar
+    if (!isOnline) {
+      toast.error('❌ Sem conexão com a internet. Não é possível baixar os dados.');
+      return;
+    }
+    
     setIsDownloading(true);
     setProgress(0);
     
-    let completed = 0;
     let totalDownloaded = 0;
-    const total = dataItems.length;
+    let successCount = 0;
+    let errorCount = 0;
     
     toast.info('🔄 Iniciando download dos dados offline...');
 
-    for (const item of dataItems) {
-      if (item.loaded) {
-        completed++;
-        setProgress((completed / total) * 100);
-        continue;
+    for (let i = 0; i < dataItems.length; i++) {
+      const item = dataItems[i];
+      
+      // Verificar conectividade durante o download
+      if (!navigator.onLine) {
+        toast.error('❌ Conexão perdida durante o download. Processo interrompido.');
+        setIsDownloading(false);
+        return;
       }
 
       // Atualizar estado do item atual
-      setDataItems(prev => prev.map(i => 
-        i.key === item.key ? { ...i, loading: true, error: undefined } : i
+      setDataItems(prev => prev.map(dataItem => 
+        dataItem.key === item.key ? { ...dataItem, loading: true, error: undefined } : dataItem
       ));
 
       try {
@@ -138,84 +158,65 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
         
         const data = await item.fetchFn();
         
-        // Verificar se os dados foram recebidos
+        // Validação rigorosa - todos devem ter dados válidos
         if (data && Array.isArray(data) && data.length > 0) {
           await indexedDBService.saveOpcoes(item.key, data);
           totalDownloaded += data.length;
+          successCount++;
           
-          // Marcar como carregado
-          setDataItems(prev => prev.map(i => 
-            i.key === item.key ? { ...i, loaded: true, loading: false } : i
+          // Marcar como carregado com sucesso
+          setDataItems(prev => prev.map(dataItem => 
+            dataItem.key === item.key ? { 
+              ...dataItem, 
+              loaded: true, 
+              loading: false, 
+              recordCount: data.length,
+              error: undefined 
+            } : dataItem
           ));
           
           console.log(`✅ ${item.name}: ${data.length} registros salvos`);
         } else {
-          // Tratar casos de dados vazios (não crítico para alguns tipos)
-          const isOptional = ['lista-sindromica', 'cbos'].includes(item.key);
-          
-          if (isOptional) {
-            console.warn(`⚠️ ${item.name}: Nenhum dado disponível (opcional)`);
-            await indexedDBService.saveOpcoes(item.key, []);
-            setDataItems(prev => prev.map(i => 
-              i.key === item.key ? { ...i, loaded: true, loading: false } : i
-            ));
-          } else {
-            throw new Error('Nenhum dado recebido');
-          }
+          throw new Error('Nenhum dado disponível');
         }
         
       } catch (error) {
         console.error(`❌ Erro ao baixar ${item.name}:`, error);
         
-        // Decidir se o erro é crítico ou não
-        const isOptional = ['lista-sindromica'].includes(item.key);
+        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
         
-        if (isOptional) {
-          // Para dados opcionais, marcar como "carregado" mesmo com erro
-          console.warn(`⚠️ ${item.name} não pôde ser baixado (opcional, continuando...)`);
-          await indexedDBService.saveOpcoes(item.key, []);
-          setDataItems(prev => prev.map(i => 
-            i.key === item.key ? { ...i, loaded: true, loading: false } : i
-          ));
-        } else {
-          // Para dados críticos, marcar erro
-          setDataItems(prev => prev.map(i => 
-            i.key === item.key ? { 
-              ...i, 
-              loading: false, 
-              error: error instanceof Error ? error.message : 'Erro desconhecido' 
-            } : i
-          ));
-        }
+        // Marcar erro sem assumir como carregado
+        setDataItems(prev => prev.map(dataItem => 
+          dataItem.key === item.key ? { 
+            ...dataItem, 
+            loading: false, 
+            loaded: false,
+            error: errorMessage,
+            recordCount: 0
+          } : dataItem
+        ));
+
+        errorCount++;
+        console.error(`❌ ${item.name} falhou: ${errorMessage}`);
       }
 
-      completed++;
-      setProgress((completed / total) * 100);
+      // Atualizar progresso baseado em itens processados
+      const progress = ((i + 1) / dataItems.length) * 100;
+      setProgress(progress);
       
-      // Pequena pausa para não sobrecarregar o servidor
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Pausa entre downloads
+      await new Promise(resolve => setTimeout(resolve, 200));
     }
 
     setTotalSize(totalDownloaded);
     setIsDownloading(false);
     
-    const successCount = dataItems.filter(item => item.loaded).length;
-    const errorCount = total - successCount;
-    
+    // Relatório final simples e claro
     if (errorCount === 0) {
-      toast.success(`🎉 Todos os dados baixados! ${totalDownloaded.toLocaleString()} registros salvos offline.`);
+      toast.success(`🎉 Todos os dados baixados com sucesso! ${totalDownloaded.toLocaleString()} registros offline.`);
       onDataLoaded?.();
     } else {
-      const criticalErrors = dataItems.filter(item => 
-        item.error && !['lista-sindromica'].includes(item.key)
-      ).length;
-      
-      if (criticalErrors === 0) {
-        toast.success(`✅ Dados essenciais baixados! ${totalDownloaded.toLocaleString()} registros offline. ${errorCount} opcionais falharam.`);
-        onDataLoaded?.();
-      } else {
-        toast.warning(`⚠️ ${successCount}/${total} conjuntos baixados. ${criticalErrors} críticos com erro.`);
-      }
+      toast.error(`❌ Falha no download! ${errorCount} itens com erro. Tente novamente.`);
     }
   };
 
@@ -226,7 +227,12 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
           await indexedDBService.saveOpcoes(item.key, []);
         }
         
-        setDataItems(prev => prev.map(item => ({ ...item, loaded: false, error: undefined })));
+        setDataItems(prev => prev.map(item => ({ 
+          ...item, 
+          loaded: false, 
+          error: undefined, 
+          recordCount: 0 
+        })));
         setProgress(0);
         setTotalSize(0);
         
@@ -236,11 +242,26 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
       }
     }
   };
-
-  const loadedCount = dataItems.filter(item => item.loaded).length;
-  const totalCount = dataItems.length;
-  const isFullyLoaded = loadedCount === totalCount;
+  // Cálculos de status simples
+  const totalItems = dataItems.length;
+  const loadedItems = dataItems.filter(item => item.loaded).length;
   const hasErrors = dataItems.some(item => item.error);
+  const isFullyLoaded = loadedItems === totalItems;
+
+  const getStatusInfo = () => {
+    if (!isOnline) {
+      return { color: 'red', text: 'Offline - Não é possível baixar' };
+    }
+    if (hasErrors) {
+      return { color: 'red', text: 'Erro nos dados' };
+    }
+    if (isFullyLoaded) {
+      return { color: 'green', text: 'Todos os dados prontos' };
+    }
+    return { color: 'blue', text: 'Pronto para download' };
+  };
+
+  const statusInfo = getStatusInfo();
 
   return (
     <div className={`relative ${className}`}>
@@ -248,30 +269,33 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-colors ${
-          isFullyLoaded 
+          statusInfo.color === 'green'
             ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100' 
-            : hasErrors
+            : statusInfo.color === 'red'
+            ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
+            : statusInfo.color === 'yellow'
             ? 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100'
             : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
         }`}
-        title={isFullyLoaded ? 'Dados offline prontos' : 'Clique para baixar dados offline'}
-      >
-        {isDownloading ? (
+        title={statusInfo.text}
+      >        {!isOnline ? (
+          <Database className="h-4 w-4" />
+        ) : isDownloading ? (
           <Loader className="h-4 w-4 animate-spin" />
-        ) : isFullyLoaded ? (
-          <Check className="h-4 w-4" />
         ) : hasErrors ? (
-          <AlertCircle className="h-4 w-4" />
+          <XCircle className="h-4 w-4" />
+        ) : isFullyLoaded ? (
+          <CheckCircle className="h-4 w-4" />
         ) : (
           <Download className="h-4 w-4" />
         )}
         
         <span className="text-sm font-medium">
-          {isDownloading 
+          {!isOnline 
+            ? 'Offline'
+            : isDownloading 
             ? `Baixando... ${Math.round(progress)}%`
-            : isFullyLoaded 
-            ? 'Dados Offline Prontos'
-            : `Baixar Dados (${loadedCount}/${totalCount})`
+            : `Dados (${loadedItems}/${totalItems})`
           }
         </span>
 
@@ -294,15 +318,23 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
                 onClick={() => setIsOpen(false)}
                 className="text-gray-400 hover:text-gray-600"
               >
-                ×
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            {/* Barra de progresso */}
+            {/* Status da conexão */}
+            <div className={`mb-4 p-3 rounded-lg flex items-center gap-2 ${
+              isOnline ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+            }`}>
+              {isOnline ? <Wifi className="h-4 w-4" /> : <Database className="h-4 w-4" />}
+              <span className="text-sm font-medium">
+                {isOnline ? 'Conectado à internet' : 'Modo offline - dados em cache apenas'}
+              </span>
+            </div>            {/* Barra de progresso */}
             <div className="mb-4">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm text-gray-600">
-                  Progresso: {loadedCount}/{totalCount}
+                  Dados carregados: {loadedItems}/{totalItems}
                 </span>
                 <span className="text-sm text-gray-600">
                   {Math.round(progress)}%
@@ -311,6 +343,7 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div 
                   className={`h-2 rounded-full transition-all duration-300 ${
+                    hasErrors ? 'bg-red-500' : 
                     isFullyLoaded ? 'bg-green-500' : 'bg-blue-500'
                   }`}
                   style={{ width: `${progress}%` }}
@@ -321,17 +354,26 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
             {/* Lista de itens */}
             <div className="space-y-2 max-h-64 overflow-y-auto mb-4">
               {dataItems.map((item) => (
-                <div key={item.key} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                  <span className="text-sm text-gray-700">{item.name}</span>
+                <div key={item.key} className="flex items-center justify-between p-2 bg-gray-50 rounded">                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-700">{item.name}</span>
+                    </div>
+                    {item.recordCount !== undefined && item.recordCount > 0 && (
+                      <span className="text-xs text-gray-500">{item.recordCount} registros</span>
+                    )}
+                    {item.error && (
+                      <div className="text-xs text-red-600 mt-1" title={item.error}>
+                        Erro: {item.error.length > 30 ? item.error.substring(0, 30) + '...' : item.error}
+                      </div>
+                    )}
+                  </div>
                   <div className="flex items-center space-x-2">
                     {item.loading ? (
                       <Loader className="h-4 w-4 animate-spin text-blue-500" />
                     ) : item.loaded ? (
-                      <Check className="h-4 w-4 text-green-500" />
+                      <CheckCircle className="h-4 w-4 text-green-500" />
                     ) : item.error ? (
-                      <div title={item.error}>
-                        <AlertCircle className="h-4 w-4 text-red-500" />
-                      </div>
+                      <XCircle className="h-4 w-4 text-red-500" />
                     ) : (
                       <Database className="h-4 w-4 text-gray-400" />
                     )}
@@ -344,9 +386,9 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
             <div className="flex space-x-2">
               <button
                 onClick={downloadAllData}
-                disabled={isDownloading}
+                disabled={isDownloading || !isOnline}
                 className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
-                  isDownloading
+                  isDownloading || !isOnline
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : 'bg-blue-600 text-white hover:bg-blue-700'
                 }`}
@@ -359,12 +401,12 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
                 ) : (
                   <>
                     <Download className="h-4 w-4" />
-                    <span>Baixar Todos</span>
+                    <span>{!isOnline ? 'Sem Internet' : 'Baixar Todos'}</span>
                   </>
                 )}
               </button>
 
-              {(loadedCount > 0 || totalSize > 0) && (
+              {(loadedItems > 0 || totalSize > 0) && (
                 <button
                   onClick={clearOfflineData}
                   disabled={isDownloading}
@@ -373,19 +415,17 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
                   Limpar
                 </button>
               )}
-            </div>
-
-            {/* Informações adicionais */}
+            </div>            {/* Informações adicionais */}
             <div className="mt-4 p-3 bg-blue-50 rounded-lg">
               <div className="flex items-start space-x-2">
                 <Wifi className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
                 <div className="text-xs text-blue-700">
-                  <p className="font-medium mb-1">Como funciona:</p>
+                  <p className="font-medium mb-1">Status do Sistema:</p>
                   <ul className="space-y-1 text-blue-600">
-                    <li>• Baixa todas as opções de dropdowns</li>
-                    <li>• Salva no seu dispositivo para uso offline</li>
-                    <li>• Formulários funcionam sem internet</li>
-                    <li>• Dados são sincronizados quando voltar online</li>
+                    <li>• Dados carregados: {loadedItems}/{totalItems}</li>
+                    <li>• Conexão: {isOnline ? 'Online' : 'Offline'}</li>
+                    <li>• Total de registros: {totalSize.toLocaleString()}</li>
+                    <li>• Status: {isFullyLoaded ? 'Sistema pronto' : hasErrors ? 'Com erros' : 'Aguardando download'}</li>
                   </ul>
                 </div>
               </div>
