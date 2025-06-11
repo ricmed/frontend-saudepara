@@ -96,6 +96,7 @@ import NotificationForm from "@/features/notificationForms/NotificationForm";
 import ListaNotificacoes from "@/features/notificationForms/ListaNotificacoes";
 import HomePage from "@/features/home/HomePage";
 import DashboardPage from '@/features/dashboard/DashboardPage';
+import OfflineManagementPage from '@/features/offlinePage/pages/OfflineManagementPage';
 // Componente de layout protegido
 const ProtectedLayout = () => {
   return (
@@ -129,9 +130,9 @@ function App() {
   return (
     <LanguageProvider>
       <Router>
-        <Routes>
-          <Route path="/private" element={<ProtectedLayout />}>
+        <Routes>          <Route path="/private" element={<ProtectedLayout />}>
             <Route path="/private/apps-auxiliares" element={<PaginaAppsAuxiliares />} />
+            <Route path="/private/offline-management" element={<OfflineManagementPage />} />
             {/* Rotas de Qualificações */}
             <Route path="/private/qualificacao" element={<RelatorioQualificacao />} />
             <Route path="/private/qualificacao/nova" element={<CadastroQualificacao />} />

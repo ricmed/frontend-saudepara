@@ -67,7 +67,7 @@ if (!self.define) {
     });
   };
 }
-define(['./workbox-f68b4228'], (function (workbox) { 'use strict';
+define(['./workbox-8c44f358'], (function (workbox) { 'use strict';
 
   self.skipWaiting();
   workbox.clientsClaim();
@@ -78,21 +78,39 @@ define(['./workbox-f68b4228'], (function (workbox) { 'use strict';
    * See https://goo.gl/S9QRab
    */
   workbox.precacheAndRoute([{
-    "url": "index.html",
-    "revision": "0.ljgliecs4u"
+    "url": "/index.html",
+    "revision": "0.6tcd0idfpho"
   }], {});
   workbox.cleanupOutdatedCaches();
-  workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("index.html"), {
-    allowlist: [/^\/$/]
+  workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("/index.html"), {
+    allowlist: [/^\/$/],
+    denylist: [/^\/_/, /\/[^/?]+\.[^/]+$/, /^\/api/]
   }));
+  workbox.registerRoute(/^https:\/\/app-api\.hml\.saude\.pa\.gov\.br\/api\/(tipo-|componentes|estabelecimentos).*$/i, new workbox.CacheFirst({
+    "cacheName": "api-tipos-cache",
+    plugins: [new workbox.ExpirationPlugin({
+      maxEntries: 300,
+      maxAgeSeconds: 2592000
+    }), new workbox.CacheableResponsePlugin({
+      statuses: [0, 200]
+    })]
+  }), 'GET');
+  workbox.registerRoute(/^https:\/\/app-api\.hml\.saude\.pa\.gov\.br\/api\/(notificacao|paciente).*$/i, new workbox.NetworkFirst({
+    "cacheName": "api-dynamic-cache",
+    "networkTimeoutSeconds": 5,
+    plugins: [new workbox.ExpirationPlugin({
+      maxEntries: 100,
+      maxAgeSeconds: 604800
+    }), new workbox.BackgroundSyncPlugin("dynamic-api-sync", {
+      maxRetentionTime: 1440
+    })]
+  }), 'GET');
   workbox.registerRoute(/^https:\/\/app-api\.hml\.saude\.pa\.gov\.br\/.*$/i, new workbox.NetworkFirst({
     "cacheName": "api-hml-cache",
     "networkTimeoutSeconds": 5,
     plugins: [new workbox.ExpirationPlugin({
       maxEntries: 200,
       maxAgeSeconds: 2592000
-    }), new workbox.BackgroundSyncPlugin("api-sync", {
-      maxRetentionTime: 1440
     })]
   }), 'GET');
   workbox.registerRoute(/^https:\/\/app\.hml\.saude\.pa\.gov\.br\/.*$/i, new workbox.NetworkFirst({
@@ -103,29 +121,33 @@ define(['./workbox-f68b4228'], (function (workbox) { 'use strict';
       maxAgeSeconds: 2592000
     })]
   }), 'GET');
-  workbox.registerRoute(/^https:\/\/app\.trn\.saude\.pa\.gov\.br\/.*$/i, new workbox.NetworkFirst({
-    "cacheName": "app-trn-cache",
-    "networkTimeoutSeconds": 5,
+  workbox.registerRoute(/\.(js|css)$/, new workbox.StaleWhileRevalidate({
+    "cacheName": "js-css-cache",
     plugins: [new workbox.ExpirationPlugin({
-      maxEntries: 200,
+      maxEntries: 60,
       maxAgeSeconds: 2592000
     })]
   }), 'GET');
-  workbox.registerRoute(/^http:\/\/localhost:\d+\/api\/.*$/i, new workbox.NetworkFirst({
-    "cacheName": "api-dev-cache",
-    "networkTimeoutSeconds": 3,
+  workbox.registerRoute(/\.(png|jpg|jpeg|svg|ico|webp)$/, new workbox.CacheFirst({
+    "cacheName": "images-cache",
     plugins: [new workbox.ExpirationPlugin({
       maxEntries: 100,
-      maxAgeSeconds: 86400
+      maxAgeSeconds: 31536000
     })]
-  }), 'GET');
-  workbox.registerRoute(/\.(js|css|png|jpg|jpeg|svg|ico)$/, new workbox.StaleWhileRevalidate({
-    "cacheName": "assets-cache",
-    plugins: []
   }), 'GET');
   workbox.registerRoute(/\.(woff|woff2|ttf|eot)$/, new workbox.CacheFirst({
     "cacheName": "fonts-cache",
-    plugins: []
+    plugins: [new workbox.ExpirationPlugin({
+      maxEntries: 30,
+      maxAgeSeconds: 31536000
+    })]
+  }), 'GET');
+  workbox.registerRoute(/^https:\/\/cdnjs\.cloudflare\.com\/.*/i, new workbox.CacheFirst({
+    "cacheName": "cdn-cache",
+    plugins: [new workbox.ExpirationPlugin({
+      maxEntries: 50,
+      maxAgeSeconds: 2592000
+    })]
   }), 'GET');
 
 }));

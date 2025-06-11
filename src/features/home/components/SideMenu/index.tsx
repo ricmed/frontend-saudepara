@@ -30,7 +30,9 @@ import {
   HeartPulse,
   Stethoscope,
   Thermometer,
-  UserCog, // Novo ícone para gerenciar usuários
+  UserCog,
+  Home, // ✅ NOVO: Ícone para Home
+  Database, // ✅ NOVO: Ícone para Gerenciamento Offline
 } from "lucide-react";
 
 interface SideMenuProps {
@@ -179,30 +181,48 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     },
   ];
 
-  // Main menu items
+  // ✅ NOVO: Main menu items reorganizados com Home e Gerenciamento Offline
   const menuItems = [
+    // ✅ NOVO: Home - sempre visível
+    {
+      icon: <Home />,
+      label: t("menu.home"), // Adicionar tradução: "Início" ou "Home"
+      onClick: () => navigate("/"), // ou "/private/dashboard" ou "/"
+    },
+    
     // Menu Qualificar Estabelecimentos - apenas para qualificadores
     ...(user && isQualificador() ? [{
       icon: <Award />,
       label: t("menu.qualify_establishments"),
       onClick: () => navigate("/private/relatorio-estabelecimentos"),
     }] : []),
+    
     // Menu Notificação - apenas para notificadores
     ...(user && isNotificador() ? [{
       icon: <FileText />,
       label: t("menu.notification"),
       onClick: () => navigate("/private/pagina-paciente-ficha"),
     }] : []),
+    
     {
       icon: <ChartSpline />,
       label: t("menu.dashboard"),
       onClick: () => navigate("/dashboard-page"),
     },
+    
+    // ✅ NOVO: Gerenciamento Offline - disponível para todos os usuários logados
+    ...(user ? [{
+      icon: <Database />,
+      label: t("menu.offline_management"), // Adicionar tradução: "Dados Offline" ou "Gerenciar Offline"
+      onClick: () => navigate("/private/offline-management"), // ou "/private/dados-offline"
+    }] : []),
+    
     {
       icon: <BookType />,
       label: t("menu.educational"),
       onClick: () => {},
     },
+    
     // Menu de Apps Auxiliares - apenas para admins logados
     ...(user && isAdmin() ? [{
       icon: <Building2 />,
@@ -210,27 +230,32 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       submenu: true,
       onClick: () => {},
     }] : []),
+    
     {
       icon: <Lock />,
       label: t("menu.security"),
       onClick: () => {},
     },
+    
     {
       icon: <Network />,
       label: t("menu.version"),
       onClick: () => {},
     },
+    
     {
       icon: <AlertTriangle />,
       label: t("menu.bug"),
       onClick: () => {},
     },
+    
     // Menu de Gerenciar Usuários - apenas para admins logados
     ...(user && isAdmin() ? [{
       icon: <UserCog />,
-      label: t("menu.manage_users"), // Adicionar esta tradução
+      label: t("menu.manage_users"),
       onClick: () => navigate("/admin"),
     }] : []),
+    
     // Menu de Logout - apenas para usuários logados
     ...(user ? [{
       icon: <LogOut className="rotate-180" />,
@@ -264,8 +289,10 @@ export const SideMenu: React.FC<SideMenuProps> = ({
               className="bg-white rounded p-1"
             />
           </div>
+          
           {/* User Profile Header */}
           <UserProfileHeader selectedLanguage={selectedLanguage} />
+          
           {/* Itens do Menu */}
           <div className="flex-grow">
             {menuItems.map((item, i) => (

@@ -1,8 +1,11 @@
-// src/features/notificationForms/hooks/useNotifications.ts
+// useNotifications.ts - Versão CORRIGIDA com SyncService
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useOfflineSystem } from '@/hooks/useOfflineSystem';
 import { NotificacaoService } from '@/services/NotificacaoService';
+import syncService from '@/services/syncService'; // ✅ AGORA SERÁ USADO
+import indexedDBService from '@/services/indexedDB';
 import { Notificacao, PaginationMeta, SearchParams } from '../types';
 import { adjustDatesForExport, compareValues, getValueForSorting } from '../utils';
 import { 
@@ -14,7 +17,16 @@ import {
 } from '@/features/notificationForms/components/exportUtilities';
 
 export const useNotifications = () => {
-  // Estado para notificações
+  // ✅ Integrar sistema offline
+  const {
+    isOnline,
+    isReadyForOffline,
+    getOfflineStatusMessage,
+    hasDataToSync,
+    pendingData
+  } = useOfflineSystem();
+
+  // Estados existentes...
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   const [allNotificacoes, setAllNotificacoes] = useState<Notificacao[]>([]);
   const [paginationMeta, setPaginationMeta] = useState<PaginationMeta>({
@@ -45,18 +57,74 @@ export const useNotifications = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Função para buscar todos os dados para ordenação e exportação
+  // ✅ FUNÇÃO: Buscar notificações offline
+  const fetchNotificacoesOffline = useCallback(async (page: number = 1, limit: number = 10) => {
+    try {
+      console.log('📱 Buscando notificações offline...');
+      
+      // Buscar todas as notificações do cache
+      const cachedNotificacoes = await indexedDBService.getOpcoes('notificacoes-cache') || [];
+      
+      if (cachedNotificacoes.length === 0) {
+        console.warn('⚠️ Nenhuma notificação encontrada no cache offline');
+        return {
+          data: [],
+          meta: { total: 0, totalPages: 0, page: 1, limit }
+        };
+      }
+
+      // Calcular paginação
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedData = cachedNotificacoes.slice(startIndex, endIndex);
+      
+      console.log(`✅ Notificações offline: ${paginatedData.length}/${cachedNotificacoes.length} (página ${page})`);
+      
+      return {
+        data: paginatedData,
+        meta: {
+          total: cachedNotificacoes.length,
+          totalPages: Math.ceil(cachedNotificacoes.length / limit),
+          page,
+          limit
+        }
+      };
+    } catch (error) {
+      console.error('❌ Erro ao buscar notificações offline:', error);
+      return {
+        data: [],
+        meta: { total: 0, totalPages: 0, page: 1, limit }
+      };
+    }
+  }, []);
+
+  // ✅ FUNÇÃO: Buscar todas as notificações (online/offline)
   const fetchAllData = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
 
+      // ✅ VERIFICAR SE ESTÁ OFFLINE
+      if (!isOnline) {
+        console.log('📱 Modo offline: buscando todas as notificações do cache...');
+        
+        const cachedData = await indexedDBService.getOpcoes('notificacoes-cache') || [];
+        
+        if (cachedData.length === 0) {
+          setError('Nenhuma notificação disponível offline. Conecte-se à internet e baixe os dados primeiro.');
+          return null;
+        }
+        
+        console.log(`✅ ${cachedData.length} notificações carregadas do cache offline`);
+        return cachedData;
+      }
+
+      // ✅ MODO ONLINE: buscar normalmente + salvar cache
       let allNotificacoes: Notificacao[] = [];
       let page = 1;
       let hasMore = true;
-      const LARGE_PAGE_SIZE = 500; // Usar tamanho de página grande para reduzir o número de requisições
+      const LARGE_PAGE_SIZE = 500;
 
-      // Buscar todas as páginas
       while (hasMore) {
         const response = await NotificacaoService.getAll(page, LARGE_PAGE_SIZE);
 
@@ -76,17 +144,42 @@ export const useNotifications = () => {
         }
       }
 
+      // ✅ SALVAR NO CACHE PARA USO OFFLINE FUTURO
+      try {
+        await indexedDBService.saveOpcoes('notificacoes-cache', allNotificacoes);
+        console.log(`✅ ${allNotificacoes.length} notificações salvas no cache offline`);
+      } catch (cacheError) {
+        console.warn('⚠️ Erro ao salvar notificações no cache:', cacheError);
+      }
+
       return allNotificacoes;
     } catch (error) {
       console.error("Erro ao buscar todos os dados:", error);
+      
+      // ✅ FALLBACK: tentar usar cache em caso de erro online
+      if (isOnline) {
+        console.log('⚠️ Erro online, tentando usar cache como fallback...');
+        
+        try {
+          const cachedData = await indexedDBService.getOpcoes('notificacoes-cache') || [];
+          
+          if (cachedData.length > 0) {
+            toast.warning('Usando dados offline devido a erro de conexão');
+            return cachedData;
+          }
+        } catch (cacheError) {
+          console.error('Erro ao usar cache como fallback:', cacheError);
+        }
+      }
+      
       setError("Erro ao buscar todas as notificações para ordenação.");
       return null;
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isOnline]);
 
-  // Carregar dados
+  // ✅ CARREGAR DADOS (online/offline) - useEffect principal
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -118,96 +211,148 @@ export const useNotifications = () => {
           return;
         }
 
-        // Caso contrário, usar a API normal com paginação do backend
         let response;
         
-        // Verificar se há termo de busca com no mínimo 3 caracteres
-        if (
-          debouncedSearchParams.term &&
-          debouncedSearchParams.term.length >= 3
-        ) {
-          setHasSearched(true);
-          console.log(`Buscando por "${debouncedSearchParams.term}" no campo "${debouncedSearchParams.field}"`);
+        // ✅ VERIFICAR SE ESTÁ OFFLINE
+        if (!isOnline) {
+          console.log('📱 Modo offline detectado');
           
-          // Obter todos os dados primeiro
-          response = await NotificacaoService.getAll(1, 1000);
+          if (!isReadyForOffline()) {
+            setError('Sistema não está pronto para uso offline. Conecte-se à internet e baixe os dados primeiro.');
+            setIsLoading(false);
+            return;
+          }
           
-          // Filtrar os dados conforme o critério de busca
-          if (response && response.data) {
-            let filteredData = [];
-            const searchTerm = debouncedSearchParams.term.toLowerCase().trim();
-            
-            // Aplicar filtro conforme o campo selecionado
-            if (debouncedSearchParams.field === "paciente") {
-              filteredData = response.data.filter(item => 
-                item.paciente && item.paciente.toLowerCase().includes(searchTerm)
-              );
-            }
-            else if (debouncedSearchParams.field === "evento") {
-              filteredData = response.data.filter(item => 
-                item.tipoEvento && item.tipoEvento.toLowerCase().includes(searchTerm)
-              );
-            }
-            else if (debouncedSearchParams.field === "atendimento") {
-              filteredData = response.data.filter(item => 
-                item.tipoAtendimento && item.tipoAtendimento.toLowerCase().includes(searchTerm)
-              );
-            }
-            else if (debouncedSearchParams.field === "encerramento") {
-              filteredData = response.data.filter(item => 
-                item.tipoEncerramento && item.tipoEncerramento.toLowerCase().includes(searchTerm)
-              );
-            }
-            else {
-              // Buscar em todos os campos
-              filteredData = response.data.filter(item => (
-                (item.paciente && item.paciente.toLowerCase().includes(searchTerm)) ||
-                (item.tipoEvento && item.tipoEvento.toLowerCase().includes(searchTerm)) ||
-                (item.tipoAtendimento && item.tipoAtendimento.toLowerCase().includes(searchTerm)) ||
-                (item.tipoEncerramento && item.tipoEncerramento.toLowerCase().includes(searchTerm)) ||
-                (item.dataOcorrencia && item.dataOcorrencia.toLowerCase().includes(searchTerm))
-              ));
-            }
-            
-            // Calcular o total de páginas com base nos resultados filtrados
-            const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-            
-            // Aplicar paginação manual aos resultados filtrados
-            const startIndex = (currentPage - 1) * itemsPerPage;
-            const endIndex = Math.min(startIndex + itemsPerPage, filteredData.length);
-            
-            // Garantir que não esteja além do número de páginas
-            const safeCurrentPage = Math.min(currentPage, Math.max(1, totalPages));
-            
-            // Se a página mudou, atualize
-            if (safeCurrentPage !== currentPage) {
-              setCurrentPage(safeCurrentPage);
-            }
-            
-            // Criar resposta com dados paginados
-            response = {
-              data: filteredData.slice(startIndex, endIndex),
-              meta: {
-                total: filteredData.length,
-                totalPages: totalPages,
-                page: safeCurrentPage,
-                limit: itemsPerPage
-              }
-            };
-            
-            console.log(`Encontrados ${filteredData.length} resultados para a busca.`);
+          // Usar dados offline
+          response = await fetchNotificacoesOffline(currentPage, itemsPerPage);
+          
+          if (response.data.length === 0 && !hasSearched) {
+            setError('Nenhuma notificação disponível offline. Baixe os dados quando estiver online.');
           }
         } else {
-          console.log("Buscando todas notificações");
-          response = await NotificacaoService.getAll(currentPage, itemsPerPage);
+          // ✅ MODO ONLINE: lógica com cache
           
-          // Se já houve busca anteriormente e agora o campo está vazio,
-          // resetar a flag
-          if (hasSearched && !debouncedSearchParams.term) {
-            setHasSearched(false);
+          // Verificar se há termo de busca com no mínimo 3 caracteres
+          if (
+            debouncedSearchParams.term &&
+            debouncedSearchParams.term.length >= 3
+          ) {
+            setHasSearched(true);
+            console.log(`🔍 Buscando por "${debouncedSearchParams.term}" no campo "${debouncedSearchParams.field}"`);
+            
+            // ✅ USAR CACHE + API para busca
+            try {
+              response = await NotificacaoService.getAll(1, 1000);
+              
+              // Salvar busca no cache
+              if (response && response.data) {
+                await indexedDBService.saveOpcoes('notificacoes-cache', response.data);
+              }
+            } catch (error) {
+              // Fallback para cache se API falhar
+              console.warn('API falhou na busca, usando cache...');
+              const cachedData = await indexedDBService.getOpcoes('notificacoes-cache') || [];
+              response = {
+                data: cachedData,
+                meta: {
+                  total: cachedData.length,
+                  totalPages: Math.ceil(cachedData.length / itemsPerPage),
+                  page: 1,
+                  limit: itemsPerPage
+                }
+              };
+            }
+            
+            // Aplicar filtros de busca
+            if (response && response.data) {
+              let filteredData = [];
+              const searchTerm = debouncedSearchParams.term.toLowerCase().trim();
+              
+              // Aplicar filtro conforme o campo selecionado
+              if (debouncedSearchParams.field === "paciente") {
+                filteredData = response.data.filter(item => 
+                  item.paciente && item.paciente.toLowerCase().includes(searchTerm)
+                );
+              }
+              else if (debouncedSearchParams.field === "evento") {
+                filteredData = response.data.filter(item => 
+                  item.tipoEvento && item.tipoEvento.toLowerCase().includes(searchTerm)
+                );
+              }
+              else if (debouncedSearchParams.field === "atendimento") {
+                filteredData = response.data.filter(item => 
+                  item.tipoAtendimento && item.tipoAtendimento.toLowerCase().includes(searchTerm)
+                );
+              }
+              else if (debouncedSearchParams.field === "encerramento") {
+                filteredData = response.data.filter(item => 
+                  item.tipoEncerramento && item.tipoEncerramento.toLowerCase().includes(searchTerm)
+                );
+              }
+              else {
+                // Buscar em todos os campos
+                filteredData = response.data.filter(item => (
+                  (item.paciente && item.paciente.toLowerCase().includes(searchTerm)) ||
+                  (item.tipoEvento && item.tipoEvento.toLowerCase().includes(searchTerm)) ||
+                  (item.tipoAtendimento && item.tipoAtendimento.toLowerCase().includes(searchTerm)) ||
+                  (item.tipoEncerramento && item.tipoEncerramento.toLowerCase().includes(searchTerm)) ||
+                  (item.dataOcorrencia && item.dataOcorrencia.toLowerCase().includes(searchTerm))
+                ));
+              }
+              
+              // Calcular paginação
+              const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+              const startIndex = (currentPage - 1) * itemsPerPage;
+              const endIndex = Math.min(startIndex + itemsPerPage, filteredData.length);
+              const safeCurrentPage = Math.min(currentPage, Math.max(1, totalPages));
+              
+              if (safeCurrentPage !== currentPage) {
+                setCurrentPage(safeCurrentPage);
+              }
+              
+              // Criar resposta com dados paginados
+              response = {
+                data: filteredData.slice(startIndex, endIndex),
+                meta: {
+                  total: filteredData.length,
+                  totalPages: totalPages,
+                  page: safeCurrentPage,
+                  limit: itemsPerPage
+                }
+              };
+              
+              console.log(`✅ Encontrados ${filteredData.length} resultados para a busca.`);
+            }
+          } else {
+            console.log("🌐 Buscando todas notificações online");
+            
+            try {
+              response = await NotificacaoService.getAll(currentPage, itemsPerPage);
+              
+              // Salvar primeira página no cache
+              if (response && response.data && currentPage === 1) {
+                // Buscar dados completos para cache em background
+                NotificacaoService.getAll(1, 1000).then(allData => {
+                  if (allData && allData.data) {
+                    indexedDBService.saveOpcoes('notificacoes-cache', allData.data);
+                  }
+                }).catch(err => console.warn('Erro ao salvar cache em background:', err));
+              }
+            } catch (error) {
+              // Fallback para cache
+              console.warn('API falhou, usando cache...');
+              response = await fetchNotificacoesOffline(currentPage, itemsPerPage);
+              toast.warning('Usando dados offline devido a erro de conexão');
+            }
+            
+            // Se já houve busca anteriormente e agora o campo está vazio, resetar a flag
+            if (hasSearched && !debouncedSearchParams.term) {
+              setHasSearched(false);
+            }
           }
         }
 
+        // Processar resposta
         if (response && response.data) {
           // Verificar se estamos em uma página válida
           if (
@@ -215,7 +360,6 @@ export const useNotifications = () => {
             response.meta.totalPages > 0 &&
             currentPage > response.meta.totalPages
           ) {
-            // Se a página atual for maior que o total de páginas, volte para a página 1
             setCurrentPage(1);
             setIsLoading(false);
             return;
@@ -235,21 +379,58 @@ export const useNotifications = () => {
           }
         } else {
           console.warn("Resposta não contém data:", response);
+          
+          if (!isOnline) {
+            setError('Nenhum dado disponível offline');
+          }
         }
       } catch (err: any) {
         console.error("Erro ao carregar notificações:", err);
-        console.error("Detalhes do erro:", err.response?.data || err.message);
-        setError("Erro ao carregar notificações. Tente novamente.");
+        
+        // ✅ TRATAMENTO DE ERRO MELHORADO
+        if (!isOnline) {
+          setError("Erro ao carregar dados offline. Verifique se os dados foram baixados.");
+        } else {
+          setError("Erro ao carregar notificações. Tente novamente.");
+          
+          // Tentar cache como último recurso
+          try {
+            const cachedData = await indexedDBService.getOpcoes('notificacoes-cache') || [];
+            if (cachedData.length > 0) {
+              const startIndex = (currentPage - 1) * itemsPerPage;
+              const endIndex = startIndex + itemsPerPage;
+              
+              setNotificacoes(cachedData.slice(startIndex, endIndex));
+              setPaginationMeta({
+                total: cachedData.length,
+                pages: Math.ceil(cachedData.length / itemsPerPage),
+                currentPage,
+                perPage: itemsPerPage,
+              });
+              
+              toast.warning('Usando dados em cache devido a erro de conexão');
+              setError(null);
+            }
+          } catch (cacheError) {
+            console.error('Erro ao usar cache como fallback:', cacheError);
+          }
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchData();
-  }, [currentPage, itemsPerPage, debouncedSearchParams, isUsingLocalSort, sortKey, sortOrder, hasSearched, allNotificacoes]);
+  }, [currentPage, itemsPerPage, debouncedSearchParams, isUsingLocalSort, sortKey, sortOrder, hasSearched, allNotificacoes, isOnline, isReadyForOffline, fetchNotificacoesOffline]);
 
-  // Funções para manipulação dos dados
+  // ✅ FUNÇÃO: Exclusão (apenas online)
   const handleDelete = async (id: number) => {
+    // ✅ VERIFICAR SE ESTÁ ONLINE
+    if (!isOnline) {
+      toast.error('Não é possível excluir notificações offline. Conecte-se à internet.');
+      return;
+    }
+
     if (window.confirm("Deseja realmente excluir esta notificação?")) {
       try {
         await NotificacaoService.delete(id);
@@ -273,6 +454,16 @@ export const useNotifications = () => {
           if (isUsingLocalSort) {
             setAllNotificacoes(prev => prev.filter(n => n.id !== id));
           }
+
+          // Atualizar cache
+          try {
+            const allData = await NotificacaoService.getAll(1, 1000);
+            if (allData && allData.data) {
+              await indexedDBService.saveOpcoes('notificacoes-cache', allData.data);
+            }
+          } catch (cacheError) {
+            console.warn('Erro ao atualizar cache após exclusão:', cacheError);
+          }
         }
 
         toast.success("Notificação excluída com sucesso");
@@ -285,8 +476,158 @@ export const useNotifications = () => {
     }
   };
 
-  // Paginação
-  const handlePageChange = (newPage: number) => {
+  // ✅ FUNÇÃO: Exportação com fallback offline
+  const handleExport = async (
+    format: 'csv' | 'excel' | 'pdf', 
+    type: 'page' | 'all',
+    pdfType?: PDFExportType
+  ) => {
+    try {
+      setIsLoading(true);
+
+      // Buscar dados - página atual ou todos
+      const dataToExport = type === "page" ? notificacoes : await fetchAllData();
+
+      if (!dataToExport || dataToExport.length === 0) {
+        toast.info("Não há dados para exportar.");
+        setIsLoading(false);
+        return;
+      }
+
+      // ✅ BUSCAR OPÇÕES COM FALLBACK OFFLINE usando SyncService
+      let options: ExportOptions;
+      
+      try {
+        if (isOnline) {
+          // ✅ USAR SYNCSERVICE para buscar opções
+          console.log('🌐 Buscando opções de exportação online via SyncService...');
+          
+          const [
+            eventoOptions,
+            publicoOptions,
+            paisOptions,
+            estadoOptions,
+            municipioOptions,
+            bairroOptions,
+            cboOptions,
+            generoOptions,
+            racaOptions,
+            escolaridadeOptions,
+            atendimentoOptions,
+            sintomaOptions,
+            hipoteseDiagOptions,
+            traumaOptions,
+            estabelecimentoOptions,
+            encerramentoOptions
+          ] = await Promise.all([
+            syncService.syncOpcoes('eventos', () => NotificacaoService.getEventoOptions()),
+            syncService.syncOpcoes('publicos', () => NotificacaoService.getPublicoOptions()),
+            syncService.syncOpcoes('paises', () => NotificacaoService.getPaisOptions()),
+            syncService.syncOpcoes('estados', () => NotificacaoService.getEstadoOptions()),
+            syncService.syncOpcoes('municipios', () => NotificacaoService.getMunicipioOptions()),
+            syncService.syncOpcoes('bairros', () => NotificacaoService.getBairroOptions()),
+            syncService.syncOpcoes('cbos', () => NotificacaoService.getCboOptions()),
+            syncService.syncOpcoes('generos', () => NotificacaoService.getGeneroOptions()),
+            syncService.syncOpcoes('racas', () => NotificacaoService.getRacaOptions()),
+            syncService.syncOpcoes('escolaridades', () => NotificacaoService.getEscolaridadeOptions()),
+            syncService.syncOpcoes('atendimentos', () => NotificacaoService.getAtendimentoOptions()),
+            syncService.syncOpcoes('sintomas', () => NotificacaoService.getSintomaOptions()),
+            syncService.syncOpcoes('hipoteses', () => NotificacaoService.getHipoteseDiagOptions()),
+            syncService.syncOpcoes('traumas', () => NotificacaoService.getTraumaOptions()),
+            syncService.syncOpcoes('estabelecimentos', () => NotificacaoService.getEstabelecimentoOptions()),
+            syncService.syncOpcoes('encerramentos', () => NotificacaoService.getEncerramentoOptions())
+          ]);
+
+          options = {
+            eventoOptions,
+            publicoOptions,
+            paisOptions,
+            estadoOptions,
+            municipioOptions,
+            bairroOptions,
+            cboOptions,
+            generoOptions,
+            racaOptions,
+            escolaridadeOptions,
+            atendimentoOptions,
+            sintomaOptions,
+            hipoteseDiagOptions,
+            traumaOptions,
+            estabelecimentoOptions,
+            encerramentoOptions
+          };
+        } else {
+          throw new Error('Modo offline, usar cache');
+        }
+      } catch (optionsError) {
+        // ✅ FALLBACK: usar opções do cache offline
+        console.log('📱 Buscando opções de exportação do cache offline...');
+        
+        options = {
+          eventoOptions: await indexedDBService.getOpcoes('eventos') || [],
+          publicoOptions: await indexedDBService.getOpcoes('publicos') || [],
+          paisOptions: await indexedDBService.getOpcoes('paises') || [],
+          estadoOptions: await indexedDBService.getOpcoes('estados') || [],
+          municipioOptions: await indexedDBService.getOpcoes('municipios') || [],
+          bairroOptions: await indexedDBService.getOpcoes('bairros') || [],
+          cboOptions: await indexedDBService.getOpcoes('cbos') || [],
+          generoOptions: await indexedDBService.getOpcoes('generos') || [],
+          racaOptions: await indexedDBService.getOpcoes('racas') || [],
+          escolaridadeOptions: await indexedDBService.getOpcoes('escolaridades') || [],
+          atendimentoOptions: await indexedDBService.getOpcoes('atendimentos') || [],
+          sintomaOptions: await indexedDBService.getOpcoes('sintomas') || [],
+          hipoteseDiagOptions: await indexedDBService.getOpcoes('hipoteses') || [],
+          traumaOptions: await indexedDBService.getOpcoes('traumas') || [],
+          estabelecimentoOptions: await indexedDBService.getOpcoes('estabelecimentos') || [],
+          encerramentoOptions: await indexedDBService.getOpcoes('encerramentos') || [],
+        };
+        
+        console.log('✅ Opções de exportação carregadas do cache offline');
+      }
+
+      // Ajustar datas antes de exportar
+      const formattedData = adjustDatesForExport(dataToExport);
+
+      // Exportar com base no formato escolhido
+      if (format === 'csv') {
+        exportListToCSV(formattedData, options);
+        toast.success(`CSV exportado com sucesso`);
+      } else if (format === 'excel') {
+        exportListToExcel(formattedData, options);
+        toast.success(`Dados exportados com sucesso para Excel`);
+      } else if (format === 'pdf') {
+        exportListToPDFWithOptions(formattedData, options, pdfType || 'both');
+        
+        const pdfMessages = {
+          'table': 'PDF da tabela resumida exportado com sucesso',
+          'forms': 'PDF das fichas detalhadas exportado com sucesso',
+          'both': 'PDF completo (tabela + fichas) exportado com sucesso'
+        };
+        
+        toast.success(pdfMessages[pdfType || 'both']);
+      }
+
+      // Adicionar mensagem se foi exportado offline
+      if (!isOnline) {
+        toast.info('Exportação realizada com dados offline');
+      }
+
+    } catch (error) {
+      console.error(`Erro ao exportar ${format}:`, error);
+      setError(`Erro ao exportar ${format}. Tente novamente.`);
+
+      if (error instanceof Error) {
+        toast.error(`Erro na exportação: ${error.message}`);
+      } else {
+        toast.error("Erro na exportação. Tente novamente.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ✅ FUNÇÃO: Mudança de página
+  const handlePageChange = useCallback((newPage: number) => {
     // Garantir que a página nunca seja maior que o total de páginas
     const safeNewPage = Math.min(newPage, paginationMeta.pages);
 
@@ -308,10 +649,10 @@ export const useNotifications = () => {
         setNotificacoes(sortedData.slice(startIndex, endIndex));
       }
     }
-  };
+  }, [paginationMeta.pages, isUsingLocalSort, allNotificacoes, itemsPerPage, sortKey, sortOrder]);
 
-  // Ordenação
-  const handleSortChange = async (key: string | keyof Notificacao) => {
+  // ✅ FUNÇÃO: Mudança de ordenação
+  const handleSortChange = useCallback(async (key: string | keyof Notificacao) => {
     try {
       // Determinar a nova ordem
       const newSortOrder = sortKey === key && sortOrder === "asc" ? "desc" : "asc";
@@ -355,86 +696,11 @@ export const useNotifications = () => {
       console.error("Erro ao ordenar:", error);
       setError("Erro ao ordenar dados. Tente novamente.");
     }
-  };
-  // Funções de exportação
-  const handleExport = async (
-    format: 'csv' | 'excel' | 'pdf', 
-    type: 'page' | 'all',
-    pdfType?: PDFExportType // Novo parâmetro opcional para PDF
-  ) => {
-    try {
-      // Mostrar loader ou feedback visual
-      setIsLoading(true);
+  }, [sortKey, sortOrder, isUsingLocalSort, allNotificacoes, notificacoes, fetchAllData]);
 
-      // Buscar dados - página atual ou todos
-      const dataToExport = type === "page" ? notificacoes : await fetchAllData();
-
-      if (!dataToExport || dataToExport.length === 0) {
-        toast.info("Não há dados para exportar.");
-        setIsLoading(false);
-        return;
-      }
-
-      // Buscar opções para conversão de IDs para descrições
-      const options: ExportOptions = {
-        eventoOptions: await NotificacaoService.getEventoOptions(),
-        publicoOptions: await NotificacaoService.getPublicoOptions(),
-        paisOptions: await NotificacaoService.getPaisOptions(),
-        estadoOptions: await NotificacaoService.getEstadoOptions(),
-        municipioOptions: await NotificacaoService.getMunicipioOptions(),
-        bairroOptions: await NotificacaoService.getBairroOptions(),
-        cboOptions: await NotificacaoService.getCboOptions(),
-        generoOptions: await NotificacaoService.getGeneroOptions(),
-        racaOptions: await NotificacaoService.getRacaOptions(),
-        escolaridadeOptions: await NotificacaoService.getEscolaridadeOptions(),
-        atendimentoOptions: await NotificacaoService.getAtendimentoOptions(),
-        sintomaOptions: await NotificacaoService.getSintomaOptions(),
-        hipoteseDiagOptions: await NotificacaoService.getHipoteseDiagOptions(),
-        traumaOptions: await NotificacaoService.getTraumaOptions(),
-        estabelecimentoOptions: await NotificacaoService.getEstabelecimentoOptions(),
-        encerramentoOptions: await NotificacaoService.getEncerramentoOptions(),
-      };
-
-      // Ajustar datas antes de exportar
-      const formattedData = adjustDatesForExport(dataToExport);
-
-      // Exportar com base no formato escolhido
-      if (format === 'csv') {
-        exportListToCSV(formattedData, options);
-        toast.success(`CSV exportado com sucesso`);
-      } else if (format === 'excel') {
-        exportListToExcel(formattedData, options);
-        toast.success(`Dados exportados com sucesso para Excel`);
-      } else if (format === 'pdf') {
-        // Usar a nova função com opções de PDF
-        exportListToPDFWithOptions(formattedData, options, pdfType || 'both');
-        
-        // Mensagens específicas baseadas no tipo de PDF
-        const pdfMessages = {
-          'table': 'PDF da tabela resumida exportado com sucesso',
-          'forms': 'PDF das fichas detalhadas exportado com sucesso',
-          'both': 'PDF completo (tabela + fichas) exportado com sucesso'
-        };
-        
-        toast.success(pdfMessages[pdfType || 'both']);
-      }
-
-    } catch (error) {
-      console.error(`Erro ao exportar ${format}:`, error);
-      setError(`Erro ao exportar ${format}. Tente novamente.`);
-
-      if (error instanceof Error) {
-        toast.error(`Erro na exportação: ${error.message}`);
-      } else {
-        toast.error("Erro na exportação. Tente novamente.");
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // ✅ RETORNAR: Estados e funções
   return {
-    // Estados
+    // Estados existentes
     notificacoes,
     allNotificacoes,
     paginationMeta,
@@ -447,6 +713,13 @@ export const useNotifications = () => {
     error,
     isLoading,
     hasSearched,
+    
+    // ✅ Estados offline
+    isOnline,
+    isReadyForOffline: isReadyForOffline(),
+    offlineStatusMessage: getOfflineStatusMessage(),
+    hasDataToSync: hasDataToSync(),
+    pendingData,
     
     // Setters
     setSearchParams,

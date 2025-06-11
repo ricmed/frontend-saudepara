@@ -50,11 +50,12 @@ export const translations: TranslationsType = {
     "nav.map": "Mapa",
     "nav.campaigns": "Campanhas",
     "nav.entrar": "Entrar",
-    
-    // Menu Lateral
+      // Menu Lateral
+    "menu.home": "Início",
     "menu.qualify_establishments": "Qualificar Estabelecimentos",
     "menu.notification": "Módulo Notificação",
     "menu.dashboard": "Dashboard",
+    "menu.offline_management": "Dados Offline",
     "menu.educational": "Materiais Educativos",
     "menu.apps": "Apps Auxiliares",
     "menu.security": "Segurança",
@@ -236,17 +237,18 @@ export const translations: TranslationsType = {
     "points.emergency.desc": "24-hour emergency care",
     "points.laboratory": "Laboratory",
     "points.laboratory.desc": "Laboratory tests and examinations",
-    
-    // Navigation
+      // Navigation
     "nav.home": "Home",
     "nav.map": "Map",
     "nav.campaigns": "Campaigns",
     "nav.entrar": "Login",
     
     // Side Menu
+    "menu.home": "Home",
     "menu.qualify_establishments": "Qualify Establishments",
     "menu.notification": "Notification Module",
     "menu.dashboard": "Dashboard",
+    "menu.offline_management": "Offline Data",
     "menu.educational": "Educational Materials",
     "menu.apps": "Auxiliary Apps",
     "menu.security": "Security",
@@ -428,17 +430,18 @@ export const translations: TranslationsType = {
     "points.emergency.desc": "Atención de emergencia las 24 horas",
     "points.laboratory": "Laboratorio",
     "points.laboratory.desc": "Pruebas y exámenes de laboratorio",
-    
-    // Navegación
+      // Navegación
     "nav.home": "Inicio",
     "nav.map": "Mapa",
     "nav.campaigns": "Campañas",
     "nav.entrar": "Iniciar Sesión",
     
     // Menú Lateral
+    "menu.home": "Inicio",
     "menu.qualify_establishments": "Calificar Establecimientos",
     "menu.notification": "Módulo de Notificación",
     "menu.dashboard": "Dashboard",
+    "menu.offline_management": "Datos Sin Conexión",
     "menu.educational": "Materiales Educativos",
     "menu.apps": "Apps Auxiliares",
     "menu.security": "Seguridad",
@@ -619,17 +622,18 @@ export const translations: TranslationsType = {
     "points.emergency.desc": "24小时紧急护理",
     "points.laboratory": "实验室",
     "points.laboratory.desc": "实验室测试和检查",
-    
-    // 导航
+      // 导航
     "nav.home": "首页",
     "nav.map": "地图",
     "nav.campaigns": "活动",
     "nav.entrar": "登录",
     
     // 侧边菜单
+    "menu.home": "首页",
     "menu.qualify_establishments": "认证机构",
     "menu.notification": "通知模块",
     "menu.dashboard": "仪表板",
+    "menu.offline_management": "离线数据",
     "menu.educational": "教育材料",
     "menu.apps": "辅助应用",
     "menu.security": "安全",
@@ -810,8 +814,7 @@ export const translations: TranslationsType = {
     "points.emergency.desc": "Soins d'urgence 24 heures sur 24",
     "points.laboratory": "Laboratoire",
     "points.laboratory.desc": "Tests et examens de laboratoire",
-    
-    // Navigation
+      // Navigation
     "nav.home": "Accueil",
     "nav.map": "Carte",
     "nav.campaigns": "Campagnes",
@@ -824,9 +827,11 @@ export const translations: TranslationsType = {
     "carousel.goToSlide": "Aller à la diapositive {number}",
     
     // Menu Latéral
-    "menu.qualify_establishments": "Calificar Establecimientos",
+    "menu.home": "Accueil",
+    "menu.qualify_establishments": "Qualifier les Établissements",
     "menu.notification": "Module de Notification",
     "menu.dashboard": "Tableau de Bord",
+    "menu.offline_management": "Données Hors Ligne",
     "menu.educational": "Matériaux Éducatifs",
     "menu.apps": "Applications Auxiliaires",
     "menu.security": "Sécurité",
@@ -999,14 +1004,15 @@ export const translations: TranslationsType = {
     "points.emergency": "طوارئ",
     "points.emergency.desc": "رعاية طارئة على مدار 24 ساعة",
     "points.laboratory": "مختبر",
-    "points.laboratory.desc": "اختبارات وفحوصات مخبرية",
-    "nav.home": "الرئيسية",
+    "points.laboratory.desc": "اختبارات وفحوصات مخبرية",    "nav.home": "الرئيسية",
     "nav.map": "الخريطة",
     "nav.campaigns": "الحملات",
     "nav.entrar": "تسجيل الدخول",
+    "menu.home": "الرئيسية",
     "menu.qualify_establishments": "تأهيل المؤسسات",
     "menu.notification": "وحدة الإشعارات",
     "menu.dashboard": "لوحة التحكم",
+    "menu.offline_management": "البيانات غير المتصلة",
     "menu.educational": "مواد تعليمية",
     "menu.apps": "تطبيقات مساعدة",
     "menu.security": "الأمان",
@@ -1171,14 +1177,15 @@ export const translations: TranslationsType = {
     "points.emergency": "Скорая помощь",
     "points.emergency.desc": "Круглосуточная экстренная помощь",
     "points.laboratory": "Лаборатория",
-    "points.laboratory.desc": "Лабораторные анализы и обследования",
-    "nav.home": "Главная",
+    "points.laboratory.desc": "Лабораторные анализы и обследования",    "nav.home": "Главная",
     "nav.map": "Карта",
     "nav.campaigns": "Кампании",
     "nav.entrar": "Войти",
+    "menu.home": "Главная",
     "menu.qualify_establishments": "Квалификация учреждений",
     "menu.notification": "Модуль уведомлений",
     "menu.dashboard": "Панель управления",
+    "menu.offline_management": "Автономные данные",
     "menu.educational": "Образовательные материалы",
     "menu.apps": "Вспомогательные приложения",
     "menu.security": "Безопасность",

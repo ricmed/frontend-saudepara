@@ -70,11 +70,12 @@ export type TranslationRecord = {
   'logout.confirmation.confirm': string;
   'logout.confirmation.cancel': string;
 
-
-  // Menu Lateral/Side Menu
+  // Side Menu
+  'menu.home': string;
   'menu.qualify_establishments': string;
   'menu.notification': string;
   'menu.dashboard': string;
+  'menu.offline_management': string;
   'menu.educational': string;
   'menu.apps': string;
   'menu.security': string;
@@ -139,13 +140,13 @@ export type TranslationRecord = {
   'healthCampaigns.errorLoading': string;
   'healthCampaigns.tabs.campanhas': string;
   'healthCampaigns.tabs.favoritos': string;
-  'healthCampaigns.tabs.recentes': string;
-  'healthCampaigns.footerCopyright': string;
+  'healthCampaigns.tabs.recentes': string;  'healthCampaigns.footerCopyright': string;
   'healthCampaigns.footer.about': string;
   'healthCampaigns.footer.contact': string;
   'healthCampaigns.footer.privacy': string;
   'healthCampaigns.footer.terms': string;
   'healthCampaigns.addToFavorites': string;
+  'healthCampaigns.removeFromFavorites': string;
   [key: `healthCampaigns.${string}.cardTitle`]: string;
   [key: `healthCampaigns.${string}.cardDescription`]: string;
   

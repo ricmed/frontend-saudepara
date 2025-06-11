@@ -6,6 +6,7 @@ import axios from 'axios';
 import { debounce } from 'lodash';
 import syncService from '@/services/syncService';
 import indexedDBService from '@/services/indexedDB';
+import { useOfflineSystem } from '@/hooks/useOfflineSystem';
 import { 
   FormData, 
   EventoOption, 
@@ -108,6 +109,20 @@ const initialFormData: FormData = {
 export const useNotificationForm = (isEditMode: boolean = false, id?: string) => {
   const navigate = useNavigate();
   
+  // ✅ INTEGRAR com sistema offline
+  const {
+    isOnline: systemIsOnline,
+    searchPatientsOfflineSafe,
+    savePatientOfflineSafe,
+    saveNotificationOfflineSafe,
+    checkCpfOfflineSafe,
+    getOfflineStatusMessage,
+    isReadyForOffline,
+    hasDataToSync,
+    pendingData: systemPendingData,
+    syncPendingData
+  } = useOfflineSystem();
+  
   // Estado para o formulário
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -117,10 +132,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
   const [apiError, setApiError] = useState<string | null>(null);
-  
-  // Estados para offline
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [pendingCount, setPendingCount] = useState({ notificacoes: 0, pacientes: 0 });
   
   // Estado para busca de pacientes
   const [pacienteSuggestions, setPacienteSuggestions] = useState<Paciente[]>([]);
@@ -170,51 +181,20 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     setExpandedSections,
     toggleSection 
   } = sectionExpansion;
-
-  // Monitoramento de conexão
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  // Contador de pendentes
-  useEffect(() => {
-    const updateCount = async () => {
-      try {
-        const count = await syncService.getPendingCount();
-        setPendingCount(count);
-      } catch (error) {
-        console.error('Erro ao atualizar contador:', error);
-      }
-    };
-
-    updateCount();
-    const interval = setInterval(updateCount, 10000);
-    return () => clearInterval(interval);
-  }, []);
+  // Monitoramento de conexão - REMOVIDO (gerenciado pelo useOfflineSystem)
+  
+  // Contador de pendentes - REMOVIDO (gerenciado pelo useOfflineSystem)
 
   // Função de sincronização manual
   const handleForceSync = async () => {
-    if (!isOnline) {
+    if (!systemIsOnline) {
       setApiError("Você está offline. Não é possível sincronizar agora.");
       return;
     }
 
     try {
       setIsSaving(true);
-      await syncService.forceSyncData();
-      
-      // Atualizar contador após sync
-      const count = await syncService.getPendingCount();
-      setPendingCount(count);
+      await syncPendingData();
       
       toast.success("Dados sincronizados com sucesso!");
     } catch (error) {
@@ -230,7 +210,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
     try {
       // ✅ USAR SISTEMA OFFLINE
-      return await syncService.checkCpfExists(cpf);
+      return await checkCpfOfflineSafe(cpf);
     } catch (error) {
       console.error("Erro ao verificar CPF:", error);
       return false;
@@ -1002,7 +982,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       setErrors(newErrors);
     }
   };
-
   // Handler para mudança no campo paciente
   const handlePacienteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { value } = e.target;
@@ -1015,8 +994,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       pacienteId: undefined, // Limpar o ID porque estamos digitando um novo nome
     }));
 
-    // Limpar sugestões se estiverem sendo mostradas
-    if (showSuggestions) {
+    // ✅ ADICIONAR: Buscar pacientes se tiver 3+ caracteres
+    if (normalizedValue.length >= 3) {
+      searchPacientes(normalizedValue);
+    } else {
       setShowSuggestions(false);
       setPacienteSuggestions([]);
     }
@@ -1115,7 +1096,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     setErrors({});
     setShowSuggestions(false);
   };
-
   // Criar novo paciente com base nos dados do formulário
   const criarNovoPaciente = async () => {
     setIsCreatingNewPatient(true);
@@ -1134,7 +1114,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         cbo_idcbo: formData.profissao || null,
       };
 
-      const pacienteCriado = await syncService.savePaciente(novoPaciente);
+      const pacienteCriado = await savePatientOfflineSafe(novoPaciente);
 
       // Atualizar o formData com o novo paciente e seu ID
       const pacienteUpperCase = toUpperCaseAllStrings(pacienteCriado);
@@ -1143,7 +1123,11 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         pacienteId: pacienteUpperCase.idpaciente,
       }));
 
-      toast.success("Novo paciente criado com sucesso!");
+      const message = systemIsOnline 
+        ? "Novo paciente criado com sucesso!" 
+        : "Paciente salvo offline. Será sincronizado quando conectar.";
+      
+      toast.success(message);
     } catch (error) {
       console.error("Erro ao criar novo paciente:", error);
       toast.error("Erro ao criar novo paciente. Por favor, tente novamente.");
@@ -1276,9 +1260,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           nomeMae: formData.nomeMae,
           dataNascimento: formData.dataNascimento,
           cpf: formData.cpf
-        });
-
-        // ✅ USAR SISTEMA OFFLINE
+        });        // ✅ USAR SISTEMA OFFLINE
         const novoPaciente = {
           nome: formData.paciente.toUpperCase(),
           nome_mae: formData.nomeMae?.toUpperCase() || "",
@@ -1292,7 +1274,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           cbo_idcbo: formData.profissao ? parseInt(formData.profissao) : null
         };
 
-        const pacienteCriado = await syncService.savePaciente(novoPaciente);
+        const pacienteCriado = await savePatientOfflineSafe(novoPaciente);
         formData.pacienteId = pacienteCriado.idpaciente;
 
         console.log("Paciente criado automaticamente com ID:", pacienteCriado.idpaciente);
@@ -1416,12 +1398,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       console.log("Iniciando salvamento da notificação...");
       
       // Converter todos os dados para caixa alta antes de enviar
-      const formDataUpperCase = toUpperCaseAllStrings(formData);
-
-      // Usar sistema offline para criação ou online para edição
+      const formDataUpperCase = toUpperCaseAllStrings(formData);      // Usar sistema offline para criação ou online para edição
       if (isEditMode && id) {
         // Para edição, verificar se está online
-        if (!isOnline) {
+        if (!systemIsOnline) {
           setApiError("Não é possível editar notificações offline. Conecte-se à internet.");
           setIsSaving(false);
           return;
@@ -1436,15 +1416,11 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       } else {
         // Para criação, usar sistema offline
         console.log("Criando nova notificação via sistema offline");
-        await syncService.saveNotificacao(formDataUpperCase);
+        await saveNotificationOfflineSafe(formDataUpperCase);
         console.log("Notificação salva (online ou offline conforme disponibilidade)");
         setIsSuccess(true);
         
-        // Atualizar contador de pendentes
-        const count = await syncService.getPendingCount();
-        setPendingCount(count);
-        
-        toast.success(isOnline ? "Notificação criada com sucesso" : "Notificação salva offline");
+        toast.success(systemIsOnline ? "Notificação criada com sucesso" : "Notificação salva offline");
       }
 
       // Redirecionar para página de listagem ou detalhes após um breve delay
@@ -1809,6 +1785,37 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     fetchHipoteses();
   }, [formData.sinaisESintomas, formData.tipoAtendimento, hipoteseDiagOptions]);
 
+  // ✅ NOVA FUNÇÃO: Buscar pacientes com sistema offline
+  const searchPacientes = useCallback(
+    debounce(async (query: string) => {
+      if (!query || query.length < 3) {
+        setPacienteSuggestions([]);
+        setShowSuggestions(false);
+        return;
+      }
+
+      try {
+        console.log('🔍 Buscando pacientes:', query);
+        const results = await searchPatientsOfflineSafe(query);
+        
+        if (results && results.length > 0) {
+          setPacienteSuggestions(results);
+          setShowSuggestions(true);
+          console.log(`✅ Encontrados ${results.length} pacientes`);
+        } else {
+          setPacienteSuggestions([]);
+          setShowSuggestions(false);
+          console.log('ℹ️ Nenhum paciente encontrado');
+        }
+      } catch (error) {
+        console.error('Erro ao buscar pacientes:', error);
+        setPacienteSuggestions([]);
+        setShowSuggestions(false);
+      }
+    }, 500),
+    [searchPatientsOfflineSafe]
+  );
+
   // Retornar todos os estados e funções necessários
   return {
     formData,
@@ -1877,13 +1884,15 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     
     // Hipóteses diagnósticas filtradas
     hipoteseDiagFiltradas,
-    isLoadingHipoteses,
-    isTipoAtendimentoFunc: (tipo: string) => isTipoAtendimento(tipo, formData.tipoAtendimento, atendimentoOptions),
+    isLoadingHipoteses,    isTipoAtendimentoFunc: (tipo: string) => isTipoAtendimento(tipo, formData.tipoAtendimento, atendimentoOptions),
     isTipoEncerramentoFunc: (tipo: string) => isTipoEncerramento(tipo, formData.tipoEncerramento, encerramentoOptions),
 
-    // Retornos para offline
-    isOnline,
-    pendingCount,
+    // ✅ Retornos do sistema offline
+    isOnline: systemIsOnline,
+    pendingCount: systemPendingData,
+    offlineStatusMessage: getOfflineStatusMessage(),
+    isReadyForOffline: isReadyForOffline(),
+    hasDataToSync: hasDataToSync(),
     handleForceSync
   };
 };
