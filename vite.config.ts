@@ -107,7 +107,7 @@ export default defineConfig({
           // 1) Trata /api/paciente/check-cpf/########### sempre como NetworkOnly
           {
             urlPattern: /^https:\/\/app-api\.hml\.saude\.pa\.gov\.br\/api\/paciente\/check-cpf\/\d{11}.*$/i,
-            handler: 'NetworkOnly',
+            handler: 'NetworkFirst',
             options: {
               cacheName: 'check-cpf-network-only',
               networkTimeoutSeconds: 5

@@ -67,7 +67,7 @@ if (!self.define) {
     });
   };
 }
-define(['./workbox-8c44f358'], (function (workbox) { 'use strict';
+define(['./workbox-26eaab98'], (function (workbox) { 'use strict';
 
   self.skipWaiting();
   workbox.clientsClaim();
@@ -79,13 +79,18 @@ define(['./workbox-8c44f358'], (function (workbox) { 'use strict';
    */
   workbox.precacheAndRoute([{
     "url": "/index.html",
-    "revision": "0.iloi1vb8v98"
+    "revision": "0.0sh9ascbd7g"
   }], {});
   workbox.cleanupOutdatedCaches();
   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("/index.html"), {
     allowlist: [/^\/$/],
     denylist: [/^\/_/, /\/[^/?]+\.[^/]+$/, /^\/api/]
   }));
+  workbox.registerRoute(/^https:\/\/app-api\.hml\.saude\.pa\.gov\.br\/api\/paciente\/check-cpf\/\d{11}.*$/i, new workbox.NetworkFirst({
+    "cacheName": "check-cpf-network-only",
+    "networkTimeoutSeconds": 5,
+    plugins: []
+  }), 'GET');
   workbox.registerRoute(/^https:\/\/app-api\.hml\.saude\.pa\.gov\.br\/api\/(tipo-|componentes|estabelecimentos).*$/i, new workbox.CacheFirst({
     "cacheName": "api-tipos-cache",
     plugins: [new workbox.ExpirationPlugin({
