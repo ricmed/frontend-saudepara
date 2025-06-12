@@ -226,55 +226,49 @@ class OfflineDataManager {
       priority: 3, 
       estimatedSize: 11000,
       category: 'administrative'
-    },
-
-    // ===== DADOS DE PACIENTES (Prioridade especial) =====
+    },    // ✅ CORRIGIDO: DADOS DE PACIENTES PARA VERIFICAÇÃO (não sincronizar)
     { 
-      key: 'pacientes-cpfs', 
-      name: 'Lista de CPFs (Pacientes)', 
+      key: 'pacientes-verificacao', 
+      name: 'Lista de Pacientes (Verificação CPF)', 
       fetchFn: async () => {
-        const cpfs = await PacienteService.getAllCPFs();
-        return cpfs.map(cpf => ({ cpf })); // Converter para formato de objeto
+        console.log('📥 Baixando pacientes para verificação de CPF...');
+        const pacientes = await PacienteService.getAllPatientsForOffline();
+        
+        // ✅ IMPORTANTE: Salvar no cache de verificação, não como pacientes para sincronizar
+        await indexedDBService.savePacientesParaCache(pacientes);
+        
+        console.log(`✅ ${pacientes.length} pacientes salvos no cache de verificação`);
+        return [{ info: `${pacientes.length} pacientes para verificação` }]; // Retorno informativo apenas
       }, 
       priority: 2, 
       estimatedSize: 0, // Será calculado dinamicamente
-      category: 'essential' // CPFs são essenciais para verificação
-    },
-    { 
-      key: 'pacientes-recentes', 
-      name: 'Pacientes Recentes (12 meses)', 
-      fetchFn: async () => {
-        return await PacienteService.getRecentPatientsForOffline(12);
-      }, 
-      priority: 3, 
-      estimatedSize: 0, // Será calculado dinamicamente
-      category: 'administrative'
-    },
-    { 
-      key: 'pacientes-completos', 
-      name: 'Base Completa de Pacientes', 
-      fetchFn: async () => {
-        return await PacienteService.getAllPatientsForOffline();
-      }, 
-      priority: 3, 
-      estimatedSize: 0, // Será calculado dinamicamente
-      category: 'administrative'
+      category: 'essential' // Verificação de CPF é essencial
     }
   ];
-
   // Verificar quais dados estão em cache
   async checkCachedData(): Promise<Record<string, { loaded: boolean; count: number; lastUpdate?: Date }>> {
     const status: Record<string, { loaded: boolean; count: number; lastUpdate?: Date }> = {};
     
     for (const source of this.dataSources) {
       try {
-        const cachedData = await indexedDBService.getOpcoes(source.key);
-        const dataLength = cachedData?.length || 0;
-        status[source.key] = {
-          loaded: !!(cachedData && dataLength > 0),
-          count: dataLength,
-          lastUpdate: dataLength > 0 ? new Date() : undefined
-        };
+        if (source.key === 'pacientes-verificacao') {
+          // ✅ Para verificação de pacientes, verificar cache específico
+          const cacheStats = await indexedDBService.getCacheStats();
+          status[source.key] = {
+            loaded: cacheStats.verificacao > 0,
+            count: cacheStats.verificacao,
+            lastUpdate: cacheStats.verificacao > 0 ? new Date() : undefined
+          };
+        } else {
+          // Para outros dados, usar método normal
+          const cachedData = await indexedDBService.getOpcoes(source.key);
+          const dataLength = cachedData?.length || 0;
+          status[source.key] = {
+            loaded: !!(cachedData && dataLength > 0),
+            count: dataLength,
+            lastUpdate: dataLength > 0 ? new Date() : undefined
+          };
+        }
       } catch {
         status[source.key] = { loaded: false, count: 0 };
       }
@@ -324,16 +318,25 @@ class OfflineDataManager {
         onProgress?.(completed / total * 100, source.name, completed, total, source.category);
         
         const data = await source.fetchFn();
-        
-        if (data && Array.isArray(data) && data.length > 0) {
-          await indexedDBService.saveOpcoes(source.key, data);
-          totalRecords += data.length;
+          if (data && Array.isArray(data) && data.length > 0) {
+          // ✅ VERIFICAR se é dados de verificação de pacientes
+          if (source.key === 'pacientes-verificacao') {
+            // Para dados de verificação, o salvamento já foi feito na fetchFn
+            // Não salvar novamente em opcoes
+            console.log(`✅ ${source.name}: Dados salvos no cache de verificação`);
+            totalRecords += 1; // Contagem simbólica
+          } else {
+            // Para outros dados, salvar normalmente
+            await indexedDBService.saveOpcoes(source.key, data);
+            totalRecords += data.length;
+            console.log(`✅ ${source.name}: ${data.length} registros salvos`);
+          }
           
           details.push({
             key: source.key,
             name: source.name,
             category: source.category,
-            recordCount: data.length,
+            recordCount: source.key === 'pacientes-verificacao' ? 'Cache atualizado' : data.length,
             duration: Date.now() - startTime,
             success: true
           });
@@ -417,11 +420,63 @@ class OfflineDataManager {
     return result;
   }
 
+  // ✅ NOVO: Download específico para verificação de CPF
+  async downloadPatientsForVerification(
+    onProgress?: (progress: number, current: string) => void
+  ): Promise<{ success: boolean; count: number; error?: string }> {
+    try {
+      onProgress?.(10, 'Analisando estratégia...');
+      
+      const recommendation = await PacienteService.getDownloadRecommendation();
+      
+      onProgress?.(30, 'Baixando pacientes para verificação...');
+      
+      let pacientes: any[] = [];
+      
+      if (recommendation.totalPatients > 50000) {
+        // Para bases muito grandes, baixar apenas CPFs
+        const cpfs = await PacienteService.getAllCPFs();
+        pacientes = cpfs.map(cpf => ({ cpf, nome: 'CPF_ONLY' }));
+        
+      } else if (recommendation.totalPatients > 15000) {
+        // Para bases grandes, baixar pacientes recentes
+        pacientes = await PacienteService.getRecentPatientsForOffline(12);
+        
+      } else {
+        // Para bases pequenas, baixar todos
+        pacientes = await PacienteService.getAllPatientsForOffline();
+      }
+      
+      onProgress?.(80, 'Salvando no cache...');
+      
+      // ✅ Salvar no cache de verificação
+      await indexedDBService.savePacientesParaCache(pacientes);
+      
+      onProgress?.(100, `${pacientes.length} pacientes salvos`);
+      
+      return {
+        success: true,
+        count: pacientes.length
+      };
+      
+    } catch (error) {
+      console.error('Erro no download de verificação:', error);
+      return {
+        success: false,
+        count: 0,
+        error: error instanceof Error ? error.message : 'Erro desconhecido'
+      };
+    }
+  }
   // Limpar dados offline
   async clearOfflineData(): Promise<void> {
     for (const source of this.dataSources) {
       try {
-        await indexedDBService.saveOpcoes(source.key, []);
+        if (source.key === 'pacientes-verificacao') {
+          await indexedDBService.clearPacientesCache();
+        } else {
+          await indexedDBService.saveOpcoes(source.key, []);
+        }
       } catch (error) {
         console.error(`Erro ao limpar ${source.key}:`, error);
       }
@@ -476,8 +531,7 @@ class OfflineDataManager {
     
     const totalLoaded = Object.values(categoryStats).reduce((sum, cat) => sum + cat.loaded, 0);
     const totalItems = this.dataSources.length;
-    
-    // Adicionar estatísticas específicas de pacientes
+      // Adicionar estatísticas específicas de pacientes
     const patientsStatus = await this.getPatientsStatus();
     
     return {
@@ -540,7 +594,6 @@ class OfflineDataManager {
       };
     }
   }
-
   // Download inteligente de pacientes
   async downloadPatientsIntelligent(
     onProgress?: (progress: number, current: string, phase: string) => void
@@ -554,24 +607,19 @@ class OfflineDataManager {
       onProgress?.(20, `Estratégia: ${strategy.recommendation}`, 'strategy');
       
       let sourceKey: string;
-      let sourceName: string;
       
       switch (strategy.recommendation) {
         case 'cpfs-only':
           sourceKey = 'pacientes-cpfs';
-          sourceName = 'Lista de CPFs';
           break;
         case 'recent':
           sourceKey = 'pacientes-recentes';
-          sourceName = 'Pacientes Recentes';
           break;
         case 'full':
           sourceKey = 'pacientes-completos';
-          sourceName = 'Base Completa';
           break;
         default:
           sourceKey = 'pacientes-cpfs';
-          sourceName = 'Lista de CPFs';
       }
       
       const result = await this.downloadSpecificSource(
@@ -596,7 +644,6 @@ class OfflineDataManager {
       };
     }
   }
-
   // Download de fonte específica
   async downloadSpecificSource(
     sourceKey: string,
@@ -610,46 +657,20 @@ class OfflineDataManager {
     try {
       onProgress?.(20, `Iniciando download: ${source.name}`);
       
-      let data: any[];
-      
-      if (sourceKey === 'pacientes-cpfs') {
-        // Download com progresso para CPFs
-        onProgress?.(40, 'Baixando lista de CPFs...');
-        const cpfs = await PacienteService.getAllCPFs();
-        data = cpfs.map(cpf => ({ cpf }));
-        
-      } else if (sourceKey === 'pacientes-recentes') {
-        // Download com progresso para pacientes recentes
-        data = await PacienteService.getRecentPatientsForOffline(
-          12,
-          (current, total, percentage) => {
-            onProgress?.(40 + (percentage * 0.4), `${current}/${total} pacientes recentes`);
-          }
-        );
-        
-      } else if (sourceKey === 'pacientes-completos') {
-        // Download com progresso para todos os pacientes
-        data = await PacienteService.getAllPatientsForOffline(
-          (current, total, percentage) => {
-            onProgress?.(40 + (percentage * 0.4), `${current}/${total} pacientes`);
-          }
-        );
-        
-      } else {
-        // Usar função padrão para outras fontes
-        data = await source.fetchFn();
-      }
+      const data = await source.fetchFn();
       
       onProgress?.(85, 'Salvando no cache...');
       
       if (data && Array.isArray(data) && data.length > 0) {
-        await indexedDBService.saveOpcoes(sourceKey, data);
-        onProgress?.(100, `${data.length} registros salvos`);
-        
-        return {
-          success: true,
-          recordCount: data.length
-        };
+        if (source.key === 'pacientes-verificacao') {
+          // Para verificação, o salvamento já foi feito
+          onProgress?.(100, `Cache de pacientes atualizado`);
+          return { success: true, recordCount: data.length };
+        } else {
+          await indexedDBService.saveOpcoes(sourceKey, data);
+          onProgress?.(100, `${data.length} registros salvos`);
+          return { success: true, recordCount: data.length };
+        }
       } else {
         throw new Error('Nenhum dado retornado');
       }
@@ -662,63 +683,58 @@ class OfflineDataManager {
       };
     }
   }
-
-  // Verificar status dos dados de pacientes
+  // ✅ CORRIGIDO: Status dos dados de pacientes
   async getPatientsStatus(): Promise<{
-    cpfsList: { loaded: boolean; count: number };
-    recentPatients: { loaded: boolean; count: number };
-    fullPatients: { loaded: boolean; count: number };
+    verification: { loaded: boolean; count: number };
+    localPatients: { loaded: boolean; count: number };
+    pendingSync: { loaded: boolean; count: number };
     recommendation: string;
     confidence: 'high' | 'medium' | 'low';
   }> {
-    const status = await this.checkCachedData();
+    const cacheStats = await indexedDBService.getCacheStats();
     
-    const cpfsList = {
-      loaded: status['pacientes-cpfs']?.loaded || false,
-      count: status['pacientes-cpfs']?.count || 0
+    const verification = {
+      loaded: cacheStats.verificacao > 0,
+      count: cacheStats.verificacao
     };
     
-    const recentPatients = {
-      loaded: status['pacientes-recentes']?.loaded || false,
-      count: status['pacientes-recentes']?.count || 0
+    const localPatients = {
+      loaded: cacheStats.locais > 0,
+      count: cacheStats.locais
     };
     
-    const fullPatients = {
-      loaded: status['pacientes-completos']?.loaded || false,
-      count: status['pacientes-completos']?.count || 0
+    const pendingSync = {
+      loaded: cacheStats.pendentes > 0,
+      count: cacheStats.pendentes
     };
     
     // Determinar recomendação e confiança
-    let recommendation = 'Baixar dados de pacientes';
+    let recommendation = 'Baixar dados de pacientes para verificação';
     let confidence: 'high' | 'medium' | 'low' = 'low';
     
-    if (fullPatients.loaded && fullPatients.count > 0) {
-      recommendation = 'Base completa disponível';
+    if (verification.count > 10000) {
+      recommendation = 'Cache de verificação completo';
       confidence = 'high';
-    } else if (recentPatients.loaded && recentPatients.count > 5000) {
-      recommendation = 'Pacientes recentes disponíveis';
-      confidence = 'high';
-    } else if (cpfsList.loaded && cpfsList.count > 10000) {
-      recommendation = 'Lista de CPFs disponível';
+    } else if (verification.count > 5000) {
+      recommendation = 'Cache de verificação parcial';
       confidence = 'medium';
-    } else if (cpfsList.loaded && cpfsList.count > 1000) {
-      recommendation = 'Lista de CPFs limitada';
+    } else if (verification.count > 1000) {
+      recommendation = 'Cache de verificação limitado';
       confidence = 'medium';
     }
     
     return {
-      cpfsList,
-      recentPatients,
-      fullPatients,
+      verification,
+      localPatients,
+      pendingSync,
       recommendation,
       confidence
     };
   }
-
-  // Verificação otimizada de CPF usando os dados em cache
+  // ✅ CORRIGIDO: Verificação otimizada de CPF
   async checkCpfExistsOptimized(cpf: string): Promise<{
     exists: boolean;
-    source: 'cpf-list' | 'recent-patients' | 'full-patients' | 'not-found';
+    source: 'verification-cache' | 'local-patients' | 'not-found';
     confidence: 'high' | 'medium' | 'low';
   }> {
     if (!cpf || cpf.length !== 11) {
@@ -726,80 +742,57 @@ class OfflineDataManager {
     }
 
     try {
-      // 1. Verificar na lista de CPFs primeiro (mais rápido)
-      const cpfsList = await indexedDBService.getOpcoes('pacientes-cpfs');
-      if (cpfsList && cpfsList.some((item: any) => item.cpf === cpf)) {
-        return { exists: true, source: 'cpf-list', confidence: 'high' };
+      // ✅ A verificação agora usa o cache separado corretamente
+      const exists = await indexedDBService.checkCpfExists(cpf);
+      
+      if (exists) {
+        // Determinar a fonte (seria necessário modificar checkCpfExists para retornar a fonte)
+        return { exists: true, source: 'verification-cache', confidence: 'high' };
       }
 
-      // 2. Verificar nos pacientes recentes
-      const recentPatients = await indexedDBService.getOpcoes('pacientes-recentes');
-      if (recentPatients && recentPatients.some((patient: any) => patient.cpf === cpf)) {
-        return { exists: true, source: 'recent-patients', confidence: 'high' };
-      }
-
-      // 3. Verificar na base completa
-      const fullPatients = await indexedDBService.getOpcoes('pacientes-completos');
-      if (fullPatients && fullPatients.some((patient: any) => patient.cpf === cpf)) {
-        return { exists: true, source: 'full-patients', confidence: 'high' };
-      }
-
-      // 4. Verificar também no cache de pacientes do IndexedDB (dados criados offline)
-      const existsInCache = await indexedDBService.checkCpfExists(cpf);
-      if (existsInCache) {
-        return { exists: true, source: 'full-patients', confidence: 'high' };
-      }
-
-      // 5. Determinar confiança baseado no que temos em cache
-      const status = await this.getPatientsStatus();
-      let confidence: 'high' | 'medium' | 'low' = status.confidence;
-
-      return { exists: false, source: 'not-found', confidence };
+      // Determinar confiança baseado no cache
+      const stats = await this.getPatientsStatus();
+      
+      return { 
+        exists: false, 
+        source: 'not-found', 
+        confidence: stats.confidence 
+      };
       
     } catch (error) {
       console.error('Erro na verificação otimizada de CPF:', error);
       return { exists: false, source: 'not-found', confidence: 'low' };
     }
   }
-
   // Limpar dados de pacientes
   async clearPatientsData(): Promise<void> {
-    const patientsKeys = ['pacientes-cpfs', 'pacientes-recentes', 'pacientes-completos'];
-    
-    for (const key of patientsKeys) {
-      try {
-        await indexedDBService.saveOpcoes(key, []);
-      } catch (error) {
-        console.error(`Erro ao limpar ${key}:`, error);
-      }
+    try {
+      await indexedDBService.clearPacientesCache();
+      console.log('✅ Cache de verificação de pacientes limpo');
+    } catch (error) {
+      console.error('Erro ao limpar cache de pacientes:', error);
     }
-    
-    console.log('✅ Dados de pacientes limpos');
-  }
-
-  // Download de categoria específica incluindo pacientes
+  }  // Download de categoria específica incluindo pacientes
   async downloadPatientsCategory(
     strategy: 'cpfs-only' | 'recent' | 'full',
     onProgress?: (progress: number, current: string) => void
   ) {
-    const sourceMap = {
-      'cpfs-only': 'pacientes-cpfs',
-      'recent': 'pacientes-recentes',
-      'full': 'pacientes-completos'
-    };
+    // Esta funcionalidade agora é direcionada para o downloadPatientsForVerification
+    toast.info(`🔄 Baixando dados de verificação de CPF (${strategy})...`);
     
-    const sourceKey = sourceMap[strategy];
-    toast.info(`🔄 Baixando: ${strategy}...`);
-    
-    const result = await this.downloadSpecificSource(sourceKey, onProgress);
+    const result = await this.downloadPatientsForVerification(onProgress);
     
     if (result.success) {
-      toast.success(`✅ ${strategy} baixado! ${result.recordCount?.toLocaleString()} registros.`);
+      toast.success(`✅ Cache de verificação atualizado! ${result.count.toLocaleString()} registros.`);
     } else {
       toast.error(`❌ Erro no download: ${result.error}`);
     }
     
-    return result;
+    return {
+      success: result.success,
+      recordCount: result.count,
+      error: result.error
+    };
   }
 }
 

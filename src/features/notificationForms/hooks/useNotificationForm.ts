@@ -1885,14 +1885,16 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     // Hipóteses diagnósticas filtradas
     hipoteseDiagFiltradas,
     isLoadingHipoteses,    isTipoAtendimentoFunc: (tipo: string) => isTipoAtendimento(tipo, formData.tipoAtendimento, atendimentoOptions),
-    isTipoEncerramentoFunc: (tipo: string) => isTipoEncerramento(tipo, formData.tipoEncerramento, encerramentoOptions),
-
-    // ✅ Retornos do sistema offline
+    isTipoEncerramentoFunc: (tipo: string) => isTipoEncerramento(tipo, formData.tipoEncerramento, encerramentoOptions),    // ✅ Retornos do sistema offline
     isOnline: systemIsOnline,
     pendingCount: systemPendingData,
     offlineStatusMessage: getOfflineStatusMessage(),
     isReadyForOffline: isReadyForOffline(),
     hasDataToSync: hasDataToSync(),
-    handleForceSync
+    handleForceSync,
+    checkCpfOfflineSafe,
+
+    // CPF original para validação de duplicatas
+    originalCpf
   };
 };

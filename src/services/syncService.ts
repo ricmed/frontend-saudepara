@@ -1,6 +1,6 @@
 import indexedDBService from './indexedDB';
 import { NotificacaoService } from '@/services/NotificacaoService';
-import { PacienteService } from '@/services/PacienteService';
+import PacienteService from '@/services/PacienteService';
 import { salvarNotificacaoCompleta } from '@/utils/notificacaoAdapter';
 import { toast } from 'react-toastify';
 
@@ -49,7 +49,10 @@ class SyncService {
       clearInterval(this.syncInterval);
       this.syncInterval = null;
     }
-  }  async syncData() {
+  }
+
+  // ✅ CORRIGIDO: Sincronizar apenas dados criados localmente
+  async syncData() {
     if (!this.isOnline || this.isSyncing) return;
 
     this.isSyncing = true;
@@ -57,17 +60,32 @@ class SyncService {
     let errorCount = 0;
 
     try {
-      // ===== 1. SINCRONIZAR PACIENTES PRIMEIRO =====
+      // ===== 1. SINCRONIZAR APENAS PACIENTES CRIADOS LOCALMENTE =====
       const unsyncedPacientes = await indexedDBService.getUnsyncedPacientes();
-      const pacienteIdMapping: Map<number, number> = new Map(); // ID temporário → ID permanente
+      const pacienteIdMapping: Map<number, number> = new Map();
       
-      console.log(`🔄 Sincronizando ${unsyncedPacientes.length} pacientes...`);
-        for (const paciente of unsyncedPacientes) {
+      console.log(`🔄 Sincronizando ${unsyncedPacientes.length} pacientes criados localmente...`);
+      
+      // ✅ LOG: Verificar quais pacientes estão sendo sincronizados
+      console.log('📋 Pacientes para sincronizar:', unsyncedPacientes.map(p => ({
+        id: p.idpaciente,
+        nome: p.nome,
+        source: p.source,
+        synced: p.synced
+      })));
+        
+      for (const paciente of unsyncedPacientes) {
         try {
-          console.log(`👤 Sincronizando paciente: ${paciente.nome} (ID temp: ${paciente.idpaciente})`);
+          console.log(`👤 Sincronizando paciente local: ${paciente.nome} (ID temp: ${paciente.idpaciente})`);
+          
+          // ✅ VERIFICAÇÃO EXTRA: Confirmar que é paciente criado localmente
+          if (paciente.source !== 'local_creation' && paciente.source) {
+            console.log(`⚠️ Pulando paciente ${paciente.nome} - source: ${paciente.source} (não é criação local)`);
+            continue;
+          }
           
           // ✅ REMOVER CAMPOS QUE NÃO DEVEM SER ENVIADOS
-          const { idpaciente, synced, savedAt, syncedAt, savedOffline, ...pacienteData } = paciente;
+          const { idpaciente, synced, savedAt, syncedAt, savedOffline, source, ...pacienteData } = paciente;
           
           // ✅ VERIFICAR SE idpaciente EXISTE ANTES DE USAR
           if (!idpaciente) {
@@ -75,6 +93,12 @@ class SyncService {
             errorCount++;
             continue;
           }
+          
+          console.log(`📤 Enviando paciente para servidor:`, {
+            nome: pacienteData.nome,
+            cpf: pacienteData.cpf,
+            source_original: paciente.source
+          });
           
           // Criar paciente no servidor
           const result = await PacienteService.create(pacienteData);
@@ -87,16 +111,16 @@ class SyncService {
             continue;
           }
           
-          console.log(`✅ Paciente criado: ID temp ${idpaciente} → ID perm ${newPatientId}`);
+          console.log(`✅ Paciente criado no servidor: ID temp ${idpaciente} → ID perm ${newPatientId}`);
           
-          // ✅ AGORA É SEGURO USAR NO MAPEAMENTO (ambos são number garantido)
+          // ✅ AGORA É SEGURO USAR NO MAPEAMENTO
           pacienteIdMapping.set(idpaciente, newPatientId);
           
           // Marcar como sincronizado
           await indexedDBService.markPacienteAsSynced(idpaciente);
           syncedCount++;
           
-          console.log(`✅ Paciente ${paciente.nome} sincronizado`);
+          console.log(`✅ Paciente ${paciente.nome} sincronizado com sucesso`);
           
         } catch (error) {
           console.error(`❌ Erro ao sincronizar paciente ${paciente.idpaciente}:`, error);
@@ -114,7 +138,8 @@ class SyncService {
           
           // ✅ CRIAR CÓPIA DOS DADOS PARA MODIFICAR
           let formDataAtualizada = { ...formData } as any;
-            // ✅ ATUALIZAR ID DO PACIENTE SE NECESSÁRIO
+            
+          // ✅ ATUALIZAR ID DO PACIENTE SE NECESSÁRIO
           const pacienteIdAtual = formDataAtualizada.pacienteId || formDataAtualizada.paciente_idpaciente;
           
           // ✅ VERIFICAR SE É UM NÚMERO VÁLIDO ANTES DE USAR NO MAPEAMENTO
@@ -215,11 +240,12 @@ class SyncService {
     }
   }
 
-  // ===== MÉTODO AUXILIAR PARA DEBUG =====
+  // ===== MÉTODO AUXILIAR PARA DEBUG MELHORADO =====
   async debugPendingData(): Promise<void> {
     try {
       const pendingNotificacoes = await indexedDBService.getPendingNotificacoes();
       const unsyncedPacientes = await indexedDBService.getUnsyncedPacientes();
+      const cacheStats = await indexedDBService.getCacheStats();
       
       console.log('=== 🔍 DEBUG: DADOS PENDENTES ===');
       console.log(`📋 Notificações pendentes: ${pendingNotificacoes.length}`);
@@ -232,10 +258,15 @@ class SyncService {
         console.log(`     Tipo: ${pacienteId && pacienteId < 0 ? 'Temporário' : 'Permanente'}`);
       });
       
-      console.log(`👤 Pacientes não sincronizados: ${unsyncedPacientes.length}`);
+      console.log(`👤 Pacientes não sincronizados (criados localmente): ${unsyncedPacientes.length}`);
       unsyncedPacientes.forEach((pac, index) => {
-        console.log(`  ${index + 1}. ID: ${pac.idpaciente}, Nome: ${pac.nome}, Synced: ${pac.synced}`);
+        console.log(`  ${index + 1}. ID: ${pac.idpaciente}, Nome: ${pac.nome}, Source: ${pac.source}, Synced: ${pac.synced}`);
       });
+      
+      console.log('📊 Stats do cache:');
+      console.log(`  - Verificação: ${cacheStats.verificacao} registros`);
+      console.log(`  - Locais: ${cacheStats.locais} registros`);
+      console.log(`  - Pendentes: ${cacheStats.pendentes} registros`);
       
       if (pendingNotificacoes.length === 0 && unsyncedPacientes.length === 0) {
         console.log('✅ Nenhum dado pendente de sincronização!');
@@ -246,8 +277,9 @@ class SyncService {
     }
   }
 
-  // *** ADICIONAR MÉTODOS PARA USAR NOS FORMULÁRIOS ***
-    // Salvar notificação (online ou offline)
+  // *** MÉTODOS PARA USAR NOS FORMULÁRIOS ***
+    
+  // Salvar notificação (online ou offline)
   async saveNotificacao(formData: any): Promise<void> {
     if (this.isOnline) {
       try {
@@ -279,7 +311,8 @@ class SyncService {
     
     toast.success(message);
   }
-  // Salvar paciente (online ou offline)
+
+  // ✅ CORRIGIDO: Salvar paciente com marcação correta
   async savePaciente(pacienteData: any): Promise<any> {
     if (this.isOnline) {
       try {
@@ -292,14 +325,22 @@ class SyncService {
       }
     }
 
-    // ✅ GERAR ID TEMPORÁRIO NEGATIVO MAIS ROBUSTO
+    // ✅ IMPORTANTE: Marcar corretamente como criação local
     const tempId = -Math.abs(Date.now()); // Garantir que seja negativo
     const pacienteComId = { 
       ...pacienteData, 
       idpaciente: tempId,
-      synced: 'false', // String para consistência com IndexedDB
-      savedOffline: true 
+      synced: 'false',
+      source: 'local_creation', // ✅ CRUCIAL: Marcar como criação local
+      savedOffline: true,
+      savedAt: Date.now()
     };
+    
+    console.log(`💾 Salvando paciente offline como criação local:`, {
+      nome: pacienteComId.nome,
+      source: pacienteComId.source,
+      synced: pacienteComId.synced
+    });
     
     await indexedDBService.savePaciente(pacienteComId);
     
@@ -322,19 +363,19 @@ class SyncService {
       }
     }
 
-    // Buscar offline usando seu IndexedDBService
+    // ✅ USAR BUSCA MELHORADA QUE INCLUI CACHE DE VERIFICAÇÃO
     return await indexedDBService.searchPacientesExtended(query);
   }
 
-  // Verificar CPF (online ou offline)
+  // ✅ CORRIGIDO: Verificar CPF com cache melhorado
   async checkCpfExists(cpf: string): Promise<boolean> {
     if (!cpf || cpf.length !== 11) return false;
 
-    // ✅ SEMPRE VERIFICAR CACHE PRIMEIRO (mais rápido)
+    // ✅ SEMPRE VERIFICAR CACHE PRIMEIRO (mais rápido e inclui verificação + locais)
     try {
       const existsInCache = await indexedDBService.checkCpfExists(cpf);
       if (existsInCache) {
-        console.log('✅ CPF encontrado no cache local');
+        console.log('✅ CPF encontrado no cache (verificação ou local)');
         return true;
       }
     } catch (cacheError) {
@@ -381,7 +422,6 @@ class SyncService {
         console.log('⚠️ Erro de rede detectado, assumindo CPF não existe');
         
         // ✅ PARA ERROS DE REDE: assumir que CPF não existe (permitir cadastro)
-        // Isso é melhor que bloquear o usuário
         return false;
       }
       
@@ -391,7 +431,8 @@ class SyncService {
     }
   }
 
-  // *** SEU MÉTODO syncOpcoes EXISTENTE (não mexer) ***
+  // *** MÉTODOS EXISTENTES (não mexer) ***
+  
   async syncOpcoes(
     tipo: string, 
     fetchFn: () => Promise<any[]>, 
@@ -452,7 +493,6 @@ class SyncService {
     return await indexedDBService.getPendingCount();
   }
 
-  // *** SEU MÉTODO forceSyncData EXISTENTE (não mexer) ***
   async forceSyncData() {
     if (!this.isOnline) {
       toast.warning('Você está offline. Não é possível sincronizar agora.');

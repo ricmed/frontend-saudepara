@@ -155,9 +155,11 @@ const FormularioPaciente = ({
   const [expandedSections, setExpandedSections] = useState({
     identificacao_individuo: true,
   });
-
   // Estado para mostrar/esconder o popover de ajuda de identidade de gênero
   const [showGenderHelp, setShowGenderHelp] = useState<boolean>(false);
+
+  // Estado para mostrar mensagem de CPF disponível
+  const [cpfAvailableMessage, setCpfAvailableMessage] = useState<string | null>(null);
 
   // Adicionando estado para o SideMenu
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -616,7 +618,6 @@ const FormularioPaciente = ({
 
     return `${cleanCPF.substring(0, 3)}.${cleanCPF.substring(3, 6)}.${cleanCPF.substring(6, 9)}-${cleanCPF.substring(9)}`;
   };
-
   // ✅ FUNÇÃO MODIFICADA: Handler para CPF com sistema offline
   const handleCPFChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
@@ -626,6 +627,9 @@ const FormularioPaciente = ({
       ...prev,
       cpf: formattedCPF,
     }));
+
+    // Limpar mensagem de CPF disponível sempre que o usuário digitar
+    setCpfAvailableMessage(null);
 
     if (errors.cpf) {
       setErrors((prev) => {
@@ -654,12 +658,12 @@ const FormularioPaciente = ({
           checkCpfOfflineSafe(formattedCPF),
           timeoutPromise
         ]);
-        
-        if (exists) {
+          if (exists) {
           setErrors((prev) => ({
             ...prev,
             cpf: "O CPF digitado já existe",
           }));
+          setCpfAvailableMessage(null);
           console.log("CPF existente detectado:", formattedCPF);
         } else {
           setErrors(prev => {
@@ -667,6 +671,8 @@ const FormularioPaciente = ({
             delete newErrors.cpf;
             return newErrors;
           });
+          setCpfAvailableMessage("CPF disponível para cadastro");
+          toast.success("CPF disponível para cadastro!");
           console.log("CPF verificado com sucesso:", formattedCPF);
         }
         
@@ -1385,10 +1391,13 @@ const FormularioPaciente = ({
                       onChange={handleCPFChange}
                       maxLength={14}
                       disabled={isLoading || isLoadingOptions}
-                      data-error={errors.cpf ? "true" : "false"}
-                    />
+                      data-error={errors.cpf ? "true" : "false"}                    />
                     {errors.cpf && (
                       <p className="mt-1 text-sm text-red-500">{errors.cpf}</p>
+                    )}
+                    {/* Mensagem de CPF disponível */}
+                    {cpfAvailableMessage && (
+                      <p className="mt-1 text-sm text-green-600">{cpfAvailableMessage}</p>
                     )}
                   </div>
 

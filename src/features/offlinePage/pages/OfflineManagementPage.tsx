@@ -166,7 +166,7 @@ const OfflineManagementPage: React.FC = () => {
   const [showInfo, setShowInfo] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  // Estados específicos para pacientes
+  // ✅ CORRIGIDO: Estados específicos para pacientes
   const [patientsStats, setPatientsStats] = useState<any>(null);
   const [downloadRecommendation, setDownloadRecommendation] = useState<any>(null);
   const [patientsDownloading, setPatientsDownloading] = useState(false);
@@ -220,43 +220,53 @@ const OfflineManagementPage: React.FC = () => {
     }
   };
 
-  // Carregar estatísticas de pacientes
+  // ✅ CORRIGIDO: Carregar estatísticas de pacientes usando método correto
   const loadPatientsStats = async () => {
     try {
-      // ✅ Usar método corrigido do PacienteService
-      const recommendation = await PacienteService.getDownloadRecommendation();
+      // ✅ 1. Usar getCacheStats do indexedDBService corrigido
+      const cacheStats = await indexedDBService.getCacheStats();
       
-      // ✅ Verificar cache atual usando indexedDBService
-      const cachedPatients = await indexedDBService.getAll('pacientes') || [];
-      const cachedCpfs = await indexedDBService.getOpcoes('cpfs_cache');
+      // ✅ 2. Usar getDownloadRecommendation (se disponível)
+      let recommendation = null;
+      try {
+        recommendation = await PacienteService.getDownloadRecommendation();
+      } catch (error) {
+        console.warn('Erro ao obter recomendação:', error);
+        recommendation = {
+          totalPatients: 0,
+          estimatedSizeMB: 0,
+          recommendation: 'cpfs-only',
+          reason: 'Dados não disponíveis'
+        };
+      }
       
-      const cacheStatus = {
-        cpfsList: {
-          loaded: !!cachedCpfs,
-          count: cachedCpfs?.length || 0
-        },
-        recentPatients: {
-          count: cachedPatients.filter((p: any) => p.cached_at).length
-        },
-        fullPatients: {
-          count: cachedPatients.length
-        },
-        confidence: cachedPatients.length > 5000 ? 'high' : 
-                     cachedPatients.length > 1000 ? 'medium' : 'low',
-        recommendation: recommendation.reason
+      // ✅ 3. Usar getPatientsStatus do offlineDataManager
+      const patientsStatus = await offlineDataManager.getPatientsStatus();
+      
+      // ✅ 4. Combinar informações
+      const combinedStats = {
+        ...patientsStatus,
+        cacheStats,
+        totalCached: cacheStats.verificacao + cacheStats.locais
       };
       
-      setPatientsStats(cacheStatus);
+      setPatientsStats(combinedStats);
       setDownloadRecommendation(recommendation);
+      
+      console.log('📊 Stats de pacientes atualizadas:', combinedStats);
       
     } catch (error) {
       console.error('Erro ao carregar stats de pacientes:', error);
+      
+      // ✅ Fallback seguro
       setPatientsStats({
-        cpfsList: { loaded: false, count: 0 },
-        recentPatients: { count: 0 },
-        fullPatients: { count: 0 },
+        verification: { loaded: false, count: 0 },
+        localPatients: { loaded: false, count: 0 },
+        pendingSync: { loaded: false, count: 0 },
+        recommendation: 'Erro ao verificar cache',
         confidence: 'low',
-        recommendation: 'Erro ao verificar cache'
+        cacheStats: { verificacao: 0, locais: 0, pendentes: 0 },
+        totalCached: 0
       });
     }
   };
@@ -343,6 +353,7 @@ const OfflineManagementPage: React.FC = () => {
       try {
         await offlineDataManager.clearOfflineData();
         await loadStats();
+        await loadPatientsStats(); // ✅ Atualizar stats de pacientes também
         toast.success('✅ Dados offline limpos');
       } catch (error) {
         toast.error('Erro ao limpar dados');
@@ -359,6 +370,7 @@ const OfflineManagementPage: React.FC = () => {
     try {
       await syncService.forceSyncData();
       await loadPendingSync();
+      await loadPatientsStats(); // ✅ Atualizar stats após sync
       toast.success('✅ Sincronização concluída');
     } catch (error) {
       toast.error('Erro na sincronização');
@@ -381,8 +393,8 @@ const OfflineManagementPage: React.FC = () => {
     navigate('/'); // Volta para a página inicial
   };
 
-  // Handlers para download de pacientes
-  const handleDownloadPatients = async (strategy: 'intelligent' | 'cpfs' | 'recent' | 'full') => {
+  // ✅ CORRIGIDO: Handlers para download de pacientes usando sistema correto
+  const handleDownloadPatients = async (strategy: 'intelligent' | 'verification' | 'cpfs' | 'recent' | 'full') => {
     if (!isOnline) {
       toast.error('❌ Sem conexão com a internet');
       return;
@@ -397,28 +409,59 @@ const OfflineManagementPage: React.FC = () => {
       
       switch (strategy) {
         case 'intelligent':
-          result = await PacienteService.downloadPatientsIntelligent(
-            (progress, current, phase) => {
+          // ✅ Usar downloadPatientsIntelligent se disponível
+          try {
+            result = await PacienteService.downloadPatientsIntelligent(
+              (progress, current, phase) => {
+                setPatientsProgress(progress);
+                setPatientsPhase(phase ? `${phase}: ${current}` : current);
+              }
+            );
+          } catch (error) {
+            // ✅ Fallback para método de verificação
+            result = await offlineDataManager.downloadPatientsForVerification(
+              (progress, current) => {
+                setPatientsProgress(progress);
+                setPatientsPhase(current);
+              }
+            );
+            result.strategy = 'Inteligente (Verificação)';
+          }
+          break;
+          
+        case 'verification':
+          // ✅ NOVO: Usar método específico para verificação
+          setPatientsPhase('Baixando pacientes para verificação...');
+          result = await offlineDataManager.downloadPatientsForVerification(
+            (progress, current) => {
               setPatientsProgress(progress);
-              setPatientsPhase(phase ? `${phase}: ${current}` : current);
+              setPatientsPhase(current);
             }
           );
+          result.strategy = 'Verificação de CPF';
           break;
           
         case 'cpfs':
           setPatientsPhase('Extraindo CPFs de todos os pacientes...');
           const cpfs = await PacienteService.getAllCPFs();
           
-          // ✅ Salvar CPFs no formato otimizado para verificação
           if (cpfs.length > 0) {
             setPatientsProgress(90);
             setPatientsPhase(`Salvando ${cpfs.length} CPFs no cache...`);
             
-            await indexedDBService.saveOpcoes('cpfs_cache', cpfs);
+            // ✅ CORRIGIDO: Usar método específico para cache de verificação
+            const cpfObjects = cpfs.map(cpf => ({ 
+              cpf, 
+              nome: 'CPF_ONLY',
+              timestamp: Date.now(),
+              source: 'download' as const
+            }));
+            
+            await indexedDBService.savePacientesParaCache(cpfObjects);
           }
           
           setPatientsProgress(100);
-          result = { success: true, count: cpfs.length, strategy: 'CPFs' };
+          result = { success: true, count: cpfs.length, strategy: 'Apenas CPFs' };
           break;
           
         case 'recent':
@@ -426,59 +469,36 @@ const OfflineManagementPage: React.FC = () => {
           const recentPatients = await PacienteService.getRecentPatientsForOffline(
             12, // 12 meses
             (current, total, percentage) => {
-              setPatientsProgress(percentage);
+              setPatientsProgress(percentage * 0.9);
               setPatientsPhase(`Pacientes recentes: ${current}/${total}`);
             }
           );
           
-          // ✅ Salvar pacientes no IndexedDB
           setPatientsProgress(95);
-          setPatientsPhase('Salvando no cache offline...');
+          setPatientsPhase('Salvando no cache de verificação...');
           
-          for (const patient of recentPatients) {
-            await indexedDBService.savePaciente({
-              ...patient,
-              cached_at: new Date().toISOString()
-            });
-          }
+          // ✅ CORRIGIDO: Usar cache de verificação, não dados para sync
+          await indexedDBService.savePacientesParaCache(recentPatients);
           
-          result = { success: true, count: recentPatients.length, strategy: 'Recentes' };
+          result = { success: true, count: recentPatients.length, strategy: 'Pacientes Recentes' };
           break;
           
         case 'full':
           setPatientsPhase('Baixando todos os pacientes...');
           const allPatients = await PacienteService.getAllPatientsForOffline(
             (current, total, percentage) => {
-              setPatientsProgress(percentage * 0.9); // 90% para download
+              setPatientsProgress(percentage * 0.9);
               setPatientsPhase(`Baixando: ${current}/${total} pacientes`);
             }
           );
           
-          // ✅ Salvar todos os pacientes
-          setPatientsProgress(90);
+          setPatientsProgress(95);
           setPatientsPhase('Salvando todos os pacientes no cache...');
           
-          let savedCount = 0;
-          for (const patient of allPatients) {
-            try {
-              await indexedDBService.savePaciente({
-                ...patient,
-                cached_at: new Date().toISOString()
-              });
-              savedCount++;
-              
-              // Atualizar progresso ocasionalmente
-              if (savedCount % 100 === 0) {
-                const saveProgress = 90 + (savedCount / allPatients.length) * 10;
-                setPatientsProgress(saveProgress);
-                setPatientsPhase(`Salvando: ${savedCount}/${allPatients.length}`);
-              }
-            } catch (saveError) {
-              console.warn('Erro ao salvar paciente:', saveError);
-            }
-          }
+          // ✅ CORRIGIDO: Usar cache de verificação para não sincronizar
+          await indexedDBService.savePacientesParaCache(allPatients);
           
-          result = { success: true, count: savedCount, strategy: 'Completo' };
+          result = { success: true, count: allPatients.length, strategy: 'Base Completa' };
           break;
           
         default:
@@ -509,22 +529,15 @@ const OfflineManagementPage: React.FC = () => {
     }
   };
 
-  // ✅ Handler CORRIGIDO para limpar cache de pacientes
+  // ✅ CORRIGIDO: Handler para limpar apenas cache de verificação
   const handleClearPatientsCache = async () => {
-    if (window.confirm('⚠️ Tem certeza que deseja limpar o cache de pacientes? Você precisará baixá-los novamente para verificação offline de CPF.')) {
+    if (window.confirm('⚠️ Tem certeza que deseja limpar o cache de pacientes para verificação? Os pacientes criados localmente serão preservados.')) {
       try {
-        // ✅ Usar o método clear agora disponível
-        await indexedDBService.clear('pacientes');
-        
-        // Tentar limpar cache de CPFs também
-        try {
-          await indexedDBService.saveOpcoes('cpfs_cache', []);
-        } catch (cpfError) {
-          console.warn('Erro ao limpar cache de CPFs:', cpfError);
-        }
+        // ✅ CORRIGIDO: Usar método específico para limpar apenas cache de verificação
+        await indexedDBService.clearPacientesCache();
         
         await loadPatientsStats();
-        toast.success('✅ Cache de pacientes limpo');
+        toast.success('✅ Cache de verificação de pacientes limpo (dados locais preservados)');
       } catch (error) {
         console.error('Erro ao limpar cache:', error);
         toast.error('❌ Erro ao limpar cache');
@@ -597,7 +610,9 @@ const OfflineManagementPage: React.FC = () => {
             </div>
           </div>
         </div>
-      </header>      {/* Side Menu - Usando o componente real do sistema */}
+      </header>
+
+      {/* Side Menu - Usando o componente real do sistema */}
       <SideMenu
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
@@ -654,10 +669,12 @@ const OfflineManagementPage: React.FC = () => {
               <div className="space-y-2">
                 <p>• <strong>Dados Essenciais:</strong> Necessários para funcionamento básico (tipos, categorias, etc.)</p>
                 <p>• <strong>Dados Geográficos:</strong> Estados, municípios, bairros e informações de localização</p>
+                <p>• <strong>Cache de Verificação:</strong> Pacientes baixados apenas para verificar CPF (não são sincronizados)</p>
               </div>
               <div className="space-y-2">
                 <p>• <strong>Dados Médicos:</strong> Sintomas, diagnósticos, tipos de atendimento</p>
                 <p>• <strong>Sincronização:</strong> Dados criados offline são enviados automaticamente quando há conexão</p>
+                <p>• <strong>Pacientes Locais:</strong> Criados offline e marcados para sincronização</p>
               </div>
             </div>
           </div>
@@ -794,7 +811,7 @@ const OfflineManagementPage: React.FC = () => {
           </div>
         )}
 
-        {/* Patients Tab - NOVA ABA */}
+        {/* ✅ CORRIGIDA: Patients Tab */}
         {activeTab === 'patients' && (
           <div className="space-y-6">
             {/* Header da seção */}
@@ -804,7 +821,7 @@ const OfflineManagementPage: React.FC = () => {
                 <h2 className="text-xl font-semibold text-gray-900">Base de Pacientes para Verificação Offline</h2>
               </div>
               <p className="text-gray-600">
-                Baixe dados de pacientes para verificação de CPF offline. O sistema analisará sua base e recomendará a melhor estratégia.
+                Baixe dados de pacientes para verificação de CPF offline. Os dados ficam separados e não são sincronizados como novos cadastros.
               </p>
             </div>
 
@@ -873,7 +890,7 @@ const OfflineManagementPage: React.FC = () => {
               </div>
             )}
 
-            {/* Status Atual */}
+            {/* ✅ CORRIGIDO: Status Atual usando dados corretos */}
             {patientsStats && (
               <div className="bg-white p-6 rounded-xl shadow-sm border">
                 <h3 className="text-lg font-semibold mb-4 text-gray-900">Status Atual do Cache</h3>
@@ -881,25 +898,25 @@ const OfflineManagementPage: React.FC = () => {
                   <div className="bg-blue-50 p-4 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <Shield className="h-5 w-5 text-blue-600" />
-                      <span className="font-medium text-blue-900">CPFs em Cache</span>
+                      <span className="font-medium text-blue-900">Cache de Verificação</span>
                     </div>
                     <div className="text-2xl font-bold text-blue-600 mb-1">
-                      {patientsStats.cpfsList.count.toLocaleString()}
+                      {(patientsStats.verification?.count || patientsStats.cacheStats?.verificacao || 0).toLocaleString()}
                     </div>
                     <div className="text-sm text-blue-700">
-                      {patientsStats.cpfsList.loaded ? 'Lista completa disponível' : 'Nenhum CPF em cache'}
+                      {(patientsStats.verification?.loaded || patientsStats.cacheStats?.verificacao > 0) ? 'Disponível para verificação' : 'Nenhum dado em cache'}
                     </div>
                   </div>
                   
                   <div className="bg-green-50 p-4 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <Users className="h-5 w-5 text-green-600" />
-                      <span className="font-medium text-green-900">Pacientes Completos</span>
+                      <span className="font-medium text-green-900">Pacientes Locais</span>
                     </div>
                     <div className="text-2xl font-bold text-green-600 mb-1">
-                      {(patientsStats.recentPatients.count + patientsStats.fullPatients.count).toLocaleString()}
+                      {(patientsStats.localPatients?.count || patientsStats.cacheStats?.locais || 0).toLocaleString()}
                     </div>
-                    <div className="text-sm text-green-700">Registros completos offline</div>
+                    <div className="text-sm text-green-700">Criados offline (serão sincronizados)</div>
                   </div>
                   
                   <div className="bg-purple-50 p-4 rounded-lg">
@@ -912,18 +929,36 @@ const OfflineManagementPage: React.FC = () => {
                        patientsStats.confidence === 'medium' ? 'Média' : 'Baixa'}
                     </div>
                     <div className="text-sm text-purple-700">
-                      {patientsStats.recommendation}
+                      {patientsStats.recommendation || 'Confiança de verificação'}
                     </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Opções de Download */}
+            {/* ✅ CORRIGIDO: Opções de Download usando métodos corretos */}
             <div className="bg-white p-6 rounded-xl shadow-sm border">
               <h3 className="text-lg font-semibold mb-4 text-gray-900">Opções de Download</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 
+                {/* ✅ NOVO: Download de Verificação (Recomendado) */}
+                <div className="p-4 border-2 border-purple-200 rounded-lg hover:border-purple-300 transition-colors">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Shield className="h-5 w-5 text-purple-600" />
+                    <span className="font-medium text-purple-900">Verificação Inteligente</span>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Sistema escolhe automaticamente a melhor estratégia para sua base (RECOMENDADO).
+                  </p>
+                  <button
+                    onClick={() => handleDownloadPatients('verification')}
+                    disabled={patientsDownloading || !isOnline}
+                    className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {patientsDownloading ? 'Baixando...' : 'Download Recomendado'}
+                  </button>
+                </div>
+
                 {/* Download Inteligente */}
                 <div className="p-4 border-2 border-blue-200 rounded-lg hover:border-blue-300 transition-colors">
                   <div className="flex items-center gap-2 mb-3">
@@ -938,7 +973,7 @@ const OfflineManagementPage: React.FC = () => {
                     disabled={patientsDownloading || !isOnline}
                     className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    {patientsDownloading ? 'Baixando...' : 'Download Recomendado'}
+                    Download Inteligente
                   </button>
                 </div>
 
@@ -1005,7 +1040,7 @@ const OfflineManagementPage: React.FC = () => {
                     disabled={patientsDownloading}
                     className="px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
                   >
-                    Limpar Cache de Pacientes
+                    Limpar Cache de Verificação
                   </button>
                   
                   <button
@@ -1157,6 +1192,8 @@ const OfflineManagementPage: React.FC = () => {
               </div>
               <p className="text-gray-600 mb-6">
                 Gerencie dados que foram salvos offline e precisam ser enviados para o servidor.
+                <br />
+                <strong>Nota:</strong> Apenas pacientes criados localmente são sincronizados. Dados baixados para verificação permanecem apenas como cache.
                 {isSyncPaused && (
                   <span className="block mt-2 text-orange-600 font-medium">
                     ⚠️ Sincronização automática está pausada

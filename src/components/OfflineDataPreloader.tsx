@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Download, Check, AlertCircle, Wifi, Database, Loader, X, CheckCircle, XCircle } from 'lucide-react';
+import { Download, Check, AlertCircle, Wifi, Database, Loader, X, CheckCircle, XCircle, Users } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { NotificacaoService } from '@/services/NotificacaoService';
 import indexedDBService from '@/services/indexedDB';
+import { offlineDataManager } from '@/services/offlineDataManager';
 
 interface OfflineDataPreloaderProps {
   className?: string;
@@ -17,6 +18,7 @@ interface DataItem {
   loading: boolean;
   error?: string;
   recordCount?: number;
+  category: 'essential' | 'geographic' | 'medical' | 'administrative';
 }
 
 const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({ 
@@ -28,22 +30,24 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
   const [progress, setProgress] = useState(0);
   const [totalSize, setTotalSize] = useState(0);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [patientsStats, setPatientsStats] = useState({ verification: 0, local: 0, pending: 0 });
+  
   const [dataItems, setDataItems] = useState<DataItem[]>([
-    { key: 'eventos', name: 'Tipos de Evento', fetchFn: NotificacaoService.getEventoOptions, loaded: false, loading: false },
-    { key: 'publicos', name: 'Tipos de Público', fetchFn: NotificacaoService.getPublicoOptions, loaded: false, loading: false },
-    { key: 'paises', name: 'Países', fetchFn: NotificacaoService.getPaisOptions, loaded: false, loading: false },
-    { key: 'estados', name: 'Estados', fetchFn: NotificacaoService.getEstadoOptions, loaded: false, loading: false },
-    { key: 'municipios', name: 'Municípios', fetchFn: NotificacaoService.getMunicipioOptions, loaded: false, loading: false },
-    { key: 'bairros', name: 'Bairros', fetchFn: NotificacaoService.getBairroOptions, loaded: false, loading: false },
-    { key: 'generos', name: 'Gêneros', fetchFn: NotificacaoService.getGeneroOptions, loaded: false, loading: false },
-    { key: 'racas', name: 'Raças', fetchFn: NotificacaoService.getRacaOptions, loaded: false, loading: false },
-    { key: 'escolaridades', name: 'Escolaridades', fetchFn: NotificacaoService.getEscolaridadeOptions, loaded: false, loading: false },
-    { key: 'atendimentos', name: 'Tipos de Atendimento', fetchFn: NotificacaoService.getAtendimentoOptions, loaded: false, loading: false },
-    { key: 'sintomas', name: 'Sintomas', fetchFn: NotificacaoService.getSintomaOptions, loaded: false, loading: false },
-    { key: 'hipoteses', name: 'Hipóteses Diagnósticas', fetchFn: NotificacaoService.getHipoteseDiagOptions, loaded: false, loading: false },
-    { key: 'traumas', name: 'Tipos de Trauma', fetchFn: NotificacaoService.getTraumaOptions, loaded: false, loading: false },
-    { key: 'encerramentos', name: 'Tipos de Encerramento', fetchFn: NotificacaoService.getEncerramentoOptions, loaded: false, loading: false },
-    { key: 'estabelecimentos', name: 'Estabelecimentos', fetchFn: NotificacaoService.getEstabelecimentoOptions, loaded: false, loading: false },
+    { key: 'eventos', name: 'Tipos de Evento', fetchFn: NotificacaoService.getEventoOptions, loaded: false, loading: false, category: 'essential' },
+    { key: 'publicos', name: 'Tipos de Público', fetchFn: NotificacaoService.getPublicoOptions, loaded: false, loading: false, category: 'essential' },
+    { key: 'paises', name: 'Países', fetchFn: NotificacaoService.getPaisOptions, loaded: false, loading: false, category: 'geographic' },
+    { key: 'estados', name: 'Estados', fetchFn: NotificacaoService.getEstadoOptions, loaded: false, loading: false, category: 'geographic' },
+    { key: 'municipios', name: 'Municípios', fetchFn: NotificacaoService.getMunicipioOptions, loaded: false, loading: false, category: 'geographic' },
+    { key: 'bairros', name: 'Bairros', fetchFn: NotificacaoService.getBairroOptions, loaded: false, loading: false, category: 'geographic' },
+    { key: 'generos', name: 'Gêneros', fetchFn: NotificacaoService.getGeneroOptions, loaded: false, loading: false, category: 'essential' },
+    { key: 'racas', name: 'Raças', fetchFn: NotificacaoService.getRacaOptions, loaded: false, loading: false, category: 'essential' },
+    { key: 'escolaridades', name: 'Escolaridades', fetchFn: NotificacaoService.getEscolaridadeOptions, loaded: false, loading: false, category: 'essential' },
+    { key: 'atendimentos', name: 'Tipos de Atendimento', fetchFn: NotificacaoService.getAtendimentoOptions, loaded: false, loading: false, category: 'essential' },
+    { key: 'sintomas', name: 'Sintomas', fetchFn: NotificacaoService.getSintomaOptions, loaded: false, loading: false, category: 'medical' },
+    { key: 'hipoteses', name: 'Hipóteses Diagnósticas', fetchFn: NotificacaoService.getHipoteseDiagOptions, loaded: false, loading: false, category: 'medical' },
+    { key: 'traumas', name: 'Tipos de Trauma', fetchFn: NotificacaoService.getTraumaOptions, loaded: false, loading: false, category: 'medical' },
+    { key: 'encerramentos', name: 'Tipos de Encerramento', fetchFn: NotificacaoService.getEncerramentoOptions, loaded: false, loading: false, category: 'essential' },
+    { key: 'estabelecimentos', name: 'Estabelecimentos', fetchFn: NotificacaoService.getEstabelecimentoOptions, loaded: false, loading: false, category: 'administrative' },
     { 
       key: 'cbos', 
       name: 'CBOs/Profissões', 
@@ -56,7 +60,8 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
         return data?.data || data || [];
       }, 
       loaded: false, 
-      loading: false
+      loading: false,
+      category: 'administrative'
     },
     { 
       key: 'lista-sindromica', 
@@ -69,7 +74,8 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
         return await response.json();
       }, 
       loaded: false, 
-      loading: false
+      loading: false,
+      category: 'medical'
     }
   ]);
 
@@ -91,6 +97,7 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
   useEffect(() => {
     checkCachedData();
   }, []);
+
   const checkCachedData = async () => {
     const updatedItems = await Promise.all(
       dataItems.map(async (item) => {
@@ -108,8 +115,19 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
       })
     );
     setDataItems(updatedItems);
+      // ✅ VERIFICAR STATS DE PACIENTES SEPARADAMENTE
+    try {
+      const stats = await indexedDBService.getCacheStats();
+      setPatientsStats({
+        verification: stats.verificacao || 0,
+        local: stats.locais || 0,
+        pending: stats.pendentes || 0
+      });
+    } catch (error) {
+      console.error('Erro ao carregar stats de pacientes:', error);
+    }
     
-    // Calcular progresso simples - todos os itens têm peso igual
+    // Calcular progresso
     const loadedItems = updatedItems.filter(item => item.loaded).length;
     const totalItems = updatedItems.length;
     const progress = totalItems > 0 ? (loadedItems / totalItems) * 100 : 0;
@@ -120,6 +138,7 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
     const totalRecords = updatedItems.reduce((sum, item) => sum + (item.recordCount || 0), 0);
     setTotalSize(totalRecords);
   };
+
   const downloadAllData = async () => {
     if (isDownloading) return;
     
@@ -158,7 +177,7 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
         
         const data = await item.fetchFn();
         
-        // Validação rigorosa - todos devem ter dados válidos
+        // Validação rigorosa
         if (data && Array.isArray(data) && data.length > 0) {
           await indexedDBService.saveOpcoes(item.key, data);
           totalDownloaded += data.length;
@@ -185,7 +204,7 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
         
         const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
         
-        // Marcar erro sem assumir como carregado
+        // Marcar erro
         setDataItems(prev => prev.map(dataItem => 
           dataItem.key === item.key ? { 
             ...dataItem, 
@@ -200,7 +219,7 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
         console.error(`❌ ${item.name} falhou: ${errorMessage}`);
       }
 
-      // Atualizar progresso baseado em itens processados
+      // Atualizar progresso
       const progress = ((i + 1) / dataItems.length) * 100;
       setProgress(progress);
       
@@ -211,7 +230,7 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
     setTotalSize(totalDownloaded);
     setIsDownloading(false);
     
-    // Relatório final simples e claro
+    // Relatório final
     if (errorCount === 0) {
       toast.success(`🎉 Todos os dados baixados com sucesso! ${totalDownloaded.toLocaleString()} registros offline.`);
       onDataLoaded?.();
@@ -220,12 +239,52 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
     }
   };
 
+  // ✅ NOVO: Download específico para verificação de pacientes
+  const downloadPatientsVerification = async () => {
+    if (isDownloading || !isOnline) return;
+    
+    setIsDownloading(true);
+    toast.info('👥 Baixando pacientes para verificação de CPF...');
+    
+    try {
+      const result = await offlineDataManager.downloadPatientsForVerification(
+        (progress, current) => {
+          setProgress(progress);
+          console.log(`${progress}%: ${current}`);
+        }
+      );
+      
+      if (result.success) {
+        toast.success(`✅ ${result.count} pacientes baixados para verificação!`);        
+        // Atualizar stats
+        const stats = await indexedDBService.getCacheStats();
+        setPatientsStats({
+          verification: stats.verificacao || 0,
+          local: stats.locais || 0,
+          pending: stats.pendentes || 0
+        });
+      } else {
+        toast.error(`❌ Erro: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Erro no download de pacientes:', error);
+      toast.error('Erro ao baixar pacientes');
+    } finally {
+      setIsDownloading(false);
+      setProgress(0);
+    }
+  };
+
   const clearOfflineData = async () => {
     if (window.confirm('Tem certeza que deseja limpar todos os dados offline? Você precisará baixá-los novamente.')) {
       try {
+        // Limpar dados normais
         for (const item of dataItems) {
           await indexedDBService.saveOpcoes(item.key, []);
         }
+        
+        // ✅ Limpar cache de pacientes
+        await indexedDBService.clearPacientesCache();
         
         setDataItems(prev => prev.map(item => ({ 
           ...item, 
@@ -233,6 +292,7 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
           error: undefined, 
           recordCount: 0 
         })));
+        setPatientsStats({ verification: 0, local: 0, pending: 0 });
         setProgress(0);
         setTotalSize(0);
         
@@ -242,11 +302,13 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
       }
     }
   };
-  // Cálculos de status simples
+
+  // Cálculos de status
   const totalItems = dataItems.length;
   const loadedItems = dataItems.filter(item => item.loaded).length;
   const hasErrors = dataItems.some(item => item.error);
   const isFullyLoaded = loadedItems === totalItems;
+  const hasPatientsVerification = patientsStats.verification > 0;
 
   const getStatusInfo = () => {
     if (!isOnline) {
@@ -255,8 +317,11 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
     if (hasErrors) {
       return { color: 'red', text: 'Erro nos dados' };
     }
+    if (isFullyLoaded && hasPatientsVerification) {
+      return { color: 'green', text: 'Sistema completo' };
+    }
     if (isFullyLoaded) {
-      return { color: 'green', text: 'Todos os dados prontos' };
+      return { color: 'yellow', text: 'Dados básicos prontos' };
     }
     return { color: 'blue', text: 'Pronto para download' };
   };
@@ -278,13 +343,14 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
             : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
         }`}
         title={statusInfo.text}
-      >        {!isOnline ? (
+      >
+        {!isOnline ? (
           <Database className="h-4 w-4" />
         ) : isDownloading ? (
           <Loader className="h-4 w-4 animate-spin" />
         ) : hasErrors ? (
           <XCircle className="h-4 w-4" />
-        ) : isFullyLoaded ? (
+        ) : isFullyLoaded && hasPatientsVerification ? (
           <CheckCircle className="h-4 w-4" />
         ) : (
           <Download className="h-4 w-4" />
@@ -330,7 +396,31 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
               <span className="text-sm font-medium">
                 {isOnline ? 'Conectado à internet' : 'Modo offline - dados em cache apenas'}
               </span>
-            </div>            {/* Barra de progresso */}
+            </div>
+
+            {/* ✅ NOVA SEÇÃO: Stats de Pacientes */}
+            <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Users className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-700">Pacientes</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="text-center">
+                  <div className="font-medium text-blue-700">{patientsStats.verification}</div>
+                  <div className="text-blue-600">Verificação</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-medium text-blue-700">{patientsStats.local}</div>
+                  <div className="text-blue-600">Locais</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-medium text-blue-700">{patientsStats.pending}</div>
+                  <div className="text-blue-600">Pendentes</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Barra de progresso */}
             <div className="mb-4">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm text-gray-600">
@@ -351,43 +441,64 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
               </div>
             </div>
 
-            {/* Lista de itens */}
-            <div className="space-y-2 max-h-64 overflow-y-auto mb-4">
-              {dataItems.map((item) => (
-                <div key={item.key} className="flex items-center justify-between p-2 bg-gray-50 rounded">                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-700">{item.name}</span>
+            {/* Lista de itens por categoria */}
+            <div className="space-y-3 max-h-64 overflow-y-auto mb-4">
+              {['essential', 'geographic', 'medical', 'administrative'].map(category => {
+                const categoryItems = dataItems.filter(item => item.category === category);
+                const categoryNames = {
+                  essential: 'Essenciais',
+                  geographic: 'Geográficos', 
+                  medical: 'Médicos',
+                  administrative: 'Administrativos'
+                };
+                
+                return (
+                  <div key={category}>
+                    <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                      {categoryNames[category as keyof typeof categoryNames]}
+                    </h4>
+                    <div className="space-y-1">
+                      {categoryItems.map((item) => (
+                        <div key={item.key} className="flex items-center justify-between p-2 bg-gray-50 rounded text-xs">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-700">{item.name}</span>
+                            </div>
+                            {item.recordCount !== undefined && item.recordCount > 0 && (
+                              <span className="text-gray-500">{item.recordCount} registros</span>
+                            )}
+                            {item.error && (
+                              <div className="text-red-600 mt-1" title={item.error}>
+                                Erro: {item.error.length > 20 ? item.error.substring(0, 20) + '...' : item.error}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {item.loading ? (
+                              <Loader className="h-3 w-3 animate-spin text-blue-500" />
+                            ) : item.loaded ? (
+                              <CheckCircle className="h-3 w-3 text-green-500" />
+                            ) : item.error ? (
+                              <XCircle className="h-3 w-3 text-red-500" />
+                            ) : (
+                              <Database className="h-3 w-3 text-gray-400" />
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    {item.recordCount !== undefined && item.recordCount > 0 && (
-                      <span className="text-xs text-gray-500">{item.recordCount} registros</span>
-                    )}
-                    {item.error && (
-                      <div className="text-xs text-red-600 mt-1" title={item.error}>
-                        Erro: {item.error.length > 30 ? item.error.substring(0, 30) + '...' : item.error}
-                      </div>
-                    )}
                   </div>
-                  <div className="flex items-center space-x-2">
-                    {item.loading ? (
-                      <Loader className="h-4 w-4 animate-spin text-blue-500" />
-                    ) : item.loaded ? (
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                    ) : item.error ? (
-                      <XCircle className="h-4 w-4 text-red-500" />
-                    ) : (
-                      <Database className="h-4 w-4 text-gray-400" />
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Botões de ação */}
-            <div className="flex space-x-2">
+            <div className="space-y-2">
+              {/* Botão principal */}
               <button
                 onClick={downloadAllData}
                 disabled={isDownloading || !isOnline}
-                className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                className={`w-full flex items-center justify-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
                   isDownloading || !isOnline
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : 'bg-blue-600 text-white hover:bg-blue-700'
@@ -401,31 +512,52 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
                 ) : (
                   <>
                     <Download className="h-4 w-4" />
-                    <span>{!isOnline ? 'Sem Internet' : 'Baixar Todos'}</span>
+                    <span>{!isOnline ? 'Sem Internet' : 'Baixar Dados Básicos'}</span>
                   </>
                 )}
               </button>
 
-              {(loadedItems > 0 || totalSize > 0) && (
+              {/* ✅ NOVO: Botão para pacientes */}
+              <button
+                onClick={downloadPatientsVerification}
+                disabled={isDownloading || !isOnline}
+                className={`w-full flex items-center justify-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                  isDownloading || !isOnline
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : hasPatientsVerification
+                    ? 'bg-green-600 text-white hover:bg-green-700'
+                    : 'bg-orange-600 text-white hover:bg-orange-700'
+                }`}
+              >
+                <Users className="h-4 w-4" />
+                <span>
+                  {hasPatientsVerification ? 'Atualizar Pacientes' : 'Baixar Pacientes (CPF)'}
+                </span>
+              </button>
+
+              {/* Botão limpar */}
+              {(loadedItems > 0 || totalSize > 0 || hasPatientsVerification) && (
                 <button
                   onClick={clearOfflineData}
                   disabled={isDownloading}
-                  className="px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+                  className="w-full px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 text-sm"
                 >
-                  Limpar
+                  Limpar Todos os Dados
                 </button>
               )}
-            </div>            {/* Informações adicionais */}
+            </div>
+
+            {/* Informações adicionais */}
             <div className="mt-4 p-3 bg-blue-50 rounded-lg">
               <div className="flex items-start space-x-2">
                 <Wifi className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
                 <div className="text-xs text-blue-700">
                   <p className="font-medium mb-1">Status do Sistema:</p>
                   <ul className="space-y-1 text-blue-600">
-                    <li>• Dados carregados: {loadedItems}/{totalItems}</li>
+                    <li>• Dados básicos: {loadedItems}/{totalItems}</li>
+                    <li>• Pacientes para verificação: {patientsStats.verification.toLocaleString()}</li>
                     <li>• Conexão: {isOnline ? 'Online' : 'Offline'}</li>
-                    <li>• Total de registros: {totalSize.toLocaleString()}</li>
-                    <li>• Status: {isFullyLoaded ? 'Sistema pronto' : hasErrors ? 'Com erros' : 'Aguardando download'}</li>
+                    <li>• Status: {statusInfo.text}</li>
                   </ul>
                 </div>
               </div>

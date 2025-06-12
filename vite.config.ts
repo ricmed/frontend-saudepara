@@ -102,9 +102,18 @@ export default defineConfig({
           'workbox-*.js',
           '**/*.map' // Source maps não precisam ser cached
         ],
-        
-        // *** CACHE RUNTIME OTIMIZADO ***
+          // *** CACHE RUNTIME OTIMIZADO ***
         runtimeCaching: [
+          // 1) Trata /api/paciente/check-cpf/########### sempre como NetworkOnly
+          {
+            urlPattern: /^https:\/\/app-api\.hml\.saude\.pa\.gov\.br\/api\/paciente\/check-cpf\/\d{11}.*$/i,
+            handler: 'NetworkOnly',
+            options: {
+              cacheName: 'check-cpf-network-only',
+              networkTimeoutSeconds: 5
+            }
+          },
+          
           // === APIs DE PRODUÇÃO ===
           {
             urlPattern: /^https:\/\/app-api\.hml\.saude\.pa\.gov\.br\/api\/(tipo-|componentes|estabelecimentos).*$/i,
@@ -122,6 +131,7 @@ export default defineConfig({
           },
           
           {
+            // essa rota genérica de paciente continua existindo, mas o check-cpf já foi "capturado" acima
             urlPattern: /^https:\/\/app-api\.hml\.saude\.pa\.gov\.br\/api\/(notificacao|paciente).*$/i,
             handler: 'NetworkFirst',
             options: {

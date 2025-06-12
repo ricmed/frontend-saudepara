@@ -1,6 +1,5 @@
 // src/features/notificationForms/components/sections/PersonIdentificationSection.tsx
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { User, Search, X, HelpCircle } from 'lucide-react';
 import { FormSectionProps } from '@/features/notificationForms/types/index2';
 import SectionHeader from '../shared/SectionHeader';
@@ -9,14 +8,12 @@ import CustomDateInput from '@/features/notificationForms/components/CustomDateI
 import CboInput from '@/features/notificationForms/components/CboInput';
 import PhoneInput from '@/features/notificationForms/components/PhoneInput';
 import { displayFormattedCPF } from '../../utils/formUtils';
-import { PacienteService } from '@/services/PacienteService';
 
 interface PersonIdentificationSectionProps extends FormSectionProps {
   pacienteSuggestions: any[];
   showSuggestions: boolean;
   isCreatingNewPatient: boolean;
   handlePacienteChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  handleCPFChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleSelectPaciente: (paciente: any) => void;
   criarNovoPaciente: () => void;
   setIsPatientModalOpen: (isOpen: boolean) => void;
@@ -26,6 +23,8 @@ interface PersonIdentificationSectionProps extends FormSectionProps {
   racaOptions: any[];
   escolaridadeOptions: any[];
   setErrors: (errors: any) => void;
+  originalCpf: string;
+  checkCpfOfflineSafe: (cpf: string) => Promise<boolean>;
 }
 
 const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = ({
@@ -39,7 +38,6 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
   showSuggestions,
   isCreatingNewPatient,
   handlePacienteChange,
-  handleCPFChange,
   handleSelectPaciente,
   criarNovoPaciente,
   setIsPatientModalOpen,
@@ -48,7 +46,9 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
   generoOptions,
   racaOptions,
   escolaridadeOptions,
-  setErrors
+  setErrors,
+  originalCpf,
+  checkCpfOfflineSafe
 }) => {
   const [typingTimer, setTypingTimer] = useState<NodeJS.Timeout | null>(null);
   const [isValidCPF, setIsValidCPF] = useState<boolean>(false);
@@ -56,10 +56,8 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
   // Função auxiliar para formatar CPF (remover caracteres não numéricos)
   const formatCPF = (cpf: string) => {
     return cpf.replace(/\D/g, "").slice(0, 11);
-  };
-
-  // Função para verificar CPF existente usando o serviço
-  const handleCPFChangeWithValidation = (e: React.ChangeEvent<HTMLInputElement>) => {
+  };  // Função para verificar CPF existente usando o serviço offline/online
+  const handleCPFChangeWithValidation = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
     const formattedCPF = formatCPF(rawValue);
 
@@ -79,9 +77,30 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
         return newErrors;
       });
     }
+      // Se o CPF tem menos de 11 dígitos, não validar e limpar estados
+    if (formattedCPF.length < 11) {
+      setIsValidCPF(false);
+      // Limpar timer se existir
+      if (typingTimer) {
+        clearTimeout(typingTimer);
+        setTypingTimer(null);
+      }
+      return;
+    }
     
     // Só verificar com 11 dígitos - caso contrário não é um CPF válido
     if (formattedCPF.length === 11) {
+      // Verificar se é o CPF original (modo edição) - não deve mostrar erro
+      if (formattedCPF === originalCpf) {
+        setIsValidCPF(true);
+        setErrors((prev: Record<string, string>) => {
+          const newErrors = { ...prev };
+          delete newErrors.cpf;
+          return newErrors;
+        });
+        return;
+      }
+
       // Limpar timeout anterior
       if (typingTimer) {
         clearTimeout(typingTimer);
@@ -96,16 +115,10 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
             cpf: "Verificando CPF..."
           }));
           
-          // Fazer chamada direta ao backend para depurar
-          const server = import.meta.env.VITE_API_SERVER;
-          const port = import.meta.env.VITE_API_PORT;
+          // ✅ USAR SISTEMA OFFLINE/ONLINE INTEGRADO
+          const exists = await checkCpfOfflineSafe(formattedCPF);
           
-          // Usar axios diretamente para ver a resposta completa
-          const response = await axios.get(`${server}:${port}/api/paciente/check-cpf/${formattedCPF}`);
-          console.log("Resposta da API para verificação de CPF:", response.data);
-          
-          // Verificar se a estrutura da resposta contém a propriedade 'exists'
-          if (response.data && response.data.exists === true) {
+          if (exists) {
             // Se o CPF já existe no sistema, mostramos erro
             setIsValidCPF(false);
             setErrors((prev: Record<string, string>) => ({

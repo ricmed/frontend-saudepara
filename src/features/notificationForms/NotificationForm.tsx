@@ -42,9 +42,7 @@ const NotificationForm: React.FC = () => {
   // Adicionar estado para controle do SideMenu
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   // Adicionar contexto de idioma
-  const { selectedLanguage, setSelectedLanguage } = useLanguage();
-
-  // Use the main form hook
+  const { selectedLanguage, setSelectedLanguage } = useLanguage();  // Use the main form hook
   const {
     formData,
     setFormData,
@@ -58,7 +56,6 @@ const NotificationForm: React.FC = () => {
     toggleSection,
     handleChange,
     handleCheckboxChange,
-    handleCPFChange,
     handleContatoLocalChange,
     handlePacienteChange,
     handleSelectPaciente,
@@ -68,6 +65,10 @@ const NotificationForm: React.FC = () => {
     toggleExportDropdown,
     criarNovoPaciente,
     handleValidationError, // Add this new function
+    originalCpf,
+    
+    // ✅ ADICIONAR checkCpfOfflineSafe para validação de CPF
+    checkCpfOfflineSafe,
       
     // Dados de pacientes
     pacienteSuggestions,
@@ -319,9 +320,7 @@ const NotificationForm: React.FC = () => {
             ufError={ufError || undefined}
             paisOptions={paisOptions}
             handleValidationError={handleValidationError}
-          />
-
-          <PersonIdentificationSection
+          />          <PersonIdentificationSection
             formData={formData}
             setFormData={setFormData}
             errors={errors}
@@ -334,7 +333,6 @@ const NotificationForm: React.FC = () => {
             showSuggestions={showSuggestions}
             isCreatingNewPatient={isCreatingNewPatient}
             handlePacienteChange={handlePacienteChange}
-            handleCPFChange={handleCPFChange}
             handleSelectPaciente={handleSelectPaciente}
             criarNovoPaciente={criarNovoPaciente}
             setIsPatientModalOpen={setIsPatientModalOpen}
@@ -346,6 +344,8 @@ const NotificationForm: React.FC = () => {
             isLoadingMunicipios={isLoadingMunicipios}
             paisOptions={paisOptions}
             handleValidationError={handleValidationError}
+            originalCpf={originalCpf}
+            checkCpfOfflineSafe={checkCpfOfflineSafe}
           />
 
           {/* Seção 4: Informações do atendimento */}

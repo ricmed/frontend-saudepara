@@ -1,7 +1,7 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { FormData } from '@/features/notificationForms/types/index2';
 
-// ✅ CORRIGIDO: Interface com tipos de índices consistentes
+// ✅ CORRIGIDO: Interface melhorada para distinguir dados
 interface NotificacaoDatabase extends DBSchema {
   notificacoes: {
     key: number;
@@ -24,12 +24,29 @@ interface NotificacaoDatabase extends DBSchema {
   pacientes: {
     key: number;
     value: any;
-    // ✅ CORRIGIDO: Todos os índices como string (mais compatível)
-    indexes: { 'by-nome': string; 'by-cpf': string; 'by-synced': string };
+    indexes: { 'by-nome': string; 'by-cpf': string; 'by-synced': string; 'by-source': string };
+  };  // ✅ NOVO: Store separado para dados de verificação (apenas leitura)
+  pacientes_cache: {
+    key: string; // CPF como chave
+    value: {
+      cpf: string;
+      nome: string;
+      data_nascimento?: string;
+      timestamp: number;
+      source: 'download' | 'api'; // Origem dos dados
+    };
+  };
+  // ✅ Store específico para cache de CPFs
+  cpfs_cache: {
+    key: string; // CPF como chave
+    value: {
+      cpf: string;
+      when: number;
+    };
   };
 }
 
-const DB_VERSION = 2;
+const DB_VERSION = 3; // ✅ INCREMENTAR versão para nova estrutura
 const DB_NAME = 'NotificacaoOfflineDB';
 const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 dias
 
@@ -61,9 +78,7 @@ export class IndexedDBService {
             db.createObjectStore('opcoes', {
               keyPath: 'tipo'
             });
-          }
-
-          // Store para pacientes
+          }          // Store para pacientes (dados criados localmente)
           if (!db.objectStoreNames.contains('pacientes')) {
             console.log('🆕 Criando store: pacientes');
             const pacientesStore = db.createObjectStore('pacientes', {
@@ -72,6 +87,21 @@ export class IndexedDBService {
             pacientesStore.createIndex('by-nome', 'nome');
             pacientesStore.createIndex('by-cpf', 'cpf');
             pacientesStore.createIndex('by-synced', 'synced');
+            pacientesStore.createIndex('by-source', 'source');
+          }          // ✅ NOVO: Store para cache de verificação
+          if (!db.objectStoreNames.contains('pacientes_cache')) {
+            console.log('🆕 Criando store: pacientes_cache');
+            db.createObjectStore('pacientes_cache', {
+              keyPath: 'cpf'
+            });
+          }
+
+          // ✅ NOVO: Store específico para cache de CPFs
+          if (!db.objectStoreNames.contains('cpfs_cache')) {
+            console.log('🆕 Criando store: cpfs_cache');
+            db.createObjectStore('cpfs_cache', {
+              keyPath: 'cpf'
+            });
           }
         },
         
@@ -154,6 +184,7 @@ export class IndexedDBService {
     }
   }
 
+  // ===== NOTIFICAÇÕES (não mexer) =====
   async saveNotificacao(formData: FormData, isEdit: boolean = false, id?: number): Promise<number> {
     await this.init();
     
@@ -187,6 +218,40 @@ export class IndexedDBService {
     }
   }
 
+  // ===== PACIENTES MELHORADO =====
+
+  // ✅ NOVO: Salvar pacientes baixados apenas para cache (não sincronizar)
+  async savePacientesParaCache(pacientes: any[]): Promise<void> {
+    await this.init();
+    
+    try {
+      const tx = this.db!.transaction(['pacientes_cache'], 'readwrite');
+      const store = tx.objectStore('pacientes_cache');
+      
+      for (const paciente of pacientes) {
+        if (paciente.cpf) {
+          const cacheEntry = {
+            cpf: paciente.cpf.replace(/\D/g, ''), // Limpar formatação
+            nome: paciente.nome?.toUpperCase() || '',
+            data_nascimento: paciente.data_nascimento,
+            timestamp: Date.now(),
+            source: 'download' as const
+          };
+          
+          await store.put(cacheEntry);
+        }
+      }
+      
+      await tx.done;
+      console.log(`📥 ${pacientes.length} pacientes salvos no cache para verificação`);
+      
+    } catch (error) {
+      console.error('❌ Erro ao salvar pacientes no cache:', error);
+      throw error;
+    }
+  }
+
+  // ✅ CORRIGIDO: Salvar paciente criado localmente (deve ser sincronizado)
   async savePaciente(paciente: any): Promise<number> {
     await this.init();
     
@@ -199,12 +264,13 @@ export class IndexedDBService {
         paciente.nome = paciente.nome.toUpperCase();
       }
       
-      // ✅ CORRIGIDO: Usar string para compatibilidade com índice
-      paciente.synced = 'false'; // string 'false'
+      // ✅ IMPORTANTE: Marcar como criado localmente para sincronização
+      paciente.synced = 'false';
+      paciente.source = 'local_creation'; // ✅ NOVO: Indicar origem
       paciente.savedAt = Date.now();
       
       await this.db!.put('pacientes', paciente);
-      console.log(`👤 Paciente salvo offline: ${paciente.nome} (ID: ${paciente.idpaciente})`);
+      console.log(`👤 Paciente criado localmente: ${paciente.nome} (ID: ${paciente.idpaciente})`);
       return paciente.idpaciente;
       
     } catch (error) {
@@ -213,41 +279,80 @@ export class IndexedDBService {
     }
   }
 
+  // ✅ CORRIGIDO: Verificação de CPF melhorada
   async checkCpfExists(cpf: string): Promise<boolean> {
     await this.init();
     
     if (!cpf || cpf.length !== 11) return false;
     
     try {
-      const pacienteComCpf = await this.db!.getFromIndex('pacientes', 'by-cpf', cpf);
-      if (pacienteComCpf) return true;
+      // ✅ 1. Verificar no cache de verificação PRIMEIRO (mais rápido)
+      const cpfInCache = await this.db!.get('pacientes_cache', cpf);
+      if (cpfInCache) {
+        console.log('✅ CPF encontrado no cache de verificação');
+        return true;
+      }
       
+      // ✅ 2. Verificar nos pacientes criados localmente
+      const pacienteLocal = await this.db!.getFromIndex('pacientes', 'by-cpf', cpf);
+      if (pacienteLocal) {
+        console.log('✅ CPF encontrado em pacientes locais');
+        return true;
+      }
+      
+      // ✅ 3. Busca manual como fallback
       const allPacientes = await this.db!.getAll('pacientes');
-      return allPacientes.some(paciente => paciente.cpf === cpf);
+      const foundInPatients = allPacientes.some(paciente => paciente.cpf === cpf);
+      
+      if (foundInPatients) {
+        console.log('✅ CPF encontrado via busca manual');
+        return true;
+      }
+      
+      console.log('ℹ️ CPF não encontrado em nenhum cache');
+      return false;
       
     } catch (error) {
-      console.warn('Erro na verificação de CPF, usando busca manual:', error);
-      const allPacientes = await this.db!.getAll('pacientes');
-      return allPacientes.some(paciente => paciente.cpf === cpf);
+      console.warn('⚠️ Erro na verificação de CPF, usando busca manual:', error);
+      
+      try {
+        const allPacientes = await this.db!.getAll('pacientes');
+        return allPacientes.some(paciente => paciente.cpf === cpf);
+      } catch (fallbackError) {
+        console.error('❌ Erro no fallback de verificação:', fallbackError);
+        return false;
+      }
     }
   }
 
+  // ✅ CORRIGIDO: Contar apenas pacientes criados localmente
   async getPendingCount(): Promise<{ notificacoes: number; pacientes: number }> {
     await this.init();
     
     try {
       const pendingNotificacoes = await this.getPendingNotificacoes();
       
+      // ✅ IMPORTANTE: Apenas pacientes com source = 'local_creation'
       let unsyncedPacientes: any[] = [];
       try {
-        // ✅ CORRIGIDO: Buscar por string 'false'
-        unsyncedPacientes = await this.db!.getAllFromIndex('pacientes', 'by-synced', 'false');
+        const allLocalPatients = await this.db!.getAllFromIndex('pacientes', 'by-synced', 'false');
+        
+        // ✅ Filtrar apenas os criados localmente
+        unsyncedPacientes = allLocalPatients.filter(p => 
+          p.source === 'local_creation' || 
+          (p.synced === 'false' && !p.source) // Compatibilidade com dados antigos
+        );
+        
       } catch (error) {
+        console.warn('Erro ao usar índice, usando busca manual:', error);
         const allPacientes = await this.db!.getAll('pacientes');
         unsyncedPacientes = allPacientes.filter(p => 
-          p.synced === 'false' || p.synced === false || p.synced === undefined
+          (p.synced === 'false' || p.synced === false || p.synced === undefined) &&
+          (p.source === 'local_creation' || !p.source) // Apenas criados localmente
         );
       }
+      
+      console.log(`📊 Pendentes: ${pendingNotificacoes.length} notificações, ${unsyncedPacientes.length} pacientes locais`);
       
       return {
         notificacoes: pendingNotificacoes.length,
@@ -260,6 +365,82 @@ export class IndexedDBService {
     }
   }
 
+  // ✅ CORRIGIDO: Apenas pacientes criados localmente
+  async getUnsyncedPacientes(): Promise<any[]> {
+    await this.init();
+    try {
+      const allLocalPatients = await this.db!.getAllFromIndex('pacientes', 'by-synced', 'false');
+      
+      // ✅ FILTRAR apenas os criados localmente
+      return allLocalPatients.filter(p => 
+        p.source === 'local_creation' || 
+        (p.synced === 'false' && !p.source) // Compatibilidade
+      );
+      
+    } catch (error) {
+      console.warn('Erro ao usar índice, usando busca manual:', error);
+      const allPacientes = await this.db!.getAll('pacientes');
+      return allPacientes.filter(p => 
+        (p.synced === 'false' || p.synced === false || p.synced === undefined) &&
+        (p.source === 'local_creation' || !p.source)
+      );
+    }
+  }
+
+  // ✅ NOVO: Busca melhorada incluindo cache
+  async searchPacientesExtended(query: string): Promise<any[]> {
+    await this.init();
+    
+    const searchTerm = query.toLowerCase();
+    const results: any[] = [];
+    
+    try {
+      // ✅ 1. Buscar no cache de verificação
+      const allCacheEntries = await this.db!.getAll('pacientes_cache');
+      const cacheResults = allCacheEntries.filter(entry => 
+        entry.nome.toLowerCase().includes(searchTerm) ||
+        entry.cpf.includes(query)
+      );
+      
+      // Converter para formato compatível
+      cacheResults.forEach(entry => {
+        results.push({
+          idpaciente: `cache_${entry.cpf}`, // ID único para cache
+          nome: entry.nome,
+          cpf: entry.cpf,
+          data_nascimento: entry.data_nascimento,
+          source: 'cache' // Indicar origem
+        });
+      });
+      
+      // ✅ 2. Buscar em pacientes locais
+      const allPacientes = await this.db!.getAll('pacientes');
+      const localResults = allPacientes.filter(paciente => 
+        (paciente.nome && paciente.nome.toLowerCase().includes(searchTerm)) ||
+        (paciente.cpf && paciente.cpf.includes(query)) ||
+        (paciente.nome_mae && paciente.nome_mae.toLowerCase().includes(searchTerm))
+      );
+      
+      // Adicionar pacientes locais
+      localResults.forEach(paciente => {
+        results.push({
+          ...paciente,
+          source: paciente.source || 'local'
+        });
+      });
+      
+      console.log(`🔍 Busca '${query}': ${cacheResults.length} no cache, ${localResults.length} locais`);
+      
+      return results;
+      
+    } catch (error) {
+      console.error('❌ Erro na busca estendida:', error);
+      return [];
+    }
+  }
+
+  // ===== MÉTODOS EXISTENTES (não mexer) =====
+  
   async getNotificacao(id: number): Promise<FormData | null> {
     await this.init();
     const notificacao = await this.db!.get('notificacoes', id);
@@ -285,37 +466,10 @@ export class IndexedDBService {
     await this.init();
     const paciente = await this.db!.get('pacientes', idpaciente);
     if (paciente) {
-      // ✅ CORRIGIDO: Usar string 'true'
       paciente.synced = 'true';
       paciente.syncedAt = Date.now();
       await this.db!.put('pacientes', paciente);
     }
-  }
-
-  async getUnsyncedPacientes(): Promise<any[]> {
-    await this.init();
-    try {
-      // ✅ CORRIGIDO: Buscar por string 'false'
-      return await this.db!.getAllFromIndex('pacientes', 'by-synced', 'false');
-    } catch (error) {
-      const allPacientes = await this.db!.getAll('pacientes');
-      return allPacientes.filter(p => 
-        p.synced === 'false' || p.synced === false || p.synced === undefined
-      );
-    }
-  }
-
-  async searchPacientesExtended(query: string): Promise<any[]> {
-    await this.init();
-    
-    const searchTerm = query.toLowerCase();
-    const allPacientes = await this.db!.getAll('pacientes');
-    
-    return allPacientes.filter(paciente => 
-      (paciente.nome && paciente.nome.toLowerCase().includes(searchTerm)) ||
-      (paciente.cpf && paciente.cpf.includes(query)) ||
-      (paciente.nome_mae && paciente.nome_mae.toLowerCase().includes(searchTerm))
-    );
   }
 
   async saveOpcoes(tipo: string, data: any[]): Promise<void> {
@@ -361,7 +515,7 @@ export class IndexedDBService {
     }
   }
 
-  async clear(storeName: 'notificacoes' | 'opcoes' | 'pacientes'): Promise<void> {
+  async clear(storeName: 'notificacoes' | 'opcoes' | 'pacientes' | 'pacientes_cache'): Promise<void> {
     await this.init();
     
     try {
@@ -372,6 +526,136 @@ export class IndexedDBService {
     } catch (error) {
       console.error(`❌ Erro ao limpar store ${storeName}:`, error);
       throw error;
+    }
+  }
+
+  // ✅ NOVO: Limpar apenas cache de verificação
+  async clearPacientesCache(): Promise<void> {
+    await this.clear('pacientes_cache');
+    console.log('🗑️ Cache de pacientes limpo');
+  }
+  // ✅ NOVO: Obter estatísticas do cache
+  async getCacheStats(): Promise<{
+    verificacao: number;
+    locais: number;
+    pendentes: number;
+  }> {
+    await this.init();
+    
+    try {
+      const cacheEntries = await this.db!.getAll('pacientes_cache');
+      const localPatients = await this.db!.getAll('pacientes');
+      const unsyncedLocal = localPatients.filter(p => 
+        p.synced === 'false' && (p.source === 'local_creation' || !p.source)
+      );
+      
+      return {
+        verificacao: cacheEntries.length,
+        locais: localPatients.length,
+        pendentes: unsyncedLocal.length
+      };
+      
+    } catch (error) {
+      console.error('Erro ao obter stats:', error);
+      return { verificacao: 0, locais: 0, pendentes: 0 };
+    }
+  }
+  // ✅ HELPERS para CPF Cache (conforme solicitado) 
+  async checkCpfExistsInCache(cpf: string): Promise<boolean> {
+    await this.init();
+    
+    if (!cpf || cpf.length !== 11) return false;
+    
+    try {
+      const rec = await this.db!.get('cpfs_cache', cpf);
+      return !!rec;
+    } catch (error) {
+      console.error('❌ Erro ao verificar CPF no cache:', error);
+      return false;
+    }
+  }
+
+  async saveCpfCache(cpf: string): Promise<void> {
+    await this.init();
+    
+    if (!cpf || cpf.length !== 11) return;
+    
+    try {
+      await this.db!.put('cpfs_cache', { 
+        cpf, 
+        when: Date.now() 
+      });
+      console.log(`✅ CPF ${cpf} salvo no cache`);
+    } catch (error) {
+      console.error('❌ Erro ao salvar CPF no cache:', error);
+      throw error;
+    }
+  }
+
+  // ✅ NOVO: Salvar múltiplos CPFs em lote
+  async saveCpfsCacheBatch(cpfs: string[]): Promise<void> {
+    await this.init();
+    
+    try {
+      const tx = this.db!.transaction(['cpfs_cache'], 'readwrite');
+      const store = tx.objectStore('cpfs_cache');
+      
+      for (const cpf of cpfs) {
+        if (cpf && cpf.length === 11) {
+          await store.put({ 
+            cpf, 
+            when: Date.now() 
+          });
+        }
+      }
+      
+      await tx.done;
+      console.log(`✅ ${cpfs.length} CPFs salvos no cache em lote`);
+      
+    } catch (error) {
+      console.error('❌ Erro ao salvar CPFs em lote:', error);
+      throw error;
+    }
+  }
+
+  // ✅ NOVO: Limpar cache de CPFs
+  async clearCpfsCache(): Promise<void> {
+    await this.init();
+    
+    try {
+      const tx = this.db!.transaction('cpfs_cache', 'readwrite');
+      await tx.store.clear();
+      await tx.done;
+      console.log('🗑️ Cache de CPFs limpo com sucesso');
+    } catch (error) {
+      console.error('❌ Erro ao limpar cache de CPFs:', error);
+      throw error;
+    }
+  }
+
+  // ✅ NOVO: Obter todos os CPFs do cache
+  async getAllCpfsFromCache(): Promise<string[]> {
+    await this.init();
+    
+    try {
+      const allCpfs = await this.db!.getAll('cpfs_cache');
+      return allCpfs.map(item => item.cpf);
+    } catch (error) {
+      console.error('❌ Erro ao obter CPFs do cache:', error);
+      return [];
+    }
+  }
+
+  // ✅ NOVO: Contar CPFs no cache
+  async getCpfsCacheCount(): Promise<number> {
+    await this.init();
+    
+    try {
+      const count = await this.db!.count('cpfs_cache');
+      return count;
+    } catch (error) {
+      console.error('❌ Erro ao contar CPFs no cache:', error);
+      return 0;
     }
   }
 }

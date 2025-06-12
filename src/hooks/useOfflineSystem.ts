@@ -22,20 +22,27 @@ interface PendingData {
   total: number;
 }
 
+interface PatientsCache {
+  verificacao: number;
+  locais: number;
+  pendentes: number;
+}
+
 interface OfflineSystemState {
   isOnline: boolean;
   syncing: boolean;
   stats: OfflineStats | null;
   pendingData: PendingData;
+  patientsCache: PatientsCache;
   initialized: boolean;
 }
 
-export function useOfflineSystem() {
-  const [state, setState] = useState<OfflineSystemState>({
+export function useOfflineSystem() {  const [state, setState] = useState<OfflineSystemState>({
     isOnline: navigator.onLine,
     syncing: false,
     stats: null,
     pendingData: { notificacoes: 0, pacientes: 0, total: 0 },
+    patientsCache: { verificacao: 0, locais: 0, pendentes: 0 },
     initialized: false
   });
 
@@ -64,6 +71,19 @@ export function useOfflineSystem() {
     }
   }, []);
 
+  // ✅ NOVO: Atualizar cache de pacientes
+  const updatePatientsCache = useCallback(async () => {
+    try {
+      const cacheStats = await indexedDBService.getCacheStats();
+      setState(prev => ({ 
+        ...prev, 
+        patientsCache: cacheStats 
+      }));
+    } catch (error) {
+      console.error('Erro ao carregar cache de pacientes:', error);
+    }
+  }, []);
+
   // Atualizar dados pendentes
   const updatePendingData = useCallback(async () => {
     try {
@@ -83,13 +103,17 @@ export function useOfflineSystem() {
   const initializeOfflineSystem = useCallback(async () => {
     try {
       await indexedDBService.init();
-      await Promise.all([updateStats(), updatePendingData()]);
+      await Promise.all([
+        updateStats(), 
+        updatePendingData(),
+        updatePatientsCache()
+      ]);
       setState(prev => ({ ...prev, initialized: true }));
     } catch (error) {
       console.error('Erro ao inicializar sistema offline:', error);
       toast.error('Erro ao inicializar sistema offline');
     }
-  }, [updateStats, updatePendingData]);
+  }, [updateStats, updatePendingData, updatePatientsCache]);
 
   // Eventos de conexão
   useEffect(() => {
@@ -122,10 +146,11 @@ export function useOfflineSystem() {
     const interval = setInterval(() => {
       updateStats();
       updatePendingData();
+      updatePatientsCache();
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [initializeOfflineSystem, updateStats, updatePendingData]);
+  }, [initializeOfflineSystem, updateStats, updatePendingData, updatePatientsCache]);
 
   // Funções para componentes
   const downloadEssentialData = useCallback(async (
@@ -178,17 +203,50 @@ export function useOfflineSystem() {
     }
   }, [state.isOnline, updateStats]);
 
+  // ✅ NOVO: Download específico para verificação de pacientes
+  const downloadPatientsVerification = useCallback(async (
+    onProgress?: (progress: number, current: string) => void
+  ) => {
+    if (!state.isOnline) {
+      toast.error('❌ Sem conexão com a internet');
+      return false;
+    }
+
+    try {
+      setState(prev => ({ ...prev, syncing: true }));
+      
+      const result = await offlineDataManager.downloadPatientsForVerification(onProgress);
+      
+      await updatePatientsCache();
+      
+      if (result.success) {
+        toast.success(`✅ ${result.count} pacientes baixados para verificação!`);
+        return true;
+      } else {
+        toast.error(`❌ Erro: ${result.error}`);
+        return false;
+      }
+      
+    } catch (error) {
+      console.error('Erro no download de pacientes:', error);
+      toast.error('Erro no download de pacientes');
+      return false;
+    } finally {
+      setState(prev => ({ ...prev, syncing: false }));
+    }
+  }, [state.isOnline, updatePatientsCache]);
+
   const clearOfflineData = useCallback(async () => {
     try {
       await offlineDataManager.clearOfflineData();
-      await updateStats();
+      await Promise.all([updateStats(), updatePatientsCache()]);
       return true;
     } catch (error) {
       console.error('Erro ao limpar dados offline:', error);
       toast.error('Erro ao limpar dados offline');
       return false;
     }
-  }, [updateStats]);
+  }, [updateStats, updatePatientsCache]);
 
   const syncPendingData = useCallback(async () => {
     if (!state.isOnline) {
@@ -207,7 +265,7 @@ export function useOfflineSystem() {
       const success = await syncService.forceSyncData();
       
       if (success) {
-        await updatePendingData();
+        await Promise.all([updatePendingData(), updatePatientsCache()]);
         toast.success('✅ Dados sincronizados com sucesso!');
       }
       
@@ -219,7 +277,7 @@ export function useOfflineSystem() {
     } finally {
       setState(prev => ({ ...prev, syncing: false }));
     }
-  }, [state.isOnline, state.pendingData.total, updatePendingData]);
+  }, [state.isOnline, state.pendingData.total, updatePendingData, updatePatientsCache]);
 
   // Funções de conveniência para verificações
   const isReadyForOffline = useCallback(() => {
@@ -244,26 +302,27 @@ export function useOfflineSystem() {
     return 'Online';
   }, [state]);
 
-  // Funções para salvar dados (com fallback offline)
+  // ✅ CORRIGIDO: Funções para salvar dados
   const saveNotificationOfflineSafe = useCallback(async (data: any) => {
     try {
-      return await syncService.saveNotificacao(data);
+      await syncService.saveNotificacao(data);
+      await updatePendingData(); // Atualizar contador
     } catch (error) {
       console.error('Erro ao salvar notificação:', error);
       throw error;
     }
-  }, []);
+  }, [updatePendingData]);
 
   const savePatientOfflineSafe = useCallback(async (data: any) => {
     try {
       const result = await syncService.savePaciente(data);
-      await updatePendingData(); // Atualizar contador
+      await Promise.all([updatePendingData(), updatePatientsCache()]);
       return result;
     } catch (error) {
       console.error('Erro ao salvar paciente:', error);
       throw error;
     }
-  }, [updatePendingData]);
+  }, [updatePendingData, updatePatientsCache]);
 
   const searchPatientsOfflineSafe = useCallback(async (query: string) => {
     try {
@@ -274,111 +333,56 @@ export function useOfflineSystem() {
     }
   }, []);
 
+  // ✅ CORRIGIDO: Verificação de CPF usando sistema melhorado
   const checkCpfOfflineSafe = useCallback(async (cpf: string): Promise<boolean> => {
     try {
       console.log(`🔍 Verificando CPF ${cpf} - Modo: ${state.isOnline ? 'Online' : 'Offline'}`);
       
-      // ✅ ESTRATÉGIA 1: SEMPRE verificar IndexedDB primeiro (mais rápido)
-      try {
-        const existsInCache = await indexedDBService.checkCpfExists(cpf);
-        if (existsInCache) {
-          console.log('✅ CPF encontrado no IndexedDB local');
-          return true;
-        }
-      } catch (cacheError) {
-        console.warn('⚠️ Erro no IndexedDB, continuando...', cacheError);
-      }
+      // ✅ Usar o método corrigido do syncService
+      const exists = await syncService.checkCpfExists(cpf);
       
-      // ✅ ESTRATÉGIA 2: Se OFFLINE, parar aqui (não tentar rede)
-      if (!state.isOnline) {
-        console.log('📱 Modo offline: CPF não encontrado no cache local');
-        return false;
-      }
+      console.log(`✅ Verificação concluída: ${exists ? 'CPF existe' : 'CPF não encontrado'}`);
+      return exists;
       
-      // ✅ ESTRATÉGIA 3: Online - tentar syncService com TIMEOUT AGRESSIVO
-      try {
-        console.log('🌐 Tentando verificação online...');
-        
-        // ⚡ TIMEOUT SUPER AGRESSIVO (1.5s) para evitar travamento
-        const syncPromise = syncService.checkCpfExists(cpf);
-        const timeoutPromise = new Promise<boolean>((_, reject) => 
-          setTimeout(() => reject(new Error('SYNC_TIMEOUT')), 1500)
-        );
-        
-        const result = await Promise.race([syncPromise, timeoutPromise]);
-        console.log('✅ Verificação online concluída:', result);
-        return result;
-        
-      } catch (syncError: any) {
-        console.warn('⚠️ SyncService falhou:', syncError?.message || syncError);
-        
-        // ✅ ESTRATÉGIA 4: ANÁLISE INTELIGENTE DO ERRO
-        const isNetworkError = (
-          syncError?.code === 'ERR_NETWORK' ||
-          syncError?.message?.includes('Network Error') ||
-          syncError?.message?.includes('Failed to fetch') ||
-          syncError?.message?.includes('no-response') ||
-          syncError?.message?.includes('SYNC_TIMEOUT') ||
-          syncError?.name === 'AxiosError' ||
-          !navigator.onLine
-        );
-        
-        if (isNetworkError) {
-          console.log('🌐 Erro de rede confirmado - assumindo CPF não existe');
-          
-          // ✅ NÃO mostrar toast excessivo para timeouts
-          if (!syncError?.message?.includes('TIMEOUT')) {
-            // Só mostrar aviso para erros de rede reais (não timeout)
-            setTimeout(() => {
-              toast.warning('⚠️ Problema de conexão - verificação limitada');
-            }, 100);
-          }
-          
-          return false; // Assumir que não existe para permitir cadastro
-        }
-        
-        // ✅ ESTRATÉGIA 5: Para outros erros, assumir que não existe
-        console.log('❓ Erro desconhecido - assumindo CPF não existe para continuidade');
-        return false;
-      }
-      
-    } catch (generalError: any) {
-      console.error('❌ Erro geral na verificação de CPF:', generalError);
+    } catch (error: any) {
+      console.error('❌ Erro geral na verificação de CPF:', error);
       return false; // Sempre permitir continuar
     }
   }, [state.isOnline]);
 
-  // ✅ Função para verificar se vale a pena baixar dados de pacientes
+  // ✅ MELHORADO: Função para verificar se vale a pena baixar dados de pacientes
   const shouldDownloadPatients = useCallback(async (): Promise<{
     recommend: boolean;
     reason: string;
     currentCpfs: number;
+    hasVerificationCache: boolean;
   }> => {
     try {
-      // Verificar quantos CPFs estão em cache
-      const allPacientes = await indexedDBService.getAll('pacientes');
-      const cpfsInCache = allPacientes?.length || 0;
+      const cacheStats = await indexedDBService.getCacheStats();
       
-      if (cpfsInCache === 0) {
+      if (cacheStats.verificacao === 0) {
         return {
           recommend: true,
           reason: 'Nenhum paciente em cache - baixe dados para verificação offline',
-          currentCpfs: 0
+          currentCpfs: 0,
+          hasVerificationCache: false
         };
       }
       
-      if (cpfsInCache < 1000) {
+      if (cacheStats.verificacao < 1000) {
         return {
           recommend: true,
-          reason: `Apenas ${cpfsInCache} pacientes em cache - baixe mais dados para melhor cobertura`,
-          currentCpfs: cpfsInCache
+          reason: `Apenas ${cacheStats.verificacao} pacientes em cache - baixe mais dados para melhor cobertura`,
+          currentCpfs: cacheStats.verificacao,
+          hasVerificationCache: true
         };
       }
       
       return {
         recommend: false,
-        reason: `${cpfsInCache} pacientes em cache - verificação offline funcional`,
-        currentCpfs: cpfsInCache
+        reason: `${cacheStats.verificacao} pacientes em cache - verificação offline funcional`,
+        currentCpfs: cacheStats.verificacao,
+        hasVerificationCache: true
       };
       
     } catch (error) {
@@ -386,29 +390,32 @@ export function useOfflineSystem() {
       return {
         recommend: true,
         reason: 'Erro ao verificar cache - recomenda-se baixar dados',
-        currentCpfs: 0
+        currentCpfs: 0,
+        hasVerificationCache: false
       };
     }
   }, []);
 
-  // ✅ Função para obter estatísticas simples do cache
-  const getCacheStats = useCallback(async () => {
+  // ✅ NOVO: Função para obter estatísticas completas
+  const getCompleteStats = useCallback(async () => {
     try {
-      const [pacientes, notificacoes] = await Promise.all([
-        indexedDBService.getAll('pacientes'),
-        indexedDBService.getAll('notificacoes')
+      const [cacheStats, recommendation] = await Promise.all([
+        indexedDBService.getCacheStats(),
+        shouldDownloadPatients()
       ]);
       
       return {
-        pacientes: pacientes?.length || 0,
-        notificacoes: notificacoes?.length || 0,
-        total: (pacientes?.length || 0) + (notificacoes?.length || 0)
+        cache: cacheStats,
+        recommendation,
+        ready: state.stats?.isReady || false,
+        online: state.isOnline,
+        pending: state.pendingData
       };
     } catch (error) {
-      console.error('Erro ao obter stats do cache:', error);
-      return { pacientes: 0, notificacoes: 0, total: 0 };
+      console.error('Erro ao obter stats completas:', error);
+      return null;
     }
-  }, []);
+  }, [state, shouldDownloadPatients]);
 
   return {
     // Estado atual
@@ -416,11 +423,13 @@ export function useOfflineSystem() {
     syncing: state.syncing,
     stats: state.stats,
     pendingData: state.pendingData,
+    patientsCache: state.patientsCache,
     initialized: state.initialized,
 
     // Funções de gestão de dados offline
     downloadEssentialData,
     downloadAllData,
+    downloadPatientsVerification, // ✅ NOVO
     clearOfflineData,
     syncPendingData,
 
@@ -439,22 +448,24 @@ export function useOfflineSystem() {
     // Funções de atualização manual
     refreshStats: updateStats,
     refreshPendingData: updatePendingData,
+    refreshPatientsCache: updatePatientsCache, // ✅ NOVO
     reinitialize: initializeOfflineSystem,
 
-    // ✅ NOVAS FUNÇÕES OPCIONAIS:
+    // ✅ FUNÇÕES MELHORADAS:
     shouldDownloadPatients,
-    getCacheStats,
+    getCompleteStats, // ✅ NOVO
     
     // Atalhos úteis
     checkCacheHealth: useCallback(async () => {
-      const stats = await getCacheStats();
-      const recommendation = await shouldDownloadPatients();
+      const stats = await getCompleteStats();
+      if (!stats) return { healthy: false };
       
       return {
-        healthy: stats.pacientes > 500,
-        stats,
-        recommendation
+        healthy: stats.cache.verificacao > 500,
+        stats: stats.cache,
+        recommendation: stats.recommendation,
+        readyOffline: stats.ready
       };
-    }, [getCacheStats, shouldDownloadPatients])
+    }, [getCompleteStats])
   };
 }

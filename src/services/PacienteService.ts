@@ -1,4 +1,5 @@
 import axios from 'axios';
+import indexedDBService from './indexedDB';
 
 // Interface para opções de dropdown
 export interface OptionItem {
@@ -410,34 +411,7 @@ export const PacienteService = {
     } catch (error) {
       console.error('Erro ao buscar tipos de escolaridade:', error);
       return [];
-    }
-  },
-
-  // Verificar disponibilidade de CPF (retorna verdadeiro se o CPF está disponível)
-  async checkCpfAvailable(cpf: string, excludeId?: number): Promise<boolean> {
-    try {
-      // Verificar se o CPF está formatado corretamente
-      if (!cpf || cpf.length !== 11) {
-        return true; // CPF inválido considerado como disponível
-      }
-      
-      // Usar o mesmo padrão do resto do código (caminho GET)
-      let url = `${API_BASE_URL}/api/paciente/check-cpf/${cpf}`;
-      if (excludeId) {
-        url += `?excludeId=${excludeId}`;
-      }
-      
-      const response = await axios.get(url);
-      
-      // Se a API retorna {exists: true/false}, precisamos inverter
-      // para manter compatível com o nome do método (available = !exists)
-      return !response.data.exists;
-    } catch (error) {
-      console.error('Erro ao verificar disponibilidade de CPF:', error);
-      // Em caso de erro, assumimos que não está disponível por segurança
-      return false;
-    }
-  },
+    }  },
 
   // ✅ CORRIGIDO: Obter contagem total usando rota existente /api/paciente
   async getTotalCount(): Promise<number> {
@@ -479,7 +453,6 @@ export const PacienteService = {
       return 0;
     }
   },
-
   // ✅ CORRIGIDO: Baixar CPFs usando rota existente
   async getAllCPFs(): Promise<string[]> {
     try {
@@ -497,6 +470,12 @@ export const PacienteService = {
       
       // Remover duplicatas
       const uniqueCpfs = Array.from(new Set(cpfs));
+      
+      // ✅ Salvar CPFs no cache para verificação rápida
+      if (uniqueCpfs.length > 0) {
+        await indexedDBService.saveCpfsCacheBatch(uniqueCpfs);
+        console.log(`✅ ${uniqueCpfs.length} CPFs salvos no cache`);
+      }
       
       console.log(`✅ Extraídos ${uniqueCpfs.length} CPFs únicos`);
       return uniqueCpfs;
