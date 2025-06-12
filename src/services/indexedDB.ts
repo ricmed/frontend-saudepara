@@ -349,6 +349,31 @@ export class IndexedDBService {
     }
     await tx.done;
   }
+
+  async getAll(storeName: 'notificacoes' | 'opcoes' | 'pacientes'): Promise<any[]> {
+    await this.init();
+    
+    try {
+      return await this.db!.getAll(storeName);
+    } catch (error) {
+      console.error(`❌ Erro ao obter dados de ${storeName}:`, error);
+      return [];
+    }
+  }
+
+  async clear(storeName: 'notificacoes' | 'opcoes' | 'pacientes'): Promise<void> {
+    await this.init();
+    
+    try {
+      const tx = this.db!.transaction(storeName, 'readwrite');
+      await tx.store.clear();
+      await tx.done;
+      console.log(`🗑️ Store ${storeName} limpo com sucesso`);
+    } catch (error) {
+      console.error(`❌ Erro ao limpar store ${storeName}:`, error);
+      throw error;
+    }
+  }
 }
 
 const indexedDBService = new IndexedDBService();

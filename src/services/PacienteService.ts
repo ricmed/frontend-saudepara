@@ -437,7 +437,328 @@ export const PacienteService = {
       // Em caso de erro, assumimos que não está disponível por segurança
       return false;
     }
-  }
+  },
+
+  // ✅ CORRIGIDO: Obter contagem total usando rota existente /api/paciente
+  async getTotalCount(): Promise<number> {
+    try {
+      console.log('📊 Descobrindo total usando rota existente...');
+      
+      // ✅ Usar sua rota existente /api/paciente com parâmetros de teste
+      const response = await this.getAll(1, 1); // Página 1, apenas 1 item
+      
+      // Verificar se tem informação de paginação
+      if (response.pagination && response.pagination.total) {
+        const total = response.pagination.total;
+        console.log(`📊 Total encontrado via paginação: ${total}`);
+        return total;
+      }
+      
+      // Fallback: tentar descobrir fazendo uma busca maior
+      console.log('ℹ️ Paginação não disponível, tentando descobrir total...');
+      const bigResponse = await this.getAll(1, 10000); // Tentar buscar muitos
+      
+      if (bigResponse.data && Array.isArray(bigResponse.data)) {
+        const count = bigResponse.data.length;
+        console.log(`📊 Total descoberto via busca: ${count}`);
+        
+        // Se retornou exatamente 10000, pode haver mais
+        if (count === 10000) {
+          console.log('⚠️ Pode haver mais de 10.000 pacientes');
+          return count + 5000; // Estimativa conservadora
+        }
+        
+        return count;
+      }
+      
+      console.log('⚠️ Não foi possível descobrir total');
+      return 0;
+      
+    } catch (error) {
+      console.error('❌ Erro ao obter contagem de pacientes:', error);
+      return 0;
+    }
+  },
+
+  // ✅ CORRIGIDO: Baixar CPFs usando rota existente
+  async getAllCPFs(): Promise<string[]> {
+    try {
+      console.log('📥 Extraindo CPFs de todos os pacientes...');
+      
+      // ✅ Usar método existente que já funciona
+      const allPatients = await this.getAllPatientsForOffline();
+      
+      // Extrair apenas CPFs válidos
+      const cpfs = allPatients
+        .map(patient => patient.cpf)
+        .filter((cpf): cpf is string => cpf != null && cpf.trim() !== '')
+        .map(cpf => cpf.replace(/\D/g, '')) // Limpar formatação
+        .filter(cpf => cpf.length === 11); // Apenas CPFs com 11 dígitos
+      
+      // Remover duplicatas
+      const uniqueCpfs = Array.from(new Set(cpfs));
+      
+      console.log(`✅ Extraídos ${uniqueCpfs.length} CPFs únicos`);
+      return uniqueCpfs;
+      
+    } catch (error) {
+      console.error('❌ Erro ao extrair CPFs:', error);
+      return [];
+    }
+  },
+
+  // ✅ CORRIGIDO: Download de todos os pacientes usando apenas rota existente
+  async getAllPatientsForOffline(
+    onProgress?: (current: number, total: number, percentage: number) => void
+  ): Promise<Paciente[]> {
+    try {
+      console.log('📥 Iniciando download usando método adaptado...');
+      
+      // ✅ 1. Tentar descobrir total primeiro
+      let estimatedTotal = 0;
+      try {
+        estimatedTotal = await this.getTotalCount();
+        console.log(`📊 Total estimado: ${estimatedTotal}`);
+      } catch (error) {
+        console.warn('⚠️ Não conseguiu obter total, continuando...');
+      }
+      
+      // ✅ 2. Download página por página
+      const batchSize = 500;
+      let allPatients: Paciente[] = [];
+      let page = 1;
+      let hasMore = true;
+      let consecutiveEmptyPages = 0;
+      
+      while (hasMore && page <= 50) { // Limite de segurança: máximo 50 páginas
+        try {
+          console.log(`📥 Baixando página ${page} (${batchSize} registros)...`);
+          
+          const response = await this.getAll(page, batchSize);
+          const batch = response.data || [];
+          
+          if (batch.length === 0) {
+            consecutiveEmptyPages++;
+            console.log(`⚠️ Página ${page} vazia (${consecutiveEmptyPages} consecutivas)`);
+            
+            // Parar se tiver 2 páginas vazias consecutivas
+            if (consecutiveEmptyPages >= 2) {
+              hasMore = false;
+              break;
+            }
+          } else {
+            consecutiveEmptyPages = 0; // Reset contador
+            allPatients = [...allPatients, ...batch];
+            
+            // ✅ Callback de progresso
+            const currentTotal = estimatedTotal > 0 ? estimatedTotal : allPatients.length + 1000;
+            const percentage = Math.min((allPatients.length / currentTotal) * 100, 95);
+            onProgress?.(allPatients.length, currentTotal, percentage);
+            
+            console.log(`✅ Página ${page}: +${batch.length} pacientes (total: ${allPatients.length})`);
+            
+            // Se a página retornou menos que o limite, provavelmente é a última
+            if (batch.length < batchSize) {
+              console.log('📄 Última página detectada (retornou menos que o limite)');
+              hasMore = false;
+            }
+          }
+          
+          page++;
+          
+          // Pequena pausa para não sobrecarregar a API
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+        } catch (pageError) {
+          console.error(`❌ Erro na página ${page}:`, pageError);
+          consecutiveEmptyPages++;
+          
+          // Se falhou em muitas páginas consecutivas, parar
+          if (consecutiveEmptyPages >= 3) {
+            console.log('❌ Muitas falhas consecutivas, parando...');
+            hasMore = false;
+          } else {
+            page++; // Tentar próxima página
+          }
+        }
+      }
+      
+      // ✅ Progresso final
+      if (onProgress) {
+        onProgress(allPatients.length, allPatients.length, 100);
+      }
+      
+      console.log(`✅ Download concluído: ${allPatients.length.toLocaleString()} pacientes`);
+      return allPatients;
+      
+    } catch (error) {
+      console.error('❌ Erro geral no download:', error);
+      throw error;
+    }
+  },
+
+  // ✅ CORRIGIDO: Pacientes recentes usando filtro local
+  async getRecentPatientsForOffline(
+    months: number = 12,
+    onProgress?: (current: number, total: number, percentage: number) => void
+  ): Promise<Paciente[]> {
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setMonth(cutoffDate.getMonth() - months);
+      
+      console.log(`📥 Baixando todos e filtrando últimos ${months} meses...`);
+      
+      // ✅ Baixar todos os pacientes primeiro
+      const allPatients = await this.getAllPatientsForOffline(onProgress);
+      
+      // ✅ Filtrar por data (se não tiver data de criação, incluir por segurança)
+      const recentPatients = allPatients.filter(patient => {
+        // Se não tem data de nascimento, incluir por segurança
+        if (!patient.data_nascimento) return true;
+        
+        try {
+          const patientDate = new Date(patient.data_nascimento);
+          
+          // Se a data é muito antiga (antes de 1900), provavelmente é data de nascimento,
+          // não de criação, então incluir por segurança
+          if (patientDate.getFullYear() < 1950) return true;
+          
+          // Se a data é recente, pode ser data de criação
+          return patientDate >= cutoffDate;
+          
+        } catch (dateError) {
+          console.warn('Erro ao processar data:', dateError);
+          return true; // Incluir por segurança
+        }
+      });
+      
+      console.log(`✅ Filtrados ${recentPatients.length} de ${allPatients.length} pacientes recentes`);
+      return recentPatients;
+      
+    } catch (error) {
+      console.error('❌ Erro ao baixar pacientes recentes:', error);
+      throw error;
+    }
+  },
+
+  // ✅ CORRIGIDO: Recomendação usando métodos que funcionam
+  async getDownloadRecommendation(): Promise<{
+    totalPatients: number;
+    estimatedSizeMB: number;
+    recommendation: 'full' | 'recent' | 'cpfs-only';
+    reason: string;
+  }> {
+    try {
+      // ✅ Usar método corrigido
+      const totalCount = await this.getTotalCount();
+      
+      if (totalCount === 0) {
+        return {
+          totalPatients: 0,
+          estimatedSizeMB: 0,
+          recommendation: 'cpfs-only',
+          reason: 'Nenhum paciente encontrado ou erro de acesso'
+        };
+      }
+      
+      // Estimar tamanho (aproximadamente 500 bytes por paciente completo)
+      const estimatedFullSizeMB = (totalCount * 500) / (1024 * 1024);
+      
+      let recommendation: 'full' | 'recent' | 'cpfs-only' = 'full';
+      let reason = '';
+      
+      if (totalCount > 50000) {
+        recommendation = 'cpfs-only';
+        reason = `Base muito grande (${totalCount.toLocaleString()} pacientes). Recomendado baixar apenas CPFs para verificação rápida.`;
+      } else if (totalCount > 15000) {
+        recommendation = 'recent';
+        reason = `Base grande (${totalCount.toLocaleString()} pacientes, ~${Math.round(estimatedFullSizeMB)}MB). Considere baixar apenas pacientes recentes.`;
+      } else if (estimatedFullSizeMB > 25) {
+        recommendation = 'recent';
+        reason = `Tamanho estimado grande (~${Math.round(estimatedFullSizeMB)}MB). Pacientes recentes podem ser suficientes.`;
+      } else {
+        recommendation = 'full';
+        reason = `Base pequena (${totalCount.toLocaleString()} pacientes, ~${Math.round(estimatedFullSizeMB)}MB). Download completo viável.`;
+      }
+      
+      return {
+        totalPatients: totalCount,
+        estimatedSizeMB: estimatedFullSizeMB,
+        recommendation,
+        reason
+      };
+      
+    } catch (error) {
+      console.error('❌ Erro ao analisar download:', error);
+      return {
+        totalPatients: 0,
+        estimatedSizeMB: 0,
+        recommendation: 'cpfs-only',
+        reason: 'Erro ao analisar base de dados - usando estratégia conservadora'
+      };
+    }
+  },
+
+  // ✅ NOVO: Função de conveniência para download inteligente
+  async downloadPatientsIntelligent(
+    onProgress?: (progress: number, current: string, phase?: string) => void
+  ): Promise<{ success: boolean; count: number; strategy: string; error?: string }> {
+    try {
+      onProgress?.(0, 'Analisando melhor estratégia...', 'Análise');
+      
+      const recommendation = await this.getDownloadRecommendation();
+      
+      onProgress?.(10, recommendation.reason, 'Estratégia Escolhida');
+      
+      let result: { success: boolean; count: number; error?: string };
+      let strategy: string;
+      
+      switch (recommendation.recommendation) {
+        case 'full':
+          strategy = 'Download Completo';
+          const allPatients = await this.getAllPatientsForOffline(
+            (current, total, percentage) => {
+              onProgress?.(10 + (percentage * 0.9), `${current}/${total} pacientes`, strategy);
+            }
+          );
+          result = { success: true, count: allPatients.length };
+          break;
+          
+        case 'recent':
+          strategy = 'Pacientes Recentes';
+          const recentPatients = await this.getRecentPatientsForOffline(
+            12, // 12 meses
+            (current, total, percentage) => {
+              onProgress?.(10 + (percentage * 0.9), `${current}/${total} pacientes`, strategy);
+            }
+          );
+          result = { success: true, count: recentPatients.length };
+          break;
+          
+        case 'cpfs-only':
+          strategy = 'Apenas CPFs';
+          onProgress?.(50, 'Extraindo CPFs...', strategy);
+          const cpfs = await this.getAllCPFs();
+          onProgress?.(100, `${cpfs.length} CPFs extraídos`, strategy);
+          result = { success: true, count: cpfs.length };
+          break;
+          
+        default:
+          throw new Error('Estratégia não implementada');
+      }
+      
+      return { ...result, strategy };
+      
+    } catch (error: any) {
+      console.error('❌ Erro no download inteligente:', error);
+      return {
+        success: false,
+        count: 0,
+        strategy: 'Erro',
+        error: error.message || 'Erro desconhecido'
+      };
+    }
+  },
 };
 
 export default PacienteService;

@@ -3,6 +3,7 @@ import { toast } from 'react-toastify';
 import { offlineDataManager } from '@/services/offlineDataManager';
 import syncService from '@/services/syncService';
 import indexedDBService from '@/services/indexedDB';
+import PacienteService from '@/services/PacienteService';
 
 interface OfflineStats {
   isReady: boolean;
@@ -273,12 +274,139 @@ export function useOfflineSystem() {
     }
   }, []);
 
-  const checkCpfOfflineSafe = useCallback(async (cpf: string) => {
+  const checkCpfOfflineSafe = useCallback(async (cpf: string): Promise<boolean> => {
     try {
-      return await syncService.checkCpfExists(cpf);
+      console.log(`🔍 Verificando CPF ${cpf} - Modo: ${state.isOnline ? 'Online' : 'Offline'}`);
+      
+      // ✅ ESTRATÉGIA 1: SEMPRE verificar IndexedDB primeiro (mais rápido)
+      try {
+        const existsInCache = await indexedDBService.checkCpfExists(cpf);
+        if (existsInCache) {
+          console.log('✅ CPF encontrado no IndexedDB local');
+          return true;
+        }
+      } catch (cacheError) {
+        console.warn('⚠️ Erro no IndexedDB, continuando...', cacheError);
+      }
+      
+      // ✅ ESTRATÉGIA 2: Se OFFLINE, parar aqui (não tentar rede)
+      if (!state.isOnline) {
+        console.log('📱 Modo offline: CPF não encontrado no cache local');
+        return false;
+      }
+      
+      // ✅ ESTRATÉGIA 3: Online - tentar syncService com TIMEOUT AGRESSIVO
+      try {
+        console.log('🌐 Tentando verificação online...');
+        
+        // ⚡ TIMEOUT SUPER AGRESSIVO (1.5s) para evitar travamento
+        const syncPromise = syncService.checkCpfExists(cpf);
+        const timeoutPromise = new Promise<boolean>((_, reject) => 
+          setTimeout(() => reject(new Error('SYNC_TIMEOUT')), 1500)
+        );
+        
+        const result = await Promise.race([syncPromise, timeoutPromise]);
+        console.log('✅ Verificação online concluída:', result);
+        return result;
+        
+      } catch (syncError: any) {
+        console.warn('⚠️ SyncService falhou:', syncError?.message || syncError);
+        
+        // ✅ ESTRATÉGIA 4: ANÁLISE INTELIGENTE DO ERRO
+        const isNetworkError = (
+          syncError?.code === 'ERR_NETWORK' ||
+          syncError?.message?.includes('Network Error') ||
+          syncError?.message?.includes('Failed to fetch') ||
+          syncError?.message?.includes('no-response') ||
+          syncError?.message?.includes('SYNC_TIMEOUT') ||
+          syncError?.name === 'AxiosError' ||
+          !navigator.onLine
+        );
+        
+        if (isNetworkError) {
+          console.log('🌐 Erro de rede confirmado - assumindo CPF não existe');
+          
+          // ✅ NÃO mostrar toast excessivo para timeouts
+          if (!syncError?.message?.includes('TIMEOUT')) {
+            // Só mostrar aviso para erros de rede reais (não timeout)
+            setTimeout(() => {
+              toast.warning('⚠️ Problema de conexão - verificação limitada');
+            }, 100);
+          }
+          
+          return false; // Assumir que não existe para permitir cadastro
+        }
+        
+        // ✅ ESTRATÉGIA 5: Para outros erros, assumir que não existe
+        console.log('❓ Erro desconhecido - assumindo CPF não existe para continuidade');
+        return false;
+      }
+      
+    } catch (generalError: any) {
+      console.error('❌ Erro geral na verificação de CPF:', generalError);
+      return false; // Sempre permitir continuar
+    }
+  }, [state.isOnline]);
+
+  // ✅ Função para verificar se vale a pena baixar dados de pacientes
+  const shouldDownloadPatients = useCallback(async (): Promise<{
+    recommend: boolean;
+    reason: string;
+    currentCpfs: number;
+  }> => {
+    try {
+      // Verificar quantos CPFs estão em cache
+      const allPacientes = await indexedDBService.getAll('pacientes');
+      const cpfsInCache = allPacientes?.length || 0;
+      
+      if (cpfsInCache === 0) {
+        return {
+          recommend: true,
+          reason: 'Nenhum paciente em cache - baixe dados para verificação offline',
+          currentCpfs: 0
+        };
+      }
+      
+      if (cpfsInCache < 1000) {
+        return {
+          recommend: true,
+          reason: `Apenas ${cpfsInCache} pacientes em cache - baixe mais dados para melhor cobertura`,
+          currentCpfs: cpfsInCache
+        };
+      }
+      
+      return {
+        recommend: false,
+        reason: `${cpfsInCache} pacientes em cache - verificação offline funcional`,
+        currentCpfs: cpfsInCache
+      };
+      
     } catch (error) {
-      console.error('Erro ao verificar CPF:', error);
-      return false;
+      console.error('Erro ao verificar status:', error);
+      return {
+        recommend: true,
+        reason: 'Erro ao verificar cache - recomenda-se baixar dados',
+        currentCpfs: 0
+      };
+    }
+  }, []);
+
+  // ✅ Função para obter estatísticas simples do cache
+  const getCacheStats = useCallback(async () => {
+    try {
+      const [pacientes, notificacoes] = await Promise.all([
+        indexedDBService.getAll('pacientes'),
+        indexedDBService.getAll('notificacoes')
+      ]);
+      
+      return {
+        pacientes: pacientes?.length || 0,
+        notificacoes: notificacoes?.length || 0,
+        total: (pacientes?.length || 0) + (notificacoes?.length || 0)
+      };
+    } catch (error) {
+      console.error('Erro ao obter stats do cache:', error);
+      return { pacientes: 0, notificacoes: 0, total: 0 };
     }
   }, []);
 
@@ -311,6 +439,22 @@ export function useOfflineSystem() {
     // Funções de atualização manual
     refreshStats: updateStats,
     refreshPendingData: updatePendingData,
-    reinitialize: initializeOfflineSystem
+    reinitialize: initializeOfflineSystem,
+
+    // ✅ NOVAS FUNÇÕES OPCIONAIS:
+    shouldDownloadPatients,
+    getCacheStats,
+    
+    // Atalhos úteis
+    checkCacheHealth: useCallback(async () => {
+      const stats = await getCacheStats();
+      const recommendation = await shouldDownloadPatients();
+      
+      return {
+        healthy: stats.pacientes > 500,
+        stats,
+        recommendation
+      };
+    }, [getCacheStats, shouldDownloadPatients])
   };
 }

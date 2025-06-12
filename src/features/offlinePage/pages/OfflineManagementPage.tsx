@@ -18,11 +18,16 @@ import {
   Pause,
   RotateCcw,
   ArrowLeft,
-  Menu
+  Menu,
+  Users,
+  Shield,
+  Zap
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { offlineDataManager } from '@/services/offlineDataManager';
 import syncService from '@/services/syncService';
+import PacienteService from '@/services/PacienteService';
+import indexedDBService from '@/services/indexedDB';
 
 // Import do SideMenu real do sistema
 import SideMenu from '@/features/home/components/SideMenu';
@@ -156,10 +161,17 @@ const OfflineManagementPage: React.FC = () => {
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [currentDownload, setCurrentDownload] = useState('');
   const [pendingSync, setPendingSync] = useState({ notificacoes: 0, pacientes: 0 });
-  const [activeTab, setActiveTab] = useState<'overview' | 'categories' | 'sources' | 'sync'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'patients' | 'categories' | 'sources' | 'sync'>('overview');
   const [isSyncPaused, setIsSyncPaused] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  // Estados específicos para pacientes
+  const [patientsStats, setPatientsStats] = useState<any>(null);
+  const [downloadRecommendation, setDownloadRecommendation] = useState<any>(null);
+  const [patientsDownloading, setPatientsDownloading] = useState(false);
+  const [patientsProgress, setPatientsProgress] = useState(0);
+  const [patientsPhase, setPatientsPhase] = useState('');
 
   // Monitorar conexão
   useEffect(() => {
@@ -179,10 +191,14 @@ const OfflineManagementPage: React.FC = () => {
   useEffect(() => {
     loadStats();
     loadPendingSync();
+    loadPatientsStats();
+    
     const interval = setInterval(() => {
       loadStats();
       loadPendingSync();
-    }, 5000);
+      loadPatientsStats();
+    }, 10000);
+    
     return () => clearInterval(interval);
   }, []);
 
@@ -201,6 +217,47 @@ const OfflineManagementPage: React.FC = () => {
       setPendingSync(pending);
     } catch (error) {
       console.error('Erro ao carregar dados pendentes:', error);
+    }
+  };
+
+  // Carregar estatísticas de pacientes
+  const loadPatientsStats = async () => {
+    try {
+      // ✅ Usar método corrigido do PacienteService
+      const recommendation = await PacienteService.getDownloadRecommendation();
+      
+      // ✅ Verificar cache atual usando indexedDBService
+      const cachedPatients = await indexedDBService.getAll('pacientes') || [];
+      const cachedCpfs = await indexedDBService.getOpcoes('cpfs_cache');
+      
+      const cacheStatus = {
+        cpfsList: {
+          loaded: !!cachedCpfs,
+          count: cachedCpfs?.length || 0
+        },
+        recentPatients: {
+          count: cachedPatients.filter((p: any) => p.cached_at).length
+        },
+        fullPatients: {
+          count: cachedPatients.length
+        },
+        confidence: cachedPatients.length > 5000 ? 'high' : 
+                     cachedPatients.length > 1000 ? 'medium' : 'low',
+        recommendation: recommendation.reason
+      };
+      
+      setPatientsStats(cacheStatus);
+      setDownloadRecommendation(recommendation);
+      
+    } catch (error) {
+      console.error('Erro ao carregar stats de pacientes:', error);
+      setPatientsStats({
+        cpfsList: { loaded: false, count: 0 },
+        recentPatients: { count: 0 },
+        fullPatients: { count: 0 },
+        confidence: 'low',
+        recommendation: 'Erro ao verificar cache'
+      });
     }
   };
 
@@ -324,6 +381,157 @@ const OfflineManagementPage: React.FC = () => {
     navigate('/'); // Volta para a página inicial
   };
 
+  // Handlers para download de pacientes
+  const handleDownloadPatients = async (strategy: 'intelligent' | 'cpfs' | 'recent' | 'full') => {
+    if (!isOnline) {
+      toast.error('❌ Sem conexão com a internet');
+      return;
+    }
+
+    setPatientsDownloading(true);
+    setPatientsProgress(0);
+    setPatientsPhase('Iniciando...');
+
+    try {
+      let result: { success: boolean; count: number; strategy?: string; error?: string };
+      
+      switch (strategy) {
+        case 'intelligent':
+          result = await PacienteService.downloadPatientsIntelligent(
+            (progress, current, phase) => {
+              setPatientsProgress(progress);
+              setPatientsPhase(phase ? `${phase}: ${current}` : current);
+            }
+          );
+          break;
+          
+        case 'cpfs':
+          setPatientsPhase('Extraindo CPFs de todos os pacientes...');
+          const cpfs = await PacienteService.getAllCPFs();
+          
+          // ✅ Salvar CPFs no formato otimizado para verificação
+          if (cpfs.length > 0) {
+            setPatientsProgress(90);
+            setPatientsPhase(`Salvando ${cpfs.length} CPFs no cache...`);
+            
+            await indexedDBService.saveOpcoes('cpfs_cache', cpfs);
+          }
+          
+          setPatientsProgress(100);
+          result = { success: true, count: cpfs.length, strategy: 'CPFs' };
+          break;
+          
+        case 'recent':
+          setPatientsPhase('Baixando pacientes recentes...');
+          const recentPatients = await PacienteService.getRecentPatientsForOffline(
+            12, // 12 meses
+            (current, total, percentage) => {
+              setPatientsProgress(percentage);
+              setPatientsPhase(`Pacientes recentes: ${current}/${total}`);
+            }
+          );
+          
+          // ✅ Salvar pacientes no IndexedDB
+          setPatientsProgress(95);
+          setPatientsPhase('Salvando no cache offline...');
+          
+          for (const patient of recentPatients) {
+            await indexedDBService.savePaciente({
+              ...patient,
+              cached_at: new Date().toISOString()
+            });
+          }
+          
+          result = { success: true, count: recentPatients.length, strategy: 'Recentes' };
+          break;
+          
+        case 'full':
+          setPatientsPhase('Baixando todos os pacientes...');
+          const allPatients = await PacienteService.getAllPatientsForOffline(
+            (current, total, percentage) => {
+              setPatientsProgress(percentage * 0.9); // 90% para download
+              setPatientsPhase(`Baixando: ${current}/${total} pacientes`);
+            }
+          );
+          
+          // ✅ Salvar todos os pacientes
+          setPatientsProgress(90);
+          setPatientsPhase('Salvando todos os pacientes no cache...');
+          
+          let savedCount = 0;
+          for (const patient of allPatients) {
+            try {
+              await indexedDBService.savePaciente({
+                ...patient,
+                cached_at: new Date().toISOString()
+              });
+              savedCount++;
+              
+              // Atualizar progresso ocasionalmente
+              if (savedCount % 100 === 0) {
+                const saveProgress = 90 + (savedCount / allPatients.length) * 10;
+                setPatientsProgress(saveProgress);
+                setPatientsPhase(`Salvando: ${savedCount}/${allPatients.length}`);
+              }
+            } catch (saveError) {
+              console.warn('Erro ao salvar paciente:', saveError);
+            }
+          }
+          
+          result = { success: true, count: savedCount, strategy: 'Completo' };
+          break;
+          
+        default:
+          throw new Error('Estratégia não suportada');
+      }
+      
+      // ✅ Atualizar estatísticas
+      await loadPatientsStats();
+      
+      if (result.success) {
+        setPatientsProgress(100);
+        setPatientsPhase('Concluído!');
+        toast.success(`✅ ${result.strategy || 'Download'} concluído: ${result.count?.toLocaleString() || 0} registros`);
+      } else {
+        throw new Error(result.error || 'Erro desconhecido');
+      }
+      
+    } catch (error: any) {
+      console.error('Erro no download:', error);
+      toast.error(`❌ Erro no download: ${error.message || 'Erro desconhecido'}`);
+      setPatientsPhase('Erro!');
+    } finally {
+      setPatientsDownloading(false);
+      setTimeout(() => {
+        setPatientsProgress(0);
+        setPatientsPhase('');
+      }, 3000);
+    }
+  };
+
+  // ✅ Handler CORRIGIDO para limpar cache de pacientes
+  const handleClearPatientsCache = async () => {
+    if (window.confirm('⚠️ Tem certeza que deseja limpar o cache de pacientes? Você precisará baixá-los novamente para verificação offline de CPF.')) {
+      try {
+        // ✅ Usar o método clear agora disponível
+        await indexedDBService.clear('pacientes');
+        
+        // Tentar limpar cache de CPFs também
+        try {
+          await indexedDBService.saveOpcoes('cpfs_cache', []);
+        } catch (cpfError) {
+          console.warn('Erro ao limpar cache de CPFs:', cpfError);
+        }
+        
+        await loadPatientsStats();
+        toast.success('✅ Cache de pacientes limpo');
+      } catch (error) {
+        console.error('Erro ao limpar cache:', error);
+        toast.error('❌ Erro ao limpar cache');
+      }
+    }
+  };
+
   if (!stats) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -397,12 +605,13 @@ const OfflineManagementPage: React.FC = () => {
         onLanguageChange={() => {}}
       />
 
-      {/* Navigation Tabs */}
+      {/* Navigation Tabs - atualizado */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4">
           <nav className="flex space-x-8 overflow-x-auto">
             {[
               { id: 'overview', label: 'Visão Geral', icon: BarChart3 },
+              { id: 'patients', label: 'Base de Pacientes', icon: Users },
               { id: 'categories', label: 'Por Categoria', icon: Folder },
               { id: 'sources', label: 'Todas as Fontes', icon: Database },
               { id: 'sync', label: 'Sincronização', icon: RefreshCw }
@@ -580,6 +789,233 @@ const OfflineManagementPage: React.FC = () => {
                   <Trash2 className="h-5 w-5" />
                   Limpar Dados
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Patients Tab - NOVA ABA */}
+        {activeTab === 'patients' && (
+          <div className="space-y-6">
+            {/* Header da seção */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border">
+              <div className="flex items-center gap-3 mb-4">
+                <Users className="h-6 w-6 text-blue-600" />
+                <h2 className="text-xl font-semibold text-gray-900">Base de Pacientes para Verificação Offline</h2>
+              </div>
+              <p className="text-gray-600">
+                Baixe dados de pacientes para verificação de CPF offline. O sistema analisará sua base e recomendará a melhor estratégia.
+              </p>
+            </div>
+
+            {/* Progress Bar para download de pacientes */}
+            {patientsDownloading && (
+              <div className="bg-blue-50 p-6 rounded-xl border border-blue-200">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="font-medium text-blue-900 flex items-center gap-2">
+                    <RefreshCw className="h-5 w-5 animate-spin" />
+                    {patientsPhase}
+                  </span>
+                  <span className="text-blue-700 font-bold">{Math.round(patientsProgress)}%</span>
+                </div>
+                <div className="w-full bg-blue-200 rounded-full h-3">
+                  <div 
+                    className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                    style={{ width: `${patientsProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Análise e Recomendação */}
+            {downloadRecommendation && (
+              <div className="bg-white p-6 rounded-xl shadow-sm border">
+                <h3 className="text-lg font-semibold mb-4 text-gray-900">Análise da Base de Dados</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-600 mb-1">
+                      {downloadRecommendation.totalPatients.toLocaleString()}
+                    </div>
+                    <div className="text-sm text-blue-700">Total de Pacientes</div>
+                  </div>
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <div className="text-2xl font-bold text-green-600 mb-1">
+                      ~{Math.round(downloadRecommendation.estimatedSizeMB)}MB
+                    </div>
+                    <div className="text-sm text-green-700">Tamanho Estimado</div>
+                  </div>
+                  <div className={`p-4 rounded-lg ${
+                    downloadRecommendation.recommendation === 'full' ? 'bg-green-50' :
+                    downloadRecommendation.recommendation === 'recent' ? 'bg-yellow-50' : 'bg-orange-50'
+                  }`}>
+                    <div className={`text-2xl font-bold mb-1 ${
+                      downloadRecommendation.recommendation === 'full' ? 'text-green-600' :
+                      downloadRecommendation.recommendation === 'recent' ? 'text-yellow-600' : 'text-orange-600'
+                    }`}>
+                      {downloadRecommendation.recommendation === 'full' ? 'Completo' :
+                       downloadRecommendation.recommendation === 'recent' ? 'Recentes' : 'Apenas CPFs'}
+                    </div>
+                    <div className={`text-sm ${
+                      downloadRecommendation.recommendation === 'full' ? 'text-green-700' :
+                      downloadRecommendation.recommendation === 'recent' ? 'text-yellow-700' : 'text-orange-700'
+                    }`}>
+                      Recomendado
+                    </div>
+                  </div>
+                </div>
+                
+                <div className={`p-4 rounded-lg border-l-4 ${
+                  downloadRecommendation.recommendation === 'full' ? 'bg-green-50 border-green-400' :
+                  downloadRecommendation.recommendation === 'recent' ? 'bg-yellow-50 border-yellow-400' : 'bg-orange-50 border-orange-400'
+                }`}>
+                  <p className="text-sm text-gray-700">{downloadRecommendation.reason}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Status Atual */}
+            {patientsStats && (
+              <div className="bg-white p-6 rounded-xl shadow-sm border">
+                <h3 className="text-lg font-semibold mb-4 text-gray-900">Status Atual do Cache</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Shield className="h-5 w-5 text-blue-600" />
+                      <span className="font-medium text-blue-900">CPFs em Cache</span>
+                    </div>
+                    <div className="text-2xl font-bold text-blue-600 mb-1">
+                      {patientsStats.cpfsList.count.toLocaleString()}
+                    </div>
+                    <div className="text-sm text-blue-700">
+                      {patientsStats.cpfsList.loaded ? 'Lista completa disponível' : 'Nenhum CPF em cache'}
+                    </div>
+                  </div>
+                  
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users className="h-5 w-5 text-green-600" />
+                      <span className="font-medium text-green-900">Pacientes Completos</span>
+                    </div>
+                    <div className="text-2xl font-bold text-green-600 mb-1">
+                      {(patientsStats.recentPatients.count + patientsStats.fullPatients.count).toLocaleString()}
+                    </div>
+                    <div className="text-sm text-green-700">Registros completos offline</div>
+                  </div>
+                  
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Zap className="h-5 w-5 text-purple-600" />
+                      <span className="font-medium text-purple-900">Verificação CPF</span>
+                    </div>
+                    <div className="text-2xl font-bold text-purple-600 mb-1">
+                      {patientsStats.confidence === 'high' ? 'Alta' : 
+                       patientsStats.confidence === 'medium' ? 'Média' : 'Baixa'}
+                    </div>
+                    <div className="text-sm text-purple-700">
+                      {patientsStats.recommendation}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Opções de Download */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border">
+              <h3 className="text-lg font-semibold mb-4 text-gray-900">Opções de Download</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* Download Inteligente */}
+                <div className="p-4 border-2 border-blue-200 rounded-lg hover:border-blue-300 transition-colors">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Zap className="h-5 w-5 text-blue-600" />
+                    <span className="font-medium text-blue-900">Download Inteligente</span>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Usa a recomendação automática baseada no tamanho da sua base.
+                  </p>
+                  <button
+                    onClick={() => handleDownloadPatients('intelligent')}
+                    disabled={patientsDownloading || !isOnline}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {patientsDownloading ? 'Baixando...' : 'Download Recomendado'}
+                  </button>
+                </div>
+
+                {/* CPFs Apenas */}
+                <div className="p-4 border-2 border-orange-200 rounded-lg hover:border-orange-300 transition-colors">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Shield className="h-5 w-5 text-orange-600" />
+                    <span className="font-medium text-orange-900">Apenas CPFs</span>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Download mínimo para verificação básica (mais rápido).
+                  </p>
+                  <button
+                    onClick={() => handleDownloadPatients('cpfs')}
+                    disabled={patientsDownloading || !isOnline}
+                    className="w-full px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Baixar CPFs
+                  </button>
+                </div>
+
+                {/* Pacientes Recentes */}
+                <div className="p-4 border-2 border-yellow-200 rounded-lg hover:border-yellow-300 transition-colors">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Clock className="h-5 w-5 text-yellow-600" />
+                    <span className="font-medium text-yellow-900">Últimos 12 Meses</span>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Pacientes recentes (balança tamanho e cobertura).
+                  </p>
+                  <button
+                    onClick={() => handleDownloadPatients('recent')}
+                    disabled={patientsDownloading || !isOnline}
+                    className="w-full px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Baixar Recentes
+                  </button>
+                </div>
+
+                {/* Todos os Pacientes */}
+                <div className="p-4 border-2 border-green-200 rounded-lg hover:border-green-300 transition-colors">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Database className="h-5 w-5 text-green-600" />
+                    <span className="font-medium text-green-900">Base Completa</span>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Todos os pacientes (verificação 100% precisa).
+                  </p>
+                  <button
+                    onClick={() => handleDownloadPatients('full')}
+                    disabled={patientsDownloading || !isOnline}
+                    className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Download Completo
+                  </button>
+                </div>
+              </div>
+
+              {/* Ações adicionais */}
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <div className="flex flex-wrap gap-4">
+                  <button
+                    onClick={handleClearPatientsCache}
+                    disabled={patientsDownloading}
+                    className="px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                  >
+                    Limpar Cache de Pacientes
+                  </button>
+                  
+                  <button
+                    onClick={loadPatientsStats}
+                    disabled={patientsDownloading}
+                    className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Atualizar Status
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -1,9 +1,4 @@
 import { PacienteService } from '@/services/PacienteService';
-import { TiposAtendimentoService } from '@/services/AtendimentoService';
-import { TiposEncerramentoService } from '@/services/EncerramentoService';
-import { EscolaridadeService } from '@/services/EscolaridadeService';
-import { TiposEventoService } from '@/services/EventoService';
-import { TiposPublicoService } from '@/services/PublicoService';
 import indexedDBService from '@/services/indexedDB';
 import { toast } from 'react-toastify';
 
@@ -14,6 +9,11 @@ export interface DataSource {
   priority: number; // 1 = alta, 2 = média, 3 = baixa
   estimatedSize: number;
   category: 'essential' | 'geographic' | 'medical' | 'administrative';
+}
+
+export interface PatientsDataSource extends DataSource {
+  patientsType: 'cpfs-only' | 'recent' | 'full';
+  estimatedPatients?: number;
 }
 
 // Função helper para chamadas diretas à API
@@ -225,6 +225,39 @@ class OfflineDataManager {
       fetchFn: createDirectApiFetch('estabelecimentos', 11000), // Aumentado para 11000
       priority: 3, 
       estimatedSize: 11000,
+      category: 'administrative'
+    },
+
+    // ===== DADOS DE PACIENTES (Prioridade especial) =====
+    { 
+      key: 'pacientes-cpfs', 
+      name: 'Lista de CPFs (Pacientes)', 
+      fetchFn: async () => {
+        const cpfs = await PacienteService.getAllCPFs();
+        return cpfs.map(cpf => ({ cpf })); // Converter para formato de objeto
+      }, 
+      priority: 2, 
+      estimatedSize: 0, // Será calculado dinamicamente
+      category: 'essential' // CPFs são essenciais para verificação
+    },
+    { 
+      key: 'pacientes-recentes', 
+      name: 'Pacientes Recentes (12 meses)', 
+      fetchFn: async () => {
+        return await PacienteService.getRecentPatientsForOffline(12);
+      }, 
+      priority: 3, 
+      estimatedSize: 0, // Será calculado dinamicamente
+      category: 'administrative'
+    },
+    { 
+      key: 'pacientes-completos', 
+      name: 'Base Completa de Pacientes', 
+      fetchFn: async () => {
+        return await PacienteService.getAllPatientsForOffline();
+      }, 
+      priority: 3, 
+      estimatedSize: 0, // Será calculado dinamicamente
       category: 'administrative'
     }
   ];
@@ -444,6 +477,9 @@ class OfflineDataManager {
     const totalLoaded = Object.values(categoryStats).reduce((sum, cat) => sum + cat.loaded, 0);
     const totalItems = this.dataSources.length;
     
+    // Adicionar estatísticas específicas de pacientes
+    const patientsStatus = await this.getPatientsStatus();
+    
     return {
       overall: {
         loaded: totalLoaded,
@@ -452,6 +488,7 @@ class OfflineDataManager {
         totalRecords
       },
       categories: categoryStats,
+      patients: patientsStatus, // Novo: estatísticas de pacientes
       sources: this.dataSources.map(source => ({
         ...source,
         loaded: status[source.key].loaded,
@@ -469,6 +506,298 @@ class OfflineDataManager {
     categories.forEach(category => {
       result[category] = this.dataSources.filter(s => s.category === category);
     });
+    
+    return result;
+  }
+
+  // Analisar estratégia recomendada para pacientes
+  async analyzePatientsStrategy(): Promise<{
+    totalPatients: number;
+    estimatedSizeMB: number;
+    recommendation: 'cpfs-only' | 'recent' | 'full';
+    reason: string;
+  }> {
+    try {
+      const recommendation = await PacienteService.getDownloadRecommendation();
+      
+      // Atualizar estimativas dos data sources dinamicamente
+      const cpfsSource = this.dataSources.find(s => s.key === 'pacientes-cpfs');
+      const recentSource = this.dataSources.find(s => s.key === 'pacientes-recentes');
+      const fullSource = this.dataSources.find(s => s.key === 'pacientes-completos');
+      
+      if (cpfsSource) cpfsSource.estimatedSize = Math.round((recommendation.totalPatients * 50) / 1024); // KB
+      if (recentSource) recentSource.estimatedSize = Math.round((recommendation.totalPatients * 0.3 * 1024) / 1024); // KB (30% dos pacientes)
+      if (fullSource) fullSource.estimatedSize = Math.round(recommendation.estimatedSizeMB * 1024); // KB
+      
+      return recommendation;
+    } catch (error) {
+      console.error('Erro ao analisar estratégia de pacientes:', error);
+      return {
+        totalPatients: 0,
+        estimatedSizeMB: 0,
+        recommendation: 'cpfs-only',
+        reason: 'Erro ao analisar base de dados'
+      };
+    }
+  }
+
+  // Download inteligente de pacientes
+  async downloadPatientsIntelligent(
+    onProgress?: (progress: number, current: string, phase: string) => void
+  ): Promise<{ success: boolean; strategy: string; count: number; error?: string }> {
+    try {
+      onProgress?.(10, 'Analisando base de dados...', 'analysis');
+      
+      const strategy = await this.analyzePatientsStrategy();
+      if (!strategy) throw new Error('Falha na análise da base');
+
+      onProgress?.(20, `Estratégia: ${strategy.recommendation}`, 'strategy');
+      
+      let sourceKey: string;
+      let sourceName: string;
+      
+      switch (strategy.recommendation) {
+        case 'cpfs-only':
+          sourceKey = 'pacientes-cpfs';
+          sourceName = 'Lista de CPFs';
+          break;
+        case 'recent':
+          sourceKey = 'pacientes-recentes';
+          sourceName = 'Pacientes Recentes';
+          break;
+        case 'full':
+          sourceKey = 'pacientes-completos';
+          sourceName = 'Base Completa';
+          break;
+        default:
+          sourceKey = 'pacientes-cpfs';
+          sourceName = 'Lista de CPFs';
+      }
+      
+      const result = await this.downloadSpecificSource(
+        sourceKey,
+        (progress, current) => onProgress?.(20 + (progress * 0.8), current, 'download')
+      );
+      
+      return {
+        success: result.success,
+        strategy: strategy.recommendation,
+        count: result.recordCount || 0,
+        error: result.error
+      };
+      
+    } catch (error) {
+      console.error('Erro no download inteligente de pacientes:', error);
+      return {
+        success: false,
+        strategy: 'failed',
+        count: 0,
+        error: error instanceof Error ? error.message : 'Erro desconhecido'
+      };
+    }
+  }
+
+  // Download de fonte específica
+  async downloadSpecificSource(
+    sourceKey: string,
+    onProgress?: (progress: number, current: string) => void
+  ): Promise<{ success: boolean; recordCount?: number; error?: string }> {
+    const source = this.dataSources.find(s => s.key === sourceKey);
+    if (!source) {
+      throw new Error(`Fonte ${sourceKey} não encontrada`);
+    }
+
+    try {
+      onProgress?.(20, `Iniciando download: ${source.name}`);
+      
+      let data: any[];
+      
+      if (sourceKey === 'pacientes-cpfs') {
+        // Download com progresso para CPFs
+        onProgress?.(40, 'Baixando lista de CPFs...');
+        const cpfs = await PacienteService.getAllCPFs();
+        data = cpfs.map(cpf => ({ cpf }));
+        
+      } else if (sourceKey === 'pacientes-recentes') {
+        // Download com progresso para pacientes recentes
+        data = await PacienteService.getRecentPatientsForOffline(
+          12,
+          (current, total, percentage) => {
+            onProgress?.(40 + (percentage * 0.4), `${current}/${total} pacientes recentes`);
+          }
+        );
+        
+      } else if (sourceKey === 'pacientes-completos') {
+        // Download com progresso para todos os pacientes
+        data = await PacienteService.getAllPatientsForOffline(
+          (current, total, percentage) => {
+            onProgress?.(40 + (percentage * 0.4), `${current}/${total} pacientes`);
+          }
+        );
+        
+      } else {
+        // Usar função padrão para outras fontes
+        data = await source.fetchFn();
+      }
+      
+      onProgress?.(85, 'Salvando no cache...');
+      
+      if (data && Array.isArray(data) && data.length > 0) {
+        await indexedDBService.saveOpcoes(sourceKey, data);
+        onProgress?.(100, `${data.length} registros salvos`);
+        
+        return {
+          success: true,
+          recordCount: data.length
+        };
+      } else {
+        throw new Error('Nenhum dado retornado');
+      }
+      
+    } catch (error) {
+      console.error(`Erro ao baixar ${source.name}:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erro desconhecido'
+      };
+    }
+  }
+
+  // Verificar status dos dados de pacientes
+  async getPatientsStatus(): Promise<{
+    cpfsList: { loaded: boolean; count: number };
+    recentPatients: { loaded: boolean; count: number };
+    fullPatients: { loaded: boolean; count: number };
+    recommendation: string;
+    confidence: 'high' | 'medium' | 'low';
+  }> {
+    const status = await this.checkCachedData();
+    
+    const cpfsList = {
+      loaded: status['pacientes-cpfs']?.loaded || false,
+      count: status['pacientes-cpfs']?.count || 0
+    };
+    
+    const recentPatients = {
+      loaded: status['pacientes-recentes']?.loaded || false,
+      count: status['pacientes-recentes']?.count || 0
+    };
+    
+    const fullPatients = {
+      loaded: status['pacientes-completos']?.loaded || false,
+      count: status['pacientes-completos']?.count || 0
+    };
+    
+    // Determinar recomendação e confiança
+    let recommendation = 'Baixar dados de pacientes';
+    let confidence: 'high' | 'medium' | 'low' = 'low';
+    
+    if (fullPatients.loaded && fullPatients.count > 0) {
+      recommendation = 'Base completa disponível';
+      confidence = 'high';
+    } else if (recentPatients.loaded && recentPatients.count > 5000) {
+      recommendation = 'Pacientes recentes disponíveis';
+      confidence = 'high';
+    } else if (cpfsList.loaded && cpfsList.count > 10000) {
+      recommendation = 'Lista de CPFs disponível';
+      confidence = 'medium';
+    } else if (cpfsList.loaded && cpfsList.count > 1000) {
+      recommendation = 'Lista de CPFs limitada';
+      confidence = 'medium';
+    }
+    
+    return {
+      cpfsList,
+      recentPatients,
+      fullPatients,
+      recommendation,
+      confidence
+    };
+  }
+
+  // Verificação otimizada de CPF usando os dados em cache
+  async checkCpfExistsOptimized(cpf: string): Promise<{
+    exists: boolean;
+    source: 'cpf-list' | 'recent-patients' | 'full-patients' | 'not-found';
+    confidence: 'high' | 'medium' | 'low';
+  }> {
+    if (!cpf || cpf.length !== 11) {
+      return { exists: false, source: 'not-found', confidence: 'high' };
+    }
+
+    try {
+      // 1. Verificar na lista de CPFs primeiro (mais rápido)
+      const cpfsList = await indexedDBService.getOpcoes('pacientes-cpfs');
+      if (cpfsList && cpfsList.some((item: any) => item.cpf === cpf)) {
+        return { exists: true, source: 'cpf-list', confidence: 'high' };
+      }
+
+      // 2. Verificar nos pacientes recentes
+      const recentPatients = await indexedDBService.getOpcoes('pacientes-recentes');
+      if (recentPatients && recentPatients.some((patient: any) => patient.cpf === cpf)) {
+        return { exists: true, source: 'recent-patients', confidence: 'high' };
+      }
+
+      // 3. Verificar na base completa
+      const fullPatients = await indexedDBService.getOpcoes('pacientes-completos');
+      if (fullPatients && fullPatients.some((patient: any) => patient.cpf === cpf)) {
+        return { exists: true, source: 'full-patients', confidence: 'high' };
+      }
+
+      // 4. Verificar também no cache de pacientes do IndexedDB (dados criados offline)
+      const existsInCache = await indexedDBService.checkCpfExists(cpf);
+      if (existsInCache) {
+        return { exists: true, source: 'full-patients', confidence: 'high' };
+      }
+
+      // 5. Determinar confiança baseado no que temos em cache
+      const status = await this.getPatientsStatus();
+      let confidence: 'high' | 'medium' | 'low' = status.confidence;
+
+      return { exists: false, source: 'not-found', confidence };
+      
+    } catch (error) {
+      console.error('Erro na verificação otimizada de CPF:', error);
+      return { exists: false, source: 'not-found', confidence: 'low' };
+    }
+  }
+
+  // Limpar dados de pacientes
+  async clearPatientsData(): Promise<void> {
+    const patientsKeys = ['pacientes-cpfs', 'pacientes-recentes', 'pacientes-completos'];
+    
+    for (const key of patientsKeys) {
+      try {
+        await indexedDBService.saveOpcoes(key, []);
+      } catch (error) {
+        console.error(`Erro ao limpar ${key}:`, error);
+      }
+    }
+    
+    console.log('✅ Dados de pacientes limpos');
+  }
+
+  // Download de categoria específica incluindo pacientes
+  async downloadPatientsCategory(
+    strategy: 'cpfs-only' | 'recent' | 'full',
+    onProgress?: (progress: number, current: string) => void
+  ) {
+    const sourceMap = {
+      'cpfs-only': 'pacientes-cpfs',
+      'recent': 'pacientes-recentes',
+      'full': 'pacientes-completos'
+    };
+    
+    const sourceKey = sourceMap[strategy];
+    toast.info(`🔄 Baixando: ${strategy}...`);
+    
+    const result = await this.downloadSpecificSource(sourceKey, onProgress);
+    
+    if (result.success) {
+      toast.success(`✅ ${strategy} baixado! ${result.recordCount?.toLocaleString()} registros.`);
+    } else {
+      toast.error(`❌ Erro no download: ${result.error}`);
+    }
     
     return result;
   }

@@ -13,7 +13,9 @@ import {
   HelpCircle,
   Loader,
   Menu,
-  ArchiveX
+  ArchiveX,
+  WifiOff, // ✅ NOVO: Ícone offline
+  Database // ✅ NOVO: Ícone cache
 } from "lucide-react";
 import CboInput from "@/features/notificationForms/components/CboInput";
 import PhoneInput from "@/features/notificationForms/components/PhoneInput";
@@ -28,15 +30,17 @@ import { toast } from "react-toastify";
 import SideMenu from "@/features/home/components/SideMenu";
 import { useLanguage } from "@/contexts/LanguageContext";
 import syncService from '@/services/syncService';
+import indexedDBService from '@/services/indexedDB'; // ✅ NOVO: Para cache offline
+import { useOfflineSystem } from '@/hooks/useOfflineSystem'; // ✅ NOVO: Sistema offline
 import ConnectionStatus from '@/components/ConnectionStatus';
 
 // Interface para as props do componente
 interface FormularioPacienteProps {
   isModal?: boolean;
-  isNewPatient?: boolean; // Nova prop para indicar explicitamente que é um novo paciente
+  isNewPatient?: boolean;
   onPacienteSalvo?: (paciente: Omit<Paciente, "idpaciente">) => void;
   onClose?: () => void;
-  pacienteId?: number; // ID para edição, se aplicável
+  pacienteId?: number;
 }
 
 // Interface para os dados do formulário
@@ -55,29 +59,27 @@ export interface PacienteFormData {
   idade?: string;
 }
 
-// Opções default para os dropdowns (serão substituídas por dados do banco)
+// Opções default para os dropdowns
 const gestanteOptions = [
   { value: "S", label: "Sim" },
   { value: "N", label: "Não" },
 ];
 
-// Modificar a função de normalização para garantir a remoção de acentos e cedilhas
+// Função de normalização para garantir a remoção de acentos e cedilhas
 function normalizeText(text: string): string {
   if (!text) return "";
 
-  // Remove acentos e cedilhas e converte para caixa alta
   return text
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // Remove completamente todos os acentos
+    .replace(/[\u0300-\u036f]/g, "")
     .toUpperCase();
 }
 
-// Modificar a função toUpperCaseAllStrings para também aplicar normalização de texto
+// Função toUpperCaseAllStrings
 const toUpperCaseAllStrings = (obj: any): any => {
   if (!obj) return obj;
 
   if (typeof obj === "string") {
-    // Além de colocar em caixa alta, normalizar para remover acentos/cedilhas
     return normalizeText(obj);
   }
 
@@ -100,14 +102,25 @@ const toUpperCaseAllStrings = (obj: any): any => {
 
 const FormularioPaciente = ({
   isModal = false,
-  isNewPatient = false, // Definir valor padrão
+  isNewPatient = false,
   onPacienteSalvo,
   onClose,
   pacienteId: propPacienteId,
 }: FormularioPacienteProps) => {
   const { id } = useParams();
-  // Se isNewPatient for true, ignorar qualquer pacienteId
   const pacienteId = isNewPatient ? undefined : (propPacienteId || (id ? parseInt(id) : undefined));
+  
+  // ✅ INTEGRAR SISTEMA OFFLINE
+  const {
+    isOnline,
+    isReadyForOffline,
+    getOfflineStatusMessage,
+    hasDataToSync,
+    pendingData,
+    savePatientOfflineSafe,
+    checkCpfOfflineSafe
+  } = useOfflineSystem();
+
   const initialFormData: PacienteFormData = {
     nome: "",
     nome_mae: "",
@@ -118,7 +131,7 @@ const FormularioPaciente = ({
     tipo_raca_idtipo_raca: "",
     escolaridade_idescolaridade: "",
     cbo_idcbo: null,
-    ddi: "55", // Padrão para Brasil
+    ddi: "55",
     contato: "",
   };
 
@@ -127,21 +140,20 @@ const FormularioPaciente = ({
   const [apiError, setApiError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
-  const [isSaving, setIsSaving] = useState<boolean>(false); // Novo estado para controle de salvamento
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
   // Estados para os dados dos dropdowns carregados do banco
   const [generoOptions, setGeneroOptions] = useState<OptionItem[]>([]);
   const [racaOptions, setRacaOptions] = useState<OptionItem[]>([]);
-  const [escolaridadeOptions, setEscolaridadeOptions] = useState<OptionItem[]>(
-    []
-  );
+  const [escolaridadeOptions, setEscolaridadeOptions] = useState<OptionItem[]>([]);
   const [isLoadingOptions, setIsLoadingOptions] = useState<boolean>(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [originalCpf, setOriginalCpf] = useState<string>(""); // Armazenar CPF original para validação
+  const [originalCpf, setOriginalCpf] = useState<string>("");
+
   // Estado para controlar seções expandidas
   const [expandedSections, setExpandedSections] = useState({
-    identificacao_individuo: true, // Única seção sempre expandida por padrão
+    identificacao_individuo: true,
   });
 
   // Estado para mostrar/esconder o popover de ajuda de identidade de gênero
@@ -149,58 +161,145 @@ const FormularioPaciente = ({
 
   // Adicionando estado para o SideMenu
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  // Adicionando contexto de idioma
   const { selectedLanguage, setSelectedLanguage } = useLanguage();
 
-  // Carregar as opções de dropdown do banco de dados
+  // ✅ FUNÇÃO: Carregar opções do cache offline
+  const loadOptionsFromCache = async (): Promise<{ hasData: boolean }> => {
+    try {
+      console.log('📱 Carregando opções de paciente do cache offline...');
+      
+      const [generos, racas, escolaridades] = await Promise.all([
+        indexedDBService.getOpcoes('generos'),
+        indexedDBService.getOpcoes('racas'),
+        indexedDBService.getOpcoes('escolaridades')
+      ]);
+
+      // Verificar se temos dados essenciais
+      const hasEssentialData = generos && generos.length > 0 && 
+                               racas && racas.length > 0 && 
+                               escolaridades && escolaridades.length > 0;
+
+      if (!hasEssentialData) {
+        console.warn('⚠️ Dados essenciais de paciente não encontrados no cache');
+        return { hasData: false };
+      }
+
+      // Converter opções para caixa alta
+      const convertOptionsToUpperCase = (options: any[]) => {
+        if (!options) return [];
+        return options.map((option) => ({
+          ...option,
+          descricao: normalizeText(option.descricao)
+        }));
+      };
+
+      // Definir opções do cache
+      setGeneroOptions(convertOptionsToUpperCase(generos));
+      setRacaOptions(convertOptionsToUpperCase(racas));
+      setEscolaridadeOptions(convertOptionsToUpperCase(escolaridades));
+
+      console.log(`✅ Opções de paciente carregadas do cache: ${generos.length} gêneros, ${racas.length} raças, ${escolaridades.length} escolaridades`);
+      return { hasData: true };
+
+    } catch (error) {
+      console.error('❌ Erro ao carregar opções do cache:', error);
+      return { hasData: false };
+    }
+  };
+
+  // ✅ FUNÇÃO MODIFICADA: Carregar opções (online/offline)
   useEffect(() => {
     const loadDropdownOptions = async () => {
       setIsLoadingOptions(true);
       setLoadingError(null);
 
       try {
-        // Carregar gêneros
-        const generos = await PacienteService.getTiposGenero();
-        setGeneroOptions(
-          generos.map((option) => ({
-            ...option,
-            descricao: normalizeText(option.descricao),
-          }))
-        );
+        // ✅ VERIFICAR SE ESTÁ OFFLINE
+        if (!isOnline) {
+          console.log('📱 Modo offline detectado para opções de paciente');
+          
+          const cachedData = await loadOptionsFromCache();
+          if (cachedData.hasData) {
+            console.log('✅ Opções de paciente carregadas do cache offline');
+            setLoadingError(null);
+          } else {
+            setLoadingError('Dados não disponíveis offline. Conecte-se à internet e baixe os dados primeiro.');
+          }
+          return;
+        }
 
-        // Carregar raças
-        const racas = await PacienteService.getTiposRaca();
-        setRacaOptions(
-          racas.map((option) => ({
-            ...option,
-            descricao: normalizeText(option.descricao),
-          }))
-        );
+        // ✅ MODO ONLINE: carregar normalmente + salvar cache
+        console.log('🌐 Modo online: carregando opções de paciente da API...');
+        
+        const [generos, racas, escolaridades] = await Promise.all([
+          PacienteService.getTiposGenero(),
+          PacienteService.getTiposRaca(),
+          PacienteService.getTiposEscolaridade()
+        ]);
 
-        // Carregar escolaridades
-        const escolaridades = await PacienteService.getTiposEscolaridade();
-        setEscolaridadeOptions(
-          escolaridades.map((option) => ({
+        // ✅ SALVAR NO CACHE PARA USO OFFLINE FUTURO
+        try {
+          await Promise.all([
+            indexedDBService.saveOpcoes('generos', generos),
+            indexedDBService.saveOpcoes('racas', racas),
+            indexedDBService.saveOpcoes('escolaridades', escolaridades)
+          ]);
+          console.log('✅ Opções de paciente salvas no cache offline');
+        } catch (cacheError) {
+          console.warn('⚠️ Erro ao salvar opções no cache:', cacheError);
+        }
+
+        // Converter opções para caixa alta
+        const convertOptionsToUpperCase = (options: any[]) => {
+          return options.map((option) => ({
             ...option,
             descricao: normalizeText(option.descricao),
-          }))
-        );
+          }));
+        };
+
+        setGeneroOptions(convertOptionsToUpperCase(generos));
+        setRacaOptions(convertOptionsToUpperCase(racas));
+        setEscolaridadeOptions(convertOptionsToUpperCase(escolaridades));
+
       } catch (error) {
         console.error("Erro ao carregar opções de dropdown:", error);
-        setLoadingError(
-          "Não foi possível carregar todas as opções. Tente recarregar a página."
-        );
+        
+        // ✅ FALLBACK: tentar usar cache em caso de erro online
+        try {
+          console.log('⚠️ Erro online, tentando usar cache como fallback...');
+          const cachedData = await loadOptionsFromCache();
+          
+          if (cachedData.hasData) {
+            toast.warning('Usando dados offline devido a erro de conexão');
+            setLoadingError(null);
+          } else {
+            throw new Error('Nenhum dado encontrado offline');
+          }
+        } catch (cacheError) {
+          console.error('Erro ao usar cache como fallback:', cacheError);
+          setLoadingError(
+            "Não foi possível carregar as opções. " + 
+            (isOnline ? "Tente recarregar a página." : "Conecte-se à internet e baixe os dados offline primeiro.")
+          );
+        }
       } finally {
         setIsLoadingOptions(false);
       }
     };
 
     loadDropdownOptions();
-  }, []);
+  }, [isOnline]);
 
-  // Carregar dados do paciente se for edição
+  // ✅ FUNÇÃO MODIFICADA: Carregar dados do paciente (apenas online para edição)
   useEffect(() => {
     if (pacienteId) {
+      // ✅ VERIFICAR SE ESTÁ ONLINE PARA EDIÇÃO
+      if (!isOnline) {
+        setApiError('Não é possível editar pacientes offline. Conecte-se à internet.');
+        setIsLoading(false);
+        return;
+      }
+
       console.log("Tentando carregar paciente com ID:", pacienteId);
       setIsLoading(true);
       setApiError(null);
@@ -229,7 +328,9 @@ const FormularioPaciente = ({
             escolaridadeId = Number(
               pacienteUpperCase.escolaridade_idescolaridade
             );
-          }          // Formatar a data de nascimento e calcular a idade
+          }
+
+          // Formatar a data de nascimento e calcular a idade
           const formattedDate = pacienteUpperCase.data_nascimento
             ? new Date(pacienteUpperCase.data_nascimento)
                 .toISOString()
@@ -238,8 +339,8 @@ const FormularioPaciente = ({
 
           // SEMPRE priorizar cálculo pela data de nascimento se existir
           const finalAge = formattedDate 
-            ? calculateAge(formattedDate).toString()  // Se tem data, SEMPRE calcular
-            : (pacienteUpperCase.idade ? pacienteUpperCase.idade.toString() : ""); // Só usar idade armazenada se não houver data
+            ? calculateAge(formattedDate).toString()
+            : (pacienteUpperCase.idade ? pacienteUpperCase.idade.toString() : "");
 
           console.log("Paciente carregado - Data:", formattedDate, "Idade final:", finalAge);
 
@@ -258,7 +359,7 @@ const FormularioPaciente = ({
             cbo_idcbo: pacienteUpperCase.cbo_idcbo || null,
             ddi: pacienteUpperCase.ddi || "55",
             contato: pacienteUpperCase.contato || "",
-            idade: finalAge, // Usar idade calculada ou armazenada conforme lógica acima
+            idade: finalAge,
           });
         })
         .catch((error) => {
@@ -271,24 +372,22 @@ const FormularioPaciente = ({
           setIsLoading(false);
         });
     }
-  }, [pacienteId]);
+  }, [pacienteId, isOnline]);
+
+  // useEffect para cálculo de idade
   useEffect(() => {
     console.log("useEffect idade - data_nascimento mudou:", formData.data_nascimento);
     
-    // Se a data de nascimento está vazia, limpar a idade e habilitar o campo
     if (!formData.data_nascimento || formData.data_nascimento.trim() === '') {
       console.log("Data de nascimento vazia, limpando idade");
       setFormData((prev) => ({
         ...prev,
         idade: "",
       }));
-    }
-    // Se a data de nascimento existe, calcular a idade
-    else {
+    } else {
       const calculatedAge = calculateAge(formData.data_nascimento);
       console.log("Idade calculada:", calculatedAge);
 
-      // Verificar se a idade é válida (não maior que 120)
       const age = parseInt(calculatedAge);
       if (!isNaN(age) && age > 120) {
         console.log("Idade inválida (>120), definindo erro");
@@ -299,7 +398,6 @@ const FormularioPaciente = ({
         return;
       }
 
-      // Atualizar idade apenas se for diferente da atual
       setFormData((prev) => {
         if (prev.idade !== calculatedAge) {
           console.log("Atualizando idade de", prev.idade, "para", calculatedAge);
@@ -311,7 +409,6 @@ const FormularioPaciente = ({
         return prev;
       });
 
-      // Limpar erro de data de nascimento se existir
       if (errors.data_nascimento) {
         setErrors((prev) => {
           const newErrors = { ...prev };
@@ -320,19 +417,19 @@ const FormularioPaciente = ({
         });
       }
     }
-  }, [formData.data_nascimento]); // Não incluir 'errors' como dependência para evitar loops
+  }, [formData.data_nascimento]);
 
   // Efeito para resetar o formulário quando isNewPatient for true
   useEffect(() => {
     if (isNewPatient) {
-      // Resetar explicitamente para o estado inicial quando for um novo paciente
       setFormData(initialFormData);
       setErrors({});
       setApiError(null);
       setIsSuccess(false);
-      setOriginalCpf(""); // Importante também resetar o CPF original
+      setOriginalCpf("");
       console.log("Formulário resetado para novo paciente");
-    }  }, [isNewPatient]);
+    }
+  }, [isNewPatient]);
 
   // Função para alternar a expansão de uma seção
   const toggleSection = (section: keyof typeof expandedSections) => {
@@ -391,7 +488,7 @@ const FormularioPaciente = ({
     return age.toString();
   };
 
-  // Handler genérico para mudanças nos campos - modificado para normalizar texto
+  // Handler genérico para mudanças nos campos
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
@@ -410,7 +507,6 @@ const FormularioPaciente = ({
 
     // Tratamento específico para cada campo
     if (name === "escolaridade_idescolaridade") {
-      // Converter para número ou vazio
       setFormData((prev) => ({
         ...prev,
         [name]: value === "" ? "" : Number(value),
@@ -419,31 +515,27 @@ const FormularioPaciente = ({
       name === "tipo_genero_idtipo_genero" ||
       name === "tipo_raca_idtipo_raca"
     ) {
-      // Outros campos numéricos obrigatórios
       setFormData((prev) => ({
         ...prev,
         [name]: value === "" ? "" : Number(value),
       }));
     } else if (name === "nome" || name === "nome_mae") {
-      // Normalizar texto: remove acentos, cedilha e converte para maiúsculas
       const normalizedValue = normalizeText(value);
-      // Limitar a 100 caracteres
       const limitedValue = normalizedValue.slice(0, 100);
 
       setFormData((prev) => ({
         ...prev,
         [name]: limitedValue,
-      }));    } else if (name === "data_nascimento") {
-      // Usar uma verificação mais rigorosa para considerar o campo vazio
+      }));
+    } else if (name === "data_nascimento") {
       if (!value || value === "" || value.trim() === "") {
         console.log("Campo de data limpo:", value);
         setFormData((prev) => ({
           ...prev,
           [name]: "",
-          idade: "", // Limpar a idade
+          idade: "",
         }));
 
-        // Limpar erro se existir
         if (errors.data_nascimento) {
           setErrors((prev) => {
             const newErrors = { ...prev };
@@ -452,10 +544,9 @@ const FormularioPaciente = ({
           });
         }
       } else {
-        // Verificar se a data é futura
         const selectedDate = new Date(value);
         const today = new Date();
-        today.setHours(0, 0, 0, 0); // Remover horas para comparação justa
+        today.setHours(0, 0, 0, 0);
         
         if (selectedDate > today) {
           setErrors(prev => ({
@@ -465,11 +556,9 @@ const FormularioPaciente = ({
           return;
         }
         
-        // CORREÇÃO: Sempre calcular idade a partir da data, não deixar idade manual
         const age = calculateAge(value);
         console.log("Nova data selecionada:", value, "Idade calculada:", age);
 
-        // Verificar se a idade é válida (não maior que 120)
         const ageNum = parseInt(age);
         if (!isNaN(ageNum) && ageNum > 120) {
           setErrors((prev) => ({
@@ -479,21 +568,19 @@ const FormularioPaciente = ({
           return;
         }
 
-        // SEMPRE atualizar a idade quando a data de nascimento mudar
         setFormData((prev) => ({
           ...prev,
           [name]: value,
-          idade: age, // SEMPRE usar idade calculada
+          idade: age,
         }));
         
         console.log("Data de nascimento atualizada para:", value, "Idade:", age);
-      }    } else if (name === "idade") {
-      // Se a idade for alterada manualmente (apenas quando data_nascimento estiver vazia)
+      }
+    } else if (name === "idade") {
       if (!formData.data_nascimento || formData.data_nascimento.trim() === '') {
         const ageValue = value === "" ? "" : value;
         const ageNum = parseInt(ageValue);
 
-        // Verificar se a idade é maior que 120
         if (!isNaN(ageNum) && ageNum > 120) {
           setErrors((prev) => ({
             ...prev,
@@ -505,11 +592,9 @@ const FormularioPaciente = ({
         setFormData((prev) => ({ ...prev, idade: ageValue }));
         console.log("Idade manual alterada para:", ageValue);
       } else {
-        // Se há data de nascimento, não permitir alteração manual da idade
         console.log("Tentativa de alterar idade manualmente ignorada - data de nascimento presente");
       }
     } else {
-      // Campos de texto simples - converter para caixa alta
       let newValue = value;
       if (typeof newValue === "string") {
         newValue = newValue.toUpperCase();
@@ -520,32 +605,28 @@ const FormularioPaciente = ({
 
   // Handler para validação do CPF
   const formatCPF = (cpf: string) => {
-    // Remove qualquer caractere que não seja número
     return cpf.replace(/\D/g, "").slice(0, 11);
   };
 
-  // Nova função para exibir CPF formatado
+  // Função para exibir CPF formatado
   const displayFormattedCPF = (cpf: string) => {
-    // Remove qualquer caractere que não seja número
     const cleanCPF = cpf.replace(/\D/g, "").slice(0, 11);
 
-    // Se o CPF não tiver 11 dígitos, retorna ele apenas limpo
     if (cleanCPF.length !== 11) return cleanCPF;
 
-    // Formata como XXX.XXX.XXX-XX
     return `${cleanCPF.substring(0, 3)}.${cleanCPF.substring(3, 6)}.${cleanCPF.substring(6, 9)}-${cleanCPF.substring(9)}`;
   };
+
+  // ✅ FUNÇÃO MODIFICADA: Handler para CPF com sistema offline
   const handleCPFChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
-    // Remove formatação para armazenar apenas os dígitos no estado
     const formattedCPF = formatCPF(rawValue);
-  
+
     setFormData((prev) => ({
       ...prev,
       cpf: formattedCPF,
     }));
-  
-    // Limpar erro anterior, se houver
+
     if (errors.cpf) {
       setErrors((prev) => {
         const newErrors = { ...prev };
@@ -556,14 +637,23 @@ const FormularioPaciente = ({
     
     // Verificar CPF existente se tiver 11 dígitos e for diferente do original
     if (formattedCPF.length === 11 && formattedCPF !== originalCpf) {
+      
+      // ✅ MELHORADO: Indicador diferente para online/offline
+      setErrors(prev => ({
+        ...prev,
+        cpf: isOnline ? "Verificando CPF..." : "Verificando CPF offline..."
+      }));
+      
       try {
-        // Adicionar indicador visual de verificação em andamento
-        setErrors(prev => ({
-          ...prev,
-          cpf: "Verificando CPF..."
-        }));
+        // ✅ ADICIONAR timeout para evitar travamento
+        const timeoutPromise = new Promise<boolean>((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout na verificação')), 8000)
+        );
         
-        const exists = await syncService.checkCpfExists(formattedCPF);
+        const exists = await Promise.race([
+          checkCpfOfflineSafe(formattedCPF),
+          timeoutPromise
+        ]);
         
         if (exists) {
           setErrors((prev) => ({
@@ -572,39 +662,75 @@ const FormularioPaciente = ({
           }));
           console.log("CPF existente detectado:", formattedCPF);
         } else {
-          // Limpar o erro se o CPF não existir
           setErrors(prev => {
             const newErrors = { ...prev };
             delete newErrors.cpf;
             return newErrors;
           });
+          console.log("CPF verificado com sucesso:", formattedCPF);
         }
-      } catch (error) {
+        
+      } catch (error: any) {
         console.error("Erro ao verificar CPF:", error);
-        setErrors(prev => ({
-          ...prev,
-          cpf: "Erro ao verificar CPF"
-        }));
+        
+        // ✅ MELHORADO: Tratamento tolerante para modo offline
+        if (error.message === 'Timeout na verificação') {
+          setErrors(prev => ({
+            ...prev,
+            cpf: "Timeout na verificação - tente novamente"
+          }));
+        } else if (
+          error.code === 'ERR_NETWORK' || 
+          error.message?.includes('Network Error') ||
+          error.message?.includes('Failed to fetch')
+        ) {
+          if (!isOnline) {
+            // ✅ MODO OFFLINE: ser tolerante com erros de rede
+            setErrors(prev => {
+              const newErrors = { ...prev };
+              delete newErrors.cpf;
+              return newErrors;
+            });
+            console.log("⚠️ Erro de rede ignorado no modo offline");
+          } else {
+            setErrors(prev => ({
+              ...prev,
+              cpf: "Erro de conexão - tente novamente"
+            }));
+          }
+        } else if (!isOnline) {
+          // ✅ QUALQUER OUTRO ERRO OFFLINE: ser tolerante
+          setErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors.cpf;
+            return newErrors;
+          });
+          console.log("⚠️ Erro offline tolerado:", error.message);
+        } else {
+          // ✅ ERROS ONLINE: mostrar mensagem
+          setErrors(prev => ({
+            ...prev,
+            cpf: "Erro ao verificar CPF"
+          }));
+        }
       }
     }
   };
+
   // Validar o formulário antes de enviar
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    // Validar nome
     if (!formData.nome.trim()) {
       newErrors.nome = "O campo nome é obrigatório";
     } else if (formData.nome.length > 100) {
       newErrors.nome = "O campo nome deve ter no máximo 100 caracteres";
     }
 
-    // Validar nome_mae (opcional)
     if (formData.nome_mae && formData.nome_mae.length > 100) {
       newErrors.nome_mae = "O campo nome da mãe deve ter no máximo 100 caracteres";
     }
 
-    // Validar data_nascimento
     if (formData.data_nascimento && formData.data_nascimento.trim() !== '') {
       const date = new Date(formData.data_nascimento);
       if (isNaN(date.getTime())) {
@@ -623,7 +749,6 @@ const FormularioPaciente = ({
       }
     }
 
-    // Validar idade quando não há data de nascimento
     if (!formData.data_nascimento && formData.idade) {
       const age = parseInt(formData.idade);
       if (isNaN(age)) {
@@ -635,34 +760,29 @@ const FormularioPaciente = ({
       }
     }
 
-    // Validar CPF (opcional)
     if (formData.cpf && formData.cpf.length > 0 && formData.cpf.length !== 11) {
       newErrors.cpf = "CPF deve ter 11 dígitos";
     }
 
-    // Validar tipo de gênero
     if (!formData.tipo_genero_idtipo_genero) {
       newErrors.tipo_genero_idtipo_genero = "O campo identidade de gênero é obrigatório";
     }
 
-    // Validar tipo de raça
     if (!formData.tipo_raca_idtipo_raca) {
       newErrors.tipo_raca_idtipo_raca = "O campo raça é obrigatório";
     }
 
-    // Validar contato (opcional)
     if (formData.contato && formData.contato.length > 15) {
       newErrors.contato = "O contato deve ter no máximo 15 caracteres";
-    }    setErrors(newErrors);
+    }
+
+    setErrors(newErrors);
     
-    // Se houver erros, fazer scroll para o resumo
     if (Object.keys(newErrors).length > 0) {
-      // Expandir a única seção
       setExpandedSections({
         identificacao_individuo: true
       });
       
-      // Scroll para o resumo de erros
       setTimeout(() => {
         const errorSummary = document.getElementById('error-summary');
         if (errorSummary) {
@@ -673,7 +793,6 @@ const FormularioPaciente = ({
         }
       }, 150);
       
-      // Toast com contagem de erros
       toast.error(`${Object.keys(newErrors).length} erro(s) encontrado(s). Verifique o resumo acima.`);
     }
     
@@ -687,19 +806,17 @@ const FormularioPaciente = ({
       JSON.stringify(formData, null, 2)
     );
 
-    // Garantir nomes normalizados (sem acentos e em caixa alta)
     const nome = normalizeText(formData.nome);
     const nome_mae = formData.nome_mae
       ? normalizeText(formData.nome_mae)
       : null;
 
-    // Iniciar com os dados obrigatórios
     const result: any = {
       nome: nome,
       nome_mae: nome_mae,
       data_nascimento: (!formData.data_nascimento || formData.data_nascimento.trim() === '')
-    ? null 
-    : formData.data_nascimento,
+        ? null 
+        : formData.data_nascimento,
       cpf: formData.cpf || null,
       tipo_genero_idtipo_genero: formData.tipo_genero_idtipo_genero as number,
       gestante: formData.gestante || null,
@@ -708,7 +825,6 @@ const FormularioPaciente = ({
       contato: formData.contato || null,
       ...((!formData.data_nascimento || formData.data_nascimento.trim() === '') && formData.idade ? { idade: parseInt(formData.idade) } : {}),
 
-      // Definir explicitamente como null quando vazio
       escolaridade_idescolaridade:
         formData.escolaridade_idescolaridade === ""
           ? null
@@ -723,9 +839,8 @@ const FormularioPaciente = ({
     return result;
   };
 
-  // Melhorado: tratamento de erros do backend
+  // ✅ FUNÇÃO MODIFICADA: Salvar paciente com sistema offline
   const handleCrearPacienteComDadosLimpos = async () => {
-    // Limpar mensagens anteriores
     setApiError(null);
     setIsSuccess(false);
 
@@ -733,44 +848,49 @@ const FormularioPaciente = ({
       setIsSaving(true);
 
       try {
-        // Converter dados do formulário para o formato da API
-        const pacienteData = convertFormDataToApiFormat();        // Garantir que todos os dados de texto estejam em caixa alta
+        const pacienteData = convertFormDataToApiFormat();
         const pacienteUpperCase = toUpperCaseAllStrings(pacienteData);
         console.log("Dados para salvar em caixa alta:", pacienteUpperCase);
 
-        // Criar ou atualizar paciente usando syncService
-        await syncService.savePaciente(pacienteUpperCase);
+        // ✅ USAR SISTEMA OFFLINE para salvar paciente
+        const result = await savePatientOfflineSafe(pacienteUpperCase);
 
-        // Sucesso!
         setIsSuccess(true);
-        toast.success(pacienteId 
-          ? "Paciente atualizado com sucesso!" 
-          : "Paciente cadastrado com sucesso!");
+        const message = isOnline 
+          ? (pacienteId ? "Paciente atualizado com sucesso!" : "Paciente cadastrado com sucesso!")
+          : (pacienteId ? "Paciente atualizado offline!" : "Paciente salvo offline! Será sincronizado quando conectar.");
+        
+        toast.success(message);
           
         if (isModal && onPacienteSalvo) {
           onPacienteSalvo(pacienteUpperCase);
         } else if (!pacienteId) {
-          setFormData(initialFormData); // Limpar formulário se for criação
+          setFormData(initialFormData);
         }
       } catch (error: any) {
-        // Melhor tratamento de erros do backend
         let errorMessage = "Erro ao salvar paciente";
         let validationErrors: Record<string, string> = {};
         
-        // Extrair mensagem de erro e possíveis erros de validação do backend
-        if (error.response && error.response.data) {
-          // Mensagem geral de erro
+        // Verificar se é erro de rede para mostrar mensagem offline apropriada
+        const isNetworkError = (
+          error?.code === 'ERR_NETWORK' ||
+          error?.code === 'ERR_INTERNET_DISCONNECTED' ||
+          error?.message?.includes('Network Error') ||
+          error?.message?.includes('Failed to fetch') ||
+          !navigator.onLine
+        );
+
+        if (isNetworkError && !isOnline) {
+          errorMessage = "Você está offline. Os dados serão salvos localmente e sincronizados quando voltar online.";
+        } else if (error.response && error.response.data) {
           if (error.response.data.message) {
             errorMessage = error.response.data.message;
           }
           
-          // Erros específicos por campo
           if (error.response.data.errors) {
             const backendErrors = error.response.data.errors;
             
-            // Mapear os erros do backend para campos do formulário
             Object.entries(backendErrors).forEach(([key, value]) => {
-              // Mapeamento de campos conforme necessário
               const fieldMapping: Record<string, string> = {
                 "nome": "nome",
                 "nome_mae": "nome_mae",
@@ -792,16 +912,14 @@ const FormularioPaciente = ({
         
         setApiError(errorMessage);
         toast.error(errorMessage);
-          // Adicionar erros de validação de campos específicos
+
         if (Object.keys(validationErrors).length > 0) {
           setErrors(prev => ({...prev, ...validationErrors}));
           
-          // Expandir a única seção com erros
           setExpandedSections({
             identificacao_individuo: true
           });
           
-          // Rolar até o primeiro campo com erro
           setTimeout(() => {
             const firstErrorField = document.querySelector('[data-error="true"]');
             if (firstErrorField) {
@@ -826,20 +944,19 @@ const FormularioPaciente = ({
     
     if (errorEntries.length === 0) return null;
 
-    // Mapear nomes dos campos para labels amigáveis
     const fieldLabels: Record<string, string> = {
-      nome: "Nome",
-      nome_mae: "Nome da Mãe", 
-      data_nascimento: "Data de Nascimento",
-      idade: "Idade",
-      cpf: "CPF",
-      tipo_genero_idtipo_genero: "Identidade de Gênero",
-      gestante: "Gestante",
-      tipo_raca_idtipo_raca: "Raça",
-      escolaridade_idescolaridade: "Escolaridade",
-      cbo_idcbo: "Profissão/Ocupação",
-      contato: "Contato Telefônico",
-      ddi: "DDI"
+      "nome": "Nome",
+      "nome_mae": "Nome da Mãe", 
+      "data_nascimento": "Data de Nascimento",
+      "idade": "Idade",
+      "cpf": "CPF",
+      "tipo_genero_idtipo_genero": "Identidade de Gênero",
+      "gestante": "Gestante",
+      "tipo_raca_idtipo_raca": "Raça",
+      "escolaridade_idescolaridade": "Escolaridade",
+      "cbo_idcbo": "Profissão/Ocupação",
+      "contato": "Contato Telefônico",
+      "ddi": "DDI"
     };
 
     return (
@@ -883,11 +1000,11 @@ const FormularioPaciente = ({
       </div>
     );
   };
+
   // ========================================
   // FUNÇÃO PARA SCROLL PARA CAMPO ESPECÍFICO
   // ========================================
   const scrollToField = (fieldName: string) => {
-    // Expandir a seção se necessário
     if (!expandedSections.identificacao_individuo) {
       setExpandedSections(prev => ({
         ...prev,
@@ -895,7 +1012,6 @@ const FormularioPaciente = ({
       }));
     }
     
-    // Aguardar expansão e fazer scroll
     setTimeout(() => {
       const element = document.querySelector(`[name="${fieldName}"]`) || 
                      document.querySelector(`[data-field="${fieldName}"]`);
@@ -906,7 +1022,6 @@ const FormularioPaciente = ({
           block: 'center'
         });
         
-        // Destacar temporariamente o campo
         (element as HTMLElement).style.transform = 'scale(1.02)';
         (element as HTMLElement).style.transition = 'transform 0.2s ease';
         
@@ -940,7 +1055,6 @@ const FormularioPaciente = ({
         <header className="bg-gradient-to-r from-blue-600 to-blue-800 p-6 shadow-lg sticky top-0 z-10">
           <div className="max-w-5xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-4 text-white">
-              {/* Adicionar botão de menu apenas quando não for modal */}
               <button
                 onClick={() => setIsMenuOpen(true)}
                 className="p-2 hover:bg-white/10 rounded-lg transition-colors"
@@ -960,8 +1074,17 @@ const FormularioPaciente = ({
               <h1 className="text-2xl font-semibold">
                 {pacienteId ? "Editar Paciente" : "Cadastro de Paciente"}
               </h1>
-            </div>            <div className="flex items-center gap-3">
-              {/* Botões de Ação (CABEÇALHO) */}
+              
+              {/* ✅ NOVO: Indicador de status offline no cabeçalho */}
+              {!isOnline && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-yellow-500 text-yellow-900 rounded-full text-sm font-medium">
+                  <WifiOff className="h-4 w-4" />
+                  Offline
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
               <button
                 type="submit"
                 form="paciente-form"
@@ -998,7 +1121,7 @@ const FormularioPaciente = ({
         </header>
       )}
 
-      {/* Adicionar SideMenu */}
+      {/* SideMenu */}
       {!isModal && (
         <SideMenu 
           isOpen={isMenuOpen} 
@@ -1016,9 +1139,47 @@ const FormularioPaciente = ({
             <h2 className="text-xl font-semibold">
               {pacienteId ? "Editar Paciente" : "Cadastro de Paciente"}
             </h2>
+            {/* ✅ NOVO: Indicador offline no modal */}
+            {!isOnline && (
+              <div className="flex items-center gap-1 px-2 py-1 bg-yellow-500 text-yellow-900 rounded text-xs font-medium ml-auto">
+                <WifiOff className="h-3 w-3" />
+                Offline
+              </div>
+            )}
           </div>
         </div>
-      )}      <main className={isModal ? "p-4" : "max-w-5xl mx-auto p-6"}>
+      )}
+
+      <main className={isModal ? "p-4" : "max-w-5xl mx-auto p-6"}>
+        {/* ✅ NOVO: Status offline detalhado */}
+        {!isModal && !isOnline && (
+          <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <WifiOff className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h3 className="text-sm font-medium text-yellow-800 mb-1">
+                  Modo Offline Ativo
+                </h3>
+                <p className="text-sm text-yellow-700 mb-2">
+                  {getOfflineStatusMessage()}
+                </p>
+                <div className="flex items-center gap-4 text-xs text-yellow-600">
+                  <div className="flex items-center gap-1">
+                    <Database className="h-3 w-3" />
+                    <span>Usando dados em cache</span>
+                  </div>
+                  {hasDataToSync() && (
+                    <div className="flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      <span>{pendingData.total} dados para sincronizar</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Connection Status - só exibir se não for modal */}
         {!isModal && <ConnectionStatus />}
         
@@ -1028,7 +1189,7 @@ const FormularioPaciente = ({
             <div className="flex items-center gap-2">
               <div className="h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
               <p className="text-blue-700">
-                Carregando opções do formulário...
+                {isOnline ? "Carregando opções do formulário..." : "Carregando opções do cache offline..."}
               </p>
             </div>
           </div>
@@ -1058,7 +1219,9 @@ const FormularioPaciente = ({
               </div>
             </div>
           </div>
-        )}        {/* Mensagem de sucesso */}
+        )}
+
+        {/* Mensagem de sucesso */}
         {isSuccess && !isModal && (
           <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
             <div className="flex items-center gap-2 text-green-600">
@@ -1076,7 +1239,9 @@ const FormularioPaciente = ({
         <ErrorSummary 
           errors={errors} 
           onFieldClick={scrollToField}
-        />        <form id="paciente-form" onSubmit={handleSubmit} className="space-y-4">
+        />
+
+        <form id="paciente-form" onSubmit={handleSubmit} className="space-y-4">
           {/* Seção Única: Identificação do Indivíduo */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <SectionHeader
@@ -1474,7 +1639,9 @@ const FormularioPaciente = ({
                 </div>
               </div>
             )}
-          </div>          {/* Botões de Ação (Inferiores) */}
+          </div>
+
+          {/* Botões de Ação (Inferiores) */}
           <div className="mt-8 flex justify-center space-x-4">
             <button
               type="submit"

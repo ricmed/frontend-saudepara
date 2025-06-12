@@ -330,17 +330,65 @@ class SyncService {
   async checkCpfExists(cpf: string): Promise<boolean> {
     if (!cpf || cpf.length !== 11) return false;
 
-    if (this.isOnline) {
-      try {
-        const available = await PacienteService.checkCpfAvailable(cpf);
-        return !available; // Inverter pois retorna disponibilidade
-      } catch (error) {
-        console.warn('Falha na verificação online, usando cache:', error);
+    // ✅ SEMPRE VERIFICAR CACHE PRIMEIRO (mais rápido)
+    try {
+      const existsInCache = await indexedDBService.checkCpfExists(cpf);
+      if (existsInCache) {
+        console.log('✅ CPF encontrado no cache local');
+        return true;
       }
+    } catch (cacheError) {
+      console.warn('⚠️ Erro ao verificar cache, continuando...', cacheError);
     }
 
-    // Verificar offline usando seu IndexedDBService
-    return await indexedDBService.checkCpfExists(cpf);
+    // ✅ SE OFFLINE, parar aqui
+    if (!this.isOnline) {
+      console.log('📱 Modo offline: CPF não encontrado no cache');
+      return false;
+    }
+
+    // ✅ SE ONLINE, tentar API com timeout e fallback robusto
+    try {
+      console.log('🌐 Verificando CPF na API...');
+      
+      // ✅ CRIAR PROMISE COM TIMEOUT
+      const apiPromise = PacienteService.checkCpfAvailable(cpf);
+      const timeoutPromise = new Promise<boolean>((_, reject) => 
+        setTimeout(() => reject(new Error('API_TIMEOUT')), 3000) // 3s timeout
+      );
+      
+      const available = await Promise.race([apiPromise, timeoutPromise]);
+      const exists = !available; // Inverter pois retorna disponibilidade
+      
+      console.log('✅ Verificação API concluída:', exists);
+      return exists;
+      
+    } catch (error: any) {
+      console.error('❌ Erro na verificação online de CPF:', error);
+      
+      // ✅ CLASSIFICAR TIPOS DE ERRO
+      const isNetworkError = (
+        error?.code === 'ERR_NETWORK' ||
+        error?.code === 'ERR_INTERNET_DISCONNECTED' ||
+        error?.message?.includes('Network Error') ||
+        error?.message?.includes('Failed to fetch') ||
+        error?.message?.includes('no-response') ||
+        error?.message === 'API_TIMEOUT' ||
+        error?.name === 'TypeError'
+      );
+      
+      if (isNetworkError) {
+        console.log('⚠️ Erro de rede detectado, assumindo CPF não existe');
+        
+        // ✅ PARA ERROS DE REDE: assumir que CPF não existe (permitir cadastro)
+        // Isso é melhor que bloquear o usuário
+        return false;
+      }
+      
+      // ✅ PARA OUTROS ERROS: assumir que não existe para permitir continuidade
+      console.log('⚠️ Erro não relacionado à rede, assumindo CPF não existe');
+      return false;
+    }
   }
 
   // *** SEU MÉTODO syncOpcoes EXISTENTE (não mexer) ***
