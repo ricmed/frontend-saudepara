@@ -32,118 +32,6 @@ import indexedDBService from '@/services/indexedDB';
 // Import do SideMenu real do sistema
 import SideMenu from '@/features/home/components/SideMenu';
 
-interface CategoryCardProps {
-  category: string;
-  sources: any[];
-  loaded: number;
-  total: number;
-  records: number;
-  onDownload: (category: string) => void;
-  isDownloading: boolean;
-}
-
-const CategoryCard: React.FC<CategoryCardProps> = ({ 
-  category, 
-  sources, 
-  loaded, 
-  total, 
-  records, 
-  onDownload, 
-  isDownloading 
-}) => {
-  const percentage = total > 0 ? (loaded / total) * 100 : 0;
-  const isComplete = loaded === total;
-  
-  const categoryNames: Record<string, string> = {
-    essential: 'Dados Essenciais',
-    geographic: 'Dados Geográficos', 
-    medical: 'Dados Médicos',
-    administrative: 'Dados Administrativos'
-  };
-
-  const categoryIcons: Record<string, React.ReactNode> = {
-    essential: <CheckCircle2 className="h-5 w-5" />,
-    geographic: <Database className="h-5 w-5" />,
-    medical: <BarChart3 className="h-5 w-5" />,
-    administrative: <Settings className="h-5 w-5" />
-  };
-
-  return (
-    <div className={`p-6 rounded-xl border-2 transition-all hover:shadow-lg ${
-      isComplete 
-        ? 'border-green-200 bg-green-50' 
-        : percentage > 50 
-        ? 'border-yellow-200 bg-yellow-50' 
-        : 'border-gray-200 bg-white'
-    }`}>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className={`p-3 rounded-lg ${
-            isComplete ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'
-          }`}>
-            {categoryIcons[category]}
-          </div>
-          <div>
-            <h3 className="font-semibold text-lg text-gray-900">{categoryNames[category] || category}</h3>
-            <p className="text-sm text-gray-600">{sources.length} fontes de dados</p>
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="text-2xl font-bold text-gray-900">{Math.round(percentage)}%</div>
-          <div className="text-sm text-gray-600">{loaded}/{total} carregados</div>
-        </div>
-      </div>
-
-      {/* Barra de progresso */}
-      <div className="mb-4">
-        <div className="w-full bg-gray-200 rounded-full h-3">
-          <div 
-            className={`h-3 rounded-full transition-all duration-300 ${
-              isComplete ? 'bg-green-500' : percentage > 50 ? 'bg-yellow-500' : 'bg-blue-500'
-            }`}
-            style={{ width: `${percentage}%` }}
-          />
-        </div>
-      </div>
-
-      {/* Informações adicionais */}
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-600">
-          {records.toLocaleString()} registros
-        </div>
-        <button
-          onClick={() => onDownload(category)}
-          disabled={isDownloading}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            isDownloading
-              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              : isComplete
-              ? 'bg-green-100 text-green-700 hover:bg-green-200'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
-          }`}
-        >
-          {isDownloading ? (
-            <>
-              <RefreshCw className="h-4 w-4 animate-spin inline mr-2" />
-              Baixando...
-            </>
-          ) : isComplete ? (
-            <>
-              <RotateCcw className="h-4 w-4 inline mr-2" />
-              Atualizar
-            </>
-          ) : (
-            <>
-              <Download className="h-4 w-4 inline mr-2" />
-              Baixar
-            </>
-          )}
-        </button>
-      </div>
-    </div>
-  );
-};
-
 /**
  * Página de Gerenciamento Offline
  * 
@@ -161,7 +49,7 @@ const OfflineManagementPage: React.FC = () => {
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [currentDownload, setCurrentDownload] = useState('');
   const [pendingSync, setPendingSync] = useState({ notificacoes: 0, pacientes: 0 });
-  const [activeTab, setActiveTab] = useState<'overview' | 'patients' | 'categories' | 'sources' | 'sync'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'patients' | 'sources' | 'sync'>('overview');
   const [isSyncPaused, setIsSyncPaused] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -297,7 +185,7 @@ const OfflineManagementPage: React.FC = () => {
     }
   };
 
-  const handleDownloadEssentials = async () => {
+  const handleDownloadSource = async (source: any) => {
     if (!isOnline) {
       toast.error('❌ Sem conexão com a internet');
       return;
@@ -306,42 +194,16 @@ const OfflineManagementPage: React.FC = () => {
     setIsDownloading(true);
     
     try {
-      await offlineDataManager.downloadEssentialData(
+      await offlineDataManager.downloadAllData(
         (progress, current) => {
           setDownloadProgress(progress);
           setCurrentDownload(current);
         }
       );
       await loadStats();
-      toast.success('✅ Dados essenciais baixados');
+      toast.success(`✅ ${source.name} atualizado`);
     } catch (error) {
-      toast.error('Erro no download dos dados essenciais');
-    } finally {
-      setIsDownloading(false);
-      setCurrentDownload('');
-    }
-  };
-
-  const handleDownloadCategory = async (category: string) => {
-    if (!isOnline) {
-      toast.error('❌ Sem conexão com a internet');
-      return;
-    }
-
-    setIsDownloading(true);
-    
-    try {
-      await offlineDataManager.downloadByCategory(
-        category,
-        (progress, current) => {
-          setDownloadProgress(progress);
-          setCurrentDownload(current);
-        }
-      );
-      await loadStats();
-      toast.success(`✅ Categoria ${category} atualizada`);
-    } catch (error) {
-      toast.error(`Erro no download da categoria ${category}`);
+      toast.error(`Erro no download de ${source.name}`);
     } finally {
       setIsDownloading(false);
       setCurrentDownload('');
@@ -394,7 +256,7 @@ const OfflineManagementPage: React.FC = () => {
   };
 
   // ✅ CORRIGIDO: Handlers para download de pacientes usando sistema correto
-  const handleDownloadPatients = async (strategy: 'intelligent' | 'verification' | 'cpfs' | 'recent' | 'full') => {
+  const handleDownloadPatients = async (strategy: 'cpfs' | 'full') => {
     if (!isOnline) {
       toast.error('❌ Sem conexão com a internet');
       return;
@@ -408,39 +270,6 @@ const OfflineManagementPage: React.FC = () => {
       let result: { success: boolean; count: number; strategy?: string; error?: string };
       
       switch (strategy) {
-        case 'intelligent':
-          // ✅ Usar downloadPatientsIntelligent se disponível
-          try {
-            result = await PacienteService.downloadPatientsIntelligent(
-              (progress, current, phase) => {
-                setPatientsProgress(progress);
-                setPatientsPhase(phase ? `${phase}: ${current}` : current);
-              }
-            );
-          } catch (error) {
-            // ✅ Fallback para método de verificação
-            result = await offlineDataManager.downloadPatientsForVerification(
-              (progress, current) => {
-                setPatientsProgress(progress);
-                setPatientsPhase(current);
-              }
-            );
-            result.strategy = 'Inteligente (Verificação)';
-          }
-          break;
-          
-        case 'verification':
-          // ✅ NOVO: Usar método específico para verificação
-          setPatientsPhase('Baixando pacientes para verificação...');
-          result = await offlineDataManager.downloadPatientsForVerification(
-            (progress, current) => {
-              setPatientsProgress(progress);
-              setPatientsPhase(current);
-            }
-          );
-          result.strategy = 'Verificação de CPF';
-          break;
-          
         case 'cpfs':
           setPatientsPhase('Extraindo CPFs de todos os pacientes...');
           const cpfs = await PacienteService.getAllCPFs();
@@ -462,25 +291,6 @@ const OfflineManagementPage: React.FC = () => {
           
           setPatientsProgress(100);
           result = { success: true, count: cpfs.length, strategy: 'Apenas CPFs' };
-          break;
-          
-        case 'recent':
-          setPatientsPhase('Baixando pacientes recentes...');
-          const recentPatients = await PacienteService.getRecentPatientsForOffline(
-            12, // 12 meses
-            (current, total, percentage) => {
-              setPatientsProgress(percentage * 0.9);
-              setPatientsPhase(`Pacientes recentes: ${current}/${total}`);
-            }
-          );
-          
-          setPatientsProgress(95);
-          setPatientsPhase('Salvando no cache de verificação...');
-          
-          // ✅ CORRIGIDO: Usar cache de verificação, não dados para sync
-          await indexedDBService.savePacientesParaCache(recentPatients);
-          
-          result = { success: true, count: recentPatients.length, strategy: 'Pacientes Recentes' };
           break;
           
         case 'full':
@@ -627,7 +437,6 @@ const OfflineManagementPage: React.FC = () => {
             {[
               { id: 'overview', label: 'Visão Geral', icon: BarChart3 },
               { id: 'patients', label: 'Base de Pacientes', icon: Users },
-              { id: 'categories', label: 'Por Categoria', icon: Folder },
               { id: 'sources', label: 'Todas as Fontes', icon: Database },
               { id: 'sync', label: 'Sincronização', icon: RefreshCw }
             ].map((tab) => {
@@ -770,18 +579,9 @@ const OfflineManagementPage: React.FC = () => {
               <h2 className="text-lg font-semibold mb-4 text-gray-900">Ações Rápidas</h2>
               <div className="flex flex-wrap gap-4">
                 <button
-                  onClick={handleDownloadEssentials}
-                  disabled={isDownloading || !isOnline}
-                  className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Download className="h-5 w-5" />
-                  Baixar Dados Essenciais
-                </button>
-
-                <button
                   onClick={handleDownloadAll}
                   disabled={isDownloading || !isOnline}
-                  className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <Database className="h-5 w-5" />
                   Baixar Todos os Dados
@@ -801,7 +601,7 @@ const OfflineManagementPage: React.FC = () => {
                 <button
                   onClick={handleClearData}
                   disabled={isDownloading}
-                  className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center gap-2 px-6 py-3 bg-blue-800 text-white rounded-lg hover:bg-blue-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <Trash2 className="h-5 w-5" />
                   Limpar Dados
@@ -939,44 +739,8 @@ const OfflineManagementPage: React.FC = () => {
             {/* ✅ CORRIGIDO: Opções de Download usando métodos corretos */}
             <div className="bg-white p-6 rounded-xl shadow-sm border">
               <h3 className="text-lg font-semibold mb-4 text-gray-900">Opções de Download</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 
-                {/* ✅ NOVO: Download de Verificação (Recomendado) */}
-                <div className="p-4 border-2 border-purple-200 rounded-lg hover:border-purple-300 transition-colors">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Shield className="h-5 w-5 text-purple-600" />
-                    <span className="font-medium text-purple-900">Verificação Inteligente</span>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Sistema escolhe automaticamente a melhor estratégia para sua base (RECOMENDADO).
-                  </p>
-                  <button
-                    onClick={() => handleDownloadPatients('verification')}
-                    disabled={patientsDownloading || !isOnline}
-                    className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {patientsDownloading ? 'Baixando...' : 'Download Recomendado'}
-                  </button>
-                </div>
-
-                {/* Download Inteligente */}
-                <div className="p-4 border-2 border-blue-200 rounded-lg hover:border-blue-300 transition-colors">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Zap className="h-5 w-5 text-blue-600" />
-                    <span className="font-medium text-blue-900">Download Inteligente</span>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Usa a recomendação automática baseada no tamanho da sua base.
-                  </p>
-                  <button
-                    onClick={() => handleDownloadPatients('intelligent')}
-                    disabled={patientsDownloading || !isOnline}
-                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Download Inteligente
-                  </button>
-                </div>
-
                 {/* CPFs Apenas */}
                 <div className="p-4 border-2 border-orange-200 rounded-lg hover:border-orange-300 transition-colors">
                   <div className="flex items-center gap-2 mb-3">
@@ -992,24 +756,6 @@ const OfflineManagementPage: React.FC = () => {
                     className="w-full px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     Baixar CPFs
-                  </button>
-                </div>
-
-                {/* Pacientes Recentes */}
-                <div className="p-4 border-2 border-yellow-200 rounded-lg hover:border-yellow-300 transition-colors">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Clock className="h-5 w-5 text-yellow-600" />
-                    <span className="font-medium text-yellow-900">Últimos 12 Meses</span>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Pacientes recentes (balança tamanho e cobertura).
-                  </p>
-                  <button
-                    onClick={() => handleDownloadPatients('recent')}
-                    disabled={patientsDownloading || !isOnline}
-                    className="w-full px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Baixar Recentes
                   </button>
                 </div>
 
@@ -1056,37 +802,6 @@ const OfflineManagementPage: React.FC = () => {
           </div>
         )}
 
-        {/* Categories Tab */}
-        {activeTab === 'categories' && (
-          <div className="space-y-6">
-            <div className="bg-white p-6 rounded-xl shadow-sm border">
-              <h2 className="text-lg font-semibold mb-2 text-gray-900">Download por Categoria</h2>
-              <p className="text-gray-600">
-                Organize o download dos dados por tipo. Dados essenciais são necessários para operação básica.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {Object.entries(stats.categories).map(([category, categoryStats]) => {
-                const sources = offlineDataManager.getSourcesByCategory()[category] || [];
-                const typedStats = categoryStats as { loaded: number; total: number; records: number };
-                return (
-                  <CategoryCard
-                    key={category}
-                    category={category}
-                    sources={sources}
-                    loaded={typedStats.loaded}
-                    total={typedStats.total}
-                    records={typedStats.records}
-                    onDownload={handleDownloadCategory}
-                    isDownloading={isDownloading}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Sources Tab */}
         {activeTab === 'sources' && (
           <div className="space-y-6">
@@ -1111,7 +826,7 @@ const OfflineManagementPage: React.FC = () => {
                         Registros
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Prioridade
+                        Ações
                       </th>
                     </tr>
                   </thead>
@@ -1151,8 +866,35 @@ const OfflineManagementPage: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {source.recordCount?.toLocaleString() || 0}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          Prioridade {source.priority}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <button
+                            onClick={() => handleDownloadSource(source)}
+                            disabled={isDownloading || !isOnline}
+                            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                              isDownloading
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                : source.loaded
+                                ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                            }`}
+                          >
+                            {isDownloading ? (
+                              <>
+                                <RefreshCw className="h-3 w-3 animate-spin inline mr-1" />
+                                Baixando...
+                              </>
+                            ) : source.loaded ? (
+                              <>
+                                <RotateCcw className="h-3 w-3 inline mr-1" />
+                                Atualizar
+                              </>
+                            ) : (
+                              <>
+                                <Download className="h-3 w-3 inline mr-1" />
+                                Baixar
+                              </>
+                            )}
+                          </button>
                         </td>
                       </tr>
                     ))}
