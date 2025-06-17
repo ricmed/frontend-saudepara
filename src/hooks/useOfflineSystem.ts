@@ -19,10 +19,17 @@ interface OfflineStats {
 interface PendingData {
   notificacoes: number;
   pacientes: number;
+  estabelecimentos: number;
   total: number;
 }
 
 interface PatientsCache {
+  verificacao: number;
+  locais: number;
+  pendentes: number;
+}
+
+interface EstabelecimentosCache {
   verificacao: number;
   locais: number;
   pendentes: number;
@@ -34,6 +41,7 @@ interface OfflineSystemState {
   stats: OfflineStats | null;
   pendingData: PendingData;
   patientsCache: PatientsCache;
+  estabelecimentosCache: EstabelecimentosCache;
   initialized: boolean;
 }
 
@@ -41,8 +49,9 @@ export function useOfflineSystem() {  const [state, setState] = useState<Offline
     isOnline: navigator.onLine,
     syncing: false,
     stats: null,
-    pendingData: { notificacoes: 0, pacientes: 0, total: 0 },
+    pendingData: { notificacoes: 0, pacientes: 0, estabelecimentos: 0, total: 0 },
     patientsCache: { verificacao: 0, locais: 0, pendentes: 0 },
+    estabelecimentosCache: { verificacao: 0, locais: 0, pendentes: 0 },
     initialized: false
   });
 
@@ -70,27 +79,46 @@ export function useOfflineSystem() {  const [state, setState] = useState<Offline
       console.error('Erro ao carregar estatísticas offline:', error);
     }
   }, []);
-
   // ✅ NOVO: Atualizar cache de pacientes
   const updatePatientsCache = useCallback(async () => {
     try {
       const cacheStats = await indexedDBService.getCacheStats();
       setState(prev => ({ 
         ...prev, 
-        patientsCache: cacheStats 
+        patientsCache: {
+          verificacao: cacheStats.verificacao,
+          locais: cacheStats.locais,
+          pendentes: cacheStats.pendentes
+        }
       }));
     } catch (error) {
       console.error('Erro ao carregar cache de pacientes:', error);
     }
   }, []);
 
+  // ✅ NOVO: Atualizar cache de estabelecimentos
+  const updateEstabelecimentosCache = useCallback(async () => {
+    try {
+      const cacheStats = await indexedDBService.getCacheStats();
+      setState(prev => ({ 
+        ...prev, 
+        estabelecimentosCache: {
+          verificacao: cacheStats.estabelecimentos_verificacao,
+          locais: cacheStats.estabelecimentos_locais,
+          pendentes: cacheStats.estabelecimentos_pendentes
+        }
+      }));
+    } catch (error) {
+      console.error('Erro ao carregar cache de estabelecimentos:', error);
+    }
+  }, []);
   // Atualizar dados pendentes
   const updatePendingData = useCallback(async () => {
     try {
       const pending = await syncService.getPendingCount();
       const pendingData = {
         ...pending,
-        total: pending.notificacoes + pending.pacientes
+        total: pending.notificacoes + pending.pacientes + pending.estabelecimentos
       };
       
       setState(prev => ({ ...prev, pendingData }));
@@ -98,7 +126,6 @@ export function useOfflineSystem() {  const [state, setState] = useState<Offline
       console.error('Erro ao carregar dados pendentes:', error);
     }
   }, []);
-
   // Inicializar sistema offline
   const initializeOfflineSystem = useCallback(async () => {
     try {
@@ -106,14 +133,15 @@ export function useOfflineSystem() {  const [state, setState] = useState<Offline
       await Promise.all([
         updateStats(), 
         updatePendingData(),
-        updatePatientsCache()
+        updatePatientsCache(),
+        updateEstabelecimentosCache()
       ]);
       setState(prev => ({ ...prev, initialized: true }));
     } catch (error) {
       console.error('Erro ao inicializar sistema offline:', error);
       toast.error('Erro ao inicializar sistema offline');
     }
-  }, [updateStats, updatePendingData, updatePatientsCache]);
+  }, [updateStats, updatePendingData, updatePatientsCache, updateEstabelecimentosCache]);
 
   // Eventos de conexão
   useEffect(() => {
@@ -137,7 +165,6 @@ export function useOfflineSystem() {  const [state, setState] = useState<Offline
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
-
   // Inicialização e atualizações periódicas
   useEffect(() => {
     initializeOfflineSystem();
@@ -147,10 +174,11 @@ export function useOfflineSystem() {  const [state, setState] = useState<Offline
       updateStats();
       updatePendingData();
       updatePatientsCache();
+      updateEstabelecimentosCache();
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [initializeOfflineSystem, updateStats, updatePendingData, updatePatientsCache]);
+  }, [initializeOfflineSystem, updateStats, updatePendingData, updatePatientsCache, updateEstabelecimentosCache]);
 
   // Funções para componentes
   const downloadEssentialData = useCallback(async (
@@ -236,18 +264,49 @@ export function useOfflineSystem() {  const [state, setState] = useState<Offline
     }
   }, [state.isOnline, updatePatientsCache]);
 
+  // ✅ NOVO: Download específico para verificação de estabelecimentos
+  const downloadEstabelecimentosVerification = useCallback(async (
+    onProgress?: (progress: number, current: string) => void
+  ) => {
+    if (!state.isOnline) {
+      toast.error('❌ Sem conexão com a internet');
+      return false;
+    }
+
+    try {
+      setState(prev => ({ ...prev, syncing: true }));
+      
+      const result = await offlineDataManager.downloadEstabelecimentosForVerification(onProgress);
+      
+      await updateEstabelecimentosCache();
+      
+      if (result.success) {
+        toast.success(`✅ ${result.count} estabelecimentos baixados para verificação!`);
+        return true;
+      } else {
+        toast.error(`❌ Erro: ${result.error}`);
+        return false;
+      }
+      
+    } catch (error) {
+      console.error('Erro no download de estabelecimentos:', error);
+      toast.error('Erro no download de estabelecimentos');
+      return false;
+    } finally {
+      setState(prev => ({ ...prev, syncing: false }));
+    }
+  }, [state.isOnline, updateEstabelecimentosCache]);
   const clearOfflineData = useCallback(async () => {
     try {
       await offlineDataManager.clearOfflineData();
-      await Promise.all([updateStats(), updatePatientsCache()]);
+      await Promise.all([updateStats(), updatePatientsCache(), updateEstabelecimentosCache()]);
       return true;
     } catch (error) {
       console.error('Erro ao limpar dados offline:', error);
       toast.error('Erro ao limpar dados offline');
       return false;
     }
-  }, [updateStats, updatePatientsCache]);
-
+  }, [updateStats, updatePatientsCache, updateEstabelecimentosCache]);
   const syncPendingData = useCallback(async () => {
     if (!state.isOnline) {
       toast.error('❌ Sem conexão para sincronizar');
@@ -265,7 +324,7 @@ export function useOfflineSystem() {  const [state, setState] = useState<Offline
       const success = await syncService.forceSyncData();
       
       if (success) {
-        await Promise.all([updatePendingData(), updatePatientsCache()]);
+        await Promise.all([updatePendingData(), updatePatientsCache(), updateEstabelecimentosCache()]);
         toast.success('✅ Dados sincronizados com sucesso!');
       }
       
@@ -277,7 +336,7 @@ export function useOfflineSystem() {  const [state, setState] = useState<Offline
     } finally {
       setState(prev => ({ ...prev, syncing: false }));
     }
-  }, [state.isOnline, state.pendingData.total, updatePendingData, updatePatientsCache]);
+  }, [state.isOnline, state.pendingData.total, updatePendingData, updatePatientsCache, updateEstabelecimentosCache]);
 
   // Funções de conveniência para verificações
   const isReadyForOffline = useCallback(() => {
@@ -324,11 +383,33 @@ export function useOfflineSystem() {  const [state, setState] = useState<Offline
     }
   }, [updatePendingData, updatePatientsCache]);
 
+  // ✅ NOVO: Funções para salvar dados de estabelecimentos
+  const saveEstabelecimentoOfflineSafe = useCallback(async (data: any) => {
+    try {
+      const result = await syncService.saveEstabelecimento(data);
+      await Promise.all([updatePendingData(), updateEstabelecimentosCache()]);
+      return result;
+    } catch (error) {
+      console.error('Erro ao salvar estabelecimento:', error);
+      throw error;
+    }
+  }, [updatePendingData, updateEstabelecimentosCache]);
+
   const searchPatientsOfflineSafe = useCallback(async (query: string) => {
     try {
       return await syncService.searchPacientes(query);
     } catch (error) {
       console.error('Erro ao buscar pacientes:', error);
+      return [];
+    }
+  }, []);
+
+  // ✅ NOVO: Função para buscar estabelecimentos
+  const searchEstabelecimentosOfflineSafe = useCallback(async (query: string) => {
+    try {
+      return await syncService.searchEstabelecimentos(query);
+    } catch (error) {
+      console.error('Erro ao buscar estabelecimentos:', error);
       return [];
     }
   }, []);
@@ -347,6 +428,22 @@ export function useOfflineSystem() {  const [state, setState] = useState<Offline
     } catch (error: any) {
       console.error('❌ Erro geral na verificação de CPF:', error);
       return false; // Sempre permitir continuar
+    }
+  }, [state.isOnline]);
+
+  // ✅ NOVO: Verificação de CNES
+  const checkCNESOfflineSafe = useCallback(async (cnes: string): Promise<boolean> => {
+    try {
+      console.log(`🔍 Verificando CNES ${cnes} - Modo: ${state.isOnline ? 'Online' : 'Offline'}`);
+      
+      const exists = await syncService.checkCNESExists(cnes);
+      
+      console.log(`✅ Verificação concluída: ${exists ? 'CNES existe' : 'CNES não encontrado'}`);
+      return exists;
+      
+    } catch (error: any) {
+      console.error('❌ Erro geral na verificação de CNES:', error);
+      return false;
     }
   }, [state.isOnline]);
 
@@ -422,14 +519,15 @@ export function useOfflineSystem() {  const [state, setState] = useState<Offline
     isOnline: state.isOnline,
     syncing: state.syncing,
     stats: state.stats,
-    pendingData: state.pendingData,
-    patientsCache: state.patientsCache,
+    pendingData: state.pendingData,    patientsCache: state.patientsCache,
+    estabelecimentosCache: state.estabelecimentosCache,
     initialized: state.initialized,
 
     // Funções de gestão de dados offline
     downloadEssentialData,
     downloadAllData,
     downloadPatientsVerification, // ✅ NOVO
+    downloadEstabelecimentosVerification, // ✅ NOVO
     clearOfflineData,
     syncPendingData,
 
@@ -442,26 +540,28 @@ export function useOfflineSystem() {  const [state, setState] = useState<Offline
     // Funções para salvar dados com fallback offline
     saveNotificationOfflineSafe,
     savePatientOfflineSafe,
+    saveEstabelecimentoOfflineSafe, // ✅ NOVO
     searchPatientsOfflineSafe,
+    searchEstabelecimentosOfflineSafe, // ✅ NOVO
     checkCpfOfflineSafe,
+    checkCNESOfflineSafe, // ✅ NOVO
 
     // Funções de atualização manual
     refreshStats: updateStats,
-    refreshPendingData: updatePendingData,
-    refreshPatientsCache: updatePatientsCache, // ✅ NOVO
+    refreshPendingData: updatePendingData,    refreshPatientsCache: updatePatientsCache, // ✅ NOVO
+    refreshEstabelecimentosCache: updateEstabelecimentosCache, // ✅ NOVO
     reinitialize: initializeOfflineSystem,
 
     // ✅ FUNÇÕES MELHORADAS:
     shouldDownloadPatients,
     getCompleteStats, // ✅ NOVO
-    
-    // Atalhos úteis
+      // Atalhos úteis
     checkCacheHealth: useCallback(async () => {
       const stats = await getCompleteStats();
       if (!stats) return { healthy: false };
       
       return {
-        healthy: stats.cache.verificacao > 500,
+        healthy: stats.cache.verificacao > 500 && stats.cache.estabelecimentos_verificacao > 100,
         stats: stats.cache,
         recommendation: stats.recommendation,
         readyOffline: stats.ready

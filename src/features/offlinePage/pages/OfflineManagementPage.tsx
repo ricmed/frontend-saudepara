@@ -192,21 +192,34 @@ const OfflineManagementPage: React.FC = () => {
     }
 
     setIsDownloading(true);
+    setDownloadProgress(0);
+    setCurrentDownload(source.name);
     
     try {
-      await offlineDataManager.downloadAllData(
-        (progress, current) => {
+      // ✅ CORRIGIDO: Download específico da fonte individual usando a chave
+      const result = await offlineDataManager.downloadSpecificSource(
+        source.key,
+        (progress: number, current: string) => {
           setDownloadProgress(progress);
-          setCurrentDownload(current);
+          setCurrentDownload(`${source.name}: ${current || ''}`);
         }
       );
+      
       await loadStats();
-      toast.success(`✅ ${source.name} atualizado`);
-    } catch (error) {
-      toast.error(`Erro no download de ${source.name}`);
+      
+      if (result.success) {
+        toast.success(`✅ ${source.name} atualizado com sucesso! ${result.recordCount?.toLocaleString() || 0} registros`);
+      } else {
+        throw new Error(result.error || 'Erro no download');
+      }
+      
+    } catch (error: any) {
+      console.error('Erro no download da fonte:', error);
+      toast.error(`❌ Erro no download de ${source.name}: ${error.message || 'Erro desconhecido'}`);
     } finally {
       setIsDownloading(false);
       setCurrentDownload('');
+      setDownloadProgress(0);
     }
   };
 
@@ -255,8 +268,33 @@ const OfflineManagementPage: React.FC = () => {
     navigate('/'); // Volta para a página inicial
   };
 
+  // ✅ NOVOS HANDLERS PARA DEBUG E RESET
+  const handleDebugPendingData = async () => {
+    try {
+      await syncService.debugPendingData();
+      toast.info('🔍 Informações de debug foram exibidas no console (F12)');
+    } catch (error) {
+      console.error('Erro no debug:', error);
+      toast.error('❌ Erro ao executar debug');
+    }
+  };
+
+  const handleResetSyncLock = async () => {
+    if (window.confirm('⚠️ Tem certeza que deseja resetar o lock de sincronização? Use apenas se a sincronização estiver travada.')) {
+      try {
+        await syncService.resetSyncLock();
+        await loadPendingSync(); // Atualizar contadores
+      } catch (error) {
+        console.error('Erro ao resetar lock:', error);
+        toast.error('❌ Erro ao resetar lock');
+      }
+    }
+  };
+
+  // ...existing code...
+
   // ✅ CORRIGIDO: Handlers para download de pacientes usando sistema correto
-  const handleDownloadPatients = async (strategy: 'cpfs' | 'full') => {
+  const handleDownloadPatients = async (strategy: 'full') => {
     if (!isOnline) {
       toast.error('❌ Sem conexão com a internet');
       return;
@@ -269,51 +307,21 @@ const OfflineManagementPage: React.FC = () => {
     try {
       let result: { success: boolean; count: number; strategy?: string; error?: string };
       
-      switch (strategy) {
-        case 'cpfs':
-          setPatientsPhase('Extraindo CPFs de todos os pacientes...');
-          const cpfs = await PacienteService.getAllCPFs();
-          
-          if (cpfs.length > 0) {
-            setPatientsProgress(90);
-            setPatientsPhase(`Salvando ${cpfs.length} CPFs no cache...`);
-            
-            // ✅ CORRIGIDO: Usar método específico para cache de verificação
-            const cpfObjects = cpfs.map(cpf => ({ 
-              cpf, 
-              nome: 'CPF_ONLY',
-              timestamp: Date.now(),
-              source: 'download' as const
-            }));
-            
-            await indexedDBService.savePacientesParaCache(cpfObjects);
-          }
-          
-          setPatientsProgress(100);
-          result = { success: true, count: cpfs.length, strategy: 'Apenas CPFs' };
-          break;
-          
-        case 'full':
-          setPatientsPhase('Baixando todos os pacientes...');
-          const allPatients = await PacienteService.getAllPatientsForOffline(
-            (current, total, percentage) => {
-              setPatientsProgress(percentage * 0.9);
-              setPatientsPhase(`Baixando: ${current}/${total} pacientes`);
-            }
-          );
-          
-          setPatientsProgress(95);
-          setPatientsPhase('Salvando todos os pacientes no cache...');
-          
-          // ✅ CORRIGIDO: Usar cache de verificação para não sincronizar
-          await indexedDBService.savePacientesParaCache(allPatients);
-          
-          result = { success: true, count: allPatients.length, strategy: 'Base Completa' };
-          break;
-          
-        default:
-          throw new Error('Estratégia não suportada');
-      }
+      setPatientsPhase('Baixando todos os pacientes...');
+      const allPatients = await PacienteService.getAllPatientsForOffline(
+        (current, total, percentage) => {
+          setPatientsProgress(percentage * 0.9);
+          setPatientsPhase(`Baixando: ${current}/${total} pacientes`);
+        }
+      );
+      
+      setPatientsProgress(95);
+      setPatientsPhase('Salvando todos os pacientes no cache...');
+      
+      // ✅ CORRIGIDO: Usar cache de verificação para não sincronizar
+      await indexedDBService.savePacientesParaCache(allPatients);
+      
+      result = { success: true, count: allPatients.length, strategy: 'Base Completa' };
       
       // ✅ Atualizar estatísticas
       await loadPatientsStats();
@@ -739,26 +747,8 @@ const OfflineManagementPage: React.FC = () => {
             {/* ✅ CORRIGIDO: Opções de Download usando métodos corretos */}
             <div className="bg-white p-6 rounded-xl shadow-sm border">
               <h3 className="text-lg font-semibold mb-4 text-gray-900">Opções de Download</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 
-                {/* CPFs Apenas */}
-                <div className="p-4 border-2 border-orange-200 rounded-lg hover:border-orange-300 transition-colors">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Shield className="h-5 w-5 text-orange-600" />
-                    <span className="font-medium text-orange-900">Apenas CPFs</span>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Download mínimo para verificação básica (mais rápido).
-                  </p>
-                  <button
-                    onClick={() => handleDownloadPatients('cpfs')}
-                    disabled={patientsDownloading || !isOnline}
-                    className="w-full px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Baixar CPFs
-                  </button>
-                </div>
-
                 {/* Todos os Pacientes */}
                 <div className="p-4 border-2 border-green-200 rounded-lg hover:border-green-300 transition-colors">
                   <div className="flex items-center gap-2 mb-3">
@@ -817,9 +807,6 @@ const OfflineManagementPage: React.FC = () => {
                         Fonte
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Categoria
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -845,16 +832,6 @@ const OfflineManagementPage: React.FC = () => {
                               <div className="text-sm text-gray-500">{source.key}</div>
                             </div>
                           </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            source.category === 'essential' ? 'bg-red-100 text-red-800' :
-                            source.category === 'medical' ? 'bg-blue-100 text-blue-800' :
-                            source.category === 'geographic' ? 'bg-green-100 text-green-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {source.category}
-                          </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -907,30 +884,45 @@ const OfflineManagementPage: React.FC = () => {
 
         {/* Sync Tab */}
         {activeTab === 'sync' && (
-          <div className="space-y-6">
-            <div className="bg-white p-6 rounded-xl shadow-sm border">
+          <div className="space-y-6">            <div className="bg-white p-6 rounded-xl shadow-sm border">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-gray-900">Sincronização</h2>
-                <button
-                  onClick={handleToggleSyncPause}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    isSyncPaused
-                      ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                      : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                  }`}
-                >
-                  {isSyncPaused ? (
-                    <>
-                      <Play className="h-4 w-4" />
-                      Retomar Sync Automático
-                    </>
-                  ) : (
-                    <>
-                      <Pause className="h-4 w-4" />
-                      Pausar Sync Automático
-                    </>
-                  )}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleDebugPendingData}
+                    className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm transition-colors"
+                  >
+                    <Info className="h-4 w-4" />
+                    Debug
+                  </button>
+                  <button
+                    onClick={handleResetSyncLock}
+                    className="flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm transition-colors"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    Reset Lock
+                  </button>
+                  <button
+                    onClick={handleToggleSyncPause}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      isSyncPaused
+                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                        : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                    }`}
+                  >
+                    {isSyncPaused ? (
+                      <>
+                        <Play className="h-4 w-4" />
+                        Retomar
+                      </>
+                    ) : (
+                      <>
+                        <Pause className="h-4 w-4" />
+                        Pausar
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
               <p className="text-gray-600 mb-6">
                 Gerencie dados que foram salvos offline e precisam ser enviados para o servidor.
@@ -988,9 +980,7 @@ const OfflineManagementPage: React.FC = () => {
                     {isOnline ? 'Sincronizar Agora' : 'Aguardando Conexão'}
                   </button>
                 </div>
-              )}
-
-              {(pendingSync.notificacoes + pendingSync.pacientes) === 0 && (
+              )}              {(pendingSync.notificacoes + pendingSync.pacientes) === 0 && (
                 <div className="mt-6 p-4 bg-green-50 rounded-xl border border-green-200">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-5 w-5 text-green-600" />
@@ -1001,6 +991,20 @@ const OfflineManagementPage: React.FC = () => {
                   </p>
                 </div>
               )}
+
+              {/* ✅ NOVA SEÇÃO: Informações sobre Duplicação */}
+              <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <Shield className="h-5 w-5 text-blue-600" />
+                  <span className="font-medium text-blue-900">Proteção Contra Duplicação</span>
+                </div>
+                <div className="text-sm text-blue-800 space-y-2">
+                  <p>• <strong>Verificação de CPF:</strong> O sistema verifica se o paciente já existe no servidor antes de criar um novo</p>
+                  <p>• <strong>Marcação única:</strong> Apenas pacientes criados offline são sincronizados (não dados baixados para cache)</p>
+                  <p>• <strong>Controle de concorrência:</strong> Evita sincronizações simultâneas que podem causar duplicação</p>
+                  <p>• <strong>Debug disponível:</strong> Use o botão "Debug" para verificar quais dados estão pendentes</p>
+                </div>
+              </div>
             </div>
           </div>
         )}

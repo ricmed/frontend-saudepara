@@ -11,6 +11,9 @@ import {
   formatListResponse
 } from '@/utils/adapters';
 
+// ✅ ADICIONAR IMPORT PARA OFFLINE
+import syncService from '@/services/syncService';
+
 const server = import.meta.env.VITE_API_SERVER;
 const port = import.meta.env.VITE_API_PORT;
 const API_URL = `${server}:${port}/api/estabelecimentos`;
@@ -50,8 +53,7 @@ const handleApiError = (error: AxiosError<APIError>) => {
 };
 
 // Serviço principal
-export const ListaDeEstabelecimentoService = {
-  // Listagem paginada com busca
+export const ListaDeEstabelecimentoService = {  // Listagem paginada com busca
   async getAllPaginated(
     page: number,
     limit: number,
@@ -59,55 +61,94 @@ export const ListaDeEstabelecimentoService = {
     sortKey: string,
     sortOrder: "asc" | "desc"
   ): Promise<PaginatedResponse> {
-    try {
-      // Construir parâmetros de requisição
-      const params: Record<string, any> = {
-        page,
-        limit,
-        orderBy: sortKey,
-        orderDir: sortOrder
-      };
-      
-      // Adicionar parâmetros de busca se tiver termo
-      if (search && search.term) {
-        params.search = search.term.trim();
-        
-        if (search.field !== 'all') {
-          params.searchField = search.field;
-        }
-      }
-      
-      console.log("Parâmetros de busca:", params);
-
-      // Fazer requisição
-      const response = await axios.get(API_URL, {
-        params,
-        timeout: 5000
-      });
-
-      console.log("Resposta da API:", response.data);
-
-      // Se a resposta não tiver o formato esperado, formatar manualmente
-      if (!response.data.data && response.data.items) {
-        response.data = {
-          data: response.data.items,
-          meta: response.data.meta || {
-            total: 0,
-            totalPages: 1,
-            page: page,
-            limit: limit
-          }
+    // ✅ TENTAR ONLINE PRIMEIRO
+    if (navigator.onLine) {
+      try {
+        // Construir parâmetros de requisição
+        const params: Record<string, any> = {
+          page,
+          limit,
+          orderBy: sortKey,
+          orderDir: sortOrder
         };
-      }
+        
+        // Adicionar parâmetros de busca se tiver termo
+        if (search && search.term) {
+          params.search = search.term.trim();
+          
+          if (search.field !== 'all') {
+            params.searchField = search.field;
+          }
+        }
+        
+        console.log("Parâmetros de busca:", params);
 
-      // Usar a função adaptadora para formatar os dados
-      return formatListResponse(response.data);
+        // Fazer requisição
+        const response = await axios.get(API_URL, {
+          params,
+          timeout: 5000
+        });
+
+        console.log("Resposta da API:", response.data);
+
+        // Se a resposta não tiver o formato esperado, formatar manualmente
+        if (!response.data.data && response.data.items) {
+          response.data = {
+            data: response.data.items,
+            meta: response.data.meta || {
+              total: 0,
+              totalPages: 1,
+              page: page,
+              limit: limit
+            }
+          };
+        }
+
+        console.log('✅ Dados carregados online');
+        // Usar a função adaptadora para formatar os dados
+        return formatListResponse(response.data);
+
+      } catch (error) {
+        console.warn('Falha na busca online, usando dados offline:', error);
+      }
+    }
+
+    // ✅ FALLBACK OFFLINE
+    console.log('📱 Usando dados offline...');
+    try {
+      const results = await syncService.searchEstabelecimentos(search?.term || '');
+      
+      // ✅ SIMULAR ORDENAÇÃO
+      const sortedResults = [...results].sort((a, b) => {
+        const aValue = a[sortKey] || '';
+        const bValue = b[sortKey] || '';
+        
+        if (sortOrder === 'asc') {
+          return aValue.toString().localeCompare(bValue.toString());
+        } else {
+          return bValue.toString().localeCompare(aValue.toString());
+        }
+      });
+      
+      // ✅ SIMULAR PAGINAÇÃO
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedResults = sortedResults.slice(startIndex, endIndex);
+
+      console.log(`📱 Retornando ${paginatedResults.length} de ${sortedResults.length} estabelecimentos offline`);
+
+      return {
+        data: paginatedResults.map(item => formatFromBackend(item) as Estabelecimento),
+        meta: {
+          total: sortedResults.length,
+          totalPages: Math.ceil(sortedResults.length / limit),
+          page,
+          limit
+        }
+      };
 
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        return handleApiError(error as AxiosError<APIError>);
-      }
-      console.error("Erro ao buscar estabelecimentos:", error);
+      console.error("Erro ao buscar estabelecimentos offline:", error);
       return {
         data: [],
         meta: {
@@ -119,44 +160,74 @@ export const ListaDeEstabelecimentoService = {
       };
     }
   },
-
   // Buscar todos os estabelecimentos (sem paginação)
   async getAll(): Promise<Estabelecimento[]> {
-    try {
-      const response = await axios.get(API_URL, {
-        timeout: 5000
-      });
-      
-      // Formatar os dados usando o adaptador e extrair o array de dados
-      let data = response.data;
-      if (data && data.data && Array.isArray(data.data)) {
-        data = data.data;
+    // ✅ TENTAR ONLINE PRIMEIRO
+    if (navigator.onLine) {
+      try {
+        const response = await axios.get(API_URL, {
+          timeout: 5000
+        });
+        
+        // Formatar os dados usando o adaptador e extrair o array de dados
+        let data = response.data;
+        if (data && data.data && Array.isArray(data.data)) {
+          data = data.data;
+        }
+        
+        console.log('✅ Todos os estabelecimentos carregados online');
+        return (Array.isArray(data) ? data : []).map((item: any) => formatFromBackend(item) as Estabelecimento);
+      } catch (error) {
+        console.warn("Falha ao buscar todos estabelecimentos online, usando offline:", error);
       }
-      
-      return (Array.isArray(data) ? data : []).map((item: any) => formatFromBackend(item) as Estabelecimento);
+    }
+
+    // ✅ FALLBACK OFFLINE
+    console.log('📱 Usando todos os estabelecimentos offline...');
+    try {
+      const results = await syncService.searchEstabelecimentos(''); // Busca vazia retorna todos
+      return results.map(item => formatFromBackend(item) as Estabelecimento);
     } catch (error) {
-      console.error("Erro ao buscar todos estabelecimentos:", error);
+      console.error("Erro ao buscar estabelecimentos offline:", error);
       return [];
     }
   },
-
   // Buscar estabelecimento por ID
   async getById(id: number): Promise<Estabelecimento | null> {
-    try {
-      const response = await axios.get(`${API_URL}/${id}`, {
-        timeout: 5000
-      });
-      
-      // Formatar usando o adaptador
-      return formatFromBackend(response.data) as Estabelecimento;
-    } catch (error) {
-      console.error(`Erro ao buscar estabelecimento ID ${id}:`, error);
-      return null;
+    // ✅ TENTAR ONLINE PRIMEIRO
+    if (navigator.onLine) {
+      try {
+        const response = await axios.get(`${API_URL}/${id}`, {
+          timeout: 5000
+        });
+        
+        console.log('✅ Estabelecimento carregado online');
+        return formatFromBackend(response.data) as Estabelecimento;
+      } catch (error) {
+        console.warn(`Falha ao buscar estabelecimento ID ${id} online, tentando offline:`, error);
+      }
     }
-  },
 
+    // ✅ FALLBACK OFFLINE
+    try {
+      const estabelecimento = await syncService.getEstabelecimentoById(id);
+      if (estabelecimento) {
+        console.log('📱 Estabelecimento encontrado offline');
+        return formatFromBackend(estabelecimento) as Estabelecimento;
+      }
+    } catch (error) {
+      console.error(`Erro ao buscar estabelecimento ID ${id} offline:`, error);
+    }
+
+    return null;
+  },
   // Excluir estabelecimento
   async delete(id: number): Promise<void> {
+    // ✅ DELETE só funciona online
+    if (!navigator.onLine) {
+      throw new Error('Exclusão requer conexão com a internet');
+    }
+
     try {
       await axios.delete(`${API_URL}/${id}`, {
         timeout: 5000
@@ -174,6 +245,11 @@ export const ListaDeEstabelecimentoService = {
     sortOrder: "asc" | "desc",
     format: "csv" | "excel" = "csv"
   ): Promise<Blob> {
+    // ✅ EXPORT só funciona online
+    if (!navigator.onLine) {
+      throw new Error('Exportação requer conexão com a internet');
+    }
+
     try {
       // Construção dos parâmetros de busca
       const params: Record<string, any> = {

@@ -18,7 +18,6 @@ import SideMenu from "@/features/home/components/SideMenu";
 // Adicionar importação do contexto de linguagem
 import { useLanguage } from "@/contexts/LanguageContext";
 import ConnectionStatus from "@/components/ConnectionStatus";
-import OfflineDataPreloader from '@/components/OfflineDataPreloader';
 
 // Import custom hooks
 import { useNotificationForm } from "./hooks/useNotificationForm";
@@ -171,14 +170,6 @@ const NotificationForm: React.FC = () => {
                 : "Nova Comunicação"}
             </h1>
           </div>          <div className="relative flex items-center gap-3">
-            {/* ✅ ADICIONAR COMPONENTE DE DOWNLOAD OFFLINE */}
-            <OfflineDataPreloader 
-              onDataLoaded={() => {
-                console.log('✅ Dados offline carregados!');
-                // Opcional: recarregar opções do formulário
-              }}
-            />
-            
             {/* Botão Exportar com Dropdown */}
             <div className="relative">
               <button

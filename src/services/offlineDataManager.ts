@@ -1,4 +1,5 @@
 import { PacienteService } from '@/services/PacienteService';
+import { EstabelecimentoFormService } from '@/services/EstabelecimentoFormService';
 import indexedDBService from '@/services/indexedDB';
 import { toast } from 'react-toastify';
 
@@ -225,8 +226,7 @@ class OfflineDataManager {
       fetchFn: createDirectApiFetch('estabelecimentos', 11000), // Aumentado para 11000
       priority: 3, 
       estimatedSize: 11000,
-      category: 'administrative'
-    },    // ✅ CORRIGIDO: DADOS DE PACIENTES PARA VERIFICAÇÃO (não sincronizar)
+      category: 'administrative'    },    // ✅ CORRIGIDO: DADOS DE PACIENTES PARA VERIFICAÇÃO (não sincronizar)
     { 
       key: 'pacientes-verificacao', 
       name: 'Lista de Pacientes (Verificação CPF)', 
@@ -243,9 +243,35 @@ class OfflineDataManager {
       priority: 2, 
       estimatedSize: 0, // Será calculado dinamicamente
       category: 'essential' // Verificação de CPF é essencial
+    },
+    // ✅ NOVO: DADOS DE ESTABELECIMENTOS PARA VERIFICAÇÃO (não sincronizar)
+    {
+      key: 'estabelecimentos-verificacao',
+      name: 'Lista de Estabelecimentos (Verificação CNES)',
+      fetchFn: async () => {
+        console.log('📥 Baixando estabelecimentos para verificação de CNES...');
+        
+        // Usar uma abordagem genérica já que não temos ListaDeEstabelecimentoService
+        const server = import.meta.env.VITE_API_SERVER;
+        const port = import.meta.env.VITE_API_PORT;
+        const url = `${server}:${port}/api/estabelecimentos?limit=20000`;
+        
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        const estabelecimentos = data?.data || data || [];
+        
+        // Salvar no cache de verificação
+        await indexedDBService.saveEstabelecimentosParaCache(estabelecimentos);
+        
+        console.log(`✅ ${estabelecimentos.length} estabelecimentos salvos no cache de verificação`);
+        return [{ info: `${estabelecimentos.length} estabelecimentos para verificação` }];
+      },
+      priority: 2,
+      estimatedSize: 0,
+      category: 'essential'
     }
-  ];
-  // Verificar quais dados estão em cache
+  ];  // Verificar quais dados estão em cache
   async checkCachedData(): Promise<Record<string, { loaded: boolean; count: number; lastUpdate?: Date }>> {
     const status: Record<string, { loaded: boolean; count: number; lastUpdate?: Date }> = {};
     
@@ -258,6 +284,14 @@ class OfflineDataManager {
             loaded: cacheStats.verificacao > 0,
             count: cacheStats.verificacao,
             lastUpdate: cacheStats.verificacao > 0 ? new Date() : undefined
+          };
+        } else if (source.key === 'estabelecimentos-verificacao') {
+          // ✅ NOVO: Para verificação de estabelecimentos, verificar cache específico
+          const cacheStats = await indexedDBService.getCacheStats();
+          status[source.key] = {
+            loaded: cacheStats.estabelecimentos_verificacao > 0,
+            count: cacheStats.estabelecimentos_verificacao,
+            lastUpdate: cacheStats.estabelecimentos_verificacao > 0 ? new Date() : undefined
           };
         } else {
           // Para outros dados, usar método normal
@@ -318,11 +352,14 @@ class OfflineDataManager {
         onProgress?.(completed / total * 100, source.name, completed, total, source.category);
         
         const data = await source.fetchFn();
-          if (data && Array.isArray(data) && data.length > 0) {
-          // ✅ VERIFICAR se é dados de verificação de pacientes
+          if (data && Array.isArray(data) && data.length > 0) {          // ✅ VERIFICAR se é dados de verificação de pacientes
           if (source.key === 'pacientes-verificacao') {
             // Para dados de verificação, o salvamento já foi feito na fetchFn
             // Não salvar novamente em opcoes
+            console.log(`✅ ${source.name}: Dados salvos no cache de verificação`);
+            totalRecords += 1; // Contagem simbólica
+          } else if (source.key === 'estabelecimentos-verificacao') {
+            // ✅ NOVO: Para verificação de estabelecimentos, o salvamento já foi feito na fetchFn
             console.log(`✅ ${source.name}: Dados salvos no cache de verificação`);
             totalRecords += 1; // Contagem simbólica
           } else {
@@ -468,12 +505,53 @@ class OfflineDataManager {
       };
     }
   }
+  // ✅ NOVO: Download específico para verificação de CNES
+  async downloadEstabelecimentosForVerification(
+    onProgress?: (progress: number, current: string) => void
+  ): Promise<{ success: boolean; count: number; error?: string }> {
+    try {
+      onProgress?.(10, 'Analisando estratégia...');
+      
+      onProgress?.(30, 'Baixando estabelecimentos para verificação...');
+      
+      // Usar uma abordagem genérica já que não temos ListaDeEstabelecimentoService
+      const server = import.meta.env.VITE_API_SERVER;
+      const port = import.meta.env.VITE_API_PORT;
+      const url = `${server}:${port}/api/estabelecimentos?limit=20000`;
+      
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const estabelecimentos = data?.data || data || [];
+      
+      onProgress?.(80, 'Salvando no cache...');
+      
+      await indexedDBService.saveEstabelecimentosParaCache(estabelecimentos);
+      
+      onProgress?.(100, `${estabelecimentos.length} estabelecimentos salvos`);
+      
+      return {
+        success: true,
+        count: estabelecimentos.length
+      };
+      
+    } catch (error) {
+      console.error('Erro no download de verificação de estabelecimentos:', error);
+      return {
+        success: false,
+        count: 0,
+        error: error instanceof Error ? error.message : 'Erro desconhecido'
+      };
+    }
+  }
   // Limpar dados offline
   async clearOfflineData(): Promise<void> {
     for (const source of this.dataSources) {
       try {
         if (source.key === 'pacientes-verificacao') {
           await indexedDBService.clearPacientesCache();
+        } else if (source.key === 'estabelecimentos-verificacao') {
+          await indexedDBService.clearEstabelecimentosCache();
         } else {
           await indexedDBService.saveOpcoes(source.key, []);
         }

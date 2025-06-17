@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, Check, AlertCircle, Wifi, Database, Loader, X, CheckCircle, XCircle, Users } from 'lucide-react';
+import { Download, Check, AlertCircle, Wifi, Database, Loader, X, CheckCircle, XCircle, Users, Building } from 'lucide-react'; // ✅ ADICIONAR Building
 import { toast } from 'react-toastify';
 import { NotificacaoService } from '@/services/NotificacaoService';
 import indexedDBService from '@/services/indexedDB';
@@ -31,6 +31,13 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
   const [totalSize, setTotalSize] = useState(0);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [patientsStats, setPatientsStats] = useState({ verification: 0, local: 0, pending: 0 });
+  
+  // ✅ ADICIONAR: Estado para estabelecimentos
+  const [estabelecimentosStats, setEstabelecimentosStats] = useState({ 
+    verification: 0, 
+    local: 0, 
+    pending: 0 
+  });
   
   const [dataItems, setDataItems] = useState<DataItem[]>([
     { key: 'eventos', name: 'Tipos de Evento', fetchFn: NotificacaoService.getEventoOptions, loaded: false, loading: false, category: 'essential' },
@@ -115,16 +122,27 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
       })
     );
     setDataItems(updatedItems);
-      // ✅ VERIFICAR STATS DE PACIENTES SEPARADAMENTE
+    
+    // ✅ VERIFICAR STATS DE PACIENTES E ESTABELECIMENTOS
     try {
       const stats = await indexedDBService.getCacheStats();
+      
+      // Stats de pacientes
       setPatientsStats({
         verification: stats.verificacao || 0,
         local: stats.locais || 0,
         pending: stats.pendentes || 0
       });
+      
+      // ✅ NOVO: Stats de estabelecimentos
+      setEstabelecimentosStats({
+        verification: stats.estabelecimentos_verificacao || 0,
+        local: stats.estabelecimentos_locais || 0,
+        pending: stats.estabelecimentos_pendentes || 0
+      });
+      
     } catch (error) {
-      console.error('Erro ao carregar stats de pacientes:', error);
+      console.error('Erro ao carregar stats:', error);
     }
     
     // Calcular progresso
@@ -239,7 +257,7 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
     }
   };
 
-  // ✅ NOVO: Download específico para verificação de pacientes
+  // Download específico para verificação de pacientes
   const downloadPatientsVerification = async () => {
     if (isDownloading || !isOnline) return;
     
@@ -257,12 +275,7 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
       if (result.success) {
         toast.success(`✅ ${result.count} pacientes baixados para verificação!`);        
         // Atualizar stats
-        const stats = await indexedDBService.getCacheStats();
-        setPatientsStats({
-          verification: stats.verificacao || 0,
-          local: stats.locais || 0,
-          pending: stats.pendentes || 0
-        });
+        await updateStats();
       } else {
         toast.error(`❌ Erro: ${result.error}`);
       }
@@ -275,6 +288,60 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
     }
   };
 
+  // ✅ NOVO: Download específico para verificação de estabelecimentos
+  const downloadEstabelecimentosVerification = async () => {
+    if (isDownloading || !isOnline) return;
+    
+    setIsDownloading(true);
+    toast.info('🏥 Baixando estabelecimentos para verificação de CNES...');
+    
+    try {
+      const result = await offlineDataManager.downloadEstabelecimentosForVerification(
+        (progress, current) => {
+          setProgress(progress);
+          console.log(`${progress}%: ${current}`);
+        }
+      );
+      
+      if (result.success) {
+        toast.success(`✅ ${result.count} estabelecimentos baixados para verificação!`);        
+        // Atualizar stats
+        await updateStats();
+      } else {
+        toast.error(`❌ Erro: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Erro no download de estabelecimentos:', error);
+      toast.error('Erro ao baixar estabelecimentos');
+    } finally {
+      setIsDownloading(false);
+      setProgress(0);
+    }
+  };
+
+  // ✅ NOVO: Função auxiliar para atualizar stats
+  const updateStats = async () => {
+    try {
+      const stats = await indexedDBService.getCacheStats();
+      
+      setPatientsStats({
+        verification: stats.verificacao || 0,
+        local: stats.locais || 0,
+        pending: stats.pendentes || 0
+      });
+      
+      setEstabelecimentosStats({
+        verification: stats.estabelecimentos_verificacao || 0,
+        local: stats.estabelecimentos_locais || 0,
+        pending: stats.estabelecimentos_pendentes || 0
+      });
+      
+    } catch (error) {
+      console.error('Erro ao atualizar stats:', error);
+    }
+  };
+
+  // ✅ ATUALIZAR: Incluir estabelecimentos na limpeza
   const clearOfflineData = async () => {
     if (window.confirm('Tem certeza que deseja limpar todos os dados offline? Você precisará baixá-los novamente.')) {
       try {
@@ -283,8 +350,9 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
           await indexedDBService.saveOpcoes(item.key, []);
         }
         
-        // ✅ Limpar cache de pacientes
+        // ✅ Limpar cache de pacientes E estabelecimentos
         await indexedDBService.clearPacientesCache();
+        await indexedDBService.clearEstabelecimentosCache();
         
         setDataItems(prev => prev.map(item => ({ 
           ...item, 
@@ -293,6 +361,7 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
           recordCount: 0 
         })));
         setPatientsStats({ verification: 0, local: 0, pending: 0 });
+        setEstabelecimentosStats({ verification: 0, local: 0, pending: 0 }); // ✅ ADICIONAR
         setProgress(0);
         setTotalSize(0);
         
@@ -309,6 +378,7 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
   const hasErrors = dataItems.some(item => item.error);
   const isFullyLoaded = loadedItems === totalItems;
   const hasPatientsVerification = patientsStats.verification > 0;
+  const hasEstabelecimentosVerification = estabelecimentosStats.verification > 0; // ✅ ADICIONAR
 
   const getStatusInfo = () => {
     if (!isOnline) {
@@ -317,7 +387,7 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
     if (hasErrors) {
       return { color: 'red', text: 'Erro nos dados' };
     }
-    if (isFullyLoaded && hasPatientsVerification) {
+    if (isFullyLoaded && hasPatientsVerification && hasEstabelecimentosVerification) { // ✅ ATUALIZAR
       return { color: 'green', text: 'Sistema completo' };
     }
     if (isFullyLoaded) {
@@ -350,7 +420,7 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
           <Loader className="h-4 w-4 animate-spin" />
         ) : hasErrors ? (
           <XCircle className="h-4 w-4" />
-        ) : isFullyLoaded && hasPatientsVerification ? (
+        ) : isFullyLoaded && hasPatientsVerification && hasEstabelecimentosVerification ? ( // ✅ ATUALIZAR
           <CheckCircle className="h-4 w-4" />
         ) : (
           <Download className="h-4 w-4" />
@@ -398,7 +468,7 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
               </span>
             </div>
 
-            {/* ✅ NOVA SEÇÃO: Stats de Pacientes */}
+            {/* ✅ SEÇÃO DE PACIENTES (existente) */}
             <div className="mb-4 p-3 bg-blue-50 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
                 <Users className="h-4 w-4 text-blue-600" />
@@ -416,6 +486,28 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
                 <div className="text-center">
                   <div className="font-medium text-blue-700">{patientsStats.pending}</div>
                   <div className="text-blue-600">Pendentes</div>
+                </div>
+              </div>
+            </div>
+
+            {/* ✅ NOVA SEÇÃO: Stats de Estabelecimentos */}
+            <div className="mb-4 p-3 bg-orange-50 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Building className="h-4 w-4 text-orange-600" />
+                <span className="text-sm font-medium text-orange-700">Estabelecimentos</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="text-center">
+                  <div className="font-medium text-orange-700">{estabelecimentosStats.verification}</div>
+                  <div className="text-orange-600">Verificação</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-medium text-orange-700">{estabelecimentosStats.local}</div>
+                  <div className="text-orange-600">Locais</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-medium text-orange-700">{estabelecimentosStats.pending}</div>
+                  <div className="text-orange-600">Pendentes</div>
                 </div>
               </div>
             </div>
@@ -441,7 +533,7 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
               </div>
             </div>
 
-            {/* Lista de itens por categoria */}
+            {/* Lista de itens por categoria (mantida igual) */}
             <div className="space-y-3 max-h-64 overflow-y-auto mb-4">
               {['essential', 'geographic', 'medical', 'administrative'].map(category => {
                 const categoryItems = dataItems.filter(item => item.category === category);
@@ -492,7 +584,7 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
               })}
             </div>
 
-            {/* Botões de ação */}
+            {/* ✅ BOTÕES DE AÇÃO ATUALIZADOS */}
             <div className="space-y-2">
               {/* Botão principal */}
               <button
@@ -517,7 +609,7 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
                 )}
               </button>
 
-              {/* ✅ NOVO: Botão para pacientes */}
+              {/* Botão para pacientes */}
               <button
                 onClick={downloadPatientsVerification}
                 disabled={isDownloading || !isOnline}
@@ -526,7 +618,7 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : hasPatientsVerification
                     ? 'bg-green-600 text-white hover:bg-green-700'
-                    : 'bg-orange-600 text-white hover:bg-orange-700'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
                 }`}
               >
                 <Users className="h-4 w-4" />
@@ -535,8 +627,26 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
                 </span>
               </button>
 
+              {/* ✅ NOVO: Botão para estabelecimentos */}
+              <button
+                onClick={downloadEstabelecimentosVerification}
+                disabled={isDownloading || !isOnline}
+                className={`w-full flex items-center justify-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                  isDownloading || !isOnline
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : hasEstabelecimentosVerification
+                    ? 'bg-green-600 text-white hover:bg-green-700'
+                    : 'bg-orange-600 text-white hover:bg-orange-700'
+                }`}
+              >
+                <Building className="h-4 w-4" />
+                <span>
+                  {hasEstabelecimentosVerification ? 'Atualizar Estabelecimentos' : 'Baixar Estabelecimentos (CNES)'}
+                </span>
+              </button>
+
               {/* Botão limpar */}
-              {(loadedItems > 0 || totalSize > 0 || hasPatientsVerification) && (
+              {(loadedItems > 0 || totalSize > 0 || hasPatientsVerification || hasEstabelecimentosVerification) && ( // ✅ ATUALIZAR
                 <button
                   onClick={clearOfflineData}
                   disabled={isDownloading}
@@ -547,7 +657,7 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
               )}
             </div>
 
-            {/* Informações adicionais */}
+            {/* ✅ INFORMAÇÕES ADICIONAIS ATUALIZADAS */}
             <div className="mt-4 p-3 bg-blue-50 rounded-lg">
               <div className="flex items-start space-x-2">
                 <Wifi className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
@@ -556,6 +666,7 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
                   <ul className="space-y-1 text-blue-600">
                     <li>• Dados básicos: {loadedItems}/{totalItems}</li>
                     <li>• Pacientes para verificação: {patientsStats.verification.toLocaleString()}</li>
+                    <li>• Estabelecimentos para verificação: {estabelecimentosStats.verification.toLocaleString()}</li> {/* ✅ ADICIONAR */}
                     <li>• Conexão: {isOnline ? 'Online' : 'Offline'}</li>
                     <li>• Status: {statusInfo.text}</li>
                   </ul>

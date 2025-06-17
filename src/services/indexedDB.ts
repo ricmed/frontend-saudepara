@@ -35,8 +35,7 @@ interface NotificacaoDatabase extends DBSchema {
       timestamp: number;
       source: 'download' | 'api'; // Origem dos dados
     };
-  };
-  // ✅ Store específico para cache de CPFs
+  };  // ✅ Store específico para cache de CPFs
   cpfs_cache: {
     key: string; // CPF como chave
     value: {
@@ -44,9 +43,27 @@ interface NotificacaoDatabase extends DBSchema {
       when: number;
     };
   };
+  // ✅ NOVO: Store para estabelecimentos criados localmente
+  estabelecimentos: {
+    key: number;
+    value: any;
+    indexes: { 'by-nome': string; 'by-cnes': string; 'by-synced': string; 'by-source': string };
+  };
+  // ✅ NOVO: Store para cache de verificação de estabelecimentos
+  estabelecimentos_cache: {
+    key: string; // CNES como chave
+    value: {
+      cnes: string;
+      nome: string;
+      tipo_estabelecimento?: string;
+      municipio?: string;
+      timestamp: number;
+      source: 'download' | 'api';
+    };
+  };
 }
 
-const DB_VERSION = 3; // ✅ INCREMENTAR versão para nova estrutura
+const DB_VERSION = 4; // ✅ INCREMENTAR versão para nova estrutura
 const DB_NAME = 'NotificacaoOfflineDB';
 const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 dias
 
@@ -94,13 +111,31 @@ export class IndexedDBService {
             db.createObjectStore('pacientes_cache', {
               keyPath: 'cpf'
             });
-          }
-
-          // ✅ NOVO: Store específico para cache de CPFs
+          }          // ✅ NOVO: Store específico para cache de CPFs
           if (!db.objectStoreNames.contains('cpfs_cache')) {
             console.log('🆕 Criando store: cpfs_cache');
             db.createObjectStore('cpfs_cache', {
               keyPath: 'cpf'
+            });
+          }
+
+          // ✅ NOVO: Store para estabelecimentos (dados criados localmente)
+          if (!db.objectStoreNames.contains('estabelecimentos')) {
+            console.log('🆕 Criando store: estabelecimentos');
+            const estabelecimentosStore = db.createObjectStore('estabelecimentos', {
+              keyPath: 'id'
+            });
+            estabelecimentosStore.createIndex('by-nome', 'nome');
+            estabelecimentosStore.createIndex('by-cnes', 'cnes');
+            estabelecimentosStore.createIndex('by-synced', 'synced');
+            estabelecimentosStore.createIndex('by-source', 'source');
+          }
+
+          // ✅ NOVO: Store para cache de verificação de estabelecimentos
+          if (!db.objectStoreNames.contains('estabelecimentos_cache')) {
+            console.log('🆕 Criando store: estabelecimentos_cache');
+            db.createObjectStore('estabelecimentos_cache', {
+              keyPath: 'cnes'
             });
           }
         },
@@ -324,9 +359,8 @@ export class IndexedDBService {
       }
     }
   }
-
   // ✅ CORRIGIDO: Contar apenas pacientes criados localmente
-  async getPendingCount(): Promise<{ notificacoes: number; pacientes: number }> {
+  async getPendingCount(): Promise<{ notificacoes: number; pacientes: number; estabelecimentos: number }> {
     await this.init();
     
     try {
@@ -351,17 +385,35 @@ export class IndexedDBService {
           (p.source === 'local_creation' || !p.source) // Apenas criados localmente
         );
       }
+
+      // ✅ NOVO: Estabelecimentos
+      let unsyncedEstabelecimentos: any[] = [];
+      try {
+        const allLocalEstabelecimentos = await this.db!.getAllFromIndex('estabelecimentos', 'by-synced', 'false');
+        unsyncedEstabelecimentos = allLocalEstabelecimentos.filter(e => 
+          e.source === 'local_creation' || 
+          (e.synced === 'false' && !e.source)
+        );
+      } catch (error) {
+        console.warn('Erro ao usar índice estabelecimentos:', error);
+        const allEstabelecimentos = await this.db!.getAll('estabelecimentos');
+        unsyncedEstabelecimentos = allEstabelecimentos.filter(e => 
+          (e.synced === 'false' || e.synced === false || e.synced === undefined) &&
+          (e.source === 'local_creation' || !e.source)
+        );
+      }
       
-      console.log(`📊 Pendentes: ${pendingNotificacoes.length} notificações, ${unsyncedPacientes.length} pacientes locais`);
+      console.log(`📊 Pendentes: ${pendingNotificacoes.length} notificações, ${unsyncedPacientes.length} pacientes locais, ${unsyncedEstabelecimentos.length} estabelecimentos`);
       
       return {
         notificacoes: pendingNotificacoes.length,
-        pacientes: unsyncedPacientes.length
+        pacientes: unsyncedPacientes.length,
+        estabelecimentos: unsyncedEstabelecimentos.length
       };
       
     } catch (error) {
       console.error('Erro ao obter contadores:', error);
-      return { notificacoes: 0, pacientes: 0 };
+      return { notificacoes: 0, pacientes: 0, estabelecimentos: 0 };
     }
   }
 
@@ -461,14 +513,32 @@ export class IndexedDBService {
       await this.db!.put('notificacoes', notificacao);
     }
   }
-
-  async markPacienteAsSynced(idpaciente: number): Promise<void> {
+  async markPacienteAsSynced(idpaciente: number, serverId?: number): Promise<void> {
     await this.init();
-    const paciente = await this.db!.get('pacientes', idpaciente);
-    if (paciente) {
-      paciente.synced = 'true';
-      paciente.syncedAt = Date.now();
-      await this.db!.put('pacientes', paciente);
+    
+    try {
+      const paciente = await this.db!.get('pacientes', idpaciente);
+      if (paciente) {
+        // ✅ ATUALIZAR com informações de sincronização
+        paciente.synced = 'true';
+        paciente.syncedAt = Date.now();
+        
+        // ✅ SALVAR ID do servidor se fornecido (para referência)
+        if (serverId) {
+          paciente.serverIdpaciente = serverId;
+          console.log(`📋 Mapeamento salvo: ID local ${idpaciente} → servidor ${serverId}`);
+        }
+        
+        await this.db!.put('pacientes', paciente);
+        console.log(`✅ Paciente ${idpaciente} marcado como sincronizado`);
+        
+      } else {
+        console.warn(`⚠️ Paciente ${idpaciente} não encontrado para marcar como sincronizado`);
+      }
+      
+    } catch (error) {
+      console.error('❌ Erro ao marcar paciente como sincronizado:', error);
+      throw error;
     }
   }
 
@@ -533,12 +603,14 @@ export class IndexedDBService {
   async clearPacientesCache(): Promise<void> {
     await this.clear('pacientes_cache');
     console.log('🗑️ Cache de pacientes limpo');
-  }
-  // ✅ NOVO: Obter estatísticas do cache
+  }  // ✅ NOVO: Obter estatísticas do cache
   async getCacheStats(): Promise<{
     verificacao: number;
     locais: number;
     pendentes: number;
+    estabelecimentos_verificacao: number;
+    estabelecimentos_locais: number;
+    estabelecimentos_pendentes: number;
   }> {
     await this.init();
     
@@ -549,15 +621,32 @@ export class IndexedDBService {
         p.synced === 'false' && (p.source === 'local_creation' || !p.source)
       );
       
+      // ✅ NOVO: Stats de estabelecimentos
+      const estabelecimentosCacheEntries = await this.db!.getAll('estabelecimentos_cache');
+      const localEstabelecimentos = await this.db!.getAll('estabelecimentos');
+      const unsyncedEstabelecimentos = localEstabelecimentos.filter(e => 
+        e.synced === 'false' && (e.source === 'local_creation' || !e.source)
+      );
+      
       return {
         verificacao: cacheEntries.length,
         locais: localPatients.length,
-        pendentes: unsyncedLocal.length
+        pendentes: unsyncedLocal.length,
+        estabelecimentos_verificacao: estabelecimentosCacheEntries.length,
+        estabelecimentos_locais: localEstabelecimentos.length,
+        estabelecimentos_pendentes: unsyncedEstabelecimentos.length
       };
       
     } catch (error) {
       console.error('Erro ao obter stats:', error);
-      return { verificacao: 0, locais: 0, pendentes: 0 };
+      return { 
+        verificacao: 0, 
+        locais: 0, 
+        pendentes: 0,
+        estabelecimentos_verificacao: 0,
+        estabelecimentos_locais: 0,
+        estabelecimentos_pendentes: 0
+      };
     }
   }
   // ✅ HELPERS para CPF Cache (conforme solicitado) 
@@ -656,6 +745,246 @@ export class IndexedDBService {
     } catch (error) {
       console.error('❌ Erro ao contar CPFs no cache:', error);
       return 0;
+    }
+  }
+
+  // ===== ESTABELECIMENTOS MÉTODOS =====
+
+  // ✅ NOVO: Salvar estabelecimentos baixados para cache (não sincronizar)
+  async saveEstabelecimentosParaCache(estabelecimentos: any[]): Promise<void> {
+    await this.init();
+    
+    try {
+      const tx = this.db!.transaction(['estabelecimentos_cache'], 'readwrite');
+      const store = tx.objectStore('estabelecimentos_cache');
+      
+      for (const estabelecimento of estabelecimentos) {
+        if (estabelecimento.cnes) {
+          const cacheEntry = {
+            cnes: estabelecimento.cnes,
+            nome: estabelecimento.nome?.toUpperCase() || '',
+            tipo_estabelecimento: estabelecimento.tipo_estabelecimento,
+            municipio: estabelecimento.municipio,
+            timestamp: Date.now(),
+            source: 'download' as const
+          };
+          
+          await store.put(cacheEntry);
+        }
+      }
+      
+      await tx.done;
+      console.log(`📥 ${estabelecimentos.length} estabelecimentos salvos no cache para verificação`);
+      
+    } catch (error) {
+      console.error('❌ Erro ao salvar estabelecimentos no cache:', error);
+      throw error;
+    }
+  }
+
+  // ✅ NOVO: Salvar estabelecimento criado localmente (deve ser sincronizado)
+  async saveEstabelecimento(estabelecimento: any): Promise<number> {
+    await this.init();
+    
+    try {
+      if (!estabelecimento.id) {
+        estabelecimento.id = -Date.now();
+      }
+      
+      if (estabelecimento.nome) {
+        estabelecimento.nome = estabelecimento.nome.toUpperCase();
+      }
+      
+      // ✅ IMPORTANTE: Marcar como criado localmente para sincronização
+      estabelecimento.synced = 'false';
+      estabelecimento.source = 'local_creation';
+      estabelecimento.savedAt = Date.now();
+      
+      await this.db!.put('estabelecimentos', estabelecimento);
+      console.log(`🏥 Estabelecimento criado localmente: ${estabelecimento.nome} (ID: ${estabelecimento.id})`);
+      return estabelecimento.id;
+      
+    } catch (error) {
+      console.error('❌ Erro ao salvar estabelecimento:', error);
+      throw error;
+    }
+  }
+
+  // ✅ NOVO: Verificação de CNES
+  async checkCNESExists(cnes: string): Promise<boolean> {
+    await this.init();
+    
+    if (!cnes || cnes.length !== 7) return false;
+    
+    try {
+      // 1. Verificar no cache de verificação PRIMEIRO
+      const cnesInCache = await this.db!.get('estabelecimentos_cache', cnes);
+      if (cnesInCache) {
+        console.log('✅ CNES encontrado no cache de verificação');
+        return true;
+      }
+      
+      // 2. Verificar nos estabelecimentos criados localmente
+      const estabelecimentoLocal = await this.db!.getFromIndex('estabelecimentos', 'by-cnes', cnes);
+      if (estabelecimentoLocal) {
+        console.log('✅ CNES encontrado em estabelecimentos locais');
+        return true;
+      }
+      
+      // 3. Busca manual como fallback
+      const allEstabelecimentos = await this.db!.getAll('estabelecimentos');
+      const foundInEstabelecimentos = allEstabelecimentos.some(est => est.cnes === cnes);
+      
+      if (foundInEstabelecimentos) {
+        console.log('✅ CNES encontrado via busca manual');
+        return true;
+      }
+      
+      console.log('ℹ️ CNES não encontrado em nenhum cache');
+      return false;
+      
+    } catch (error) {
+      console.warn('⚠️ Erro na verificação de CNES, usando busca manual:', error);
+      
+      try {
+        const allEstabelecimentos = await this.db!.getAll('estabelecimentos');
+        return allEstabelecimentos.some(est => est.cnes === cnes);
+      } catch (fallbackError) {
+        console.error('❌ Erro no fallback de verificação:', fallbackError);
+        return false;
+      }
+    }
+  }
+
+  // ✅ NOVO: Busca estendida de estabelecimentos
+  async searchEstabelecimentosExtended(query: string): Promise<any[]> {
+    await this.init();
+    
+    const searchTerm = query.toLowerCase();
+    const results: any[] = [];
+    
+    try {
+      // 1. Buscar no cache de verificação
+      const allCacheEntries = await this.db!.getAll('estabelecimentos_cache');
+      const cacheResults = allCacheEntries.filter(entry => 
+        entry.nome.toLowerCase().includes(searchTerm) ||
+        entry.cnes.includes(query) ||
+        (entry.municipio && entry.municipio.toLowerCase().includes(searchTerm))
+      );
+      
+      // Converter para formato compatível
+      cacheResults.forEach(entry => {
+        results.push({
+          id: `cache_${entry.cnes}`,
+          nome: entry.nome,
+          cnes: entry.cnes,
+          tipo_estabelecimento: entry.tipo_estabelecimento,
+          municipio: entry.municipio,
+          source: 'cache'
+        });
+      });
+      
+      // 2. Buscar em estabelecimentos locais
+      const allEstabelecimentos = await this.db!.getAll('estabelecimentos');
+      const localResults = allEstabelecimentos.filter(estabelecimento => 
+        (estabelecimento.nome && estabelecimento.nome.toLowerCase().includes(searchTerm)) ||
+        (estabelecimento.cnes && estabelecimento.cnes.includes(query)) ||
+        (estabelecimento.municipio && estabelecimento.municipio.toLowerCase().includes(searchTerm))
+      );
+      
+      // Adicionar estabelecimentos locais
+      localResults.forEach(estabelecimento => {
+        results.push({
+          ...estabelecimento,
+          source: estabelecimento.source || 'local'
+        });
+      });
+      
+      console.log(`🔍 Busca '${query}': ${cacheResults.length} no cache, ${localResults.length} locais`);
+      
+      return results;
+      
+    } catch (error) {
+      console.error('❌ Erro na busca estendida de estabelecimentos:', error);
+      return [];
+    }
+  }
+
+  // ✅ NOVO: Contar estabelecimentos pendentes
+  async getUnsyncedEstabelecimentos(): Promise<any[]> {
+    await this.init();
+    try {
+      const allLocalEstabelecimentos = await this.db!.getAllFromIndex('estabelecimentos', 'by-synced', 'false');
+      
+      // Filtrar apenas os criados localmente
+      return allLocalEstabelecimentos.filter(e => 
+        e.source === 'local_creation' || 
+        (e.synced === 'false' && !e.source)
+      );
+      
+    } catch (error) {
+      console.warn('Erro ao usar índice, usando busca manual:', error);
+      const allEstabelecimentos = await this.db!.getAll('estabelecimentos');
+      return allEstabelecimentos.filter(e => 
+        (e.synced === 'false' || e.synced === false || e.synced === undefined) &&
+        (e.source === 'local_creation' || !e.source)
+      );
+    }
+  }
+
+  // ✅ NOVO: Marcar estabelecimento como sincronizado
+  async markEstabelecimentoAsSynced(id: number, serverId?: number): Promise<void> {
+    await this.init();
+    
+    try {
+      const estabelecimento = await this.db!.get('estabelecimentos', id);
+      if (estabelecimento) {
+        estabelecimento.synced = 'true';
+        estabelecimento.syncedAt = Date.now();
+        
+        if (serverId) {
+          estabelecimento.serverId = serverId;
+          console.log(`📋 Mapeamento salvo: ID local ${id} → servidor ${serverId}`);
+        }
+        
+        await this.db!.put('estabelecimentos', estabelecimento);
+        console.log(`✅ Estabelecimento ${id} marcado como sincronizado`);
+        
+      } else {
+        console.warn(`⚠️ Estabelecimento ${id} não encontrado para marcar como sincronizado`);
+      }
+      
+    } catch (error) {
+      console.error('❌ Erro ao marcar estabelecimento como sincronizado:', error);
+      throw error;
+    }
+  }
+
+  // ✅ NOVO: Limpar cache de estabelecimentos
+  async clearEstabelecimentosCache(): Promise<void> {
+    await this.init();
+    
+    try {
+      const tx = this.db!.transaction('estabelecimentos_cache', 'readwrite');
+      await tx.store.clear();
+      await tx.done;
+      console.log('🗑️ Cache de estabelecimentos limpo com sucesso');
+    } catch (error) {
+      console.error('❌ Erro ao limpar cache de estabelecimentos:', error);
+      throw error;
+    }
+  }
+
+  // ✅ NOVO: Buscar estabelecimento por ID
+  async getEstabelecimento(id: number): Promise<any | null> {
+    await this.init();
+    
+    try {
+      const estabelecimento = await this.db!.get('estabelecimentos', id);
+      return estabelecimento || null;
+    } catch (error) {
+      console.error('Erro ao buscar estabelecimento:', error);
+      return null;
     }
   }
 }

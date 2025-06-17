@@ -10,6 +10,10 @@ import {
   formatToBackend
 } from '@/utils/adapters';
 
+// ✅ ADICIONAR IMPORTS PARA OFFLINE
+import syncService from '@/services/syncService';
+import indexedDBService from '@/services/indexedDB';
+
 const server = import.meta.env.VITE_API_SERVER;
 const port = import.meta.env.VITE_API_PORT;
 // URL base para o backend
@@ -117,17 +121,28 @@ async function fetchAllPages<T>(endpoint: string): Promise<T[]> {
   }
 }
 
-export const EstabelecimentoFormService = {
-  // Obter tipos de estabelecimento
+export const EstabelecimentoFormService = {  // Obter tipos de estabelecimento
   async getTiposEstabelecimento(): Promise<OptionItem[]> {
     try {
-      console.log(`Buscando tipos de estabelecimento em: ${ENDPOINTS.TIPO_ESTABELECIMENTO}`);
-      
-      // Buscar todos os itens
-      const items = await fetchAllPages<OptionItem>(ENDPOINTS.TIPO_ESTABELECIMENTO);
-      console.log('Todos os tipos estabelecimento:', items);
-      
-      return items;
+      // ✅ USAR indexedDBService para cache offline
+      const cachedData = await indexedDBService.getOpcoes('estabelecimentos-tipos');
+      if (cachedData && cachedData.length > 0) {
+        console.log('📱 Usando tipos de estabelecimento do cache');
+        return cachedData;
+      }
+
+      if (navigator.onLine) {
+        console.log(`Buscando tipos de estabelecimento em: ${ENDPOINTS.TIPO_ESTABELECIMENTO}`);
+        const items = await fetchAllPages<OptionItem>(ENDPOINTS.TIPO_ESTABELECIMENTO);
+        
+        // Salvar no cache
+        await indexedDBService.saveOpcoes('estabelecimentos-tipos', items);
+        console.log('✅ Tipos de estabelecimento salvos no cache');
+        
+        return items;
+      }
+
+      return [];
     } catch (error) {
       console.error('Erro ao buscar tipos de estabelecimento:', error);
       return [];
@@ -137,13 +152,25 @@ export const EstabelecimentoFormService = {
   // Obter tipos de natureza
   async getTiposNatureza(): Promise<OptionItem[]> {
     try {
-      console.log(`Buscando tipos de natureza em: ${ENDPOINTS.TIPO_NATUREZA}`);
-      
-      // Buscar todos os itens
-      const items = await fetchAllPages<OptionItem>(ENDPOINTS.TIPO_NATUREZA);
-      console.log('Todos os tipos natureza:', items);
-      
-      return items;
+      // ✅ USAR indexedDBService para cache offline
+      const cachedData = await indexedDBService.getOpcoes('naturezas');
+      if (cachedData && cachedData.length > 0) {
+        console.log('📱 Usando tipos de natureza do cache');
+        return cachedData;
+      }
+
+      if (navigator.onLine) {
+        console.log(`Buscando tipos de natureza em: ${ENDPOINTS.TIPO_NATUREZA}`);
+        const items = await fetchAllPages<OptionItem>(ENDPOINTS.TIPO_NATUREZA);
+        
+        // Salvar no cache
+        await indexedDBService.saveOpcoes('naturezas', items);
+        console.log('✅ Tipos de natureza salvos no cache');
+        
+        return items;
+      }
+
+      return [];
     } catch (error) {
       console.error('Erro ao buscar tipos de natureza:', error);
       return [];
@@ -153,13 +180,25 @@ export const EstabelecimentoFormService = {
   // Obter tipos de turno
   async getTiposTurno(): Promise<OptionItem[]> {
     try {
-      console.log(`Buscando tipos de turno em: ${ENDPOINTS.TIPO_TURNO}`);
-      
-      // Buscar todos os itens
-      const items = await fetchAllPages<OptionItem>(ENDPOINTS.TIPO_TURNO);
-      console.log('Todos os tipos turno:', items);
-      
-      return items;
+      // ✅ USAR indexedDBService para cache offline
+      const cachedData = await indexedDBService.getOpcoes('turnos');
+      if (cachedData && cachedData.length > 0) {
+        console.log('📱 Usando tipos de turno do cache');
+        return cachedData;
+      }
+
+      if (navigator.onLine) {
+        console.log(`Buscando tipos de turno em: ${ENDPOINTS.TIPO_TURNO}`);
+        const items = await fetchAllPages<OptionItem>(ENDPOINTS.TIPO_TURNO);
+        
+        // Salvar no cache
+        await indexedDBService.saveOpcoes('turnos', items);
+        console.log('✅ Tipos de turno salvos no cache');
+        
+        return items;
+      }
+
+      return [];
     } catch (error) {
       console.error('Erro ao buscar tipos de turno:', error);
       return [];
@@ -169,13 +208,25 @@ export const EstabelecimentoFormService = {
   // Obter habilitações
   async getHabilitacoes(): Promise<OptionItem[]> {
     try {
-      console.log(`Buscando habilitações em: ${ENDPOINTS.TIPO_HABILITACAO}`);
-      
-      // Buscar todos os itens
-      const items = await fetchAllPages<OptionItem>(ENDPOINTS.TIPO_HABILITACAO);
-      console.log('Todas as habilitações:', items);
-      
-      return items;
+      // ✅ USAR indexedDBService para cache offline
+      const cachedData = await indexedDBService.getOpcoes('habilitacoes');
+      if (cachedData && cachedData.length > 0) {
+        console.log('📱 Usando habilitações do cache');
+        return cachedData;
+      }
+
+      if (navigator.onLine) {
+        console.log(`Buscando habilitações em: ${ENDPOINTS.TIPO_HABILITACAO}`);
+        const items = await fetchAllPages<OptionItem>(ENDPOINTS.TIPO_HABILITACAO);
+        
+        // Salvar no cache
+        await indexedDBService.saveOpcoes('habilitacoes', items);
+        console.log('✅ Habilitações salvas no cache');
+        
+        return items;
+      }
+
+      return [];
     } catch (error) {
       console.error('Erro ao buscar habilitações:', error);
       return [];
@@ -185,82 +236,120 @@ export const EstabelecimentoFormService = {
   // Obter qualificações
   async getQualificacoes(): Promise<OptionItem[]> {
     try {
-      console.log(`Buscando qualificações em: ${ENDPOINTS.TIPO_QUALIFICACAO}`);
-      
-      // Buscar todos os itens
-      const items = await fetchAllPages<OptionItem>(ENDPOINTS.TIPO_QUALIFICACAO);
-      console.log('Todas as qualificações:', items);
-      
-      return items;
+      // ✅ USAR indexedDBService para cache offline
+      const cachedData = await indexedDBService.getOpcoes('qualificacoes');
+      if (cachedData && cachedData.length > 0) {
+        console.log('📱 Usando qualificações do cache');
+        return cachedData;
+      }
+
+      if (navigator.onLine) {
+        console.log(`Buscando qualificações em: ${ENDPOINTS.TIPO_QUALIFICACAO}`);
+        const items = await fetchAllPages<OptionItem>(ENDPOINTS.TIPO_QUALIFICACAO);
+        
+        // Salvar no cache
+        await indexedDBService.saveOpcoes('qualificacoes', items);
+        console.log('✅ Qualificações salvas no cache');
+        
+        return items;
+      }
+
+      return [];
     } catch (error) {
       console.error('Erro ao buscar qualificações:', error);
       return [];
     }
   },
-
   // Obter estabelecimento por ID
   async getById(id: number): Promise<EstabelecimentoData> {
-    try {
-      // Usar a instância de API que já tem a baseURL configurada
-      const response = await api.get(`/${id}`);
-      console.log('Dados originais:', response.data);
-      
-      // Usar o adaptador para formatar os dados
-      const formattedData = formatFromBackend(response.data) as EstabelecimentoData;
-      console.log('Dados formatados:', formattedData);
-      
-      return formattedData;
-    } catch (error) {
-      return handleApiError(error);
+    // ✅ TENTAR ONLINE PRIMEIRO
+    if (navigator.onLine) {
+      try {
+        // Usar a instância de API que já tem a baseURL configurada
+        const response = await api.get(`/${id}`);
+        console.log('Dados originais:', response.data);
+        
+        // Usar o adaptador para formatar os dados
+        const formattedData = formatFromBackend(response.data) as EstabelecimentoData;
+        console.log('Dados formatados:', formattedData);
+        
+        return formattedData;
+      } catch (error) {
+        console.warn('Falha ao buscar estabelecimento online, tentando offline:', error);
+      }
     }
-  },
 
+    // ✅ FALLBACK OFFLINE
+    try {
+      const estabelecimento = await syncService.getEstabelecimentoById(id);
+      if (estabelecimento) {
+        return formatFromBackend(estabelecimento) as EstabelecimentoData;
+      }
+    } catch (error) {
+      console.error('Erro ao buscar estabelecimento offline:', error);
+    }
+
+    throw new Error('Estabelecimento não encontrado');
+  },
   // Criar estabelecimento
   async create(data: EstabelecimentoData): Promise<any> {
-    try {
-      if (!data.nome) {
-        throw new Error('O nome do estabelecimento é obrigatório');
-      }
-      
-      // Usar o adaptador para converter para o formato do backend
-      const payload = formatToBackend(data, false); // false = criação
-      console.log('Payload create:', payload);
-      
-      const response = await api.post("/", payload);
-      return response.data;
-    } catch (error) {
-      return handleApiError(error);
+    if (!data.nome) {
+      throw new Error('O nome do estabelecimento é obrigatório');
     }
+
+    // ✅ TENTAR ONLINE PRIMEIRO
+    if (navigator.onLine) {
+      try {
+        const payload = formatToBackend(data, false);
+        console.log('Payload create:', payload);
+        
+        const response = await api.post("/", payload);
+        console.log('✅ Estabelecimento criado online');
+        return response.data;
+      } catch (error) {
+        console.warn('Falha ao criar estabelecimento online, salvando offline:', error);
+      }
+    }
+
+    // ✅ FALLBACK OFFLINE
+    console.log('📱 Salvando estabelecimento offline...');
+    return await syncService.saveEstabelecimento(data);
   },
 
   // Atualizar estabelecimento
   async update(id: number, data: EstabelecimentoData): Promise<any> {
-    try {
-      // Usar o adaptador para converter para o formato do backend (com flag de atualização)
-      const payload = formatToBackend(data, true); // true = atualização
-      
-      console.log('ID da atualização:', id);
-      console.log('Payload completo:', payload);
-      
-      const response = await api.put(`/${id}`, payload);
-      return response.data;
-    } catch (error) {
-      const err = error as any;
-      console.log('Erro detalhado:', {
-        response: err.response?.data,
-        status: err.response?.status,
-        fullError: err
-      });
-      
-      if (err.response?.data?.errors?.[0]) {
-        throw new Error(err.response.data.errors[0]);
+    // ✅ TENTAR ONLINE PRIMEIRO
+    if (navigator.onLine) {
+      try {
+        const payload = formatToBackend(data, true);
+        
+        console.log('ID da atualização:', id);
+        console.log('Payload completo:', payload);
+        
+        const response = await api.put(`/${id}`, payload);
+        console.log('✅ Estabelecimento atualizado online');
+        return response.data;
+      } catch (error) {
+        console.warn('Falha ao atualizar estabelecimento online:', error);
+        
+        const err = error as any;
+        if (err.response?.data?.errors?.[0]) {
+          throw new Error(err.response.data.errors[0]);
+        }
+        throw new Error(err.message || 'Erro ao atualizar estabelecimento');
       }
-      throw new Error(err.message || 'Erro ao atualizar estabelecimento');
     }
+
+    // ✅ Para atualizações offline, seria necessário implementar lógica específica
+    throw new Error('Atualização offline não implementada ainda');
   },
 
-  // Excluir estabelecimento
   async delete(id: number): Promise<void> {
+    // ✅ DELETE só funciona online por enquanto
+    if (!navigator.onLine) {
+      throw new Error('Exclusão requer conexão com a internet');
+    }
+
     try {
       await api.delete(`/${id}`);
     } catch (error) {
@@ -268,25 +357,43 @@ export const EstabelecimentoFormService = {
     }
   },
 
-  // Verificar duplicidade
+  // ✅ VERIFICAÇÃO DE DUPLICATAS COM CACHE OFFLINE
   async checkDuplicate(
     field: 'codigo_unidade' | 'cnes' | 'cnpj',
     value: string,
     id?: number
   ): Promise<DuplicateCheckResponse> {
-    try {
-      const response = await api.post("/check-duplicate", {
-        field,
-        value: value.trim(),
-        excludeId: id,
-      });
-      
-      return {
-        isDuplicate: response.data.isDuplicate,
-        field: field
-      };
-    } catch (error) {
-      return handleApiError(error);
+    // ✅ TENTAR ONLINE PRIMEIRO
+    if (navigator.onLine) {
+      try {
+        const response = await api.post("/check-duplicate", {
+          field,
+          value: value.trim(),
+          excludeId: id,
+        });
+        
+        return {
+          isDuplicate: response.data.isDuplicate,
+          field: field
+        };
+      } catch (error) {
+        console.warn('Falha na verificação online, usando cache offline:', error);
+      }
     }
+
+    // ✅ FALLBACK OFFLINE
+    if (field === 'cnes') {
+      try {
+        const exists = await syncService.checkCNESExists(value.trim());
+        return { isDuplicate: exists, field };
+      } catch (error) {
+        console.error('Erro na verificação offline de CNES:', error);
+        return { isDuplicate: false, field };
+      }
+    }
+
+    // Para outros campos, assumir que não existe (por segurança)
+    console.warn(`Verificação offline para ${field} não implementada, assumindo não duplicado`);
+    return { isDuplicate: false, field };
   }
 };
