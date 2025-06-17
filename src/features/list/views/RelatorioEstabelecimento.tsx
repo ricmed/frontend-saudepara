@@ -15,7 +15,7 @@ import TableBody from "../components/RelatorioEstabelecimento/TableBody";
 import PaginationControls from "../components/RelatorioEstabelecimento/PaginationControls";
 import SearchBar from "../components/RelatorioEstabelecimento/SearchBar";
 import ColumnsMenu from "../components/RelatorioEstabelecimento/ColumnsMenu";
-import SideMenu from "@/features/apps/components/SideMenu";
+import SideMenu from "@/features/home/components/SideMenu";
 
 // Importando tipos e utilitários
 import {
@@ -25,14 +25,16 @@ import {
   allColumns,
 } from "../types/estabelecimento";
 import { formatHabilitacoes } from "../utils/helpers";
+import { Language } from "@/i18n/types";
 
 export function RelatorioEstabelecimento() {
   const navigate = useNavigate();
   const menuRef = useRef<HTMLDivElement>(null);
   const [csvLinkRef, setCsvLinkRef] = useState<any>(null);
-  const csvLinkAllRef = useRef<any>(null);
-  // Estado para controlar o SideMenu
+  const csvLinkAllRef = useRef<any>(null);  // Estado para controlar o SideMenu
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // Estados para o SideMenu
+  const [selectedLanguage, setSelectedLanguage] = useState<Language>("pt-BR");
 
   const resetToFirstPage = () => {
     setCurrentPage(1);
@@ -519,10 +521,13 @@ export function RelatorioEstabelecimento() {
             </div>
           </div>
         </div>
-      </header>
-
-       {/* Adicionar o componente SideMenu */}
-       <SideMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
+      </header>       {/* Adicionar o componente SideMenu */}
+       <SideMenu 
+         isOpen={isMenuOpen} 
+         onClose={() => setIsMenuOpen(false)} 
+         selectedLanguage={selectedLanguage}
+         onLanguageChange={setSelectedLanguage}
+       />
 
       {/* Conteúdo principal */}
       <main className="max-w-7xl mx-auto px-4 py-8">
