@@ -35,7 +35,7 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
     {
       icon: <MessageCircle className={`${isMobile ? 'h-6 w-6' : 'h-10 w-10'} text-[#3B5FFF] mb-${isMobile ? '2' : '3'}`} />,
       label: 'menu.fale_conosco',
-      onClick: () => navigate('/contato')
+      onClick: () => navigate('/fale-conosco')
     }
   ];
 

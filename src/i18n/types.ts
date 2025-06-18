@@ -83,6 +83,7 @@ export type TranslationRecord = {
   'menu.bug': string;
   'menu.logout': string;
   'menu.login': string;
+  'menu.manage_users': string;
 
   // Auxiliary Apps
   'apps.components': string;
@@ -171,8 +172,29 @@ export type TranslationRecord = {
   'footer.contactOmbudsman': string;
   'footer.portalTitle': string;
   'footer.portalDescription': string;
-  'footer.developedBy': string;
-  'footer.copyright': string;
+  'footer.developedBy': string;  'footer.copyright': string;
+  
+  // Fale Conosco, ASCOM, Ouvidoria
+  'faleConosco.title': string;
+  'faleConosco.ascom': string;
+  'faleConosco.ouvitoria': string;
+  'faleConosco.access': string;
+  'ascom.title': string;
+  'ascom.subTitle': string;
+  'ascom.description': string;
+  'ascom.emailLabel': string;
+  'ascom.phoneLabel': string;
+  'ouvitoria.title': string;
+  'ouvitoria.description': string;
+  'ouvitoria.inPersonLabel': string;
+  'ouvitoria.address': string;
+  'ouvitoria.phoneLabel': string;
+  'ouvitoria.freeCallLabel': string;
+  'ouvitoria.emailLabel': string;
+  'ouvitoria.siteLabel': string;
+  'ouvitoria.formButton': string;
+  'voltar': string;
+  'menu.open': string;
   
   // Other pages
   'campaigns.title': string;

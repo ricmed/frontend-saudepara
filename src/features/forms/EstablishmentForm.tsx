@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Building2, Save, Trash2, Eraser, X } from "lucide-react";
+import { ArrowLeft, Building2, Save, Trash2, Eraser, X, Menu } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { EstabelecimentoFormService } from "@/services/EstabelecimentoFormService";
 import {
@@ -15,6 +15,8 @@ import DadosPrincipais from "@/features/forms/components/PrimaryData";
 import Endereco from "@/features/forms/components/Address";
 import InformacoesComplementares from "@/features/forms/components/ComplementaryInformations";
 import QualificacoesHabilitacoes from "@/features/forms/components/QualificationsHabilitations";
+import SideMenu from "@/features/home/components/SideMenu";
+import { Language } from "@/i18n/types";
 
 export interface OptionItem {
   id?: number;
@@ -86,6 +88,12 @@ const EstabelecimentoForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  
+  // Estado para controlar o SideMenu
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // Estados para o SideMenu
+  const [selectedLanguage, setSelectedLanguage] = useState<Language>("pt-BR");
+  
   const [tiposEstabelecimento, setTiposEstabelecimento] = useState<
     OptionItem[]
   >([]);
@@ -608,10 +616,16 @@ const EstabelecimentoForm: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="bg-gradient-to-r from-blue-600 to-blue-800 p-4 sticky top-0 z-10 shadow-lg">
+    <div className="min-h-screen bg-gray-50 flex flex-col">      <header className="bg-gradient-to-r from-blue-600 to-blue-800 p-4 sticky top-0 z-10 shadow-lg">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between">
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => setIsMenuOpen(true)}
+              className="text-white/90 p-2 hover:bg-white/10 rounded-lg transition-colors"
+              title="Abrir menu"
+            >
+              <Menu className="h-6 w-6" />
+            </button>
             <button
               onClick={handleBack}
               className="text-white/90 p-2 hover:bg-white/10 rounded-lg transition-colors"
@@ -759,10 +773,17 @@ const EstabelecimentoForm: React.FC = () => {
                   <span>Excluir</span>
                 </button>
               )}
-            </div>
-          </form>
+            </div>          </form>
         </div>
       </main>
+      
+      {/* SideMenu */}
+      <SideMenu
+        isOpen={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
+        selectedLanguage={selectedLanguage}
+        onLanguageChange={setSelectedLanguage}
+      />
     </div>
   );
 };

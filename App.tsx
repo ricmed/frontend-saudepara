@@ -97,6 +97,10 @@ import ListaNotificacoes from "@/features/notificationForms/ListaNotificacoes";
 import HomePage from "@/features/home/HomePage";
 import DashboardPage from '@/features/dashboard/DashboardPage';
 import OfflineManagementPage from '@/features/offlinePage/pages/OfflineManagementPage';
+// Contact pages
+import FaleConoscoPage from '@/features/contact/FaleConoscoPage';
+import AscomPage from '@/features/contact/AscomPage';
+import OuvidoriaPage from '@/features/contact/OuvidoriaPage';
 // Componente de layout protegido
 const ProtectedLayout = () => {
   return (
@@ -257,6 +261,10 @@ function App() {
           <Route path="/campanha-novembro-azul" element={<NovembroAzul />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/access-denied" element={<AccessDenied />} />
+          {/* Contact Pages */}
+          <Route path="/fale-conosco" element={<FaleConoscoPage />} />
+          <Route path="/fale-conosco/ascom" element={<AscomPage />} />
+          <Route path="/fale-conosco/ouvidoria" element={<OuvidoriaPage />} />
           <Route path="/admin/*" element={<AdminRoutes />}></Route>
         </Routes>
       </Router>

@@ -1,11 +1,10 @@
 import { TranslationsType } from './types';
 import { adminTranslations } from '../keycloak/admin/translations';
 
-export const translations: TranslationsType = {
-  "pt-BR": {
+export const translations: TranslationsType = {  "pt-BR": {
     ...adminTranslations.pt,
     // Cabeçalho
-    "search.placeholder": "Buscar serviços",
+    "search.placeholder": "Pesquisar",
     "header.secretaryOf": "Secretaria de Estado de",
     "header.publicHealth": "Saúde Pública",
     
@@ -22,7 +21,6 @@ export const translations: TranslationsType = {
     "logout.confirmation.message": "Você tem certeza de que deseja sair?",
     
     // Seção de Pontos
-    "section.locate": "Localize aqui",
     "localize.title": "Localize Aqui",
     "points.vaccination": "Pontos de Vacinação",
     "points.vaccination.desc": "Locais para vacinação",
@@ -49,11 +47,10 @@ export const translations: TranslationsType = {
     "nav.home": "Início",
     "nav.map": "Mapa",
     "nav.campaigns": "Campanhas",
-    "nav.entrar": "Entrar",
-      // Menu Lateral
+    "nav.entrar": "Entrar",    // Menu Lateral
     "menu.home": "Início",
     "menu.qualify_establishments": "Qualificar Estabelecimentos",
-    "menu.notification": "Módulo Notificação",
+    "menu.notification": "Módulo Comunicação de Caso",
     "menu.dashboard": "Dashboard",
     "menu.offline_management": "Dados Offline",
     "menu.educational": "Materiais Educativos",
@@ -176,9 +173,11 @@ export const translations: TranslationsType = {
     "apps.cbo": "CBO",
     "apps.countries": "Países",
     "apps.states": "Estados",
-    "apps.cities": "Municípios",
-    "apps.gender": "Gênero",
+    "apps.cities": "Municípios",    "apps.gender": "Gênero",
     "apps.sexual_orientation": "Orientação Sexual",
+
+    // Menu adicional
+    "menu.manage_users": "Gerenciar Usuários",
 
     // Footer
     "footer.contact": "Contato",
@@ -192,12 +191,33 @@ export const translations: TranslationsType = {
     "footer.portalDescription": "Portal de serviços e informações da Secretaria de Estado de Saúde Pública do Pará.",
     "footer.developedBy": "Desenvolvido pelo Núcleo de Informação em Vigilância em Saúde - NIVS",
     "footer.copyright": "© {year} Secretaria de Estado de Saúde Pública do Pará. Todos os direitos reservados.",
-    "footer.rights": "Todos os direitos reservados"
-  },
-  "en": {
+    "footer.rights": "Todos os direitos reservados",
+    
+    // Fale Conosco, ASCOM, Ouvidoria
+    "faleConosco.title": "Fale Conosco",
+    "faleConosco.ascom": "ASCOM",
+    "faleConosco.ouvitoria": "Ouvidoria",
+    "faleConosco.access": "Acessar",
+    "ascom.title": "Assessoria de Imprensa - ASCOM",
+    "ascom.subTitle": "Contatos da Assessoria de Imprensa",
+    "ascom.description": "Este é o canal de comunicação oficial entre a Secretaria de Saúde Pública do Pará e os veículos de imprensa.",
+    "ascom.emailLabel": "E-mail",
+    "ascom.phoneLabel": "Telefone",
+    "ouvitoria.title": "Ouvidoria do SUS",
+    "ouvitoria.description": "A Ouvidoria da SESPA é um canal democrático de comunicação entre a gestão da SESPA e os usuários do SUS, destinado à busca ativa, disseminação de informações e realização de pesquisas para subsidiar a gestão e o controle social do SUS.",
+    "ouvitoria.inPersonLabel": "Presencial",
+    "ouvitoria.address": "Travessa Lomas Valentinas, 2190, Bairro Marco - CEP: 66093-687 - Belém / Pa",
+    "ouvitoria.phoneLabel": "Telefones",
+    "ouvitoria.freeCallLabel": "Disque Saúde (Gratuito)",
+    "ouvitoria.emailLabel": "E-mail",
+    "ouvitoria.siteLabel": "Site",
+    "ouvitoria.formButton": "Acessar Formulário Online",
+    "voltar": "Voltar",
+    "menu.open": "Abrir menu"
+  },  "en": {
     ...adminTranslations.en,
     // Header
-    "search.placeholder": "Search services",
+    "search.placeholder": "Search",
     "header.secretaryOf": "State Department of",
     "header.publicHealth": "Public Health",
     
@@ -241,11 +261,10 @@ export const translations: TranslationsType = {
     "nav.map": "Map",
     "nav.campaigns": "Campaigns",
     "nav.entrar": "Login",
-    
-    // Side Menu
+      // Side Menu
     "menu.home": "Home",
     "menu.qualify_establishments": "Qualify Establishments",
-    "menu.notification": "Notification Module",
+    "menu.notification": "Case Communication Module",
     "menu.dashboard": "Dashboard",
     "menu.offline_management": "Offline Data",
     "menu.educational": "Educational Materials",
@@ -368,9 +387,11 @@ export const translations: TranslationsType = {
     "apps.cbo": "CBO",
     "apps.countries": "Countries",
     "apps.states": "States",
-    "apps.cities": "Cities",
-    "apps.gender": "Gender",
+    "apps.cities": "Cities",    "apps.gender": "Gender",
     "apps.sexual_orientation": "Sexual Orientation",
+
+    // Additional Menu
+    "menu.manage_users": "Manage Users",
 
     // Footer
     "footer.contact": "Contact",
@@ -384,12 +405,33 @@ export const translations: TranslationsType = {
     "footer.portalDescription": "Portal of services and information from the State Department of Public Health of Pará.",
     "footer.developedBy": "Developed by the Health Surveillance Information Center - NIVS",
     "footer.copyright": "© {year} State Department of Public Health of Pará. All rights reserved.",
-    "footer.rights": "All rights reserved"
-  },
-  "es": {
+    "footer.rights": "All rights reserved",
+    
+    // Contact Us, ASCOM, Ombudsman
+    "faleConosco.title": "Contact Us",
+    "faleConosco.ascom": "Press Office",
+    "faleConosco.ouvitoria": "Ombudsman",
+    "faleConosco.access": "Access",
+    "ascom.title": "Press Office - ASCOM",
+    "ascom.subTitle": "Press Office Contacts",
+    "ascom.description": "This is the official communication channel between the Pará State Department of Public Health and the press.",
+    "ascom.emailLabel": "Email",
+    "ascom.phoneLabel": "Phone",
+    "ouvitoria.title": "SUS Ombudsman",
+    "ouvitoria.description": "The SESPA Ombudsman is a democratic communication channel between SESPA management and SUS users, aimed at active searching, disseminating information, and conducting research to support management and social control of SUS.",
+    "ouvitoria.inPersonLabel": "In-Person",
+    "ouvitoria.address": "Travessa Lomas Valentinas, 2190, Bairro Marco - ZIP: 66093-687 - Belém / PA",
+    "ouvitoria.phoneLabel": "Phones",
+    "ouvitoria.freeCallLabel": "Health Hotline (Toll-Free)",
+    "ouvitoria.emailLabel": "Email",
+    "ouvitoria.siteLabel": "Website",
+    "ouvitoria.formButton": "Access Online Form",
+    "voltar": "Back",
+    "menu.open": "Open menu"
+  },  "es": {
     ...adminTranslations.es,
     // Encabezado
-    "search.placeholder": "Buscar servicios",
+    "search.placeholder": "Buscar",
     "header.secretaryOf": "Secretaría de Estado de",
     "header.publicHealth": "Salud Pública",
     
@@ -433,11 +475,10 @@ export const translations: TranslationsType = {
     "nav.map": "Mapa",
     "nav.campaigns": "Campañas",
     "nav.entrar": "Iniciar Sesión",
-    
-    // Menú Lateral
+      // Menú Lateral
     "menu.home": "Inicio",
     "menu.qualify_establishments": "Calificar Establecimientos",
-    "menu.notification": "Módulo de Notificación",
+    "menu.notification": "Módulo de Comunicación de Caso",
     "menu.dashboard": "Dashboard",
     "menu.offline_management": "Datos Sin Conexión",
     "menu.educational": "Materiales Educativos",
@@ -560,9 +601,11 @@ export const translations: TranslationsType = {
     "apps.cbo": "CBO",
     "apps.countries": "Países",
     "apps.states": "Estados",
-    "apps.cities": "Municipios",
-    "apps.gender": "Género",
+    "apps.cities": "Municipios",    "apps.gender": "Género",
     "apps.sexual_orientation": "Orientación Sexual",
+
+    // Menu adicional
+    "menu.manage_users": "Gestionar Usuarios",
 
     // Footer
     "footer.contact": "Contacto",
@@ -576,11 +619,32 @@ export const translations: TranslationsType = {
     "footer.portalDescription": "Portal de servicios e información de la Secretaría de Estado de Salud Pública de Pará.",
     "footer.developedBy": "Desarrollado por el Núcleo de Información en Vigilancia en Salud - NIVS",
     "footer.copyright": "© {year} Secretaría de Estado de Salud Pública de Pará. Todos los derechos reservados.",
-    "footer.rights": "Todos los derechos reservados"
-  },
-  "zh": {
+    "footer.rights": "Todos los derechos reservados",
+    
+    // Contáctenos, ASCOM, Defensoría
+    "faleConosco.title": "Contáctenos",
+    "faleConosco.ascom": "Oficina de Prensa",
+    "faleConosco.ouvitoria": "Defensoría",
+    "faleConosco.access": "Acceder",
+    "ascom.title": "Oficina de Prensa - ASCOM",
+    "ascom.subTitle": "Contactos de la Oficina de Prensa",
+    "ascom.description": "Este es el canal de comunicación oficial entre la Secretaría de Salud Pública de Pará y los medios de comunicación.",
+    "ascom.emailLabel": "Correo Electrónico",
+    "ascom.phoneLabel": "Teléfono",
+    "ouvitoria.title": "Defensoría del SUS",
+    "ouvitoria.description": "La Defensoría de SESPA es un canal de comunicación democrático entre la gestión de SESPA y los usuarios del SUS, destinado a la búsqueda activa, difusión de información y realización de encuestas para apoyar la gestión y el control social del SUS.",
+    "ouvitoria.inPersonLabel": "Presencial",
+    "ouvitoria.address": "Travessa Lomas Valentinas, 2190, Bairro Marco - CP: 66093-687 - Belém / PA",
+    "ouvitoria.phoneLabel": "Teléfonos",
+    "ouvitoria.freeCallLabel": "Línea de Salud (Gratuita)",
+    "ouvitoria.emailLabel": "Correo Electrónico",
+    "ouvitoria.siteLabel": "Sitio Web",
+    "ouvitoria.formButton": "Acceder al Formulario en Línea",
+    "voltar": "Volver",
+    "menu.open": "Abrir menú"
+  },  "zh": {
     // 标题
-    "search.placeholder": "搜索服务",
+    "search.placeholder": "搜索",
     "header.secretaryOf": "国家",
     "header.publicHealth": "公共卫生部",
     
@@ -624,11 +688,10 @@ export const translations: TranslationsType = {
     "nav.map": "地图",
     "nav.campaigns": "活动",
     "nav.entrar": "登录",
-    
-    // 侧边菜单
+      // 侧边菜单
     "menu.home": "首页",
     "menu.qualify_establishments": "认证机构",
-    "menu.notification": "通知模块",
+    "menu.notification": "病例沟通模块",
     "menu.dashboard": "仪表板",
     "menu.offline_management": "离线数据",
     "menu.educational": "教育材料",
@@ -751,9 +814,11 @@ export const translations: TranslationsType = {
     "apps.cbo": "CBO",
     "apps.countries": "国家",
     "apps.states": "州",
-    "apps.cities": "城市",
-    "apps.gender": "性别",
+    "apps.cities": "城市",    "apps.gender": "性别",
     "apps.sexual_orientation": "性取向",
+
+    // Menu adicional
+    "menu.manage_users": "管理用户",
 
     // Footer
     "footer.contact": "联系方式",
@@ -767,11 +832,32 @@ export const translations: TranslationsType = {
     "footer.portalDescription": "帕拉州公共卫生部的服务和信息门户。",
     "footer.developedBy": "由卫生监督信息中心开发 - NIVS",
     "footer.copyright": "© {year} 帕拉州公共卫生部。版权所有。",
-    "footer.rights": "版权所有"
-  },
-  "fr": {
+    "footer.rights": "版权所有",
+    
+    // 联系我们, 新闻办公室, 监察员
+    "faleConosco.title": "联系我们",
+    "faleConosco.ascom": "新闻办公室",
+    "faleConosco.ouvitoria": "监察员",
+    "faleConosco.access": "访问",
+    "ascom.title": "新闻办公室 - ASCOM",
+    "ascom.subTitle": "新闻办公室联系方式",
+    "ascom.description": "这是帕拉州公共卫生部与新闻媒体之间的官方沟通渠道。",
+    "ascom.emailLabel": "电子邮件",
+    "ascom.phoneLabel": "电话",
+    "ouvitoria.title": "SUS 监察员",
+    "ouvitoria.description": "SESPA 监察员是 SESPA 管理层与 SUS 用户之间的民主沟通渠道，旨在积极搜索、传播信息和进行研究，以支持 SUS 的管理和社会控制。",
+    "ouvitoria.inPersonLabel": "现场办理",
+    "ouvitoria.address": "Travessa Lomas Valentinas, 2190, Bairro Marco - 邮政编码: 66093-687 - Belém / PA",
+    "ouvitoria.phoneLabel": "电话",
+    "ouvitoria.freeCallLabel": "健康热线 (免费)",
+    "ouvitoria.emailLabel": "电子邮件",
+    "ouvitoria.siteLabel": "网站",
+    "ouvitoria.formButton": "访问在线表格",
+    "voltar": "返回",
+    "menu.open": "打开菜单"
+  },  "fr": {
     // En-tête
-    "search.placeholder": "Rechercher des services",
+    "search.placeholder": "Rechercher",
     "header.secretaryOf": "Département d'État de",
     "header.publicHealth": "Santé Publique",
     
@@ -821,11 +907,10 @@ export const translations: TranslationsType = {
     "carousel.previousSlide": "Diapositive précédente",
     "carousel.nextSlide": "Diapositive suivante",
     "carousel.goToSlide": "Aller à la diapositive {number}",
-    
-    // Menu Latéral
+      // Menu Latéral
     "menu.home": "Accueil",
     "menu.qualify_establishments": "Qualifier les Établissements",
-    "menu.notification": "Module de Notification",
+    "menu.notification": "Module de Communication de Cas",
     "menu.dashboard": "Tableau de Bord",
     "menu.offline_management": "Données Hors Ligne",
     "menu.educational": "Matériaux Éducatifs",
@@ -942,9 +1027,11 @@ export const translations: TranslationsType = {
     "apps.cbo": "CBO",
     "apps.countries": "Pays",
     "apps.states": "États",
-    "apps.cities": "Villes",
-    "apps.gender": "Genre",
+    "apps.cities": "Villes",    "apps.gender": "Genre",
     "apps.sexual_orientation": "Orientation Sexuelle",
+
+    // Menu adicional
+    "menu.manage_users": "Gérer les Utilisateurs",
 
     // Footer
     "footer.contact": "Contact",
@@ -958,16 +1045,37 @@ export const translations: TranslationsType = {
     "footer.portalDescription": "Portail de services et d'informations du Secrétariat d'État à la Santé Publique du Pará.",
     "footer.developedBy": "Développé par le Centre d'Information de Surveillance Sanitaire - NIVS",
     "footer.copyright": "© {year} Secrétariat d'État à la Santé Publique du Pará. Tous droits réservés.",
-    "footer.rights": "Tous droits réservés"
-  },
-  "ar": {
+    "footer.rights": "Tous droits réservés",
+    
+    // Contactez-nous, Bureau de Presse, Médiateur
+    "faleConosco.title": "Contactez-nous",
+    "faleConosco.ascom": "Bureau de Presse",
+    "faleConosco.ouvitoria": "Médiateur",
+    "faleConosco.access": "Accéder",
+    "ascom.title": "Bureau de Presse - ASCOM",
+    "ascom.subTitle": "Contacts du Bureau de Presse",
+    "ascom.description": "Ceci est le canal de communication officiel entre le Département de la Santé Publique de l'État du Pará et la presse.",
+    "ascom.emailLabel": "E-mail",
+    "ascom.phoneLabel": "Téléphone",
+    "ouvitoria.title": "Médiateur du SUS",
+    "ouvitoria.description": "Le Médiateur de la SESPA est un canal de communication démocratique entre la direction de la SESPA et les usagers du SUS, destiné à la recherche active, à la diffusion d'informations et à la réalisation d'enquêtes pour soutenir la gestion et le contrôle social du SUS.",
+    "ouvitoria.inPersonLabel": "En personne",
+    "ouvitoria.address": "Travessa Lomas Valentinas, 2190, Bairro Marco - CP: 66093-687 - Belém / PA",
+    "ouvitoria.phoneLabel": "Téléphones",
+    "ouvitoria.freeCallLabel": "Ligne Santé (Gratuite)",
+    "ouvitoria.emailLabel": "E-mail",
+    "ouvitoria.siteLabel": "Site Web",
+    "ouvitoria.formButton": "Accéder au Formulaire en Ligne",
+    "voltar": "Retour",
+    "menu.open": "Ouvrir le menu"
+  },  "ar": {
         // Logout Confirmation
     "logout.confirmation.title": "هل تريد تسجيل الخروج؟",
     "logout.confirmation.confirm": "نعم، تسجيل الخروج",
     "logout.confirmation.cancel": "إلغاء",
     "logout.confirmation.message": "هل أنت متأكد أنك تريد تسجيل الخروج؟",
     // مثال على الترجمات العربية
-    "search.placeholder": "ابحث عن الخدمات",
+    "search.placeholder": "بحث",
     "header.secretaryOf": "وزارة الدولة لـ",
     "header.publicHealth": "الصحة العامة",
     "menu.locations": "المواقع",
@@ -1002,10 +1110,9 @@ export const translations: TranslationsType = {
     "points.laboratory.desc": "اختبارات وفحوصات مخبرية",    "nav.home": "الرئيسية",
     "nav.map": "الخريطة",
     "nav.campaigns": "الحملات",
-    "nav.entrar": "تسجيل الدخول",
-    "menu.home": "الرئيسية",
+    "nav.entrar": "تسجيل الدخول",    "menu.home": "الرئيسية",
     "menu.qualify_establishments": "تأهيل المؤسسات",
-    "menu.notification": "وحدة الإشعارات",
+    "menu.notification": "وحدة التواصل للحالات",
     "menu.dashboard": "لوحة التحكم",
     "menu.offline_management": "البيانات غير المتصلة",
     "menu.educational": "مواد تعليمية",
@@ -1115,10 +1222,8 @@ export const translations: TranslationsType = {
     "apps.education": "التعليم",
     "apps.cbo": "CBO",
     "apps.countries": "الدول",
-    "apps.states": "الولايات",
-    "apps.cities": "المدن",
-    "apps.gender": "الجنس",
-    "apps.sexual_orientation": "الميول الجنسي",
+    "apps.states": "الولايات",    "apps.cities": "المدن",    "apps.gender": "الجنس",    "apps.sexual_orientation": "الميول الجنسي",
+    "menu.manage_users": "إدارة المستخدمين",
     "footer.contact": "اتصل",
     "footer.address": "Tv. Lomas Valentinas, 2190 - Marco, Belém - PA, 66093-677",
     "footer.openingHours": "ساعات العمل",
@@ -1130,16 +1235,37 @@ export const translations: TranslationsType = {
     "footer.portalDescription": "بوابة الخدمات والمعلومات لوزارة الصحة العامة في بارا.",
     "footer.developedBy": "تم التطوير بواسطة مركز معلومات الرقابة الصحية - NIVS",
     "footer.copyright": "© {year} وزارة الصحة العامة في بارا. جميع الحقوق محفوظة.",
-    "footer.rights": "جميع الحقوق محفوظة"
-  },
-  "ru": {
+    "footer.rights": "جميع الحقوق محفوظة",
+    
+    // اتصل بنا، المكتب الإعلامي، أمين المظالم
+    "faleConosco.title": "اتصل بنا",
+    "faleConosco.ascom": "المكتب الإعلامي",
+    "faleConosco.ouvitoria": "أمين المظالم",
+    "faleConosco.access": "وصول",
+    "ascom.title": "المكتب الإعلامي - ASCOM",
+    "ascom.subTitle": "جهات اتصال المكتب الإعلامي",
+    "ascom.description": "هذه هي قناة الاتصال الرسمية بين وزارة الصحة العامة في ولاية بارا والصحافة.",
+    "ascom.emailLabel": "البريد الإلكتروني",
+    "ascom.phoneLabel": "الهاتف",
+    "ouvitoria.title": "أمين المظالم في SUS",
+    "ouvitoria.description": "أمين المظالم في SESPA هو قناة اتصال ديمقراطية بين إدارة SESPA ومستخدمي SUS، تهدف إلى البحث النشط ونشر المعلومات وإجراء البحوث لدعم الإدارة والرقابة الاجتماعية لـ SUS.",
+    "ouvitoria.inPersonLabel": "حضور شخصي",
+    "ouvitoria.address": "Travessa Lomas Valentinas, 2190, Bairro Marco - الرمز البريدي: 66093-687 - Belém / PA",
+    "ouvitoria.phoneLabel": "الهواتف",
+    "ouvitoria.freeCallLabel": "الخط الساخن للصحة (مجاني)",
+    "ouvitoria.emailLabel": "البريد الإلكتروني",
+    "ouvitoria.siteLabel": "الموقع الإلكتروني",
+    "ouvitoria.formButton": "الوصول إلى النموذج عبر الإنترنت",
+    "voltar": "رجوع",
+    "menu.open": "فتح القائمة"
+  },  "ru": {
         // Logout Confirmation
     "logout.confirmation.title": "Вы хотите выйти?",
     "logout.confirmation.confirm": "Да, выйти",
     "logout.confirmation.cancel": "Отмена",
     "logout.confirmation.message": "Вы уверены, что хотите выйти?",
     // Пример переводов на русский язык
-    "search.placeholder": "Поиск услуг",
+    "search.placeholder": "Поиск",
     "header.secretaryOf": "Государственный департамент",
     "header.publicHealth": "Общественное здравоохранение",
     "menu.locations": "Места",
@@ -1174,10 +1300,9 @@ export const translations: TranslationsType = {
     "points.laboratory.desc": "Лабораторные анализы и обследования",    "nav.home": "Главная",
     "nav.map": "Карта",
     "nav.campaigns": "Кампании",
-    "nav.entrar": "Войти",
-    "menu.home": "Главная",
+    "nav.entrar": "Войти",    "menu.home": "Главная",
     "menu.qualify_establishments": "Квалификация учреждений",
-    "menu.notification": "Модуль уведомлений",
+    "menu.notification": "Модуль связи по случаям",
     "menu.dashboard": "Панель управления",
     "menu.offline_management": "Автономные данные",
     "menu.educational": "Образовательные материалы",
@@ -1287,10 +1412,8 @@ export const translations: TranslationsType = {
     "apps.education": "Образование",
     "apps.cbo": "CBO",
     "apps.countries": "Страны",
-    "apps.states": "Штаты",
-    "apps.cities": "Города",
-    "apps.gender": "Пол",
-    "apps.sexual_orientation": "Сексуальная ориентация",
+    "apps.states": "Штаты",    "apps.cities": "Города",    "apps.gender": "Пол",    "apps.sexual_orientation": "Сексуальная ориентация",
+    "menu.manage_users": "Управление пользователями",
     "footer.contact": "Контакт",
     "footer.address": "Tv. Lomas Valentinas, 2190 - Marco, Belém - PA, 66093-677",
     "footer.openingHours": "Часы работы",
@@ -1302,6 +1425,28 @@ export const translations: TranslationsType = {
     "footer.portalDescription": "Портал услуг и информации Государственного департамента общественного здравоохранения Пара.",
     "footer.developedBy": "Разработано Центром информации по надзору за здоровьем - NIVS",
     "footer.copyright": "© {year} Государственный департамент общественного здравоохранения Пара. Все права защищены.",
-    "footer.rights": "Все права защищены"
+    "footer.rights": "Все права защищены",
+    
+    // Связаться с нами, Пресс-служба, Омбудсмен
+    "faleConosco.title": "Связаться с нами",
+    "faleConosco.ascom": "Пресс-служба",
+    "faleConosco.ouvitoria": "Омбудсмен",
+    "faleConosco.access": "Доступ",
+    "ascom.title": "Пресс-служба - ASCOM",
+    "ascom.subTitle": "Контакты пресс-службы",
+    "ascom.description": "Это официальный канал связи между Департаментом здравоохранения штата Пара и прессой.",
+    "ascom.emailLabel": "Электронная почта",
+    "ascom.phoneLabel": "Телефон",
+    "ouvitoria.title": "Омбудсмен SUS",
+    "ouvitoria.description": "Омбудсмен SESPA — это демократический канал связи между руководством SESPA и пользователями SUS, предназначенный для активного поиска, распространения информации и проведения исследований для поддержки управления и социального контроля SUS.",
+    "ouvitoria.inPersonLabel": "Личный прием",
+    "ouvitoria.address": "Travessa Lomas Valentinas, 2190, Bairro Marco - Индекс: 66093-687 - Belém / PA",
+    "ouvitoria.phoneLabel": "Телефоны",
+    "ouvitoria.freeCallLabel": "Горячая линия здоровья (бесплатно)",
+    "ouvitoria.emailLabel": "Электронная почта",
+    "ouvitoria.siteLabel": "Веб-сайт",
+    "ouvitoria.formButton": "Перейти к онлайн-форме",
+    "voltar": "Назад",
+    "menu.open": "Открыть меню"
   }
 };

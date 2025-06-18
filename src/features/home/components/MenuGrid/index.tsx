@@ -50,7 +50,7 @@ export const MenuGrid: React.FC = () => {
    {
      icon: <WhatsAppIcon />,
      label: t('menu.fale_conosco'),
-     onClick: () => window.open('https://wa.me/seunumero', '_blank')
+     onClick: () => window.open('/fale-conosco', '_blank')
    }
  ];
 
