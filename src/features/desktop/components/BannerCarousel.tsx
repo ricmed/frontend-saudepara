@@ -223,14 +223,22 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
           >
             {items.map((item, index) => (
               <div key={index} className="w-full flex-shrink-0">
-                <div className="relative aspect-[21/9]">
+                <div className="relative h-80 md:h-96 bg-gradient-to-br from-gray-800 to-gray-900">
+                  {/* Imagem de fundo desfocada para preencher espaços */}
+                  <img
+                    src={item.imagem}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover blur-sm opacity-30"
+                    draggable="false"
+                  />
+                  {/* Imagem principal */}
                   <img
                     src={item.imagem}
                     alt={item.titulo}
-                    className="w-full h-full object-cover"
+                    className="relative w-full h-full object-contain"
                     draggable="false"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-transparent" />
                   <div className="absolute bottom-0 left-0 p-8 max-w-lg">
                     <h2 className="text-3xl font-bold text-white mb-2">{item.titulo}</h2>
                     <p className="text-lg text-white/90">{item.descricao}</p>

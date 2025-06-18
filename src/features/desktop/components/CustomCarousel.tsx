@@ -226,12 +226,20 @@ export const CustomCarousel: React.FC<CustomCarouselProps> = ({ materials: propM
                   }
                 }}
               >
-                <div className="relative pt-[45%]">
+                <div className="relative h-48 bg-gradient-to-br from-gray-800 to-gray-900">
+                  {/* Imagem de fundo desfocada */}
+                  <img
+                    src={material.image}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover blur-sm opacity-30"
+                    draggable="false"
+                  />
+                  {/* Imagem principal */}
                   <img
                     src={material.image}
                     alt={material.title}
-                    className="absolute top-0 left-0 w-full h-full object-cover"
-                    draggable="false" // Impede o comportamento de arrasto padrão da imagem
+                    className="relative w-full h-full object-contain"
+                    draggable="false"
                   />
                   <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/60" />
                   <div className="absolute bottom-0 left-0 right-0 p-4">

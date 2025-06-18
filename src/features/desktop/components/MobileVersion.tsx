@@ -1,9 +1,9 @@
 import React from 'react';
 import { CustomCarousel } from '@/features/desktop/components/CustomCarousel';
 import { BottomNavigation } from '@/features/home/components/BottomNavigation';
-import Header from './Header';
-import { MenuGrid } from './MenuGrid';
-import { LocalizeAqui } from './LocalizeAqui';
+import { CustomHeader } from './CustomHeader';
+import { CustomMenuGrid } from './CustomMenuGrid';
+import { CustomLocalizeAqui } from './CustomLocalizeAqui';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Language } from '@/i18n/types';
 
@@ -27,18 +27,18 @@ export const MobileVersion: React.FC<MobileVersionProps> = ({
   return (
     <div className="relative bg-blue-600 min-h-screen pb-16">
       {/* Header */}
-      <Header onMenuToggle={onMenuToggle} isMobile={true} selectedLanguage={selectedLanguage} />
+      <CustomHeader onMenuToggle={onMenuToggle} selectedLanguage={selectedLanguage} />
       
       {/* Carrossel */}
-      <div className="mt-6 px-4">
+      <div className="px-4 pb-4">
         <CustomCarousel />
       </div>
       
-      {/* Menu Grid */}
-      <MenuGrid isMobile={true} selectedLanguage={selectedLanguage} />
+      {/* Menu Grid com espaçamento azul acima */}
+      <CustomMenuGrid selectedLanguage={selectedLanguage} />
       
-      {/* Localize Aqui */}
-      <LocalizeAqui isMobile={true} selectedLanguage={selectedLanguage} />
+      {/* Localize Aqui com linha azul separadora */}
+      <CustomLocalizeAqui selectedLanguage={selectedLanguage} />
       
       {/* Bottom Navigation */}
       <BottomNavigation 
