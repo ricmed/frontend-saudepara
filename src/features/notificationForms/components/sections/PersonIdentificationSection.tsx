@@ -498,8 +498,8 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
               )}
             </div>
 
-            {/* Gestante (condicional) */}
-            {formData.identidadeGenero === "1" && (
+            {/* Gestante (condicional) - Mulher cisgênero OU Homem transgênero */}
+            {(formData.identidadeGenero === "1" || formData.identidadeGenero === "4") && (
               <FormField
                 label="Gestante"
                 name="gestante"
@@ -508,8 +508,8 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
                 type="select"
                 error={errors.gestante}
                 options={[
-                  { value: "S", label: "Sim" },   // ✅ Mudado de "1" para "S"
-                  { value: "N", label: "Não" }    // ✅ Mudado de "2" para "N"
+                  { value: "S", label: "Sim" },
+                  { value: "N", label: "Não" }
                 ]}
               />
             )}

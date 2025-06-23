@@ -1524,9 +1524,9 @@ const FormularioPaciente = ({
                     )}
                   </div>
 
-                  {/* Gestante (condicional - apenas para mulher cisgênero) */}
-                  {typeof formData.tipo_genero_idtipo_genero === "number" &&
-                    formData.tipo_genero_idtipo_genero === 1 && (
+                  {/* Gestante (condicional - apenas para mulher cisgênero e homem transgênero) */}
+                  {(typeof formData.tipo_genero_idtipo_genero === "number" &&
+                    (formData.tipo_genero_idtipo_genero === 1 || formData.tipo_genero_idtipo_genero === 4)) && (
                       <div>
                         <label className="block mb-2 font-medium text-gray-700">
                           Gestante
