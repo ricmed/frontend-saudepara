@@ -508,8 +508,8 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
                 type="select"
                 error={errors.gestante}
                 options={[
-                  { value: "1", label: "Sim" },
-                  { value: "2", label: "Não" }
+                  { value: "S", label: "Sim" },   // ✅ Mudado de "1" para "S"
+                  { value: "N", label: "Não" }    // ✅ Mudado de "2" para "N"
                 ]}
               />
             )}

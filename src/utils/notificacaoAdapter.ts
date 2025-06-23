@@ -170,7 +170,7 @@ if (backendData.contato_notificador) {
     cpf: backendData.paciente?.cpf || "",
     identidadeGenero:
       backendData.paciente?.tipo_genero_idtipo_genero?.toString() || "",
-    gestante: backendData.paciente?.gestante === "S" ? "1" : "2",
+    gestante: backendData.paciente?.gestante || "",  // ✅ mantém "S" ou "N" conforme veio do backend
     raca: backendData.paciente?.tipo_raca_idtipo_raca?.toString() || "",
     escolaridade:
       backendData.paciente?.escolaridade_idescolaridade?.toString() || "",
@@ -318,17 +318,17 @@ export function extractLocalEncaminhamento(notificacao: NotificacaoGenerica): st
  * @param isUpdate Indica se é uma atualização (true) ou criação (false)
  */
 export const formatToBackend = (frontendData: FormData, isUpdate: boolean = false): NotificacaoGenerica => {
-  const trimFields = <T extends Record<string, any>>(data: T): T => {
-    const result: Record<string, any> = {};
+const trimFields = <T extends Record<string, any>>(data: T): T => {
+  const result: Record<string, any> = {};
 
-    Object.entries(data).forEach(([key, value]) => {
-      result[key] = typeof value === "string" ? value.trim() : value;
-    });
+  Object.entries(data).forEach(([key, value]) => {
+    result[key] = typeof value === "string" ? value.trim() : value;
+  });
 
-    return result as T;
-  };
+  return result as T;
+};
 
-  const trimmedData = trimFields(frontendData);
+const trimmedData = trimFields(frontendData);
 
   // Converter valores específicos
   const residenteBelem =

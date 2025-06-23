@@ -791,6 +791,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         const dadosNormalizados = normalizarDadosResidencia(formattedData);
         console.log("Dados normalizados:", dadosNormalizados);
 
+        if (dadosNormalizados.paciente?.gestante) {
+  dadosNormalizados.gestante = dadosNormalizados.paciente.gestante;
+}
+
         // Combinar DDI e número de telefone no formato correto
         if (dadosNormalizados.paciente?.ddi && dadosNormalizados.paciente?.contato) {
           console.log("[PHONE DEBUG] Combinando DDI e telefone:", {
@@ -1082,6 +1086,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       cpf: pacienteUpperCase.cpf || "",
       identidadeGenero:
         pacienteUpperCase.tipo_genero_idtipo_genero?.toString() || "",
+      gestante: pacienteUpperCase.gestante || "",
       raca: pacienteUpperCase.tipo_raca_idtipo_raca?.toString() || "",
       escolaridade: escolaridadeValue,
       profissao: pacienteUpperCase.cbo_idcbo
@@ -1343,6 +1348,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           cpf: formData.cpf || "",
           contato: formData.contatoTelefonico || "",
           ddi: formData.ddi || "55",
+          gestante: formData.gestante || null,
         };
 
         // CORREÇÃO: SEMPRE enviar data_nascimento (null se vazio)
