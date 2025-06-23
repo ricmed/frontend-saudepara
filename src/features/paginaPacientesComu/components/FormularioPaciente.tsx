@@ -639,17 +639,20 @@ const FormularioPaciente = ({
       });
     }
     
-    // Verificar CPF existente se tiver 11 dígitos e for diferente do original
-    if (formattedCPF.length === 11 && formattedCPF !== originalCpf) {
-      
-      // ✅ MELHORADO: Indicador diferente para online/offline
+    // ✅ IMPORTANTE: Só verificar CPF se for diferente do original (para edição)
+    // ou se for criação nova (sem pacienteId)
+    const shouldCheckCPF = formattedCPF.length === 11 && (
+      !pacienteId || // Criação nova
+      formattedCPF !== originalCpf // Edição com CPF diferente
+    );
+    
+    if (shouldCheckCPF) {
       setErrors(prev => ({
         ...prev,
         cpf: isOnline ? "Verificando CPF..." : "Verificando CPF offline..."
       }));
       
       try {
-        // ✅ ADICIONAR timeout para evitar travamento
         const timeoutPromise = new Promise<boolean>((_, reject) => 
           setTimeout(() => reject(new Error('Timeout na verificação')), 8000)
         );
@@ -658,7 +661,8 @@ const FormularioPaciente = ({
           checkCpfOfflineSafe(formattedCPF),
           timeoutPromise
         ]);
-          if (exists) {
+        
+        if (exists) {
           setErrors((prev) => ({
             ...prev,
             cpf: "O CPF digitado já existe",
@@ -679,33 +683,13 @@ const FormularioPaciente = ({
       } catch (error: any) {
         console.error("Erro ao verificar CPF:", error);
         
-        // ✅ MELHORADO: Tratamento tolerante para modo offline
         if (error.message === 'Timeout na verificação') {
           setErrors(prev => ({
             ...prev,
             cpf: "Timeout na verificação - tente novamente"
           }));
-        } else if (
-          error.code === 'ERR_NETWORK' || 
-          error.message?.includes('Network Error') ||
-          error.message?.includes('Failed to fetch')
-        ) {
-          if (!isOnline) {
-            // ✅ MODO OFFLINE: ser tolerante com erros de rede
-            setErrors(prev => {
-              const newErrors = { ...prev };
-              delete newErrors.cpf;
-              return newErrors;
-            });
-            console.log("⚠️ Erro de rede ignorado no modo offline");
-          } else {
-            setErrors(prev => ({
-              ...prev,
-              cpf: "Erro de conexão - tente novamente"
-            }));
-          }
         } else if (!isOnline) {
-          // ✅ QUALQUER OUTRO ERRO OFFLINE: ser tolerante
+          // Modo offline: ser tolerante com erros
           setErrors(prev => {
             const newErrors = { ...prev };
             delete newErrors.cpf;
@@ -713,13 +697,15 @@ const FormularioPaciente = ({
           });
           console.log("⚠️ Erro offline tolerado:", error.message);
         } else {
-          // ✅ ERROS ONLINE: mostrar mensagem
           setErrors(prev => ({
             ...prev,
             cpf: "Erro ao verificar CPF"
           }));
         }
       }
+    } else if (formattedCPF === originalCpf && pacienteId) {
+      // ✅ CPF não mudou durante edição - sem erro
+      console.log("CPF não alterado durante edição, não verificando");
     }
   };
 
@@ -845,7 +831,7 @@ const FormularioPaciente = ({
     return result;
   };
 
-  // ✅ FUNÇÃO MODIFICADA: Salvar paciente com sistema offline
+  // ✅ FUNÇÃO CORRIGIDA: Salvar paciente diferenciando criação de edição
   const handleCrearPacienteComDadosLimpos = async () => {
     setApiError(null);
     setIsSuccess(false);
@@ -856,24 +842,67 @@ const FormularioPaciente = ({
       try {
         const pacienteData = convertFormDataToApiFormat();
         const pacienteUpperCase = toUpperCaseAllStrings(pacienteData);
-        console.log("Dados para salvar em caixa alta:", pacienteUpperCase);
+        
+        console.log("=== DEBUG SAVE ===");
+        console.log("pacienteId:", pacienteId);
+        console.log("isOnline:", isOnline);
+        console.log("Dados para salvar:", pacienteUpperCase);
+        console.log("=================");
 
-        // ✅ USAR SISTEMA OFFLINE para salvar paciente
-        const result = await savePatientOfflineSafe(pacienteUpperCase);
+        let result;
+        
+        if (pacienteId) {
+          // ==========================================
+          // 🔄 EDIÇÃO: Sempre requer conexão online
+          // ==========================================
+          console.log(`🔄 Editando paciente ID ${pacienteId}`);
+          
+          if (isOnline) {
+            // ✅ EDIÇÃO ONLINE
+            result = await PacienteService.update(pacienteId, pacienteUpperCase);
+          } else {
+            // ⚠️ EDIÇÃO OFFLINE: Informar que não é possível
+            throw new Error("Não é possível editar pacientes offline. Conecte-se à internet para editar.");
+          }
+          
+        } else {
+          // ==========================================
+          // ➕ CRIAÇÃO: Online direto, Offline com sistema
+          // ==========================================
+          console.log("➕ Criando novo paciente");
+          
+          if (isOnline) {
+            // ✅ CRIAÇÃO ONLINE
+            result = await PacienteService.create(pacienteUpperCase);
+          } else {
+            // ✅ CRIAÇÃO OFFLINE
+            result = await savePatientOfflineSafe(pacienteUpperCase);
+          }
+        }
 
         setIsSuccess(true);
-        const message = isOnline 
-          ? (pacienteId ? "Paciente atualizado com sucesso!" : "Paciente cadastrado com sucesso!")
-          : (pacienteId ? "Paciente atualizado offline!" : "Paciente salvo offline! Será sincronizado quando conectar.");
+        
+        // ✅ MENSAGENS ESPECÍFICAS
+        let message;
+        if (isOnline) {
+          message = pacienteId ? "Paciente atualizado com sucesso!" : "Paciente cadastrado com sucesso!";
+        } else {
+          message = "Paciente salvo offline! Será sincronizado quando conectar.";
+        }
         
         toast.success(message);
+        console.log("✅ Operação concluída:", message);
           
         if (isModal && onPacienteSalvo) {
           onPacienteSalvo(pacienteUpperCase);
         } else if (!pacienteId) {
+          // Só limpar formulário se foi criação (não edição)
           setFormData(initialFormData);
         }
+        
       } catch (error: any) {
+        console.error("❌ Erro ao salvar paciente:", error);
+        
         let errorMessage = "Erro ao salvar paciente";
         let validationErrors: Record<string, string> = {};
         
@@ -886,7 +915,8 @@ const FormularioPaciente = ({
           !navigator.onLine
         );
 
-        if (isNetworkError && !isOnline) {
+        if (isNetworkError && !isOnline && !pacienteId) {
+          // Só para criação offline
           errorMessage = "Você está offline. Os dados serão salvos localmente e sincronizados quando voltar online.";
         } else if (error.response && error.response.data) {
           if (error.response.data.message) {
