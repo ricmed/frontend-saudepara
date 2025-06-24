@@ -5,6 +5,8 @@ import { Search, X } from 'lucide-react';
 interface Option {
   id: string | number;
   label: string;
+  helpButton?: React.ReactNode;
+  matchingSynonym?: string; // ← NOVO: Sinônimo que foi usado na busca
 }
 
 interface SearchableCheckboxGroupProps {
@@ -14,6 +16,8 @@ interface SearchableCheckboxGroupProps {
   onChange: (value: string) => void;
   error?: string;
   maxHeight?: string;
+  customSearchFunction?: (option: Option, searchTerm: string) => boolean;
+  getSynonymMatch?: (option: Option, searchTerm: string) => string | null; // ← NOVO: Função para obter sinônimo
 }
 
 const SearchableCheckboxGroup: React.FC<SearchableCheckboxGroupProps> = ({
@@ -22,15 +26,28 @@ const SearchableCheckboxGroup: React.FC<SearchableCheckboxGroupProps> = ({
   selectedValues,
   onChange,
   error,
-  maxHeight = '96'
+  maxHeight = '96',
+  customSearchFunction,
+  getSynonymMatch
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Função de busca padrão
+  const defaultSearchFunction = (option: Option, searchTerm: string) => {
+    return option.label.toLowerCase().includes(searchTerm.toLowerCase());
+  };
+
+  // Usa função personalizada se fornecida, senão usa a padrão
+  const searchFunction = customSearchFunction || defaultSearchFunction;
 
   const filteredOptions = options.filter(
     (option) =>
       searchTerm === '' ||
-      option.label.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      searchFunction(option, searchTerm)
+  ).map(option => ({
+    ...option,
+    matchingSynonym: getSynonymMatch ? getSynonymMatch(option, searchTerm) : null
+  }));
 
   // Função para obter todas as opções selecionadas com seus rótulos
   const getSelectedOptions = () => {
@@ -116,21 +133,35 @@ const SearchableCheckboxGroup: React.FC<SearchableCheckboxGroupProps> = ({
 
       <div className={`grid grid-cols-2 md:grid-cols-3 gap-3 max-h-${maxHeight} overflow-y-auto`}>
         {filteredOptions.map((option) => (
-          <label
+          <div
             key={option.id}
-            className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer transition-all duration-200 hover:border-blue-400 hover:bg-blue-50/50 group"
+            className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg transition-all duration-200 hover:border-blue-400 hover:bg-blue-50/50 group"
             translate="no"
           >
-            <input
-              type="checkbox"
-              checked={selectedValues.includes(option.id.toString())}
-              onChange={() => onChange(option.id.toString())}
-              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 transition-all duration-200 group-hover:border-blue-400"
-            />
-            <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors duration-200">
-              {option.label}
-            </span>
-          </label>
+            <label className="flex items-center cursor-pointer flex-1">
+              <input
+                type="checkbox"
+                checked={selectedValues.includes(option.id.toString())}
+                onChange={() => onChange(option.id.toString())}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 transition-all duration-200 group-hover:border-blue-400"
+              />
+              <div className="ml-3 flex-1">
+                <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors duration-200">
+                  {option.label}
+                </span>
+                {option.matchingSynonym && (
+                  <div className="text-xs text-blue-600 mt-1">
+                    encontrado por: "{option.matchingSynonym}"
+                  </div>
+                )}
+              </div>
+            </label>
+            {option.helpButton && (
+              <div className="ml-auto" onClick={(e) => e.stopPropagation()}>
+                {option.helpButton}
+              </div>
+            )}
+          </div>
         ))}
       </div>
 
