@@ -1,4 +1,3 @@
-// src/features/notificationForms/utils/formUtils.ts
 import { FormData, AtendimentoOption, EncerramentoOption } from '@/features/notificationForms/types/index2';
 import type { SectionState } from '@/features/notificationForms/hooks/useSectionExpansion';
 
@@ -80,26 +79,42 @@ export const formatContatoLocal = (contato: string): string => {
 };
 
 /**
- * Calcula idade com base na data de nascimento
+ * Calcula idade em anos e meses a partir da data de nascimento
  */
-export const calculateAge = (birthdate: string): number => {
-  if (!birthdate) return 0;
+export const calculateAgeInYearsAndMonths = (birthdate: string): { idade: string, idadeMeses: string } => {
+  if (!birthdate) return { idade: "", idadeMeses: "" };
 
   const birthDate = new Date(birthdate);
   const today = new Date();
+  
+  // Assegura que a hora não interfira no cálculo da data
+  birthDate.setUTCHours(0, 0, 0, 0);
+  today.setUTCHours(0, 0, 0, 0);
 
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDifference = today.getMonth() - birthDate.getMonth();
-
-  if (
-    monthDifference < 0 ||
-    (monthDifference === 0 && today.getDate() < birthDate.getDate())
-  ) {
-    age--;
+  if (isNaN(birthDate.getTime())) {
+    return { idade: "", idadeMeses: "" };
   }
 
-  return age;
+  // Calcula idade em anos
+  let years = today.getUTCFullYear() - birthDate.getUTCFullYear();
+  const monthDiff = today.getUTCMonth() - birthDate.getUTCMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getUTCDate() < birthDate.getUTCDate())) {
+    years--;
+  }
+
+  // Calcula idade total em meses
+  let totalMonths = (today.getUTCFullYear() - birthDate.getUTCFullYear()) * 12;
+  totalMonths += today.getUTCMonth() - birthDate.getUTCMonth();
+  if (today.getUTCDate() < birthDate.getUTCDate()) {
+      totalMonths--;
+  }
+  
+  return { 
+    idade: years >= 0 ? years.toString() : "",
+    idadeMeses: totalMonths >= 0 ? totalMonths.toString() : ""
+  };
 };
+
 
 /**
  * Compara duas datas e verifica se a primeira é igual ou depois da segunda

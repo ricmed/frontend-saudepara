@@ -14,6 +14,8 @@ export interface Paciente {
   nome: string;
   nome_mae?: string | null;
   data_nascimento: string;
+  idade?: number | null; // <-- Idade em anos
+  idade_meses?: number | null; // <-- CAMPO ADICIONADO AQUI
   cpf?: string | null;
   tipo_genero_idtipo_genero: number;
   gestante?: string | null;
@@ -55,8 +57,8 @@ const API_BASE_URL = `${server}:${port}`;
 // Endpoint específico para pacientes e tipos relacionados
 const ENDPOINTS = {
   PACIENTE: `${API_BASE_URL}/api/paciente`,
-  TIPO_GENERO: `${API_BASE_URL}/api/tipo-genero`,  // Endpoint para tipos de gênero
-  TIPO_RACA: `${API_BASE_URL}/api/tipo-raca`,      // Endpoint para tipos de raça
+  TIPO_GENERO: `${API_BASE_URL}/api/tipo-genero`,   // Endpoint para tipos de gênero
+  TIPO_RACA: `${API_BASE_URL}/api/tipo-raca`,       // Endpoint para tipos de raça
   TIPO_ESCOLARIDADE: `${API_BASE_URL}/api/tipo-escolaridade`, // Endpoint para escolaridades
   TIPO_CBO: `${API_BASE_URL}/api/cbo`,             // Endpoint para CBOs
 };
@@ -307,7 +309,7 @@ export const PacienteService = {
       // Crie um objeto com os campos para limpar
       const updateData: any = {};
       fields.forEach(field => {
-        updateData[field] = 0;  // Tente com 0 em vez de null
+        updateData[field] = 0;   // Tente com 0 em vez de null
       });
       
       this.logObject("Dados para limpar campos", updateData);
@@ -402,7 +404,7 @@ export const PacienteService = {
         
         // Criar novo objeto com a estrutura esperada
         return {
-          id: item.idtipo_escolaridade,  // Usar idtipo_escolaridade como id
+          id: item.idtipo_escolaridade,   // Usar idtipo_escolaridade como id
           descricao: item.descricao,
           // Preservar o campo original também se necessário
           idtipo_escolaridade: item.idtipo_escolaridade
@@ -411,7 +413,7 @@ export const PacienteService = {
     } catch (error) {
       console.error('Erro ao buscar tipos de escolaridade:', error);
       return [];
-    }  },
+    }   },
 
   // ✅ CORRIGIDO: Obter contagem total usando rota existente /api/paciente
   async getTotalCount(): Promise<number> {

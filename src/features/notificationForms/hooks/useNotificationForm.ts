@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import axios from 'axios';
 import { debounce } from 'lodash';
 import syncService from '@/services/syncService';
 import indexedDBService from '@/services/indexedDB';
@@ -28,7 +27,7 @@ import {
 import { 
   normalizeText, 
   toUpperCaseAllStrings, 
-  calculateAge, 
+  calculateAgeInYearsAndMonths, // <-- ALTERADO AQUI
   compareDates,
   isTipoAtendimento,
   isTipoEncerramento,
@@ -64,13 +63,14 @@ const initialFormData: FormData = {
   paisProcedencia: "",
   localHospedagem: "",
   contatoLocal: "",
-
   // Seção 3: Identificação do indivíduo
   paciente: "",
   pacienteId: undefined,
   nomeMae: "",
   dataNascimento: "",
   idade: "",
+  idadeMeses: "", // <-- CAMPO ADICIONADO AQUI
+  idadeUnidade: 'anos' as 'anos' | 'meses', // <-- VALOR INICIAL
   cpf: "",
   identidadeGenero: "",
   gestante: "",
@@ -888,9 +888,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           dataAtendimento: "A data de atendimento não pode ser anterior à data de início dos sintomas",
         }));
       }
-    }
-
-    // Validar dataInicioSintomas em relação a dataAtendimento
+    }    // Validar dataInicioSintomas em relação a dataAtendimento
     if (name === "dataInicioSintomas" && formData.dataAtendimento && newValue) {
       if (!compareDates(formData.dataAtendimento, newValue)) {
         setErrors((prev) => ({
@@ -898,9 +896,34 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           dataInicioSintomas: "A data de início dos sintomas não pode ser posterior à data de atendimento",
         }));
       }
-    }
+    }    // LÓGICA CORRIGIDA PARA IDADE
+    if (name === 'idadeUnidade') {
+        setFormData(prev => ({ ...prev, idadeUnidade: newValue as 'anos' | 'meses' }));
+    } else if (name === 'idade' || name === 'idadeMeses') {
+        if (formData.dataNascimento) return; // Bloqueia edição manual se a data existe
+        
+        setFormData(prev => {
+            const newFormData = {...prev, [name]: newValue};
+            const numValue = parseInt(newValue, 10);
+            
+            if (isNaN(numValue) || newValue === "") {
+                newFormData.idade = "";
+                newFormData.idadeMeses = "";
+                return newFormData;
+            }
 
-    setFormData((prev) => ({ ...prev, [name]: newValue }));
+            if (name === 'idade') {
+                newFormData.idadeMeses = (numValue * 12).toString();
+            } else { // name === 'idadeMeses'
+                newFormData.idade = Math.floor(numValue / 12).toString();
+            }
+            return newFormData;
+        });
+    }
+    // Lógica para outros campos
+    else {
+      setFormData((prev) => ({ ...prev, [name]: newValue }));
+    }
   };
 
   // Handler para checkboxes (múltipla seleção)
@@ -1022,23 +1045,25 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     const pacienteUpperCase = toUpperCaseAllStrings(paciente);
 
     // Armazenar o CPF original para comparações
-    setOriginalCpf(pacienteUpperCase.cpf || "");
-
-    // Formatar a data corretamente
-    let formattedDate = "";
-    let calculatedAge = "";
-      if (pacienteUpperCase.data_nascimento) {
-      const date = new Date(pacienteUpperCase.data_nascimento);
-      formattedDate = date.toISOString().split("T")[0]; // Formato YYYY-MM-DD
-      
-      // SEMPRE calcular idade a partir da data de nascimento se ela existir
-      calculatedAge = calculateAge(formattedDate).toString();
-      console.log("Paciente selecionado - Data:", formattedDate, "Idade calculada:", calculatedAge);
-    } else if (pacienteUpperCase.idade) {
-      // Só usar idade armazenada se não houver data de nascimento
-      calculatedAge = pacienteUpperCase.idade.toString();
-      console.log("Paciente selecionado - Sem data, usando idade armazenada:", calculatedAge);
-    }
+    setOriginalCpf(pacienteUpperCase.cpf || "");        // Formatar a data corretamente
+        let formattedDate = "";
+        let calculatedAge = "";
+        let calculatedMonths = "";
+          if (pacienteUpperCase.data_nascimento) {
+          const date = new Date(pacienteUpperCase.data_nascimento);
+          formattedDate = date.toISOString().split("T")[0]; // Formato YYYY-MM-DD
+          
+          // SEMPRE calcular idade a partir da data de nascimento se ela existir
+          const ageInfo = calculateAgeInYearsAndMonths(formattedDate);
+          calculatedAge = ageInfo.idade;
+          calculatedMonths = ageInfo.idadeMeses;
+          console.log("Paciente selecionado - Data:", formattedDate, "Idade calculada:", calculatedAge, "Meses:", calculatedMonths);
+        } else if (pacienteUpperCase.idade) {
+          // Só usar idade armazenada se não houver data de nascimento
+          calculatedAge = pacienteUpperCase.idade.toString();
+          calculatedMonths = pacienteUpperCase.idade_meses ? pacienteUpperCase.idade_meses.toString() : "";
+          console.log("Paciente selecionado - Sem data, usando idade armazenada:", calculatedAge, "Meses:", calculatedMonths);
+        }
 
     // Verificar explicitamente se o nome_mae não é um CPF
     let nomeDaMae = pacienteUpperCase.nome_mae || "";
@@ -1074,28 +1099,27 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           pacienteUpperCase.tipo_escolaridade.idescolaridade
         );
       }
-    }
-
-    setFormData((prev) => ({
-      ...prev,
-      paciente: pacienteUpperCase.nome || "",
-      pacienteId: pacienteUpperCase.idpaciente,
-      nomeMae: nomeDaMae,
-      dataNascimento: formattedDate,
-      idade: calculatedAge, // Usar idade calculada ou armazenada conforme lógica acima
-      cpf: pacienteUpperCase.cpf || "",
-      identidadeGenero:
-        pacienteUpperCase.tipo_genero_idtipo_genero?.toString() || "",
-      gestante: pacienteUpperCase.gestante || "",
-      raca: pacienteUpperCase.tipo_raca_idtipo_raca?.toString() || "",
-      escolaridade: escolaridadeValue,
-      profissao: pacienteUpperCase.cbo_idcbo
-        ? pacienteUpperCase.cbo_idcbo.toString()
-        : "",
-      contatoTelefonico: (pacienteUpperCase.ddi && pacienteUpperCase.contato) 
-        ? `+${pacienteUpperCase.ddi.replace(/\D/g, '')} ${pacienteUpperCase.contato}` 
-        : pacienteUpperCase.contato || "",
-    }));
+    }      setFormData((prev) => ({
+        ...prev,
+        paciente: pacienteUpperCase.nome || "",
+        pacienteId: pacienteUpperCase.idpaciente,
+        nomeMae: nomeDaMae,
+        dataNascimento: formattedDate,
+        idade: calculatedAge, // Usar idade calculada ou armazenada conforme lógica acima
+        idadeMeses: calculatedMonths, // <-- CAMPO ADICIONADO AQUI
+        cpf: pacienteUpperCase.cpf || "",
+        identidadeGenero:
+          pacienteUpperCase.tipo_genero_idtipo_genero?.toString() || "",
+        gestante: pacienteUpperCase.gestante || "",
+        raca: pacienteUpperCase.tipo_raca_idtipo_raca?.toString() || "",
+        escolaridade: escolaridadeValue,
+        profissao: pacienteUpperCase.cbo_idcbo
+          ? pacienteUpperCase.cbo_idcbo.toString()
+          : "",
+        contatoTelefonico: (pacienteUpperCase.ddi && pacienteUpperCase.contato) 
+          ? `+${pacienteUpperCase.ddi.replace(/\D/g, '')} ${pacienteUpperCase.contato}` 
+          : pacienteUpperCase.contato || "",
+      }));
 
     // Limpar erros ao selecionar um paciente
     setErrors({});
@@ -1500,24 +1524,25 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     if (isEditMode && id) {
       loadNotificacao(id);
     }
-  }, [isEditMode, id]);
-
-  // Efeito para calcular idade automaticamente quando a data de nascimento mudar
+  }, [isEditMode, id]);  // Efeito para calcular idade automaticamente quando a data de nascimento mudar
   useEffect(() => {
     console.log("useEffect idade - dataNascimento mudou:", formData.dataNascimento);
     
     if (formData.dataNascimento && formData.dataNascimento.trim() !== "") {
-      const calculatedAge = calculateAge(formData.dataNascimento);
-      console.log("Idade calculada:", calculatedAge);
+      const { idade, idadeMeses } = calculateAgeInYearsAndMonths(formData.dataNascimento);
+      console.log("Idade calculada:", idade, "Meses:", idadeMeses);
+      const idadeAnos = parseInt(idade, 10);
 
       // Verificar se a idade calculada é válida (não maior que 120)
-      if (calculatedAge > 120) {
+      if (idadeAnos > 120) {
         console.log("Idade inválida (>120), limpando campos");
         // Limpar a data de nascimento se for inválida
         setFormData((prev) => ({
           ...prev,
           dataNascimento: "", 
-          idade: "", 
+          idade: "",
+          idadeMeses: "",
+          idadeUnidade: 'anos'
         }));
 
         // Mostrar mensagem de erro
@@ -1527,14 +1552,17 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         }));
       } else {
         // Se a idade for válida, atualizar normalmente
-        console.log("Atualizando idade para:", calculatedAge);
+        console.log("Atualizando idade para:", idade, "Meses:", idadeMeses);
         setFormData((prev) => {
-          // Só atualizar se a idade calculada for diferente da atual
-          if (prev.idade !== calculatedAge.toString()) {
-            console.log("Idade alterada de", prev.idade, "para", calculatedAge.toString());
+          // Só atualizar se a idade ou meses calculados forem diferentes dos atuais
+          if (prev.idade !== idade || prev.idadeMeses !== idadeMeses) {
+            console.log("Idade alterada de", prev.idade, "para", idade, "Meses de", prev.idadeMeses, "para", idadeMeses);
             return {
               ...prev,
-              idade: calculatedAge.toString(),
+              idade,
+              idadeMeses,
+              // Define a unidade com base na idade
+              idadeUnidade: !isNaN(idadeAnos) && idadeAnos >= 1 ? 'anos' : 'meses'
             };
           }
           return prev;
@@ -1550,14 +1578,16 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         }
       }
     } else {
-      // Quando data de nascimento for limpa, só limpar idade se ela foi calculada automaticamente
-      console.log("Data de nascimento vazia, limpando idade");
+      // Quando data de nascimento for limpa, limpar idade e meses
+      console.log("Data de nascimento vazia, limpando idade e meses");
       setFormData((prev) => ({
         ...prev,
         idade: "",
+        idadeMeses: "",
+        idadeUnidade: 'anos'
       }));
     }
-  }, [formData.dataNascimento]); // Importante: não incluir 'errors' como dependência para evitar loops
+  }, [formData.dataNascimento]);// Importante: não incluir 'errors' como dependência para evitar loops
 
   // Efeito para atualizar municípios quando o estado muda
   useEffect(() => {
@@ -1821,7 +1851,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     }, 500),
     [searchPatientsOfflineSafe]
   );
-
   // Retornar todos os estados e funções necessários
   return {
     formData,
@@ -1890,8 +1919,13 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     
     // Hipóteses diagnósticas filtradas
     hipoteseDiagFiltradas,
-    isLoadingHipoteses,    isTipoAtendimentoFunc: (tipo: string) => isTipoAtendimento(tipo, formData.tipoAtendimento, atendimentoOptions),
-    isTipoEncerramentoFunc: (tipo: string) => isTipoEncerramento(tipo, formData.tipoEncerramento, encerramentoOptions),    // ✅ Retornos do sistema offline
+    isLoadingHipoteses,
+    
+    // Helpers para condicionais
+    isTipoAtendimentoFunc: (tipo: string) => isTipoAtendimento(tipo, formData.tipoAtendimento, atendimentoOptions),
+    isTipoEncerramentoFunc: (tipo: string) => isTipoEncerramento(tipo, formData.tipoEncerramento, encerramentoOptions),
+    
+    // ✅ Retornos do sistema offline
     isOnline: systemIsOnline,
     pendingCount: systemPendingData,
     offlineStatusMessage: getOfflineStatusMessage(),

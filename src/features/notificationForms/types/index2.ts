@@ -1,4 +1,3 @@
-// src/features/notificationForms/types/index.ts
 import { Paciente } from "@/services/PacienteService";
 
 // Interface FormData
@@ -22,6 +21,8 @@ export interface FormData {
   nomeMae: string;
   dataNascimento: string;
   idade: string;
+  idadeMeses: string; 
+  idadeUnidade: 'anos' | 'meses'; // <-- CAMPO ADICIONADO AQUI
   cpf: string;
   identidadeGenero: string;
   gestante: string;

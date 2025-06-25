@@ -7,8 +7,9 @@ interface NotificacaoGenerica {
 import { FormData } from '@/features/notificationForms/types/index2';
 import axios from "axios";
 // import indexedDBService from '@/services/indexedDB'; // COMENTADO - SERÁ USADO NO FUTURO
-// import syncService from '@/services/syncService';    // COMENTADO - SERÁ USADO NO FUTURO
+// import syncService from '@/services/syncService';     // COMENTADO - SERÁ USADO NO FUTURO
 import { toast } from 'react-toastify';
+import { calculateAgeInYearsAndMonths } from '@/features/notificationForms/utils/formUtils';
 
 // Função auxiliar para conversão de datas UTC para local
 const convertUTCDateToLocal = (dateString: string): Date => {
@@ -65,45 +66,48 @@ export const formatFromBackend = async (
     backendData.residente_belem === "S"
       ? "1"
       : backendData.residente_belem === "N"
-      ? "2"
-      : "3";
-
-  // Mapear o campo tipo_bairro_idtipo_bairro para bairro
-  const bairroId = backendData.tipo_bairro_idtipo_bairro ?
-    backendData.tipo_bairro_idtipo_bairro.toString() : "";
+      ? "2"       : "3";
 
   // Buscar sintomas com método melhorado e aguardar resultado
   const sinaisESintomas = await extractSintomasStrings(backendData);
   console.log("Sintomas extraídos:", sinaisESintomas);
+  
+  // Buscar hipóteses diagnósticas com suporte a múltiplas
+  const hipotesesDiagnosticas = await formatFromBackendHipoteses(backendData);
+  console.log("Hipóteses extraídas:", hipotesesDiagnosticas);
+  
   // Buscar local de encaminhamento
   let localEncaminhamento = extractLocalEncaminhamento(backendData);
   
   // SEMPRE priorizar cálculo pela data de nascimento se existir
   let idade = "";
+  let idadeMeses = "";
+  let idadeUnidade: 'anos' | 'meses' = 'anos'; // Default para anos
+
   if (backendData.paciente?.data_nascimento) {
-    // Se tem data de nascimento, SEMPRE calcular a idade a partir dela
-    const birthDate = convertUTCDateToLocal(backendData.paciente.data_nascimento);
-    const today = new Date();
-    const todayUTC = new Date(
-      Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
-    );
-    
-    idade = String(todayUTC.getFullYear() - birthDate.getUTCFullYear());
-    
-    if (
-      todayUTC.getMonth() < birthDate.getUTCMonth() ||
-      (todayUTC.getMonth() === birthDate.getUTCMonth() && 
-       todayUTC.getDate() < birthDate.getUTCDate())
-    ) {
-      idade = String(parseInt(idade) - 1);
+    const ageInfo = calculateAgeInYearsAndMonths(backendData.paciente.data_nascimento);
+    idade = ageInfo.idade;
+    idadeMeses = ageInfo.idadeMeses;
+    // Define a unidade com base na idade calculada
+    if (parseInt(idade, 10) >= 1) {
+      idadeUnidade = 'anos';
+    } else {
+      idadeUnidade = 'meses';
     }
-    
-    console.log("Idade calculada a partir da data de nascimento:", idade);
-  } else if (backendData.paciente?.idade) {
+    console.log(`Idade calculada: ${idade} anos e ${idadeMeses} meses. Unidade default: ${idadeUnidade}`);
+  } else if (backendData.paciente) {
     // Só usar idade armazenada se NÃO houver data de nascimento
-    idade = backendData.paciente.idade.toString();
-    console.log("Usando idade armazenada (sem data de nascimento):", idade);
+    idade = backendData.paciente.idade?.toString() || "";
+    idadeMeses = backendData.paciente.idade_meses?.toString() || "";
+    // Se tiver idade em anos, a unidade é anos. Se não, mas tiver em meses, é meses.
+    if (idade) {
+        idadeUnidade = 'anos';
+    } else if (idadeMeses) {
+        idadeUnidade = 'meses';
+    }
+    console.log(`Usando idade armazenada: ${idade} anos e ${idadeMeses} meses. Unidade: ${idadeUnidade}`);
   }
+
 
   // Processar contatos telefônicos - versão melhorada
 let contatoTelefonico = "";
@@ -167,10 +171,12 @@ if (backendData.contato_notificador) {
     nomeMae: backendData.paciente?.nome_mae || "",
     dataNascimento: processarData(backendData.paciente?.data_nascimento),
     idade,
+    idadeMeses,
+    idadeUnidade,
     cpf: backendData.paciente?.cpf || "",
     identidadeGenero:
       backendData.paciente?.tipo_genero_idtipo_genero?.toString() || "",
-    gestante: backendData.paciente?.gestante || "",  // ✅ mantém "S" ou "N" conforme veio do backend
+    gestante: backendData.paciente?.gestante || "",   // ✅ mantém "S" ou "N" conforme veio do backend
     raca: backendData.paciente?.tipo_raca_idtipo_raca?.toString() || "",
     escolaridade:
       backendData.paciente?.escolaridade_idescolaridade?.toString() || "",
@@ -181,13 +187,10 @@ if (backendData.contato_notificador) {
 
     // Seção 4: Informações do atendimento
     tipoAtendimento:
-      backendData.tipo_atendimento_idtipo_atendimento?.toString() || "",
-    sinaisESintomas,
+      backendData.tipo_atendimento_idtipo_atendimento?.toString() || "",     sinaisESintomas,
     dataInicioSintomas: processarData(backendData.data_inicio_sintomas),
     observacaoSintomas: backendData.observacao_sintomas || "",
-    hipoteseDiagnostica: backendData.tipo_hipotese_diag_idtipo_hipotese_diag
-      ? [backendData.tipo_hipotese_diag_idtipo_hipotese_diag.toString()]
-      : [],
+    hipoteseDiagnostica: hipotesesDiagnosticas,
     observacaoHipotese: backendData.observacao_hiposete || "",
     tipoTrauma: backendData.tipo_trauma_idtipo_trauma
       ? [backendData.tipo_trauma_idtipo_trauma.toString()]
@@ -209,11 +212,11 @@ if (backendData.contato_notificador) {
       backendData.tipo_encerramento_idtipo_encerramento?.toString() || "",
     localEncaminhamento,
   };
-
   console.log("FormData processado:", {
     contatoTelefonico: formData.contatoTelefonico,
     contatoNotificador: formData.contatoNotificador,
     sinaisESintomas: formData.sinaisESintomas,
+    hipoteseDiagnostica: formData.hipoteseDiagnostica,
     localEncaminhamento: formData.localEncaminhamento,
     tipoEncerramento: formData.tipoEncerramento
   });
@@ -400,8 +403,7 @@ const trimmedData = trimFields(frontendData);
     contato_local_hospedagem: trimmedData.contatoLocal || "",
     ...(trimmedData.dataInicioSintomas && {
       data_inicio_sintomas: processarDataParaUTC(trimmedData.dataInicioSintomas),
-    }),
-    ...(trimmedData.observacaoSintomas && {
+    }),     ...(trimmedData.observacaoSintomas && {
       observacao_sintomas: trimmedData.observacaoSintomas || "",
     }),
     tipo_hipotese_diag_idtipo_hipotese_diag: 
@@ -563,9 +565,11 @@ export const salvarNotificacaoCompleta = async (
         throw postError; // Repassar o erro
       }
     }
-    
-    // Extrair IDs dos sintomas do formulário
+      // Extrair IDs dos sintomas do formulário
     const sintomasIds = formData.sinaisESintomas.map(id => parseInt(id));
+    
+    // Extrair IDs das hipóteses do formulário
+    const hipotesesIds = formData.hipoteseDiagnostica.map(id => parseInt(id));
     
     // Chamar função para salvar sintomas em endpoint separado
     if (sintomasIds.length > 0 || isUpdate) {
@@ -574,6 +578,16 @@ export const salvarNotificacaoCompleta = async (
       } catch (error) {
         console.error("Erro ao salvar sintomas:", error);
         toast.warning('Notificação salva, mas houve erro ao salvar sintomas.');
+      }
+    }
+    
+    // Chamar função para salvar hipóteses em endpoint separado
+    if (hipotesesIds.length > 0 || isUpdate) {
+      try {
+        await salvarHipotesesViaApi(savedNotificacaoId, hipotesesIds);
+      } catch (error) {
+        console.error("Erro ao salvar hipóteses:", error);
+        toast.warning('Notificação salva, mas houve erro ao salvar hipóteses diagnósticas.');
       }
     }
     
@@ -745,17 +759,21 @@ export const extractSintomasIds = (
 };
 
 /**
- * Extrai os IDs das hipóteses diagnósticas a partir de uma notificação formatada
+ * Extrai os IDs das hipóteses diagnósticas a partir de uma notificação formatada (ATUALIZADA)
  */
-export const extractHipoteseDiagnosticaIds = (
-  notificacao: NotificacaoGenerica
-): number[] => {
-  if (
-    "hipoteseDiagnostica" in notificacao &&
-    Array.isArray(notificacao.hipoteseDiagnostica)
-  ) {
+export const extractHipotesesIds = (notificacao: NotificacaoGenerica): number[] => {
+  if ("hipoteseDiagnostica" in notificacao && Array.isArray(notificacao.hipoteseDiagnostica)) {
     return notificacao.hipoteseDiagnostica.map((id: string) => parseInt(id));
   }
+  
+  // Verificar estrutura has_hipotese (múltiplas)
+  if (notificacao.notificacao_has_hipotese_diag && Array.isArray(notificacao.notificacao_has_hipotese_diag)) {
+    return notificacao.notificacao_has_hipotese_diag.map((item: any) => 
+      item.tipo_hipotese_diag_idtipo_hipotese_diag || item.tipo_hipotese_diag?.idtipo_hipotese_diag
+    ).filter(id => id !== undefined);
+  }
+  
+  // Fallback para campo single (compatibilidade)
   if (notificacao.tipo_hipotese_diag_idtipo_hipotese_diag) {
     return [notificacao.tipo_hipotese_diag_idtipo_hipotese_diag];
   }
@@ -778,3 +796,141 @@ export const extractTraumaIds = (
   
   return [];
 };
+
+/**
+ * Extrai hipóteses diagnósticas de uma notificação (suporte a múltiplas)
+ */
+export const formatFromBackendHipoteses = async (backendData: any): Promise<string[]> => {
+  const hipoteses: string[] = [];
+  
+  console.log("🔍 Buscando hipóteses em:", Object.keys(backendData));
+  
+  // CORREÇÃO: Nome correto do campo é notificacao_has_tipo_hipotese_diag
+  if (backendData.notificacao_has_tipo_hipotese_diag && 
+      Array.isArray(backendData.notificacao_has_tipo_hipotese_diag)) {
+    
+    console.log("✅ Encontradas múltiplas hipóteses:", backendData.notificacao_has_tipo_hipotese_diag.length);
+    
+    backendData.notificacao_has_tipo_hipotese_diag.forEach((item: any) => {
+      let hipoteseId = null;
+      
+      if (item.tipo_hipotese_diag_idtipo_hipotese_diag) {
+        hipoteseId = item.tipo_hipotese_diag_idtipo_hipotese_diag;
+      } else if (item.tipo_hipotese_diag?.idtipo_hipotese_diag) {
+        hipoteseId = item.tipo_hipotese_diag.idtipo_hipotese_diag;
+      }
+      
+      if (hipoteseId) {
+        hipoteses.push(hipoteseId.toString());
+        console.log(`✅ Hipótese múltipla encontrada: ID ${hipoteseId} - ${item.tipo_hipotese_diag?.descricao || 'Sem descrição'}`);
+      }
+    });
+  }
+  
+  // Se não há estrutura múltipla, verificar campo single (compatibilidade)
+  if (hipoteses.length === 0 && backendData.tipo_hipotese_diag_idtipo_hipotese_diag) {
+    hipoteses.push(backendData.tipo_hipotese_diag_idtipo_hipotese_diag.toString());
+    console.log(`⚠️ Hipótese única encontrada (campo legacy): ${backendData.tipo_hipotese_diag_idtipo_hipotese_diag}`);
+  }
+  
+  // Se ainda não temos hipóteses e há ID da notificação, buscar via API
+  if (hipoteses.length === 0 && backendData.idnotificacao) {
+    console.log(`🔍 Nenhuma hipótese encontrada para notificação ${backendData.idnotificacao}, tentando buscar via API...`);
+    
+    try {
+      const hipotesesApi = await fetchHipotesesForNotificacao(backendData.idnotificacao);
+      if (hipotesesApi.length > 0) {
+        console.log("📡 Hipóteses buscadas via API:", hipotesesApi);
+        hipotesesApi.forEach((hipotese: any) => {
+          if (hipotese.idtipo_hipotese_diag) {
+            hipoteses.push(hipotese.idtipo_hipotese_diag.toString());
+          } else if (hipotese.tipo_hipotese_diag_idtipo_hipotese_diag) {
+            hipoteses.push(hipotese.tipo_hipotese_diag_idtipo_hipotese_diag.toString());
+          } else if (hipotese.tipo_hipotese_diag?.idtipo_hipotese_diag) {
+            hipoteses.push(hipotese.tipo_hipotese_diag.idtipo_hipotese_diag.toString());
+          }
+        });
+      }
+    } catch (err) {
+      console.error("❌ Erro ao buscar hipóteses:", err);
+    }
+  }
+  
+  console.log(`📊 Total de hipóteses extraídas: ${hipoteses.length}`, hipoteses);
+  return hipoteses;
+};
+
+/**
+ * Formata hipóteses para envio ao backend (suporte a múltiplas)
+ */
+export const formatToBackendHipoteses = (hipotesesIds: string[]) => {
+  // Para compatibilidade com backend atual, ainda enviar a primeira como campo single
+  const primeiraHipotese = hipotesesIds.length > 0 ? parseInt(hipotesesIds[0]) || null : null;
+  
+  // Preparar array de hipóteses para endpoint separado
+  const todasHipoteses = hipotesesIds.map(id => parseInt(id)).filter(id => !isNaN(id));
+  
+  return {
+    // Manter compatibilidade com campo single
+    tipo_hipotese_diag_idtipo_hipotese_diag: primeiraHipotese,
+    // Adicionar informação sobre múltiplas hipóteses
+    hipoteses_para_salvar: todasHipoteses
+  };
+};
+
+/**
+ * Salva as hipóteses diagnósticas associadas a uma notificação via API separada
+ * @param notificacaoId ID da notificação
+ * @param hipotesesIds Array de IDs das hipóteses
+ */
+export const salvarHipotesesViaApi = async (notificacaoId: number, hipotesesIds: number[]): Promise<void> => {
+  const server = import.meta.env.VITE_API_SERVER;
+  const port = import.meta.env.VITE_API_PORT;
+  
+  try {
+    await axios.post(`${server}:${port}/api/notificacao/${notificacaoId}/hipoteses`, {
+      hipoteses: hipotesesIds
+    });
+    
+    console.log(`Hipóteses salvas com sucesso para notificação ${notificacaoId}:`, hipotesesIds);
+  } catch (error) {
+    console.error(`Erro ao salvar hipóteses para notificação ${notificacaoId}:`, error);
+    throw new Error('Falha ao salvar hipóteses diagnósticas. Por favor, tente novamente.');
+  }
+};
+
+/**
+ * Função auxiliar para buscar hipóteses via API quando necessário
+ */
+async function fetchHipotesesForNotificacao(notificacaoId: number): Promise<any[]> {
+  const server = import.meta.env.VITE_API_SERVER;
+  const port = import.meta.env.VITE_API_PORT;
+  
+  try {
+    // ROTA CORRETA que você criou
+    const response = await axios.get(`${server}:${port}/api/notificacao/${notificacaoId}/hipoteses-diagnosticas`);
+    
+    console.log("📡 Response da API de hipóteses:", response.data);
+    
+    // A rota retorna array direto
+    if (Array.isArray(response.data)) {
+      return response.data;
+    }
+    
+    // Ou se vier dentro de data
+    if (response.data?.data && Array.isArray(response.data.data)) {
+      return response.data.data;
+    }
+    
+    return [];
+  } catch (error) {
+    console.error(`❌ Erro ao buscar hipóteses para notificação ${notificacaoId}:`, error);
+    return [];
+  }
+}
+
+/**
+ * Função de compatibilidade - alias para extractHipotesesIds
+ * @deprecated Use extractHipotesesIds instead
+ */
+export const extractHipoteseDiagnosticaIds = extractHipotesesIds;

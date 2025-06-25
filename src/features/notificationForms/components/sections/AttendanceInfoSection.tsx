@@ -792,7 +792,7 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
 
   const handleClearAllHipoteses = () => {
     if (formData.hipoteseDiagnostica.length > 0 && 
-        window.confirm(`Deseja remover a hipótese diagnóstica selecionada?`)) {
+        window.confirm(`Deseja remover todas as hipóteses diagnósticas selecionadas?`)) {
       setFormData({
         ...formData,
         hipoteseDiagnostica: []
@@ -989,7 +989,7 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
               <div className="md:col-span-2" data-field="hipoteseDiagnostica">
                 <div className="flex items-center justify-between mb-2">
                   <label className="font-medium text-gray-700">
-                    Hipótese Diagnóstica (selecione apenas uma)
+                    Hipóteses Diagnósticas (selecione uma ou mais)
                   </label>
                   
                   <div className="relative w-64">
@@ -1041,7 +1041,7 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                           onClick={handleClearAllHipoteses}
                           className="ml-2 text-xs text-gray-500 hover:text-red-500 focus:outline-none"
                         >
-                          Limpar
+                          Limpar todas
                         </button>
                       )}
                     </div>
@@ -1128,14 +1128,8 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                                 formData={formData}
                                 checked={isChecked}
                                 onChange={() => {
-                                  if (isChecked) {
-                                    handleCheckboxChange && handleCheckboxChange("hipoteseDiagnostica", option.idtipo_hipotese_diag.toString());
-                                  } else {
-                                    handleCheckboxChange && setFormData({
-                                      ...formData,
-                                      hipoteseDiagnostica: [option.idtipo_hipotese_diag.toString()]
-                                    });
-                                  }
+                                  // ✅ MUDANÇA PRINCIPAL: Usar handleCheckboxChange padrão para permitir múltiplas seleções
+                                  handleCheckboxChange && handleCheckboxChange("hipoteseDiagnostica", option.idtipo_hipotese_diag.toString());
                                 }}
                                 showAllHipoteses={showAllHipoteses}
                               />

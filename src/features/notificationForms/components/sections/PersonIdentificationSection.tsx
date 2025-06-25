@@ -1,4 +1,3 @@
-// src/features/notificationForms/components/sections/PersonIdentificationSection.tsx
 import React, { useState, useEffect } from 'react';
 import { User, Search, X, HelpCircle } from 'lucide-react';
 import { FormSectionProps } from '@/features/notificationForms/types/index2';
@@ -56,7 +55,7 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
   // Função auxiliar para formatar CPF (remover caracteres não numéricos)
   const formatCPF = (cpf: string) => {
     return cpf.replace(/\D/g, "").slice(0, 11);
-  };  // Função para verificar CPF existente usando o serviço offline/online
+  };   // Função para verificar CPF existente usando o serviço offline/online
   const handleCPFChangeWithValidation = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
     const formattedCPF = formatCPF(rawValue);
@@ -296,60 +295,38 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
                   {errors.dataNascimento}
                 </p>
               )}
-            </div>
-
-            {/* Idade */}
+            </div>            {/* Idade com Seletor de Unidade */}
             <div>
-              <label className="block mb-2 font-medium text-gray-700">
-                Idade
-              </label>
-              <input
-                type="number"
-                name="idade"
-                placeholder={
-                  formData.dataNascimento
-                    ? "Calculada automaticamente"
-                    : "Digite a idade"
-                }
-                className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none disabled:bg-gray-100 disabled:text-gray-500"
-                value={formData.idade}
-                onChange={(e) => {
-                  // Obter o valor digitado
-                  const value = e.target.value;
+              <label className="block mb-2 font-medium text-gray-700">Idade</label>
+              <div className="flex items-center gap-2">
+                {/* Seletor de Unidade */}
+                <select
+                  name="idadeUnidade"
+                  value={formData.idadeUnidade}
+                  onChange={handleChange}
+                  disabled={!!formData.dataNascimento}
+                  className="p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none disabled:bg-gray-100"
+                >
+                  <option value="anos">Anos</option>
+                  <option value="meses">Meses</option>
+                </select>
 
-                  // Verificar se é um número válido e não maior que 120
-                  const numValue = parseInt(value);
-                  if (!isNaN(numValue) && numValue > 120) {
-                    // Se for maior que 120, mostrar erro
-                    setFormData(prev => ({
-                      ...prev,
-                      idade: value
-                    }));
-                    return;
-                  }
-
-                  // Limitar a 3 caracteres e processar normalmente
-                  if (value.length <= 3) {
-                    handleChange({
-                      target: {
-                        name: "idade",
-                        value: value,
-                      },
-                    } as React.ChangeEvent<HTMLInputElement>);
-                  }
-                }}
-                disabled={!!formData.dataNascimento}
-                max={120}
-              />
+                {/* Campo de Idade (Anos ou Meses) */}
+                <input
+                  type="number"
+                  name={formData.idadeUnidade === 'anos' ? 'idade' : 'idadeMeses'}
+                  value={formData.idadeUnidade === 'anos' ? formData.idade : formData.idadeMeses}
+                  onChange={handleChange}
+                  placeholder={formData.idadeUnidade === 'anos' ? 'Anos' : 'Meses'}
+                  disabled={!!formData.dataNascimento}
+                  className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none disabled:bg-gray-100"
+                />
+              </div>
               {formData.dataNascimento && (
-                <p className="mt-1 text-xs text-gray-500">
-                  Idade calculada a partir da data de nascimento
-                </p>
+                <p className="mt-1 text-xs text-gray-500">Calculada automaticamente</p>
               )}
-              {errors.idade && (
-                <p className="mt-1 text-xs text-red-500">
-                  {errors.idade}
-                </p>
+              {(errors.idade || errors.idadeMeses) && (
+                <p className="mt-1 text-sm text-red-500">{errors.idade || errors.idadeMeses}</p>
               )}
             </div>
 
