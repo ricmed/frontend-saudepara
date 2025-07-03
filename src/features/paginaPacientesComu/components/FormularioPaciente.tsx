@@ -29,8 +29,8 @@ import SideMenu from "@/features/home/components/SideMenu";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useOfflineSystem } from '@/hooks/useOfflineSystem';
 import ConnectionStatus from '@/components/ConnectionStatus';
-import { calculateAgeInYearsAndMonths } from "@/features/notificationForms/utils/formUtils";
 import indexedDBService from '@/services/indexedDB';
+import { calcularIdadeAutomatica } from '@/features/notificationForms/hooks/useNotificationForm';
 
 // Interface para as props do componente
 interface FormularioPacienteProps {
@@ -328,28 +328,36 @@ const FormularioPaciente = ({
             escolaridadeId = Number(
               pacienteUpperCase.escolaridade_idescolaridade
             );
-          }          // Formatar a data de nascimento e calcular a idade
+          }          // Formatar a data de nascimento e processar idade
           const formattedDate = pacienteUpperCase.data_nascimento
             ? new Date(pacienteUpperCase.data_nascimento)
                 .toISOString()
                 .split("T")[0]
             : "";
             
-          // SEMPRE priorizar cálculo pela data de nascimento se existir
-          const finalAge = formattedDate 
-            ? calculateAgeInYearsAndMonths(formattedDate).idade
-            : (pacienteUpperCase.idade ? pacienteUpperCase.idade.toString() : "");
-
-          const finalAgeMonths = formattedDate 
-            ? calculateAgeInYearsAndMonths(formattedDate).idadeMeses 
-            : "";
-
-          // Determinar unidade de idade
-          const ageUnit = formattedDate 
-            ? (parseInt(finalAge) >= 1 ? 'anos' : 'meses')
-            : 'anos'; // Default para anos quando não há data de nascimento
-
-          console.log("Paciente carregado - Data:", formattedDate, "Idade final:", finalAge, "Meses:", finalAgeMonths, "Unidade:", ageUnit);
+          // Processar idade conforme nova lógica: backend envia idade total em meses
+          let finalAge = "";
+          let finalAgeMonths = "";
+          let ageUnit: 'anos' | 'meses' = 'anos';
+          
+          if (formattedDate) {
+            // Se há data de nascimento, a idade já foi processada pelo backend
+            console.log("Paciente com data de nascimento - dados já processados pelo backend");
+          }
+          
+          // O backend agora envia a IDADE TOTAL EM MESES no campo 'idade'
+          if (pacienteUpperCase.idade !== null && pacienteUpperCase.idade !== undefined) {
+            const totalMonths = Number(pacienteUpperCase.idade);
+            
+            // Calcula anos e meses a partir do total de meses
+            finalAge = Math.floor(totalMonths / 12).toString();
+            finalAgeMonths = totalMonths.toString();
+            
+            // Define a unidade padrão para a UI
+            ageUnit = totalMonths >= 12 ? 'anos' : 'meses';
+            
+            console.log(`Paciente carregado - Idade do backend (meses): ${totalMonths}. Convertido para: ${finalAge} anos e ${finalAgeMonths} meses. Unidade: ${ageUnit}`);
+          }
 
           setFormData({
             nome: pacienteUpperCase.nome || "",
@@ -380,7 +388,7 @@ const FormularioPaciente = ({
           setIsLoading(false);
         });
     }
-  }, [pacienteId, isOnline]);  // useEffect para cálculo de idade
+  }, [pacienteId, isOnline]);  // useEffect para processar idade quando dados vêm do backend
   useEffect(() => {
     console.log("useEffect idade - data_nascimento mudou:", formData.data_nascimento);
     
@@ -392,43 +400,8 @@ const FormularioPaciente = ({
         idadeMeses: "", // <-- LIMPA MESES TAMBÉM
       }));
     } else {
-      const { idade, idadeMeses } = calculateAgeInYearsAndMonths(formData.data_nascimento);
-      console.log("Idade calculada:", idade, "Meses:", idadeMeses);
-
-      const age = parseInt(idade);
-      
-      if (!isNaN(age) && age > 120) {
-        console.log("Idade inválida (>120), definindo erro");
-        setErrors((prev) => ({
-          ...prev,
-          data_nascimento: "A idade não pode ser maior que 120 anos",
-        }));
-        return;
-      }
-
-      // Determinar unidade baseada na idade calculada
-      const unidade = age >= 1 ? 'anos' : 'meses';
-
-      setFormData((prev) => {
-        if (prev.idade !== idade || prev.idadeMeses !== idadeMeses || prev.idadeUnidade !== unidade) {
-          console.log("Atualizando idade de", prev.idade, "para", idade, "e meses de", prev.idadeMeses, "para", idadeMeses, "unidade:", unidade);
-          return {
-            ...prev,
-            idade: idade,
-            idadeMeses: idadeMeses, // <-- ATUALIZA MESES
-            idadeUnidade: unidade, // <-- ATUALIZA UNIDADE
-          };
-        }
-        return prev;
-      });
-
-      if (errors.data_nascimento) {
-        setErrors((prev) => {
-          const newErrors = { ...prev };
-          delete newErrors.data_nascimento;
-          return newErrors;
-        });
-      }
+      // A nova lógica de idade está no backend - dados já vêm processados
+      console.log("Data de nascimento presente - idade será processada pelo backend");
     }
   }, [formData.data_nascimento]);
 
@@ -546,7 +519,8 @@ const FormularioPaciente = ({
           ...prev,
           [name]: "",
           idade: "",
-          idadeMeses: "", // <-- LIMPA MESES TAMBÉM
+          idadeMeses: "",
+          idadeUnidade: 'anos'
         }));
 
         if (errors.data_nascimento) {
@@ -569,14 +543,16 @@ const FormularioPaciente = ({
           return;
         }
         
-        const { idade, idadeMeses } = calculateAgeInYearsAndMonths(value);
-        console.log("Nova data selecionada:", value, "Idade calculada:", idade, "Meses:", idadeMeses);
+        // Calcular idade automaticamente usando a função importada
+        const idadeCalculada = calcularIdadeAutomatica(value);
+        console.log("Nova data selecionada:", value, "Idade calculada:", idadeCalculada);
 
-        const ageNum = parseInt(idade);
-        if (!isNaN(ageNum) && ageNum > 120) {
-          setErrors((prev) => ({
+        // Validar se a idade calculada não ultrapassa 120 anos
+        const anosCalculados = parseInt(idadeCalculada.idade, 10);
+        if (!isNaN(anosCalculados) && anosCalculados > 120) {
+          setErrors(prev => ({
             ...prev,
-            data_nascimento: "A idade não pode ser maior que 120 anos",
+            data_nascimento: "A idade calculada não pode ser superior a 120 anos"
           }));
           return;
         }
@@ -584,11 +560,12 @@ const FormularioPaciente = ({
         setFormData((prev) => ({
           ...prev,
           [name]: value,
-          idade: idade,
-          idadeMeses: idadeMeses, // <-- ATUALIZA MESES
+          idade: idadeCalculada.idade,
+          idadeMeses: idadeCalculada.idadeMeses,
+          idadeUnidade: idadeCalculada.idadeUnidade as 'anos' | 'meses'
         }));
         
-        console.log("Data de nascimento atualizada para:", value, "Idade:", idade, "Meses:", idadeMeses);
+        console.log("Data de nascimento atualizada para:", value);
       }    } else if (name === "idade") {
       if (!formData.data_nascimento || formData.data_nascimento.trim() === '') {
         const ageValue = value === "" ? "" : value;
@@ -623,12 +600,25 @@ const FormularioPaciente = ({
         const monthsValue = value === "" ? "" : value;
         const monthsNum = parseInt(monthsValue);
 
-        if (!isNaN(monthsNum) && monthsNum > 1440) { // 120 anos * 12 meses
-          setErrors((prev) => ({
-            ...prev,
-            idadeMeses: "A idade não pode ser maior que 120 anos",
-          }));
-          return;
+        // Validação específica baseada na unidade selecionada
+        if (formData.idadeUnidade === 'meses') {
+          // Quando a unidade é "meses", permitir apenas 0-11 meses
+          if (!isNaN(monthsNum) && monthsNum > 11) {
+            setErrors((prev) => ({
+              ...prev,
+              idadeMeses: "Quando a unidade é 'meses', o valor máximo é 11 meses",
+            }));
+            return;
+          }
+        } else {
+          // Quando a unidade é "anos", permitir até 1440 meses (120 anos)
+          if (!isNaN(monthsNum) && monthsNum > 1440) {
+            setErrors((prev) => ({
+              ...prev,
+              idadeMeses: "A idade não pode ser maior que 120 anos (1440 meses)",
+            }));
+            return;
+          }
         }
 
         setFormData((prev) => {
@@ -897,7 +887,7 @@ const FormularioPaciente = ({
       tipo_raca_idtipo_raca: formData.tipo_raca_idtipo_raca as number,
       ddi: formData.ddi,
       contato: formData.contato || null,
-      ...((!formData.data_nascimento || formData.data_nascimento.trim() === '') && formData.idade ? { idade: parseInt(formData.idade) } : {}),
+      ...((!formData.data_nascimento || formData.data_nascimento.trim() === '') && formData.idadeMeses ? { idade: parseInt(formData.idadeMeses) } : {}),
 
       escolaridade_idescolaridade:
         formData.escolaridade_idescolaridade === ""
@@ -1480,7 +1470,19 @@ const FormularioPaciente = ({
                     </div>
                     {formData.data_nascimento && (
                       <p className="mt-1 text-xs text-gray-500">
-                        Calculada automaticamente: {formData.idade} anos ({formData.idadeMeses} meses)
+                        Calculada automaticamente: {(() => {
+                          const totalMeses = parseInt(formData.idadeMeses || '0');
+                          const anos = parseInt(formData.idade || '0');
+                          
+                          // Se tem menos de 12 meses, mostrar só os meses
+                          if (totalMeses < 12) {
+                            return `${totalMeses} ${totalMeses === 1 ? 'mês' : 'meses'}`;
+                          }
+                          // Se tem 12 meses ou mais, mostrar só os anos
+                          else {
+                            return `${anos} ${anos === 1 ? 'ano' : 'anos'}`;
+                          }
+                        })()}
                       </p>
                     )}
                     {!formData.data_nascimento && (

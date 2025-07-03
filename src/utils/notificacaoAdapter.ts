@@ -9,7 +9,7 @@ import axios from "axios";
 // import indexedDBService from '@/services/indexedDB'; // COMENTADO - SERÁ USADO NO FUTURO
 // import syncService from '@/services/syncService';     // COMENTADO - SERÁ USADO NO FUTURO
 import { toast } from 'react-toastify';
-import { calculateAgeInYearsAndMonths } from '@/features/notificationForms/utils/formUtils';
+import { calcularIdadeAutomatica } from '@/features/notificationForms/hooks/useNotificationForm';
 
 // Função auxiliar para conversão de datas UTC para local
 const convertUTCDateToLocal = (dateString: string): Date => {
@@ -79,33 +79,24 @@ export const formatFromBackend = async (
   // Buscar local de encaminhamento
   let localEncaminhamento = extractLocalEncaminhamento(backendData);
   
-  // SEMPRE priorizar cálculo pela data de nascimento se existir
   let idade = "";
   let idadeMeses = "";
-  let idadeUnidade: 'anos' | 'meses' = 'anos'; // Default para anos
+  let idadeUnidade: 'anos' | 'meses' = 'anos'; // Default
 
-  if (backendData.paciente?.data_nascimento) {
-    const ageInfo = calculateAgeInYearsAndMonths(backendData.paciente.data_nascimento);
-    idade = ageInfo.idade;
-    idadeMeses = ageInfo.idadeMeses;
-    // Define a unidade com base na idade calculada
-    if (parseInt(idade, 10) >= 1) {
-      idadeUnidade = 'anos';
-    } else {
-      idadeUnidade = 'meses';
-    }
-    console.log(`Idade calculada: ${idade} anos e ${idadeMeses} meses. Unidade default: ${idadeUnidade}`);
-  } else if (backendData.paciente) {
-    // Só usar idade armazenada se NÃO houver data de nascimento
-    idade = backendData.paciente.idade?.toString() || "";
-    idadeMeses = backendData.paciente.idade_meses?.toString() || "";
-    // Se tiver idade em anos, a unidade é anos. Se não, mas tiver em meses, é meses.
-    if (idade) {
-        idadeUnidade = 'anos';
-    } else if (idadeMeses) {
-        idadeUnidade = 'meses';
-    }
-    console.log(`Usando idade armazenada: ${idade} anos e ${idadeMeses} meses. Unidade: ${idadeUnidade}`);
+  // O backend agora envia a IDADE TOTAL EM MESES no campo 'idade'
+  const totalMonthsFromBackend = backendData.paciente?.idade;
+
+  if (totalMonthsFromBackend !== null && totalMonthsFromBackend !== undefined) {
+    const totalMonths = Number(totalMonthsFromBackend);
+    
+    // Calcula anos e meses a partir do total de meses
+    idade = Math.floor(totalMonths / 12).toString();
+    idadeMeses = totalMonths.toString();
+    
+    // Define a unidade padrão para a UI
+    idadeUnidade = totalMonths >= 12 ? 'anos' : 'meses';
+    
+    console.log(`Idade do backend (meses): ${totalMonths}. Convertido para: ${idade} anos e ${idadeMeses} meses. Unidade: ${idadeUnidade}`);
   }
 
 
@@ -341,6 +332,26 @@ const trimmedData = trimFields(frontendData);
 
   const pacienteId = trimmedData.pacienteId ? Number(trimmedData.pacienteId) : null;
 
+  // *** LÓGICA MELHORADA PARA PROCESSAR IDADE EM MESES ***
+  let idadeParaBackend = null;
+  
+  if (trimmedData.dataNascimento && trimmedData.dataNascimento.trim() !== '') {
+    // Se há data de nascimento, recalcular idade para garantir precisão
+    const idadeCalculada = calcularIdadeAutomatica(trimmedData.dataNascimento);
+    idadeParaBackend = parseInt(idadeCalculada.idadeMeses) || null;
+    console.log(`Idade calculada a partir da data de nascimento: ${idadeParaBackend} meses`);
+  } else if (trimmedData.idadeMeses && trimmedData.idadeMeses.trim() !== '') {
+    // Se não há data de nascimento mas há idade em meses
+    idadeParaBackend = parseInt(trimmedData.idadeMeses);
+    console.log(`Usando idade em meses informada: ${idadeParaBackend} meses`);
+  } else if (trimmedData.idade && trimmedData.idade.trim() !== '') {
+    // Se só há idade em anos, converter para meses
+    idadeParaBackend = parseInt(trimmedData.idade) * 12;
+    console.log(`Convertendo idade em anos para meses: ${trimmedData.idade} anos = ${idadeParaBackend} meses`);
+  }
+
+  console.log(`Idade final para o backend: ${idadeParaBackend} meses`);
+
   // Processar o local de encaminhamento (conforme esperado pelo backend)
   let estabelecimentoEncaminhado = null;
   if (trimmedData.localEncaminhamento) {
@@ -388,6 +399,9 @@ const trimmedData = trimFields(frontendData);
     // Adicionar telefone do paciente no payload para notificações novas
     // Para edições este campo não deve ser enviado pois não faz parte da tabela de notificação
     ...(isUpdate ? {} : { contato_paciente: trimmedData.contatoTelefonico || "" }),
+
+    // *** ADICIONAR IDADE EM MESES PARA O BACKEND ***
+    ...(idadeParaBackend !== null && { idade_paciente_meses: idadeParaBackend }),
 
     // Campos opcionais
     ...(trimmedData.bairro && { 

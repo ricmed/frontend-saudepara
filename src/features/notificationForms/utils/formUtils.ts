@@ -80,9 +80,14 @@ export const formatContatoLocal = (contato: string): string => {
 
 /**
  * Calcula idade em anos e meses a partir da data de nascimento
+ * MELHORADO: Cálculo mais preciso considerando dias
  */
-export const calculateAgeInYearsAndMonths = (birthdate: string): { idade: string, idadeMeses: string } => {
-  if (!birthdate) return { idade: "", idadeMeses: "" };
+export const calculateAgeInYearsAndMonths = (birthdate: string): { 
+  idade: string, 
+  idadeMeses: string,
+  idadeUnidade: 'anos' | 'meses'
+} => {
+  if (!birthdate) return { idade: "", idadeMeses: "", idadeUnidade: 'anos' };
 
   const birthDate = new Date(birthdate);
   const today = new Date();
@@ -92,29 +97,145 @@ export const calculateAgeInYearsAndMonths = (birthdate: string): { idade: string
   today.setUTCHours(0, 0, 0, 0);
 
   if (isNaN(birthDate.getTime())) {
-    return { idade: "", idadeMeses: "" };
+    return { idade: "", idadeMeses: "", idadeUnidade: 'anos' };
   }
 
-  // Calcula idade em anos
-  let years = today.getUTCFullYear() - birthDate.getUTCFullYear();
-  const monthDiff = today.getUTCMonth() - birthDate.getUTCMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getUTCDate() < birthDate.getUTCDate())) {
-    years--;
+  // Verifica se a data de nascimento não é futura
+  if (birthDate > today) {
+    return { idade: "", idadeMeses: "", idadeUnidade: 'anos' };
   }
 
-  // Calcula idade total em meses
+  // Calcula idade total em meses de forma precisa
   let totalMonths = (today.getUTCFullYear() - birthDate.getUTCFullYear()) * 12;
   totalMonths += today.getUTCMonth() - birthDate.getUTCMonth();
+  
+  // Ajusta se o dia ainda não chegou no mês atual
   if (today.getUTCDate() < birthDate.getUTCDate()) {
-      totalMonths--;
+    totalMonths--;
   }
+
+  // Garante que não seja negativo
+  totalMonths = Math.max(0, totalMonths);
+
+  // Calcula anos a partir dos meses totais
+  const years = Math.floor(totalMonths / 12);
+  
+  // Define a unidade baseada na idade
+  const idadeUnidade: 'anos' | 'meses' = totalMonths < 12 ? 'meses' : 'anos';
   
   return { 
-    idade: years >= 0 ? years.toString() : "",
-    idadeMeses: totalMonths >= 0 ? totalMonths.toString() : ""
+    idade: years.toString(),
+    idadeMeses: totalMonths.toString(),
+    idadeUnidade
   };
 };
 
+/**
+ * NOVA FUNÇÃO: Valida idade manual (sem data de nascimento)
+ */
+export const validateManualAge = (formData: FormData): { 
+  isValid: boolean, 
+  errors: Record<string, string> 
+} => {
+  const errors: Record<string, string> = {};
+  
+  // Se há data de nascimento, não validar idade manual
+  if (formData.dataNascimento) {
+    return { isValid: true, errors: {} };
+  }
+
+  const idadeAnos = parseInt(formData.idade) || 0;
+  const idadeMeses = parseInt(formData.idadeMeses) || 0;
+
+  // Validar se pelo menos uma idade foi informada
+  if (idadeAnos === 0 && idadeMeses === 0) {
+    errors.idade = "Informe a idade ou a data de nascimento";
+    return { isValid: false, errors };
+  }
+
+  // Validar limite máximo em anos
+  if (idadeAnos > 120) {
+    errors.idade = "A idade não pode ser maior que 120 anos";
+  }
+
+  // Validar limite máximo em meses (120 anos = 1440 meses)
+  if (idadeMeses > 1440) {
+    errors.idadeMeses = "A idade não pode ser maior que 120 anos (1440 meses)";
+  }
+
+  // NOVA VALIDAÇÃO: Validar que meses não ultrapassem 11 quando há anos
+  if (idadeAnos > 0) {
+    const mesesCalculados = idadeMeses % 12;
+    if (mesesCalculados > 11) {
+      errors.idadeMeses = "Meses devem ser entre 0 e 11 quando há anos informados";
+    }
+  }
+
+  // NOVA VALIDAÇÃO: Para bebês (apenas meses), validar limite de 23 meses
+  if (idadeAnos === 0 && idadeMeses > 23) {
+    errors.idadeMeses = "Para bebês, use anos quando passar de 23 meses";
+  }
+
+  // Validar valores negativos
+  if (idadeAnos < 0) {
+    errors.idade = "A idade não pode ser negativa";
+  }
+
+  if (idadeMeses < 0) {
+    errors.idadeMeses = "A idade em meses não pode ser negativa";
+  }
+
+  // Validar consistência entre anos e meses
+  if (idadeAnos > 0 && idadeMeses > 0) {
+    const mesesEsperados = idadeAnos * 12;
+    const diferenca = Math.abs(idadeMeses - mesesEsperados);
+    
+    // Permitir diferença de até 11 meses (para casos como 2 anos e 6 meses)
+    if (diferenca > 11) {
+      errors.idade = "Inconsistência entre idade em anos e meses";
+    }
+  }
+
+  return { 
+    isValid: Object.keys(errors).length === 0, 
+    errors 
+  };
+};
+
+/**
+ * NOVA FUNÇÃO: Valida data de nascimento
+ */
+export const validateBirthDate = (birthDate: string): { 
+  isValid: boolean, 
+  error?: string 
+} => {
+  if (!birthDate) {
+    return { isValid: true }; // Data de nascimento é opcional
+  }
+
+  const birth = new Date(birthDate);
+  const today = new Date();
+
+  // Verificar se é uma data válida
+  if (isNaN(birth.getTime())) {
+    return { isValid: false, error: "Data de nascimento inválida" };
+  }
+
+  // Verificar se não é futura
+  if (birth > today) {
+    return { isValid: false, error: "Data de nascimento não pode ser futura" };
+  }
+
+  // Verificar se não é muito antiga (mais de 120 anos)
+  const maxAge = new Date();
+  maxAge.setFullYear(maxAge.getFullYear() - 120);
+  
+  if (birth < maxAge) {
+    return { isValid: false, error: "Data de nascimento não pode ser anterior a 120 anos" };
+  }
+
+  return { isValid: true };
+};
 
 /**
  * Compara duas datas e verifica se a primeira é igual ou depois da segunda
@@ -216,6 +337,7 @@ export const isTipoEncerramento = (tipo: string, tipoEncerramento: string, encer
 
 /**
  * Validar campos obrigatórios e outras regras de validação
+ * MELHORADO: Incluindo validações completas de idade
  */
 export const validateForm = (
   formData: FormData, 
@@ -243,6 +365,7 @@ export const validateForm = (
   if (!formData.publicoAtendido || formData.publicoAtendido === "") {
     newErrors.publicoAtendido = "O campo Público Atendido é obrigatório";
   }
+
   // ========================================
   // SEÇÃO 2: PROCEDÊNCIA (CORRIGIDA)
   // ========================================
@@ -271,21 +394,39 @@ export const validateForm = (
     }
   }
 
-  // Seção 3: Identificação do Paciente
+  // ========================================
+  // SEÇÃO 3: IDENTIFICAÇÃO DO PACIENTE (MELHORADA)
+  // ========================================
   if (!formData.paciente || formData.paciente.trim() === "") {
     newErrors.paciente = "O nome do paciente é obrigatório";
   }
 
-  // Validações opcionais mas importantes
-  if (formData.cpf && formData.cpf.length > 0 && formData.cpf.length !== 11) {
-    newErrors.cpf = "CPF deve ter 11 dígitos";
+  // NOVA VALIDAÇÃO: Data de nascimento
+  if (formData.dataNascimento) {
+    const birthValidation = validateBirthDate(formData.dataNascimento);
+    if (!birthValidation.isValid) {
+      newErrors.dataNascimento = birthValidation.error!;
+    }
   }
 
-  if (formData.idade && parseInt(formData.idade) > 120) {
-    newErrors.idade = "A idade não pode ser maior que 120 anos";
+  // NOVA VALIDAÇÃO: Idade manual (quando não há data de nascimento)
+  const ageValidation = validateManualAge(formData);
+  if (!ageValidation.isValid) {
+    Object.assign(newErrors, ageValidation.errors);
   }
 
-  // Seção 4: Informações do Atendimento
+  // Validação de CPF melhorada
+  if (formData.cpf && formData.cpf.length > 0) {
+    if (formData.cpf.length !== 11) {
+      newErrors.cpf = "CPF deve ter 11 dígitos";
+    } else if (!/^\d{11}$/.test(formData.cpf)) {
+      newErrors.cpf = "CPF deve conter apenas números";
+    }
+  }
+
+  // ========================================
+  // SEÇÃO 4: INFORMAÇÕES DO ATENDIMENTO
+  // ========================================
   if (!formData.tipoAtendimento || formData.tipoAtendimento === "") {
     newErrors.tipoAtendimento = "O campo Tipo de Atendimento é obrigatório";
   }
@@ -311,7 +452,9 @@ export const validateForm = (
     }
   }
 
-  // Seção 5: Unidade Notificadora
+  // ========================================
+  // SEÇÃO 5: UNIDADE NOTIFICADORA
+  // ========================================
   if (!formData.unidadeNotificadora || formData.unidadeNotificadora === "") {
     newErrors.unidadeNotificadora = "O campo Unidade Notificadora é obrigatório";
   }
@@ -321,7 +464,9 @@ export const validateForm = (
     newErrors.unidadeNotificadora = "Selecione uma unidade notificadora válida";
   }
 
-  // Seção 6: Desfecho do Caso
+  // ========================================
+  // SEÇÃO 6: DESFECHO DO CASO
+  // ========================================
   if (!formData.tipoEncerramento || formData.tipoEncerramento === "") {
     newErrors.tipoEncerramento = "O campo Desfecho é obrigatório";
   }
@@ -415,6 +560,7 @@ export const validateForm = (
       newErrors.nomeMae ||
       newErrors.dataNascimento ||
       newErrors.idade ||
+      newErrors.idadeMeses || // NOVO
       newErrors.cpf ||
       newErrors.identidadeGenero ||
       newErrors.gestante ||

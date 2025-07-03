@@ -27,7 +27,6 @@ import {
 import { 
   normalizeText, 
   toUpperCaseAllStrings, 
-  calculateAgeInYearsAndMonths, // <-- ALTERADO AQUI
   compareDates,
   isTipoAtendimento,
   isTipoEncerramento,
@@ -49,6 +48,51 @@ import { ListaSindromicaService } from '@/services/ListaSindromicaService';
 interface HipoteseFiltrada extends HipoteseDiagOption {
   qtdSintomas?: number; // Quantidade de sintomas relacionados
 }
+
+// Função utilitária para calcular idade automaticamente a partir da data de nascimento
+export const calcularIdadeAutomatica = (dataNascimento: string) => {
+  if (!dataNascimento) {
+    return { idade: "", idadeMeses: "", idadeUnidade: 'anos' as 'anos' | 'meses' };
+  }
+
+  try {
+    const hoje = new Date();
+    const nascimento = new Date(dataNascimento);
+    
+    // Verificar se a data é válida
+    if (isNaN(nascimento.getTime()) || nascimento > hoje) {
+      return { idade: "", idadeMeses: "", idadeUnidade: 'anos' as 'anos' | 'meses' };
+    }
+
+    let anos = hoje.getFullYear() - nascimento.getFullYear();
+    let meses = hoje.getMonth() - nascimento.getMonth();
+
+    // Ajustar se ainda não completou o aniversário no mês atual
+    if (meses < 0 || (meses === 0 && hoje.getDate() < nascimento.getDate())) {
+      anos--;
+      meses += 12;
+    }
+
+    // Ajustar se ainda não completou o dia no mês atual
+    if (hoje.getDate() < nascimento.getDate()) {
+      meses--;
+    }
+
+    const totalMeses = anos * 12 + meses;
+
+    // Definir unidade automaticamente: menos de 12 meses = 'meses', 12+ = 'anos'
+    const unidade = totalMeses < 12 ? 'meses' : 'anos';
+
+    return {
+      idade: anos.toString(),
+      idadeMeses: totalMeses.toString(),
+      idadeUnidade: unidade
+    };
+  } catch (error) {
+    console.error('Erro ao calcular idade:', error);
+    return { idade: "", idadeMeses: "", idadeUnidade: 'anos' as 'anos' | 'meses' };
+  }
+};
 
 // Initial form data
 const initialFormData: FormData = {
@@ -756,44 +800,43 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     try {
       const response = await NotificacaoService.getById(Number(notificacaoId));
       const responseUpperCase = toUpperCaseAllStrings(response);
-      const formattedData = responseUpperCase;
-
-      if (formattedData) {
+      
+      if (responseUpperCase) {
         // Normalizar dados para garantir consistência
         const normalizarDadosResidencia = (dados: any) => {
-            // Criar uma cópia dos dados para não modificar o original
-            const normalizado = { ...dados };
+          // Criar uma cópia dos dados para não modificar o original
+          const normalizado = { ...dados };
+          
+          // Normalizar IDs para strings nos campos de localização primeiro
+          if (normalizado.tipo_pais_idtipo_pais !== undefined) {
+            normalizado.paisProcedencia = normalizado.tipo_pais_idtipo_pais.toString();
+          }
+          
+          // Se é estrangeiro (país não é Brasil - ID 105)
+          if (normalizado.paisProcedencia && normalizado.paisProcedencia !== "105") {
+            // Forçar opção "Estrangeiro" independentemente do que estiver no banco
+            normalizado.residenteBelem = "3";
+            console.log("Detectado país estrangeiro, corrigindo para ESTRANGEIRO");
             
-            // Normalizar IDs para strings nos campos de localização primeiro
-            if (normalizado.tipo_pais_idtipo_pais !== undefined) {
-              normalizado.paisProcedencia = normalizado.tipo_pais_idtipo_pais.toString();
-            }
-            
-            // Se é estrangeiro (país não é Brasil - ID 105)
-            if (normalizado.paisProcedencia && normalizado.paisProcedencia !== "105") {
-              // Forçar opção "Estrangeiro" independentemente do que estiver no banco
-              normalizado.residenteBelem = "3";
-              console.log("Detectado país estrangeiro, corrigindo para ESTRANGEIRO");
-              
-              // Limpar campos brasileiros
-              normalizado.bairro = "";
-              normalizado.uf = "";
-              normalizado.municipio = "";
-            } 
-            // Se não é estrangeiro, manter o valor original
-            else if (normalizado.residente_belem !== undefined) {
-              normalizado.residenteBelem = normalizado.residente_belem.toString();
-            }
-            
-            return normalizado;
-          };
+            // Limpar campos brasileiros
+            normalizado.bairro = "";
+            normalizado.uf = "";
+            normalizado.municipio = "";
+          } 
+          // Se não é estrangeiro, manter o valor original
+          else if (normalizado.residente_belem !== undefined) {
+            normalizado.residenteBelem = normalizado.residente_belem.toString();
+          }
+          
+          return normalizado;
+        };
         
-        const dadosNormalizados = normalizarDadosResidencia(formattedData);
+        const dadosNormalizados = normalizarDadosResidencia(responseUpperCase);
         console.log("Dados normalizados:", dadosNormalizados);
 
         if (dadosNormalizados.paciente?.gestante) {
-  dadosNormalizados.gestante = dadosNormalizados.paciente.gestante;
-}
+          dadosNormalizados.gestante = dadosNormalizados.paciente.gestante;
+        }
 
         // Combinar DDI e número de telefone no formato correto
         if (dadosNormalizados.paciente?.ddi && dadosNormalizados.paciente?.contato) {
@@ -829,398 +872,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Lidar com mudanças no formulário
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-
-    // Limpar erro quando o campo for alterado
-    if (errors[name]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[name];
-        return newErrors;
-      });
-    }
-
-    // Processamento específico para certos campos
-    let newValue = value;
-
-    // Converter campos de texto para caixa alta
-    if (typeof newValue === "string") {
-      newValue = normalizeText(newValue);
-    }
-
-    // Aplicar normalização apenas para campos de texto - não em datas, números, IDs, etc.
-    const textFields = [
-      "paciente",
-      "nomeMae",
-      "bairro",
-      "localHospedagem",
-      "nomeNotificador",
-      "observacaoSintomas",
-      "observacaoHipotese",
-      "observacaoTrauma",
-      "observacaoIncidente",
-    ];
-
-    if (textFields.includes(name)) {
-      // Para esses campos, além de converter para caixa alta, remover acentos
-      newValue = normalizeText(value);
-
-      if (name === "paciente" && newValue.length > 100) {
-        newValue = newValue.slice(0, 100);
-      } else if (name === "nomeMae" && newValue.length > 100) {
-        newValue = newValue.slice(0, 100);
-      }
-    }
-    // Limitar contato telefônico a 15 caracteres numéricos
-    else if (name === "contatoTelefonico") {
-      newValue = value.slice(0, 15);
-    }
-
-    // Validar relações entre datas
-    if (name === "dataAtendimento" && formData.dataInicioSintomas && newValue) {
-      if (!compareDates(newValue, formData.dataInicioSintomas)) {
-        setErrors((prev) => ({
-          ...prev,
-          dataAtendimento: "A data de atendimento não pode ser anterior à data de início dos sintomas",
-        }));
-      }
-    }    // Validar dataInicioSintomas em relação a dataAtendimento
-    if (name === "dataInicioSintomas" && formData.dataAtendimento && newValue) {
-      if (!compareDates(formData.dataAtendimento, newValue)) {
-        setErrors((prev) => ({
-          ...prev,
-          dataInicioSintomas: "A data de início dos sintomas não pode ser posterior à data de atendimento",
-        }));
-      }
-    }    // LÓGICA CORRIGIDA PARA IDADE
-    if (name === 'idadeUnidade') {
-        setFormData(prev => ({ ...prev, idadeUnidade: newValue as 'anos' | 'meses' }));
-    } else if (name === 'idade' || name === 'idadeMeses') {
-        if (formData.dataNascimento) return; // Bloqueia edição manual se a data existe
-        
-        setFormData(prev => {
-            const newFormData = {...prev, [name]: newValue};
-            const numValue = parseInt(newValue, 10);
-            
-            if (isNaN(numValue) || newValue === "") {
-                newFormData.idade = "";
-                newFormData.idadeMeses = "";
-                return newFormData;
-            }
-
-            if (name === 'idade') {
-                newFormData.idadeMeses = (numValue * 12).toString();
-            } else { // name === 'idadeMeses'
-                newFormData.idade = Math.floor(numValue / 12).toString();
-            }
-            return newFormData;
-        });
-    }
-    // Lógica para outros campos
-    else {
-      setFormData((prev) => ({ ...prev, [name]: newValue }));
-    }
-  };
-
-  // Handler para checkboxes (múltipla seleção)
-  const handleCheckboxChange = (field: keyof FormData, value: string) => {
-    if (!value) return;
-
-    setFormData((prev) => {
-      const currentValues = prev[field] as string[];
-      return {
-        ...prev,
-        [field]: currentValues.includes(value)
-          ? currentValues.filter((item) => item !== value)
-          : [...currentValues, value],
-      };
-    });
-  };
-
-  // Handler para CPF
-  const handleCPFChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = e.target.value;
-    // Remove formatação para armazenar apenas os dígitos no estado
-    const formattedCPF = rawValue.replace(/\D/g, "").slice(0, 11);
-
-    setFormData((prev) => ({
-      ...prev,
-      cpf: formattedCPF,
-    }));
-
-    // Limpar erro existente
-    if (errors.cpf) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors.cpf;
-        return newErrors;
-      });
-    }
-
-    // Verificar CPF existente apenas se for um CPF completo
-    if (formattedCPF.length === 11 && formattedCPF !== originalCpf) {
-      const exists = await searchCpfExists(formattedCPF);
-
-      if (exists) {
-        setErrors((prev) => ({
-          ...prev,
-          cpf: "O CPF digitado já existe",
-        }));
-      }
-    }
-  };
-
-  // Handler para contato local
-  const handleContatoLocalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = e.target.value;
-    const formattedValue = rawValue.replace(/\D/g, "").slice(0, 11);
-
-    setFormData((prev) => ({
-      ...prev,
-      contatoLocal: formattedValue,
-    }));
-
-    // Clear error if exists
-    if (errors.contatoLocal) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors.contatoLocal;
-        return newErrors;
-      });
-    }
-  };
-
-  // Função para receber erros de validação de componentes
-  const handleValidationError = (name: string, error: string | null) => {
-    if (error) {
-      // Adicionar erro ao estado de erros
-      setErrors(prev => ({
-        ...prev,
-        [name]: error
-      }));
-    } else if (errors[name]) {
-      // Remover o erro se foi resolvido
-      const newErrors = { ...errors };
-      delete newErrors[name];
-      setErrors(newErrors);
-    }
-  };
-  // Handler para mudança no campo paciente
-  const handlePacienteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { value } = e.target;
-    const normalizedValue = normalizeText(value);
-
-    // Atualizar o formData sem o ID se estiver digitando manualmente
-    setFormData((prev) => ({
-      ...prev,
-      paciente: normalizedValue,
-      pacienteId: undefined, // Limpar o ID porque estamos digitando um novo nome
-    }));
-
-    // ✅ ADICIONAR: Buscar pacientes se tiver 3+ caracteres
-    if (normalizedValue.length >= 3) {
-      searchPacientes(normalizedValue);
-    } else {
-      setShowSuggestions(false);
-      setPacienteSuggestions([]);
-    }
-
-    // Limpar erro se existir
-    if (errors.paciente) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors.paciente;
-        return newErrors;
-      });
-    }
-  };
-
-  // Selecionar paciente da lista de sugestões
-  const handleSelectPaciente = (paciente: Paciente) => {
-    // Converter todos os campos de texto para caixa alta
-    const pacienteUpperCase = toUpperCaseAllStrings(paciente);
-
-    // Armazenar o CPF original para comparações
-    setOriginalCpf(pacienteUpperCase.cpf || "");        // Formatar a data corretamente
-        let formattedDate = "";
-        let calculatedAge = "";
-        let calculatedMonths = "";
-          if (pacienteUpperCase.data_nascimento) {
-          const date = new Date(pacienteUpperCase.data_nascimento);
-          formattedDate = date.toISOString().split("T")[0]; // Formato YYYY-MM-DD
-          
-          // SEMPRE calcular idade a partir da data de nascimento se ela existir
-          const ageInfo = calculateAgeInYearsAndMonths(formattedDate);
-          calculatedAge = ageInfo.idade;
-          calculatedMonths = ageInfo.idadeMeses;
-          console.log("Paciente selecionado - Data:", formattedDate, "Idade calculada:", calculatedAge, "Meses:", calculatedMonths);
-        } else if (pacienteUpperCase.idade) {
-          // Só usar idade armazenada se não houver data de nascimento
-          calculatedAge = pacienteUpperCase.idade.toString();
-          calculatedMonths = pacienteUpperCase.idade_meses ? pacienteUpperCase.idade_meses.toString() : "";
-          console.log("Paciente selecionado - Sem data, usando idade armazenada:", calculatedAge, "Meses:", calculatedMonths);
-        }
-
-    // Verificar explicitamente se o nome_mae não é um CPF
-    let nomeDaMae = pacienteUpperCase.nome_mae || "";
-    // Se o nome_mae parece ser um CPF (apenas dígitos e tem entre 11 a 14 caracteres)
-    if (/^\d{11,14}$/.test(nomeDaMae)) {
-      nomeDaMae = ""; // Limpar se parecer um CPF
-      console.warn("Nome da mãe parece ser um CPF, limpando o campo");
-    }
-
-    // Mapeamento de escolaridade com correção específica
-    let escolaridadeValue = "";
-    if (
-      pacienteUpperCase.escolaridade_idescolaridade !== null &&
-      pacienteUpperCase.escolaridade_idescolaridade !== undefined
-    ) {
-      // Mapear especificamente o valor 7 para 8
-      if (pacienteUpperCase.escolaridade_idescolaridade === 7) {
-        escolaridadeValue = "8"; // Corrigindo o mapeamento específico
-      } else {
-        escolaridadeValue = String(
-          pacienteUpperCase.escolaridade_idescolaridade
-        );
-      }
-    } else if (
-      pacienteUpperCase.tipo_escolaridade &&
-      pacienteUpperCase.tipo_escolaridade.idescolaridade
-    ) {
-      // Aplicar o mesmo mapeamento para a estrutura alternativa
-      if (pacienteUpperCase.tipo_escolaridade.idescolaridade === 7) {
-        escolaridadeValue = "8";
-      } else {
-        escolaridadeValue = String(
-          pacienteUpperCase.tipo_escolaridade.idescolaridade
-        );
-      }
-    }      setFormData((prev) => ({
-        ...prev,
-        paciente: pacienteUpperCase.nome || "",
-        pacienteId: pacienteUpperCase.idpaciente,
-        nomeMae: nomeDaMae,
-        dataNascimento: formattedDate,
-        idade: calculatedAge, // Usar idade calculada ou armazenada conforme lógica acima
-        idadeMeses: calculatedMonths, // <-- CAMPO ADICIONADO AQUI
-        cpf: pacienteUpperCase.cpf || "",
-        identidadeGenero:
-          pacienteUpperCase.tipo_genero_idtipo_genero?.toString() || "",
-        gestante: pacienteUpperCase.gestante || "",
-        raca: pacienteUpperCase.tipo_raca_idtipo_raca?.toString() || "",
-        escolaridade: escolaridadeValue,
-        profissao: pacienteUpperCase.cbo_idcbo
-          ? pacienteUpperCase.cbo_idcbo.toString()
-          : "",
-        contatoTelefonico: (pacienteUpperCase.ddi && pacienteUpperCase.contato) 
-          ? `+${pacienteUpperCase.ddi.replace(/\D/g, '')} ${pacienteUpperCase.contato}` 
-          : pacienteUpperCase.contato || "",
-      }));
-
-    // Limpar erros ao selecionar um paciente
-    setErrors({});
-    setShowSuggestions(false);
-  };
-  // Criar novo paciente com base nos dados do formulário
-  const criarNovoPaciente = async () => {
-    setIsCreatingNewPatient(true);
-
-    try {
-      // ✅ USAR SISTEMA OFFLINE
-      const novoPaciente = {
-        nome: formData.paciente,
-        nome_mae: formData.nomeMae || "",
-        data_nascimento: formData.dataNascimento || null,
-        cpf: formData.cpf || "",
-        contato: formData.contatoTelefonico || "",
-        tipo_genero_idtipo_genero: formData.identidadeGenero || null,
-        tipo_raca_idtipo_raca: formData.raca || null,
-        escolaridade_idescolaridade: formData.escolaridade || null,
-        cbo_idcbo: formData.profissao || null,
-      };
-
-      const pacienteCriado = await savePatientOfflineSafe(novoPaciente);
-
-      // Atualizar o formData com o novo paciente e seu ID
-      const pacienteUpperCase = toUpperCaseAllStrings(pacienteCriado);
-      setFormData((prev) => ({
-        ...prev,
-        pacienteId: pacienteUpperCase.idpaciente,
-      }));
-
-      const message = systemIsOnline 
-        ? "Novo paciente criado com sucesso!" 
-        : "Paciente salvo offline. Será sincronizado quando conectar.";
-      
-      toast.success(message);
-    } catch (error) {
-      console.error("Erro ao criar novo paciente:", error);
-      toast.error("Erro ao criar novo paciente. Por favor, tente novamente.");
-    } finally {
-      setIsCreatingNewPatient(false);
-      setShowSuggestions(false);
-    }
-  };
-
-  // Função para limpar o formulário
-  const handleClearForm = () => {
-    if (window.confirm("Tem certeza que deseja limpar todos os campos do formulário?")) {
-      setFormData(initialFormData);
-      setErrors({});
-      toast.info("Formulário limpo com sucesso");
-    }
-  };
-
-  // Funções de exportação
-  const handleExport = async (format: string) => {
-    try {
-      const exportOptions = {
-        eventoOptions,
-        publicoOptions,
-        paisOptions,
-        estadoOptions,
-        municipioOptions,
-        bairroOptions,
-        generoOptions,
-        racaOptions,
-        escolaridadeOptions,
-        atendimentoOptions,
-        sintomaOptions,
-        hipoteseDiagOptions,
-        traumaOptions,
-        estabelecimentoOptions,
-        encerramentoOptions,
-      };
-
-      switch (format) {
-        case "Excel":
-          exportToExcel(formData, exportOptions);
-          break;
-        case "Word":
-          exportToWord(formData, exportOptions);
-          break;
-        case "CSV":
-          exportToCSV(formData, exportOptions);
-          break;
-        case "PDF":
-          exportToPDF(formData, exportOptions);
-          break;
-      }
-    } catch (error) {
-      console.error(`Error exporting to ${format}:`, error);
-      toast.error(`Falha ao exportar para ${format}. Por favor, tente novamente.`);
-    }
-
-    setIsExportDropdownOpen(false);
-  };
-
-  // Alternar dropdown de exportação
-  const toggleExportDropdown = () => {
-    setIsExportDropdownOpen(!isExportDropdownOpen);
   };
 
   // ✅ FUNÇÃO MODIFICADA PARA SUBMETER O FORMULÁRIO (COM SISTEMA OFFLINE)
@@ -1382,9 +1033,9 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           pacienteData.data_nascimento = null;
         }
 
-        // CORREÇÃO: SEMPRE enviar idade quando não há data de nascimento
-        if ((!formData.dataNascimento || formData.dataNascimento.trim() === '') && formData.idade) {
-          pacienteData.idade = parseInt(formData.idade);
+        // CORREÇÃO: SEMPRE enviar idade em meses quando não há data de nascimento
+        if ((!formData.dataNascimento || formData.dataNascimento.trim() === '') && formData.idadeMeses) {
+          pacienteData.idade = parseInt(formData.idadeMeses); // Envia o total de meses
         } else {
           pacienteData.idade = null;
         }
@@ -1524,70 +1175,12 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     if (isEditMode && id) {
       loadNotificacao(id);
     }
-  }, [isEditMode, id]);  // Efeito para calcular idade automaticamente quando a data de nascimento mudar
+  }, [isEditMode, id]);  // Efeito para processar idade quando dados vêm do backend
   useEffect(() => {
-    console.log("useEffect idade - dataNascimento mudou:", formData.dataNascimento);
-    
-    if (formData.dataNascimento && formData.dataNascimento.trim() !== "") {
-      const { idade, idadeMeses } = calculateAgeInYearsAndMonths(formData.dataNascimento);
-      console.log("Idade calculada:", idade, "Meses:", idadeMeses);
-      const idadeAnos = parseInt(idade, 10);
-
-      // Verificar se a idade calculada é válida (não maior que 120)
-      if (idadeAnos > 120) {
-        console.log("Idade inválida (>120), limpando campos");
-        // Limpar a data de nascimento se for inválida
-        setFormData((prev) => ({
-          ...prev,
-          dataNascimento: "", 
-          idade: "",
-          idadeMeses: "",
-          idadeUnidade: 'anos'
-        }));
-
-        // Mostrar mensagem de erro
-        setErrors((prev) => ({
-          ...prev,
-          dataNascimento: "A idade não pode ser maior que 120 anos",
-        }));
-      } else {
-        // Se a idade for válida, atualizar normalmente
-        console.log("Atualizando idade para:", idade, "Meses:", idadeMeses);
-        setFormData((prev) => {
-          // Só atualizar se a idade ou meses calculados forem diferentes dos atuais
-          if (prev.idade !== idade || prev.idadeMeses !== idadeMeses) {
-            console.log("Idade alterada de", prev.idade, "para", idade, "Meses de", prev.idadeMeses, "para", idadeMeses);
-            return {
-              ...prev,
-              idade,
-              idadeMeses,
-              // Define a unidade com base na idade
-              idadeUnidade: !isNaN(idadeAnos) && idadeAnos >= 1 ? 'anos' : 'meses'
-            };
-          }
-          return prev;
-        });
-
-        // Limpar erro se existir
-        if (errors.dataNascimento) {
-          setErrors((prev) => {
-            const newErrors = { ...prev };
-            delete newErrors.dataNascimento;
-            return newErrors;
-          });
-        }
-      }
-    } else {
-      // Quando data de nascimento for limpa, limpar idade e meses
-      console.log("Data de nascimento vazia, limpando idade e meses");
-      setFormData((prev) => ({
-        ...prev,
-        idade: "",
-        idadeMeses: "",
-        idadeUnidade: 'anos'
-      }));
-    }
-  }, [formData.dataNascimento]);// Importante: não incluir 'errors' como dependência para evitar loops
+    // Esta lógica será executada quando o formulário for carregado com dados do backend
+    // A nova lógica de idade está no notificacaoAdapter.ts
+    console.log("useEffect idade - dados carregados do backend");
+  }, [formData.dataNascimento]);
 
   // Efeito para atualizar municípios quando o estado muda
   useEffect(() => {
@@ -1851,7 +1444,340 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     }, 500),
     [searchPatientsOfflineSafe]
   );
+
   // Retornar todos os estados e funções necessários
+
+  // Lidar com mudanças no formulário
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+
+    // Limpar erro quando o campo for alterado
+    if (errors[name]) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
+
+    // Processamento específico para certos campos
+    let newValue = value;
+
+    // Converter campos de texto para caixa alta
+    if (typeof newValue === "string") {
+      newValue = normalizeText(newValue);
+    }
+
+    // Aplicar normalização apenas para campos de texto - não em datas, números, IDs, etc.
+    const textFields = [
+      "paciente",
+      "nomeMae",
+      "bairro",
+      "localHospedagem",
+      "nomeNotificador",
+      "observacaoSintomas",
+      "observacaoHipotese",
+      "observacaoTrauma",
+      "observacaoIncidente",
+    ];
+
+    if (textFields.includes(name)) {
+      // Para esses campos, além de converter para caixa alta, remover acentos
+      newValue = normalizeText(value);
+
+      if (name === "paciente" && newValue.length > 100) {
+        newValue = newValue.slice(0, 100);
+      } else if (name === "nomeMae" && newValue.length > 100) {
+        newValue = newValue.slice(0, 100);
+      }
+    }
+    // Limitar contato telefônico a 15 caracteres numéricos
+    else if (name === "contatoTelefonico") {
+      newValue = value.slice(0, 15);
+    }
+
+    // *** LÓGICA MELHORADA PARA DATA DE NASCIMENTO ***
+    if (name === "dataNascimento") {
+      // Calcular idade automaticamente quando a data de nascimento for alterada
+      const idadeCalculada = calcularIdadeAutomatica(newValue);
+      
+      // Validar se a idade calculada não ultrapassa 120 anos
+      const anosCalculados = parseInt(idadeCalculada.idade, 10);
+      if (!isNaN(anosCalculados) && anosCalculados > 120) {
+        setErrors((prev) => ({
+          ...prev,
+          dataNascimento: "A idade calculada não pode ser superior a 120 anos"
+        }));
+        return;
+      }
+      
+      setFormData((prev) => ({
+        ...prev,
+        dataNascimento: newValue,
+        idade: idadeCalculada.idade,
+        idadeMeses: idadeCalculada.idadeMeses,
+        idadeUnidade: idadeCalculada.idadeUnidade as 'anos' | 'meses' // Cast correto do tipo
+      }));
+      return;
+    }
+
+    // Validar relações entre datas
+    if (name === "dataAtendimento" && formData.dataNascimento && newValue) {
+      if (!compareDates(newValue, formData.dataNascimento)) {
+        setErrors((prev) => ({
+          ...prev,
+          dataAtendimento: "A data de atendimento não pode ser anterior à data de início dos sintomas",
+        }));
+      }
+    }
+    
+    // Validar dataInicioSintomas em relação a dataAtendimento
+    if (name === "dataInicioSintomas" && formData.dataAtendimento && newValue) {
+      if (!compareDates(formData.dataAtendimento, newValue)) {
+        setErrors((prev) => ({
+          ...prev,
+          dataInicioSintomas: "A data de início dos sintomas não pode ser posterior à data de atendimento",
+        }));
+      }
+    }
+    
+    // Lógica específica para o seletor de unidade de idade
+    if (name === 'idadeUnidade') {
+        setFormData(prev => ({ ...prev, idadeUnidade: newValue as 'anos' | 'meses' }));
+        return;
+    }
+    
+    // Lógica para os campos de idade em anos ou meses (apenas se não houver data de nascimento)
+    if ((name === 'idade' || name === 'idadeMeses') && !formData.dataNascimento) {
+        const numValue = parseInt(newValue, 10);
+        
+        // Validações de limite
+        if (!isNaN(numValue) && newValue !== "") {
+          if (name === 'idade' && numValue > 120) {
+            setErrors((prev) => ({
+              ...prev,
+              idade: "A idade não pode ser superior a 120 anos"
+            }));
+            return;
+          }
+          
+          if (name === 'idadeMeses' && numValue > 11 && formData.idadeUnidade === 'meses') {
+            setErrors((prev) => ({
+              ...prev,
+              idadeMeses: "Quando a unidade é 'meses', o valor não pode ser superior a 11"
+            }));
+            return;
+          }
+        }
+        
+        setFormData(prev => {
+            const newFormData = {...prev, [name]: newValue};
+            
+            if (isNaN(numValue) || newValue === "") {
+                newFormData.idade = "";
+                newFormData.idadeMeses = "";
+            } else if (name === 'idade') {
+                newFormData.idadeMeses = (numValue * 12).toString();
+            } else { // name === 'idadeMeses'
+                newFormData.idade = Math.floor(numValue / 12).toString();
+            }
+            return newFormData;
+        });
+        return;
+    }
+    
+    // Lógica para outros campos
+    setFormData((prev) => ({ ...prev, [name]: newValue }));
+  };
+
+  // Handler para checkboxes (múltipla seleção)
+  const handleCheckboxChange = (field: keyof FormData, value: string) => {
+    if (!value) return;
+
+    setFormData((prev) => {
+      const currentValues = prev[field] as string[];
+      return {
+        ...prev,
+        [field]: currentValues.includes(value)
+          ? currentValues.filter((item) => item !== value)
+          : [...currentValues, value],
+      };
+    });
+  };
+
+  // Handler para CPF
+  const handleCPFChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value;
+    // Remove formatação para armazenar apenas os dígitos no estado
+    const formattedCPF = rawValue.replace(/\D/g, "").slice(0, 11);
+
+    setFormData((prev) => ({
+      ...prev,
+      cpf: formattedCPF,
+    }));
+  };
+
+  // Handler para contato local
+  const handleContatoLocalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      contatoLocal: value,
+    }));
+  };
+
+  // Handler para mudanças no campo de paciente
+  const handlePacienteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      paciente: value,
+    }));
+
+    // Buscar pacientes usando debounce
+    searchPacientes(value);
+  };
+
+  // Handler para seleção de paciente das sugestões
+  const handleSelectPaciente = (paciente: Paciente) => {
+    const idadeCalculada = paciente.data_nascimento 
+      ? calcularIdadeAutomatica(paciente.data_nascimento)
+      : { idade: "", idadeMeses: "", idadeUnidade: 'anos' as 'anos' | 'meses' };
+
+    setFormData((prev) => ({
+      ...prev,
+      paciente: paciente.nome || "",
+      cpf: paciente.cpf || "",
+      dataNascimento: paciente.data_nascimento || "",
+      nomeMae: paciente.nome_mae || "",
+      // Usar os IDs dos tipos em vez dos nomes diretos
+      genero: paciente.tipo_genero?.idtipo_genero?.toString() || "",
+      raca: paciente.tipo_raca?.idtipo_raca?.toString() || "",
+      escolaridade: paciente.escolaridade_idescolaridade?.toString() || "",
+      contatoTelefonico: paciente.contato || "",
+      idade: idadeCalculada.idade,
+      idadeMeses: idadeCalculada.idadeMeses,
+      idadeUnidade: idadeCalculada.idadeUnidade as 'anos' | 'meses'
+    }));
+
+    setShowSuggestions(false);
+    setPacienteSuggestions([]);
+  };
+
+  // Função para limpar o formulário
+  const handleClearForm = () => {
+    if (window.confirm("Tem certeza que deseja limpar todos os campos do formulário?")) {
+      setFormData(initialFormData);
+      setErrors({});
+      toast.info("Formulário limpo com sucesso");
+    }
+  };
+
+  // Funções de exportação
+  const handleExport = async (format: string) => {
+    try {
+      const exportOptions = {
+        eventoOptions,
+        publicoOptions,
+        paisOptions,
+        estadoOptions,
+        municipioOptions,
+        bairroOptions,
+        generoOptions,
+        racaOptions,
+        escolaridadeOptions,
+        atendimentoOptions,
+        sintomaOptions,
+        hipoteseDiagOptions,
+        traumaOptions,
+        estabelecimentoOptions,
+        encerramentoOptions,
+      };
+
+      switch (format) {
+        case "Excel":
+          exportToExcel(formData, exportOptions);
+          break;
+        case "Word":
+          exportToWord(formData, exportOptions);
+          break;
+        case "CSV":
+          exportToCSV(formData, exportOptions);
+          break;
+        case "PDF":
+          exportToPDF(formData, exportOptions);
+          break;
+      }
+    } catch (error) {
+      console.error(`Error exporting to ${format}:`, error);
+      toast.error(`Falha ao exportar para ${format}. Por favor, tente novamente.`);
+    }
+
+    setIsExportDropdownOpen(false);
+  };
+
+  // Alternar dropdown de exportação
+  const toggleExportDropdown = () => {
+    setIsExportDropdownOpen(!isExportDropdownOpen);
+  };
+
+  // Criar novo paciente com base nos dados do formulário
+  const criarNovoPaciente = async () => {
+    setIsCreatingNewPatient(true);
+
+    try {
+      // ✅ USAR SISTEMA OFFLINE
+      const novoPaciente = {
+        nome: formData.paciente,
+        nome_mae: formData.nomeMae || "",
+        data_nascimento: formData.dataNascimento || null,
+        cpf: formData.cpf || "",
+        contato: formData.contatoTelefonico || "",
+        tipo_genero_idtipo_genero: formData.identidadeGenero || null,
+        tipo_raca_idtipo_raca: formData.raca || null,
+        escolaridade_idescolaridade: formData.escolaridade || null,
+        cbo_idcbo: formData.profissao || null,
+      };
+
+      const pacienteCriado = await savePatientOfflineSafe(novoPaciente);
+
+      // Atualizar o formData com o novo paciente e seu ID
+      const pacienteUpperCase = toUpperCaseAllStrings(pacienteCriado);
+      setFormData((prev) => ({
+        ...prev,
+        pacienteId: pacienteUpperCase.idpaciente,
+      }));
+
+      const message = systemIsOnline 
+        ? "Novo paciente criado com sucesso!" 
+        : "Paciente salvo offline. Será sincronizado quando conectar.";
+      
+      toast.success(message);
+    } catch (error) {
+      console.error("Erro ao criar novo paciente:", error);
+      toast.error("Erro ao criar novo paciente. Por favor, tente novamente.");
+    } finally {
+      setIsCreatingNewPatient(false);
+      setShowSuggestions(false);
+    }
+  };
+
+  // Função para receber erros de validação de componentes
+  const handleValidationError = (name: string, error: string | null) => {
+    if (error) {
+      // Adicionar erro ao estado de erros
+      setErrors(prev => ({
+        ...prev,
+        [name]: error
+      }));
+    } else if (errors[name]) {
+      // Remover o erro se foi resolvido
+      const newErrors = { ...errors };
+      delete newErrors[name];
+      setErrors(newErrors);
+    }
+  };
+
   return {
     formData,
     setFormData,

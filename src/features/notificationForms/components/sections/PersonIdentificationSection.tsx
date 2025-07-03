@@ -295,38 +295,71 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
                   {errors.dataNascimento}
                 </p>
               )}
-            </div>            {/* Idade com Seletor de Unidade */}
+            </div>            {/* Idade com Lógica Melhorada */}
             <div>
-              <label className="block mb-2 font-medium text-gray-700">Idade</label>
-              <div className="flex items-center gap-2">
-                {/* Seletor de Unidade */}
-                <select
-                  name="idadeUnidade"
-                  value={formData.idadeUnidade}
-                  onChange={handleChange}
-                  disabled={!!formData.dataNascimento}
-                  className="p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none disabled:bg-gray-100"
-                >
-                  <option value="anos">Anos</option>
-                  <option value="meses">Meses</option>
-                </select>
+              <label className="block mb-2 font-medium text-gray-700">
+                Idade
+                {formData.dataNascimento && (
+                  <span className="text-xs text-gray-500 ml-2">
+                    (calculada automaticamente)
+                  </span>
+                )}
+              </label>
+              
+              {formData.dataNascimento ? (
+                // Mostrar idade calculada quando há data de nascimento
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm">
+                  <span className="font-medium">
+                    {(() => {
+                      const totalMeses = parseInt(formData.idadeMeses) || 0;
+                      const anos = parseInt(formData.idade) || 0;
+                      
+                      // Se tem menos de 12 meses, mostrar só os meses
+                      if (totalMeses < 12) {
+                        return `${totalMeses} ${totalMeses === 1 ? 'mês' : 'meses'}`;
+                      }
+                      // Se tem 12 meses ou mais, mostrar só os anos
+                      else {
+                        return `${anos} ${anos === 1 ? 'ano' : 'anos'}`;
+                      }
+                    })()}
+                  </span>
+                </div>
+              ) : (
+                // Permitir edição manual quando não há data de nascimento
+                <div className="flex items-center gap-2">
+                  <select
+                    name="idadeUnidade"
+                    value={formData.idadeUnidade}
+                    onChange={handleChange}
+                    className="p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                  >
+                    <option value="anos">Anos</option>
+                    <option value="meses">Meses</option>
+                  </select>
 
-                {/* Campo de Idade (Anos ou Meses) */}
-                <input
-                  type="number"
-                  name={formData.idadeUnidade === 'anos' ? 'idade' : 'idadeMeses'}
-                  value={formData.idadeUnidade === 'anos' ? formData.idade : formData.idadeMeses}
-                  onChange={handleChange}
-                  placeholder={formData.idadeUnidade === 'anos' ? 'Anos' : 'Meses'}
-                  disabled={!!formData.dataNascimento}
-                  className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none disabled:bg-gray-100"
-                />
-              </div>
-              {formData.dataNascimento && (
-                <p className="mt-1 text-xs text-gray-500">Calculada automaticamente</p>
+                  <input
+                    type="number"
+                    name={formData.idadeUnidade === 'anos' ? 'idade' : 'idadeMeses'}
+                    value={formData.idadeUnidade === 'anos' ? formData.idade : formData.idadeMeses}
+                    onChange={handleChange}
+                    placeholder={formData.idadeUnidade === 'anos' ? 'Anos' : 'Meses'}
+                    min="0"
+                    max={formData.idadeUnidade === 'anos' ? "120" : "11"}
+                    className={`w-full p-3 border ${
+                      (formData.idadeUnidade === 'anos' && errors.idade) || 
+                      (formData.idadeUnidade === 'meses' && errors.idadeMeses)
+                        ? "border-red-500 bg-red-50"
+                        : "border-gray-200"
+                    } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
+                  />
+                </div>
               )}
-              {(errors.idade || errors.idadeMeses) && (
-                <p className="mt-1 text-sm text-red-500">{errors.idade || errors.idadeMeses}</p>
+              
+              {(errors.idade || errors.idadeMeses || errors.dataNascimento) && (
+                <p className="mt-1 text-sm text-red-500">
+                  {errors.dataNascimento || errors.idade || errors.idadeMeses}
+                </p>
               )}
             </div>
 
