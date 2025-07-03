@@ -1460,6 +1460,32 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       });
     }
 
+    // ✅ CORREÇÃO: Tratar idadeUnidade ANTES da normalização
+    if (name === 'idadeUnidade') {
+      // Limpar erros quando mudar a unidade
+      if (errors.idade) {
+        setErrors((prev) => {
+          const newErrors = { ...prev };
+          delete newErrors.idade;
+          return newErrors;
+        });
+      }
+      if (errors.idadeMeses) {
+        setErrors((prev) => {
+          const newErrors = { ...prev };
+          delete newErrors.idadeMeses;
+          return newErrors;
+        });
+      }
+      
+      setFormData((prev) => ({ 
+        ...prev, 
+        idadeUnidade: value as 'anos' | 'meses'  // ✅ Usa o value original, não normalizado
+      }));
+      console.log("Unidade de idade alterada para:", value);
+      return;
+    }
+
     // Processamento específico para certos campos
     let newValue = value;
 
@@ -1471,7 +1497,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     // Aplicar normalização apenas para campos de texto - não em datas, números, IDs, etc.
     const textFields = [
       "paciente",
-      "nomeMae",
+      "nomeMae", 
       "bairro",
       "localHospedagem",
       "nomeNotificador",
@@ -1516,7 +1542,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         dataNascimento: newValue,
         idade: idadeCalculada.idade,
         idadeMeses: idadeCalculada.idadeMeses,
-        idadeUnidade: idadeCalculada.idadeUnidade as 'anos' | 'meses' // Cast correto do tipo
+        idadeUnidade: idadeCalculada.idadeUnidade as 'anos' | 'meses'
       }));
       return;
     }
@@ -1539,12 +1565,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           dataInicioSintomas: "A data de início dos sintomas não pode ser posterior à data de atendimento",
         }));
       }
-    }
-    
-    // Lógica específica para o seletor de unidade de idade
-    if (name === 'idadeUnidade') {
-        setFormData(prev => ({ ...prev, idadeUnidade: newValue as 'anos' | 'meses' }));
-        return;
     }
     
     // Lógica para os campos de idade em anos ou meses (apenas se não houver data de nascimento)
