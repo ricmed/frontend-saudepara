@@ -1,10 +1,12 @@
+// notificacaoAdapter.ts - VERSÃO ATUALIZADA com suporte a arquivos
+
 // Interface genérica para entidades de notificação
 interface NotificacaoGenerica {
   [key: string]: any;
 }
 
 // Interface para os dados do formulário frontend
-import { FormData } from '@/features/notificationForms/types/index2';
+import { type FormData, ArquivoFormulario } from '@/features/notificationForms/types/index2';
 import axios from "axios";
 // import indexedDBService from '@/services/indexedDB'; // COMENTADO - SERÁ USADO NO FUTURO
 // import syncService from '@/services/syncService';     // COMENTADO - SERÁ USADO NO FUTURO
@@ -51,15 +53,15 @@ const processarDataParaUTC = (dateString: string | null | undefined): string => 
 
 /**
  * Formata dados do backend para o formato esperado pelo frontend (FormData)
+ * ✅ CORRIGIDO: Agora processa a lista de arquivos recebida diretamente.
  * @param backendData Dados recebidos da API
  */
 export const formatFromBackend = async (
-  backendData: NotificacaoGenerica
+  backendData: any // Usando 'any' para flexibilidade com os dados da API
 ): Promise<FormData | null> => {
   if (!backendData) return null;
 
-  // Log de depuração para visualizar a estrutura completa dos dados
-  console.log("Dados recebidos do backend:", JSON.stringify(backendData, null, 2));
+  console.log("[ADAPTER] Dados recebidos do backend para formatação:", backendData);
 
   // Converter valores de residente_belem para o formato do formulário
   const residenteBelem =
@@ -78,6 +80,27 @@ export const formatFromBackend = async (
   
   // Buscar local de encaminhamento
   let localEncaminhamento = extractLocalEncaminhamento(backendData);
+  
+  // ✅ CORREÇÃO: Mapear diretamente os arquivos que vêm com a notificação.
+  let arquivos: ArquivoFormulario[] = [];
+  if (backendData.arquivos && Array.isArray(backendData.arquivos)) {
+    const server = import.meta.env.VITE_API_SERVER;
+    const port = import.meta.env.VITE_API_PORT;
+
+    arquivos = backendData.arquivos.map((arquivo: any) => ({
+      id: arquivo.id.toString(),
+      nome: arquivo.nome_original || arquivo.nome || 'Arquivo sem nome',
+      tamanho: arquivo.tamanho || 0,
+      tipo: arquivo.tipo_mime || arquivo.tipo || 'application/octet-stream',
+      url: `${server}:${port}/api/arquivos/${arquivo.id}/download`,
+      isExisting: true, // Marcar como já existente no servidor
+      status: 'uploaded' as const, // Definir o status como 'uploaded'
+    }));
+    
+    console.log(`[ADAPTER] Mapeados ${arquivos.length} arquivos existentes da notificação.`);
+  } else {
+    console.log("[ADAPTER] Nenhum arquivo existente encontrado nos dados da notificação.");
+  }
   
   let idade = "";
   let idadeMeses = "";
@@ -99,46 +122,45 @@ export const formatFromBackend = async (
     console.log(`Idade do backend (meses): ${totalMonths}. Convertido para: ${idade} anos e ${idadeMeses} meses. Unidade: ${idadeUnidade}`);
   }
 
-
   // Processar contatos telefônicos - versão melhorada
-let contatoTelefonico = "";
-let contatoNotificador = "";
-let ddi = backendData.paciente?.ddi || "55"; // Começa com o DDI do backend
+  let contatoTelefonico = "";
+  let contatoNotificador = "";
+  let ddi = backendData.paciente?.ddi || "55"; // Começa com o DDI do backend
 
-// Contato do paciente
-if (backendData.paciente?.contato) {
-  // Se o contato começa com +, extrair o DDI dele
-  if (backendData.paciente.contato.startsWith('+') && backendData.paciente.contato.includes(' ')) {
-    const parts = backendData.paciente.contato.split(' ');
-    // Atualizar o DDI a partir do número (mais confiável)
-    ddi = parts[0].replace('+', '');
-    // Armazenar apenas o número
-    contatoTelefonico = parts.slice(1).join(' ');
-  } else {
-    // Se não tem formato +XX, usar o valor completo
-    contatoTelefonico = backendData.paciente.contato;
+  // Contato do paciente
+  if (backendData.paciente?.contato) {
+    // Se o contato começa com +, extrair o DDI dele
+    if (backendData.paciente.contato.startsWith('+') && backendData.paciente.contato.includes(' ')) {
+      const parts = backendData.paciente.contato.split(' ');
+      // Atualizar o DDI a partir do número (mais confiável)
+      ddi = parts[0].replace('+', '');
+      // Armazenar apenas o número
+      contatoTelefonico = parts.slice(1).join(' ');
+    } else {
+      // Se não tem formato +XX, usar o valor completo
+      contatoTelefonico = backendData.paciente.contato;
+    }
+  } else if (backendData.paciente?.telefone) {
+    contatoTelefonico = backendData.paciente.telefone;
+  } else if (backendData.paciente?.celular) {
+    contatoTelefonico = backendData.paciente.celular;
   }
-} else if (backendData.paciente?.telefone) {
-  contatoTelefonico = backendData.paciente.telefone;
-} else if (backendData.paciente?.celular) {
-  contatoTelefonico = backendData.paciente.celular;
-}
 
-// Contato do notificador
-if (backendData.contato_notificador) {
-  // Se o contato começa com +, extrair apenas o número
-  if (backendData.contato_notificador.startsWith('+') && backendData.contato_notificador.includes(' ')) {
-    const parts = backendData.contato_notificador.split(' ');
-    // Armazenar apenas o número (não precisamos do DDI do notificador)
-    contatoNotificador = parts.slice(1).join(' ');
-  } else {
-    contatoNotificador = backendData.contato_notificador;
+  // Contato do notificador
+  if (backendData.contato_notificador) {
+    // Se o contato começa com +, extrair apenas o número
+    if (backendData.contato_notificador.startsWith('+') && backendData.contato_notificador.includes(' ')) {
+      const parts = backendData.contato_notificador.split(' ');
+      // Armazenar apenas o número (não precisamos do DDI do notificador)
+      contatoNotificador = parts.slice(1).join(' ');
+    } else {
+      contatoNotificador = backendData.contato_notificador;
+    }
+  } else if (backendData.telefone_notificador) {
+    contatoNotificador = backendData.telefone_notificador;
+  } else if (backendData.celular_notificador) {
+    contatoNotificador = backendData.celular_notificador;
   }
-} else if (backendData.telefone_notificador) {
-  contatoNotificador = backendData.telefone_notificador;
-} else if (backendData.celular_notificador) {
-  contatoNotificador = backendData.celular_notificador;
-}
 
   // Criar objeto de formulário com dados do backend
   const formData: FormData = {
@@ -178,7 +200,8 @@ if (backendData.contato_notificador) {
 
     // Seção 4: Informações do atendimento
     tipoAtendimento:
-      backendData.tipo_atendimento_idtipo_atendimento?.toString() || "",     sinaisESintomas,
+      backendData.tipo_atendimento_idtipo_atendimento?.toString() || "",
+    sinaisESintomas,
     dataInicioSintomas: processarData(backendData.data_inicio_sintomas),
     observacaoSintomas: backendData.observacao_sintomas || "",
     hipoteseDiagnostica: hipotesesDiagnosticas,
@@ -202,14 +225,19 @@ if (backendData.contato_notificador) {
     tipoEncerramento:
       backendData.tipo_encerramento_idtipo_encerramento?.toString() || "",
     localEncaminhamento,
+    
+    // 🆕 NOVA SEÇÃO 7: Arquivos Anexos
+    arquivos: arquivos
   };
+  
   console.log("FormData processado:", {
     contatoTelefonico: formData.contatoTelefonico,
     contatoNotificador: formData.contatoNotificador,
     sinaisESintomas: formData.sinaisESintomas,
     hipoteseDiagnostica: formData.hipoteseDiagnostica,
     localEncaminhamento: formData.localEncaminhamento,
-    tipoEncerramento: formData.tipoEncerramento
+    tipoEncerramento: formData.tipoEncerramento,
+    arquivos: formData.arquivos.length // 🆕 LOG DOS ARQUIVOS
   });
 
   return formData;
@@ -312,23 +340,23 @@ export function extractLocalEncaminhamento(notificacao: NotificacaoGenerica): st
  * @param isUpdate Indica se é uma atualização (true) ou criação (false)
  */
 export const formatToBackend = (frontendData: FormData, isUpdate: boolean = false): NotificacaoGenerica => {
-const trimFields = <T extends Record<string, any>>(data: T): T => {
-  const result: Record<string, any> = {};
+  const trimFields = <T extends Record<string, any>>(data: T): T => {
+    const result: Record<string, any> = {};
 
-  Object.entries(data).forEach(([key, value]) => {
-    result[key] = typeof value === "string" ? value.trim() : value;
-  });
+    Object.entries(data).forEach(([key, value]) => {
+      result[key] = typeof value === "string" ? value.trim() : value;
+    });
 
-  return result as T;
-};
+    return result as T;
+  };
 
-const trimmedData = trimFields(frontendData);
+  const trimmedData = trimFields(frontendData);
 
   // Converter valores específicos
   const residenteBelem =
-  trimmedData.residenteBelem === "1"
-  ? "S"
-  : "N"; // Tanto "2" (não residente BR) quanto "3" (estrangeiro) mapeiam para "N"
+    trimmedData.residenteBelem === "1"
+      ? "S"
+      : "N"; // Tanto "2" (não residente BR) quanto "3" (estrangeiro) mapeiam para "N"
 
   const pacienteId = trimmedData.pacienteId ? Number(trimmedData.pacienteId) : null;
 
@@ -373,6 +401,13 @@ const trimmedData = trimFields(frontendData);
     tipoEncerramento: trimmedData.tipoEncerramento
   });
 
+  // 🆕 LOG DOS ARQUIVOS NO ENVIO
+  console.log("Arquivos no formulário para envio:", {
+    total: trimmedData.arquivos?.length || 0,
+    novos: trimmedData.arquivos?.filter(a => !a.isExisting).length || 0,
+    existentes: trimmedData.arquivos?.filter(a => a.isExisting).length || 0
+  });
+
   // Construir payload para o backend com datas ajustadas para UTC
   const payload: NotificacaoGenerica = {
     tipo_evento_idtipo_evento: parseInt(trimmedData.evento) || null,
@@ -380,8 +415,8 @@ const trimmedData = trimFields(frontendData);
     paciente_idpaciente: pacienteId,
     residente_belem: residenteBelem,
     tipo_pais_idtipo_pais: trimmedData.residenteBelem === "3" 
-  ? parseInt(trimmedData.paisProcedencia) || null 
-  : 105, // Brasil para opções 1 e 2
+      ? parseInt(trimmedData.paisProcedencia) || null 
+      : 105, // Brasil para opções 1 e 2
     tipo_atendimento_idtipo_atendimento: parseInt(trimmedData.tipoAtendimento) || null,
     estabelecimento_idestabelecimento: parseInt(trimmedData.unidadeNotificadora) || null,
     tipo_encerramento_idtipo_encerramento: parseInt(trimmedData.tipoEncerramento) || null,
@@ -417,21 +452,22 @@ const trimmedData = trimFields(frontendData);
     contato_local_hospedagem: trimmedData.contatoLocal || "",
     ...(trimmedData.dataInicioSintomas && {
       data_inicio_sintomas: processarDataParaUTC(trimmedData.dataInicioSintomas),
-    }),     ...(trimmedData.observacaoSintomas && {
+    }),
+    ...(trimmedData.observacaoSintomas && {
       observacao_sintomas: trimmedData.observacaoSintomas || "",
     }),
     tipo_hipotese_diag_idtipo_hipotese_diag: 
-  trimmedData.hipoteseDiagnostica.length > 0
-    ? parseInt(trimmedData.hipoteseDiagnostica[0]) || null
-    : null,
-  ...(trimmedData.observacaoHipotese && {
-    observacao_hiposete: trimmedData.observacaoHipotese || "",
-  }),
-  tipo_trauma_idtipo_trauma: trimmedData.tipoTrauma.length > 0 
-    ? parseInt(trimmedData.tipoTrauma[0]) 
-    : null,
-  ...(trimmedData.observacaoTrauma && {
-    observacao_trauma: trimmedData.observacaoTrauma || "",
+      trimmedData.hipoteseDiagnostica.length > 0
+        ? parseInt(trimmedData.hipoteseDiagnostica[0]) || null
+        : null,
+    ...(trimmedData.observacaoHipotese && {
+      observacao_hiposete: trimmedData.observacaoHipotese || "",
+    }),
+    tipo_trauma_idtipo_trauma: trimmedData.tipoTrauma.length > 0 
+      ? parseInt(trimmedData.tipoTrauma[0]) 
+      : null,
+    ...(trimmedData.observacaoTrauma && {
+      observacao_trauma: trimmedData.observacaoTrauma || "",
     }),
     ...(trimmedData.observacaoIncidente && {
       observavao_incidente: trimmedData.observacaoIncidente || "",
@@ -483,14 +519,98 @@ export const salvarSintomasViaApi = async (notificacaoId: number, sintomasIds: n
 };
 
 /**
- * Função principal para salvar uma notificação completa (incluindo sintomas)
- * Versão simplificada sem suporte offline
- * @param formData Dados do formulário
+ * 🆕 NOVA FUNÇÃO: Processar upload de arquivos de uma notificação
+ * @param notificacaoId ID da notificação
+ * @param arquivos Array de arquivos do formulário
+ */
+export const processarArquivosNotificacao = async (
+  notificacaoId: number,
+  arquivos: ArquivoFormulario[]
+): Promise<void> => {
+  console.log('\n🚀 ===== UPLOAD DE ARQUIVOS (LÓGICA CENTRALIZADA) =====');
+  console.log('📋 Notificação ID:', notificacaoId);
+  console.log('📁 Total de arquivos no formData:', arquivos.length);
+  console.log('💾 Storage disponível no início:', (window as any).fileStorage?.size || 0);
+
+  const arquivosNovos = arquivos.filter(arquivo => !arquivo.isExisting);
+  console.log(`🆕 Encontrados ${arquivosNovos.length} arquivos novos para upload.`);
+
+  if (arquivosNovos.length === 0) {
+    console.log('📭 Nenhum arquivo novo para enviar. Finalizando.');
+    return;
+  }
+
+  if (!(window as any).fileStorage) {
+    console.error('❌ ERRO CRÍTICO: window.fileStorage não existe no momento do upload!');
+    throw new Error('O sistema de armazenamento de arquivos não foi inicializado.');
+  }
+
+  const formDataApi = new FormData();
+  let arquivosAnexadosContador = 0;
+
+  for (const arquivo of arquivosNovos) {
+    console.log(`\n🔍 Processando para anexo: ${arquivo.nome} (ID: ${arquivo.id})`);
+
+    if (!arquivo.id) {
+      console.warn(`    L ⚠️ Arquivo [${arquivo.nome}] sem ID, será ignorado.`);
+      continue;
+    }
+
+    const file = (window as any).fileStorage.get(arquivo.id);
+
+    if (file instanceof File) {
+      // O nome do campo 'arquivos' DEVE corresponder ao esperado pelo seu backend (multer)
+      formDataApi.append('arquivos', file, file.name);
+      arquivosAnexadosContador++;
+      console.log(`    L ✅ Anexado ao FormData: ${file.name}`);
+    } else {
+      console.error(`    L ❌ ERRO: Não foi possível encontrar o File para o ID [${arquivo.id}]. Tipo encontrado: ${typeof file}`);
+    }
+  }
+
+  if (arquivosAnexadosContador === 0) {
+    console.error('❌ ERRO CRÍTICO: Nenhum arquivo válido foi anexado ao FormData, apesar de haver arquivos novos. O upload será abortado.');
+    throw new Error('Falha ao encontrar os arquivos para upload. Por favor, adicione-os novamente.');
+  }
+
+  console.log(`\n📦 FormData final pronto com ${arquivosAnexadosContador} arquivo(s). Enviando para o backend...`);
+
+  try {
+    const server = import.meta.env.VITE_API_SERVER;
+    const port = import.meta.env.VITE_API_PORT;
+    const url = `${server}:${port}/api/notificacao/${notificacaoId}/arquivos`;
+
+    await axios.post(url, formDataApi, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000 // Timeout de 2 minutos para uploads
+    });
+
+    console.log('✅ Upload concluído com sucesso!');
+
+    // Limpar apenas os arquivos que foram enviados com sucesso
+    arquivosNovos.forEach(arquivo => {
+      if (arquivo.id) {
+        (window as any).fileStorage.delete(arquivo.id);
+      }
+    });
+    console.log('🧹 Storage limpo após o upload.');
+
+  } catch (error) {
+    console.error('❌ ERRO DURANTE O UPLOAD PARA A API:', error);
+    // Lançar o erro novamente para que a função `salvarNotificacaoCompleta` possa capturá-lo
+    throw new Error('Falha ao enviar arquivos para o servidor.');
+  }
+};
+
+/**
+ * Função principal para salvar uma notificação completa (incluindo sintomas e arquivos)
+ * Versão atualizada com suporte a arquivos e exclusão
+ * @param formData Dados do formulário (agora com arquivos_para_excluir)
  * @param isUpdate Indica se é uma atualização
  * @param notificacaoId ID da notificação (apenas para atualizações)
  */
 export const salvarNotificacaoCompleta = async (
-  formData: FormData, 
+  formData: any, // Usando 'any' para acomodar o novo campo arquivos_para_excluir
   isUpdate: boolean = false,
   notificacaoId?: number
 ): Promise<any> => {
@@ -508,7 +628,6 @@ export const salvarNotificacaoCompleta = async (
   if (!formData.residenteBelem) console.warn("Campo obrigatório ausente: residenteBelem");
   if (!formData.paisProcedencia) console.warn("Campo obrigatório ausente: paisProcedencia");
   if (!formData.tipoAtendimento) console.warn("Campo obrigatório ausente: tipoAtendimento");
-  // Removed warning for missing dataOcorrencia
   if (!formData.tipoEncerramento) console.warn("Campo obrigatório ausente: tipoEncerramento");
   
   // Formatar dados para o backend
@@ -530,6 +649,7 @@ export const salvarNotificacaoCompleta = async (
         console.error("ERRO: ID do paciente ausente na atualização!");
       }
       
+      // ✅ NOVO: Usar axios diretamente para manter compatibilidade
       response = await axios.put(`${server}:${port}/api/notificacao/${notificacaoId}`, payloadBackend);
       savedNotificacaoId = notificacaoId;
     } else {
@@ -557,12 +677,8 @@ export const salvarNotificacaoCompleta = async (
         throw new Error("Tipo de encerramento não informado");
       }
       
-      // Garantir que a data está em formato UTC correto
-      if (payloadBackend.data_ocorrencia) {
-        console.log("Data de ocorrência formatada:", payloadBackend.data_ocorrencia);
-      }
-      
       try {
+        // ✅ NOVO: Usar axios diretamente para manter compatibilidade
         response = await axios.post(`${server}:${port}/api/notificacao`, payloadBackend);
         savedNotificacaoId = response.data.idnotificacao;
         console.log(`Notificação criada com ID: ${savedNotificacaoId}`);
@@ -579,11 +695,12 @@ export const salvarNotificacaoCompleta = async (
         throw postError; // Repassar o erro
       }
     }
-      // Extrair IDs dos sintomas do formulário
-    const sintomasIds = formData.sinaisESintomas.map(id => parseInt(id));
+
+    // Extrair IDs dos sintomas do formulário
+    const sintomasIds = formData.sinaisESintomas?.map((id: any) => parseInt(id)) || [];
     
     // Extrair IDs das hipóteses do formulário
-    const hipotesesIds = formData.hipoteseDiagnostica.map(id => parseInt(id));
+    const hipotesesIds = formData.hipoteseDiagnostica?.map((id: any) => parseInt(id)) || [];
     
     // Chamar função para salvar sintomas em endpoint separado
     if (sintomasIds.length > 0 || isUpdate) {
@@ -605,8 +722,52 @@ export const salvarNotificacaoCompleta = async (
       }
     }
     
+    // ✅ NOVO: Processar exclusão de arquivos ANTES do upload de novos
+    // Esta lógica processa a lista de IDs de arquivos que foram marcados para exclusão
+    // no hook useNotificationForm e os remove do servidor
+    if (formData.arquivos_para_excluir && formData.arquivos_para_excluir.length > 0) {
+      try {
+        console.log(`[ADAPTER] Solicitando exclusão de ${formData.arquivos_para_excluir.length} arquivos:`, formData.arquivos_para_excluir);
+        
+        // Excluir arquivos individualmente
+        // Nota: Pode ser otimizado para operação em batch no futuro
+        for (const arquivoId of formData.arquivos_para_excluir) {
+          try {
+            await axios.delete(`${server}:${port}/api/arquivos/${arquivoId}`);
+            console.log(`[ADAPTER] ✅ Arquivo ID ${arquivoId} excluído com sucesso.`);
+          } catch (deleteError) {
+            console.error(`[ADAPTER] ❌ Erro ao excluir arquivo ID ${arquivoId}:`, deleteError);
+            // Continua tentando excluir os outros arquivos mesmo se um falhar
+          }
+        }
+        
+        console.log(`[ADAPTER] Processamento de exclusão concluído.`);
+      } catch (error) {
+        console.error("Erro ao excluir arquivos antigos:", error);
+        toast.warning('Notificação salva, mas houve erro ao remover alguns arquivos antigos.');
+      }
+    }
+    
+    // ✅ NOVO: Processar upload de novos arquivos
+    if (formData.arquivos && formData.arquivos.length > 0) {
+      try {
+        // Filtrar apenas arquivos novos (não existentes)
+        const novosArquivos = formData.arquivos.filter((a: ArquivoFormulario) => !a.isExisting);
+        
+        if (novosArquivos.length > 0) {
+          console.log(`[ADAPTER] Processando upload de ${novosArquivos.length} novos arquivos.`);
+          await processarArquivosNotificacao(savedNotificacaoId, novosArquivos);
+        } else {
+          console.log('[ADAPTER] Nenhum arquivo novo para upload.');
+        }
+      } catch (error) {
+        console.error("Erro ao processar arquivos:", error);
+        toast.warning('Notificação salva, mas houve erro ao processar arquivos anexados.');
+      }
+    }
+    
     toast.success('Notificação salva com sucesso!');
-    return response.data;
+    return response.data || response;
   } catch (error: any) {
     console.error("Erro ao salvar notificação:", error);
     

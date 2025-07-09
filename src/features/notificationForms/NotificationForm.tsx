@@ -29,6 +29,7 @@ import PersonIdentificationSection from "./components/sections/PersonIdentificat
 import AttendanceInfoSection from "./components/sections/AttendanceInfoSection";
 import NotifierInfoSection from "./components/sections/NotifierInfoSection";
 import CaseClosureSection from "./components/sections/CaseClosureSection";
+import AttachmentsSection from "./components/sections/AttachmentsSection";
 
 // Import do novo componente de resumo de erros
 import ErrorSummary, { scrollToField } from "./components/ErrorSummary";
@@ -65,6 +66,11 @@ const NotificationForm: React.FC = () => {
     criarNovoPaciente,
     handleValidationError, // Add this new function
     originalCpf,
+    
+    // 🆕 ADICIONAR FUNÇÕES PARA ARQUIVOS:
+    handleArquivosChange,
+    handleRemoveFile, // Adicionar função de remoção
+    validateArquivos,
     
     // ✅ ADICIONAR checkCpfOfflineSafe para validação de CPF
     checkCpfOfflineSafe,
@@ -393,6 +399,17 @@ const NotificationForm: React.FC = () => {
             isLoadingMunicipios={isLoadingMunicipios}
             paisOptions={paisOptions}
             handleValidationError={handleValidationError}
+          />
+
+          {/* 🆕 NOVA SEÇÃO 7: Arquivos Anexos */}
+          <AttachmentsSection
+            formData={formData}
+            errors={errors}
+            isExpanded={expandedSections.anexos}
+            toggleSection={() => toggleSection("anexos")}
+            handleValidationError={handleValidationError}
+            onArquivosChange={handleArquivosChange}
+            onRemoveFile={handleRemoveFile}
           />
 
           {/* Botões de ação na parte inferior do formulário (centralizados) */}

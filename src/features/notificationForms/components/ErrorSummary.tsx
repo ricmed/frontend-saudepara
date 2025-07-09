@@ -72,7 +72,10 @@ const ErrorSummary: React.FC<ErrorSummaryProps> = ({
     // Seção 6: Desfecho do Caso
     dataEncerramento: "Data do Desfecho",
     tipoEncerramento: "Desfecho",
-    localEncaminhamento: "Local de Encaminhamento"
+    localEncaminhamento: "Local de Encaminhamento",
+    
+    // 🆕 Seção 7: Arquivos Anexos
+    arquivos: "Arquivos Anexos"
   };
 
   // Mapear campos para suas respectivas seções
@@ -125,7 +128,10 @@ const ErrorSummary: React.FC<ErrorSummaryProps> = ({
     // Seção 6: Desfecho do Caso
     dataEncerramento: "encerramento",
     tipoEncerramento: "encerramento",
-    localEncaminhamento: "encerramento"
+    localEncaminhamento: "encerramento",
+    
+    // 🆕 Seção 7: Arquivos Anexos
+    arquivos: "anexos"
   };
 
   const handleFieldClick = (fieldName: string) => {

@@ -8,6 +8,7 @@ export interface SectionState {
   atendimento: boolean;
   unidadeNotificadora: boolean;
   encerramento: boolean;
+  anexos: boolean; // 🆕 NOVA SEÇÃO
 }
 
 /**
@@ -21,6 +22,7 @@ export const useSectionExpansion = (initialState?: Partial<SectionState>) => {
     atendimento: true,
     unidadeNotificadora: true,
     encerramento: true,
+    anexos: false, // 🆕 NOVA SEÇÃO
     ...initialState
   });
 
@@ -54,6 +56,8 @@ export const useSectionExpansion = (initialState?: Partial<SectionState>) => {
         sectionsToExpand.unidadeNotificadora = true;
       } else if (['dataEncerramento', 'tipoEncerramento', 'localEncaminhamento'].includes(field)) {
         sectionsToExpand.encerramento = true;
+      } else if (['arquivos'].includes(field)) {
+        sectionsToExpand.anexos = true; // 🆕 NOVA SEÇÃO
       }
     });
 

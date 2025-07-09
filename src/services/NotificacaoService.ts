@@ -1,8 +1,9 @@
+// NotificacaoService.ts - VERSÃO ATUALIZADA com funções de arquivo
 import axios from 'axios';
-import { FormData } from '@/features/notificationForms/types/index2';
+import type { FormData } from '@/features/notificationForms/types/index2';
 import { formatFromBackend, formatToBackend, formatListResponse } from '@/utils/notificacaoAdapter';
 
-// Interfaces para os tipos de dados usados nos dropdowns e checkboxes
+// ... todas as interfaces existentes permanecem iguais ...
 export interface CboOption extends BaseOption {
   idtipo_cbo: number;
 }
@@ -162,6 +163,8 @@ export const NotificacaoService = {
   // Property to track active município fetch requests
   municipioAbortController: null as AbortController | null,
   
+  // ... TODAS AS FUNÇÕES EXISTENTES PERMANECEM IGUAIS ...
+  
   // Método genérico para buscar opções de dropdown
   async fetchOptions<T>(endpoint: string, limit: number = 100): Promise<T[]> {
     try {
@@ -212,6 +215,7 @@ export const NotificacaoService = {
       ] as unknown as T[];
     }
   },
+
   // Métodos para buscar cada tipo de opção
   async getEventoOptions(): Promise<EventoOption[]> {
     return NotificacaoService.fetchOptions<EventoOption>(TIPO_ENDPOINTS.EVENTO);
@@ -228,6 +232,7 @@ export const NotificacaoService = {
   async getEstadoOptions(): Promise<EstadoOption[]> {
     return NotificacaoService.fetchOptions<EstadoOption>(TIPO_ENDPOINTS.ESTADO);
   },
+
   async getMunicipioOptions(estadoId?: number): Promise<MunicipioOption[]> {
     // Se não tiver estadoId, baixar TODOS os municípios para uso offline
     if (!estadoId) {
@@ -320,7 +325,9 @@ export const NotificacaoService = {
       // Limpar o controlador após a conclusão
       NotificacaoService.municipioAbortController = null;
     }
-  },  async getBairroOptions(): Promise<BairroOption[]> {
+  },
+
+  async getBairroOptions(): Promise<BairroOption[]> {
     return NotificacaoService.fetchOptions<BairroOption>(TIPO_ENDPOINTS.BAIRRO, 1000);
   },
 
@@ -335,6 +342,7 @@ export const NotificacaoService = {
   async getEscolaridadeOptions(): Promise<EscolaridadeOption[]> {
     return NotificacaoService.fetchOptions<EscolaridadeOption>(TIPO_ENDPOINTS.ESCOLARIDADE);
   },
+
   async getCboOptions(): Promise<BaseOption[]> {
     try {
       const response = await axios.get(`${server}:${port}/api/tipo-cbo?limit=20000`);
@@ -353,9 +361,11 @@ export const NotificacaoService = {
       return [];
     }
   },
+
   async getAtendimentoOptions(): Promise<AtendimentoOption[]> {
     return NotificacaoService.fetchOptions<AtendimentoOption>(TIPO_ENDPOINTS.ATENDIMENTO);
   },
+
   async getSintomaOptions(): Promise<SintomaOption[]> {
     return NotificacaoService.fetchOptions<SintomaOption>(TIPO_ENDPOINTS.SINTOMA, 500);
   },
@@ -367,9 +377,10 @@ export const NotificacaoService = {
   async getTraumaOptions(): Promise<TraumaOption[]> {
     return NotificacaoService.fetchOptions<TraumaOption>(TIPO_ENDPOINTS.TRAUMA);
   },
+
   async getEstabelecimentoOptions(): Promise<EstabelecimentoOption[]> {
-  return NotificacaoService.fetchOptions<EstabelecimentoOption>(TIPO_ENDPOINTS.ESTABELECIMENTO, 11000);
-},
+    return NotificacaoService.fetchOptions<EstabelecimentoOption>(TIPO_ENDPOINTS.ESTABELECIMENTO, 11000);
+  },
 
   async getEncerramentoOptions(): Promise<EncerramentoOption[]> {
     return NotificacaoService.fetchOptions<EncerramentoOption>(TIPO_ENDPOINTS.ENCERRAMENTO);
@@ -468,6 +479,134 @@ export const NotificacaoService = {
       console.error('Erro ao buscar notificações para seleção:', error);
       return [];
     }
+  },
+
+  // 🆕 ================================
+  // NOVAS FUNÇÕES PARA GERENCIAMENTO DE ARQUIVOS
+  // ================================
+
+  /**
+   * Upload de arquivos para uma notificação
+   */
+  async uploadArquivos(notificacaoId: number, arquivos: File[]): Promise<any> {
+    try {
+      if (!arquivos || arquivos.length === 0) {
+        throw new Error('Nenhum arquivo selecionado');
+      }
+
+      // Preparar FormData para upload
+      const formData = new FormData();
+      arquivos.forEach((arquivo) => {
+        formData.append('arquivos', arquivo);
+      });
+
+      // Fazer upload
+      const response = await axios.post(
+        `${server}:${port}/api/notificacao/${notificacaoId}/arquivos`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          timeout: 120000, // 2 minutos para uploads grandes
+          onUploadProgress: (progressEvent) => {
+            // Callback opcional para progresso
+            if (progressEvent.total) {
+              const percentCompleted = Math.round(
+                (progressEvent.loaded * 100) / progressEvent.total
+              );
+              console.log(`Upload: ${percentCompleted}%`);
+            }
+          }
+        }
+      );
+
+      return response.data;
+    } catch (error: any) {
+      console.error('Erro no upload de arquivos:', error);
+      
+      if (error.response?.status === 413) {
+        throw new Error('Arquivo muito grande. Limite máximo de 10MB por arquivo.');
+      }
+      
+      if (error.response?.data?.error) {
+        throw new Error(error.response.data.error);
+      }
+      
+      throw new Error('Erro ao fazer upload dos arquivos');
+    }
+  },
+
+  /**
+   * Listar arquivos de uma notificação
+   */
+  async getArquivos(notificacaoId: number): Promise<any[]> {
+    try {
+      const response = await axios.get(
+        `${server}:${port}/api/notificacao/${notificacaoId}/arquivos`
+      );
+      
+      return response.data || [];
+    } catch (error: any) {
+      console.error('Erro ao listar arquivos:', error);
+      
+      if (error.response?.status === 404) {
+        return []; // Retorna array vazio se notificação não existir
+      }
+      
+      throw new Error('Erro ao carregar lista de arquivos');
+    }
+  },
+
+  /**
+   * Deletar um arquivo específico
+   */
+  async deleteArquivo(arquivoId: number): Promise<void> {
+    try {
+      await axios.delete(`${server}:${port}/api/arquivos/${arquivoId}`);
+    } catch (error: any) {
+      console.error('Erro ao deletar arquivo:', error);
+      
+      if (error.response?.status === 404) {
+        throw new Error('Arquivo não encontrado');
+      }
+      
+      throw new Error('Erro ao deletar arquivo');
+    }
+  },
+
+  /**
+   * Obter estatísticas de upload de uma notificação
+   */
+  async getArquivosStats(notificacaoId: number): Promise<any> {
+    try {
+      const response = await axios.get(
+        `${server}:${port}/api/notificacao/${notificacaoId}/arquivos/stats`
+      );
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('Erro ao obter estatísticas:', error);
+      
+      // Retornar estatísticas padrão em caso de erro
+      return {
+        total_arquivos: 0,
+        tamanho_total: 0,
+        limite_arquivos: 10,
+        limite_tamanho: 50 * 1024 * 1024,
+        espaco_disponivel: {
+          arquivos: 10,
+          bytes: 50 * 1024 * 1024
+        }
+      };
+    }
+  },
+
+  /**
+   * Função utilitária para download de arquivo
+   */
+  getDownloadUrl(arquivoId: number): string {
+    return `${server}:${port}/api/arquivos/${arquivoId}/download`;
   }
 };
 
