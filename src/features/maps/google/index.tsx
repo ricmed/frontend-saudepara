@@ -469,23 +469,32 @@ const MapaLocais: React.FC<MapaLocaisProps> = ({ initialFilters }) => {
       {/* Botão “abrir menu” que só aparece no mobile (MD para cima fica oculto) */}
       <div className="absolute top-4 left-4 z-50 md:hidden">
         <button
-          onClick={() => setMenuAberto(true)}
-          className="p-2 text-gray-600 bg-blue-600 rounded shadow"
+          onClick={() => setMenuAberto(!menuAberto)}
+          className="p-2 text-white bg-blue-600 rounded shadow hover:bg-blue-700 transition-colors"
         >
-          {/* Ícone de menu hambúrguer */}
+          {/* Ícone de menu hambúrguer ou X dependendo do estado */}
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="h-6 w-6"
             fill="none"
             viewBox="0 0 24 24"
-            stroke="white"
+            stroke="currentColor"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 6h16M4 12h16M4 18h16"
-            />
+            {menuAberto ? (
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            ) : (
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M4 12h16M4 18h16"
+              />
+            )}
           </svg>
         </button>
       </div>
@@ -514,7 +523,7 @@ const MapaLocais: React.FC<MapaLocaisProps> = ({ initialFilters }) => {
       )}
 
       {userLocation && (
-        <div className="absolute top-4 right-4 z-50 bg-green-50 p-2 rounded-lg shadow border border-green-200">
+        <div className="absolute top-4 right-4 z-50 bg-green-50 p-2 rounded-lg shadow border border-green-200 hidden md:block">
           <p className="text-xs text-green-800">✅ Localização ativa</p>
         </div>
       )}
