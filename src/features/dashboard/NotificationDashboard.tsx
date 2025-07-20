@@ -331,16 +331,17 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   const [originalTrauma, setOriginalTrauma] = useState<ChartDataItem[]>([]);
   const [originalGenero, setOriginalGenero] = useState<ChartDataItem[]>([]);
   
-  // Estado para os dados filtrados de cada categoria
-  const [filteredRaca, setFilteredRaca] = useState<ChartDataItem[]>([]);
-  const [filteredEscolaridade, setFilteredEscolaridade] = useState<ChartDataItem[]>([]);
-  const [filteredUnidades, setFilteredUnidades] = useState<ChartDataItem[]>([]);
-  const [filteredSintomas, setFilteredSintomas] = useState<ChartDataItem[]>([]);
-  const [filteredTipoAtendimento, setFilteredTipoAtendimento] = useState<ChartDataItem[]>([]);
-  const [filteredPublico, setFilteredPublico] = useState<ChartDataItem[]>([]);
-  const [filteredHipoteses, setFilteredHipoteses] = useState<ChartDataItem[]>([]);
-  const [filteredTrauma, setFilteredTrauma] = useState<ChartDataItem[]>([]);
-  const [filteredGenero, setFilteredGenero] = useState<ChartDataItem[]>([]);
+  // Estados para os dados que SERÃO EXIBIDOS nos gráficos.
+  // Eles serão atualizados toda vez que o filtro mudar.
+  const [displayRaca, setDisplayRaca] = useState<ChartDataItem[]>([]);
+  const [displayEscolaridade, setDisplayEscolaridade] = useState<ChartDataItem[]>([]);
+  const [displayUnidades, setDisplayUnidades] = useState<ChartDataItem[]>([]);
+  const [displaySintomas, setDisplaySintomas] = useState<ChartDataItem[]>([]);
+  const [displayTipoAtendimento, setDisplayTipoAtendimento] = useState<ChartDataItem[]>([]);
+  const [displayPublico, setDisplayPublico] = useState<ChartDataItem[]>([]);
+  const [displayHipoteses, setDisplayHipoteses] = useState<ChartDataItem[]>([]);
+  const [displayTrauma, setDisplayTrauma] = useState<ChartDataItem[]>([]);
+  const [displayGenero, setDisplayGenero] = useState<ChartDataItem[]>([]);
   
   // Mapeamentos de tipos de atendimento (serão inicializados com base nos dados)
   const [tipoAtendimentoMap, setTipoAtendimentoMap] = useState<Record<string, string>>({});
@@ -824,9 +825,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         'normal'
       );
       if (racaPorNotificacao.length > 0) {
-        setFilteredRaca(racaPorNotificacao);
+        setDisplayRaca(racaPorNotificacao);
         // Se for a primeira vez, armazenar como original também
-        if (originalRaca.length === 0) {
+        if (!initialProcessingDone.current) {
           setOriginalRaca(racaPorNotificacao);
         }
       }
@@ -841,8 +842,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         'normal'
       );
       if (escolaridadePorNotificacao.length > 0) {
-        setFilteredEscolaridade(escolaridadePorNotificacao);
-        if (originalEscolaridade.length === 0) {
+        setDisplayEscolaridade(escolaridadePorNotificacao);
+        if (!initialProcessingDone.current) {
           setOriginalEscolaridade(escolaridadePorNotificacao);
         }
       }
@@ -857,8 +858,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         'normal'
       );
       if (unidadesPorNotificacao.length > 0) {
-        setFilteredUnidades(unidadesPorNotificacao);
-        if (originalUnidades.length === 0) {
+        setDisplayUnidades(unidadesPorNotificacao);
+        if (!initialProcessingDone.current) {
           setOriginalUnidades(unidadesPorNotificacao);
         }
       }
@@ -874,8 +875,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         'pie'
       );
       if (generoPorNotificacao.length > 0) {
-        setFilteredGenero(generoPorNotificacao);
-        if (originalGenero.length === 0) {
+        setDisplayGenero(generoPorNotificacao);
+        if (!initialProcessingDone.current) {
           setOriginalGenero(generoPorNotificacao);
         }
       }
@@ -891,8 +892,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         'normal'
       );
       if (sintomasPorNotificacao.length > 0) {
-        setFilteredSintomas(sintomasPorNotificacao);
-        if (originalSintomas.length === 0) {
+        setDisplaySintomas(sintomasPorNotificacao);
+        if (!initialProcessingDone.current) {
           setOriginalSintomas(sintomasPorNotificacao);
         }
       }
@@ -907,8 +908,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         'normal'
       );
       if (atendimentoPorNotificacao.length > 0) {
-        setFilteredTipoAtendimento(atendimentoPorNotificacao);
-        if (originalTipoAtendimento.length === 0) {
+        setDisplayTipoAtendimento(atendimentoPorNotificacao);
+        if (!initialProcessingDone.current) {
           setOriginalTipoAtendimento(atendimentoPorNotificacao);
         }
       }
@@ -924,8 +925,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         'pie'
       );
       if (publicoPorNotificacao.length > 0) {
-        setFilteredPublico(publicoPorNotificacao);
-        if (originalPublico.length === 0) {
+        setDisplayPublico(publicoPorNotificacao);
+        if (!initialProcessingDone.current) {
           setOriginalPublico(publicoPorNotificacao);
         }
       }
@@ -949,8 +950,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           return b.value - a.value;
         });
         
-        setFilteredHipoteses(sortedHipoteses);
-        if (originalHipoteses.length === 0) {
+        setDisplayHipoteses(sortedHipoteses);
+        if (!initialProcessingDone.current) {
           setOriginalHipoteses(sortedHipoteses);
         }
       }
@@ -966,8 +967,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       );
       console.log("Dados de trauma processados:", traumaPorNotificacao);
       if (traumaPorNotificacao.length > 0) {
-        setFilteredTrauma(traumaPorNotificacao);
-        if (originalTrauma.length === 0) {
+        setDisplayTrauma(traumaPorNotificacao);
+        if (!initialProcessingDone.current) {
           setOriginalTrauma(traumaPorNotificacao);
         }
       }
@@ -1163,26 +1164,21 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     };
   }, [autoRefreshEnabled]);
 
-  // Quando a categoria selecionada mudar, aplicar filtro real
+  // Quando a categoria selecionada mudar, aplica o filtro e reprocessa TUDO.
   useEffect(() => {
+    // Não faça nada até que os dados originais tenham sido processados pela primeira vez.
     if (!initialProcessingDone.current) return;
+
     setLoading(true);
+    
+    // Filtra as notificações originais com base na categoria selecionada
     const dadosFiltrados = filtrarNotificacoes(selectedCategory);
-    filteredNotificacoes.current = dadosFiltrados;
-
-    if (dadosFiltrados.length === 0) {
-      // sem notificações: zerar totais e limpar gráficos
-      setTotalNotifications(0);
-      setStatCounts({ clinico:0, trauma:0, multiplas:0, qbrn:0 });
-      setFilteredRaca([]); setFilteredEscolaridade([]); setFilteredUnidades([]);
-      setFilteredSintomas([]); setFilteredTipoAtendimento([]); setFilteredPublico([]);
-      setFilteredHipoteses([]); setFilteredTrauma([]); setFilteredGenero([]);
-    } else {
-      calcularEstatisticas(dadosFiltrados);
-    }
-
+    
+    // Recalcula todas as estatísticas e dados de gráficos a partir dos dados filtrados
+    calcularEstatisticas(dadosFiltrados);
+    
     setLoading(false);
-  }, [selectedCategory, filtrarNotificacoes, calcularEstatisticas]);
+  }, [selectedCategory, calcularEstatisticas, filtrarNotificacoes]); // Adicione as dependências
 
   // useEffect para processamento inicial de dados
   useEffect(() => {
@@ -1223,15 +1219,15 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           setOriginalTrauma([]);
           setOriginalGenero([]);
           
-          setFilteredRaca([]);
-          setFilteredEscolaridade([]);
-          setFilteredUnidades([]);
-          setFilteredSintomas([]);
-          setFilteredTipoAtendimento([]);
-          setFilteredPublico([]);
-          setFilteredHipoteses([]);
-          setFilteredTrauma([]);
-          setFilteredGenero([]);
+          setDisplayRaca([]);
+          setDisplayEscolaridade([]);
+          setDisplayUnidades([]);
+          setDisplaySintomas([]);
+          setDisplayTipoAtendimento([]);
+          setDisplayPublico([]);
+          setDisplayHipoteses([]);
+          setDisplayTrauma([]);
+          setDisplayGenero([]);
         } else {
           console.log("Iniciando processamento de dados com", notificacoes.length, "notificações");
           // Processar todas as notificações (sem filtro inicialmente)
@@ -1285,26 +1281,23 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     setSelectedCategory(novoEvento !== "Todos" ? novoEvento : null);
   }, []);
 
-  // Handler para cards e charts
-  const handleCardClick = useCallback((tipoAtendimento: string) => {
-    console.log(`Card clicado: ${tipoAtendimento}`);
-    const filterKey = atendimentoToFilterKey[tipoAtendimento.toLowerCase()] || tipoAtendimento;
+  const handleChartOrCardClick = useCallback((category: string) => {
+    console.log(`Item clicado: ${category}`);
     
-    // Se já está selecionado, limpar filtro
-    if (selectedCategory === filterKey) {
-      console.log("Limpando filtro atual");
+    // Se a categoria clicada já for a selecionada, limpa o filtro.
+    // Senão, define a nova categoria como filtro.
+    if (selectedCategory === category) {
       setSelectedCategory(null);
-      setSelectedEvento("Todos");
+      setSelectedEvento("Todos"); // Limpa o dropdown de evento também
     } else {
-      console.log(`Aplicando filtro: ${filterKey}`);
-      setSelectedCategory(filterKey);
-      
-      // Manter evento selecionado sincronizado se necessário
-      if (tipoAtendimento !== selectedEvento && !Object.values(atendimentoToFilterKey).includes(selectedEvento)) {
-        setSelectedEvento("Todos");
+      setSelectedCategory(category);
+      // Se a categoria não for um evento, reseta o dropdown de evento
+      const isEvento = eventoOptions.includes(category);
+      if (!isEvento) {
+          setSelectedEvento("Todos");
       }
     }
-  }, [selectedCategory, selectedEvento, atendimentoToFilterKey]);
+  }, [selectedCategory, eventoOptions]); // Adicione a dependência
 
   // Handler para o botão de voltar
   const handleBackButton = useCallback(() => {
@@ -1506,7 +1499,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
           <div
             className={`bg-white p-4 rounded-lg shadow-sm flex items-center gap-4 cursor-pointer hover:shadow-md transition-shadow ${selectedCategory === 'Clínico' ? 'ring-2 ring-green-400' : ''}`}
-            onClick={() => handleCardClick("clinico")}
+            onClick={() => handleChartOrCardClick("clinico")}
           >
             <div className="p-3 bg-green-100 text-green-800 rounded-full">
               <Activity className="h-6 w-6" />
@@ -1521,7 +1514,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
           <div
             className={`bg-white p-4 rounded-lg shadow-sm flex items-center gap-4 cursor-pointer hover:shadow-md transition-shadow ${selectedCategory === 'Trauma' ? 'ring-2 ring-red-400' : ''}`}
-            onClick={() => handleCardClick("trauma")}
+            onClick={() => handleChartOrCardClick("trauma")}
           >
             <div className="p-3 bg-red-100 text-red-800 rounded-full">
               <AlertCircle className="h-6 w-6" />
@@ -1537,7 +1530,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           {/* NOVO CARD: Múltiplas Vítimas */}
           <div
             className={`bg-white p-4 rounded-lg shadow-sm flex items-center gap-4 cursor-pointer hover:shadow-md transition-shadow ${selectedCategory === 'Múltiplas Vítimas' ? 'ring-2 ring-purple-400' : ''}`}
-            onClick={() => handleCardClick("multiplas")}
+            onClick={() => handleChartOrCardClick("multiplas")}
           >
             <div className="p-3 bg-purple-100 text-purple-800 rounded-full">
               <AlertTriangle className="h-6 w-6" />
@@ -1553,7 +1546,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           {/* NOVO CARD: Incidente QBRN */}
           <div
             className={`bg-white p-4 rounded-lg shadow-sm flex items-center gap-4 cursor-pointer hover:shadow-md transition-shadow ${selectedCategory === 'Incidente QBRN' ? 'ring-2 ring-orange-400' : ''}`}
-            onClick={() => handleCardClick("qbrn")}
+            onClick={() => handleChartOrCardClick("qbrn")}
           >
             <div className="p-3 bg-orange-100 text-orange-800 rounded-full">
               <Bomb className="h-6 w-6" />
@@ -1588,18 +1581,18 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 <GraphExportMenu 
                   chartId="chart-publico" 
                   chartType={chartType.publico}
-                  chartData={filteredPublico}
+                  chartData={displayPublico}
                   chartTitle="Distribuição por Público Atendido"
                 />
               </div>
             </div>
             <div className="h-64" id="chart-publico">
-              {filteredPublico.length > 0 ? (
+              {displayPublico.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   {chartType.publico === 'pie' ? (
                     <PieChart>
                       <Pie
-                        data={filteredPublico}
+                        data={displayPublico}
                         cx="50%"
                         cy="50%"
                         labelLine={true}
@@ -1612,12 +1605,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         }
                         onClick={(data) => {
                           if (data && data.name) {
-                            handleCardClick(data.name);
+                            handleChartOrCardClick(data.name);
                           }
                         }}
                         cursor="pointer"
                       >
-                        {filteredPublico.map((entry, i) => (
+                        {displayPublico.map((entry, i) => (
                           <Cell 
                             key={`cell-${i}`} 
                             fill={entry.fill}
@@ -1639,7 +1632,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                     </PieChart>
                   ) : (
                     <BarChart
-                      data={filteredPublico}
+                      data={displayPublico}
                       margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -1660,12 +1653,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         radius={[4, 4, 0, 0]}
                         onClick={(data) => {
                           if (data && data.name) {
-                            handleCardClick(data.name);
+                            handleChartOrCardClick(data.name);
                           }
                         }}
                         cursor="pointer"
                       >
-                        {filteredPublico.map((entry, i) => (
+                        {displayPublico.map((entry, i) => (
                           <Cell 
                             key={`cell-${i}`} 
                             fill={entry.fill}
@@ -1707,17 +1700,17 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 <GraphExportMenu 
                   chartId="chart-tipo-atendimento" 
                   chartType={chartType.tipoAtendimento}
-                  chartData={filteredTipoAtendimento}
+                  chartData={displayTipoAtendimento}
                   chartTitle="Distribuição por Tipo de Atendimento"
                 />
               </div>
             </div>
             <div className="h-64" id="chart-tipo-atendimento">
-              {filteredTipoAtendimento.length > 0 ? (
+              {displayTipoAtendimento.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   {chartType.tipoAtendimento === 'bar' ? (
                     <BarChart
-                      data={filteredTipoAtendimento}
+                      data={displayTipoAtendimento}
                       margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -1738,12 +1731,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         radius={[4, 4, 0, 0]}
                         onClick={(data) => {
                           if (data && data.name) {
-                            handleCardClick(data.name);
+                            handleChartOrCardClick(data.name);
                           }
                         }}
                         cursor="pointer"
                       >
-                        {filteredTipoAtendimento.map((entry, i) => (
+                        {displayTipoAtendimento.map((entry, i) => (
                           <Cell 
                             key={`cell-${i}`} 
                             fill={entry.fill}
@@ -1756,7 +1749,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                   ) : (
                     <PieChart>
                       <Pie
-                        data={filteredTipoAtendimento}
+                        data={displayTipoAtendimento}
                         cx="50%"
                         cy="50%"
                         labelLine={true}
@@ -1768,12 +1761,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         }
                         onClick={(data) => {
                           if (data && data.name) {
-                            handleCardClick(data.name);
+                            handleChartOrCardClick(data.name);
                           }
                         }}
                         cursor="pointer"
                       >
-                        {filteredTipoAtendimento.map((entry, i) => (
+                        {displayTipoAtendimento.map((entry, i) => (
                           <Cell 
                             key={`cell-${i}`} 
                             fill={entry.fill}
@@ -1825,18 +1818,18 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 <GraphExportMenu 
                   chartId="chart-genero" 
                   chartType={chartType.genero}
-                  chartData={filteredGenero}
+                  chartData={displayGenero}
                   chartTitle="Distribuição por Sexo"
                 />
               </div>
             </div>
             <div className="h-64" id="chart-genero">
-              {filteredGenero.length > 0 ? (
+              {displayGenero.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   {chartType.genero === 'pie' ? (
                     <PieChart>
                       <Pie
-                        data={filteredGenero}
+                        data={displayGenero}
                         cx="50%"
                         cy="50%"
                         labelLine={false}
@@ -1849,11 +1842,11 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         cursor="pointer"
                         onClick={(data) => {
                           if (data && data.name) {
-                            handleCardClick(data.name);
+                            handleChartOrCardClick(data.name);
                           }
                         }}
                       >
-                        {filteredGenero.map((entry, i) => (
+                        {displayGenero.map((entry, i) => (
                           <Cell 
                             key={`cell-${i}`} 
                             fill={entry.fill}
@@ -1875,7 +1868,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                     </PieChart>
                   ) : (
                     <BarChart
-                      data={filteredGenero}
+                      data={displayGenero}
                       margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -1896,12 +1889,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         radius={[4, 4, 0, 0]}
                         onClick={(data) => {
                           if (data && data.name) {
-                            handleCardClick(data.name);
+                            handleChartOrCardClick(data.name);
                           }
                         }}
                         cursor="pointer"
                       >
-                        {filteredGenero.map((entry, i) => (
+                        {displayGenero.map((entry, i) => (
                           <Cell 
                             key={`cell-${i}`} 
                             fill={entry.fill}
@@ -1943,17 +1936,17 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 <GraphExportMenu 
                   chartId="chart-raca" 
                   chartType={chartType.raca}
-                  chartData={filteredRaca}
+                  chartData={displayRaca}
                   chartTitle="Distribuição por Raça e Cor"
                 />
               </div>
             </div>
             <div className="h-64" id="chart-raca">
-              {filteredRaca.length > 0 ? (
+              {displayRaca.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   {chartType.raca === 'bar' ? (
                     <BarChart
-                      data={filteredRaca}
+                      data={displayRaca}
                       margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -1974,12 +1967,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         radius={[4, 4, 0, 0]}
                         onClick={(data) => {
                           if (data && data.name) {
-                            handleCardClick(data.name);
+                            handleChartOrCardClick(data.name);
                           }
                         }}
                         cursor="pointer"
                       >
-                        {filteredRaca.map((entry, i) => (
+                        {displayRaca.map((entry, i) => (
                           <Cell 
                             key={`cell-${i}`} 
                             fill={entry.fill}
@@ -1992,7 +1985,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                   ) : (
                     <PieChart>
                       <Pie
-                        data={filteredRaca}
+                        data={displayRaca}
                         cx="50%"
                         cy="50%"
                         labelLine={true}
@@ -2004,12 +1997,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         }
                         onClick={(data) => {
                           if (data && data.name) {
-                            handleCardClick(data.name);
+                            handleChartOrCardClick(data.name);
                           }
                         }}
                         cursor="pointer"
                       >
-                        {filteredRaca.map((entry, i) => (
+                        {displayRaca.map((entry, i) => (
                           <Cell 
                             key={`cell-${i}`} 
                             fill={entry.fill}
@@ -2051,15 +2044,15 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
               <GraphExportMenu 
                 chartId="chart-sintomas" 
                 chartType="bar"
-                chartData={filteredSintomas.slice(0, 10)}
+                chartData={displaySintomas.slice(0, 10)}
                 chartTitle="Principais Sinais e Sintomas"
               />
             </div>
             <div className="h-64" id="chart-sintomas">
-              {filteredSintomas.length > 0 ? (
+              {displaySintomas.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
-                    data={filteredSintomas.slice(0, 10)}
+                    data={displaySintomas.slice(0, 10)}
                     layout="vertical"
                     margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
                   >
@@ -2086,12 +2079,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                       dataKey="value"
                       onClick={(data) => {
                         if (data && data.name) {
-                          handleCardClick(data.name);
+                          handleChartOrCardClick(data.name);
                         }
                       }}
                       cursor="pointer"
                     >
-                      {filteredSintomas.slice(0, 10).map((entry, i) => (
+                      {displaySintomas.slice(0, 10).map((entry, i) => (
                         <Cell 
                           key={`cell-${i}`} 
                           fill={entry.fill}
@@ -2122,15 +2115,15 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
               <GraphExportMenu 
                 chartId="chart-trauma" 
                 chartType="bar"
-                chartData={filteredTrauma}
+                chartData={displayTrauma}
                 chartTitle="Tipos de Trauma"
               />
             </div>
             <div className="h-64" id="chart-trauma">
-              {filteredTrauma.length > 0 ? (
+              {displayTrauma.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
-                    data={filteredTrauma}
+                    data={displayTrauma}
                     layout="vertical"
                     margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
                   >
@@ -2157,12 +2150,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                       dataKey="value"
                       onClick={(data) => {
                         if (data && data.name) {
-                          handleCardClick(data.name);
+                          handleChartOrCardClick(data.name);
                         }
                       }}
                       cursor="pointer"
                     >
-                      {filteredTrauma.map((entry, i) => (
+                      {displayTrauma.map((entry, i) => (
                         <Cell 
                           key={`cell-${i}`} 
                           fill={entry.fill}
@@ -2194,7 +2187,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 <GraphExportMenu 
                   chartId="chart-hipoteses" 
                   chartType="bar"
-                  chartData={filteredHipoteses.slice(0, 15)}
+                  chartData={displayHipoteses.slice(0, 15)}
                   chartTitle="Hipóteses Diagnósticas"
                 />
                 <div className="flex ml-2 space-x-2 text-xs">
@@ -2214,10 +2207,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
               </div>
             </div>
             <div className="h-96" id="chart-hipoteses">
-              {filteredHipoteses.length > 0 ? (
+              {displayHipoteses.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
-                    data={filteredHipoteses.slice(0, 15)}
+                    data={displayHipoteses.slice(0, 15)}
                     layout="vertical"
                     margin={{ top: 5, right: 30, left: 140, bottom: 5 }}
                   >
@@ -2244,12 +2237,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                       dataKey="value"
                       onClick={(data) => {
                         if (data && data.name) {
-                          handleCardClick(data.name);
+                          handleChartOrCardClick(data.name);
                         }
                       }}
                       cursor="pointer"
                     >
-                      {filteredHipoteses.slice(0, 15).map((entry, i) => (
+                      {displayHipoteses.slice(0, 15).map((entry, i) => (
                         <Cell 
                           key={`cell-${i}`} 
                           fill={entry.fill}
