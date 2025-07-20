@@ -2,7 +2,7 @@ import React from "react";
 import { Building2 } from "lucide-react";
 import FormField from "./FormField";
 import SectionTitle from "./SectionTitle";
-import MiniMapa from "@/features/maps/components/MiniMapa";
+import MiniMapa from "@/features/maps/leaflet/components/MiniMapa";
 import { FIELD_LENGTHS } from "@/features/forms/utils/validations";
 
 interface EstabelecimentoData {

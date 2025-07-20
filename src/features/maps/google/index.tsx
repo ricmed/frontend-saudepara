@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
+import { useLoadScript } from '@react-google-maps/api';
 import { PainelLateral } from "./components/PainelLateral";
 import { MapaContainer } from "./components/MapaContainer";
 import { BotoesControle } from "./components/BotoesControle";
@@ -17,7 +18,9 @@ import {
   MODOS_TRANSPORTE,
   SUPPORTED_LANGUAGES,
 } from "./utils/constants";
-import { Local, LatLngLiteral, TempoViagem, SupportedLanguage } from "./types";
+import { Local, LatLngLiteral, TempoViagem } from "./types";
+import { SupportedLanguage } from '@/api/maps/types';
+import { GOOGLE_MAPS_CONFIG } from '@/api/maps';
 
 /**
  * Componente principal que reúne todo o fluxo de:
@@ -28,11 +31,18 @@ import { Local, LatLngLiteral, TempoViagem, SupportedLanguage } from "./types";
  * - Traduzir instruções se necessário
  */
 const MapaLocais: React.FC = () => {
+  // Carregamento da API do Google Maps
+  const { isLoaded } = useLoadScript({
+    googleMapsApiKey: GOOGLE_MAPS_CONFIG.apiKey,
+    libraries: GOOGLE_MAPS_CONFIG.libraries,
+  });
+
   // Hook de Geolocalização (posição do usuário)
   const {
     userLocation,
     error: locationError,
     isLoading: geoIsLoading,
+    hasPermission,
     obterLocalizacao,
   } = useGeolocation();
 
@@ -97,21 +107,20 @@ const MapaLocais: React.FC = () => {
   /**
    * Effect de inicialização:
    * - Carrega dados do Excel
-   * - Obtém localização do usuário
+   * - A geolocalização é iniciada automaticamente pelo useGeolocation
    */
   useEffect(() => {
     const inicializar = async () => {
       try {
-        console.log('Iniciando obtenção de localização...'); // Para debug
-        await obterLocalizacao();
-        console.log('Localização obtida com sucesso'); // Para debug
+        console.log('Carregando dados do Excel...');
         await carregarDadosExcel();
+        console.log('Dados do Excel carregados com sucesso');
       } catch (error) {
-        console.error('Erro na inicialização:', error);
+        console.error('Erro ao carregar dados:', error);
       }
     };
     inicializar();
-  }, [carregarDadosExcel, obterLocalizacao]);
+  }, [carregarDadosExcel]);
 
   /**
    * Effect que filtra estabelecimentos com base em:
@@ -121,7 +130,7 @@ const MapaLocais: React.FC = () => {
    * - Raio de busca
    */
   useEffect(() => {
-    if (!allPlaces.length) return;
+    if (!allPlaces.length || !isLoaded || !google?.maps?.geometry?.spherical) return;
 
     const center = userLocation || mapCenter;
     const estabelecimentosFiltrados = allPlaces.filter((local) => {
@@ -149,13 +158,18 @@ const MapaLocais: React.FC = () => {
     naturezaSelecionada,
     searchRadius,
     setFilteredPlaces,
+    isLoaded,
   ]);
 
   /**
    * Effect que recentraliza o mapa no usuário assim que userLocation e map estão definidos.
    */
   useEffect(() => {
-    if (userLocation && map) {
+    console.log('Effect recentralizar - userLocation:', userLocation, 'map:', !!map, 'isLoaded:', isLoaded);
+    
+    if (userLocation && map && isLoaded && google?.maps?.LatLngBounds) {
+      console.log('Recentralizando mapa na localização do usuário:', userLocation);
+      
       const bounds = new google.maps.LatLngBounds();
       bounds.extend(userLocation);
 
@@ -164,18 +178,19 @@ const MapaLocais: React.FC = () => {
         filteredPlaces.forEach((place) => {
           bounds.extend({ lat: place.lat, lng: place.lng });
         });
+        console.log('Incluindo', filteredPlaces.length, 'lugares nos bounds');
       }
 
       map.fitBounds(bounds);
 
       // Se só tiver a localização do usuário, dá um zoom mais próximo
       if (filteredPlaces.length === 0) {
-        map.setZoom(15);
+        setTimeout(() => map.setZoom(15), 100); // Pequeno delay para garantir que fitBounds execute primeiro
       }
 
       setMapCenter(userLocation);
     }
-  }, [userLocation, map, filteredPlaces]);
+  }, [userLocation, map, filteredPlaces, isLoaded]);
 
   /**
    * Função para falar as direções (Text-to-Speech).
@@ -216,7 +231,7 @@ const MapaLocais: React.FC = () => {
    */
   const updateRoute = useCallback(
     (newLocation: LatLngLiteral) => {
-      if (!selectedLocal) return;
+      if (!selectedLocal || !isLoaded || !google?.maps?.DirectionsService) return;
 
       const directionsService = new google.maps.DirectionsService();
       directionsService.route(
@@ -242,6 +257,7 @@ const MapaLocais: React.FC = () => {
       voiceGuidanceActive,
       speakDirections,
       setDirections,
+      isLoaded,
     ]
   );
 
@@ -279,7 +295,7 @@ const MapaLocais: React.FC = () => {
    */
   const calcularTemposViagem = useCallback(
     async (destino: Local) => {
-      if (!userLocation) return;
+      if (!userLocation || !isLoaded || !google?.maps?.DirectionsService) return;
 
       const tempos: TempoViagem[] = [];
       const directionsService = new google.maps.DirectionsService();
@@ -318,7 +334,7 @@ const MapaLocais: React.FC = () => {
 
       setTemposViagem(tempos);
     },
-    [userLocation]
+    [userLocation, isLoaded]
   );
 
   /**
@@ -328,6 +344,11 @@ const MapaLocais: React.FC = () => {
     async (destino: Local) => {
       if (!userLocation) {
         alert("Permita o acesso à sua localização para traçar a rota");
+        return;
+      }
+
+      if (!isLoaded || !google?.maps?.DirectionsService) {
+        alert("Google Maps ainda está carregando. Tente novamente em alguns segundos.");
         return;
       }
 
@@ -368,6 +389,7 @@ const MapaLocais: React.FC = () => {
       calcularTemposViagem,
       speakDirections,
       startWatchingPosition,
+      isLoaded,
     ]
   );
 
@@ -401,6 +423,18 @@ const MapaLocais: React.FC = () => {
       obterLocalizacao();
     }
   }, [userLocation, map, obterLocalizacao]);
+
+  // Se a API do Google Maps não estiver carregada, mostrar loading
+  if (!isLoaded) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
+          <p className="mt-4 text-lg">Carregando Google Maps...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full h-screen relative">
@@ -447,8 +481,31 @@ const MapaLocais: React.FC = () => {
       </div>
 
       {geoIsLoading && (
-        <div className="absolute top-4 right-4 z-50 bg-white p-2 rounded shadow">
-          <p>Obtendo sua localização...</p>
+        <div className="absolute top-4 right-4 z-50 bg-white p-3 rounded-lg shadow-lg border">
+          <div className="flex items-center space-x-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+            <p className="text-sm">Obtendo sua localização...</p>
+          </div>
+        </div>
+      )}
+
+      {!hasPermission && !geoIsLoading && !userLocation && (
+        <div className="absolute top-4 right-4 z-50 bg-yellow-50 p-3 rounded-lg shadow-lg border border-yellow-200">
+          <div className="flex flex-col space-y-2">
+            <p className="text-sm text-yellow-800">📍 Localização necessária</p>
+            <button
+              onClick={obterLocalizacao}
+              className="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors"
+            >
+              Permitir Localização
+            </button>
+          </div>
+        </div>
+      )}
+
+      {userLocation && (
+        <div className="absolute top-4 right-4 z-50 bg-green-50 p-2 rounded-lg shadow border border-green-200">
+          <p className="text-xs text-green-800">✅ Localização ativa</p>
         </div>
       )}
 
@@ -478,6 +535,7 @@ const MapaLocais: React.FC = () => {
         directions={directions}
         selectedMarker={selectedMarker}
         visibleCount={visibleCount}
+        isLoaded={isLoaded}
         onMapLoad={setMap}
         onMapIdle={() => {}}
         onMarkerClick={setSelectedMarker}

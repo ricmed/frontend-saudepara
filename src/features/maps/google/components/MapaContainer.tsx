@@ -1,13 +1,13 @@
 import React from 'react';
 import {
   GoogleMap,
-  LoadScript,
   Marker,
   DirectionsRenderer,
   InfoWindow,
 } from '@react-google-maps/api';
 import { Local, LatLngLiteral } from '../types';
-import { GOOGLE_MAPS_CONFIG, MAP_CONFIG } from '@/api/maps';
+import { MAP_CONFIG } from '@/api/maps';
+import { UserLocationMarker } from './UserLocationMarker';
 
 interface MapaContainerProps {
   center: LatLngLiteral;
@@ -16,6 +16,7 @@ interface MapaContainerProps {
   directions: google.maps.DirectionsResult | null;
   selectedMarker: Local | null;
   visibleCount: number;
+  isLoaded: boolean;
   onMapLoad: (map: google.maps.Map) => void;
   onMapIdle: () => void;
   onMarkerClick: (local: Local) => void;
@@ -30,6 +31,7 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
   directions,
   selectedMarker,
   visibleCount,
+  isLoaded,
   onMapLoad,
   onMapIdle,
   onMarkerClick,
@@ -38,16 +40,12 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
 }) => {
   // Não use spread operator aqui - use a referência direta
   return (
-    <LoadScript
-      googleMapsApiKey={GOOGLE_MAPS_CONFIG.apiKey}
-      libraries={GOOGLE_MAPS_CONFIG.libraries}
-    >
-      <GoogleMap
-        mapContainerStyle={MAP_CONFIG.containerStyle}
-        center={center}
-        zoom={MAP_CONFIG.defaultOptions.zoom}
-        onLoad={onMapLoad}
-        onIdle={onMapIdle}
+    <GoogleMap
+      mapContainerStyle={MAP_CONFIG.containerStyle}
+      center={center}
+      zoom={MAP_CONFIG.defaultOptions.zoom}
+      onLoad={onMapLoad}
+      onIdle={onMapIdle}
         options={MAP_CONFIG.defaultOptions}
       >
         {directions && (
@@ -58,22 +56,10 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
         )}
 
         {userLocation && (
-          <Marker
-            position={userLocation}
-            title={directions ? 'Seu destino' : 'Você está aqui'}
-            icon={{
-              url: directions 
-                ? MAP_CONFIG.markerIcons.user.destination 
-                : MAP_CONFIG.markerIcons.user.normal,
-              scaledSize: new google.maps.Size(
-                MAP_CONFIG.markerIcons.user.size, 
-                MAP_CONFIG.markerIcons.user.size
-              ),
-              anchor: new google.maps.Point(
-                MAP_CONFIG.markerIcons.user.size / 2, 
-                MAP_CONFIG.markerIcons.user.size
-              ),
-            }}
+          <UserLocationMarker
+            userLocation={userLocation}
+            hasRoute={!!directions}
+            isApiLoaded={isLoaded}
           />
         )}
 
@@ -111,7 +97,6 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
           </InfoWindow>
         )}
       </GoogleMap>
-    </LoadScript>
   );
 };
 
