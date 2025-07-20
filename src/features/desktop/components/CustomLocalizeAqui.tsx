@@ -1,30 +1,26 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Syringe, Utensils, Trees, Building, BriefcaseMedical, Hospital } from 'lucide-react';
-import { useTranslation } from '@/i18n/useTranslations';
 import { Language } from "@/i18n/types";
+import { useMapaNavigation } from '@/features/maps/hooks/useMapaNavigation';
 
 interface CustomLocalizeAquiProps {
   selectedLanguage?: Language;
 }
 
-export const CustomLocalizeAqui: React.FC<CustomLocalizeAquiProps> = ({ 
-  selectedLanguage 
-}) => {
-  const navigate = useNavigate();
-  const { t } = useTranslation(selectedLanguage || 'pt-BR');
+export const CustomLocalizeAqui: React.FC<CustomLocalizeAquiProps> = () => {
+  const { navigateToMapa } = useMapaNavigation();
 
   const pontosDeInteresse = [
     {
       nome: "Pontos de Vacinação",
       icone: <Syringe className="h-6 w-6 text-white" />,
-      link: "/mapa?tipo=vacinacao",
+      tipo: "vacinacao",
       descricao: "Locais para vacinação",
     },
     {
       nome: "Praças de Alimentação",
       icone: <Utensils className="h-6 w-6 text-white" />,
-      link: "/mapa?tipo=alimentacao",
+      tipo: "alimentacao",
       descricao: "Locais para refeições",
     },
     {
@@ -64,7 +60,7 @@ export const CustomLocalizeAqui: React.FC<CustomLocalizeAquiProps> = ({
           <div
             key={index}
             className="flex flex-col items-center cursor-pointer"
-            onClick={() => navigate(ponto.link)}
+            onClick={() => navigateToMapa({ tipo: ponto.tipo })}
           >
             <div className="w-12 h-12 rounded-full bg-[#4A6CF7] flex items-center justify-center mb-2 hover:bg-[#5A7CFF] transition-colors shadow-sm">
               {ponto.icone}

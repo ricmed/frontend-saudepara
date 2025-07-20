@@ -38,16 +38,22 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
   onInfoWindowClose,
   onTracarRota,
 }) => {
-  // Não use spread operator aqui - use a referência direta
+  // Container style que se adapta ao painel lateral
+  const mapContainerStyle = {
+    width: '100%',
+    height: '100%',
+    position: 'relative' as const
+  };
+
   return (
     <GoogleMap
-      mapContainerStyle={MAP_CONFIG.containerStyle}
+      mapContainerStyle={mapContainerStyle}
       center={center}
       zoom={MAP_CONFIG.defaultOptions.zoom}
       onLoad={onMapLoad}
       onIdle={onMapIdle}
-        options={MAP_CONFIG.defaultOptions}
-      >
+      options={MAP_CONFIG.defaultOptions}
+    >
         {directions && (
           <DirectionsRenderer
             directions={directions}

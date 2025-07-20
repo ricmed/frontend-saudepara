@@ -5,6 +5,7 @@ import indexedDBService from '@/services/indexedDB';
 import syncService from '@/services/syncService';
 
 import MapaLocais from "@/features/maps/google";
+import MapaPage from "@/features/maps/MapaPage";
 import AccessDenied from "@/paginas/AccessDenied";
 import HealthCampaignsPage from "@/features/campaigns/pages/HealthCampaignsPage";
 import ProtectedRoute from "@/keycloak/ProtectedRoute";
@@ -247,8 +248,11 @@ function App() {
           <Route path="/logout" element={<ProtectedRoute><LogoutConfirmation /></ProtectedRoute>} />
           {/* Rotas de Apps Auxiliares */}
           {/* Rotas Públicas */}
-          <Route path="/" element={<DesktopPage />} />          <Route path="/teste" element={<HomePage />} />
-          <Route path="/mapa" element={<MapaLocais />} />
+          <Route path="/" element={<DesktopPage />} />          
+          <Route path="/teste" element={<HomePage />} />
+          <Route path="/mapa" element={<MapaPage />} />
+          <Route path="/mapa/fullscreen" element={<MapaPage fullScreen={true} />} />
+          <Route path="/mapa-original" element={<MapaLocais />} />
           <Route path="/campanhas" element={<HealthCampaignsPage />} />
           <Route path="/dashboard" element={<NotificationDashboard />} />
           <Route path="/dashboard-page" element={<DashboardPage />} />

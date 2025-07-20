@@ -1,0 +1,54 @@
+/* Estilos customizados para scrollbar */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Animação suave para hover nos cards */
+.establishment-card {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.establishment-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Indicador de scroll */
+.scroll-indicator {
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(transparent, #f8fafc);
+  height: 20px;
+  pointer-events: none;
+}
+
+/* Responsividade melhorada */
+@media (max-width: 768px) {
+  .establishment-list-container {
+    height: 240px; /* Menor no mobile */
+  }
+}
+
+@media (min-width: 769px) {
+  .establishment-list-container {
+    height: 320px; /* Maior no desktop */
+  }
+}

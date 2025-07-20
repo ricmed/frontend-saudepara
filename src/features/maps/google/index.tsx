@@ -22,6 +22,16 @@ import { Local, LatLngLiteral, TempoViagem } from "./types";
 import { SupportedLanguage } from '@/api/maps/types';
 import { GOOGLE_MAPS_CONFIG } from '@/api/maps';
 
+interface MapaFilters {
+  tipo: string;
+  natureza: string;
+  radius: number;
+}
+
+interface MapaLocaisProps {
+  initialFilters?: MapaFilters;
+}
+
 /**
  * Componente principal que reúne todo o fluxo de:
  * - Carregar dados de estabelecimentos
@@ -30,7 +40,7 @@ import { GOOGLE_MAPS_CONFIG } from '@/api/maps';
  * - Traçar rota + falar instruções
  * - Traduzir instruções se necessário
  */
-const MapaLocais: React.FC = () => {
+const MapaLocais: React.FC<MapaLocaisProps> = ({ initialFilters }) => {
   // Carregamento da API do Google Maps
   const { isLoaded } = useLoadScript({
     googleMapsApiKey: GOOGLE_MAPS_CONFIG.apiKey,
@@ -89,9 +99,9 @@ const MapaLocais: React.FC = () => {
   const [watchId, setWatchId] = useState<number | null>(null);
 
   // Filtros
-  const [searchRadius, setSearchRadius] = useState(DEFAULT_RADIUS);
-  const [tipoSelecionado, setTipoSelecionado] = useState("todos");
-  const [naturezaSelecionada, setNaturezaSelecionada] = useState("todos");
+  const [searchRadius, setSearchRadius] = useState(initialFilters?.radius || DEFAULT_RADIUS);
+  const [tipoSelecionado, setTipoSelecionado] = useState(initialFilters?.tipo || "todos");
+  const [naturezaSelecionada, setNaturezaSelecionada] = useState(initialFilters?.natureza || "todos");
 
   // Referência para DirectionsRenderer
   const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(
@@ -439,7 +449,7 @@ const MapaLocais: React.FC = () => {
   return (
     <div className="w-full h-screen relative">
       {/* Seletor de idiomas */}
-      <div className="absolute top-4 left-4 z-50 md:left-52">
+      <div className="absolute top-4 left-4 z-50 md:left-96">
         <select
           value={selectedLanguage}
           onChange={(e) =>
@@ -509,70 +519,76 @@ const MapaLocais: React.FC = () => {
         </div>
       )}
 
-      {/* Painel lateral (filtros, lista de locais, etc.) */}
-      <PainelLateral
-        menuAberto={menuAberto}
-        tiposEstabelecimentos={tiposEstabelecimentos}
-        tipoSelecionado={tipoSelecionado}
-        naturezaSelecionada={naturezaSelecionada}
-        searchRadius={searchRadius}
-        filteredPlaces={filteredPlaces}
-        visibleCount={visibleCount}
-        onTipoChange={setTipoSelecionado}
-        onNaturezaChange={setNaturezaSelecionada}
-        onRadiusChange={setSearchRadius}
-        onTracarRota={tracarRota}
-        onLoadMore={() => setVisibleCount((prev) => prev + 20)}
-        onSearch={() => {}}
-        onClose={() => setMenuAberto(false)}
-      />
-
-      {/* O mapa em si, com marcadores, rota (DirectionsRenderer), etc. */}
-      <MapaContainer
-        center={mapCenter}
-        userLocation={userLocation}
-        filteredPlaces={filteredPlaces}
-        directions={directions}
-        selectedMarker={selectedMarker}
-        visibleCount={visibleCount}
-        isLoaded={isLoaded}
-        onMapLoad={setMap}
-        onMapIdle={() => {}}
-        onMarkerClick={setSelectedMarker}
-        onInfoWindowClose={() => setSelectedMarker(null)}
-        onTracarRota={tracarRota}
-      />
-
-      {/* Botões de controle (centralizar no usuário, limpar rota, etc.) */}
-      <BotoesControle
-        directions={directions}
-        voiceGuidanceActive={voiceGuidanceActive}
-        onCentralizarUsuario={centralizarNoUsuario}
-        onCarregarDados={carregarDadosExcel}
-        onLimparRota={limparRota}
-        onToggleVoiceGuidance={() => {
-          setVoiceGuidanceActive(!voiceGuidanceActive);
-          if (!voiceGuidanceActive && directions) {
-            // Se acabamos de ativar a voz e já temos uma rota
-            setStepIndex(0);
-            speakDirections(directions);
-            startWatchingPosition();
-          }
-        }}
-      />
-
-      {/* Exibe tempos de viagem + seletor de modo de transporte, SE houver rota */}
-      {directions && temposViagem.length > 0 && (
-        <InfoTemposViagem
-          temposViagem={temposViagem}
-          modoTransporteSelecionado={modoTransporteSelecionado}
-          onModoSelect={(modo) => {
-            setModoTransporteSelecionado(modo);
-            // Ao trocar de modo, recalcula rota
-            if (selectedLocal) tracarRota(selectedLocal);
-          }}
+      {/* Layout com painel lateral no desktop */}
+      <div className="flex h-full">
+        {/* Painel lateral (sempre visível no desktop, deslizante no mobile) */}
+        <PainelLateral
+          menuAberto={menuAberto}
+          tiposEstabelecimentos={tiposEstabelecimentos}
+          tipoSelecionado={tipoSelecionado}
+          naturezaSelecionada={naturezaSelecionada}
+          searchRadius={searchRadius}
+          filteredPlaces={filteredPlaces}
+          visibleCount={visibleCount}
+          onTipoChange={setTipoSelecionado}
+          onNaturezaChange={setNaturezaSelecionada}
+          onRadiusChange={setSearchRadius}
+          onTracarRota={tracarRota}
+          onLoadMore={() => setVisibleCount((prev) => prev + 20)}
+          onSearch={() => {}}
+          onClose={() => setMenuAberto(false)}
         />
-      )}
+
+        {/* Container do mapa que se adapta ao painel lateral */}
+        <div className="flex-1 relative">
+          {/* O mapa em si, com marcadores, rota (DirectionsRenderer), etc. */}
+          <MapaContainer
+            center={mapCenter}
+            userLocation={userLocation}
+            filteredPlaces={filteredPlaces}
+            directions={directions}
+            selectedMarker={selectedMarker}
+            visibleCount={visibleCount}
+            isLoaded={isLoaded}
+            onMapLoad={setMap}
+            onMapIdle={() => {}}
+            onMarkerClick={setSelectedMarker}
+            onInfoWindowClose={() => setSelectedMarker(null)}
+            onTracarRota={tracarRota}
+          />
+
+          {/* Botões de controle (centralizar no usuário, limpar rota, etc.) */}
+          <BotoesControle
+            directions={directions}
+            voiceGuidanceActive={voiceGuidanceActive}
+            onCentralizarUsuario={centralizarNoUsuario}
+            onCarregarDados={carregarDadosExcel}
+            onLimparRota={limparRota}
+            onToggleVoiceGuidance={() => {
+              setVoiceGuidanceActive(!voiceGuidanceActive);
+              if (!voiceGuidanceActive && directions) {
+                // Se acabamos de ativar a voz e já temos uma rota
+                setStepIndex(0);
+                speakDirections(directions);
+                startWatchingPosition();
+              }
+            }}
+          />
+
+          {/* Exibe tempos de viagem + seletor de modo de transporte, SE houver rota */}
+          {directions && temposViagem.length > 0 && (
+            <InfoTemposViagem
+              temposViagem={temposViagem}
+              modoTransporteSelecionado={modoTransporteSelecionado}
+              onModoSelect={(modo) => {
+                setModoTransporteSelecionado(modo);
+                // Ao trocar de modo, recalcula rota
+                if (selectedLocal) tracarRota(selectedLocal);
+              }}
+            />
+          )}
+        </div>
+      </div>
 
       {/* Tela de carregamento caso dados ainda estejam sendo lidos */}
       {isLoading && (

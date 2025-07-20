@@ -1,8 +1,8 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Syringe, Utensils, Trees, Building, BriefcaseMedical, Hospital } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslations';
 import { Language } from "@/i18n/types";
+import { useMapaNavigation } from '@/features/maps/hooks/useMapaNavigation';
 
 interface LocalizeAquiProps {
   isMobile?: boolean;
@@ -10,44 +10,44 @@ interface LocalizeAquiProps {
 }
 
 export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, selectedLanguage }) => {
-  const navigate = useNavigate();
+  const { navigateToMapa } = useMapaNavigation();
   const { t } = useTranslation(selectedLanguage);
 
   const pontosDeInteresse = [
     {
       nome: "vaccination",
       icone: <Syringe className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} text-white`} />,
-      link: "/mapa?tipo=vacinacao",
+      tipo: "vacinacao",
       descricao: "Postos de vacinação",
     },
     {
       nome: "food",
       icone: <Utensils className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} text-white`} />,
-      link: "/mapa?tipo=alimentacao",
+      tipo: "alimentacao",
       descricao: "Restaurantes",
     },
     {
       nome: "parks",
       icone: <Trees className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} text-white`} />,
-      link: "/mapa?tipo=lazer",
+      tipo: "lazer",
       descricao: "Parques e áreas",
     },
     {
       nome: "cultural",
       icone: <Building className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} text-white`} />,
-      link: "/mapa?tipo=cultura",
+      tipo: "cultura",
       descricao: "Museus e eventos",
     },
     {
       nome: "health",
       icone: <BriefcaseMedical className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} text-white`} />,
-      link: "/mapa?tipo=saude",
+      tipo: "saude",
       descricao: "Postos de Saúde",
     },
     {
       nome: "hospitals",
       icone: <Hospital className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} text-white`} />,
-      link: "/mapa?tipo=hospitais",
+      tipo: "hospitais",
       descricao: "Unidades de saúde",
     },
   ];
@@ -61,7 +61,7 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
             <div
               key={index}
               className="flex flex-col items-center cursor-pointer"
-              onClick={() => navigate(ponto.link)}
+              onClick={() => navigateToMapa({ tipo: ponto.tipo })}
             >
               <div className="w-14 h-14 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-2 hover:bg-[#4D6FFF] transition-colors">
                 {ponto.icone}
@@ -88,7 +88,7 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
             <div
               key={index}
               className="flex flex-col items-center cursor-pointer"
-              onClick={() => navigate(ponto.link)}
+              onClick={() => navigateToMapa({ tipo: ponto.tipo })}
             >
               <div className="w-20 h-20 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-3 hover:bg-[#4D6FFF] transition-colors">
                 {ponto.icone}
