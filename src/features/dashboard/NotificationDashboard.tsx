@@ -221,6 +221,18 @@ const COLORS = {
     "#c2c9fd", // Azul pastel
     "#e4e8fe", // Azul muito claro
   ],
+  // Paleta específica para traumas - variações de vermelho
+  trauma: [
+    "#8B0000", // Vermelho escuro (DarkRed)
+    "#DC143C", // Crimson
+    "#B22222", // FireBrick
+    "#CD5C5C", // IndianRed
+    "#F08080", // LightCoral
+    "#FA8072", // Salmon
+    "#E9967A", // DarkSalmon
+    "#FFA07A", // LightSalmon
+    "#FFB6C1", // LightPink
+  ],
   // Cores para os tipos de atendimento (mantendo tons azuis)
   atendimento: {
     clinico: "#4c6cf1",     // Azul médio
@@ -605,10 +617,13 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           valor = getPropSafely(item, 'publicoAtendido');
         } else if (campoId.includes('tipo_hipotese_diag')) {
           valor = getPropSafely(item, 'hipoteseDiagnostica') || getPropSafely(item, 'original.hipotese_diagnostica');
+        } else if (campoId.includes('tipo_trauma')) {
+          valor = getPropSafely(item, 'tipoTrauma') || getPropSafely(item, 'original.trauma');
         }
       }
   
-      if (valor !== undefined) {
+      // Tratar valores null como undefined para casos específicos como trauma
+      if (valor !== undefined && valor !== null) {
         const id = String(valor);
         if (!contagem[id]) {
           contagem[id] = { count: 0, items: [] };
@@ -616,6 +631,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         contagem[id].count += 1;
         contagem[id].items.push(item);
       } else {
+        // Para trauma, não mostrar entradas vazias no gráfico, apenas ignorar silenciosamente
+        if (campoId.includes('tipo_trauma')) {
+          // Ignorar notificações sem trauma (a maioria das notificações clínicas não terá trauma)
+          return;
+        }
+        
         if (!contagem["unknown"]) {
           contagem["unknown"] = { count: 0, items: [] };
         }
@@ -630,6 +651,11 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   
     for (const [id, data] of Object.entries(contagem)) {
       if (id === "unknown") {
+        // Para hipóteses diagnósticas, não incluir entradas "Ignorado"
+        if (campoId.includes('tipo_hipotese_diag')) {
+          continue; // Pular entradas ignoradas/desconhecidas para hipóteses
+        }
+        
         resultado.push({
           name: "Ignorado",
           value: data.count,
@@ -672,6 +698,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         fill = getHipotesisColor(descricao, data.count);
         // Verificar se é uma hipótese alarmante
         isAlarmante = isHipotesisAlarmante(descricao);
+      } else if (campoId.includes('tipo_trauma')) {
+        // Cores específicas para traumas - usar paleta vermelha
+        const paletaTrauma = COLORS.trauma;
+        fill = paletaTrauma[index % paletaTrauma.length];
       } else {
         // Usar paleta apropriada para o tipo de gráfico (pizza ou normal)
         const paletaCores = tipoCores === 'pie' ? COLORS.pie : COLORS.blue;
@@ -934,6 +964,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         COLORS.blue,
         'normal'
       );
+      console.log("Dados de trauma processados:", traumaPorNotificacao);
       if (traumaPorNotificacao.length > 0) {
         setFilteredTrauma(traumaPorNotificacao);
         if (originalTrauma.length === 0) {
@@ -2009,7 +2040,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           </div>
 
           {/* Principais Sintomas */}
-          <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-5">
+          <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-3">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Heart className="h-5 w-5 text-red-700" />
@@ -2074,6 +2105,77 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
               ) : (
                 <div className="h-64 flex items-center justify-center text-gray-500">
                   Não há dados disponíveis para exibir
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Tipos de Trauma */}
+          <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-2">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-red-700" />
+                <h3 className="text-sm font-medium text-gray-700">
+                  Tipos de Trauma
+                </h3>
+              </div>
+              <GraphExportMenu 
+                chartId="chart-trauma" 
+                chartType="bar"
+                chartData={filteredTrauma}
+                chartTitle="Tipos de Trauma"
+              />
+            </div>
+            <div className="h-64" id="chart-trauma">
+              {filteredTrauma.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={filteredTrauma}
+                    layout="vertical"
+                    margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis type="number" stroke="#666" />
+                    <YAxis
+                      dataKey="name"
+                      type="category"
+                      stroke="#666"
+                      width={80}
+                      tick={{ fontSize: 10 }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#fff",
+                        border: "1px solid #ddd",
+                      }}
+                      formatter={(value) => [
+                        value.toLocaleString(),
+                        "Casos",
+                      ]}
+                    />
+                    <Bar
+                      dataKey="value"
+                      onClick={(data) => {
+                        if (data && data.name) {
+                          handleCardClick(data.name);
+                        }
+                      }}
+                      cursor="pointer"
+                    >
+                      {filteredTrauma.map((entry, i) => (
+                        <Cell 
+                          key={`cell-${i}`} 
+                          fill={entry.fill}
+                          stroke={selectedCategory === entry.name ? "#000" : "none"}
+                          strokeWidth={selectedCategory === entry.name ? 2 : 0}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-64 flex items-center justify-center text-gray-500">
+                  Nenhum caso de trauma registrado
                 </div>
               )}
             </div>
