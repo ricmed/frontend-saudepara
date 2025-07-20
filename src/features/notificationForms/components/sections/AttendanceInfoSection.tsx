@@ -935,9 +935,10 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
               </>
             )}
 
-            {/* Trauma ou múltiplas vítimas */}
+            {/* Trauma ou múltiplas vítimas ou incidente QBRN */}
             {(isTipoAtendimentoFunc("TRAUMA") ||
-              isTipoAtendimentoFunc("MULTIPLAS VITIMAS")) && (
+              isTipoAtendimentoFunc("MULTIPLAS VITIMAS") ||
+              isTipoAtendimentoFunc("INCIDENTE QBRN")) && (
               <>
                 <div className="md:col-span-2" data-field="tipoTrauma">
                   <SearchableCheckboxGroup
