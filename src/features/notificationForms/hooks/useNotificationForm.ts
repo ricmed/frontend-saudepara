@@ -682,8 +682,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
       // Definir todas as opções carregadas do cache
       if (eventos) {
-        setEventoOptions(convertOptionsToUpperCase(eventos));
-        console.log(`✅ Eventos carregados do cache: ${eventos.length}`);
+        // 🆕 FILTRAR: Apenas eventos ativos para o formulário
+        const eventosAtivos = eventos.filter((evento: any) => evento.ativo === 'S' || evento.ativo === undefined);
+        setEventoOptions(convertOptionsToUpperCase(eventosAtivos));
+        console.log(`✅ Eventos ativos carregados do cache: ${eventosAtivos.length}/${eventos.length}`);
       }
 
       if (publicos) {
@@ -934,7 +936,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
       // Ordenar e atribuir as opções
       setPaisOptions(convertOptionsToUpperCase(paises));
-      setEventoOptions(convertOptionsToUpperCase(eventos));
+      
+      // 🆕 FILTRAR: Apenas eventos ativos para o formulário
+      const eventosAtivos = eventos.filter((evento: any) => evento.ativo === 'S' || evento.ativo === undefined);
+      setEventoOptions(convertOptionsToUpperCase(eventosAtivos));
 
       // Ordenação específica para público atendido
       const ordenacaoPublico = [

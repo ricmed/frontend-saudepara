@@ -17,6 +17,7 @@ export type TranslationRecord = {
   // Header
   'header.secretaryOf': string;
   'header.publicHealth': string;
+  'notifications': string;
   
   // Navigation
   'nav.home': string;

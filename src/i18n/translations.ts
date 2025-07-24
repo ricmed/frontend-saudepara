@@ -213,7 +213,8 @@ export const translations: TranslationsType = {  "pt-BR": {
     "ouvitoria.siteLabel": "Site",
     "ouvitoria.formButton": "Acessar Formulário Online",
     "voltar": "Voltar",
-    "menu.open": "Abrir menu"
+    "menu.open": "Abrir menu",
+    "notifications": "Notificações"
   },  "en": {
     ...adminTranslations.en,
     // Header
@@ -427,7 +428,8 @@ export const translations: TranslationsType = {  "pt-BR": {
     "ouvitoria.siteLabel": "Website",
     "ouvitoria.formButton": "Access Online Form",
     "voltar": "Back",
-    "menu.open": "Open menu"
+    "menu.open": "Open menu",
+    "notifications": "Notifications"
   },  "es": {
     ...adminTranslations.es,
     // Encabezado
@@ -641,7 +643,8 @@ export const translations: TranslationsType = {  "pt-BR": {
     "ouvitoria.siteLabel": "Sitio Web",
     "ouvitoria.formButton": "Acceder al Formulario en Línea",
     "voltar": "Volver",
-    "menu.open": "Abrir menú"
+    "menu.open": "Abrir menú",
+    "notifications": "Notificaciones"
   },  "zh": {
     // 标题
     "search.placeholder": "搜索",
@@ -854,7 +857,8 @@ export const translations: TranslationsType = {  "pt-BR": {
     "ouvitoria.siteLabel": "网站",
     "ouvitoria.formButton": "访问在线表格",
     "voltar": "返回",
-    "menu.open": "打开菜单"
+    "menu.open": "打开菜单",
+    "notifications": "通知"
   },  "fr": {
     // En-tête
     "search.placeholder": "Rechercher",
@@ -1067,7 +1071,8 @@ export const translations: TranslationsType = {  "pt-BR": {
     "ouvitoria.siteLabel": "Site Web",
     "ouvitoria.formButton": "Accéder au Formulaire en Ligne",
     "voltar": "Retour",
-    "menu.open": "Ouvrir le menu"
+    "menu.open": "Ouvrir le menu",
+    "notifications": "Notifications"
   },  "ar": {
         // Logout Confirmation
     "logout.confirmation.title": "هل تريد تسجيل الخروج؟",
@@ -1257,7 +1262,8 @@ export const translations: TranslationsType = {  "pt-BR": {
     "ouvitoria.siteLabel": "الموقع الإلكتروني",
     "ouvitoria.formButton": "الوصول إلى النموذج عبر الإنترنت",
     "voltar": "رجوع",
-    "menu.open": "فتح القائمة"
+    "menu.open": "فتح القائمة",
+    "notifications": "الإشعارات"
   },  "ru": {
         // Logout Confirmation
     "logout.confirmation.title": "Вы хотите выйти?",
@@ -1447,6 +1453,7 @@ export const translations: TranslationsType = {  "pt-BR": {
     "ouvitoria.siteLabel": "Веб-сайт",
     "ouvitoria.formButton": "Перейти к онлайн-форме",
     "voltar": "Назад",
-    "menu.open": "Открыть меню"
+    "menu.open": "Открыть меню",
+    "notifications": "Уведомления"
   }
 };

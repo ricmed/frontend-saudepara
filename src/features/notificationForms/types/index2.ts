@@ -191,6 +191,7 @@ export interface OptionType {
 export interface EventoOption {
   idtipo_evento: number;
   descricao: string;
+  ativo?: string; // 🆕 CAMPO ADICIONADO para compatibilidade
 }
 
 export interface PublicoOption {

@@ -14,6 +14,7 @@ export interface BaseOption {
 
 export interface EventoOption extends BaseOption {
   idtipo_evento: number;
+  ativo?: string; // 🆕 CAMPO ADICIONADO para compatibilidade
 }
 
 export interface PublicoOption extends BaseOption {
@@ -218,7 +219,15 @@ export const NotificacaoService = {
 
   // Métodos para buscar cada tipo de opção
   async getEventoOptions(): Promise<EventoOption[]> {
-    return NotificacaoService.fetchOptions<EventoOption>(TIPO_ENDPOINTS.EVENTO);
+    try {
+      // 🔄 MODIFICADO: Usar endpoint de eventos ativos apenas
+      const response = await axios.get<EventoOption[]>(`${TIPO_ENDPOINTS.EVENTO}/ativos`);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao buscar eventos ativos:', error);
+      // Fallback para o método original se o endpoint /ativos não existir ainda
+      return NotificacaoService.fetchOptions<EventoOption>(TIPO_ENDPOINTS.EVENTO);
+    }
   },
 
   async getPublicoOptions(): Promise<PublicoOption[]> {

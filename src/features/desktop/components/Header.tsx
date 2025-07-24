@@ -17,124 +17,189 @@ export const Header: React.FC<HeaderProps> = ({
   const { t } = useTranslation(selectedLanguage || "pt-BR");
 
   return isMobile ? (
-    <header className="p-4">
-      <div className="flex justify-between">
-        <Menu
-          className="h-6 w-6 text-white cursor-pointer"
+    <header className="p-4" role="banner">
+      {/* Barra superior com controles principais */}
+      <div className="flex justify-between items-center mb-4">
+        <button
           onClick={onMenuToggle}
-        />
-        <Bell className="h-6 w-6 text-white" />
+          className="p-2 -ml-2 rounded-lg hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-white/30"
+          aria-label={t("menu.open")}
+        >
+          <Menu className="h-6 w-6 text-white" />
+        </button>
+        
+        <button
+          className="p-2 -mr-2 rounded-lg hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-white/30"
+          aria-label={t("notifications")}
+        >
+          <Bell className="h-6 w-6 text-white" />
+        </button>
       </div>
 
-      {/* Logos */}
-      <div className="mt-2 flex justify-between items-center">
-        <img
-          src="./images/logos/Logo Topo Sespa.png"
-          alt="Sespa Logo"
-          className="h-12 w-auto"
-        />
-
+      {/* Logos com melhor hierarquia visual */}
+      <div className="flex justify-between items-center mb-4">
         <div className="flex items-center">
           <img
+            src="./images/logos/Logo Topo Sespa.png"
+            alt="Secretaria de Estado de Saúde Pública do Pará"
+            className="h-12 w-auto"
+          />
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <img
             src="./images/logos/Logo Topo Saude Para.png"
-            alt="Saúde Pará Logo"
-            className="h-10 w-auto mr-2"
+            alt="Saúde Pará"
+            className="h-10 w-auto"
           />
           <img
             src="./images/logos/Logo Topo Bandeira.png"
-            alt="Bandeira Logo"
-            className="h-6 w-auto"
+            alt="Governo do Estado do Pará"
+            className="h-8 w-auto"
           />
         </div>
       </div>
 
-      {/* Barra de busca */}
-      <div className="mt-4 relative">
+      {/* Barra de busca com melhor acessibilidade */}
+      <div className="relative">
+        <label htmlFor="search-mobile" className="sr-only">
+          {t("search.placeholder")}
+        </label>
         <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-          <Search className="h-5 w-5 text-white/60" />
+          <Search className="h-5 w-5 text-white/60" aria-hidden="true" />
         </div>
         <input
-          type="text"
+          id="search-mobile"
+          type="search"
           placeholder={t("search.placeholder")}
-          className="w-full bg-blue-500/40 border-none rounded-full py-2 pl-10 pr-4 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/30"
+          className="w-full bg-blue-500/40 border-none rounded-full py-3 pl-10 pr-4 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50 focus:bg-blue-500/60 transition-colors"
+          autoComplete="off"
         />
       </div>
     </header>
   ) : (
-    <header className="bg-blue-600 px-6 py-4">
-      <div className="flex items-center max-w-7xl mx-auto relative">
-        {/* Menu hamburguer na extremidade esquerda */}
-        <Menu
-          className="h-6 w-6 text-white cursor-pointer absolute left-6"
-          onClick={onMenuToggle}
-        />
+    <header className="bg-blue-600 shadow-lg" role="banner">
+      <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="flex items-center justify-between">
+          {/* Seção esquerda: Menu + Logos */}
+          <div className="flex items-center space-x-6">
+            <button
+              onClick={onMenuToggle}
+              className="p-2 rounded-lg hover:bg-blue-500/50 transition-colors focus:outline-none focus:ring-2 focus:ring-white/30"
+              aria-label={t("menu.open")}
+            >
+              <Menu className="h-6 w-6 text-white" />
+            </button>
 
-        {/* Logos à esquerda com margem para o menu */}
-        <div className="flex items-center ml-20">
-          <img
-            src="./images/logos/Logo Topo Sespa.png"
-            alt="Sespa Logo"
-            className="h-12 w-auto"
-          />
-          <img
-            src="./images/logos/Logo Topo Saude Para.png"
-            alt="Saúde Pará Logo"
-            className="h-12 w-auto mr-2"
-          />
-          <img
-            src="./images/logos/Logo Topo Bandeira.png"
-            alt="Bandeira Logo"
-            className="h-8 w-auto"
-          />
-        </div>
+            {/* Logos com melhor espaçamento */}
+            <div className="flex items-center space-x-3">
+              <img
+                src="./images/logos/Logo Topo Sespa.png"
+                alt="Secretaria de Estado de Saúde Pública do Pará"
+                className="h-12 w-auto"
+              />
+              <div className="h-10 w-px bg-white/20"></div>
+              <img
+                src="./images/logos/Logo Topo Saude Para.png"
+                alt="Saúde Pará"
+                className="h-11 w-auto"
+              />
+              <img
+                src="./images/logos/Logo Topo Bandeira.png"
+                alt="Governo do Estado do Pará"
+                className="h-9 w-auto"
+              />
+            </div>
+          </div>
 
-        {/* Navegação centralizada */}
-        <nav className="hidden md:flex items-center justify-center flex-1 mx-auto">
-          <div className="flex space-x-8">
+          {/* Navegação principal centralizada */}
+          <nav className="hidden lg:flex items-center space-x-8" role="navigation">
             <a
               href="/"
-              className="text-white font-medium hover:text-blue-100 transition"
+              className="text-white font-medium hover:text-blue-100 transition-colors py-2 px-3 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
+              aria-current="page"
             >
               {t("nav.home")}
             </a>
             <a
-              href="/servicos"
-              className="text-white font-medium hover:text-blue-100 transition"
-            >
-              {t("nav.map")}
-            </a>
-            <a
               href="/unidades"
-              className="text-white font-medium hover:text-blue-100 transition"
+              className="text-white font-medium hover:text-blue-100 transition-colors py-2 px-3 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
             >
               {t("menu.locations")}
             </a>
             <a
               href="/campanhas"
-              className="text-white font-medium hover:text-blue-100 transition"
+              className="text-white font-medium hover:text-blue-100 transition-colors py-2 px-3 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
             >
               {t("nav.campaigns")}
             </a>
             <a
               href="/contato"
-              className="text-white font-medium hover:text-blue-100 transition"
+              className="text-white font-medium hover:text-blue-100 transition-colors py-2 px-3 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
+            >
+              {t("menu.fale_conosco")}
+            </a>
+          </nav>
+
+          {/* Seção direita: Busca + Controles */}
+          <div className="flex items-center space-x-4">
+            {/* Barra de busca melhorada */}
+            <div className="relative w-64">
+              <label htmlFor="search-desktop" className="sr-only">
+                {t("search.placeholder")}
+              </label>
+              <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-white/60" aria-hidden="true" />
+              </div>
+              <input
+                id="search-desktop"
+                type="search"
+                placeholder={t("search.placeholder")}
+                className="w-full bg-[#4D6FFF]/40 border border-white/10 rounded-full py-2.5 pl-10 pr-4 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50 focus:bg-[#4D6FFF]/60 focus:border-white/20 transition-all"
+                autoComplete="off"
+              />
+            </div>
+
+            {/* Botão de notificações */}
+            <button
+              className="p-2 rounded-lg hover:bg-blue-500/50 transition-colors focus:outline-none focus:ring-2 focus:ring-white/30"
+              aria-label={t("notifications")}
+            >
+              <Bell className="h-5 w-5 text-white" />
+            </button>
+          </div>
+        </div>
+
+        {/* Navegação mobile (tablet) */}
+        <nav className="lg:hidden mt-4 pt-4 border-t border-white/10" role="navigation">
+          <div className="flex flex-wrap justify-center gap-6">
+            <a
+              href="/"
+              className="text-white font-medium hover:text-blue-100 transition-colors py-2 px-3 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
+              aria-current="page"
+            >
+              {t("nav.home")}
+            </a>
+            <a
+              href="/unidades"
+              className="text-white font-medium hover:text-blue-100 transition-colors py-2 px-3 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
+            >
+              {t("menu.locations")}
+            </a>
+            <a
+              href="/campanhas"
+              className="text-white font-medium hover:text-blue-100 transition-colors py-2 px-3 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
+            >
+              {t("nav.campaigns")}
+            </a>
+            <a
+              href="/contato"
+              className="text-white font-medium hover:text-blue-100 transition-colors py-2 px-3 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
             >
               {t("menu.fale_conosco")}
             </a>
           </div>
         </nav>
-
-        {/* Barra de busca à direita */}
-        <div className="relative w-60">
-          <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-            <Search className="h-5 w-5 text-white/60" />
-          </div>
-          <input
-            type="text"
-            placeholder={t("search.placeholder")}
-            className="w-full bg-[#4D6FFF]/40 border-none rounded-full py-2 pl-10 pr-4 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/30"
-          />
-        </div>
       </div>
     </header>
   );

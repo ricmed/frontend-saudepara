@@ -6,7 +6,7 @@ import SectionHeader from '../shared/SectionHeader';
 import FormField from '../shared/FormField';
 
 interface GeneralInfoSectionProps extends FormSectionProps {
-  eventoOptions?: Array<{ idtipo_evento: number; descricao: string }>;
+  eventoOptions?: Array<{ idtipo_evento: number; descricao: string; ativo?: string }>;
   publicoOptions?: Array<{ idtipo_publico: number; descricao: string }>;
 }
 

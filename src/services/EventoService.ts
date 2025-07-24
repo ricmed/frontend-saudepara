@@ -7,6 +7,7 @@ const API_URL = `${server}:${port}/api/tipo-evento`;
 interface TipoEvento {
   idtipo_evento: number;
   descricao: string;
+  ativo: string;  // 🆕 CAMPO ADICIONADO
 }
 
 interface PaginatedResponse {
@@ -42,6 +43,16 @@ export const TiposEventoService = {
     }
   },
 
+  // 🆕 NOVO MÉTODO - Buscar apenas ativos
+  getAllAtivos: async (): Promise<TipoEvento[]> => {
+    try {
+      const response = await axios.get<TipoEvento[]>(`${API_URL}/ativos`);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error as AxiosError<APIError>);
+    }
+  },
+
   getAllPaginated: async (
     page: number,
     itemsPerPage: number,
@@ -61,7 +72,6 @@ export const TiposEventoService = {
 
       const response = await axios.get<{ data: TipoEvento[], pagination: any }>(url, { params });
       
-      // Convertendo o formato da resposta para manter compatibilidade
       return {
         data: response.data.data,
         meta: {
@@ -87,10 +97,12 @@ export const TiposEventoService = {
     }
   },
 
-  create: async (descricao: string): Promise<TipoEvento> => {
+  // 🔄 MÉTODO ATUALIZADO - Incluir campo ativo
+  create: async (descricao: string, ativo: string = 'S'): Promise<TipoEvento> => {
     try {
       const response = await axios.post<TipoEvento>(API_URL, { 
-        descricao: descricao.trim() 
+        descricao: descricao.trim(),
+        ativo  // 🆕 CAMPO ADICIONADO
       });
       return response.data;
     } catch (error) {
@@ -98,13 +110,29 @@ export const TiposEventoService = {
     }
   },
 
-  update: async (id: number, descricao: string): Promise<void> => {
+  // 🔄 MÉTODO ATUALIZADO - Incluir campo ativo
+  update: async (id: number, descricao: string, ativo?: string): Promise<void> => {
     try {
       if (isNaN(id) || id <= 0) throw new Error('ID inválido');
       
-      await axios.put(`${API_URL}/${id}`, { 
-        descricao: descricao.trim() 
-      });
+      const data: any = { descricao: descricao.trim() };
+      if (ativo !== undefined) {
+        data.ativo = ativo;  // 🆕 CAMPO ADICIONADO
+      }
+      
+      await axios.put(`${API_URL}/${id}`, data);
+    } catch (error) {
+      return handleApiError(error as AxiosError<APIError>);
+    }
+  },
+
+  // 🆕 NOVO MÉTODO - Toggle ativo/inativo
+  toggleAtivo: async (id: number): Promise<TipoEvento> => {
+    try {
+      if (isNaN(id) || id <= 0) throw new Error('ID inválido');
+      
+      const response = await axios.put<{ data: TipoEvento }>(`${API_URL}/${id}/toggle`);
+      return response.data.data;
     } catch (error) {
       return handleApiError(error as AxiosError<APIError>);
     }
@@ -125,7 +153,6 @@ export const TiposEventoService = {
     excludeId?: number
   ): Promise<boolean> => {
     try {
-      // Usando o endpoint de busca para verificar duplicatas
       const response = await axios.get<{ data: TipoEvento[] }>(`${API_URL}/search`, {
         params: {
           descricao: descricao.trim(),
@@ -133,13 +160,9 @@ export const TiposEventoService = {
         }
       });
 
-      // Se não encontrou nenhum tipo de evento, retorna false
       if (response.data.data.length === 0) return false;
-
-      // Se encontrou e não temos excludeId, então existe duplicata
       if (!excludeId) return true;
 
-      // Se temos excludeId, verifica se o tipo encontrado é diferente do atual
       return response.data.data.some(tipo => 
         tipo.descricao.toLowerCase() === descricao.toLowerCase() && 
         tipo.idtipo_evento !== excludeId

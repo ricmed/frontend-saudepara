@@ -26,6 +26,24 @@ export const useNotifications = () => {
     pendingData
   } = useOfflineSystem();
 
+  // 🆕 FUNÇÃO: Filtrar notificações com eventos ativos apenas
+  const filterNotificacoesComEventosAtivos = useCallback(async (notificacoes: Notificacao[]): Promise<Notificacao[]> => {
+    try {
+      // Buscar lista de eventos ativos do cache
+      const eventosAtivos = await indexedDBService.getOpcoes('eventos') || [];
+      const idsEventosAtivos = new Set(eventosAtivos.map((evento: any) => evento.idtipo_evento));
+      
+      // Filtrar notificações que tenham eventos ativos
+      return notificacoes.filter(notificacao => {
+        const idEvento = notificacao.original?.tipo_evento?.idtipo_evento;
+        return idEvento ? idsEventosAtivos.has(idEvento) : true; // Manter se não tiver evento definido
+      });
+    } catch (error) {
+      console.warn('⚠️ Erro ao filtrar eventos ativos, mantendo todas as notificações:', error);
+      return notificacoes; // Em caso de erro, retornar todas
+    }
+  }, []);
+
   // Estados existentes...
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   const [allNotificacoes, setAllNotificacoes] = useState<Notificacao[]>([]);
@@ -73,18 +91,21 @@ export const useNotifications = () => {
         };
       }
 
+      // 🆕 FILTRAR: Aplicar filtro de eventos ativos
+      const notificacoesFiltradas = await filterNotificacoesComEventosAtivos(cachedNotificacoes);
+
       // Calcular paginação
       const startIndex = (page - 1) * limit;
       const endIndex = startIndex + limit;
-      const paginatedData = cachedNotificacoes.slice(startIndex, endIndex);
+      const paginatedData = notificacoesFiltradas.slice(startIndex, endIndex);
       
-      console.log(`✅ Notificações offline: ${paginatedData.length}/${cachedNotificacoes.length} (página ${page})`);
+      console.log(`✅ Notificações offline: ${paginatedData.length}/${notificacoesFiltradas.length} (página ${page})`);
       
       return {
         data: paginatedData,
         meta: {
-          total: cachedNotificacoes.length,
-          totalPages: Math.ceil(cachedNotificacoes.length / limit),
+          total: notificacoesFiltradas.length,
+          totalPages: Math.ceil(notificacoesFiltradas.length / limit),
           page,
           limit
         }
@@ -96,7 +117,7 @@ export const useNotifications = () => {
         meta: { total: 0, totalPages: 0, page: 1, limit }
       };
     }
-  }, []);
+  }, [filterNotificacoesComEventosAtivos]);
 
   // ✅ FUNÇÃO: Buscar todas as notificações (online/offline)
   const fetchAllData = useCallback(async () => {
@@ -115,8 +136,11 @@ export const useNotifications = () => {
           return null;
         }
         
-        console.log(`✅ ${cachedData.length} notificações carregadas do cache offline`);
-        return cachedData;
+        // 🆕 FILTRAR: Aplicar filtro de eventos ativos
+        const dadosFiltrados = await filterNotificacoesComEventosAtivos(cachedData);
+        
+        console.log(`✅ ${dadosFiltrados.length} notificações carregadas do cache offline (filtradas)`);
+        return dadosFiltrados;
       }
 
       // ✅ MODO ONLINE: buscar normalmente + salvar cache
@@ -152,7 +176,9 @@ export const useNotifications = () => {
         console.warn('⚠️ Erro ao salvar notificações no cache:', cacheError);
       }
 
-      return allNotificacoes;
+      // 🆕 FILTRAR: Aplicar filtro de eventos ativos antes de retornar
+      const notificacoesFiltradas = await filterNotificacoesComEventosAtivos(allNotificacoes);
+      return notificacoesFiltradas;
     } catch (error) {
       console.error("Erro ao buscar todos os dados:", error);
       
@@ -165,7 +191,9 @@ export const useNotifications = () => {
           
           if (cachedData.length > 0) {
             toast.warning('Usando dados offline devido a erro de conexão');
-            return cachedData;
+            // 🆕 FILTRAR: Aplicar filtro de eventos ativos
+            const dadosFiltrados = await filterNotificacoesComEventosAtivos(cachedData);
+            return dadosFiltrados;
           }
         } catch (cacheError) {
           console.error('Erro ao usar cache como fallback:', cacheError);
@@ -265,33 +293,36 @@ export const useNotifications = () => {
             
             // Aplicar filtros de busca
             if (response && response.data) {
+              // 🆕 FILTRAR: Primeiro filtrar eventos ativos
+              const dadosComEventosAtivos = await filterNotificacoesComEventosAtivos(response.data);
+              
               let filteredData = [];
               const searchTerm = debouncedSearchParams.term.toLowerCase().trim();
               
               // Aplicar filtro conforme o campo selecionado
               if (debouncedSearchParams.field === "paciente") {
-                filteredData = response.data.filter(item => 
+                filteredData = dadosComEventosAtivos.filter(item => 
                   item.paciente && item.paciente.toLowerCase().includes(searchTerm)
                 );
               }
               else if (debouncedSearchParams.field === "evento") {
-                filteredData = response.data.filter(item => 
+                filteredData = dadosComEventosAtivos.filter(item => 
                   item.tipoEvento && item.tipoEvento.toLowerCase().includes(searchTerm)
                 );
               }
               else if (debouncedSearchParams.field === "atendimento") {
-                filteredData = response.data.filter(item => 
+                filteredData = dadosComEventosAtivos.filter(item => 
                   item.tipoAtendimento && item.tipoAtendimento.toLowerCase().includes(searchTerm)
                 );
               }
               else if (debouncedSearchParams.field === "encerramento") {
-                filteredData = response.data.filter(item => 
+                filteredData = dadosComEventosAtivos.filter(item => 
                   item.tipoEncerramento && item.tipoEncerramento.toLowerCase().includes(searchTerm)
                 );
               }
               else {
                 // Buscar em todos os campos
-                filteredData = response.data.filter(item => (
+                filteredData = dadosComEventosAtivos.filter(item => (
                   (item.paciente && item.paciente.toLowerCase().includes(searchTerm)) ||
                   (item.tipoEvento && item.tipoEvento.toLowerCase().includes(searchTerm)) ||
                   (item.tipoAtendimento && item.tipoAtendimento.toLowerCase().includes(searchTerm)) ||
@@ -354,6 +385,9 @@ export const useNotifications = () => {
 
         // Processar resposta
         if (response && response.data) {
+          // 🆕 FILTRAR: Remover notificações com eventos inativos
+          const notificacoesFiltradas = await filterNotificacoesComEventosAtivos(response.data);
+          
           // Verificar se estamos em uma página válida
           if (
             response.meta &&
@@ -366,7 +400,7 @@ export const useNotifications = () => {
           }
 
           // Atualizar os dados
-          setNotificacoes(response.data);
+          setNotificacoes(notificacoesFiltradas);
 
           // Verificação de segurança para meta
           if (response.meta) {
@@ -397,13 +431,16 @@ export const useNotifications = () => {
           try {
             const cachedData = await indexedDBService.getOpcoes('notificacoes-cache') || [];
             if (cachedData.length > 0) {
+              // 🆕 FILTRAR: Aplicar filtro de eventos ativos
+              const dadosFiltrados = await filterNotificacoesComEventosAtivos(cachedData);
+              
               const startIndex = (currentPage - 1) * itemsPerPage;
               const endIndex = startIndex + itemsPerPage;
               
-              setNotificacoes(cachedData.slice(startIndex, endIndex));
+              setNotificacoes(dadosFiltrados.slice(startIndex, endIndex));
               setPaginationMeta({
-                total: cachedData.length,
-                pages: Math.ceil(cachedData.length / itemsPerPage),
+                total: dadosFiltrados.length,
+                pages: Math.ceil(dadosFiltrados.length / itemsPerPage),
                 currentPage,
                 perPage: itemsPerPage,
               });
@@ -665,7 +702,9 @@ export const useNotifications = () => {
         const allData = await fetchAllData();
         
         if (allData && allData.length > 0) {
-          setAllNotificacoes(allData);
+          // 🆕 FILTRAR: Aplicar filtro de eventos ativos
+          const allDataFiltrado = await filterNotificacoesComEventosAtivos(allData);
+          setAllNotificacoes(allDataFiltrado);
           setIsUsingLocalSort(true);
           
           // Atualizar as chaves de ordenação
