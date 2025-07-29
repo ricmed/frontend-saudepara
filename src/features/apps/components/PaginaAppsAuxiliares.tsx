@@ -1,9 +1,10 @@
+
 import {  Building2,  Award,  FileSpreadsheet,  FileCheck,  Clock,  Leaf,  Menu,  GraduationCap,  UserSquare,  MapPin, Map, CheckCircle, Users, Calendar, AlertTriangle, HeartPulse, Stethoscope, Thermometer, HomeIcon} from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "../../../i18n/useTranslations";
 import { useLanguage } from "../../../contexts/LanguageContext";
-import { SideMenu } from "./SideMenu";
+import { SideMenu } from "../../home/components/SideMenu";
 
 type AppConfig = {
   icon: JSX.Element;
@@ -23,6 +24,12 @@ const PaginaAppsAuxiliares = () => {
     targetLink: "",
   });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const handleNavigation = (link: string) => {
+    if (navigationState.isNavigating) return;
+    setNavigationState({ isNavigating: true, targetLink: link });
+    navigate(link);
+  };
 
   const aplicativos: AppConfig[] = [
     {
@@ -62,7 +69,7 @@ const PaginaAppsAuxiliares = () => {
     },
     {
       icon: <AlertTriangle className="h-8 w-8 text-white" />,
-      nome: "Tipos de Trauma",
+      nome: "Traumas",
       link: "/private/trauma",
     },
     {
@@ -72,17 +79,17 @@ const PaginaAppsAuxiliares = () => {
     },
     {
       icon: <Stethoscope className="h-8 w-8 text-white" />,
-      nome: "Tipos de Hipótese Diagnóstica",
+      nome: "Hipótese Diagnóstica",
       link: "/private/hipotese-diagnostica",
     },
     {
       icon: <Thermometer className="h-8 w-8 text-white" />,
-      nome: "Tipos de Sintoma",
+      nome: "Sinais e Sintomas",
       link: "/private/sintoma",
     },
     {
       icon: <HomeIcon className="h-8 w-8 text-white" />,
-      nome: "Tipos de Bairro",
+      nome: "Bairro",
       link: "/private/bairro",
     },
     {
@@ -129,14 +136,13 @@ const PaginaAppsAuxiliares = () => {
       icon: <MapPin className="h-8 w-8 text-white" />,
       nome: "Gênero Sexual",
       link: "/private/genero",
+    },
+    {
+      icon: <Calendar className="h-8 w-8 text-white" />,
+      nome: "Eventos",
+      link: "/private/evento",
     }
   ];
-
-  const handleNavigation = (link: string) => {
-    if (navigationState.isNavigating) return;
-    setNavigationState({ isNavigating: true, targetLink: link });
-    navigate(link);
-  };
 
   useEffect(() => {
     const unlisten = () => {
@@ -144,6 +150,9 @@ const PaginaAppsAuxiliares = () => {
     };
     return unlisten;
   }, []);
+
+  // Ordena os aplicativos em ordem alfabética pelo nome
+  const aplicativosOrdenados = [...aplicativos].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -188,13 +197,18 @@ const PaginaAppsAuxiliares = () => {
         </div>
       </header>
 
-      <SideMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
+      <SideMenu
+        isOpen={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
+        selectedLanguage={selectedLanguage}
+        onLanguageChange={() => {}}
+      />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
           <div className="p-6">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {aplicativos.map((app, index) => (
+              {aplicativosOrdenados.map((app, index) => (
                 <button
                   key={index}
                   onClick={() => handleNavigation(app.link)}

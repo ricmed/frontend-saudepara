@@ -115,7 +115,7 @@ const CadastroTipoEstabelecimento = () => {
       <PageHeader
         title={id ? 'Editar Estabelecimento' : 'Novo Estabelecimento'}
         onMenuClick={() => setIsMenuOpen(true)}
-        onBackClick={() => navigate(-1)}
+        onBackClick={() => navigate('/private/apps-auxiliares')}
       />
 
       <SideBarMenuAppsAuxiliares

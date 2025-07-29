@@ -99,7 +99,7 @@ const CadastroGenero = () => {
       <PageHeader
         title={id ? 'Editar Gênero' : 'Novo Gênero'}
         onMenuClick={() => setIsMenuOpen(true)}
-        onBackClick={() => navigate(-1)}
+        onBackClick={() => navigate('/private/apps-auxiliares')}
       />
 
       <FormContainer onSubmit={handleSubmit}>

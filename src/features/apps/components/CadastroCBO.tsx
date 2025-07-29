@@ -146,7 +146,7 @@ const CadastroCBO = () => {
      <PageHeader
        title={id ? 'Editar CBO' : 'Novo CBO'}
        onMenuClick={() => setIsMenuOpen(true)}
-       onBackClick={() => navigate(-1)}
+       onBackClick={() => navigate('/private/apps-auxiliares')}
      />
 
      <SideBarMenuAppsAuxiliares

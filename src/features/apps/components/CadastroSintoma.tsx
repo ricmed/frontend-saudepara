@@ -107,7 +107,7 @@ const CadastroTipoSintoma = () => {
       <PageHeader
         title={id ? 'Editar Tipo de Sintoma' : 'Novo Tipo de Sintoma'}
         onMenuClick={() => setIsMenuOpen(true)}
-        onBackClick={() => navigate(-1)}
+        onBackClick={() => navigate('/private/apps-auxiliares')}
       />
 
       <SideBarMenuAppsAuxiliares

@@ -107,7 +107,7 @@ const CadastroTipoPublico = () => {
       <PageHeader
         title={id ? 'Editar Tipo de Público' : 'Novo Tipo de Público'}
         onMenuClick={() => setIsMenuOpen(true)}
-        onBackClick={() => navigate(-1)}
+        onBackClick={() => navigate('/private/apps-auxiliares')}
       />
 
       <SideBarMenuAppsAuxiliares

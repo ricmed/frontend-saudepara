@@ -148,7 +148,7 @@ const CadastroQualificacao = () => {
       <PageHeader
         title={id ? "Editar Qualificação" : "Nova Qualificação"}
         onMenuClick={() => setIsMenuOpen(true)}
-        onBackClick={() => navigate(-1)}
+        onBackClick={() => navigate('/private/apps-auxiliares')}
       />
 
       <SideBarMenuAppsAuxiliares

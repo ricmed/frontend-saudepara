@@ -115,7 +115,7 @@ const CadastroTurno = () => {
       <PageHeader
         title={id ? 'Editar Turno' : 'Novo Turno'}
         onMenuClick={() => setIsMenuOpen(true)}
-        onBackClick={() => navigate(-1)}
+        onBackClick={() => navigate('/private/apps-auxiliares')}
       />
 
       <SideBarMenuAppsAuxiliares

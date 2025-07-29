@@ -115,7 +115,7 @@ const CadastroPais = () => {
       <PageHeader
         title={id ? 'Editar País' : 'Novo País'}
         onMenuClick={() => setIsMenuOpen(true)}
-        onBackClick={() => navigate(-1)}
+        onBackClick={() => navigate('/private/apps-auxiliares')}
       />
 
       <SideBarMenuAppsAuxiliares

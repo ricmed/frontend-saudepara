@@ -102,7 +102,7 @@ const CadastroTipoEncerramento = () => {
       <PageHeader
         title={id ? 'Editar Tipo de Encerramento' : 'Novo Tipo de Encerramento'}
         onMenuClick={() => setIsMenuOpen(true)}
-        onBackClick={() => navigate(-1)}
+        onBackClick={() => navigate('/private/apps-auxiliares')}
       />
 
       <SideBarMenuAppsAuxiliares

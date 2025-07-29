@@ -107,7 +107,7 @@ const CadastroTipoTrauma = () => {
       <PageHeader
         title={id ? 'Editar Tipo de Trauma' : 'Novo Tipo de Trauma'}
         onMenuClick={() => setIsMenuOpen(true)}
-        onBackClick={() => navigate(-1)}
+        onBackClick={() => navigate('/private/apps-auxiliares')}
       />
 
       <SideBarMenuAppsAuxiliares

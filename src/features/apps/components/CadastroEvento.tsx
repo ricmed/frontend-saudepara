@@ -113,7 +113,7 @@ const CadastroTipoEvento = () => {
       <PageHeader
         title={id ? 'Editar Tipo de Evento' : 'Novo Tipo de Evento'}
         onMenuClick={() => setIsMenuOpen(true)}
-        onBackClick={() => navigate(-1)}
+        onBackClick={() => navigate('/private/apps-auxiliares')}
       />
 
       <SideBarMenuAppsAuxiliares

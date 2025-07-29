@@ -107,7 +107,7 @@ const CadastroTipoHipoteseDiag = () => {
       <PageHeader
         title={id ? 'Editar Tipo de Hipótese Diagnóstica' : 'Novo Tipo de Hipótese Diagnóstica'}
         onMenuClick={() => setIsMenuOpen(true)}
-        onBackClick={() => navigate(-1)}
+        onBackClick={() => navigate('/private/apps-auxiliares')}
       />
 
       <SideBarMenuAppsAuxiliares

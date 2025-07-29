@@ -90,7 +90,7 @@ const CadastroEscolaridade = () => {
       <PageHeader
         title={id ? 'Editar Nível de Escolaridade' : 'Novo Nível de Escolaridade'}
         onMenuClick={() => setIsMenuOpen(true)}
-        onBackClick={() => navigate(-1)}
+        onBackClick={() => navigate('/private/apps-auxiliares')}
       />
 
       <SideBarMenuAppsAuxiliares

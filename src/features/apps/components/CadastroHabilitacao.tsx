@@ -128,7 +128,7 @@ const CadastroHabilitacao = () => {
       <PageHeader
         title={id ? 'Editar Habilitação' : 'Nova Habilitação'}
         onMenuClick={() => setIsMenuOpen(true)}
-        onBackClick={() => navigate(-1)}
+        onBackClick={() => navigate('/private/apps-auxiliares')}
       />
 
       <SideBarMenuAppsAuxiliares

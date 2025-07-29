@@ -99,7 +99,7 @@ const CadastroRaca = () => {
       <PageHeader
         title={id ? 'Editar Raça' : 'Nova Raça'}
         onMenuClick={() => setIsMenuOpen(true)}
-        onBackClick={() => navigate(-1)}
+        onBackClick={() => navigate('/private/apps-auxiliares')}
       />
 
       <FormContainer onSubmit={handleSubmit}>

@@ -107,7 +107,7 @@ const CadastroTipoAtendimento = () => {
       <PageHeader
         title={id ? 'Editar Tipo de Atendimento' : 'Novo Tipo de Atendimento'}
         onMenuClick={() => setIsMenuOpen(true)}
-        onBackClick={() => navigate(-1)}
+        onBackClick={() => navigate('/private/apps-auxiliares')}
       />
 
       <SideBarMenuAppsAuxiliares

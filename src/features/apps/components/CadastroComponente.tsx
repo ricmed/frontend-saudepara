@@ -102,7 +102,7 @@ const CadastroComponente = () => {
       <PageHeader
         title={id ? 'Editar Componente' : 'Novo Componente'}
         onMenuClick={() => setIsMenuOpen(true)}
-        onBackClick={() => navigate(-1)}
+        onBackClick={() => navigate('/private/apps-auxiliares')}
       />
 
       <SideBarMenuAppsAuxiliares

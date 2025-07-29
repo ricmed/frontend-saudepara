@@ -164,7 +164,7 @@ const CadastroMunicipio = () => {
       <PageHeader
         title={id ? 'Editar Município' : 'Novo Município'}
         onMenuClick={() => setIsMenuOpen(true)}
-        onBackClick={() => navigate(-1)}
+        onBackClick={() => navigate('/private/apps-auxiliares')}
       />
 
       <SideBarMenuAppsAuxiliares

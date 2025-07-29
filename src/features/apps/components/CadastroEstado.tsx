@@ -136,7 +136,7 @@ const CadastroEstado = () => {
       <PageHeader
         title={id ? 'Editar Estado' : 'Novo Estado'}
         onMenuClick={() => setIsMenuOpen(true)}
-        onBackClick={() => navigate(-1)}
+        onBackClick={() => navigate('/private/apps-auxiliares')}
       />
 
       <SideBarMenuAppsAuxiliares

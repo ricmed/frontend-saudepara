@@ -112,7 +112,7 @@ const CadastroTipoBairro = () => {
       <PageHeader
         title={id ? 'Editar Tipo de Bairro' : 'Novo Tipo de Bairro'}
         onMenuClick={() => setIsMenuOpen(true)}
-        onBackClick={() => navigate(-1)}
+        onBackClick={() => navigate('/private/apps-auxiliares')}
       />
 
       <SideBarMenuAppsAuxiliares

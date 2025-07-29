@@ -106,7 +106,7 @@ const CadastroNatureza = () => {
       <PageHeader
         title={id ? "Editar Natureza" : "Nova Natureza"}
         onMenuClick={() => setIsMenuOpen(true)}
-        onBackClick={() => navigate(-1)}
+        onBackClick={() => navigate('/private/apps-auxiliares')}
       />
 
       <SideBarMenuAppsAuxiliares

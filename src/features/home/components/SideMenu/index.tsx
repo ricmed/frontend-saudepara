@@ -296,7 +296,22 @@ export const SideMenu: React.FC<SideMenuProps> = ({
           {/* Itens do Menu */}
           <div className="flex-grow">
             {menuItems.map((item, i) => (
-              <div key={i} className="relative">
+              <div
+                key={i}
+                className="relative"
+                onMouseEnter={() => {
+                  if (item.submenu) {
+                    setShowAppsSubmenu(true);
+                  } else {
+                    setShowAppsSubmenu(false);
+                  }
+                }}
+                onMouseLeave={() => {
+                  if (item.submenu) {
+                    setShowAppsSubmenu(false);
+                  }
+                }}
+              >
                 <div
                   className="flex items-center gap-3 text-white py-3 px-2 hover:bg-blue-800 rounded-lg cursor-pointer"
                   onClick={() => {
@@ -306,13 +321,6 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                       item.onClick();
                       onClose();
                     }
-                  }}
-                  onMouseEnter={() => {
-                    if (item.submenu) setShowAppsSubmenu(true);
-                  }}
-                  onMouseLeave={() => {
-                    if (item.submenu && !showAppsSubmenu)
-                      setShowAppsSubmenu(false);
                   }}
                 >
                   <span className="text-white">{item.icon}</span>
