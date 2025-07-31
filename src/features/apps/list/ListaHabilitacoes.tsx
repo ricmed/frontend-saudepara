@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { HabilitacaoService } from "@/services/HabilitacaoService";
+import { useHabilitacoes, useDeleteHabilitacao } from "@/features/apps/hooks/useHabilitacao";
 import { useDebounce } from "@/hooks/useDebounce";
 import SideBarMenuAppsAuxiliares from "../../apps/components/SideBarMenuAppsAuxiliares";
 import { ListHeader, DataTable, ActionButtons } from "@/features/apps/list/shared";
@@ -12,89 +12,42 @@ interface TipoHabilitacao {
   descricao: string;
 }
 
-interface PaginationData {
-  data: TipoHabilitacao[];
-  meta: {
-    total: number;
-    totalPages: number;
-    page: number;
-  };
-}
-
 const ListaHabilitacoes = () => {
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [habilitacoes, setHabilitacoes] = useState<TipoHabilitacao[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [inputValue, setInputValue] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [processingId, setProcessingId] = useState<number | null>(null);
   const itemsPerPage = 10;
-  const isSearchFetch = useRef(false);
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  
+  // React Query hooks - substituem TODO o useState + useEffect anterior!
+  const { 
+    data: response, 
+    isLoading, 
+    error 
+  } = useHabilitacoes(currentPage, itemsPerPage, debouncedSearchTerm);
+  
+  const deleteMutation = useDeleteHabilitacao();
 
-  useEffect(() => {
-    if (debouncedSearchTerm) {
-      isSearchFetch.current = true;
-      setCurrentPage(1);
-    }
-  }, [debouncedSearchTerm]);
-
-  useEffect(() => {
-    const carregarHabilitacoes = async () => {
-      try {
-        if (!isSearchFetch.current) {
-          setLoading(true);
-        }
-
-        const response: PaginationData =
-          await HabilitacaoService.getAllPaginated(
-            currentPage,
-            itemsPerPage,
-            debouncedSearchTerm
-          );
-
-        setHabilitacoes(response.data);
-        setTotalItems(response.meta.total);
-        setTotalPages(response.meta.totalPages);
-        setError(null);
-      } catch (err) {
-        setError("Erro ao carregar as habilitações");
-      } finally {
-        setLoading(false);
-        isSearchFetch.current = false;
-      }
-    };
-
-    carregarHabilitacoes();
-  }, [currentPage, debouncedSearchTerm]);
+  // Dados extraídos da resposta
+  const habilitacoes = response?.data || [];
+  const totalItems = response?.meta?.total || 0;
+  const totalPages = Math.min(Math.max(response?.meta?.totalPages || 1, 1), 1000);
 
   const handleDelete = async (id: number) => {
     if (!window.confirm("Deseja realmente excluir esta habilitação?")) return;
 
     try {
-      setProcessingId(id);
-      await HabilitacaoService.delete(id);
-
-      setHabilitacoes((prev) => {
-        const newData = prev.filter((item) => item.idtipo_habilitacao !== id);
-
-        if (newData.length === 0 && currentPage > 1) {
-          setCurrentPage((prevPage) => prevPage - 1);
-        }
-
-        return newData;
-      });
+      await deleteMutation.mutateAsync(id);
+      
+      // Se não há mais itens na página atual, volta uma página
+      if (habilitacoes.length === 1 && currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+      }
     } catch (err) {
-      console.error("Erro ao excluir:", err);
-      setError("Erro ao excluir a habilitação");
-    } finally {
-      setProcessingId(null);
+      console.error('Erro ao excluir:', err);
     }
   };
 
@@ -111,6 +64,7 @@ const ListaHabilitacoes = () => {
         onSearch={(value) => {
           setInputValue(value);
           setSearchTerm(value);
+          setCurrentPage(1); // Reset para primeira página ao pesquisar
         }}
         searchValue={inputValue}
         onNewClick={() => navigate("/private/habilitacao/nova")}
@@ -127,16 +81,16 @@ const ListaHabilitacoes = () => {
         <DataTable
           data={habilitacoes}
           columns={tableColumns}
-          loading={loading}
-          error={error}
-          onDismissError={() => setError(null)}
+          loading={isLoading}
+          error={error ? "Erro ao carregar as habilitações" : null}
+          onDismissError={() => {}}
           emptyMessage="Nenhuma habilitação cadastrada"
           searchTerm={searchTerm}
           renderActions={(hab) => (
             <ActionButtons
               onEdit={() => navigate(`/private/habilitacao/editar/${hab.idtipo_habilitacao}`)}
               onDelete={() => handleDelete(hab.idtipo_habilitacao)}
-              isProcessing={processingId === hab.idtipo_habilitacao}
+              isProcessing={deleteMutation.isPending}
               itemName={hab.descricao}
             />
           )}
@@ -147,7 +101,7 @@ const ListaHabilitacoes = () => {
           totalPages={totalPages}
           totalItems={totalItems}
           itemsPerPage={itemsPerPage}
-          isProcessing={false}
+          isProcessing={isLoading}
           onPageChange={setCurrentPage}
         />
       </main>

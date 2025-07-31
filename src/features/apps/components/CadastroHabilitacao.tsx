@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from "react-router-dom";
-import { HabilitacaoService } from '@/services/HabilitacaoService';
+import { 
+  useHabilitacao, 
+  useCreateHabilitacao, 
+  useUpdateHabilitacao,
+  useCheckHabilitacaoCodigoExisting 
+} from '@/features/apps/hooks/useHabilitacao';
 import SideBarMenuAppsAuxiliares from "../../apps/components/SideBarMenuAppsAuxiliares";
 
 import {
@@ -16,117 +21,100 @@ import {
   capitalizeFirstLetter
 } from './shared';
 
-interface FormData {
-  codigo: string;
-  descricao: string;
-}
-
 const CadastroHabilitacao = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const isEditing = !!id;
   
-  const [formData, setFormData] = useState<FormData>({ 
-    codigo: '',
+  const [formData, setFormData] = useState({ 
+    codigo: '', 
     descricao: '' 
-  });
-  const [loading, setLoading] = useState({
-    initial: !!id,
-    saving: false
   });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  useEffect(() => {
-    const carregarDados = async () => {
-      if (!id) return;
-      
-      try {
-        const habilitacao = await HabilitacaoService.getById(parseInt(id));
-        if (habilitacao) {
-          setFormData({ 
-            codigo: habilitacao.codigo,
-            descricao: habilitacao.descricao 
-          });
-        }
-      } catch (err) {
-        console.error('Erro ao carregar:', err);
-        setError('Erro ao carregar dados da habilitação');
-      } finally {
-        setLoading(prev => ({ ...prev, initial: false }));
-      }
-    };
+  // React Query hooks
+  const { data: habilitacao, isLoading: loadingHabilitacao } = useHabilitacao(Number(id));
+  const createMutation = useCreateHabilitacao();
+  const updateMutation = useUpdateHabilitacao();
+  const checkCodigoMutation = useCheckHabilitacaoCodigoExisting();
 
-    carregarDados();
-  }, [id]);
+  // Carregar dados para edição
+  useEffect(() => {
+    if (habilitacao) {
+      setFormData({
+        codigo: habilitacao.codigo || '',
+        descricao: habilitacao.descricao || ''
+      });
+    }
+  }, [habilitacao]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     const trimmedCodigo = formatText(formData.codigo);
-    const formattedDesc = capitalizeFirstLetter(formatText(formData.descricao));
+    const trimmedDescricao = formatText(formData.descricao);
+    const capitalizedDescricao = capitalizeFirstLetter(trimmedDescricao);
 
-    if (!trimmedCodigo || !formattedDesc) {
-      setError('Código e descrição não podem estar vazios');
+    if (!trimmedCodigo || !trimmedDescricao) {
+      setError('Código e descrição não podem estar vazios.');
       return;
     }
 
-    if (!(/^\d+$/.test(trimmedCodigo))) {
-      setError('O código deve conter apenas números');
+    if (trimmedCodigo.length > 4) {
+      setError('O código deve ter no máximo 4 caracteres.');
       return;
     }
-
-    if (loading.saving) return;
 
     try {
-      setLoading(prev => ({ ...prev, saving: true }));
       setError(null);
       setSuccess(false);
-
-      const [codigoExistente, descricaoExistente] = await Promise.all([
-        HabilitacaoService.checkExistingCodigo(trimmedCodigo, id ? parseInt(id) : undefined),
-        HabilitacaoService.checkExistingDescricao(formattedDesc, id ? parseInt(id) : undefined)
-      ]);
-
-      if (codigoExistente) {
-        setError('Já existe uma habilitação com este código');
-        return;
+      // Verificar duplicata de código apenas se não estiver editando ou se o código foi alterado
+      if (!isEditing || trimmedCodigo !== habilitacao?.codigo) {
+        const codigoExists = await checkCodigoMutation.mutateAsync({ codigo: trimmedCodigo });
+        if (codigoExists) {
+          setError('Já existe uma habilitação com este código.');
+          return;
+        }
       }
 
-      if (descricaoExistente) {
-        setError('Já existe uma habilitação com esta descrição');
-        return;
-      }
-
-      const payload = {
+      const habilitacaoData = {
         codigo: trimmedCodigo,
-        descricao: formattedDesc,
+        descricao: capitalizedDescricao
       };
 
-      if (id) {
-        await HabilitacaoService.update(parseInt(id), payload);
+      if (isEditing) {
+        await updateMutation.mutateAsync({ id: Number(id), data: habilitacaoData });
       } else {
-        await HabilitacaoService.create(payload);
+        await createMutation.mutateAsync(habilitacaoData);
+        setFormData({ codigo: '', descricao: '' });
       }
 
       setSuccess(true);
-      setTimeout(() => navigate("/private/habilitacao", { replace: true }), 1500);
-      
-    } catch (err) {
-      console.error('Erro ao salvar:', err);
-      setError('Erro ao salvar habilitação. Verifique os dados e tente novamente.');
-    } finally {
-      setLoading(prev => ({ ...prev, saving: false }));
+      setTimeout(() => navigate('/private/habilitacao'), 1500);
+    } catch (error: any) {
+      setError(error.message || 'Erro ao salvar habilitação.');
     }
   };
 
-  const handleCancel = () => {
-    navigate('/private/habilitacao');
-  };
+  // Loading do habilitacao sendo editado
+  if (isEditing && loadingHabilitacao) {
+    return (
+      <PageLayout>
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </PageLayout>
+    );
+  }
+
+  const isLoading = createMutation.isPending || updateMutation.isPending || checkCodigoMutation.isPending;
 
   return (
     <PageLayout>
       <PageHeader
-        title={id ? 'Editar Habilitação' : 'Nova Habilitação'}
+        title={isEditing ? 'Editar Habilitação' : 'Nova Habilitação'}
         onMenuClick={() => setIsMenuOpen(true)}
         onBackClick={() => navigate('/private/apps-auxiliares')}
       />
@@ -148,49 +136,44 @@ const CadastroHabilitacao = () => {
         {success && (
           <Alert
             type="success"
-            message={`Habilitação ${id ? "atualizada" : "criada"} com sucesso!`}
+            message={`Habilitação ${isEditing ? "atualizada" : "criada"} com sucesso!`}
           />
         )}
 
-        <div className="space-y-4">
-          <FormInput
-            label="Código"
-            name="codigo"
-            value={formData.codigo}
-            onChange={(e) => {
-              const numericValue = e.target.value.replace(/\D/g, '');
-              setFormData(prev => ({ ...prev, codigo: numericValue }));
-            }}
-            placeholder="Digite o código da habilitação"
-            maxLength={15}
-            required
-            disabled={loading.saving}
-            preventSpaceStart
-            formatOnBlur
-          />
+        <FormInput
+          label="Código"
+          name="codigo"
+          value={formData.codigo}
+          onChange={(e) => setFormData(prev => ({ ...prev, codigo: e.target.value }))}
+          placeholder="Digite o código da habilitação"
+          required
+          disabled={isLoading}
+          preventSpaceStart
+          formatOnBlur
+          maxLength={4}
+        />
 
-          <FormInput
-            label="Descrição"
-            name="descricao"
-            value={formData.descricao}
-            onChange={(e) => setFormData(prev => ({ ...prev, descricao: e.target.value }))}
-            placeholder="Descreva a habilitação"
-            required
-            disabled={loading.saving}
-            preventSpaceStart
-            formatOnBlur
-          />
-        </div>
+        <FormInput
+          label="Descrição"
+          name="descricao"
+          value={formData.descricao}
+          onChange={(e) => setFormData(prev => ({ ...prev, descricao: e.target.value }))}
+          placeholder="Digite a descrição da habilitação"
+          required
+          disabled={isLoading}
+          preventSpaceStart
+          formatOnBlur
+        />
 
         <ButtonGroup>
           <CancelButton
-            onClick={handleCancel}
-            isDisabled={loading.saving}
+            onClick={() => navigate('/private/habilitacao')}
+            isDisabled={isLoading}
           />
           <SubmitButton
-            isLoading={loading.saving}
-            isDisabled={loading.initial}
-            defaultText={id ? "Atualizar Habilitação" : "Criar Habilitação"}
+            isLoading={isLoading}
+            isDisabled={loadingHabilitacao}
+            defaultText={isEditing ? "Atualizar Habilitação" : "Criar Habilitação"}
           />
         </ButtonGroup>
       </FormContainer>

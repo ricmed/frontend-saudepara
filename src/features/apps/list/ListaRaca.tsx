@@ -1,113 +1,70 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { RacaService } from "@/services/RacaService";
-import { useDebounce } from "@/hooks/useDebounce";
+import { useRacas, useDeleteRaca } from "../hooks/useRaca";
 import SideBarMenuAppsAuxiliares from "../../apps/components/SideBarMenuAppsAuxiliares";
 import { ListHeader, DataTable, ActionButtons } from "@/features/apps/list/shared";
 import Paginacao from "./paginacao";
 
-interface TipoRaca {
+interface Raca {
   idtipo_raca: number;
   descricao: string;
 }
 
 const ListaRaca = () => {
   const navigate = useNavigate();
-  const [tiposRaca, setTiposRaca] = useState<TipoRaca[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [inputValue, setInputValue] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [processingId, setProcessingId] = useState<number | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [processingId, setProcessingId] = useState<number | null>(null);
   const itemsPerPage = 10;
-  const isMounted = useRef(false);
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-  useEffect(() => {
-    isMounted.current = true;
-    return () => {
-      isMounted.current = false;
-    };
-  }, []);
+  const { data: racasData, isLoading, error } = useRacas(currentPage, itemsPerPage, searchTerm);
+  const deleteRaca = useDeleteRaca();
 
-  useEffect(() => {
-    if (debouncedSearchTerm) {
-      setCurrentPage(1);
+  const racas = racasData?.data || [];
+
+  const handleDelete = async (raca: Raca) => {
+    if (!confirm(`Tem certeza que deseja excluir a raça/cor "${raca.descricao}"?`)) {
+      return;
     }
-  }, [debouncedSearchTerm]);
 
-  useEffect(() => {
-    const carregarTiposRaca = async () => {
-      try {
-        setLoading(true);
-        const response = await RacaService.getAllPaginated(
-          currentPage, 
-          itemsPerPage, 
-          debouncedSearchTerm
-        );
-        
-        if (isMounted.current) {
-          setTiposRaca(response.data);
-          setTotalItems(response.meta.total);
-          setTotalPages(Math.min(Math.max(response.meta.totalPages, 1), 1000));
-          setError(null);
-        }
-      } catch (err) {
-        if (isMounted.current) {
-          setError("Erro ao carregar tipos de raça");
-        }
-      } finally {
-        if (isMounted.current) {
-          setLoading(false);
-        }
-      }
-    };
-
-    carregarTiposRaca();
-  }, [currentPage, debouncedSearchTerm]);
-
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("Deseja realmente excluir este tipo de raça?")) return;
+    console.log('🗑️ Tentando deletar raça:', raca.idtipo_raca);
+    setProcessingId(raca.idtipo_raca);
 
     try {
-      setProcessingId(id);
-      await RacaService.delete(id);
-
-      setTiposRaca(prev => {
-        const newData = prev.filter(item => item.idtipo_raca !== id);
-        if (newData.length === 0 && currentPage > 1) {
-          setCurrentPage(prevPage => prevPage - 1);
-        }
-        return newData;
-      });
-    } catch (err) {
-      setError("Erro ao excluir o tipo de raça");
+      await deleteRaca.mutateAsync(raca.idtipo_raca);
+      console.log('✅ Raça deletada com sucesso:', raca.idtipo_raca);
+    } catch (error: any) {
+      console.error('❌ Erro ao deletar raça:', error);
+      alert('Erro ao excluir raça/cor: ' + (error.message || 'Erro desconhecido'));
     } finally {
       setProcessingId(null);
     }
   };
 
   const tableColumns = [
-    { header: "Descrição", accessor: "descricao" as keyof TipoRaca }
+    { header: "Descrição", accessor: "descricao" as keyof Raca },
   ];
 
+  const renderActionButtons = (raca: Raca) => (
+    <ActionButtons
+      onEdit={() => navigate(`/private/raca/editar/${raca.idtipo_raca}`)}
+      onDelete={() => handleDelete(raca)}
+      isProcessing={processingId === raca.idtipo_raca}
+      itemName="raça/cor"
+    />
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
       <ListHeader
-        title="Lista de Tipos de Raça"
-        searchPlaceholder="Pesquisar tipos de raça..."
-        onSearch={(value) => {
-          setInputValue(value);
-          setSearchTerm(value);
-        }}
-        searchValue={inputValue}
-        onNewClick={() => navigate("/private/raca/nova")}
-        isProcessing={false}
+        title="Lista de Raças/Cores"
         onMenuOpen={() => setIsMenuOpen(true)}
+        onNewClick={() => navigate('/private/raca/nova')}
+        searchValue={searchTerm}
+        onSearch={setSearchTerm}
+        searchPlaceholder="Buscar por descrição..."
+        isProcessing={deleteRaca.isPending}
       />
 
       <SideBarMenuAppsAuxiliares
@@ -115,34 +72,33 @@ const ListaRaca = () => {
         onClose={() => setIsMenuOpen(false)}
       />
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <div className="container mx-auto p-4">
         <DataTable
-          data={tiposRaca}
+          data={racas}
           columns={tableColumns}
-          loading={loading}
-          error={error}
-          onDismissError={() => setError(null)}
-          emptyMessage="Nenhum tipo de raça cadastrado"
+          renderActions={renderActionButtons}
+          loading={isLoading}
+          error={error?.message || null}
+          onDismissError={() => {}}
+          emptyMessage="Nenhuma raça/cor encontrada"
           searchTerm={searchTerm}
-          renderActions={(tipo) => (
-            <ActionButtons
-              onEdit={() => navigate(`/private/raca/editar/${tipo.idtipo_raca}`)}
-              onDelete={() => handleDelete(tipo.idtipo_raca)}
-              isProcessing={processingId === tipo.idtipo_raca}
-              itemName={tipo.descricao}
+        />
+
+        {/* Paginação */}
+        {racasData && racasData.meta.totalPages > 1 && (
+          <div className="mt-6">
+            <Paginacao
+              currentPage={currentPage}
+              totalPages={racasData.meta.totalPages}
+              totalItems={racasData.meta.total}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              isProcessing={isLoading}
             />
-          )}
-        />
-        <Paginacao
-          currentPage={currentPage}
-          totalPages={totalPages}
-          totalItems={totalItems}
-          itemsPerPage={itemsPerPage}
-          isProcessing={false}
-          onPageChange={setCurrentPage}
-        />
-      </main>
-    </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 };
 

@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { EscolaridadeService } from "@/services/EscolaridadeService";
-import { useDebounce } from "@/hooks/useDebounce";
-import SideBarMenuAppsAuxiliares from "../components/SideBarMenuAppsAuxiliares";
+import { useEscolaridades, useDeleteEscolaridade } from "../hooks/useEscolaridade";
+import SideBarMenuAppsAuxiliares from "../../apps/components/SideBarMenuAppsAuxiliares";
 import { ListHeader, DataTable, ActionButtons } from "@/features/apps/list/shared";
 import Paginacao from "./paginacao";
 
@@ -11,152 +10,95 @@ interface Escolaridade {
   descricao: string;
 }
 
-interface PaginatedResponse {
-  data: Escolaridade[];
-  meta: {
-    total: number;
-    totalPages: number;
-    page: number;
-    limit: number;
-  };
-}
-
 const ListaEscolaridade = () => {
   const navigate = useNavigate();
-  const [escolaridades, setEscolaridades] = useState<Escolaridade[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [inputValue, setInputValue] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [processingId, setProcessingId] = useState<number | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [processingId, setProcessingId] = useState<number | null>(null);
   const itemsPerPage = 10;
-  const isMounted = useRef(false);
-  const isSearchFetch = useRef(false);
 
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const { data: escolaridadesData, isLoading, error } = useEscolaridades(currentPage, itemsPerPage, searchTerm);
+  const deleteEscolaridade = useDeleteEscolaridade();
 
-  useEffect(() => {
-    isMounted.current = true;
-    return () => {
-      isMounted.current = false;
-    };
-  }, []);
+  const escolaridades = escolaridadesData?.data || [];
 
-  useEffect(() => {
-    if (debouncedSearchTerm) {
-      isSearchFetch.current = true;
-      setCurrentPage(1);
+  const handleDelete = async (escolaridade: Escolaridade) => {
+    if (!confirm(`Tem certeza que deseja excluir a escolaridade "${escolaridade.descricao}"?`)) {
+      return;
     }
-  }, [debouncedSearchTerm]);
 
-  useEffect(() => {
-    const carregarEscolaridades = async () => {
-      try {
-        if (!isSearchFetch.current && isMounted.current) setLoading(true);
+    console.log('🗑️ Tentando deletar escolaridade:', escolaridade.idtipo_escolaridade);
+    setProcessingId(escolaridade.idtipo_escolaridade);
 
-        const response = (await EscolaridadeService.getAllPaginated(
-          currentPage,
-          itemsPerPage,
-          debouncedSearchTerm
-        )) as PaginatedResponse;
-
-        if (isMounted.current) {
-          setEscolaridades(response.data);
-          setTotalItems(response.meta.total || 0);
-          setTotalPages(
-            Math.min(Math.max(response.meta.totalPages || 1, 1), 1000)
-          );
-        }
-      } catch (err) {
-        if (isMounted.current) {
-          setError("Erro ao carregar níveis de escolaridade");
-        }
-      } finally {
-        if (isMounted.current) {
-          setLoading(false);
-          isSearchFetch.current = false;
-        }
-      }
-    };
-
-    carregarEscolaridades();
-  }, [currentPage, debouncedSearchTerm]);
-
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("Deseja realmente excluir este nível de escolaridade?")) return;
     try {
-      setProcessingId(id);
-      await EscolaridadeService.delete(id);
-
-      setEscolaridades((prev) => {
-        const newData = prev.filter((item) => item.idtipo_escolaridade !== id);
-        if (newData.length === 0 && currentPage > 1) {
-          setCurrentPage((prevPage) => prevPage - 1);
-        }
-        return newData;
-      });
-    } catch (err) {
-      setError("Erro ao excluir o nível de escolaridade");
+      await deleteEscolaridade.mutateAsync(escolaridade.idtipo_escolaridade);
+      console.log('✅ Escolaridade deletada com sucesso:', escolaridade.idtipo_escolaridade);
+    } catch (error: any) {
+      console.error('❌ Erro ao deletar escolaridade:', error);
+      alert('Erro ao excluir escolaridade: ' + (error.message || 'Erro desconhecido'));
     } finally {
       setProcessingId(null);
     }
   };
 
   const tableColumns = [
-    { header: "Descrição", accessor: "descricao" as keyof Escolaridade }
+    { header: "Descrição", accessor: "descricao" as keyof Escolaridade },
   ];
 
+  const renderActionButtons = (escolaridade: Escolaridade) => (
+    <ActionButtons
+      onEdit={() => navigate(`/private/escolaridade/editar/${escolaridade.idtipo_escolaridade}`)}
+      onDelete={() => handleDelete(escolaridade)}
+      isProcessing={processingId === escolaridade.idtipo_escolaridade}
+      itemName="escolaridade"
+    />
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
       <ListHeader
-        title="Lista de Escolaridade"
-        searchPlaceholder="Pesquisar escolaridade..."
-        onSearch={(value) => {
-          setInputValue(value);
-          setSearchTerm(value);
-        }}
-        searchValue={inputValue}
-        onNewClick={() => navigate("/private/escolaridade/nova")}
-        isProcessing={false}
+        title="Lista de Escolaridades"
         onMenuOpen={() => setIsMenuOpen(true)}
+        onNewClick={() => navigate('/private/escolaridade/nova')}
+        searchValue={searchTerm}
+        onSearch={setSearchTerm}
+        searchPlaceholder="Buscar por descrição..."
+        isProcessing={deleteEscolaridade.isPending}
       />
+
       <SideBarMenuAppsAuxiliares
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
       />
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <div className="container mx-auto p-4">
         <DataTable
           data={escolaridades}
           columns={tableColumns}
-          loading={loading}
-          error={error}
-          onDismissError={() => setError(null)}
-          emptyMessage="Nenhum nível de escolaridade cadastrado"
+          renderActions={renderActionButtons}
+          loading={isLoading}
+          error={error?.message || null}
+          onDismissError={() => {}}
+          emptyMessage="Nenhuma escolaridade encontrada"
           searchTerm={searchTerm}
-          renderActions={(escolaridade) => (
-            <ActionButtons
-              onEdit={() => navigate(`/private/escolaridade/editar/${escolaridade.idtipo_escolaridade}`)}
-              onDelete={() => handleDelete(escolaridade.idtipo_escolaridade)}
-              isProcessing={processingId === escolaridade.idtipo_escolaridade}
-              itemName={escolaridade.descricao}
+        />
+
+        {/* Paginação */}
+        {escolaridadesData && escolaridadesData.meta && (
+          <div className="mt-6">
+            <Paginacao
+              currentPage={currentPage}
+              totalPages={escolaridadesData.meta.totalPages}
+              totalItems={escolaridadesData.meta.total}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              isProcessing={isLoading}
             />
-          )}
-        />
-        <Paginacao
-          currentPage={currentPage}
-          totalPages={totalPages}
-          totalItems={totalItems}
-          itemsPerPage={itemsPerPage}
-          isProcessing={false}
-          onPageChange={setCurrentPage}
-        />
-      </main>
-    </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 };
 

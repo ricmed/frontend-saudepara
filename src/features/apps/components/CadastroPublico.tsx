@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from "react-router-dom";
-import { TiposPublicoService } from '@/services/PublicoService';
+import { 
+  usePublico, 
+  useCreatePublico, 
+  useUpdatePublico,
+  useCheckPublicoExisting 
+} from '@/features/apps/hooks/usePublico';
 import SideBarMenuAppsAuxiliares from "../../apps/components/SideBarMenuAppsAuxiliares";
 
 import {
@@ -16,41 +21,32 @@ import {
   capitalizeFirstLetter
 } from './shared';
 
-const CadastroTipoPublico = () => {
+const CadastroPublico = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const isEditing = !!id;
   
   const [formData, setFormData] = useState({ descricao: '' });
-  const [loading, setLoading] = useState({
-    initial: !!id,
-    saving: false
-  });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  useEffect(() => {
-    const loadData = async () => {
-      if (!id) return;
-      
-      try {
-        const tipoPublico = await TiposPublicoService.getById(parseInt(id));
-        if (tipoPublico) {
-          setFormData({ descricao: tipoPublico.descricao });
-        }
-      } catch (err) {
-        console.error('Erro ao carregar:', err);
-        setError('Erro ao carregar dados do tipo de público');
-      } finally {
-        setLoading(prev => ({ ...prev, initial: false }));
-      }
-    };
+  // React Query hooks
+  const { data: publico, isLoading: loadingPublico } = usePublico(Number(id));
+  const createMutation = useCreatePublico();
+  const updateMutation = useUpdatePublico();
+  const checkExistingMutation = useCheckPublicoExisting();
 
-    loadData();
-  }, [id]);
+  // Carregar dados para edição
+  useEffect(() => {
+    if (publico) {
+      setFormData({ descricao: publico.descricao });
+    }
+  }, [publico]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     const trimmedDesc = formatText(formData.descricao);
     const capitalizedDesc = capitalizeFirstLetter(trimmedDesc);
 
@@ -59,53 +55,53 @@ const CadastroTipoPublico = () => {
       return;
     }
 
-    if (trimmedDesc.length > 15) {
-      setError('A descrição deve ter no máximo 15 caracteres.');
-      return;
-    }
-
-    if (loading.saving) return;
-
     try {
-      setLoading(prev => ({ ...prev, saving: true }));
       setError(null);
       setSuccess(false);
-
-      const isDuplicate = await TiposPublicoService.checkExisting(
-        capitalizedDesc,
-        id ? parseInt(id) : undefined
-      );
-
-      if (isDuplicate) {
-        setError('Já existe um tipo de público com essa descrição.');
-        return;
+      
+      // Verificar duplicata apenas se não estiver editando ou se a descrição foi alterada
+      if (!isEditing || trimmedDesc !== publico?.descricao) {
+        const exists = await checkExistingMutation.mutateAsync({ descricao: trimmedDesc });
+        if (exists) {
+          setError('Já existe um público com esta descrição.');
+          return;
+        }
       }
 
-      if (id) {
-        await TiposPublicoService.update(parseInt(id), capitalizedDesc);
+      if (isEditing) {
+        await updateMutation.mutateAsync({ id: Number(id), descricao: capitalizedDesc });
       } else {
-        await TiposPublicoService.create(capitalizedDesc);
+        await createMutation.mutateAsync(capitalizedDesc);
+        setFormData({ descricao: '' });
       }
 
       setSuccess(true);
-      setTimeout(() => navigate('/private/publico', { replace: true }), 1500);
-      
+      setTimeout(() => {
+        navigate('/private/publico');
+      }, 2000);
     } catch (err) {
       console.error('Erro ao salvar:', err);
-      setError('Erro ao salvar tipo de público. Verifique os dados e tente novamente.');
-    } finally {
-      setLoading(prev => ({ ...prev, saving: false }));
+      setError('Erro ao salvar público. Verifique os dados e tente novamente.');
     }
   };
 
-  const handleCancel = () => {
-    navigate('/private/publico');
-  };
+  // Loading do público sendo editado
+  if (isEditing && loadingPublico) {
+    return (
+      <PageLayout>
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </PageLayout>
+    );
+  }
+
+  const isLoading = createMutation.isPending || updateMutation.isPending || checkExistingMutation.isPending;
 
   return (
     <PageLayout>
       <PageHeader
-        title={id ? 'Editar Tipo de Público' : 'Novo Tipo de Público'}
+        title={isEditing ? 'Editar Público' : 'Novo Público'}
         onMenuClick={() => setIsMenuOpen(true)}
         onBackClick={() => navigate('/private/apps-auxiliares')}
       />
@@ -127,7 +123,8 @@ const CadastroTipoPublico = () => {
         {success && (
           <Alert
             type="success"
-            message={`Tipo de público ${id ? "atualizado" : "criado"} com sucesso!`}
+            message="Público criado/atualizado com sucesso!"
+            onClose={() => setSuccess(false)}
           />
         )}
 
@@ -136,23 +133,22 @@ const CadastroTipoPublico = () => {
           name="descricao"
           value={formData.descricao}
           onChange={(e) => setFormData({ descricao: e.target.value })}
-          placeholder="Digite a descrição do tipo de público"
+          placeholder="Digite a descrição do público"
           required
-          disabled={loading.saving}
+          disabled={isLoading}
           preventSpaceStart
           formatOnBlur
-          maxLength={15}
         />
 
         <ButtonGroup>
           <CancelButton
-            onClick={handleCancel}
-            isDisabled={loading.saving}
+            onClick={() => navigate('/private/publico')}
+            isDisabled={isLoading}
           />
           <SubmitButton
-            isLoading={loading.saving}
-            isDisabled={loading.initial}
-            defaultText={id ? "Atualizar Tipo de Público" : "Criar Tipo de Público"}
+            isLoading={isLoading}
+            isDisabled={loadingPublico}
+            defaultText={isEditing ? "Atualizar Público" : "Criar Público"}
           />
         </ButtonGroup>
       </FormContainer>
@@ -160,4 +156,4 @@ const CadastroTipoPublico = () => {
   );
 };
 
-export default CadastroTipoPublico;
+export default CadastroPublico;

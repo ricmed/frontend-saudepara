@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from "react-router-dom";
-import { TiposEventoService } from '@/services/EventoService';
+import { useEvento, useCreateEvento, useUpdateEvento, useCheckEventoExisting } from '../hooks/useEvento';
 import SideBarMenuAppsAuxiliares from "../../apps/components/SideBarMenuAppsAuxiliares";
 
 import {
@@ -20,38 +20,28 @@ const CadastroTipoEvento = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   
-  // 🔄 MODIFICAR o estado inicial
   const [formData, setFormData] = useState({ descricao: '', ativo: 'S' });
-  const [loading, setLoading] = useState({
-    initial: !!id,
-    saving: false
-  });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
+  // React Query hooks
+  const { data: tipoEvento, isLoading: loadingData } = useEvento(id ? parseInt(id) : 0);
+  const createMutation = useCreateEvento();
+  const updateMutation = useUpdateEvento();
+  const checkExistingMutation = useCheckEventoExisting();
+
+  // Carregar dados quando disponível (apenas uma vez)
   useEffect(() => {
-    const loadData = async () => {
-      if (!id) return;
-      
-      try {
-        const tipoEvento = await TiposEventoService.getById(parseInt(id));
-        if (tipoEvento) {
-          setFormData({
-            descricao: tipoEvento.descricao,
-            ativo: tipoEvento.ativo || 'S' // 🆕 CAMPO ADICIONADO
-          });
-        }
-      } catch (err) {
-        console.error('Erro ao carregar:', err);
-        setError('Erro ao carregar dados do tipo de evento');
-      } finally {
-        setLoading(prev => ({ ...prev, initial: false }));
-      }
-    };
-
-    loadData();
-  }, [id]);
+    if (tipoEvento && !dataLoaded) {
+      setFormData({
+        descricao: tipoEvento.descricao,
+        ativo: tipoEvento.ativo || 'S'
+      });
+      setDataLoaded(true);
+    }
+  }, [tipoEvento, dataLoaded]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,17 +58,18 @@ const CadastroTipoEvento = () => {
       return;
     }
 
-    if (loading.saving) return;
+    const isSaving = createMutation.isPending || updateMutation.isPending;
+    if (isSaving) return;
 
     try {
-      setLoading(prev => ({ ...prev, saving: true }));
       setError(null);
       setSuccess(false);
 
-      const isDuplicate = await TiposEventoService.checkExisting(
-        capitalizedDesc,
-        id ? parseInt(id) : undefined
-      );
+      // Verificar duplicatas
+      const isDuplicate = await checkExistingMutation.mutateAsync({
+        descricao: capitalizedDesc,
+        excludeId: id ? parseInt(id) : undefined
+      });
 
       if (isDuplicate) {
         setError('Já existe um tipo de evento com essa descrição.');
@@ -86,11 +77,16 @@ const CadastroTipoEvento = () => {
       }
 
       if (id) {
-        // 🔄 MODIFICAR - incluir campo ativo
-        await TiposEventoService.update(parseInt(id), capitalizedDesc, formData.ativo);
+        await updateMutation.mutateAsync({
+          id: parseInt(id),
+          descricao: capitalizedDesc,
+          ativo: formData.ativo
+        });
       } else {
-        // 🔄 MODIFICAR - incluir campo ativo
-        await TiposEventoService.create(capitalizedDesc, formData.ativo);
+        await createMutation.mutateAsync({
+          descricao: capitalizedDesc,
+          ativo: formData.ativo
+        });
       }
 
       setSuccess(true);
@@ -99,8 +95,6 @@ const CadastroTipoEvento = () => {
     } catch (err) {
       console.error('Erro ao salvar:', err);
       setError('Erro ao salvar tipo de evento. Verifique os dados e tente novamente.');
-    } finally {
-      setLoading(prev => ({ ...prev, saving: false }));
     }
   };
 
@@ -145,13 +139,13 @@ const CadastroTipoEvento = () => {
           onChange={(e) => setFormData(prev => ({ ...prev, descricao: e.target.value }))}
           placeholder="Digite a descrição do tipo de evento"
           required
-          disabled={loading.saving}
+          disabled={createMutation.isPending || updateMutation.isPending}
           preventSpaceStart
           formatOnBlur
           maxLength={60}
         />
 
-        {/* 🆕 ADICIONAR este campo após o campo descrição */}
+        {/* Campo de Status */}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-700">
             Status
@@ -160,7 +154,7 @@ const CadastroTipoEvento = () => {
             name="ativo"
             value={formData.ativo}
             onChange={(e) => setFormData(prev => ({ ...prev, ativo: e.target.value }))}
-            disabled={loading.saving}
+            disabled={createMutation.isPending || updateMutation.isPending}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
           >
             <option value="S">Ativo</option>
@@ -171,11 +165,11 @@ const CadastroTipoEvento = () => {
         <ButtonGroup>
           <CancelButton
             onClick={handleCancel}
-            isDisabled={loading.saving}
+            isDisabled={createMutation.isPending || updateMutation.isPending}
           />
           <SubmitButton
-            isLoading={loading.saving}
-            isDisabled={loading.initial}
+            isLoading={createMutation.isPending || updateMutation.isPending}
+            isDisabled={loadingData}
             defaultText={id ? "Atualizar Tipo de Evento" : "Criar Tipo de Evento"}
           />
         </ButtonGroup>

@@ -26,7 +26,17 @@ interface APIError {
 }
 
 const handleApiError = (error: AxiosError<APIError>) => {
-  console.error('API Error:', error);
+  console.error('🔥 Erro na API do CBO:', {
+    message: error.message,
+    status: error.response?.status,
+    statusText: error.response?.statusText,
+    data: error.response?.data,
+    config: {
+      url: error.config?.url,
+      method: error.config?.method,
+    }
+  });
+  
   if (error.response?.data?.message === 'Já existe um CBO com este código ou descrição') {
     throw new Error(error.response.data.message);
   }
@@ -136,7 +146,7 @@ export const CBOService = {
       
       await axios.delete(`${API_URL}/${id}`);
     } catch (error) {
-      return handleApiError(error as AxiosError<APIError>);
+      handleApiError(error as AxiosError<APIError>);
     }
   },
 

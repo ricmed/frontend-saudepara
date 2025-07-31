@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from "react-router-dom";
-import { GeneroService } from "@/services/GeneroService";
+import { useGenero, useCreateGenero, useUpdateGenero, useCheckGeneroExisting } from '../hooks/useGenero';
 
 import {
   PageLayout,
@@ -18,34 +18,24 @@ import {
 const CadastroGenero = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const generoId = id ? parseInt(id) : undefined;
   
   const [formData, setFormData] = useState({ descricao: '' });
-  const [loading, setLoading] = useState({
-    initial: !!id,
-    saving: false
-  });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  useEffect(() => {
-    const loadData = async () => {
-      if (!id) return;
-      
-      try {
-        const data = await GeneroService.getById(parseInt(id));
-        if (data) {
-          setFormData({ descricao: data.descricao });
-        }
-      } catch (err) {
-        setError('Erro ao carregar dados do gênero');
-      } finally {
-        setLoading(prev => ({ ...prev, initial: false }));
-      }
-    };
+  const { data: generoData, isLoading: loadingGenero } = useGenero(generoId!);
+  const createGenero = useCreateGenero();
+  const updateGenero = useUpdateGenero();
+  const checkExisting = useCheckGeneroExisting();
 
-    loadData();
-  }, [id]);
+  // Carregar dados quando disponível
+  useEffect(() => {
+    if (generoData && !formData.descricao) {
+      setFormData({ descricao: generoData.descricao });
+    }
+  }, [generoData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,27 +47,26 @@ const CadastroGenero = () => {
       return;
     }
 
-    if (loading.saving) return;
+    if (createGenero.isPending || updateGenero.isPending) return;
 
     try {
-      setLoading(prev => ({ ...prev, saving: true }));
       setError(null);
       setSuccess(false);
 
-      const exists = await GeneroService.checkExisting(
-        formattedDesc,
-        id ? parseInt(id) : undefined
-      );
+      const existsResult = await checkExisting.mutateAsync({
+        descricao: formattedDesc,
+        excludeId: generoId
+      });
 
-      if (exists) {
+      if (existsResult) {
         setError('Já existe um gênero com essa descrição.');
         return;
       }
 
-      if (id) {
-        await GeneroService.update(parseInt(id), formattedDesc);
+      if (generoId) {
+        await updateGenero.mutateAsync({ id: generoId, descricao: formattedDesc });
       } else {
-        await GeneroService.create(formattedDesc);
+        await createGenero.mutateAsync(formattedDesc);
       }
 
       setSuccess(true);
@@ -85,8 +74,6 @@ const CadastroGenero = () => {
       
     } catch (err: any) {
       setError(err.message || 'Erro ao salvar gênero. Verifique os dados e tente novamente.');
-    } finally {
-      setLoading(prev => ({ ...prev, saving: false }));
     }
   };
 
@@ -94,10 +81,12 @@ const CadastroGenero = () => {
     navigate('/private/genero');
   };
 
+  const isLoading = loadingGenero || createGenero.isPending || updateGenero.isPending;
+
   return (
     <PageLayout>
       <PageHeader
-        title={id ? 'Editar Gênero' : 'Novo Gênero'}
+        title={generoId ? 'Editar Gênero' : 'Novo Gênero'}
         onMenuClick={() => setIsMenuOpen(true)}
         onBackClick={() => navigate('/private/apps-auxiliares')}
       />
@@ -114,7 +103,7 @@ const CadastroGenero = () => {
         {success && (
           <Alert
             type="success"
-            message={`Gênero ${id ? "atualizado" : "criado"} com sucesso!`}
+            message={`Gênero ${generoId ? "atualizado" : "criado"} com sucesso!`}
           />
         )}
 
@@ -129,7 +118,7 @@ const CadastroGenero = () => {
           }}
           placeholder="Digite a descrição do gênero"
           required
-          disabled={loading.saving}
+          disabled={isLoading}
           preventSpaceStart
           formatOnBlur
         />
@@ -137,12 +126,12 @@ const CadastroGenero = () => {
         <ButtonGroup>
           <CancelButton
             onClick={handleCancel}
-            isDisabled={loading.saving}
+            isDisabled={isLoading}
           />
           <SubmitButton
-            isLoading={loading.saving}
-            isDisabled={loading.initial}
-            defaultText={id ? "Atualizar Gênero" : "Criar Gênero"}
+            isLoading={isLoading}
+            isDisabled={loadingGenero}
+            defaultText={generoId ? "Atualizar Gênero" : "Criar Gênero"}
           />
         </ButtonGroup>
       </FormContainer>

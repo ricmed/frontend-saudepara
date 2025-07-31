@@ -1,7 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { TurnoService } from '@/services/TurnoService';
-import { useDebounce } from "@/hooks/useDebounce";
+import { useTurnos, useDeleteTurno } from "../hooks/useTurno";
 import SideBarMenuAppsAuxiliares from "../../apps/components/SideBarMenuAppsAuxiliares";
 import { ListHeader, DataTable, ActionButtons } from "@/features/apps/list/shared";
 import Paginacao from "./paginacao";
@@ -13,98 +12,59 @@ interface Turno {
 
 const ListaTurnos = () => {
   const navigate = useNavigate();
-  const [turnos, setTurnos] = useState<Turno[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [inputValue, setInputValue] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [processingId, setProcessingId] = useState<number | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [processingId, setProcessingId] = useState<number | null>(null);
   const itemsPerPage = 10;
-  const isSearchFetch = useRef(false);
 
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const { data: turnosData, isLoading, error } = useTurnos(currentPage, itemsPerPage, searchTerm);
+  const deleteTurno = useDeleteTurno();
 
-  useEffect(() => {
-    if (debouncedSearchTerm) {
-      isSearchFetch.current = true;
-      setCurrentPage(1);
+  const turnos = turnosData?.data || [];
+
+  const handleDelete = async (turno: Turno) => {
+    if (!confirm(`Tem certeza que deseja excluir o turno "${turno.descricao}"?`)) {
+      return;
     }
-  }, [debouncedSearchTerm]);
 
-  useEffect(() => {
-    const carregarTurnos = async () => {
-      try {
-        if (!isSearchFetch.current) {
-          setLoading(true);
-        }
-
-        const response = await TurnoService.getAllPaginated(
-          currentPage,
-          itemsPerPage,
-          debouncedSearchTerm
-        );
-        
-        setTurnos(response.data);
-        setTotalItems(response.meta.total);
-        setTotalPages(response.meta.totalPages);
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Erro ao carregar os turnos");
-      } finally {
-        setLoading(false);
-        isSearchFetch.current = false;
-      }
-    };
-
-    carregarTurnos();
-  }, [currentPage, debouncedSearchTerm]);
-
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("Deseja realmente excluir este turno?")) return;
+    console.log('🗑️ Tentando deletar turno:', turno.id_turno);
+    setProcessingId(turno.id_turno);
 
     try {
-      setProcessingId(id);
-      await TurnoService.delete(id);
-
-      setTurnos(prev => {
-        const newData = prev.filter(item => item.id_turno !== id);
-        
-        if (newData.length === 0 && currentPage > 1) {
-          setCurrentPage(prevPage => prevPage - 1);
-        }
-        
-        return newData;
-      });
-
-    } catch (err) {
-      console.error('Erro ao excluir:', err);
-      setError(err instanceof Error ? err.message : "Erro ao excluir o turno");
+      await deleteTurno.mutateAsync(turno.id_turno);
+      console.log('✅ Turno deletado com sucesso:', turno.id_turno);
+    } catch (error: any) {
+      console.error('❌ Erro ao deletar turno:', error);
+      alert('Erro ao excluir turno: ' + (error.message || 'Erro desconhecido'));
     } finally {
       setProcessingId(null);
     }
   };
 
   const tableColumns = [
-    { header: "Descrição", accessor: "descricao" as keyof Turno }
+    { header: "Descrição", accessor: "descricao" as keyof Turno },
   ];
 
+  const renderActionButtons = (turno: Turno) => (
+    <ActionButtons
+      onEdit={() => navigate(`/private/turnos/editar/${turno.id_turno}`)}
+      onDelete={() => handleDelete(turno)}
+      isProcessing={processingId === turno.id_turno}
+      itemName="turno"
+    />
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
       <ListHeader
         title="Lista de Turnos"
-        searchPlaceholder="Pesquisar turnos..."
-        onSearch={(value) => {
-          setInputValue(value);
-          setSearchTerm(value);
-        }}
-        searchValue={inputValue}
-        onNewClick={() => navigate("/private/turnos/nova")}
-        isProcessing={false}
         onMenuOpen={() => setIsMenuOpen(true)}
+        onNewClick={() => navigate('/private/turnos/nova')}
+        searchValue={searchTerm}
+        onSearch={setSearchTerm}
+        searchPlaceholder="Buscar por descrição..."
+        isProcessing={deleteTurno.isPending}
       />
 
       <SideBarMenuAppsAuxiliares
@@ -112,34 +72,33 @@ const ListaTurnos = () => {
         onClose={() => setIsMenuOpen(false)}
       />
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <div className="container mx-auto p-4">
         <DataTable
           data={turnos}
           columns={tableColumns}
-          loading={loading}
-          error={error}
-          onDismissError={() => setError(null)}
-          emptyMessage="Nenhum turno cadastrado"
+          renderActions={renderActionButtons}
+          loading={isLoading}
+          error={error?.message || null}
+          onDismissError={() => {}}
+          emptyMessage="Nenhum turno encontrado"
           searchTerm={searchTerm}
-          renderActions={(turno) => (
-            <ActionButtons
-              onEdit={() => navigate(`/private/turnos/editar/${turno.id_turno}`)}
-              onDelete={() => handleDelete(turno.id_turno)}
-              isProcessing={processingId === turno.id_turno}
-              itemName={turno.descricao}
+        />
+
+        {/* Paginação */}
+        {turnosData && turnosData.meta.totalPages > 1 && (
+          <div className="mt-6">
+            <Paginacao
+              currentPage={currentPage}
+              totalPages={turnosData.meta.totalPages}
+              totalItems={turnosData.meta.total}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              isProcessing={isLoading}
             />
-          )}
-        />
-        <Paginacao
-          currentPage={currentPage}
-          totalPages={totalPages}
-          totalItems={totalItems}
-          itemsPerPage={itemsPerPage}
-          isProcessing={false}
-          onPageChange={setCurrentPage}
-        />
-      </main>
-    </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 };
 

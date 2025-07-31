@@ -1,7 +1,7 @@
 // src/features/apps/components/CadastroCBO.tsx
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from "react-router-dom";
-import { CBOService } from '@/services/CBOService';
+import { useCBO, useCreateCBO, useUpdateCBO, useCheckCBOCodigoExisting } from '../hooks/useCBO';
 import SideBarMenuAppsAuxiliares from "../../apps/components/SideBarMenuAppsAuxiliares";
 
 import {
@@ -20,41 +20,30 @@ import {
 const CadastroCBO = () => {
  const navigate = useNavigate();
  const { id } = useParams();
+ const cboId = id ? parseInt(id) : undefined;
  
  const [formData, setFormData] = useState({
    codigo: '',
    descricao: ''
  });
- const [loading, setLoading] = useState({
-   initial: !!id,
-   saving: false
- });
  const [error, setError] = useState<string | null>(null);
  const [success, setSuccess] = useState(false);
  const [isMenuOpen, setIsMenuOpen] = useState(false);
  
- useEffect(() => {
-   const loadData = async () => {
-     if (!id) return;
-     
-     try {
-       const cbo = await CBOService.getById(parseInt(id));
-       if (cbo) {
-         setFormData({
-           codigo: cbo.codigo,
-           descricao: cbo.descricao
-         });
-       }
-     } catch (err) {
-       console.error('Erro ao carregar:', err);
-       setError('Erro ao carregar dados do CBO');
-     } finally {
-       setLoading(prev => ({ ...prev, initial: false }));
-     }
-   };
+ const { data: cboData, isLoading: loadingCBO } = useCBO(cboId!);
+ const createCBO = useCreateCBO();
+ const updateCBO = useUpdateCBO();
+ const checkExisting = useCheckCBOCodigoExisting();
 
-   loadData();
- }, [id]);
+ // Carregar dados quando disponível
+ useEffect(() => {
+   if (cboData && !formData.codigo) {
+     setFormData({
+       codigo: cboData.codigo,
+       descricao: cboData.descricao
+     });
+   }
+ }, [cboData]);
 
  const validateForm = () => {
    const trimmedCodigo = formData.codigo.trim();
@@ -81,42 +70,34 @@ const CadastroCBO = () => {
  const handleSubmit = async (e: React.FormEvent) => {
    e.preventDefault();    
    if (!validateForm()) return;
-   if (loading.saving) return;
+   if (createCBO.isPending || updateCBO.isPending) return;
 
    try {
-     setLoading(prev => ({ ...prev, saving: true }));
      setError(null);
      setSuccess(false);
 
-     const isDuplicate = await CBOService.checkExisting(
-       formData.codigo,
-       id ? parseInt(id) : undefined
-     );
-
-     const isDescDuplicate = await CBOService.checkExistingDescricao(
-       formData.descricao,
-       id ? parseInt(id) : undefined
-     );
+     const isDuplicate = await checkExisting.mutateAsync({
+       codigo: formData.codigo,
+       excludeId: cboId
+     });
 
      if (isDuplicate) {
        setError('Já existe um CBO com esse código.');
        return;
      }
 
-     if (isDescDuplicate) {
-       setError('Já existe um CBO com essa descrição.');
-       return;
-     }
-
      const formattedDesc = capitalizeFirstLetter(formatText(formData.descricao));
 
-     if (id) {
-       await CBOService.update(parseInt(id), {
-         codigo: formData.codigo.trim(),
-         descricao: formattedDesc
+     if (cboId) {
+       await updateCBO.mutateAsync({
+         id: cboId,
+         data: {
+           codigo: formData.codigo.trim(),
+           descricao: formattedDesc
+         }
        });
      } else {
-       await CBOService.create({
+       await createCBO.mutateAsync({
          codigo: formData.codigo.trim(),
          descricao: formattedDesc
        });
@@ -130,10 +111,8 @@ const CadastroCBO = () => {
      if (err?.response?.data?.error) {
        setError(err.response.data.error);
      } else {
-       setError('Erro ao salvar CBO. Verifique os dados e tente novamente.');
+       setError(err.message || 'Erro ao salvar CBO. Verifique os dados e tente novamente.');
      }
-   } finally {
-     setLoading(prev => ({ ...prev, saving: false }));
    }
  };
 
@@ -141,10 +120,12 @@ const CadastroCBO = () => {
    navigate('/private/cbo');
  };
 
+ const isLoading = loadingCBO || createCBO.isPending || updateCBO.isPending;
+
  return (
    <PageLayout>
      <PageHeader
-       title={id ? 'Editar CBO' : 'Novo CBO'}
+       title={cboId ? 'Editar CBO' : 'Novo CBO'}
        onMenuClick={() => setIsMenuOpen(true)}
        onBackClick={() => navigate('/private/apps-auxiliares')}
      />
@@ -166,7 +147,7 @@ const CadastroCBO = () => {
        {success && (
          <Alert
            type="success"
-           message={`CBO ${id ? "atualizado" : "criado"} com sucesso!`}
+           message={`CBO ${cboId ? "atualizado" : "criado"} com sucesso!`}
          />
        )}
 
@@ -181,7 +162,7 @@ const CadastroCBO = () => {
            }}
            placeholder="Digite o código do CBO (6 dígitos)"
            required
-           disabled={loading.saving}
+           disabled={isLoading}
            maxLength={6}
            onlyNumbers={true}
          />
@@ -193,7 +174,7 @@ const CadastroCBO = () => {
            onChange={(e) => setFormData(prev => ({ ...prev, descricao: e.target.value }))}
            placeholder="Digite a descrição do CBO"
            required
-           disabled={loading.saving}
+           disabled={isLoading}
            preventSpaceStart
            formatOnBlur
          />
@@ -202,12 +183,12 @@ const CadastroCBO = () => {
        <ButtonGroup>
          <CancelButton
            onClick={handleCancel}
-           isDisabled={loading.saving}
+           isDisabled={isLoading}
          />
          <SubmitButton
-           isLoading={loading.saving}
-           isDisabled={loading.initial}
-           defaultText={id ? "Atualizar CBO" : "Criar CBO"}
+           isLoading={isLoading}
+           isDisabled={loadingCBO}
+           defaultText={cboId ? "Atualizar CBO" : "Criar CBO"}
          />
        </ButtonGroup>
      </FormContainer>

@@ -1,104 +1,52 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { NaturezaService } from '@/services/NaturezaService';
+import { useNaturezas, useDeleteNatureza } from "@/features/apps/hooks/useNatureza";
 import { useDebounce } from "@/hooks/useDebounce";
 import SideBarMenuAppsAuxiliares from "../../apps/components/SideBarMenuAppsAuxiliares";
 import { ListHeader, DataTable, ActionButtons } from "@/features/apps/list/shared";
 import Paginacao from "./paginacao";
 
-interface Natureza {
+interface TipoNatureza {
   idtipo_natureza: number;
   descricao: string;
 }
 
-interface PaginationData {
-  data: Natureza[];
-  meta: {
-    total: number;
-    totalPages: number;
-    page: number;
-  };
-}
-
 const ListaNatureza = () => {
   const navigate = useNavigate();
-  const [naturezas, setNaturezas] = useState<Natureza[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [inputValue, setInputValue] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [processingId, setProcessingId] = useState<number | null>(null);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const itemsPerPage = 10;
-  const isSearchFetch = useRef(false);
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  
+  const { data, isLoading, error } = useNaturezas(currentPage, itemsPerPage, debouncedSearchTerm);
+  const deleteMutation = useDeleteNatureza();
 
-  useEffect(() => {
-    if (debouncedSearchTerm) {
-      isSearchFetch.current = true;
-      setCurrentPage(1);
-    }
-  }, [debouncedSearchTerm]);
-
-  useEffect(() => {
-    const carregarNaturezas = async () => {
-      try {
-        if (!isSearchFetch.current) {
-          setLoading(true);
-        }
-
-        const response: PaginationData = await NaturezaService.getAllPaginated(
-          currentPage,
-          itemsPerPage,
-          debouncedSearchTerm
-        );
-        
-        setNaturezas(response.data);
-        setTotalItems(response.meta.total);
-        setTotalPages(response.meta.totalPages);
-        setError(null);
-      } catch (err) {
-        setError("Erro ao carregar as naturezas");
-      } finally {
-        setLoading(false);
-        isSearchFetch.current = false;
-      }
-    };
-
-    carregarNaturezas();
-  }, [currentPage, debouncedSearchTerm]);
+  const naturezas = data?.data || [];
+  const totalItems = data?.meta?.total || 0;
+  const totalPages = data?.meta?.totalPages || 1;
 
   const handleDelete = async (id: number) => {
     if (!window.confirm("Deseja realmente excluir esta natureza?")) return;
 
-    try {
-      setProcessingId(id);
-      await NaturezaService.delete(id);
-
-      setNaturezas(prev => {
-        const newData = prev.filter(item => item.idtipo_natureza !== id);
-        
-        if (newData.length === 0 && currentPage > 1) {
-          setCurrentPage(prevPage => prevPage - 1);
+    deleteMutation.mutate(id, {
+      onSuccess: () => {
+        // Se ficou sem itens na página atual e não é a primeira página
+        if (naturezas.length === 1 && currentPage > 1) {
+          setCurrentPage(prev => prev - 1);
         }
-        
-        return newData;
-      });
-
-    } catch (err) {
-      console.error('Erro ao excluir:', err);
-      setError("Erro ao excluir a natureza");
-    } finally {
-      setProcessingId(null);
-    }
+      },
+      onError: (error) => {
+        console.error("Erro ao excluir natureza:", error);
+        alert("Erro ao excluir a natureza");
+      }
+    });
   };
 
   const tableColumns = [
-    { header: "Descrição", accessor: "descricao" as keyof Natureza }
+    { header: "Descrição", accessor: "descricao" as keyof TipoNatureza }
   ];
 
   return (
@@ -108,7 +56,8 @@ const ListaNatureza = () => {
         searchPlaceholder="Pesquisar naturezas..."
         onSearch={(value) => {
           setInputValue(value);
-          setSearchTerm(value.trim());
+          setSearchTerm(value);
+          setCurrentPage(1); // Reset para primeira página ao pesquisar
         }}
         searchValue={inputValue}
         onNewClick={() => navigate("/private/naturezas/nova")}
@@ -125,16 +74,16 @@ const ListaNatureza = () => {
         <DataTable
           data={naturezas}
           columns={tableColumns}
-          loading={loading}
-          error={error}
-          onDismissError={() => setError(null)}
+          loading={isLoading}
+          error={error ? "Erro ao carregar as naturezas" : null}
+          onDismissError={() => {}}
           emptyMessage="Nenhuma natureza cadastrada"
           searchTerm={searchTerm}
           renderActions={(natureza) => (
             <ActionButtons
               onEdit={() => navigate(`/private/naturezas/editar/${natureza.idtipo_natureza}`)}
               onDelete={() => handleDelete(natureza.idtipo_natureza)}
-              isProcessing={processingId === natureza.idtipo_natureza}
+              isProcessing={deleteMutation.isPending}
               itemName={natureza.descricao}
             />
           )}
@@ -145,7 +94,7 @@ const ListaNatureza = () => {
           totalPages={totalPages}
           totalItems={totalItems}
           itemsPerPage={itemsPerPage}
-          isProcessing={false}
+          isProcessing={isLoading}
           onPageChange={setCurrentPage}
         />
       </main>

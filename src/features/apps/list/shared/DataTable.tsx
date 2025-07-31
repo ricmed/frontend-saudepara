@@ -6,6 +6,7 @@ interface DataTableProps<T> {
       header: string;
       accessor: keyof T;
       align?: 'left' | 'right' | 'center';
+      render?: (value: any, item: T) => React.ReactNode;
     }[];
     loading: boolean;
     error: string | null;
@@ -87,7 +88,10 @@ interface DataTableProps<T> {
                           key={colIndex}
                           className={`px-8 py-4 text-gray-600 text-${column.align || 'left'}`}
                         >
-                          {String(item[column.accessor])}
+                          {column.render 
+                            ? column.render(item[column.accessor], item)
+                            : String(item[column.accessor])
+                          }
                         </td>
                       ))}
                       {renderActions && (

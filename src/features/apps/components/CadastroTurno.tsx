@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from "react-router-dom";
-import { TurnoService } from '@/services/TurnoService';
+import { useTurno, useCreateTurno, useUpdateTurno } from '../hooks/useTurno';
 import SideBarMenuAppsAuxiliares from "../../apps/components/SideBarMenuAppsAuxiliares";
 
 import {
@@ -27,35 +27,23 @@ const CadastroTurno = () => {
   const [formData, setFormData] = useState<FormData>({ 
     descricao: '' 
   });
-  const [loading, setLoading] = useState({
-    initial: Boolean(id),
-    saving: false
-  });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
+  // React Query hooks
+  const { data: turno, isLoading } = useTurno(id ? parseInt(id) : 0);
+  const createMutation = useCreateTurno();
+  const updateMutation = useUpdateTurno();
+
+  // Carregar dados quando disponível (apenas uma vez)
   useEffect(() => {
-    const carregarDados = async () => {
-      if (!id) return;
-      
-      try {
-        const turno = await TurnoService.getById(parseInt(id));
-        if (turno) {
-          setFormData({ 
-            descricao: turno.descricao 
-          });
-        }
-      } catch (err) {
-        console.error('Erro ao carregar:', err);
-        setError('Erro ao carregar dados do turno');
-      } finally {
-        setLoading(prev => ({ ...prev, initial: false }));
-      }
-    };
-
-    carregarDados();
-  }, [id]);
+    if (turno && !dataLoaded) {
+      setFormData({ descricao: turno.descricao });
+      setDataLoaded(true);
+    }
+  }, [turno, dataLoaded]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,32 +55,16 @@ const CadastroTurno = () => {
       return;
     }
 
-    if (loading.saving) return;
+    if (createMutation.isPending || updateMutation.isPending) return;
 
     try {
-      setLoading(prev => ({ ...prev, saving: true }));
       setError(null);
       setSuccess(false);
 
-      const isDuplicate = await TurnoService.checkExisting(
-        formattedDesc,
-        id ? parseInt(id) : undefined
-      );
-
-      if (isDuplicate) {
-        setError('Já existe um turno com essa descrição.');
-        return;
-      }
-
-      const payload = {
-        id_turno: 0,
-        descricao: formattedDesc
-      };
-
       if (id) {
-        await TurnoService.update(parseInt(id), payload);
+        await updateMutation.mutateAsync({ id: parseInt(id), descricao: formattedDesc });
       } else {
-        await TurnoService.create(formattedDesc);
+        await createMutation.mutateAsync(formattedDesc);
       }
 
       setSuccess(true);
@@ -101,8 +73,6 @@ const CadastroTurno = () => {
     } catch (err) {
       console.error('Erro ao salvar:', err);
       setError('Erro ao salvar turno. Verifique os dados e tente novamente.');
-    } finally {
-      setLoading(prev => ({ ...prev, saving: false }));
     }
   };
 
@@ -147,7 +117,7 @@ const CadastroTurno = () => {
             onChange={(e) => setFormData({ descricao: e.target.value })}
             placeholder="Digite a descrição do turno"
             required
-            disabled={loading.saving}
+            disabled={createMutation.isPending || updateMutation.isPending}
             maxLength={255}
             preventSpaceStart
             formatOnBlur
@@ -160,11 +130,11 @@ const CadastroTurno = () => {
         <ButtonGroup>
           <CancelButton
             onClick={handleCancel}
-            isDisabled={loading.saving}
+            isDisabled={createMutation.isPending || updateMutation.isPending}
           />
           <SubmitButton
-            isLoading={loading.saving}
-            isDisabled={loading.initial}
+            isLoading={createMutation.isPending || updateMutation.isPending}
+            isDisabled={isLoading}
             defaultText={id ? "Atualizar Turno" : "Criar Turno"}
           />
         </ButtonGroup>

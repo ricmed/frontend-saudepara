@@ -1,7 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { EstadoService } from "@/services/EstadoService";
-import { useDebounce } from "@/hooks/useDebounce";
+import { useEstados, useDeleteEstado } from "../hooks/useEstado";
 import SideBarMenuAppsAuxiliares from "../components/SideBarMenuAppsAuxiliares";
 import { ListHeader, DataTable, ActionButtons } from "@/features/apps/list/shared";
 import Paginacao from "./paginacao";
@@ -12,97 +11,33 @@ interface Estado {
   descricao: string;
 }
 
-interface PaginatedResponse {
-  data: Estado[];
-  meta: {
-    total: number;
-    totalPages: number;
-    page: number;
-    limit: number;
-  };
-}
-
 const ListaEstados = () => {
   const navigate = useNavigate();
-  const [estados, setEstados] = useState<Estado[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [inputValue, setInputValue] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [processingId, setProcessingId] = useState<number | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [processingId, setProcessingId] = useState<number | null>(null);
   const itemsPerPage = 10;
-  const isMounted = useRef(false);
-  const isSearchFetch = useRef(false);
 
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const { data: estadosData, isLoading, error } = useEstados(currentPage, itemsPerPage, searchTerm);
+  const deleteEstado = useDeleteEstado();
 
-  useEffect(() => {
-    isMounted.current = true;
-    return () => {
-      isMounted.current = false;
-    };
-  }, []);
+  const estados = estadosData?.data || [];
 
-  useEffect(() => {
-    if (debouncedSearchTerm) {
-      isSearchFetch.current = true;
-      setCurrentPage(1);
+  const handleDelete = async (estado: Estado) => {
+    if (!confirm(`Tem certeza que deseja excluir o estado "${estado.descricao}" (${estado.codigo})?`)) {
+      return;
     }
-  }, [debouncedSearchTerm]);
 
-  useEffect(() => {
-    const carregarEstados = async () => {
-      try {
-        if (!isSearchFetch.current && isMounted.current) setLoading(true);
-
-        const response = (await EstadoService.getAllPaginated(
-          currentPage,
-          itemsPerPage,
-          debouncedSearchTerm
-        )) as PaginatedResponse;
-
-        if (isMounted.current) {
-          setEstados(response.data);
-          setTotalItems(response.meta.total || 0);
-          setTotalPages(
-            Math.min(Math.max(response.meta.totalPages || 1, 1), 1000)
-          );
-        }
-      } catch (err) {
-        if (isMounted.current) {
-          setError("Erro ao carregar estados");
-        }
-      } finally {
-        if (isMounted.current) {
-          setLoading(false);
-          isSearchFetch.current = false;
-        }
-      }
-    };
-
-    carregarEstados();
-  }, [currentPage, debouncedSearchTerm]);
-
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("Deseja realmente excluir este estado?")) return;
+    console.log('🗑️ Tentando deletar estado:', estado.idtipo_estado);
+    setProcessingId(estado.idtipo_estado);
 
     try {
-      setProcessingId(id);
-      await EstadoService.delete(id);
-
-      setEstados((prev) => {
-        const newData = prev.filter((item) => item.idtipo_estado !== id);
-        if (newData.length === 0 && currentPage > 1) {
-          setCurrentPage((prevPage) => prevPage - 1);
-        }
-        return newData;
-      });
-    } catch (err) {
-      setError("Erro ao excluir o estado");
+      await deleteEstado.mutateAsync(estado.idtipo_estado);
+      console.log('✅ Estado deletado com sucesso:', estado.idtipo_estado);
+    } catch (error: any) {
+      console.error('❌ Erro ao deletar estado:', error);
+      alert('Erro ao excluir estado: ' + (error.message || 'Erro desconhecido'));
     } finally {
       setProcessingId(null);
     }
@@ -110,22 +45,28 @@ const ListaEstados = () => {
 
   const tableColumns = [
     { header: "Código", accessor: "codigo" as keyof Estado },
-    { header: "Descrição", accessor: "descricao" as keyof Estado }
+    { header: "Descrição", accessor: "descricao" as keyof Estado },
   ];
 
+  const renderActionButtons = (estado: Estado) => (
+    <ActionButtons
+      onEdit={() => navigate(`/private/estado/editar/${estado.idtipo_estado}`)}
+      onDelete={() => handleDelete(estado)}
+      isProcessing={processingId === estado.idtipo_estado}
+      itemName="estado"
+    />
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
       <ListHeader
         title="Lista de Estados"
-        searchPlaceholder="Pesquisar estado..."
-        onSearch={(value) => {
-          setInputValue(value);
-          setSearchTerm(value);
-        }}
-        searchValue={inputValue}
-        onNewClick={() => navigate("/private/estado/nova")}
-        isProcessing={false}
         onMenuOpen={() => setIsMenuOpen(true)}
+        onNewClick={() => navigate('/private/estado/nova')}
+        searchValue={searchTerm}
+        onSearch={setSearchTerm}
+        searchPlaceholder="Buscar por código ou descrição..."
+        isProcessing={deleteEstado.isPending}
       />
 
       <SideBarMenuAppsAuxiliares
@@ -133,35 +74,33 @@ const ListaEstados = () => {
         onClose={() => setIsMenuOpen(false)}
       />
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <div className="container mx-auto p-4">
         <DataTable
           data={estados}
           columns={tableColumns}
-          loading={loading}
-          error={error}
-          onDismissError={() => setError(null)}
-          emptyMessage="Nenhum estado cadastrado"
+          renderActions={renderActionButtons}
+          loading={isLoading}
+          error={error?.message || null}
+          onDismissError={() => {}}
+          emptyMessage="Nenhum estado encontrado"
           searchTerm={searchTerm}
-          renderActions={(estado) => (
-            <ActionButtons
-              onEdit={() => navigate(`/private/estado/editar/${estado.idtipo_estado}`)}
-              onDelete={() => handleDelete(estado.idtipo_estado)}
-              isProcessing={processingId === estado.idtipo_estado}
-              itemName={estado.descricao}
-            />
-          )}
         />
 
-        <Paginacao
-          currentPage={currentPage}
-          totalPages={totalPages}
-          totalItems={totalItems}
-          itemsPerPage={itemsPerPage}
-          isProcessing={false}
-          onPageChange={setCurrentPage}
-        />
-      </main>
-    </div>
+        {/* Paginação */}
+        {estadosData && estadosData.meta && (
+          <div className="mt-6">
+            <Paginacao
+              currentPage={currentPage}
+              totalPages={estadosData.meta.totalPages}
+              totalItems={estadosData.meta.total}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              isProcessing={isLoading}
+            />
+          </div>
+        )}
+      </div>
+    </>
   );
 };
 

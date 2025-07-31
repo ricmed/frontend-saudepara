@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from "react-router-dom";
-import { ComponentsService } from '@/services/ComponentsService';
+import { 
+  useComponente, 
+  useCreateComponente, 
+  useUpdateComponente,
+  useCheckComponenteExisting 
+} from '@/features/apps/hooks/useComponentes';
 import SideBarMenuAppsAuxiliares from "../../apps/components/SideBarMenuAppsAuxiliares";
 
 import {
@@ -19,38 +24,30 @@ import {
 const CadastroComponente = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const isEditing = !!id;
   
+  // Estados simples - só UI
   const [formData, setFormData] = useState({ descricao: '' });
-  const [loading, setLoading] = useState({
-    initial: !!id,
-    saving: false
-  });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  useEffect(() => {
-    const loadData = async () => {
-      if (!id) return;
-      
-      try {
-        const component = await ComponentsService.getById(parseInt(id));
-        if (component) {
-          setFormData({ descricao: component.descricao });
-        }
-      } catch (err) {
-        console.error('Erro ao carregar:', err);
-        setError('Erro ao carregar dados do componente');
-      } finally {
-        setLoading(prev => ({ ...prev, initial: false }));
-      }
-    };
+  // React Query hooks - substituem TODO o useState + useEffect anterior!
+  const { data: componente, isLoading: loadingComponente } = useComponente(Number(id));
+  const createMutation = useCreateComponente();
+  const updateMutation = useUpdateComponente();
+  const checkExistingMutation = useCheckComponenteExisting();
 
-    loadData();
-  }, [id]);
+  // Carregar dados para edição
+  useEffect(() => {
+    if (componente) {
+      setFormData({ descricao: componente.descricao });
+    }
+  }, [componente]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     const trimmedDesc = formatText(formData.descricao);
     const capitalizedDesc = capitalizeFirstLetter(trimmedDesc);
 
@@ -59,27 +56,29 @@ const CadastroComponente = () => {
       return;
     }
 
-    if (loading.saving) return;
-
     try {
-      setLoading(prev => ({ ...prev, saving: true }));
       setError(null);
       setSuccess(false);
 
-      const isDuplicate = await ComponentsService.checkExisting(
-        capitalizedDesc,
-        id ? parseInt(id) : undefined
-      );
+      // Verificar se já existe
+      const isDuplicate = await checkExistingMutation.mutateAsync({
+        descricao: capitalizedDesc,
+        excludeId: id ? parseInt(id) : undefined
+      });
 
       if (isDuplicate) {
         setError('Já existe um componente com essa descrição.');
         return;
       }
 
-      if (id) {
-        await ComponentsService.update(parseInt(id), capitalizedDesc);
+      // Criar ou atualizar
+      if (isEditing) {
+        await updateMutation.mutateAsync({ 
+          id: parseInt(id), 
+          descricao: capitalizedDesc 
+        });
       } else {
-        await ComponentsService.create(capitalizedDesc);
+        await createMutation.mutateAsync(capitalizedDesc);
       }
 
       setSuccess(true);
@@ -88,19 +87,26 @@ const CadastroComponente = () => {
     } catch (err) {
       console.error('Erro ao salvar:', err);
       setError('Erro ao salvar componente. Verifique os dados e tente novamente.');
-    } finally {
-      setLoading(prev => ({ ...prev, saving: false }));
     }
   };
 
-  const handleCancel = () => {
-    navigate('/private/componente');
-  };
+  // Loading do componente sendo editado
+  if (isEditing && loadingComponente) {
+    return (
+      <PageLayout>
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </PageLayout>
+    );
+  }
+
+  const isLoading = createMutation.isPending || updateMutation.isPending || checkExistingMutation.isPending;
 
   return (
     <PageLayout>
       <PageHeader
-        title={id ? 'Editar Componente' : 'Novo Componente'}
+        title={isEditing ? 'Editar Componente' : 'Novo Componente'}
         onMenuClick={() => setIsMenuOpen(true)}
         onBackClick={() => navigate('/private/apps-auxiliares')}
       />
@@ -122,7 +128,7 @@ const CadastroComponente = () => {
         {success && (
           <Alert
             type="success"
-            message={`Componente ${id ? "atualizado" : "criado"} com sucesso!`}
+            message={`Componente ${isEditing ? "atualizado" : "criado"} com sucesso!`}
           />
         )}
 
@@ -133,20 +139,20 @@ const CadastroComponente = () => {
           onChange={(e) => setFormData({ descricao: e.target.value })}
           placeholder="Digite a descrição do componente"
           required
-          disabled={loading.saving}
+          disabled={isLoading}
           preventSpaceStart
           formatOnBlur
         />
 
         <ButtonGroup>
           <CancelButton
-            onClick={handleCancel}
-            isDisabled={loading.saving}
+            onClick={() => navigate('/private/componente')}
+            isDisabled={isLoading}
           />
           <SubmitButton
-            isLoading={loading.saving}
-            isDisabled={loading.initial}
-            defaultText={id ? "Atualizar Componente" : "Criar Componente"}
+            isLoading={isLoading}
+            isDisabled={loadingComponente}
+            defaultText={isEditing ? "Atualizar Componente" : "Criar Componente"}
           />
         </ButtonGroup>
       </FormContainer>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from "react-router-dom";
-import { EstabelecimentoService } from '@/services/EstabelecimentoService';
+import { useEstabelecimento, useCreateEstabelecimento, useUpdateEstabelecimento } from '../hooks/useEstabelecimento';
 import SideBarMenuAppsAuxiliares from "../../apps/components/SideBarMenuAppsAuxiliares";
 
 import {
@@ -27,35 +27,25 @@ const CadastroTipoEstabelecimento = () => {
   const [formData, setFormData] = useState<FormData>({ 
     descricao: '' 
   });
-  const [loading, setLoading] = useState({
-    initial: !!id,
-    saving: false
-  });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
+  // React Query hooks
+  const { data: estabelecimento, isLoading } = useEstabelecimento(id ? parseInt(id) : 0);
+  const createMutation = useCreateEstabelecimento();
+  const updateMutation = useUpdateEstabelecimento();
+
+  // Carregar dados quando disponível (apenas uma vez)
   useEffect(() => {
-    const carregarDados = async () => {
-      if (!id) return;
-      
-      try {
-        const estabelecimento = await EstabelecimentoService.getById(parseInt(id));
-        if (estabelecimento) {
-          setFormData({ 
-            descricao: estabelecimento.descricao 
-          });
-        }
-      } catch (err) {
-        console.error('Erro ao carregar:', err);
-        setError('Erro ao carregar dados do estabelecimento');
-      } finally {
-        setLoading(prev => ({ ...prev, initial: false }));
-      }
-    };
-
-    carregarDados();
-  }, [id]);
+    if (estabelecimento && !dataLoaded) {
+      setFormData({ 
+        descricao: estabelecimento.descricao 
+      });
+      setDataLoaded(true);
+    }
+  }, [estabelecimento, dataLoaded]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,32 +57,16 @@ const CadastroTipoEstabelecimento = () => {
       return;
     }
 
-    if (loading.saving) return;
+    if (createMutation.isPending || updateMutation.isPending) return;
 
     try {
-      setLoading(prev => ({ ...prev, saving: true }));
       setError(null);
       setSuccess(false);
 
-      const isDuplicate = await EstabelecimentoService.checkExisting(
-        formattedDesc,
-        id ? parseInt(id) : undefined
-      );
-
-      if (isDuplicate) {
-        setError('Já existe um estabelecimento com essa descrição.');
-        return;
-      }
-
-      const payload = {
-        descricao: formattedDesc,
-        idtipo_estabelecimento: id ? parseInt(id) : 0
-      };
-
       if (id) {
-        await EstabelecimentoService.update(parseInt(id), payload);
+        await updateMutation.mutateAsync({ id: parseInt(id), descricao: formattedDesc });
       } else {
-        await EstabelecimentoService.create(payload);
+        await createMutation.mutateAsync(formattedDesc);
       }
 
       setSuccess(true);
@@ -101,8 +75,6 @@ const CadastroTipoEstabelecimento = () => {
     } catch (err) {
       console.error('Erro ao salvar:', err);
       setError('Erro ao salvar estabelecimento. Verifique os dados e tente novamente.');
-    } finally {
-      setLoading(prev => ({ ...prev, saving: false }));
     }
   };
 
@@ -146,7 +118,7 @@ const CadastroTipoEstabelecimento = () => {
           onChange={(e) => setFormData({ descricao: e.target.value })}
           placeholder="Descreva o tipo de estabelecimento"
           required
-          disabled={loading.saving}
+          disabled={createMutation.isPending || updateMutation.isPending}
           maxLength={255}
           preventSpaceStart
           formatOnBlur
@@ -155,11 +127,11 @@ const CadastroTipoEstabelecimento = () => {
         <ButtonGroup>
           <CancelButton
             onClick={handleCancel}
-            isDisabled={loading.saving}
+            isDisabled={createMutation.isPending || updateMutation.isPending}
           />
           <SubmitButton
-            isLoading={loading.saving}
-            isDisabled={loading.initial}
+            isLoading={createMutation.isPending || updateMutation.isPending}
+            isDisabled={isLoading}
             defaultText={id ? "Atualizar Estabelecimento" : "Criar Estabelecimento"}
           />
         </ButtonGroup>

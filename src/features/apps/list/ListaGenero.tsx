@@ -1,113 +1,70 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { GeneroService } from "@/services/GeneroService";
-import { useDebounce } from "@/hooks/useDebounce";
+import { useGeneros, useDeleteGenero } from "../hooks/useGenero";
 import SideBarMenuAppsAuxiliares from "../../apps/components/SideBarMenuAppsAuxiliares";
 import { ListHeader, DataTable, ActionButtons } from "@/features/apps/list/shared";
 import Paginacao from "./paginacao";
 
-interface TipoGenero {
+interface Genero {
   idtipo_genero: number;
   descricao: string;
 }
 
 const ListaGenero = () => {
   const navigate = useNavigate();
-  const [tiposGenero, setTiposGenero] = useState<TipoGenero[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [inputValue, setInputValue] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [processingId, setProcessingId] = useState<number | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [processingId, setProcessingId] = useState<number | null>(null);
   const itemsPerPage = 10;
-  const isMounted = useRef(false);
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-  useEffect(() => {
-    isMounted.current = true;
-    return () => {
-      isMounted.current = false;
-    };
-  }, []);
+  const { data: generosData, isLoading, error } = useGeneros(currentPage, itemsPerPage, searchTerm);
+  const deleteGenero = useDeleteGenero();
 
-  useEffect(() => {
-    if (debouncedSearchTerm) {
-      setCurrentPage(1);
+  const generos = generosData?.data || [];
+
+  const handleDelete = async (genero: Genero) => {
+    if (!confirm(`Tem certeza que deseja excluir o gênero "${genero.descricao}"?`)) {
+      return;
     }
-  }, [debouncedSearchTerm]);
 
-  useEffect(() => {
-    const carregarTiposGenero = async () => {
-      try {
-        setLoading(true);
-        const response = await GeneroService.getAllPaginated(
-          currentPage, 
-          itemsPerPage, 
-          debouncedSearchTerm
-        );
-        
-        if (isMounted.current) {
-          setTiposGenero(response.data);
-          setTotalItems(response.meta.total);
-          setTotalPages(Math.min(Math.max(response.meta.totalPages, 1), 1000));
-          setError(null);
-        }
-      } catch (err) {
-        if (isMounted.current) {
-          setError("Erro ao carregar tipos de gênero");
-        }
-      } finally {
-        if (isMounted.current) {
-          setLoading(false);
-        }
-      }
-    };
-
-    carregarTiposGenero();
-  }, [currentPage, debouncedSearchTerm]);
-
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("Deseja realmente excluir este tipo de gênero?")) return;
+    console.log('🗑️ Tentando deletar gênero:', genero.idtipo_genero);
+    setProcessingId(genero.idtipo_genero);
 
     try {
-      setProcessingId(id);
-      await GeneroService.delete(id);
-
-      setTiposGenero(prev => {
-        const newData = prev.filter(item => item.idtipo_genero !== id);
-        if (newData.length === 0 && currentPage > 1) {
-          setCurrentPage(prevPage => prevPage - 1);
-        }
-        return newData;
-      });
-    } catch (err) {
-      setError("Erro ao excluir o tipo de gênero");
+      await deleteGenero.mutateAsync(genero.idtipo_genero);
+      console.log('✅ Gênero deletado com sucesso:', genero.idtipo_genero);
+    } catch (error: any) {
+      console.error('❌ Erro ao deletar gênero:', error);
+      alert('Erro ao excluir gênero: ' + (error.message || 'Erro desconhecido'));
     } finally {
       setProcessingId(null);
     }
   };
 
   const tableColumns = [
-    { header: "Descrição", accessor: "descricao" as keyof TipoGenero }
+    { header: "Descrição", accessor: "descricao" as keyof Genero },
   ];
 
+  const renderActionButtons = (genero: Genero) => (
+    <ActionButtons
+      onEdit={() => navigate(`/private/genero/editar/${genero.idtipo_genero}`)}
+      onDelete={() => handleDelete(genero)}
+      isProcessing={processingId === genero.idtipo_genero}
+      itemName="gênero"
+    />
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
       <ListHeader
-        title="Lista de Tipos de Gênero"
-        searchPlaceholder="Pesquisar tipos de gênero..."
-        onSearch={(value) => {
-          setInputValue(value);
-          setSearchTerm(value);
-        }}
-        searchValue={inputValue}
-        onNewClick={() => navigate("/private/genero/nova")}
-        isProcessing={false}
+        title="Lista de Gêneros"
         onMenuOpen={() => setIsMenuOpen(true)}
+        onNewClick={() => navigate('/private/genero/nova')}
+        searchValue={searchTerm}
+        onSearch={setSearchTerm}
+        searchPlaceholder="Buscar por descrição..."
+        isProcessing={deleteGenero.isPending}
       />
 
       <SideBarMenuAppsAuxiliares
@@ -115,34 +72,33 @@ const ListaGenero = () => {
         onClose={() => setIsMenuOpen(false)}
       />
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <div className="container mx-auto p-4">
         <DataTable
-          data={tiposGenero}
+          data={generos}
           columns={tableColumns}
-          loading={loading}
-          error={error}
-          onDismissError={() => setError(null)}
-          emptyMessage="Nenhum tipo de gênero cadastrado"
+          renderActions={renderActionButtons}
+          loading={isLoading}
+          error={error?.message || null}
+          onDismissError={() => {}}
+          emptyMessage="Nenhum gênero encontrado"
           searchTerm={searchTerm}
-          renderActions={(tipo) => (
-            <ActionButtons
-              onEdit={() => navigate(`/private/genero/editar/${tipo.idtipo_genero}`)}
-              onDelete={() => handleDelete(tipo.idtipo_genero)}
-              isProcessing={processingId === tipo.idtipo_genero}
-              itemName={tipo.descricao}
+        />
+
+        {/* Paginação */}
+        {generosData && generosData.meta.totalPages > 1 && (
+          <div className="mt-6">
+            <Paginacao
+              currentPage={currentPage}
+              totalPages={generosData.meta.totalPages}
+              totalItems={generosData.meta.total}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              isProcessing={isLoading}
             />
-          )}
-        />
-        <Paginacao
-          currentPage={currentPage}
-          totalPages={totalPages}
-          totalItems={totalItems}
-          itemsPerPage={itemsPerPage}
-          isProcessing={false}
-          onPageChange={setCurrentPage}
-        />
-      </main>
-    </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 };
 

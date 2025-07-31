@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from "react-router-dom";
-import { TiposHipoteseDiagService } from '@/services/HipoteseDiagService';
+import { useHipoteseDiag, useCreateHipoteseDiag, useUpdateHipoteseDiag, useCheckHipoteseDiagExisting } from '../hooks/useHipoteseDiag';
 import SideBarMenuAppsAuxiliares from "../../apps/components/SideBarMenuAppsAuxiliares";
 
 import {
@@ -21,33 +21,24 @@ const CadastroTipoHipoteseDiag = () => {
   const { id } = useParams();
   
   const [formData, setFormData] = useState({ descricao: '' });
-  const [loading, setLoading] = useState({
-    initial: !!id,
-    saving: false
-  });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
+  // React Query hooks
+  const { data: tipoHipoteseDiag, isLoading: loadingData } = useHipoteseDiag(id ? parseInt(id) : 0);
+  const createMutation = useCreateHipoteseDiag();
+  const updateMutation = useUpdateHipoteseDiag();
+  const checkExistingMutation = useCheckHipoteseDiagExisting();
+
+  // Carregar dados quando disponível (apenas uma vez)
   useEffect(() => {
-    const loadData = async () => {
-      if (!id) return;
-      
-      try {
-        const tipoHipoteseDiag = await TiposHipoteseDiagService.getById(parseInt(id));
-        if (tipoHipoteseDiag) {
-          setFormData({ descricao: tipoHipoteseDiag.descricao });
-        }
-      } catch (err) {
-        console.error('Erro ao carregar:', err);
-        setError('Erro ao carregar dados do tipo de hipótese diagnóstica');
-      } finally {
-        setLoading(prev => ({ ...prev, initial: false }));
-      }
-    };
-
-    loadData();
-  }, [id]);
+    if (tipoHipoteseDiag && !dataLoaded) {
+      setFormData({ descricao: tipoHipoteseDiag.descricao });
+      setDataLoaded(true);
+    }
+  }, [tipoHipoteseDiag, dataLoaded]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,17 +55,18 @@ const CadastroTipoHipoteseDiag = () => {
       return;
     }
 
-    if (loading.saving) return;
+    const isSaving = createMutation.isPending || updateMutation.isPending;
+    if (isSaving) return;
 
     try {
-      setLoading(prev => ({ ...prev, saving: true }));
       setError(null);
       setSuccess(false);
 
-      const isDuplicate = await TiposHipoteseDiagService.checkExisting(
-        capitalizedDesc,
-        id ? parseInt(id) : undefined
-      );
+      // Verificar duplicatas
+      const isDuplicate = await checkExistingMutation.mutateAsync({
+        descricao: capitalizedDesc,
+        excludeId: id ? parseInt(id) : undefined
+      });
 
       if (isDuplicate) {
         setError('Já existe um tipo de hipótese diagnóstica com essa descrição.');
@@ -82,9 +74,12 @@ const CadastroTipoHipoteseDiag = () => {
       }
 
       if (id) {
-        await TiposHipoteseDiagService.update(parseInt(id), capitalizedDesc);
+        await updateMutation.mutateAsync({
+          id: parseInt(id),
+          descricao: capitalizedDesc
+        });
       } else {
-        await TiposHipoteseDiagService.create(capitalizedDesc);
+        await createMutation.mutateAsync(capitalizedDesc);
       }
 
       setSuccess(true);
@@ -93,8 +88,6 @@ const CadastroTipoHipoteseDiag = () => {
     } catch (err) {
       console.error('Erro ao salvar:', err);
       setError('Erro ao salvar tipo de hipótese diagnóstica. Verifique os dados e tente novamente.');
-    } finally {
-      setLoading(prev => ({ ...prev, saving: false }));
     }
   };
 
@@ -138,7 +131,7 @@ const CadastroTipoHipoteseDiag = () => {
           onChange={(e) => setFormData({ descricao: e.target.value })}
           placeholder="Digite a descrição do tipo de hipótese diagnóstica"
           required
-          disabled={loading.saving}
+          disabled={createMutation.isPending || updateMutation.isPending}
           preventSpaceStart
           formatOnBlur
           maxLength={60}
@@ -147,11 +140,11 @@ const CadastroTipoHipoteseDiag = () => {
         <ButtonGroup>
           <CancelButton
             onClick={handleCancel}
-            isDisabled={loading.saving}
+            isDisabled={createMutation.isPending || updateMutation.isPending}
           />
           <SubmitButton
-            isLoading={loading.saving}
-            isDisabled={loading.initial}
+            isLoading={createMutation.isPending || updateMutation.isPending}
+            isDisabled={loadingData}
             defaultText={id ? "Atualizar Tipo de Hipótese Diagnóstica" : "Criar Tipo de Hipótese Diagnóstica"}
           />
         </ButtonGroup>

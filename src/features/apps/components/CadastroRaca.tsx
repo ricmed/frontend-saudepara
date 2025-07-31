@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from "react-router-dom";
-import { RacaService } from "@/services/RacaService";
+import { 
+  useRaca, 
+  useCreateRaca, 
+  useUpdateRaca,
+  useCheckRacaExisting 
+} from '@/features/apps/hooks/useRaca';
+import SideBarMenuAppsAuxiliares from "../../apps/components/SideBarMenuAppsAuxiliares";
 
 import {
   PageLayout,
@@ -18,88 +24,91 @@ import {
 const CadastroRaca = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const isEditing = !!id;
   
   const [formData, setFormData] = useState({ descricao: '' });
-  const [loading, setLoading] = useState({
-    initial: !!id,
-    saving: false
-  });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  useEffect(() => {
-    const loadData = async () => {
-      if (!id) return;
-      
-      try {
-        const data = await RacaService.getById(parseInt(id));
-        if (data) {
-          setFormData({ descricao: data.descricao });
-        }
-      } catch (err) {
-        setError('Erro ao carregar dados da raça');
-      } finally {
-        setLoading(prev => ({ ...prev, initial: false }));
-      }
-    };
+  // React Query hooks
+  const { data: raca, isLoading: loadingRaca } = useRaca(Number(id));
+  const createMutation = useCreateRaca();
+  const updateMutation = useUpdateRaca();
+  const checkExistingMutation = useCheckRacaExisting();
 
-    loadData();
-  }, [id]);
+  // Carregar dados para edição
+  useEffect(() => {
+    if (raca) {
+      setFormData({ descricao: raca.descricao });
+    }
+  }, [raca]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     const trimmedDesc = formatText(formData.descricao);
-    const formattedDesc = capitalizeFirstLetter(trimmedDesc);
+    const capitalizedDesc = capitalizeFirstLetter(trimmedDesc);
 
     if (!trimmedDesc) {
       setError('A descrição não pode estar vazia.');
       return;
     }
 
-    if (loading.saving) return;
-
     try {
-      setLoading(prev => ({ ...prev, saving: true }));
       setError(null);
       setSuccess(false);
-
-      const exists = await RacaService.checkExisting(
-        formattedDesc,
-        id ? parseInt(id) : undefined
-      );
-
-      if (exists) {
-        setError('Já existe uma raça com essa descrição.');
-        return;
+      
+      // Verificar duplicata apenas se não estiver editando ou se a descrição foi alterada
+      if (!isEditing || trimmedDesc !== raca?.descricao) {
+        const exists = await checkExistingMutation.mutateAsync({ descricao: trimmedDesc });
+        if (exists) {
+          setError('Já existe uma raça com esta descrição.');
+          return;
+        }
       }
 
-      if (id) {
-        await RacaService.update(parseInt(id), formattedDesc);
+      if (isEditing) {
+        await updateMutation.mutateAsync({ id: Number(id), descricao: capitalizedDesc });
       } else {
-        await RacaService.create(formattedDesc);
+        await createMutation.mutateAsync(capitalizedDesc);
+        setFormData({ descricao: '' });
       }
 
       setSuccess(true);
-      setTimeout(() => navigate('/private/raca', { replace: true }), 1500);
-      
-    } catch (err: any) {
-      setError(err.message || 'Erro ao salvar raça. Verifique os dados e tente novamente.');
-    } finally {
-      setLoading(prev => ({ ...prev, saving: false }));
+      setTimeout(() => {
+        navigate('/private/raca');
+      }, 2000);
+    } catch (err) {
+      console.error('Erro ao salvar:', err);
+      setError('Erro ao salvar raça. Verifique os dados e tente novamente.');
     }
   };
 
-  const handleCancel = () => {
-    navigate('/private/raca');
-  };
+  // Loading da raça sendo editada
+  if (isEditing && loadingRaca) {
+    return (
+      <PageLayout>
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </PageLayout>
+    );
+  }
+
+  const isLoading = createMutation.isPending || updateMutation.isPending || checkExistingMutation.isPending;
 
   return (
     <PageLayout>
       <PageHeader
-        title={id ? 'Editar Raça' : 'Nova Raça'}
+        title={isEditing ? 'Editar Raça' : 'Nova Raça'}
         onMenuClick={() => setIsMenuOpen(true)}
         onBackClick={() => navigate('/private/apps-auxiliares')}
+      />
+
+      <SideBarMenuAppsAuxiliares
+        isOpen={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
       />
 
       <FormContainer onSubmit={handleSubmit}>
@@ -114,7 +123,8 @@ const CadastroRaca = () => {
         {success && (
           <Alert
             type="success"
-            message={`Raça ${id ? "atualizada" : "criada"} com sucesso!`}
+            message="Raça criada/atualizada com sucesso!"
+            onClose={() => setSuccess(false)}
           />
         )}
 
@@ -122,27 +132,23 @@ const CadastroRaca = () => {
           label="Descrição"
           name="descricao"
           value={formData.descricao}
-          onChange={(e) => {
-            const value = e.target.value;
-            if (value && /^\d/.test(value)) return; // Previne números no início
-            setFormData({ descricao: value });
-          }}
+          onChange={(e) => setFormData({ descricao: e.target.value })}
           placeholder="Digite a descrição da raça"
           required
-          disabled={loading.saving}
+          disabled={isLoading}
           preventSpaceStart
           formatOnBlur
         />
 
         <ButtonGroup>
           <CancelButton
-            onClick={handleCancel}
-            isDisabled={loading.saving}
+            onClick={() => navigate('/private/raca')}
+            isDisabled={isLoading}
           />
           <SubmitButton
-            isLoading={loading.saving}
-            isDisabled={loading.initial}
-            defaultText={id ? "Atualizar Raça" : "Criar Raça"}
+            isLoading={isLoading}
+            isDisabled={loadingRaca}
+            defaultText={isEditing ? "Atualizar Raça" : "Criar Raça"}
           />
         </ButtonGroup>
       </FormContainer>

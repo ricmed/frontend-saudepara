@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from "react-router-dom";
-import { TiposTraumaService } from '@/services/TraumaService';
+import { useTrauma, useCreateTrauma, useUpdateTrauma } from '../hooks/useTrauma';
 import SideBarMenuAppsAuxiliares from "../../apps/components/SideBarMenuAppsAuxiliares";
 
 import {
@@ -21,33 +21,23 @@ const CadastroTipoTrauma = () => {
   const { id } = useParams();
   
   const [formData, setFormData] = useState({ descricao: '' });
-  const [loading, setLoading] = useState({
-    initial: !!id,
-    saving: false
-  });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
+  // React Query hooks
+  const { data: trauma, isLoading } = useTrauma(id ? parseInt(id) : 0);
+  const createMutation = useCreateTrauma();
+  const updateMutation = useUpdateTrauma();
+
+  // Carregar dados quando disponível (apenas uma vez)
   useEffect(() => {
-    const loadData = async () => {
-      if (!id) return;
-      
-      try {
-        const tipoTrauma = await TiposTraumaService.getById(parseInt(id));
-        if (tipoTrauma) {
-          setFormData({ descricao: tipoTrauma.descricao });
-        }
-      } catch (err) {
-        console.error('Erro ao carregar:', err);
-        setError('Erro ao carregar dados do tipo de trauma');
-      } finally {
-        setLoading(prev => ({ ...prev, initial: false }));
-      }
-    };
-
-    loadData();
-  }, [id]);
+    if (trauma && !dataLoaded) {
+      setFormData({ descricao: trauma.descricao });
+      setDataLoaded(true);
+    }
+  }, [trauma, dataLoaded]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,27 +54,16 @@ const CadastroTipoTrauma = () => {
       return;
     }
 
-    if (loading.saving) return;
+    if (createMutation.isPending || updateMutation.isPending) return;
 
     try {
-      setLoading(prev => ({ ...prev, saving: true }));
       setError(null);
       setSuccess(false);
 
-      const isDuplicate = await TiposTraumaService.checkExisting(
-        capitalizedDesc,
-        id ? parseInt(id) : undefined
-      );
-
-      if (isDuplicate) {
-        setError('Já existe um tipo de trauma com essa descrição.');
-        return;
-      }
-
       if (id) {
-        await TiposTraumaService.update(parseInt(id), capitalizedDesc);
+        await updateMutation.mutateAsync({ id: parseInt(id), descricao: capitalizedDesc });
       } else {
-        await TiposTraumaService.create(capitalizedDesc);
+        await createMutation.mutateAsync(capitalizedDesc);
       }
 
       setSuccess(true);
@@ -93,8 +72,6 @@ const CadastroTipoTrauma = () => {
     } catch (err) {
       console.error('Erro ao salvar:', err);
       setError('Erro ao salvar tipo de trauma. Verifique os dados e tente novamente.');
-    } finally {
-      setLoading(prev => ({ ...prev, saving: false }));
     }
   };
 
@@ -138,7 +115,7 @@ const CadastroTipoTrauma = () => {
           onChange={(e) => setFormData({ descricao: e.target.value })}
           placeholder="Digite a descrição do tipo de trauma"
           required
-          disabled={loading.saving}
+          disabled={createMutation.isPending || updateMutation.isPending}
           preventSpaceStart
           formatOnBlur
           maxLength={60}
@@ -147,11 +124,11 @@ const CadastroTipoTrauma = () => {
         <ButtonGroup>
           <CancelButton
             onClick={handleCancel}
-            isDisabled={loading.saving}
+            isDisabled={createMutation.isPending || updateMutation.isPending}
           />
           <SubmitButton
-            isLoading={loading.saving}
-            isDisabled={loading.initial}
+            isLoading={createMutation.isPending || updateMutation.isPending}
+            isDisabled={isLoading}
             defaultText={id ? "Atualizar Tipo de Trauma" : "Criar Tipo de Trauma"}
           />
         </ButtonGroup>

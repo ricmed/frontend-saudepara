@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { TipoQualificacaoService } from "@/services/TipoQualificacaoService";
-import { ComponentsService } from "@/services/ComponentsService";
-import { useDebounce } from "@/hooks/useDebounce";
+import { useQualificacoes, useDeleteQualificacao } from "../hooks/useQualificacao";
+import { useComponentes } from "../hooks/useComponentes";
 import SideBarMenuAppsAuxiliares from "../components/SideBarMenuAppsAuxiliares";
 import { ListHeader, DataTable, ActionButtons } from "@/features/apps/list/shared";
 import Paginacao from "./paginacao";
@@ -11,7 +10,7 @@ interface TipoQualificacao {
   idtipo_qualificacao: number;
   descricao: string;
   idcomponente: number;
-  componente_descricao?: string; // Adicionado para armazenar a descrição do componente
+  componente_descricao?: string;
 }
 
 interface Componente {
@@ -22,119 +21,41 @@ interface Componente {
 const ListaQualificacao = () => {
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [qualificacoes, setQualificacoes] = useState<TipoQualificacao[]>([]);
-  const [componentes, setComponentes] = useState<Componente[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [inputValue, setInputValue] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [processingId, setProcessingId] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
+  const [processingId, setProcessingId] = useState<number | null>(null);
   const itemsPerPage = 10;
 
-  const isMounted = useRef(false);
-  const isSearchFetch = useRef(false);
-  const componentesMap = useRef<Map<number, string>>(new Map()); // Adicionado para lookup rápido
+  const { data: qualificacoesData, isLoading, error } = useQualificacoes(currentPage, itemsPerPage, searchTerm);
+  const { data: componentesData } = useComponentes();
+  const deleteQualificacao = useDeleteQualificacao();
 
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  // Extrair array de componentes dos dados paginados
+  const componentes: Componente[] = componentesData?.data || [];
+  
+  // Criar mapa de componentes para lookup rápido
+  const componentesMap = new Map(componentes.map(c => [c.idcomponente, c.descricao]));
 
-  // Carregar componentes apenas uma vez no início
-  useEffect(() => {
-    isMounted.current = true;
-    
-    const carregarComponentes = async () => {
-      try {
-        const response = await ComponentsService.getAll();
-        if (isMounted.current) {
-          setComponentes(response);
-          // Criar mapa de componentes para lookup rápido
-          const map = new Map(response.map(componente => [componente.idcomponente, componente.descricao]));
-          componentesMap.current = map;
-        }
-      } catch (err) {
-        if (isMounted.current) {
-          setError("Erro ao carregar componentes");
-        }
-      }
-    };
+  // Adicionar descrição do componente aos dados
+  const qualificacoes = qualificacoesData?.data.map(qual => ({
+    ...qual,
+    componente_descricao: componentesMap.get(qual.idcomponente) || 'N/A'
+  })) || [];
 
-    carregarComponentes();
-
-    return () => {
-      isMounted.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (debouncedSearchTerm && debouncedSearchTerm.length < 3) return;
-    
-    if (debouncedSearchTerm) {
-      isSearchFetch.current = true;
-      setCurrentPage(1);
+  const handleDelete = async (qualificacao: TipoQualificacao) => {
+    if (!confirm(`Tem certeza que deseja excluir a qualificação "${qualificacao.descricao}"?`)) {
+      return;
     }
-  }, [debouncedSearchTerm]);
 
-  useEffect(() => {
-    const carregarQualificacoes = async () => {
-      try {
-        if (!isSearchFetch.current && isMounted.current) {
-          setIsLoading(true);
-        }
+    console.log('🗑️ Tentando deletar qualificação:', qualificacao.idtipo_qualificacao);
+    setProcessingId(qualificacao.idtipo_qualificacao);
 
-        const dataQual = await TipoQualificacaoService.getAllPaginated(
-          currentPage, 
-          itemsPerPage, 
-          debouncedSearchTerm
-        );
-        
-        if (isMounted.current) {
-          // Usar o mapa de componentes para lookup rápido
-          const qualificacoesComComponente = dataQual.data.map(qualificacao => ({
-            ...qualificacao,
-            componente_descricao: componentesMap.current.get(qualificacao.idcomponente) || ''
-          }));
-
-          setQualificacoes(qualificacoesComComponente);
-          setTotalItems(dataQual.meta.total);
-          setTotalPages(dataQual.meta.totalPages);
-          setError(null);
-        }
-      } catch (err) {
-        if (isMounted.current) {
-          console.error("Erro ao carregar dados:", err);
-          setError("Erro ao carregar qualificações");
-        }
-      } finally {
-        if (isMounted.current) {
-          setIsLoading(false);
-          isSearchFetch.current = false;
-        }
-      }
-    };
-
-    if (debouncedSearchTerm && debouncedSearchTerm.length < 2) return;
-    carregarQualificacoes();
-  }, [currentPage, debouncedSearchTerm]);
-
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("Deseja realmente excluir esta qualificação?")) return;
-    
     try {
-      setProcessingId(id);
-      await TipoQualificacaoService.delete(id);
-      
-      setQualificacoes((prev) => {
-        const newData = prev.filter((item) => item.idtipo_qualificacao !== id);
-        if (newData.length === 0 && currentPage > 1) {
-          setCurrentPage((prevPage) => prevPage - 1);
-        }
-        return newData;
-      });
-    } catch (err) {
-      console.error("Erro ao excluir:", err);
-      setError("Não foi possível excluir. Verifique dependências ou tente novamente.");
+      await deleteQualificacao.mutateAsync(qualificacao.idtipo_qualificacao);
+      console.log('✅ Qualificação deletada com sucesso:', qualificacao.idtipo_qualificacao);
+    } catch (error: any) {
+      console.error('❌ Erro ao deletar qualificação:', error);
+      alert('Erro ao excluir qualificação: ' + (error.message || 'Erro desconhecido'));
     } finally {
       setProcessingId(null);
     }
@@ -142,25 +63,28 @@ const ListaQualificacao = () => {
 
   const tableColumns = [
     { header: "Descrição", accessor: "descricao" as keyof TipoQualificacao },
-    { 
-      header: "Componente", 
-      accessor: "componente_descricao" as keyof TipoQualificacao // Alterado para usar a descrição diretamente
-    }
+    { header: "Componente", accessor: "componente_descricao" as keyof TipoQualificacao },
   ];
 
+  const renderActionButtons = (qualificacao: TipoQualificacao) => (
+    <ActionButtons
+      onEdit={() => navigate(`/private/qualificacao/editar/${qualificacao.idtipo_qualificacao}`)}
+      onDelete={() => handleDelete(qualificacao)}
+      isProcessing={processingId === qualificacao.idtipo_qualificacao}
+      itemName="qualificação"
+    />
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
       <ListHeader
-        title="Relatório de Qualificações"
-        searchPlaceholder="Pesquisar qualificações..."
-        onSearch={(value) => {
-          setInputValue(value);
-          setSearchTerm(value);
-        }}
-        searchValue={inputValue}
-        onNewClick={() => navigate("/private/qualificacao/nova")}
-        isProcessing={false}
+        title="Lista de Qualificações"
         onMenuOpen={() => setIsMenuOpen(true)}
+        onNewClick={() => navigate('/private/qualificacao/nova')}
+        searchValue={searchTerm}
+        onSearch={setSearchTerm}
+        searchPlaceholder="Buscar por descrição..."
+        isProcessing={deleteQualificacao.isPending}
       />
 
       <SideBarMenuAppsAuxiliares
@@ -168,35 +92,33 @@ const ListaQualificacao = () => {
         onClose={() => setIsMenuOpen(false)}
       />
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <div className="container mx-auto p-4">
         <DataTable
           data={qualificacoes}
           columns={tableColumns}
+          renderActions={renderActionButtons}
           loading={isLoading}
-          error={error}
-          onDismissError={() => setError(null)}
-          emptyMessage="Nenhuma qualificação cadastrada"
+          error={error?.message || null}
+          onDismissError={() => {}}
+          emptyMessage="Nenhuma qualificação encontrada"
           searchTerm={searchTerm}
-          renderActions={(qualificacao) => (
-            <ActionButtons
-              onEdit={() => navigate(`/private/qualificacao/editar/${qualificacao.idtipo_qualificacao}`)}
-              onDelete={() => handleDelete(qualificacao.idtipo_qualificacao)}
-              isProcessing={processingId === qualificacao.idtipo_qualificacao}
-              itemName={qualificacao.descricao}
-            />
-          )}
         />
 
-        <Paginacao
-          currentPage={currentPage}
-          totalPages={totalPages}
-          totalItems={totalItems}
-          itemsPerPage={itemsPerPage}
-          isProcessing={isLoading}
-          onPageChange={setCurrentPage}
-        />
-      </main>
-    </div>
+        {/* Paginação */}
+        {qualificacoesData && qualificacoesData.meta.totalPages > 1 && (
+          <div className="mt-6">
+            <Paginacao
+              currentPage={currentPage}
+              totalPages={qualificacoesData.meta.totalPages}
+              totalItems={qualificacoesData.meta.total}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              isProcessing={isLoading}
+            />
+          </div>
+        )}
+      </div>
+    </>
   );
 };
 

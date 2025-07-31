@@ -1,135 +1,97 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useCBOs, useDeleteCBO } from "@/features/apps/hooks/useCBO";
 import { useDebounce } from "@/hooks/useDebounce";
-import { CBOService } from "@/services/CBOService";
 import SideBarMenuAppsAuxiliares from "../../apps/components/SideBarMenuAppsAuxiliares";
 import { ListHeader, DataTable, ActionButtons } from "@/features/apps/list/shared";
 import Paginacao from "./paginacao";
 
-interface CBO {
+interface TipoCBO {
   idtipo_cbo: number;
   codigo: string;
   descricao: string;
 }
 
-export interface PaginatedResponse {
-  data: CBO[];
-  meta: {
-    total: number;
-    totalPages: number;
-    page: number;
-    limit: number;
-  };
-}
-
-const ListaCBOs = () => {
+const ListaCBO = () => {
   const navigate = useNavigate();
-  const [cbos, setCBOs] = useState<CBO[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [inputValue, setInputValue] = useState("");
-  const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<number | null>(null);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const itemsPerPage = 10;
-  const isMounted = useRef(false);
-  const isSearchFetch = useRef(false);
+
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  
+  // React Query hooks - substituem TODO o useState + useEffect anterior!
+  const { 
+    data: response, 
+    isLoading, 
+    error 
+  } = useCBOs(currentPage, itemsPerPage, debouncedSearchTerm);
+  
+  const deleteMutation = useDeleteCBO();
 
-  useEffect(() => {
-    isMounted.current = true;
-    return () => {
-      isMounted.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (debouncedSearchTerm) {
-      isSearchFetch.current = true;
-      setCurrentPage(1);
-    }
-  }, [debouncedSearchTerm]);
-
-  useEffect(() => {
-    const carregarCBOs = async () => {
-      try {
-        if (!isSearchFetch.current && isMounted.current) setLoading(true);
-        const response = await CBOService.getAllPaginated(
-          currentPage,
-          itemsPerPage,
-          debouncedSearchTerm
-        );
-        if (isMounted.current) {
-          setCBOs(response.data);
-          setTotalItems(response.meta.total || 0);
-          setTotalPages(Math.min(Math.max(response.meta.totalPages || 1, 1), 1000));
-        }
-      } catch (err) {
-        if (isMounted.current) {
-          setError("Erro ao carregar CBOs");
-        }
-      } finally {
-        if (isMounted.current) {
-          setLoading(false);
-          isSearchFetch.current = false;
-        }
-      }
-    };
-    carregarCBOs();
-  }, [currentPage, debouncedSearchTerm]);
+  // Dados extraídos da resposta
+  const cbos = response?.data || [];
+  const totalItems = response?.meta?.total || 0;
+  const totalPages = Math.min(Math.max(response?.meta?.totalPages || 1, 1), 1000);
 
   const handleDelete = async (id: number) => {
     if (!window.confirm("Deseja realmente excluir este CBO?")) return;
+
+    console.log('Tentando excluir CBO com ID:', id);
+    setProcessingId(id);
+
     try {
-      setProcessingId(id);
-      await CBOService.delete(id);
-      setCBOs((prev) => {
-        const newData = prev.filter((item) => item.idtipo_cbo !== id);
-        if (newData.length === 0 && currentPage > 1) {
-          setCurrentPage((prevPage) => prevPage - 1);
-        }
-        return newData;
-      });
+      await deleteMutation.mutateAsync(id);
+      console.log('CBO excluído com sucesso!');
+      
+      // Se não há mais itens na página atual, volta uma página
+      if (cbos.length === 1 && currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+      }
     } catch (err) {
-      setError("Erro ao excluir o CBO");
+      console.error('Erro ao excluir CBO:', err);
+      alert('Erro ao excluir o CBO: ' + (err as Error).message);
     } finally {
       setProcessingId(null);
     }
   };
 
   const tableColumns = [
-    { header: "Código", accessor: "codigo" as keyof CBO },
-    { header: "Descrição", accessor: "descricao" as keyof CBO }
+    { header: "Código", accessor: "codigo" as keyof TipoCBO },
+    { header: "Descrição", accessor: "descricao" as keyof TipoCBO }
   ];
 
   return (
     <div className="min-h-screen bg-gray-50">
       <ListHeader
         title="Lista de CBOs"
-        searchPlaceholder="Pesquisar CBOs..."
+        searchPlaceholder="Pesquisar CBOs ou código..."
         onSearch={(value) => {
           setInputValue(value);
           setSearchTerm(value);
+          setCurrentPage(1); // Reset para primeira página ao pesquisar
         }}
         searchValue={inputValue}
         onNewClick={() => navigate("/private/cbo/nova")}
         isProcessing={false}
         onMenuOpen={() => setIsMenuOpen(true)}
       />
+
       <SideBarMenuAppsAuxiliares
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
       />
+
       <main className="max-w-7xl mx-auto px-4 py-8">
         <DataTable
           data={cbos}
           columns={tableColumns}
-          loading={loading}
-          error={error}
-          onDismissError={() => setError(null)}
+          loading={isLoading}
+          error={error ? "Erro ao carregar os CBOs" : null}
+          onDismissError={() => {}}
           emptyMessage="Nenhum CBO cadastrado"
           searchTerm={searchTerm}
           renderActions={(cbo) => (
@@ -141,12 +103,13 @@ const ListaCBOs = () => {
             />
           )}
         />
+
         <Paginacao
           currentPage={currentPage}
           totalPages={totalPages}
           totalItems={totalItems}
           itemsPerPage={itemsPerPage}
-          isProcessing={false}
+          isProcessing={isLoading}
           onPageChange={setCurrentPage}
         />
       </main>
@@ -154,4 +117,4 @@ const ListaCBOs = () => {
   );
 };
 
-export default ListaCBOs;
+export default ListaCBO;

@@ -151,25 +151,46 @@ export const EstadoService = {
     excludeId?: number
   ): Promise<boolean> => {
     try {
-      // Usando o endpoint de busca para verificar duplicatas de código
-      const response = await axios.get<{ data: Estado[] }>(`${API_URL}/search`, {
-        params: {
-          descricao: codigo,
-          limit: 1
-        }
-      });
+      // Para códigos de estado (geralmente 2 caracteres), não usar o endpoint de busca
+      // que tem validação de mínimo 3 caracteres
+      
+      if (codigo.length < 3) {
+        // Buscar todos os estados e filtrar localmente
+        const response = await axios.get<{ data: Estado[] }>(`${API_URL}`, {
+          params: {
+            limit: 1000 // Buscar todos para filtrar localmente
+          }
+        });
 
-      // Se não encontrou nenhum registro, retorna false
-      if (response.data.data.length === 0) return false;
+        // Filtrar localmente por código
+        const existingState = response.data.data.find(estado => 
+          estado.codigo?.toUpperCase() === codigo.toUpperCase()
+        );
 
-      // Se encontrou e não temos excludeId, então existe duplicata
-      if (!excludeId) return true;
+        if (!existingState) return false;
+        if (!excludeId) return true;
+        return existingState.idtipo_estado !== excludeId;
+      } else {
+        // Para códigos com 3+ caracteres, usar o endpoint de busca normal
+        const response = await axios.get<{ data: Estado[] }>(`${API_URL}/search`, {
+          params: {
+            descricao: codigo,
+            limit: 1
+          }
+        });
 
-      // Se temos excludeId, verifica se o registro encontrado é diferente do atual
-      return response.data.data.some(estado => 
-        estado.codigo === codigo && 
-        estado.idtipo_estado !== excludeId
-      );
+        // Se não encontrou nenhum registro, retorna false
+        if (response.data.data.length === 0) return false;
+
+        // Se encontrou e não temos excludeId, então existe duplicata
+        if (!excludeId) return true;
+
+        // Se temos excludeId, verifica se o registro encontrado é diferente do atual
+        return response.data.data.some(estado => 
+          estado.codigo === codigo && 
+          estado.idtipo_estado !== excludeId
+        );
+      }
     } catch (error) {
       return handleApiError(error as AxiosError<APIError>);
     }

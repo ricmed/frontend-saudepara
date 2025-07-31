@@ -1,108 +1,49 @@
-import { useState, useEffect, useRef } from "react";
-import {  ArrowLeft,  Plus,  Pencil,  Trash,  Search,  Menu,} from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, Plus, Pencil, Trash, Search, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { TiposAtendimentoService } from "@/services/AtendimentoService";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useTiposAtendimento, useDeleteTipoAtendimento } from "@/features/apps/hooks/useAtendimento";
 import SideBarMenuAppsAuxiliares from "../../apps/components/SideBarMenuAppsAuxiliares";
 import Paginacao from "./paginacao";
 
-interface TipoAtendimento {
-  idtipo_atendimento: number;
-  descricao: string;
-}
-
-interface PaginatedResponse {
-  data: TipoAtendimento[];
-  meta: {
-    total: number;
-    totalPages: number;
-    page: number;
-    limit: number;
-  };
-}
-
 const ListaTiposAtendimento = () => {
   const navigate = useNavigate();
-  const [tiposAtendimento, setTiposAtendimento] = useState<TipoAtendimento[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  
+  // Estados simples - só UI
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [inputValue, setInputValue] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [processingId, setProcessingId] = useState<number | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  
   const itemsPerPage = 10;
-  const isMounted = useRef(false);
-  const isSearchFetch = useRef(false);
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
-
-  useEffect(() => {
-    isMounted.current = true;
-    return () => {
-      isMounted.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (debouncedSearchTerm) {
-      isSearchFetch.current = true;
-      setCurrentPage(1);
-    }
-  }, [debouncedSearchTerm]);
-
-  useEffect(() => {
-    const carregarTiposAtendimento = async () => {
-      try {
-        if (!isSearchFetch.current && isMounted.current) setLoading(true);
-
-        const response = (await TiposAtendimentoService.getAllPaginated(
-          currentPage,
-          itemsPerPage,
-          debouncedSearchTerm
-        )) as PaginatedResponse;
-
-        if (isMounted.current) {
-          setTiposAtendimento(response.data);
-          setTotalItems(response.meta.total || 0);
-          setTotalPages(
-            Math.min(Math.max(response.meta.totalPages || 1, 1), 1000)
-          );
-        }
-      } catch (err) {
-        if (isMounted.current) {
-          setError("Erro ao carregar tipos de atendimento");
-        }
-      } finally {
-        if (isMounted.current) {
-          setLoading(false);
-          isSearchFetch.current = false;
-        }
-      }
-    };
-
-    carregarTiposAtendimento();
-  }, [currentPage, debouncedSearchTerm]);
+  
+  // React Query hooks - substituem TODO o useState + useEffect anterior!
+  const { 
+    data: response, 
+    isLoading, 
+    error 
+  } = useTiposAtendimento(currentPage, itemsPerPage, debouncedSearchTerm);
+  
+  const deleteMutation = useDeleteTipoAtendimento();
+  
+  // Dados extraídos da resposta
+  const tiposAtendimento = response?.data || [];
+  const totalItems = response?.meta?.total || 0;
+  const totalPages = Math.min(Math.max(response?.meta?.totalPages || 1, 1), 1000);
 
   const handleDelete = async (id: number) => {
     if (!window.confirm("Deseja realmente excluir este tipo de atendimento?")) return;
-
+    
     try {
-      setProcessingId(id);
-      await TiposAtendimentoService.delete(id);
-
-      setTiposAtendimento((prev) => {
-        const newData = prev.filter((item) => item.idtipo_atendimento !== id);
-        if (newData.length === 0 && currentPage > 1) {
-          setCurrentPage((prevPage) => prevPage - 1);
-        }
-        return newData;
-      });
+      await deleteMutation.mutateAsync(id);
+      
+      // Se não há mais itens na página atual, volta uma página
+      if (tiposAtendimento.length === 1 && currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+      }
     } catch (err) {
-      setError("Erro ao excluir o tipo de atendimento");
-    } finally {
-      setProcessingId(null);
+      console.error('Erro ao excluir:', err);
     }
   };
 
@@ -140,25 +81,11 @@ const ListaTiposAtendimento = () => {
                 placeholder="Pesquisar tipos de atendimento..."
                 value={inputValue}
                 onChange={(e) => {
-                  const value = e.target.value;
-                  setInputValue(value);
-                  
-                  // Verificações para decidir se dispara a busca:
-                  // Se o termo estiver vazio, permitir (para limpar filtros)
-                  if (value === "") {
-                    setSearchTerm(value);
-                    return;
-                  }
-                  
-                  // Para qualquer outro caso, exigir pelo menos 3 caracteres
-                  if (value.length >= 3) {
-                    setSearchTerm(value);
-                  }
-                  // Não dispara a busca se não atingiu o mínimo de caracteres
+                  setInputValue(e.target.value);
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1); // Reset para primeira página ao pesquisar
                 }}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-800"
-                autoComplete="off"
-                aria-label="Campo de pesquisa"
               />
             </div>
 
@@ -182,19 +109,12 @@ const ListaTiposAtendimento = () => {
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
           {error && (
-            <div className="bg-red-50 text-red-700 p-4 mb-4 flex justify-between items-center animate-fade-in">
-              <span>{error}</span>
-              <button
-                onClick={() => setError(null)}
-                className="text-red-700 hover:text-red-800"
-                aria-label="Fechar erro"
-              >
-                ×
-              </button>
+            <div className="bg-red-50 text-red-700 p-4 mb-4 flex justify-between items-center">
+              <span>Erro ao carregar tipos de atendimento</span>
             </div>
           )}
 
-          {loading ? (
+          {isLoading ? (
             <div className="flex justify-center items-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
             </div>
@@ -215,13 +135,8 @@ const ListaTiposAtendimento = () => {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {tiposAtendimento.length === 0 ? (
                       <tr>
-                        <td
-                          colSpan={2}
-                          className="px-8 py-6 text-center text-gray-500"
-                        >
-                          {searchTerm
-                            ? "Nenhum resultado encontrado"
-                            : "Nenhum tipo de atendimento cadastrado"}
+                        <td colSpan={2} className="px-8 py-6 text-center text-gray-500">
+                          {searchTerm ? "Nenhum resultado encontrado" : "Nenhum tipo de atendimento cadastrado"}
                         </td>
                       </tr>
                     ) : (
@@ -236,29 +151,18 @@ const ListaTiposAtendimento = () => {
                           <td className="px-8 py-4 text-right">
                             <div className="flex justify-end gap-3">
                               <button
-                                onClick={() =>
-                                  navigate(
-                                    `/private/atendimento/editar/${tipoAtendimento.idtipo_atendimento}`
-                                  )
-                                }
+                                onClick={() => navigate(`/private/atendimento/editar/${tipoAtendimento.idtipo_atendimento}`)}
                                 className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-                                disabled={processingId === tipoAtendimento.idtipo_atendimento}
-                                aria-label={`Editar ${tipoAtendimento.descricao}`}
                               >
                                 <Pencil className="h-5 w-5" />
                               </button>
                               <button
-                                onClick={() =>
-                                  handleDelete(tipoAtendimento.idtipo_atendimento)
-                                }
+                                onClick={() => handleDelete(tipoAtendimento.idtipo_atendimento)}
                                 className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                                disabled={processingId === tipoAtendimento.idtipo_atendimento}
-                                aria-label={`Excluir ${tipoAtendimento.descricao}`}
+                                disabled={deleteMutation.isPending}
                               >
-                                {processingId === tipoAtendimento.idtipo_atendimento ? (
-                                  <span className="animate-pulse">
-                                    Excluindo...
-                                  </span>
+                                {deleteMutation.isPending ? (
+                                  <span className="animate-pulse">Excluindo...</span>
                                 ) : (
                                   <Trash className="h-5 w-5" />
                                 )}

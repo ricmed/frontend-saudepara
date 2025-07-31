@@ -125,25 +125,46 @@ export const HabilitacaoService = {
 
   checkExistingCodigo: async (codigo: string, excludeId?: number): Promise<boolean> => {
     try {
-      // Usando o endpoint de busca para verificar duplicatas de código
-      const response = await axios.get<{ data: TipoHabilitacao[] }>(`${API_URL}/search`, {
-        params: {
-          descricao: codigo.trim().toUpperCase(),
-          limit: 1
-        }
-      });
+      // Para códigos curtos (menos de 3 caracteres), buscar todos e filtrar localmente
+      // para evitar o problema de validação mínima do endpoint de busca
+      
+      if (codigo.length < 3) {
+        // Buscar todos os registros e filtrar localmente
+        const response = await axios.get<{ data: TipoHabilitacao[] }>(`${API_URL}`, {
+          params: {
+            limit: 1000 // Buscar todos para filtrar localmente
+          }
+        });
 
-      // Se não encontrou nenhum registro, retorna false
-      if (response.data.data.length === 0) return false;
+        // Filtrar localmente por código
+        const existing = response.data.data.find(hab => 
+          hab.codigo?.toUpperCase() === codigo.toUpperCase()
+        );
 
-      // Se encontrou e não temos excludeId, então existe duplicata
-      if (!excludeId) return true;
+        if (!existing) return false;
+        if (!excludeId) return true;
+        return existing.idtipo_habilitacao !== excludeId;
+      } else {
+        // Para códigos com 3+ caracteres, usar o endpoint de busca normal
+        const response = await axios.get<{ data: TipoHabilitacao[] }>(`${API_URL}/search`, {
+          params: {
+            descricao: codigo.trim().toUpperCase(),
+            limit: 1
+          }
+        });
 
-      // Se temos excludeId, verifica se o registro encontrado é diferente do atual
-      return response.data.data.some(hab => 
-        hab.codigo === codigo.trim().toUpperCase() && 
-        hab.idtipo_habilitacao !== excludeId
-      );
+        // Se não encontrou nenhum registro, retorna false
+        if (response.data.data.length === 0) return false;
+
+        // Se encontrou e não temos excludeId, então existe duplicata
+        if (!excludeId) return true;
+
+        // Se temos excludeId, verifica se o registro encontrado é diferente do atual
+        return response.data.data.some(hab => 
+          hab.codigo === codigo.trim().toUpperCase() && 
+          hab.idtipo_habilitacao !== excludeId
+        );
+      }
     } catch (error) {
       return handleApiError(error as AxiosError<APIError>);
     }

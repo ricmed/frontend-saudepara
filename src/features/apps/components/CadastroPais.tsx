@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from "react-router-dom";
-import { PaisService } from '@/services/PaisService';
-import SideBarMenuAppsAuxiliares from "./SideBarMenuAppsAuxiliares";
+import { usePais, useCreatePais, useUpdatePais } from '../hooks/usePais';
+import SideBarMenuAppsAuxiliares from "../../apps/components/SideBarMenuAppsAuxiliares";
 
 import {
   PageLayout,
@@ -21,33 +21,23 @@ const CadastroPais = () => {
   const { id } = useParams();
   
   const [formData, setFormData] = useState({ descricao: '' });
-  const [loading, setLoading] = useState({
-    initial: !!id,
-    saving: false
-  });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
+  // React Query hooks
+  const { data: pais, isLoading: loadingData } = usePais(id ? parseInt(id) : 0);
+  const createMutation = useCreatePais();
+  const updateMutation = useUpdatePais();
+
+  // Carregar dados quando disponível (apenas uma vez)
   useEffect(() => {
-    const loadData = async () => {
-      if (!id) return;
-      
-      try {
-        const pais = await PaisService.getById(parseInt(id));
-        if (pais) {
-          setFormData({ descricao: pais.descricao });
-        }
-      } catch (err) {
-        console.error('Erro ao carregar:', err);
-        setError('Erro ao carregar dados do país');
-      } finally {
-        setLoading(prev => ({ ...prev, initial: false }));
-      }
-    };
-
-    loadData();
-  }, [id]);
+    if (pais && !dataLoaded) {
+      setFormData({ descricao: pais.descricao });
+      setDataLoaded(true);
+    }
+  }, [pais, dataLoaded]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,27 +54,20 @@ const CadastroPais = () => {
       return;
     }
 
-    if (loading.saving) return;
+    const isSaving = createMutation.isPending || updateMutation.isPending;
+    if (isSaving) return;
 
     try {
-      setLoading(prev => ({ ...prev, saving: true }));
       setError(null);
       setSuccess(false);
 
-      const isDuplicate = await PaisService.checkExisting(
-        formattedDesc,
-        id ? parseInt(id) : undefined
-      );
-
-      if (isDuplicate) {
-        setError('Já existe um país com essa descrição.');
-        return;
-      }
-
       if (id) {
-        await PaisService.update(parseInt(id), formattedDesc);
+        await updateMutation.mutateAsync({
+          id: parseInt(id),
+          descricao: formattedDesc
+        });
       } else {
-        await PaisService.create(formattedDesc);
+        await createMutation.mutateAsync(formattedDesc);
       }
 
       setSuccess(true);
@@ -93,8 +76,6 @@ const CadastroPais = () => {
     } catch (err) {
       console.error('Erro ao salvar:', err);
       setError('Erro ao salvar país. Verifique os dados e tente novamente.');
-    } finally {
-      setLoading(prev => ({ ...prev, saving: false }));
     }
   };
 
@@ -147,7 +128,7 @@ const CadastroPais = () => {
           placeholder="Digite a descrição do país"
           maxLength={50}
           required
-          disabled={loading.saving}
+          disabled={createMutation.isPending || updateMutation.isPending}
           preventSpaceStart
           formatOnBlur
         />
@@ -155,11 +136,11 @@ const CadastroPais = () => {
         <ButtonGroup>
           <CancelButton
             onClick={handleCancel}
-            isDisabled={loading.saving}
+            isDisabled={createMutation.isPending || updateMutation.isPending}
           />
           <SubmitButton
-            isLoading={loading.saving}
-            isDisabled={loading.initial}
+            isLoading={createMutation.isPending || updateMutation.isPending}
+            isDisabled={loadingData}
             defaultText={id ? "Atualizar País" : "Criar País"}
           />
         </ButtonGroup>

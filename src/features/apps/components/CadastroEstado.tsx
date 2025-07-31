@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from "react-router-dom";
-import { EstadoService } from '@/services/EstadoService';
+import { useEstado, useCreateEstado, useUpdateEstado, useCheckEstadoExisting } from '../hooks/useEstado';
 import SideBarMenuAppsAuxiliares from "./SideBarMenuAppsAuxiliares";
 
 import {
@@ -19,44 +19,35 @@ import {
 const CadastroEstado = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const estadoId = id ? parseInt(id) : undefined;
   
   const [formData, setFormData] = useState({ 
     codigo: '',
     descricao: '' 
   });
-  const [loading, setLoading] = useState({
-    initial: !!id,
-    saving: false
-  });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
+  const { data: estadoData, isLoading: loadingEstado } = useEstado(estadoId || 0);
+  const createEstado = useCreateEstado();
+  const updateEstado = useUpdateEstado();
+  const checkExisting = useCheckEstadoExisting();
+
+  // Carregar dados quando disponível (apenas uma vez)
   useEffect(() => {
-    const loadData = async () => {
-      if (!id) return;
-      
-      try {
-        const estado = await EstadoService.getById(parseInt(id));
-        if (estado) {
-          setFormData({ 
-            codigo: estado.codigo,
-            descricao: estado.descricao 
-          });
-        }
-      } catch (err) {
-        console.error('Erro ao carregar:', err);
-        setError('Erro ao carregar dados do estado');
-      } finally {
-        setLoading(prev => ({ ...prev, initial: false }));
-      }
-    };
-
-    loadData();
-  }, [id]);
+    if (estadoData && !dataLoaded) {
+      setFormData({ 
+        codigo: estadoData.codigo,
+        descricao: estadoData.descricao 
+      });
+      setDataLoaded(true);
+    }
+  }, [estadoData, dataLoaded]);
 
   const validateForm = () => {
-    const trimmedCodigo = formData.codigo.trim();
+    const trimmedCodigo = formData.codigo.trim().toUpperCase();
     const trimmedDesc = formData.descricao.trim();
 
     if (!trimmedCodigo || !trimmedDesc) {
@@ -64,8 +55,13 @@ const CadastroEstado = () => {
       return false;
     }
 
-    if (trimmedCodigo.length > 5) {
-      setError('O código deve ter no máximo 5 caracteres.');
+    if (trimmedCodigo.length !== 2) {
+      setError('O código deve ter exatamente 2 letras.');
+      return false;
+    }
+
+    if (!/^[A-Z]{2}$/.test(trimmedCodigo)) {
+      setError('O código deve conter apenas letras.');
       return false;
     }
 
@@ -80,50 +76,44 @@ const CadastroEstado = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
-    if (loading.saving) return;
+    if (createEstado.isPending || updateEstado.isPending) return;
 
     try {
-      setLoading(prev => ({ ...prev, saving: true }));
       setError(null);
       setSuccess(false);
 
-      const trimmedCodigo = formatText(formData.codigo);
+      const trimmedCodigo = formData.codigo.trim().toUpperCase();
       const formattedDesc = capitalizeFirstLetter(formatText(formData.descricao));
 
-      const isDuplicateCodigo = await EstadoService.checkExisting(
-        trimmedCodigo,
-        id ? parseInt(id) : undefined
-      );
+      const isDuplicateCodigo = await checkExisting.mutateAsync({
+        codigo: trimmedCodigo,
+        excludeId: estadoId
+      });
 
       if (isDuplicateCodigo) {
         setError('Já existe um estado com esse código.');
         return;
       }
-
-      const isDuplicateDescricao = await EstadoService.checkExistingDescricao(
-        formattedDesc,
-        id ? parseInt(id) : undefined
-      );
-
-      if (isDuplicateDescricao) {
-        setError('Já existe um estado com essa descrição.');
-        return;
-      }
-
-      if (id) {
-        await EstadoService.update(parseInt(id), trimmedCodigo, formattedDesc);
+      
+      if (estadoId) {
+        await updateEstado.mutateAsync({ 
+          id: estadoId, 
+          codigo: trimmedCodigo, 
+          descricao: formattedDesc 
+        });
       } else {
-        await EstadoService.create(trimmedCodigo, formattedDesc);
+        await createEstado.mutateAsync({ 
+          codigo: trimmedCodigo, 
+          descricao: formattedDesc 
+        });
       }
 
       setSuccess(true);
       setTimeout(() => navigate('/private/estado', { replace: true }), 1500);
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao salvar:', err);
-      setError('Erro ao salvar estado. Verifique os dados e tente novamente.');
-    } finally {
-      setLoading(prev => ({ ...prev, saving: false }));
+      setError(err.message || 'Erro ao salvar estado. Verifique os dados e tente novamente.');
     }
   };
 
@@ -131,10 +121,12 @@ const CadastroEstado = () => {
     navigate('/private/estado');
   };
 
+  const isLoading = loadingEstado || createEstado.isPending || updateEstado.isPending;
+
   return (
     <PageLayout>
       <PageHeader
-        title={id ? 'Editar Estado' : 'Novo Estado'}
+        title={estadoId ? 'Editar Estado' : 'Novo Estado'}
         onMenuClick={() => setIsMenuOpen(true)}
         onBackClick={() => navigate('/private/apps-auxiliares')}
       />
@@ -156,7 +148,7 @@ const CadastroEstado = () => {
         {success && (
           <Alert
             type="success"
-            message={`Estado ${id ? "atualizado" : "criado"} com sucesso!`}
+            message={`Estado ${estadoId ? "atualizado" : "criado"} com sucesso!`}
           />
         )}
 
@@ -165,14 +157,18 @@ const CadastroEstado = () => {
             label="Código"
             name="codigo"
             value={formData.codigo}
-            onChange={(e) => setFormData(prev => ({ ...prev, codigo: e.target.value }))}
-            placeholder="Digite o código do estado"
-            maxLength={5}
+            onChange={(e) => {
+              const value = e.target.value.toUpperCase();
+              // Permite apenas letras e limita a 2 caracteres
+              if (/^[A-Z]*$/.test(value) && value.length <= 2) {
+                setFormData(prev => ({ ...prev, codigo: value }));
+              }
+            }}
+            placeholder="Digite o código do estado (2 letras)"
+            maxLength={2}
             required
-            disabled={loading.saving}
+            disabled={isLoading}
             preventSpaceStart
-            formatOnBlur
-            onlyNumbers={true}
           />
 
           <FormInput
@@ -183,7 +179,7 @@ const CadastroEstado = () => {
             placeholder="Digite a descrição do estado"
             maxLength={45}
             required
-            disabled={loading.saving}
+            disabled={isLoading}
             preventSpaceStart
             formatOnBlur
           />
@@ -192,12 +188,12 @@ const CadastroEstado = () => {
         <ButtonGroup>
           <CancelButton
             onClick={handleCancel}
-            isDisabled={loading.saving}
+            isDisabled={isLoading}
           />
           <SubmitButton
-            isLoading={loading.saving}
-            isDisabled={loading.initial}
-            defaultText={id ? "Atualizar Estado" : "Criar Estado"}
+            isLoading={isLoading}
+            isDisabled={loadingEstado}
+            defaultText={estadoId ? "Atualizar Estado" : "Criar Estado"}
           />
         </ButtonGroup>
       </FormContainer>

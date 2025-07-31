@@ -89,16 +89,7 @@ export const MunicipioService = {
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar municípios:', error);
-      // Retornar um objeto vazio mas válido em caso de erro
-      return {
-        data: [],
-        pagination: {
-          total: 0,
-          pages: 0,
-          currentPage: page,
-          perPage: itemsPerPage
-        }
-      };
+      return handleApiError(error as AxiosError<APIError>);
     }
   },
 

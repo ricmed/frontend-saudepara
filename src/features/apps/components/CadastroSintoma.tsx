@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from "react-router-dom";
-import { TiposSintomaService } from '@/services/SintomaService';
+import { useSintoma, useCreateSintoma, useUpdateSintoma, useCheckSintomaExisting } from '../hooks/useSintoma';
 import SideBarMenuAppsAuxiliares from "../../apps/components/SideBarMenuAppsAuxiliares";
 
 import {
@@ -21,33 +21,24 @@ const CadastroTipoSintoma = () => {
   const { id } = useParams();
   
   const [formData, setFormData] = useState({ descricao: '' });
-  const [loading, setLoading] = useState({
-    initial: !!id,
-    saving: false
-  });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
+  // React Query hooks
+  const { data: tipoSintoma, isLoading: loadingData } = useSintoma(id ? parseInt(id) : 0);
+  const createMutation = useCreateSintoma();
+  const updateMutation = useUpdateSintoma();
+  const checkExistingMutation = useCheckSintomaExisting();
+
+  // Carregar dados quando disponível (apenas uma vez)
   useEffect(() => {
-    const loadData = async () => {
-      if (!id) return;
-      
-      try {
-        const tipoSintoma = await TiposSintomaService.getById(parseInt(id));
-        if (tipoSintoma) {
-          setFormData({ descricao: tipoSintoma.descricao });
-        }
-      } catch (err) {
-        console.error('Erro ao carregar:', err);
-        setError('Erro ao carregar dados do tipo de sintoma');
-      } finally {
-        setLoading(prev => ({ ...prev, initial: false }));
-      }
-    };
-
-    loadData();
-  }, [id]);
+    if (tipoSintoma && !dataLoaded) {
+      setFormData({ descricao: tipoSintoma.descricao });
+      setDataLoaded(true);
+    }
+  }, [tipoSintoma, dataLoaded]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,17 +55,18 @@ const CadastroTipoSintoma = () => {
       return;
     }
 
-    if (loading.saving) return;
+    const isSaving = createMutation.isPending || updateMutation.isPending;
+    if (isSaving) return;
 
     try {
-      setLoading(prev => ({ ...prev, saving: true }));
       setError(null);
       setSuccess(false);
 
-      const isDuplicate = await TiposSintomaService.checkExisting(
-        capitalizedDesc,
-        id ? parseInt(id) : undefined
-      );
+      // Verificar duplicatas
+      const isDuplicate = await checkExistingMutation.mutateAsync({
+        descricao: capitalizedDesc,
+        excludeId: id ? parseInt(id) : undefined
+      });
 
       if (isDuplicate) {
         setError('Já existe um tipo de sintoma com essa descrição.');
@@ -82,9 +74,12 @@ const CadastroTipoSintoma = () => {
       }
 
       if (id) {
-        await TiposSintomaService.update(parseInt(id), capitalizedDesc);
+        await updateMutation.mutateAsync({
+          id: parseInt(id),
+          descricao: capitalizedDesc
+        });
       } else {
-        await TiposSintomaService.create(capitalizedDesc);
+        await createMutation.mutateAsync(capitalizedDesc);
       }
 
       setSuccess(true);
@@ -93,8 +88,6 @@ const CadastroTipoSintoma = () => {
     } catch (err) {
       console.error('Erro ao salvar:', err);
       setError('Erro ao salvar tipo de sintoma. Verifique os dados e tente novamente.');
-    } finally {
-      setLoading(prev => ({ ...prev, saving: false }));
     }
   };
 
@@ -138,7 +131,7 @@ const CadastroTipoSintoma = () => {
           onChange={(e) => setFormData({ descricao: e.target.value })}
           placeholder="Digite a descrição do tipo de sintoma"
           required
-          disabled={loading.saving}
+          disabled={createMutation.isPending || updateMutation.isPending}
           preventSpaceStart
           formatOnBlur
           maxLength={60}
@@ -147,11 +140,11 @@ const CadastroTipoSintoma = () => {
         <ButtonGroup>
           <CancelButton
             onClick={handleCancel}
-            isDisabled={loading.saving}
+            isDisabled={createMutation.isPending || updateMutation.isPending}
           />
           <SubmitButton
-            isLoading={loading.saving}
-            isDisabled={loading.initial}
+            isLoading={createMutation.isPending || updateMutation.isPending}
+            isDisabled={loadingData}
             defaultText={id ? "Atualizar Tipo de Sintoma" : "Criar Tipo de Sintoma"}
           />
         </ButtonGroup>
