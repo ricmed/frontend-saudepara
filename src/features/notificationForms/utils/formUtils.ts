@@ -1,6 +1,6 @@
 // src/utils/formUtils.ts
 
-import { FormData, AtendimentoOption, EncerramentoOption } from '@/features/notificationForms/types/index2';
+import { FormData, AtendimentoOption, EncerramentoOption, detectUserTimezone } from '@/features/notificationForms/types/index2';
 import type { SectionState } from '@/features/notificationForms/hooks/useSectionExpansion';
 
 /**

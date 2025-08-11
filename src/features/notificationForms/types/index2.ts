@@ -1,5 +1,4 @@
-// types/index2.ts - Versão atualizada com campo de arquivos
-import { Paciente } from "@/services/PacienteService";
+// types/index2.ts - Versão atualizada com timezone e campos de auditoria
 
 // Interface para representar um arquivo no formulário
 export interface ArquivoFormulario {
@@ -12,67 +11,6 @@ export interface ArquivoFormulario {
   isExisting?: boolean; // Flag para identificar se é um arquivo já existente
   status?: 'pending' | 'uploading' | 'uploaded' | 'error'; // Status do upload
   error?: string; // Mensagem de erro se houver
-}
-
-// Interface FormData atualizada
-export interface FormData {
-  // Seção 1: Dados Gerais
-  evento: string;
-  publicoAtendido: string;
-
-  // Seção 2: Procedência do indivíduo
-  residenteBelem: string;
-  bairro: string;
-  municipio: string;
-  uf: string;
-  paisProcedencia: string;
-  localHospedagem: string;
-  contatoLocal: string;
-
-  // Seção 3: Identificação do indivíduo
-  paciente: string;
-  pacienteId?: number;
-  nomeMae: string;
-  dataNascimento: string;
-  idade: string;
-  idadeMeses: string; 
-  idadeUnidade: 'anos' | 'meses';
-  cpf: string;
-  identidadeGenero: string;
-  gestante: string;
-  raca: string;
-  escolaridade: string;
-  profissao: string;
-  profissaoSearch?: string;
-  showProfissaoOptions?: boolean;
-  ddi: string;
-  contatoTelefonico: string;
-
-  // Seção 4: Informações do atendimento
-  tipoAtendimento: string;
-  sinaisESintomas: string[];
-  dataInicioSintomas: string;
-  observacaoSintomas: string;
-  hipoteseDiagnostica: string[];
-  observacaoHipotese: string;
-  tipoTrauma: string[];
-  observacaoTrauma: string;
-  relacionadoSurto: string;
-  observacaoIncidente: string;
-
-  // Seção 5: Informações da unidade notificadora
-  dataAtendimento: string;
-  unidadeNotificadora: string;
-  nomeNotificador: string;
-  contatoNotificador: string;
-
-  // Seção 6: Encerramento do Caso
-  dataEncerramento: string;
-  tipoEncerramento: string;
-  localEncaminhamento: string;
-
-  // 🆕 NOVA SEÇÃO: Arquivos Anexos
-  arquivos: ArquivoFormulario[];
 }
 
 // Configuração de limites para upload
@@ -180,6 +118,155 @@ export const validateTotalFiles = (arquivos: ArquivoFormulario[], config: Upload
   }
   
   return { valid: true };
+};
+
+// Interface FormData atualizada
+export interface FormData {
+  // Seção 1: Dados Gerais
+  evento: string;
+  publicoAtendido: string;
+
+  // Seção 2: Procedência do indivíduo
+  residenteBelem: string;
+  bairro: string;
+  municipio: string;
+  uf: string;
+  paisProcedencia: string;
+  localHospedagem: string;
+  contatoLocal: string;
+
+  // Seção 3: Identificação do indivíduo
+  paciente: string;
+  pacienteId?: number;
+  nomeMae: string;
+  dataNascimento: string;
+  idade: string;
+  idadeMeses: string; 
+  idadeUnidade: 'anos' | 'meses';
+  cpf: string;
+  identidadeGenero: string;
+  gestante: string;
+  raca: string;
+  escolaridade: string;
+  profissao: string;
+  profissaoSearch?: string;
+  showProfissaoOptions?: boolean;
+  ddi: string;
+  contatoTelefonico: string;
+
+  // Seção 4: Informações do atendimento
+  tipoAtendimento: string;
+  sinaisESintomas: string[];
+  dataInicioSintomas: string;
+  observacaoSintomas: string;
+  hipoteseDiagnostica: string[];
+  observacaoHipotese: string;
+  tipoTrauma: string[];
+  observacaoTrauma: string;
+  relacionadoSurto: string;
+  observacaoIncidente: string;
+
+  // Seção 5: Informações da unidade notificadora
+  dataAtendimento: string;
+  unidadeNotificadora: string;
+  nomeNotificador: string;
+  contatoNotificador: string;
+
+  // Seção 6: Encerramento do Caso
+  dataEncerramento: string;
+  tipoEncerramento: string;
+  localEncaminhamento: string;
+
+  // Seção 7: Arquivos Anexos
+  arquivos: ArquivoFormulario[];
+
+  // 🆕 NOVOS CAMPOS: Timezone automático
+  timezone_name?: string;        // ex: "America/Belem"
+  timezone_offset_minutos?: number; // ex: -180
+
+  // 🆕 NOVOS CAMPOS: Auditoria (só para exibição)
+  created_at?: string;
+  updated_at?: string;
+}
+
+// 🆕 NOVA FUNÇÃO: Detectar timezone do usuário automaticamente
+export const detectUserTimezone = (): { timezone_name: string; timezone_offset_minutos: number } => {
+  try {
+    // Detectar timezone usando Intl API
+    const timezone_name = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
+    // Calcular offset em minutos
+    const now = new Date();
+    const timezone_offset_minutos = -now.getTimezoneOffset(); // Inverter sinal para padrão UTC
+    
+    console.log(`🌍 Timezone detectado: ${timezone_name} (${timezone_offset_minutos} min)`);
+    
+    return {
+      timezone_name,
+      timezone_offset_minutos
+    };
+  } catch (error) {
+    console.error('Erro ao detectar timezone:', error);
+    
+    // Fallback para Belém/Pará (Brasil)
+    return {
+      timezone_name: 'America/Belem',
+      timezone_offset_minutos: -180
+    };
+  }
+};
+
+// 🆕 NOVA FUNÇÃO: Formatar data com timezone para envio
+export const formatDateWithTimezone = (
+  dateString: string, 
+  timezone_name?: string,
+  timezone_offset_minutos?: number
+): string => {
+  if (!dateString) return '';
+  
+  // Se a data já tem timezone (formato ISO completo), manter como está
+  if (dateString.includes('T') && (dateString.includes('+') || dateString.match(/-\d{2}:\d{2}$/))) {
+    return dateString;
+  }
+  
+  try {
+    // Detectar se é só data (YYYY-MM-DD) ou data-hora (YYYY-MM-DD HH:mm:ss)
+    let isoDate: string;
+    
+    if (dateString.includes(' ')) {
+      // Formato: "YYYY-MM-DD HH:mm:ss" -> "YYYY-MM-DDTHH:mm:ss"
+      isoDate = dateString.replace(' ', 'T');
+    } else if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      // Formato: "YYYY-MM-DD" -> "YYYY-MM-DDTHH:mm:ss" (assumindo meio-dia)
+      isoDate = `${dateString}T12:00:00`;
+    } else {
+      // Se já tem T, manter formato
+      isoDate = dateString;
+    }
+    
+    // Adicionar timezone offset se fornecido
+    if (timezone_offset_minutos !== undefined) {
+      const hours = Math.floor(Math.abs(timezone_offset_minutos) / 60);
+      const minutes = Math.abs(timezone_offset_minutos) % 60;
+      const sign = timezone_offset_minutos >= 0 ? '+' : '-';
+      const offset = `${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      
+      const result = `${isoDate}${offset}`;
+      console.log(`📅 Data formatada: ${dateString} -> ${result}`);
+      return result;
+    }
+    
+    // Log do timezone_name para debug
+    if (timezone_name) {
+      console.log(`🌍 Formatando data para timezone: ${timezone_name}`);
+    }
+    
+    return isoDate;
+    
+  } catch (error) {
+    console.error('Erro ao formatar data com timezone:', error);
+    return dateString; // Retornar original em caso de erro
+  }
 };
 
 // Rest of existing interfaces...

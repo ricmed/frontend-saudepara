@@ -75,30 +75,29 @@ const getLabelFromOptions = (
     : value || "";
 };
 
-// Função universal de formatação de datas
+// Função universal de formatação de datas - 🆕 ATUALIZADA com timezone
+import { detectUserTimezone } from '@/features/notificationForms/types/index2';
+
 export const formatarDataUniversal = (dateString?: string | null): string => {
   if (!dateString) return "";
 
-  // Logs para verificar o que está acontecendo
   console.log(`Data original: ${dateString}`);
 
   try {
     const date = new Date(dateString);
     console.log(`Data após criação do objeto Date: ${date.toISOString()}`);
 
-    const offset = date.getTimezoneOffset() * 60000;
-    console.log(`Offset em milissegundos: ${offset}`);
-
-    const adjustedDate = new Date(date.getTime() + offset);
-    console.log(`Data após ajuste: ${adjustedDate.toISOString()}`);
-
-    const result = adjustedDate.toLocaleDateString("pt-BR", {
+    // 🆕 USAR timezone do usuário detectado automaticamente
+    const { timezone_name } = detectUserTimezone();
+    
+    const result = date.toLocaleDateString("pt-BR", {
+      timeZone: timezone_name,
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
     });
 
-    console.log(`Resultado final formatado: ${result}`);
+    console.log(`Resultado final formatado com timezone (${timezone_name}): ${result}`);
     return result;
   } catch (error) {
     console.error("Erro ao formatar data:", error);

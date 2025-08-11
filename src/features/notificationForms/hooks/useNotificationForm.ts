@@ -31,6 +31,8 @@ import {
   validateTotalFiles,
   validateFile,
   DEFAULT_UPLOAD_CONFIG,
+  detectUserTimezone,
+  formatDateWithTimezone,
   EventoOption, 
   PublicoOption, 
   PaisOption, 
@@ -176,6 +178,13 @@ const initialFormData: FormData = {
 
   // 🆕 NOVA SEÇÃO: Arquivos Anexos
   arquivos: [],
+
+  // 🆕 Timezone automático (detectado no carregamento)
+  ...detectUserTimezone(),
+
+  // Campos de auditoria (apenas para exibição)
+  created_at: undefined,
+  updated_at: undefined,
 };
 
 export const useNotificationForm = (isEditMode: boolean = false, id?: string) => {
@@ -1209,6 +1218,21 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     }
   }, [navigate, loadMunicipiosByEstado]);
 
+  // 🆕 NOVA FUNÇÃO: Adicionar timezone ao FormData
+  const addTimezoneToFormData = useCallback((data: FormData): FormData => {
+    // Se não tiver timezone definido, detectar automaticamente
+    if (!data.timezone_name || !data.timezone_offset_minutos) {
+      const timezone = detectUserTimezone();
+      return {
+        ...data,
+        timezone_name: timezone.timezone_name,
+        timezone_offset_minutos: timezone.timezone_offset_minutos
+      };
+    }
+    
+    return data;
+  }, []);
+
   // ✅ FUNÇÃO MODIFICADA PARA SUBMETER O FORMULÁRIO (COM SISTEMA OFFLINE)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1433,6 +1457,9 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         arquivos: arquivos, // Mantém o array de arquivos original, com IDs em minúsculas
         // ✅ NOVO: Envia a lista de IDs para exclusão
         arquivos_para_excluir: arquivosParaExcluir,
+        // 🆕 GARANTIR que timezone seja sempre enviado
+        timezone_name: formData.timezone_name || detectUserTimezone().timezone_name,
+        timezone_offset_minutos: formData.timezone_offset_minutos ?? detectUserTimezone().timezone_offset_minutos,
       };
 
       console.log("✅ Dados preparados para backend (arquivos preservados):", {
@@ -2178,6 +2205,17 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     }
   };
 
+  // 🆕 NOVA FUNÇÃO: Obter informações do timezone
+  const getTimezoneInfo = useCallback(() => {
+    return {
+      timezone_name: formData.timezone_name || detectUserTimezone().timezone_name,
+      timezone_offset_minutos: formData.timezone_offset_minutos ?? detectUserTimezone().timezone_offset_minutos,
+      timezone_display: formData.timezone_name ? 
+        `${formData.timezone_name} (UTC${formData.timezone_offset_minutos! >= 0 ? '+' : ''}${Math.floor(formData.timezone_offset_minutos! / 60)}:${Math.abs(formData.timezone_offset_minutos! % 60).toString().padStart(2, '0')})` :
+        'Detectando...'
+    };
+  }, [formData.timezone_name, formData.timezone_offset_minutos]);
+
   return {
     formData,
     setFormData,
@@ -2274,6 +2312,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     checkCpfOfflineSafe,
 
     // CPF original para validação de duplicatas
-    originalCpf
+    originalCpf,
+
+    // 🆕 NOVOS RETORNOS para timezone:
+    getTimezoneInfo,
+    detectUserTimezone,
   };
 };

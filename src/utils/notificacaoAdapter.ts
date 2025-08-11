@@ -6,7 +6,7 @@ interface NotificacaoGenerica {
 }
 
 // Interface para os dados do formulário frontend
-import { type FormData, ArquivoFormulario } from '@/features/notificationForms/types/index2';
+import { type FormData, ArquivoFormulario, detectUserTimezone, formatDateWithTimezone } from '@/features/notificationForms/types/index2';
 import axios from "axios";
 // import indexedDBService from '@/services/indexedDB'; // COMENTADO - SERÁ USADO NO FUTURO
 // import syncService from '@/services/syncService';     // COMENTADO - SERÁ USADO NO FUTURO
@@ -44,10 +44,32 @@ const processarData = (dateString: string | null | undefined): string => {
   return dateString.split("T")[0];
 };
 
-// Função para converter datas locais para UTC
-const processarDataParaUTC = (dateString: string | null | undefined): string => {
+// 🆕 NOVA FUNÇÃO: Processar data com timezone para envio ao backend
+const processarDataParaUTC = (
+  dateString: string | null | undefined, 
+  timezone_name?: string, 
+  timezone_offset_minutos?: number
+): string => {
   if (!dateString) return "";
-  // Mantém apenas a parte da data, sem conversão
+  
+  // Se temos informações de timezone, processar data com timezone
+  if (timezone_name || timezone_offset_minutos !== undefined) {
+    const resultado = formatDateWithTimezone(dateString, timezone_name, timezone_offset_minutos);
+    console.log(`🔄 processarDataParaUTC: ${dateString} -> ${resultado}`);
+    return resultado;
+  }
+  
+  // Se não tem timezone, mas a data está em formato simples (YYYY-MM-DD), 
+  // tentar detectar timezone automaticamente
+  if (dateString.match(/^\d{4}-\d{2}-\d{2}$/) || dateString.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)) {
+    const timezoneInfo = detectUserTimezone();
+    const resultado = formatDateWithTimezone(dateString, timezoneInfo.timezone_name, timezoneInfo.timezone_offset_minutos);
+    console.log(`🔄 processarDataParaUTC (timezone detectado): ${dateString} -> ${resultado}`);
+    return resultado;
+  }
+  
+  // Fallback: se já está em formato ISO, retornar como está
+  console.log(`🔄 processarDataParaUTC (sem alteração): ${dateString}`);
   return dateString;
 };
 
@@ -227,7 +249,16 @@ export const formatFromBackend = async (
     localEncaminhamento,
     
     // 🆕 NOVA SEÇÃO 7: Arquivos Anexos
-    arquivos: arquivos
+    arquivos: arquivos,
+
+    // 🆕 CAMPOS DE TIMEZONE (se existirem no backend)
+    timezone_name: backendData.timezone_name || undefined,
+    timezone_offset_minutos: backendData.timezone_offset_minutos !== undefined ? 
+      backendData.timezone_offset_minutos : undefined,
+
+    // 🆕 CAMPOS DE AUDITORIA (se existirem no backend)
+    created_at: backendData.created_at || undefined,
+    updated_at: backendData.updated_at || undefined,
   };
   
   console.log("FormData processado:", {
@@ -451,7 +482,11 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
     local_hospedagem: trimmedData.localHospedagem || "", 
     contato_local_hospedagem: trimmedData.contatoLocal || "",
     ...(trimmedData.dataInicioSintomas && {
-      data_inicio_sintomas: processarDataParaUTC(trimmedData.dataInicioSintomas),
+      data_inicio_sintomas: processarDataParaUTC(
+        trimmedData.dataInicioSintomas,
+        trimmedData.timezone_name,
+        trimmedData.timezone_offset_minutos
+      ),
     }),
     ...(trimmedData.observacaoSintomas && {
       observacao_sintomas: trimmedData.observacaoSintomas || "",
@@ -473,7 +508,11 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
       observavao_incidente: trimmedData.observacaoIncidente || "",
     }),
     ...(trimmedData.dataAtendimento && {
-      data_atendimento: processarDataParaUTC(trimmedData.dataAtendimento),
+      data_atendimento: processarDataParaUTC(
+        trimmedData.dataAtendimento,
+        trimmedData.timezone_name,
+        trimmedData.timezone_offset_minutos
+      ),
     }),
     ...(trimmedData.nomeNotificador && {
       nome_notificador: trimmedData.nomeNotificador,
@@ -482,7 +521,11 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
       contato_notificador: trimmedData.contatoNotificador.substring(0, 15)
     }),
     ...(trimmedData.dataEncerramento && {
-      data_encerramento: processarDataParaUTC(trimmedData.dataEncerramento),
+      data_encerramento: processarDataParaUTC(
+        trimmedData.dataEncerramento,
+        trimmedData.timezone_name,
+        trimmedData.timezone_offset_minutos
+      ),
     }),
     
     // CORREÇÃO: Usar o nome de campo correto conforme esperado pelo backend
