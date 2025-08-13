@@ -875,29 +875,53 @@ const FormularioPaciente = ({
       ? normalizeText(formData.nome_mae)
       : null;
 
+    // Determinar se há data de nascimento
+    const hasDateOfBirth = formData.data_nascimento && formData.data_nascimento.trim() !== '';
+    
     const result: any = {
       nome: nome,
       nome_mae: nome_mae,
-      data_nascimento: (!formData.data_nascimento || formData.data_nascimento.trim() === '')
-        ? null 
-        : formData.data_nascimento,
+      data_nascimento: hasDateOfBirth ? formData.data_nascimento : null,
       cpf: formData.cpf || null,
       tipo_genero_idtipo_genero: formData.tipo_genero_idtipo_genero as number,
       gestante: formData.gestante || null,
       tipo_raca_idtipo_raca: formData.tipo_raca_idtipo_raca as number,
       ddi: formData.ddi,
       contato: formData.contato || null,
-      ...((!formData.data_nascimento || formData.data_nascimento.trim() === '') && formData.idadeMeses ? { idade: parseInt(formData.idadeMeses) } : {}),
-
-      escolaridade_idescolaridade:
-        formData.escolaridade_idescolaridade === ""
-          ? null
-          : formData.escolaridade_idescolaridade
-            ? Number(formData.escolaridade_idescolaridade)
-            : null,
-
-      cbo_idcbo: !formData.cbo_idcbo ? null : Number(formData.cbo_idcbo),
     };
+
+    // ✅ CORREÇÃO: Lógica de idade adequada
+    console.log("🔍 DEBUG - hasDateOfBirth:", hasDateOfBirth);
+    console.log("🔍 DEBUG - formData.data_nascimento:", formData.data_nascimento);
+    console.log("🔍 DEBUG - formData.idadeUnidade:", formData.idadeUnidade);
+    console.log("🔍 DEBUG - formData.idade:", formData.idade);
+    console.log("🔍 DEBUG - formData.idadeMeses:", formData.idadeMeses);
+    
+    if (!hasDateOfBirth) {
+      // Se não há data de nascimento, precisamos enviar a idade
+      if (formData.idadeUnidade === 'anos' && formData.idade) {
+        // Se idade foi digitada em anos, converter para meses para o backend
+        const ageInYears = parseInt(formData.idade);
+        result.idade = ageInYears * 12; // Backend espera idade total em meses
+        console.log(`🔢 Idade convertida: ${ageInYears} anos = ${result.idade} meses para o backend`);
+      } else if (formData.idadeUnidade === 'meses' && formData.idadeMeses) {
+        // Se idade foi digitada em meses, usar diretamente
+        result.idade = parseInt(formData.idadeMeses);
+        console.log(`🔢 Idade em meses: ${result.idade} meses para o backend`);
+      }
+    } else {
+      console.log("🔍 DEBUG - Pulando idade pois há data de nascimento");
+    }
+    // Se há data de nascimento, não enviamos idade - backend calculará
+
+    // Adicionar outros campos
+    result.escolaridade_idescolaridade = formData.escolaridade_idescolaridade === ""
+      ? null
+      : formData.escolaridade_idescolaridade
+        ? Number(formData.escolaridade_idescolaridade)
+        : null;
+
+    result.cbo_idcbo = !formData.cbo_idcbo ? null : Number(formData.cbo_idcbo);
 
     console.log("Payload final:", JSON.stringify(result, null, 2));
     return result;
