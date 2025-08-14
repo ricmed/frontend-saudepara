@@ -7,6 +7,7 @@ interface NotificacaoGenerica {
 
 // Interface para os dados do formulário frontend
 import { type FormData, ArquivoFormulario, detectUserTimezone, formatDateWithTimezone } from '@/features/notificationForms/types/index2';
+import { formatLocalDateForBackend } from './timezoneHelper';
 import axios from "axios";
 // import indexedDBService from '@/services/indexedDB'; // COMENTADO - SERÁ USADO NO FUTURO
 // import syncService from '@/services/syncService';     // COMENTADO - SERÁ USADO NO FUTURO
@@ -44,7 +45,7 @@ const processarData = (dateString: string | null | undefined): string => {
   return dateString.split("T")[0];
 };
 
-// 🆕 NOVA FUNÇÃO: Processar data com timezone para envio ao backend
+// 🆕 FUNÇÃO OTIMIZADA: Processar data com timezone para envio ao backend
 const processarDataParaUTC = (
   dateString: string | null | undefined, 
   timezone_name?: string, 
@@ -52,25 +53,33 @@ const processarDataParaUTC = (
 ): string => {
   if (!dateString) return "";
   
-  // Se temos informações de timezone, processar data com timezone
-  if (timezone_name || timezone_offset_minutos !== undefined) {
-    const resultado = formatDateWithTimezone(dateString, timezone_name, timezone_offset_minutos);
+  try {
+    // Usar a função helper otimizada
+    const resultado = formatLocalDateForBackend(dateString, timezone_name, timezone_offset_minutos);
     console.log(`🔄 processarDataParaUTC: ${dateString} -> ${resultado}`);
     return resultado;
+  } catch (error) {
+    console.error('Erro ao processar data para UTC:', error);
+    
+    // Fallback para a função anterior em caso de erro
+    if (timezone_name || timezone_offset_minutos !== undefined) {
+      const resultado = formatDateWithTimezone(dateString, timezone_name, timezone_offset_minutos);
+      console.log(`🔄 processarDataParaUTC (fallback): ${dateString} -> ${resultado}`);
+      return resultado;
+    }
+    
+    // Se não tem timezone, tentar detectar automaticamente
+    if (dateString.match(/^\d{4}-\d{2}-\d{2}$/) || dateString.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)) {
+      const timezoneInfo = detectUserTimezone();
+      const resultado = formatDateWithTimezone(dateString, timezoneInfo.timezone_name, timezoneInfo.timezone_offset_minutos);
+      console.log(`🔄 processarDataParaUTC (auto-detect): ${dateString} -> ${resultado}`);
+      return resultado;
+    }
+    
+    // Fallback final: retornar como está
+    console.log(`🔄 processarDataParaUTC (sem alteração): ${dateString}`);
+    return dateString;
   }
-  
-  // Se não tem timezone, mas a data está em formato simples (YYYY-MM-DD), 
-  // tentar detectar timezone automaticamente
-  if (dateString.match(/^\d{4}-\d{2}-\d{2}$/) || dateString.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)) {
-    const timezoneInfo = detectUserTimezone();
-    const resultado = formatDateWithTimezone(dateString, timezoneInfo.timezone_name, timezoneInfo.timezone_offset_minutos);
-    console.log(`🔄 processarDataParaUTC (timezone detectado): ${dateString} -> ${resultado}`);
-    return resultado;
-  }
-  
-  // Fallback: se já está em formato ISO, retornar como está
-  console.log(`🔄 processarDataParaUTC (sem alteração): ${dateString}`);
-  return dateString;
 };
 
 /**

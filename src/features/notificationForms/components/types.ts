@@ -51,6 +51,10 @@ export interface FormData {
     dataEncerramento: string;
     tipoEncerramento: string;
     localEncaminhamento: string;
+
+    // Seção 7: Campos de Auditoria (opcionais)
+    created_at?: string;
+    updated_at?: string;
   }
   
   // Option item type for dropdowns

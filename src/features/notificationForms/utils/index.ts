@@ -46,6 +46,8 @@ export const adjustDatesForExport = (data: any[]): any[] => {
       'data_encerramento',
       'data_inicio_sintomas',
       'data_nascimento',
+      'created_at',
+      'updated_at',
     ];
     
     dateFields.forEach(field => {

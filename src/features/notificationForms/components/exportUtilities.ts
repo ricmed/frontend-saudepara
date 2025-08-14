@@ -1,7 +1,6 @@
 import { FormData } from "@/features/notificationForms/components/types";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
-import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
 import { PDFDocument } from "pdf-lib";
 
@@ -106,21 +105,40 @@ export const formatarDataUniversal = (dateString?: string | null): string => {
 };
 
 // Função para calcular idade a partir da data de nascimento
+// 🆕 Atualizada para mostrar em meses/anos conforme especificação
 const calculateAge = (dateString: string): string => {
   try {
     const birthDate = new Date(dateString);
     const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-
-    if (
-      monthDiff < 0 ||
-      (monthDiff === 0 && today.getDate() < birthDate.getDate())
-    ) {
-      age--;
+    
+    // Calcular diferença em meses
+    let totalMonths = (today.getFullYear() - birthDate.getFullYear()) * 12;
+    totalMonths += today.getMonth() - birthDate.getMonth();
+    
+    // Ajustar se o dia ainda não chegou no mês atual
+    if (today.getDate() < birthDate.getDate()) {
+      totalMonths--;
     }
-
-    return age.toString();
+    
+    // Garantir que não seja negativo
+    if (totalMonths < 0) {
+      totalMonths = 0;
+    }
+    
+    // Aplicar as regras de formatação
+    if (totalMonths === 1) {
+      return "1 mês";
+    } else if (totalMonths >= 2 && totalMonths <= 11) {
+      return `${totalMonths} meses`;
+    } else if (totalMonths >= 12 && totalMonths < 24) {
+      return "1 ano";
+    } else if (totalMonths >= 24) {
+      const years = Math.floor(totalMonths / 12);
+      return years === 1 ? "1 ano" : `${years} anos`;
+    } else {
+      // Menos de 1 mês
+      return "0 meses";
+    }
   } catch (error) {
     console.error("Erro ao calcular idade:", error);
     return "";
@@ -207,141 +225,6 @@ const extractPhoneComponents = (
   // Sem detecção, retornar sem DDI
   console.log(`[EXPORT DEBUG] Impossível determinar DDI, retornando apenas número: ${phoneNumber}`);
   return { ddi: "", number: phoneNumber };
-};
-
-// Manter a função anterior para compatibilidade com código existente
-const processPhoneNumber = (phoneNumber: string | undefined): string => {
-  if (!phoneNumber) return "";
-
-  console.log(
-    "[EXPORT] Processando número telefônico para exportação:",
-    phoneNumber
-  );
-
-  // Se já contém o sinal de +, significa que o DDI foi preservado corretamente
-  // Neste caso, simplesmente retornamos o número como está
-  if (phoneNumber.includes("+")) {
-    console.log(
-      "[EXPORT] Número já tem formato completo com DDI:",
-      phoneNumber
-    );
-    return phoneNumber;
-  }
-
-  // Se não tem o +, mas tem espaço, pode ser que o + tenha sido removido
-  // Alguns sistemas ou processamentos podem remover o + mas manter o formato
-  if (phoneNumber.includes(" ")) {
-    const parts = phoneNumber.split(" ");
-    const possibleDDI = parts[0];
-    // Verificar se parece um DDI (normalmente 1-3 dígitos)
-    if (/^\d{1,3}$/.test(possibleDDI)) {
-      const fixedFormat = `+${possibleDDI} ${parts.slice(1).join(" ")}`;
-      console.log("[EXPORT] Corrigindo formato adicionando +:", fixedFormat);
-      return fixedFormat;
-    }
-  }
-
-  // Último recurso: verificar se é um número brasileiro pelo DDD e tamanho
-  const numericPhone = phoneNumber.replace(/\D/g, "");
-
-  // Lista de DDDs válidos no Brasil
-  const validDDDs = [
-    "11",
-    "12",
-    "13",
-    "14",
-    "15",
-    "16",
-    "17",
-    "18",
-    "19",
-    "21",
-    "22",
-    "24",
-    "27",
-    "28",
-    "31",
-    "32",
-    "33",
-    "34",
-    "35",
-    "37",
-    "38",
-    "41",
-    "42",
-    "43",
-    "44",
-    "45",
-    "46",
-    "47",
-    "48",
-    "49",
-    "51",
-    "53",
-    "54",
-    "55",
-    "61",
-    "62",
-    "63",
-    "64",
-    "65",
-    "66",
-    "67",
-    "68",
-    "69",
-    "71",
-    "73",
-    "74",
-    "75",
-    "77",
-    "79",
-    "81",
-    "82",
-    "83",
-    "84",
-    "85",
-    "86",
-    "87",
-    "88",
-    "89",
-    "91",
-    "92",
-    "93",
-    "94",
-    "95",
-    "96",
-    "97",
-    "98",
-    "99",
-  ];
-
-  // Verificar se o formato parece um número brasileiro (DDD válido + 8-9 dígitos)
-  if (numericPhone.length >= 10 && numericPhone.length <= 11) {
-    const possibleDDD = numericPhone.substring(0, 2);
-
-    if (validDDDs.includes(possibleDDD)) {
-      // Verificar o padrão completo para ter mais certeza de que é brasileiro
-      // Celular: DDD + 9 dígitos
-      // Fixo: DDD + 8 dígitos
-      const nationalPart = numericPhone.substring(2);
-      if (
-        (nationalPart.length === 9 && nationalPart.startsWith("9")) ||
-        nationalPart.length === 8
-      ) {
-        const formattedNumber = `+55 ${numericPhone}`;
-        console.log(
-          "[EXPORT] Identificado como telefone brasileiro, adicionando +55:",
-          formattedNumber
-        );
-        return formattedNumber;
-      }
-    }
-  }
-
-  // Se não conseguimos determinar um formato específico,
-  // retornar o número conforme fornecido
-  console.log("[EXPORT] Mantendo formato original:", phoneNumber);
-  return phoneNumber;
 };
 
 // ===================================================================
@@ -598,7 +481,29 @@ const prepareDataForExport = (
 
   // 1. Calcular idade a partir da data de nascimento
   const getAge = (): string => {
-    if (formData.idade) return formData.idade;
+    // Se já tem a idade informada
+    if (formData.idade) {
+      // Verificar se é um número (sempre em meses)
+      const idadeNum = typeof formData.idade === 'string' ? parseInt(formData.idade) : formData.idade;
+      if (!isNaN(idadeNum)) {
+        // Lógica: 0-11 são meses literais, 12+ são meses convertidos para anos
+        if (idadeNum === 0) {
+          return "0 meses";
+        } else if (idadeNum === 1) {
+          return "1 mês";
+        } else if (idadeNum >= 2 && idadeNum <= 11) {
+          return `${idadeNum} meses`;
+        } else if (idadeNum >= 12 && idadeNum < 24) {
+          return "1 ano";
+        } else if (idadeNum >= 24) {
+          const years = Math.floor(idadeNum / 12);
+          return years === 1 ? "1 ano" : `${years} anos`;
+        }
+      } else {
+        // Se não for numérico, retornar como está
+        return formData.idade;
+      }
+    }
 
     if (formData.dataNascimento) {
       return calculateAge(formData.dataNascimento);
@@ -914,6 +819,10 @@ const prepareDataForExport = (
     "Data de Encerramento": formatarDataUniversal(formData.dataEncerramento),
     "Tipo de Encerramento": getTipoEncerramentoLabel(formData.tipoEncerramento),
     "Local de Encaminhamento": getLocalEncaminhamentoText(),
+
+    // Seção 7: Campos de Auditoria
+    "Data de Criação": formatarDataUniversal(formData.created_at),
+    "Data de Atualização": formatarDataUniversal(formData.updated_at),
   };
 };
 
@@ -1163,6 +1072,13 @@ export const exportToPDF = (
           "Local de Encaminhamento",
         ],
       },
+      {
+        title: "7. Campos de Auditoria",
+        fields: [
+          "Data de Criação",
+          "Data de Atualização",
+        ],
+      },
     ];
 
     // Processar cada seção
@@ -1260,28 +1176,29 @@ const formatNotificacaoForExport = (
 
   // 1. Função para calcular idade
   const getAge = (): string => {
+    // Se já tem a idade calculada, priorizar ela
     if (paciente.idade !== undefined && paciente.idade !== null) {
-      return paciente.idade.toString();
+      // Verificar se é um número (sempre em meses)
+      const idadeNum = typeof paciente.idade === 'string' ? parseInt(paciente.idade) : paciente.idade;
+      if (!isNaN(idadeNum)) {
+        // Lógica: 0-11 são meses literais, 12+ são meses convertidos para anos
+        if (idadeNum === 0) {
+          return "0 meses";
+        } else if (idadeNum === 1) {
+          return "1 mês";
+        } else if (idadeNum >= 2 && idadeNum <= 11) {
+          return `${idadeNum} meses`;
+        } else if (idadeNum >= 12 && idadeNum < 24) {
+          return "1 ano";
+        } else if (idadeNum >= 24) {
+          const years = Math.floor(idadeNum / 12);
+          return years === 1 ? "1 ano" : `${years} anos`;
+        }
+      }
     }
 
     if (paciente.data_nascimento) {
-      try {
-        const birthDate = new Date(paciente.data_nascimento);
-        const today = new Date();
-        let age = today.getFullYear() - birthDate.getFullYear();
-        const monthDiff = today.getMonth() - birthDate.getMonth();
-
-        if (
-          monthDiff < 0 ||
-          (monthDiff === 0 && today.getDate() < birthDate.getDate())
-        ) {
-          age--;
-        }
-
-        return age.toString();
-      } catch (error) {
-        console.error("Erro ao calcular idade:", error);
-      }
+      return calculateAge(paciente.data_nascimento);
     }
 
     return "";
@@ -1623,6 +1540,10 @@ const formatNotificacaoForExport = (
       "idtipo_encerramento"
     ),
     "Local de Encaminhamento": getLocalEncaminhamentoText(), // Usando a função aprimorada
+
+    // Campos de Auditoria
+    "Data de Criação": formatarDataUniversal(original.created_at),
+    "Data de Atualização": formatarDataUniversal(original.updated_at),
   };
 };
 
@@ -1887,7 +1808,7 @@ export const exportListToPDF = (
         6: { cellWidth: 25 }, // Tipo de Encerramento
         7: { cellWidth: 40 }, // Unidade Notificadora
       },
-      didDrawPage: (data) => {
+      didDrawPage: (_data) => {
         // Adicionar rodapé à página da tabela
         addFooter(tabelaDoc, 1, 1 + notificacoes.length); // 1 página de tabela + N páginas de fichas
       },
@@ -2073,16 +1994,16 @@ export const exportListToPDF = (
 
           // Adicionar a página da tabela (em paisagem)
           const tabelaPdfOutput = tabelaDoc.output("arraybuffer");
-          const tabelaPdfBlob = new Blob([tabelaPdfOutput], {
-            type: "application/pdf",
-          });
-          const tabelaPdfUrl = URL.createObjectURL(tabelaPdfBlob);
+          const tabelaPdfBuffer = new ArrayBuffer(tabelaPdfOutput.byteLength);
+          const tabelaPdfUint8 = new Uint8Array(tabelaPdfBuffer);
+          tabelaPdfUint8.set(new Uint8Array(tabelaPdfOutput));
+          // Blob não é utilizado neste contexto
           combinedDoc.addPage("landscape");
           combinedDoc.setPage(1);
           combinedDoc.addFileToVFS("tabela.pdf", tabelaPdfOutput.toString());
 
           // Adicionar as páginas das fichas (em retrato)
-          const fichasPdfOutput = fichasDoc.output("arraybuffer");
+          // fichasPdfOutput não é utilizado neste contexto
 
           // Para cada página em fichasDoc
           const fichasPagesCount = fichasDoc.getNumberOfPages();
@@ -2145,7 +2066,10 @@ export const exportListToPDF = (
       const mergedBytes = await mergedPdf.save();
 
       // Criar um blob e fazer o download
-      const blob = new Blob([mergedBytes], { type: "application/pdf" });
+      const arrayBuffer = new ArrayBuffer(mergedBytes.byteLength);
+      const uint8Array = new Uint8Array(arrayBuffer);
+      uint8Array.set(new Uint8Array(mergedBytes));
+      const blob = new Blob([arrayBuffer], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
 
       const link = document.createElement("a");
