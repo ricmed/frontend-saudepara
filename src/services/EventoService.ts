@@ -7,8 +7,33 @@ const API_URL = `${server}:${port}/api/tipo-evento`;
 interface TipoEvento {
   idtipo_evento: number;
   descricao: string;
-  ativo: string;  // 🆕 CAMPO ADICIONADO
+  ativo: string;
+  created_at?: string;
+  updated_at?: string;
+  // 🆕 NOVA ESTRUTURA: Abrangência com relacionamento N:N
+  abrangencia?: Array<{
+    municipio: {
+      idtipo_municipio: number;
+      descricao: string;
+    };
+  }>;
 }
+
+// 🆕 TIPOS: Para criação/atualização com array de IDs de municípios
+export interface TipoEventoCreate {
+  descricao: string;
+  ativo?: string;
+  municipios_ids: number[]; // Array de IDs dos municípios da abrangência
+}
+
+export interface TipoEventoUpdate {
+  descricao?: string;
+  ativo?: string;
+  municipios_ids?: number[]; // Opcional na atualização
+}
+
+// 🆕 TIPO: Para exportar o TipoEvento também
+export type { TipoEvento };
 
 interface PaginatedResponse {
   data: TipoEvento[];
@@ -97,33 +122,43 @@ export const TiposEventoService = {
     }
   },
 
-  // 🔄 MÉTODO ATUALIZADO - Incluir campo ativo
-  create: async (descricao: string, ativo: string = 'S'): Promise<TipoEvento> => {
+  // 🔄 MÉTODO ATUALIZADO - Incluir abrangência de municípios
+  create: async (data: TipoEventoCreate): Promise<TipoEvento> => {
     try {
-      const response = await axios.post<TipoEvento>(API_URL, { 
-        descricao: descricao.trim(),
-        ativo  // 🆕 CAMPO ADICIONADO
-      });
+      const response = await axios.post<TipoEvento>(API_URL, data);
       return response.data;
     } catch (error) {
       return handleApiError(error as AxiosError<APIError>);
     }
   },
 
-  // 🔄 MÉTODO ATUALIZADO - Incluir campo ativo
-  update: async (id: number, descricao: string, ativo?: string): Promise<void> => {
+  // 🔄 MÉTODO ATUALIZADO - Incluir abrangência de municípios  
+  update: async (id: number, data: TipoEventoUpdate): Promise<void> => {
     try {
       if (isNaN(id) || id <= 0) throw new Error('ID inválido');
-      
-      const data: any = { descricao: descricao.trim() };
-      if (ativo !== undefined) {
-        data.ativo = ativo;  // 🆕 CAMPO ADICIONADO
-      }
       
       await axios.put(`${API_URL}/${id}`, data);
     } catch (error) {
       return handleApiError(error as AxiosError<APIError>);
     }
+  },
+
+  // 🆕 MÉTODO UTILITÁRIO: Criar evento com dados básicos (compatibilidade)
+  createSimple: async (descricao: string, ativo: string = 'S', municipios_ids: number[] = []): Promise<TipoEvento> => {
+    return await TiposEventoService.create({
+      descricao: descricao.trim(),
+      ativo,
+      municipios_ids
+    });
+  },
+
+  // 🆕 MÉTODO UTILITÁRIO: Atualizar evento com dados básicos (compatibilidade) 
+  updateSimple: async (id: number, descricao: string, ativo?: string, municipios_ids?: number[]): Promise<void> => {
+    const data: TipoEventoUpdate = { descricao: descricao.trim() };
+    if (ativo !== undefined) data.ativo = ativo;
+    if (municipios_ids !== undefined) data.municipios_ids = municipios_ids;
+    
+    return await TiposEventoService.update(id, data);
   },
 
   // 🆕 NOVO MÉTODO - Toggle ativo/inativo

@@ -1,16 +1,11 @@
 import { useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Pencil, Trash, MapPin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEventos, useDeleteEvento, useToggleEventoAtivo } from "../hooks/useEvento";
+import { TipoEvento } from "@/services/EventoService";
 import SideBarMenuAppsAuxiliares from "../../apps/components/SideBarMenuAppsAuxiliares";
-import { ListHeader, DataTable, ActionButtons } from "@/features/apps/list/shared";
+import { ListHeader, DataTable } from "@/features/apps/list/shared";
 import Paginacao from "./paginacao";
-
-interface TipoEvento {
-  idtipo_evento: number;
-  descricao: string;
-  ativo: string;
-}
 
 const ListaTiposEvento = () => {
   const navigate = useNavigate();
@@ -19,6 +14,7 @@ const ListaTiposEvento = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'S' | 'N'>('all');
+  const [showAbrangencia, setShowAbrangencia] = useState<number | null>(null);
   const itemsPerPage = 10;
 
   const { data: eventosData, isLoading, error } = useEventos(currentPage, itemsPerPage, searchTerm);

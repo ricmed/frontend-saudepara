@@ -1,16 +1,11 @@
 import { useState } from "react";
-import { Eye, EyeOff, Pencil, Trash } from "lucide-react";
+import { Eye, EyeOff, Pencil, Trash, MapPin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEventos, useDeleteEvento, useToggleEventoAtivo } from "../hooks/useEvento";
+import { TipoEvento } from "@/services/EventoService";
 import SideBarMenuAppsAuxiliares from "../../apps/components/SideBarMenuAppsAuxiliares";
 import { ListHeader, DataTable } from "@/features/apps/list/shared";
 import Paginacao from "./paginacao";
-
-interface TipoEvento {
-  idtipo_evento: number;
-  descricao: string;
-  ativo: string;
-}
 
 const ListaTiposEvento = () => {
   const navigate = useNavigate();
@@ -19,6 +14,7 @@ const ListaTiposEvento = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'S' | 'N'>('all');
+  const [showAbrangencia, setShowAbrangencia] = useState<number | null>(null);
   const itemsPerPage = 10;
 
   const { data: eventosData, isLoading, error } = useEventos(currentPage, itemsPerPage, searchTerm);
@@ -66,6 +62,10 @@ const ListaTiposEvento = () => {
     }
   };
 
+  const handleToggleAbrangencia = (eventoId: number) => {
+    setShowAbrangencia(current => current === eventoId ? null : eventoId);
+  };
+
   const tableColumns = [
     { header: "Descrição", accessor: "descricao" as keyof TipoEvento },
     { 
@@ -77,9 +77,32 @@ const ListaTiposEvento = () => {
             ? 'bg-green-100 text-green-800' 
             : 'bg-red-100 text-red-800'
         }`}>
-          {value === 'S' ? 'Sim' : 'Não'}
+          {value === 'S' ? 'Ativo' : 'Inativo'}
         </span>
       )
+    },
+    {
+      header: "Abrangência",
+      accessor: "abrangencia" as keyof TipoEvento,
+      render: (value: TipoEvento['abrangencia'], evento: TipoEvento) => {
+        const quantidade = value?.length || 0;
+        return (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">
+              {quantidade} município{quantidade !== 1 ? 's' : ''}
+            </span>
+            {quantidade > 0 && (
+              <button
+                onClick={() => handleToggleAbrangencia(evento.idtipo_evento)}
+                className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                title="Ver municípios"
+              >
+                <MapPin size={14} />
+              </button>
+            )}
+          </div>
+        );
+      }
     },
   ];
 
@@ -164,7 +187,7 @@ const ListaTiposEvento = () => {
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
-            Sim
+            Ativos
           </button>
           <button
             onClick={() => setStatusFilter('N')}
@@ -174,7 +197,7 @@ const ListaTiposEvento = () => {
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
-            Não
+            Inativos
           </button>
         </div>
 
@@ -200,6 +223,68 @@ const ListaTiposEvento = () => {
               onPageChange={setCurrentPage}
               isProcessing={isLoading}
             />
+          </div>
+        )}
+
+        {/* Modal para mostrar municípios */}
+        {showAbrangencia && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden">
+              <div className="flex items-center justify-between p-6 border-b">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <MapPin size={20} />
+                  Municípios da Abrangência
+                </h3>
+                <button
+                  onClick={() => setShowAbrangencia(null)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="p-6 overflow-y-auto max-h-96">
+                {(() => {
+                  const evento = eventos.find(e => e.idtipo_evento === showAbrangencia);
+                  if (!evento || !evento.abrangencia || evento.abrangencia.length === 0) {
+                    return (
+                      <p className="text-gray-500 text-center py-8">
+                        Nenhum município configurado para este evento.
+                      </p>
+                    );
+                  }
+                  
+                  return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {evento.abrangencia.map((ab) => (
+                        <div
+                          key={ab.municipio.idtipo_municipio}
+                          className="bg-gray-50 px-4 py-3 rounded-lg border text-sm"
+                        >
+                          <div className="font-medium text-gray-900">
+                            {ab.municipio.descricao}
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            ID: {ab.municipio.idtipo_municipio}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+              
+              <div className="flex justify-end p-6 border-t bg-gray-50">
+                <button
+                  onClick={() => setShowAbrangencia(null)}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
