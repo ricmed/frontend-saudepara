@@ -558,6 +558,32 @@ export class IndexedDBService {
     return null;
   }
 
+  // 🆕 FUNÇÃO: Obter eventos ativos com filtro de município (se necessário)
+  async getEventosAtivos(municipioId?: number): Promise<any[]> {
+    await this.init();
+    const eventos = await this.getOpcoes('eventos') || [];
+    
+    // Filtrar apenas eventos ativos
+    let eventosAtivos = eventos.filter((evento: any) => {
+      return evento.ativo === undefined || evento.ativo === 'S' || evento.ativo === '1' || evento.ativo === true;
+    });
+    
+    // Se foi passado um municipioId, filtrar pela abrangência
+    if (municipioId) {
+      eventosAtivos = eventosAtivos.filter((evento: any) => {
+        if (!evento.abrangencia || !Array.isArray(evento.abrangencia)) {
+          return true; // Se não tem abrangência definida, considera disponível para todos
+        }
+        
+        return evento.abrangencia.some((abr: any) => 
+          abr.municipio?.idtipo_municipio === municipioId
+        );
+      });
+    }
+    
+    return eventosAtivos;
+  }
+
   async cleanup(): Promise<void> {
     await this.init();
     

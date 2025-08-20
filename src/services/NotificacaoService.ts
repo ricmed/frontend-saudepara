@@ -15,6 +15,15 @@ export interface BaseOption {
 export interface EventoOption extends BaseOption {
   idtipo_evento: number;
   ativo?: string; // 🆕 CAMPO ADICIONADO para compatibilidade
+  created_at?: string;
+  updated_at?: string;
+  // 🆕 NOVA ESTRUTURA: Abrangência com relacionamento N:N
+  abrangencia?: Array<{
+    municipio: {
+      idtipo_municipio: number;
+      descricao: string;
+    };
+  }>;
 }
 
 export interface PublicoOption extends BaseOption {

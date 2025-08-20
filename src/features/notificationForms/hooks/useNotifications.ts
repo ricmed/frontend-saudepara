@@ -31,7 +31,13 @@ export const useNotifications = () => {
     try {
       // Buscar lista de eventos ativos do cache
       const eventosAtivos = await indexedDBService.getOpcoes('eventos') || [];
-      const idsEventosAtivos = new Set(eventosAtivos.map((evento: any) => evento.idtipo_evento));
+      
+      // 🔄 ATUALIZADO: Considerar também o campo `ativo` se presente
+      const eventosAtivosFiltrados = eventosAtivos.filter((evento: any) => {
+        return evento.ativo === undefined || evento.ativo === 'S' || evento.ativo === '1' || evento.ativo === true;
+      });
+      
+      const idsEventosAtivos = new Set(eventosAtivosFiltrados.map((evento: any) => evento.idtipo_evento));
       
       // Filtrar notificações que tenham eventos ativos
       return notificacoes.filter(notificacao => {

@@ -463,6 +463,14 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
     // Adiciona campo surto com valor padrão
     surto: "N",
 
+    // 🆕 CAMPOS DE TIMEZONE: Adicionar informações de timezone da notificação
+    ...(trimmedData.timezone_name && {
+      timezone_name: trimmedData.timezone_name
+    }),
+    ...(trimmedData.timezone_offset_minutos !== undefined && {
+      timezone_offset_minutos: trimmedData.timezone_offset_minutos
+    }),
+
     // IMPORTANTE: Adicione estes campos sempre, mesmo que vazios
     observavao_incidente: trimmedData.observacaoIncidente || "",
     observacao_sintomas: trimmedData.observacaoSintomas || "",
