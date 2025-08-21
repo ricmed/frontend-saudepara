@@ -9,9 +9,17 @@ interface DirectionsMock {
   duration?: number;
 }
 
+interface RouteInfo {
+  hasRoute: boolean;
+  isCalculating: boolean;
+  distance?: string;
+  duration?: string;
+}
+
 export interface BotoesControleProps {
   directions: DirectionsMock | null;
   voiceGuidanceActive: boolean;
+  routeInfo?: RouteInfo;
   onCentralizarUsuario: () => void;
   onCarregarDados: () => void;
   onLimparRota: () => void;
@@ -21,6 +29,7 @@ export interface BotoesControleProps {
 export const BotoesControle: React.FC<BotoesControleProps> = ({
   directions,
   voiceGuidanceActive,
+  routeInfo = { hasRoute: false, isCalculating: false },
   onCentralizarUsuario,
   onCarregarDados,
   onLimparRota,
@@ -34,6 +43,27 @@ export const BotoesControle: React.FC<BotoesControleProps> = ({
       {isMenuOpen && (
         <div className="absolute bottom-16 right-0 bg-white rounded-lg shadow-lg p-2 mb-2">
           <div className="flex flex-col gap-2">
+            {/* Informações da rota ativa */}
+            {routeInfo.hasRoute && routeInfo.distance && routeInfo.duration && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+                <div className="text-xs font-medium text-blue-800 mb-1">Rota Ativa</div>
+                <div className="text-xs text-blue-700">
+                  <div>Distância: {routeInfo.distance}</div>
+                  <div>Tempo: {routeInfo.duration}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Indicador de carregamento da rota */}
+            {routeInfo.isCalculating && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2">
+                <div className="text-xs text-yellow-800 flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-3 w-3 border-b border-yellow-600"></div>
+                  Calculando rota...
+                </div>
+              </div>
+            )}
+
             {/* Botão de Minha Localização */}
             <button
               onClick={onCentralizarUsuario}
@@ -55,7 +85,7 @@ export const BotoesControle: React.FC<BotoesControleProps> = ({
             </button>
 
             {/* Botão de Limpar Rota (condicional) */}
-            {directions && (
+            {(directions || routeInfo.hasRoute) && (
               <button
                 onClick={onLimparRota}
                 className="p-2 rounded-lg hover:bg-gray-100 flex items-center gap-2 text-gray-700"

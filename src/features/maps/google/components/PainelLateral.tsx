@@ -1,23 +1,27 @@
 import React, { useState, useMemo } from 'react';
-import { Local, TipoEstabelecimento } from '../types';
+import { Local, TipoHabilitacao, TipoQualificacao } from '../types';
 import { MIN_RADIUS, MAX_RADIUS } from '../utils/constants';
+import { QUALIFICACOES_PREDEFINIDAS } from '../../../../data/qualificacoesPredefinidas';
 import '../styles/PainelLateral.css';
 
 interface PainelLateralProps {
   menuAberto: boolean;
   onClose: () => void;
 
-  tiposEstabelecimentos: TipoEstabelecimento[];
-  tipoSelecionado: string;
+  tiposHabilitacoes: TipoHabilitacao[];
+  tiposQualificacoes: TipoQualificacao[];
+  habilitacaoSelecionada: string;
+  qualificacaoSelecionada: string;
   naturezaSelecionada: string;
   searchRadius: number;
   filteredPlaces: Local[];
   visibleCount: number;
 
-  onTipoChange: (tipo: string) => void;
+  onHabilitacaoChange: (habilitacao: string) => void;
+  onQualificacaoChange: (qualificacao: string) => void;
   onNaturezaChange: (natureza: string) => void;
   onRadiusChange: (radius: number) => void;
-  onTracarRota: (local: Local) => void;
+  onTracarRota: (local: Local, transportType?: string) => void;
   onLoadMore: () => void;
   onSearch: () => void;
 }
@@ -25,13 +29,16 @@ interface PainelLateralProps {
 export const PainelLateral: React.FC<PainelLateralProps> = ({
   menuAberto,
   onClose,
-  tiposEstabelecimentos,
-  tipoSelecionado,
+  tiposHabilitacoes,
+  tiposQualificacoes,
+  habilitacaoSelecionada,
+  qualificacaoSelecionada,
   naturezaSelecionada,
   searchRadius,
   filteredPlaces,
   visibleCount,
-  onTipoChange,
+  onHabilitacaoChange,
+  onQualificacaoChange,
   onNaturezaChange,
   onRadiusChange,
   onTracarRota,
@@ -56,7 +63,8 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
     return filteredPlaces.filter(local => 
       local.nome.toLowerCase().includes(searchLower) ||
       (local.endereco && local.endereco.toLowerCase().includes(searchLower)) ||
-      local.tipo.toLowerCase().includes(searchLower)
+      local.habilitacoes.some(h => h.toLowerCase().includes(searchLower)) ||
+      local.qualificacoes.some(q => q.toLowerCase().includes(searchLower))
     );
   }, [filteredPlaces, searchText]);
 
@@ -83,19 +91,37 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
 
         <h2 className="text-lg font-bold mb-4">Estabelecimentos de Saúde</h2>
 
-        {/* Seletor de tipo */}
+        {/* Seletor de habilitação */}
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Tipo de Estabelecimento
+            Habilitação
           </label>
           <select
-            value={tipoSelecionado}
-            onChange={(e) => onTipoChange(e.target.value)}
+            value={habilitacaoSelecionada}
+            onChange={(e) => onHabilitacaoChange(e.target.value)}
             className="w-full p-2 border rounded-md shadow-sm bg-white"
           >
-            {tiposEstabelecimentos.map((tipo) => (
-              <option key={tipo.id} value={tipo.id}>
-                {tipo.nome}
+            {tiposHabilitacoes.map((habilitacao) => (
+              <option key={habilitacao.id} value={habilitacao.id}>
+                {habilitacao.nome}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Campo de pesquisa por qualificação */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Qualificação
+          </label>
+          <select
+            value={qualificacaoSelecionada}
+            onChange={(e) => onQualificacaoChange(e.target.value)}
+            className="w-full p-2 border rounded-md shadow-sm bg-white"
+          >
+            {QUALIFICACOES_PREDEFINIDAS.map((qualificacao) => (
+              <option key={qualificacao.id} value={qualificacao.id === "todas" ? "todas" : qualificacao.nome}>
+                {qualificacao.nome}
               </option>
             ))}
           </select>
@@ -241,7 +267,21 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
                         )}
                       </div>
                       
-                      <div className="text-xs mt-1 text-gray-600 font-medium">{local.tipo}</div>
+                      {/* Exibir habilitações */}
+                      {local.habilitacoes.length > 0 && (
+                        <div className="text-xs mt-1 text-gray-600">
+                          <strong>Habilitações:</strong> {local.habilitacoes.slice(0, 2).join(', ')}
+                          {local.habilitacoes.length > 2 && ` (+${local.habilitacoes.length - 2})`}
+                        </div>
+                      )}
+                      
+                      {/* Exibir qualificações */}
+                      {local.qualificacoes.length > 0 && (
+                        <div className="text-xs mt-1 text-gray-600">
+                          <strong>Qualificações:</strong> {local.qualificacoes.slice(0, 2).join(', ')}
+                          {local.qualificacoes.length > 2 && ` (+${local.qualificacoes.length - 2})`}
+                        </div>
+                      )}
                       
                       <button
                         onClick={() => onTracarRota(local)}

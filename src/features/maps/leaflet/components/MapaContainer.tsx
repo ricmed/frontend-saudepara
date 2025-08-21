@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Local, LatLngLiteral } from '../types';
+import { TILE_OPTIONS } from '../config/tileProviders';
+import { useMapProvider } from '../hooks/useMapProvider';
 
 // Fix para ícones do Leaflet no Webpack/Vite
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
@@ -30,7 +32,8 @@ interface MapaContainerProps {
   onMapIdle: () => void;
   onMarkerClick: (local: Local) => void;
   onInfoWindowClose: () => void;
-  onTracarRota: (local: Local) => void;
+  onTracarRota: (local: Local, transportType?: string) => void;
+  mapboxApiKey?: string; // Nova prop para API key do Mapbox
 }
 
 export const MapaContainer: React.FC<MapaContainerProps> = ({
@@ -44,6 +47,7 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
   onMarkerClick,
   onInfoWindowClose,
   onTracarRota,
+  mapboxApiKey,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -53,6 +57,12 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
   const [isMapReady, setIsMapReady] = useState(false);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
 
+  // Hook para gerenciar provedor de mapa
+  const { tileProvider } = useMapProvider({
+    defaultProvider: 'openstreetmap',
+    mapboxApiKey
+  });
+
   // Inicializar mapa uma única vez
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
@@ -60,26 +70,44 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
     console.log('🗺️ Inicializando mapa Leaflet...');
 
     try {
+      // Configurações otimizadas para COP 30 - 60k usuários
       const map = L.map(mapContainerRef.current, {
         center: [center.lat, center.lng],
         zoom: 6,
         zoomControl: true,
         attributionControl: true,
-        preferCanvas: false,
+        // OTIMIZAÇÃO 1: Performance melhorada para eventos grandes
+        preferCanvas: true,        // Usa Canvas ao invés de SVG - muito mais rápido
+        maxZoom: 18,              // Limita zoom máximo para reduzir tiles
+        zoomSnap: 0.5,            // Zoom mais suave
+        worldCopyJump: false,     // Desabilita duplicação de mundo
+        maxBounds: [              // Limita área para o Brasil
+          [-35, -75],             // Sudoeste
+          [10, -30]               // Nordeste
+        ],
+        maxBoundsViscosity: 0.8,  // Resistência para sair dos limites
       });
 
-      // Adicionar camada de tiles do OpenStreetMap
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19,
+      // OTIMIZAÇÃO 2 & 3: Tile provider otimizado para COP 30 no Brasil
+      const tileLayer = L.tileLayer(tileProvider.url, {
+        attribution: tileProvider.attribution,
+        maxZoom: tileProvider.maxZoom,
         minZoom: 3,
-      }).addTo(map);
-
-      // Event listeners
-      map.on('moveend', () => {
-        if (isMapLoaded) onMapIdle();
+        ...TILE_OPTIONS, // Configurações de cache agressivo
       });
       
+      tileLayer.addTo(map);
+      
+      // Listener para recarregar marcadores quando o mapa se move (lazy loading)
+      map.on('moveend', () => {
+        if (isMapLoaded) {
+          onMapIdle();
+          // Força atualização dos marcadores baseado nos novos bounds
+          // Os marcadores serão atualizados automaticamente pelo useEffect dos filteredPlaces
+        }
+      });
+
+      // Event listeners otimizados para COP 30
       map.on('zoomend', () => {
         if (isMapLoaded) onMapIdle();
       });
@@ -193,6 +221,7 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
   }, [userLocation?.lat, userLocation?.lng, isMapReady]); // Dependências específicas
 
   // Gerenciar marcadores dos estabelecimentos
+  // OTIMIZAÇÃO 4: Lazy loading de marcadores baseado nos bounds do mapa
   useEffect(() => {
     if (!mapRef.current || !isMapReady) return;
 
@@ -205,17 +234,50 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
       });
       markersRef.current = [];
 
-      // Adicionar novos marcadores
-      const visiblePlaces = filteredPlaces.slice(0, visibleCount);
+      // OTIMIZAÇÃO: Carregar apenas estabelecimentos visíveis na tela
+      const mapBounds = mapRef.current.getBounds();
+      const visiblePlacesInBounds = filteredPlaces.filter(local => {
+        // Verificar se o estabelecimento tem coordenadas válidas
+        if (!local.lat || !local.lng || local.lat === 0 || local.lng === 0) {
+          return false;
+        }
+        
+        // Verificar se está dentro dos bounds visíveis do mapa
+        return mapBounds.contains([local.lat, local.lng]);
+      });
+
+      // Limitar também pelo visibleCount para performance
+      const visiblePlaces = visiblePlacesInBounds.slice(0, Math.min(visibleCount, 100)); // Máximo 100 marcadores simultâneos
       
-      visiblePlaces.forEach((local) => {
-        if (!local.lat || !local.lng || local.lat === 0 || local.lng === 0) return;
+      console.log(`🔍 Debug: ${filteredPlaces.length} total, ${visiblePlacesInBounds.length} nos bounds, ${visiblePlaces.length} renderizados`);
+      
+      visiblePlaces.forEach((local, index) => {
+        console.log(`🏥 Estabelecimento ${index}:`, {
+          nome: local.nome,
+          lat: local.lat,
+          lng: local.lng,
+        });
 
         // Definir cor baseada na natureza
-        const isPublic = local.natureza?.toLowerCase().includes('público') || 
-                         local.natureza?.toLowerCase().includes('publico') ||
-                         local.natureza?.toLowerCase().includes('pública') ||
-                         local.natureza?.toLowerCase().includes('publica');
+        const naturezaLower = local.natureza?.toLowerCase() || '';
+        const isPublic = naturezaLower.includes('público') || 
+                         naturezaLower.includes('publico') ||
+                         naturezaLower.includes('pública') ||
+                         naturezaLower.includes('publica') ||
+                         naturezaLower.includes('municipal') ||
+                         naturezaLower.includes('estadual') ||
+                         naturezaLower.includes('federal') ||
+                         naturezaLower.includes('governo') ||
+                         naturezaLower.includes('sus');
+        
+        // Debug para primeiro item
+        if (index === 0) {
+          console.log(`🏛️ Detecção de natureza - ${local.nome}:`, {
+            natureza: local.natureza,
+            naturezaLower,
+            isPublic
+          });
+        }
         
         const markerColor = isPublic ? '#dc3545' : '#ffc107';
         const textColor = isPublic ? 'white' : '#000';
@@ -387,25 +449,43 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
 // Função para criar conteúdo do popup
 const createPopupContent = (
   local: Local, 
-  onTracarRota: (local: Local) => void
+  onTracarRota: (local: Local, transportType?: string) => void
 ): HTMLElement => {
   const container = document.createElement('div');
   container.className = 'estabelecimento-popup-content';
   
-  const isPublic = local.natureza?.toLowerCase().includes('público') || 
-                   local.natureza?.toLowerCase().includes('publico') ||
-                   local.natureza?.toLowerCase().includes('pública') ||
-                   local.natureza?.toLowerCase().includes('publica');
+  // Debug: log dos dados do local
+  console.log('🔍 Criando popup para estabelecimento:', {
+    nome: local.nome,
+    endereco: local.endereco,
+    natureza: local.natureza,
+    turno: local.turno,
+    habilitacoes: local.habilitacoes,
+    qualificacoes: local.qualificacoes,
+    cnes: local.cnes
+  });
+  
+  const naturezaLower = local.natureza?.toLowerCase() || '';
+  const isPublic = naturezaLower.includes('público') || 
+                   naturezaLower.includes('publico') ||
+                   naturezaLower.includes('municipal') ||
+                   naturezaLower.includes('estadual') ||
+                   naturezaLower.includes('federal');
+  
+  // Limitar habilitações e qualificações mostradas no popup
+  const maxItems = 3;
+  const habilitacoesLimitadas = local.habilitacoes.slice(0, maxItems);
+  const qualificacoesLimitadas = local.qualificacoes.slice(0, maxItems);
   
   container.innerHTML = `
-    <div class="space-y-2">
+    <div class="space-y-3">
       <div>
         <h3 class="text-base font-semibold text-gray-900 mb-1 leading-tight">${local.nome}</h3>
-        <p class="text-sm text-gray-600 mb-2">${local.endereco || 'Endereço não informado'}</p>
+        ${local.endereco ? `<p class="text-sm text-gray-600 mb-2">📍 ${local.endereco}</p>` : ''}
       </div>
       
-      <div class="space-y-1">
-        <div class="flex items-center gap-2">
+      <div class="space-y-2">
+        <div class="flex items-center gap-2 flex-wrap">
           <span class="px-2 py-1 rounded-full text-xs font-medium ${
             isPublic 
               ? 'bg-red-100 text-red-800' 
@@ -413,17 +493,42 @@ const createPopupContent = (
           }">
             ${local.natureza || 'Não informado'}
           </span>
+          ${local.turno && local.turno !== 'Não informado' ? `
+            <span class="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              ${local.turno}
+            </span>
+          ` : ''}
         </div>
         
-        ${local.tipo ? `
-          <div class="text-sm text-gray-700">
-            <strong>Tipo:</strong> ${local.tipo}
+        ${habilitacoesLimitadas.length > 0 ? `
+          <div class="text-sm">
+            <div class="font-medium text-gray-700 mb-1">Habilitações:</div>
+            <div class="space-y-1">
+              ${habilitacoesLimitadas.map(hab => 
+                `<div class="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">• ${hab}</div>`
+              ).join('')}
+              ${local.habilitacoes.length > maxItems ? 
+                `<div class="text-xs text-gray-500">+ ${local.habilitacoes.length - maxItems} mais...</div>` : ''}
+            </div>
           </div>
         ` : ''}
         
-        ${local.turno ? `
-          <div class="text-sm text-gray-600">
-            <strong>Turno:</strong> ${local.turno}
+        ${qualificacoesLimitadas.length > 0 ? `
+          <div class="text-sm">
+            <div class="font-medium text-gray-700 mb-1">Qualificações:</div>
+            <div class="space-y-1">
+              ${qualificacoesLimitadas.map(qual => 
+                `<div class="text-xs bg-green-50 text-green-700 px-2 py-1 rounded">• ${qual}</div>`
+              ).join('')}
+              ${local.qualificacoes.length > maxItems ? 
+                `<div class="text-xs text-gray-500">+ ${local.qualificacoes.length - maxItems} mais...</div>` : ''}
+            </div>
+          </div>
+        ` : ''}
+        
+        ${local.cnes ? `
+          <div class="text-xs text-gray-600">
+            <strong>CNES:</strong> ${local.cnes}
           </div>
         ` : ''}
         
@@ -435,21 +540,34 @@ const createPopupContent = (
       </div>
       
       <div class="flex gap-2 mt-3 pt-2 border-t border-gray-200">
+        <div class="flex-1">
+          <label class="block text-xs text-gray-600 mb-1">Tipo de Transporte:</label>
+          <select 
+            id="transport-select-${local.id}" 
+            class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            <option value="driving-car">🚗 Carro</option>
+            <option value="foot-walking">🚶 A pé</option>
+            <option value="cycling-regular">🚴 Bicicleta</option>
+            <option value="motorcycle">🏍️ Motocicleta</option>
+            <option value="public-transport">🚌 Transporte Público</option>
+          </select>
+        </div>
         <button
           id="btn-rota-${local.id}"
-          class="flex-1 px-3 py-2 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+          class="px-3 py-2 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
         >
           📍 Traçar Rota
         </button>
+      </div>
+      
+      <div class="flex gap-2 mt-2">
         <button
           id="btn-google-maps-${local.id}"
-          class="flex-1 px-3 py-2 bg-green-500 text-white text-sm rounded-md hover:bg-green-600 transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
+          class="flex-1 px-3 py-1.5 bg-green-500 text-white text-xs rounded-md hover:bg-green-600 transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
         >
           🗺️ Google Maps
         </button>
-      </div>
-      
-      <div class="flex gap-2">
         <button
           id="btn-waze-${local.id}"
           class="flex-1 px-3 py-1.5 bg-indigo-500 text-white text-xs rounded-md hover:bg-indigo-600 transition-colors font-medium"
@@ -469,6 +587,7 @@ const createPopupContent = (
   // Event listeners para os botões (com timeout para garantir que DOM esteja pronto)
   setTimeout(() => {
     const btnRota = container.querySelector(`#btn-rota-${local.id}`) as HTMLButtonElement;
+    const transportSelect = container.querySelector(`#transport-select-${local.id}`) as HTMLSelectElement;
     const btnGoogleMaps = container.querySelector(`#btn-google-maps-${local.id}`) as HTMLButtonElement;
     const btnWaze = container.querySelector(`#btn-waze-${local.id}`) as HTMLButtonElement;
     const btnAppleMaps = container.querySelector(`#btn-apple-maps-${local.id}`) as HTMLButtonElement;
@@ -476,7 +595,8 @@ const createPopupContent = (
     if (btnRota) {
       btnRota.addEventListener('click', (e) => {
         e.stopPropagation();
-        onTracarRota(local);
+        const selectedTransport = transportSelect?.value || 'driving-car';
+        onTracarRota(local, selectedTransport);
       });
     }
 

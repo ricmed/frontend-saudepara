@@ -56,12 +56,13 @@ const MapaLocais: React.FC<MapaLocaisProps> = ({ initialFilters }) => {
     obterLocalizacao,
   } = useGeolocation();
 
-  // Hook de Estabelecimentos (carrega e filtra dados do Excel)
+  // Hook de Estabelecimentos (carrega dados da API)
   const {
     allPlaces,
     filteredPlaces,
     setFilteredPlaces,
-    tiposEstabelecimentos,
+    tiposHabilitacoes,
+    tiposQualificacoes,
     isLoading,
     carregarDadosExcel,
   } = useEstabelecimentos();
@@ -100,7 +101,8 @@ const MapaLocais: React.FC<MapaLocaisProps> = ({ initialFilters }) => {
 
   // Filtros
   const [searchRadius, setSearchRadius] = useState(initialFilters?.radius || DEFAULT_RADIUS);
-  const [tipoSelecionado, setTipoSelecionado] = useState(initialFilters?.tipo || "todos");
+  const [habilitacaoSelecionada, setHabilitacaoSelecionada] = useState("todas");
+  const [qualificacaoSelecionada, setQualificacaoSelecionada] = useState("todas");
   const [naturezaSelecionada, setNaturezaSelecionada] = useState(initialFilters?.natureza || "todos");
 
   // Referência para DirectionsRenderer
@@ -116,17 +118,17 @@ const MapaLocais: React.FC<MapaLocaisProps> = ({ initialFilters }) => {
 
   /**
    * Effect de inicialização:
-   * - Carrega dados do Excel
+   * - Carrega estabelecimentos ativos da API
    * - A geolocalização é iniciada automaticamente pelo useGeolocation
    */
   useEffect(() => {
     const inicializar = async () => {
       try {
-        console.log('Carregando dados do Excel...');
+        console.log('Carregando estabelecimentos ativos da API...');
         await carregarDadosExcel();
-        console.log('Dados do Excel carregados com sucesso');
+        console.log('Estabelecimentos carregados com sucesso da API');
       } catch (error) {
-        console.error('Erro ao carregar dados:', error);
+        console.error('Erro ao carregar estabelecimentos:', error);
       }
     };
     inicializar();
@@ -135,7 +137,8 @@ const MapaLocais: React.FC<MapaLocaisProps> = ({ initialFilters }) => {
   /**
    * Effect que filtra estabelecimentos com base em:
    * - Posição do usuário ou centro default
-   * - Tipo selecionado
+   * - Habilitação selecionada
+   * - Qualificação selecionada
    * - Natureza selecionada
    * - Raio de busca
    */
@@ -149,14 +152,25 @@ const MapaLocais: React.FC<MapaLocaisProps> = ({ initialFilters }) => {
         new google.maps.LatLng(center.lat, center.lng)
       );
 
-      const tipoMatch =
-        tipoSelecionado === "todos" || local.tipo === tipoSelecionado;
+      // Filtro por habilitação
+      const habilitacaoMatch =
+        habilitacaoSelecionada === "todas" || 
+        local.habilitacoes.includes(habilitacaoSelecionada);
+
+      // Filtro por qualificação (busca em qualquer qualificação do estabelecimento)
+      const qualificacaoMatch =
+        qualificacaoSelecionada === "todas" ||
+        local.qualificacoes.some(q => q.toLowerCase().includes(qualificacaoSelecionada.toLowerCase()));
+
+      // Filtro por natureza
       const naturezaMatch =
         naturezaSelecionada === "todos" ||
         local.natureza === naturezaSelecionada;
+
+      // Filtro por distância
       const distanceMatch = distance <= searchRadius;
 
-      return tipoMatch && naturezaMatch && distanceMatch;
+      return habilitacaoMatch && qualificacaoMatch && naturezaMatch && distanceMatch;
     });
 
     setFilteredPlaces(estabelecimentosFiltrados);
@@ -164,7 +178,8 @@ const MapaLocais: React.FC<MapaLocaisProps> = ({ initialFilters }) => {
     allPlaces,
     userLocation,
     mapCenter,
-    tipoSelecionado,
+    habilitacaoSelecionada,
+    qualificacaoSelecionada,
     naturezaSelecionada,
     searchRadius,
     setFilteredPlaces,
@@ -351,7 +366,7 @@ const MapaLocais: React.FC<MapaLocaisProps> = ({ initialFilters }) => {
    * Função para traçar rota a partir da userLocation até o Local selecionado.
    */
   const tracarRota = useCallback(
-    async (destino: Local) => {
+    async (destino: Local, transportType?: string) => {
       if (!userLocation) {
         alert("Permita o acesso à sua localização para traçar a rota");
         return;
@@ -366,6 +381,15 @@ const MapaLocais: React.FC<MapaLocaisProps> = ({ initialFilters }) => {
       setDirections(null);
       setSelectedLocal(destino);
       setStepIndex(0);
+      
+      // Usar o tipo de transporte fornecido ou o atual
+      const modoTransporte = transportType || modoTransporteSelecionado;
+      
+      // Atualizar o modo de transporte selecionado se fornecido
+      if (transportType) {
+        setModoTransporteSelecionado(transportType);
+      }
+      
       await calcularTemposViagem(destino);
 
       const directionsService = new google.maps.DirectionsService();
@@ -373,7 +397,7 @@ const MapaLocais: React.FC<MapaLocaisProps> = ({ initialFilters }) => {
         {
           origin: userLocation,
           destination: { lat: destino.lat, lng: destino.lng },
-          travelMode: modoTransporteSelecionado as google.maps.TravelMode,
+          travelMode: modoTransporte as google.maps.TravelMode,
         },
         async (result, status) => {
           if (status === google.maps.DirectionsStatus.OK && result) {
@@ -533,13 +557,16 @@ const MapaLocais: React.FC<MapaLocaisProps> = ({ initialFilters }) => {
         {/* Painel lateral (sempre visível no desktop, deslizante no mobile) */}
         <PainelLateral
           menuAberto={menuAberto}
-          tiposEstabelecimentos={tiposEstabelecimentos}
-          tipoSelecionado={tipoSelecionado}
+          tiposHabilitacoes={tiposHabilitacoes}
+          tiposQualificacoes={tiposQualificacoes}
+          habilitacaoSelecionada={habilitacaoSelecionada}
+          qualificacaoSelecionada={qualificacaoSelecionada}
           naturezaSelecionada={naturezaSelecionada}
           searchRadius={searchRadius}
           filteredPlaces={filteredPlaces}
           visibleCount={visibleCount}
-          onTipoChange={setTipoSelecionado}
+          onHabilitacaoChange={setHabilitacaoSelecionada}
+          onQualificacaoChange={setQualificacaoSelecionada}
           onNaturezaChange={setNaturezaSelecionada}
           onRadiusChange={setSearchRadius}
           onTracarRota={tracarRota}
@@ -564,12 +591,19 @@ const MapaLocais: React.FC<MapaLocaisProps> = ({ initialFilters }) => {
             onMarkerClick={setSelectedMarker}
             onInfoWindowClose={() => setSelectedMarker(null)}
             onTracarRota={tracarRota}
+            onLimparRota={limparRota}
           />
 
           {/* Botões de controle (centralizar no usuário, limpar rota, etc.) */}
           <BotoesControle
             directions={directions}
             voiceGuidanceActive={voiceGuidanceActive}
+            routeInfo={{
+              hasRoute: !!directions,
+              isCalculating: false, // Google Maps não tem indicador de carregamento separado
+              distance: directions?.routes[0]?.legs[0]?.distance?.text,
+              duration: directions?.routes[0]?.legs[0]?.duration?.text,
+            }}
             onCentralizarUsuario={centralizarNoUsuario}
             onCarregarDados={carregarDadosExcel}
             onLimparRota={limparRota}

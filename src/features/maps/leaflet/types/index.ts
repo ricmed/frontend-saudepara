@@ -9,7 +9,8 @@ export interface Local {
   lat: number;
   lng: number;
   endereco: string;
-  tipo: string;
+  habilitacoes: string[];
+  qualificacoes: string[];
   natureza: string;
   turno: string;
   // Campos adicionais da API
@@ -17,9 +18,6 @@ export interface Local {
   cnpj?: string;
   codigo_unidade?: string;
   ativo: boolean;
-  // Arrays de habilitações e qualificações (opcionais)
-  habilitacoes?: string[];
-  qualificacoes?: string[];
 }
 
 export interface TempoViagem {
@@ -29,6 +27,16 @@ export interface TempoViagem {
 }
 
 export interface TipoEstabelecimento {
+  id: string;
+  nome: string;
+}
+
+export interface TipoHabilitacao {
+  id: string;
+  nome: string;
+}
+
+export interface TipoQualificacao {
   id: string;
   nome: string;
 }
@@ -43,9 +51,11 @@ export interface MapaLocaisState {
   directions: google.maps.DirectionsResult | null;
   selectedLocal: Local | null;
   searchRadius: number;
-  tipoSelecionado: string;
+  habilitacaoSelecionada: string;
+  qualificacaoSelecionada: string;
   naturezaSelecionada: string;
-  tiposEstabelecimentos: TipoEstabelecimento[];
+  tiposHabilitacoes: TipoHabilitacao[];
+  tiposQualificacoes: TipoQualificacao[];
   menuAberto: boolean;
   voiceGuidanceActive: boolean;
   selectedLanguage: SupportedLanguage;
@@ -54,7 +64,7 @@ export interface MapaLocaisState {
   visibleCount: number;
 }
 
-export type SupportedLanguage = 'pt-BR' | 'en-US' | 'es-ES' | 'fr-FR' | 'zh-CN';
+export type SupportedLanguage = 'pt-BR' | 'en-US' | 'es-ES';
 
 // Tipos específicos para API
 export interface ApiEstabelecimento {

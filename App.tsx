@@ -6,6 +6,7 @@ import syncService from '@/services/syncService';
 
 import MapaLocais from "@/features/maps/google";
 import MapaPage from "@/features/maps/MapaPage";
+import MapaLeaflet from "@/features/maps/leaflet/MapaLeaflet";
 import AccessDenied from "@/paginas/AccessDenied";
 import HealthCampaignsPage from "@/features/campaigns/pages/HealthCampaignsPage";
 import ProtectedRoute from "@/keycloak/ProtectedRoute";
@@ -253,6 +254,7 @@ function App() {
           <Route path="/mapa" element={<MapaPage />} />
           <Route path="/mapa/fullscreen" element={<MapaPage fullScreen={true} />} />
           <Route path="/mapa-original" element={<MapaLocais />} />
+          <Route path="/mapa-leaflet" element={<MapaLeaflet />} />
           <Route path="/campanhas" element={<HealthCampaignsPage />} />
           <Route path="/dashboard" element={<NotificationDashboard />} />
           <Route path="/dashboard-page" element={<DashboardPage />} />

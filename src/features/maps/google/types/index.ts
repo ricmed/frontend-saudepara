@@ -9,7 +9,8 @@ export interface LatLngLiteral {
     lat: number;
     lng: number;
     endereco?: string;
-    tipo: string;
+    habilitacoes: string[];
+    qualificacoes: string[];
     natureza: string;
     turno: string;
   }
@@ -25,6 +26,16 @@ export interface LatLngLiteral {
     nome: string;
   }
   
+  export interface TipoHabilitacao {
+    id: string;
+    nome: string;
+  }
+  
+  export interface TipoQualificacao {
+    id: string;
+    nome: string;
+  }
+  
   export interface MapaLocaisState {
     allPlaces: Local[];
     filteredPlaces: Local[];
@@ -35,9 +46,11 @@ export interface LatLngLiteral {
     directions: google.maps.DirectionsResult | null;
     selectedLocal: Local | null;
     searchRadius: number;
-    tipoSelecionado: string;
+    habilitacaoSelecionada: string;
+    qualificacaoSelecionada: string;
     naturezaSelecionada: string;
-    tiposEstabelecimentos: TipoEstabelecimento[];
+    tiposHabilitacoes: TipoHabilitacao[];
+    tiposQualificacoes: TipoQualificacao[];
     menuAberto: boolean;
     voiceGuidanceActive: boolean;
     selectedLanguage: 'pt-BR' | 'en';
