@@ -4,6 +4,19 @@
 
 Implementação de seletor dinâmico entre **OpenStreetMap** e **Mapbox** para garantir disponibilidade máxima durante a COP 30 com 60k usuários simultâneos.
 
+## 🔑 TOKEN MAPBOX PRÉ-CONFIGURADO
+
+**✅ TOKEN PÚBLICO ATIVO:**
+```
+pk.eyJ1IjoiZGFuaWVsbW9yYWVzNyIsImEiOiJjbWVtdmNvZm8wdmd6MmlvYTY5YWdqYXk0In0.6c-WJv8161bzZhq7dBxz3A
+```
+
+- **Status**: Configurado automaticamente no sistema
+- **Tipo**: Token público (seguro para uso frontend)
+- **Proprietário**: danielmoraes7
+- **Validade**: Ativo e funcional
+- **Uso**: Mapbox disponível imediatamente sem configuração adicional
+
 ## 🎯 Funcionalidades
 
 ### ✅ OpenStreetMap (Padrão)
@@ -29,28 +42,27 @@ O seletor aparece automaticamente no **painel lateral** do mapa:
 
 #### OpenStreetMap → Mapbox
 1. Clique no botão **"Mapbox"** 
-2. Se não houver API key, abrirá modal de configuração
-3. Cole sua API key do Mapbox
-4. Clique **"Salvar"**
-5. O mapa recarrega automaticamente
+2. ✅ **Token já configurado** - Mudança instantânea!
+3. O mapa recarrega automaticamente com qualidade premium
 
 #### Mapbox → OpenStreetMap  
 1. Clique no botão **"OpenStreetMap"**
 2. Mudança instantânea (sem configuração)
 
-### 3. Configurar API Key do Mapbox
+### 3. Token Mapbox Pré-Configurado
 
-#### Obter API Key
+#### ✅ Sistema Pronto para Uso
+- **Token público** já configurado no sistema
+- **Mapbox disponível** imediatamente
+- **Sem necessidade** de configuração manual
+- **Backup perfeito** para COP 30
+
+#### Configurar Token Personalizado (Opcional)
 1. Acesse [mapbox.com](https://account.mapbox.com/)
-2. Faça login ou crie conta gratuita
+2. Faça login ou crie conta gratuita  
 3. Vá em **"Access tokens"**
 4. Copie a **"Default public token"**
-
-#### Configurar no Sistema
-1. Clique no ícone ⚙️ ao lado do Mapbox
-2. Cole a API key no campo
-3. Clique **"Salvar"**
-4. A key fica salva no seu navegador
+5. Configure via interface do sistema
 
 ## 🚀 Cenários de Uso para COP 30
 

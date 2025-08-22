@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/i18n/useTranslations";
-import { Language } from "@/i18n/types";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { useAuth } from '@/keycloak/AuthProvider';
 import UserProfileHeader from "@/keycloak/components/UserProfileHeader";
@@ -38,17 +38,14 @@ import {
 interface SideMenuProps {
   isOpen: boolean;
   onClose: () => void;
-  selectedLanguage: Language;
-  onLanguageChange: (language: Language) => void;
 }
 
 export const SideMenu: React.FC<SideMenuProps> = ({
   isOpen,
   onClose,
-  selectedLanguage,
-  onLanguageChange,
 }) => {
   const navigate = useNavigate();
+  const { selectedLanguage, setSelectedLanguage } = useLanguage();
   const { t } = useTranslation(selectedLanguage);
   const { user } = useAuth();
   const [showAppsSubmenu, setShowAppsSubmenu] = useState(false);
@@ -276,7 +273,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     <>
       {/* Main Menu */}
       <div
-        className={`fixed top-0 left-0 h-full w-64 bg-blue-900 transform transition-transform duration-300 ease-in-out z-50 ${
+        className={`fixed top-0 left-0 h-full w-64 bg-blue-900 transform transition-transform duration-300 ease-in-out z-[1100] ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -331,7 +328,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                 {/* Apps Submenu */}
                 {item.submenu && showAppsSubmenu && (
                   <div
-                    className="fixed top-0 left-64 w-64 h-full bg-blue-900 z-60 overflow-y-auto"
+                    className="fixed top-0 left-64 w-64 h-full bg-blue-900 z-[1110] overflow-y-auto"
                     onMouseEnter={() => setShowAppsSubmenu(true)}
                     onMouseLeave={() => setShowAppsSubmenu(false)}
                   >
@@ -364,7 +361,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
           <div className="mt-auto border-t border-blue-800 pt-4">
             <LanguageSelector
               selectedLanguage={selectedLanguage}
-              onLanguageChange={onLanguageChange}
+              onLanguageChange={setSelectedLanguage}
             />
           </div>
         </div>
@@ -372,7 +369,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
 
       {/* Overlay */}
       {isOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} />
+        <div className="fixed inset-0 bg-black/50 z-[1050]" onClick={onClose} />
       )}
     </>
   );

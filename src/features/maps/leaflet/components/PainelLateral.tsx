@@ -3,7 +3,6 @@ import { Local, TipoHabilitacao, TipoQualificacao } from '../types';
 import { MIN_RADIUS, MAX_RADIUS } from '../utils/constants';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { QUALIFICACOES_PREDEFINIDAS } from '../../../../data/qualificacoesPredefinidas';
-import { MapProviderSelector, type MapProvider } from './MapProviderSelector';
 
 interface PainelLateralProps {
   menuAberto: boolean;
@@ -25,13 +24,6 @@ interface PainelLateralProps {
   onTracarRota: (local: Local, transportType?: string) => void;
   onLoadMore: () => void;
   onSearch: () => void;
-  
-  // Props para seletor de mapa
-  currentMapProvider: MapProvider;
-  onMapProviderChange: (provider: MapProvider) => void;
-  isMapboxAvailable: boolean;
-  onMapboxConfig: (apiKey: string) => void;
-  mapboxApiKey?: string;
 }
 
 export const PainelLateral: React.FC<PainelLateralProps> = ({
@@ -52,11 +44,6 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
   onTracarRota,
   onLoadMore,
   onSearch,
-  currentMapProvider,
-  onMapProviderChange,
-  isMapboxAvailable,
-  onMapboxConfig,
-  mapboxApiKey,
 }) => {
   const [searchText, setSearchText] = useState('');
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
@@ -97,8 +84,8 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
   return (
     <div
       className={`
-        fixed lg:static top-0 left-0 z-40 
-        w-full sm:w-80 lg:w-64 xl:w-72 
+        fixed lg:static top-0 left-0 z-[1200] 
+        w-full sm:w-80 md:w-96 lg:w-64 xl:w-72 
         h-full lg:max-h-[calc(100vh-120px)]
         bg-white shadow-lg transform transition-transform duration-300 ease-in-out
         ${menuAberto ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
@@ -106,7 +93,7 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
         overflow-y-auto flex flex-col
       `}
     >
-      <div className="p-4 relative">
+      <div className="p-3 sm:p-4 relative">
         {/* Botão de fechar no mobile/tablet */}
         <button
           onClick={onClose}
@@ -378,17 +365,6 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
               );
             })}
 
-          </div>
-
-          {/* Seletor de Provedor de Mapa */}
-          <div className="mt-6">
-            <MapProviderSelector
-              currentProvider={currentMapProvider}
-              onProviderChange={onMapProviderChange}
-              isMapboxAvailable={isMapboxAvailable}
-              onMapboxConfig={onMapboxConfig}
-              mapboxApiKey={mapboxApiKey}
-            />
           </div>
 
           {visibleCount < searchFilteredPlaces.length && (

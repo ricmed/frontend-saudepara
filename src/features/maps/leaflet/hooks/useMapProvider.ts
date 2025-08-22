@@ -17,7 +17,10 @@ interface UseMapProviderReturn {
 }
 
 export function useMapProvider(options: UseMapProviderOptions = {}): UseMapProviderReturn {
-  const { defaultProvider = 'openstreetmap', mapboxApiKey } = options;
+  const { 
+    defaultProvider = 'openstreetmap', 
+    mapboxApiKey = 'pk.eyJ1IjoiZGFuaWVsbW9yYWVzNyIsImEiOiJjbWVtdmNvZm8wdmd6MmlvYTY5YWdqYXk0In0.6c-WJv8161bzZhq7dBxz3A' 
+  } = options;
   
   // Estado do provedor atual
   const [currentProvider, setCurrentProvider] = useState<MapProvider>(() => {
@@ -33,7 +36,15 @@ export function useMapProvider(options: UseMapProviderOptions = {}): UseMapProvi
   const [apiKey] = useState<string | undefined>(() => {
     // Recupera do localStorage se existir
     const saved = localStorage.getItem('mapbox-api-key');
-    return saved || mapboxApiKey;
+    if (saved) return saved;
+    
+    // Se não existe e foi fornecida uma API key, salva ela
+    if (mapboxApiKey) {
+      localStorage.setItem('mapbox-api-key', mapboxApiKey);
+      return mapboxApiKey;
+    }
+    
+    return undefined;
   });
 
   // Persiste o provedor no localStorage

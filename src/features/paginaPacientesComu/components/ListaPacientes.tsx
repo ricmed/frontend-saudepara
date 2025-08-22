@@ -22,8 +22,8 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 // Atualizando a importação do SideMenu
 import SideMenu from "@/features/home/components/SideMenu";
-import ModalBuscaPaciente from "@/features/paginaPacientesComu/components/ModalBuscaPaciente";
-import { useLanguage } from "@/contexts/LanguageContext";
+// import ModalBuscaPaciente from "@/features/paginaPacientesComu/components/ModalBuscaPaciente";
+// import { useLanguage } from "@/contexts/LanguageContext";
 
 // Tipos
 interface PaginationMeta {
@@ -141,16 +141,17 @@ const allColumns: ColumnDefinition[] = [
   { key: "contato", label: "Contato", sortable: false },
 ];
 
-const ListaPacientes = () => {  const navigate = useNavigate();
+const ListaPacientes = () => {
+  const navigate = useNavigate();
   const menuRef = useRef<HTMLDivElement>(null);
   // Adicionando contexto de idioma
-  const { selectedLanguage, setSelectedLanguage } = useLanguage();
+  // Não utilizado no momento mas mantido para compatibilidade futura
 
   // Estado para controlar o SideMenu
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  // Estado para controlar o Modal de busca avançada
-  const [isBuscaModalOpen, setIsBuscaModalOpen] = useState(false);
+  // Estado para controlar o Modal de busca avançada (temporariamente removido)
+  // const [isBuscaModalOpen, setIsBuscaModalOpen] = useState(false);
 
   // Estados principais
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
@@ -677,7 +678,7 @@ const ListaPacientes = () => {  const navigate = useNavigate();
 
         autoTable(doc, {
           startY: yPos,
-          body: dadosPessoais.filter(([key, value]) => value),
+          body: dadosPessoais.filter(([, value]) => value),
           theme: "grid",
           styles: { fontSize: 9, cellPadding: 3 },
           columnStyles: {
@@ -703,7 +704,7 @@ const ListaPacientes = () => {  const navigate = useNavigate();
 
           autoTable(doc, {
             startY: yPos,
-            body: dadosContato.filter(([key, value]) => value),
+            body: dadosContato.filter(([, value]) => value),
             theme: "grid",
             styles: { fontSize: 9, cellPadding: 3 },
             columnStyles: {
@@ -766,17 +767,17 @@ const ListaPacientes = () => {  const navigate = useNavigate();
     return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
   };
 
-  // Selecionar um paciente da busca avançada
-  const handleSelectPaciente = (paciente: Paciente) => {
-    navigate(`/private/pacientes/editar/${paciente.idpaciente}`);
-  };
+  // Selecionar um paciente da busca avançada (temporariamente comentado)
+  // const handleSelectPaciente = (paciente: Paciente) => {
+  //   navigate(`/private/pacientes/editar/${paciente.idpaciente}`);
+  // };
 
   // Componente para exibir menu de colunas
   const ColumnsMenu = ({ isOpen }: { isOpen: boolean }) => {
     if (!isOpen) return null;
 
     return (
-      <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 p-2">
+      <div className="absolute left-0 md:left-0 right-0 md:right-auto mt-2 w-full md:w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 p-2">
         {allColumns.map((col) => (
           <div
             key={col.key}
@@ -806,7 +807,7 @@ const ListaPacientes = () => {  const navigate = useNavigate();
     if (!isOpen) return null;
 
     return (
-      <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 p-3">
+      <div className="absolute left-0 md:left-0 right-0 md:right-auto mt-2 w-full md:w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 p-3">
         <div className="flex items-center mb-3">
           <Download className="h-4 w-4 text-blue-600 mr-2" />
           <h3 className="text-sm font-medium text-gray-700">Exportar Dados</h3>
@@ -891,8 +892,108 @@ const ListaPacientes = () => {  const navigate = useNavigate();
     <div className="min-h-screen bg-gray-50">
       {/* Cabeçalho */}
       <header className="bg-blue-600 text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="max-w-7xl mx-auto px-4 py-4 md:py-6">
+          {/* Mobile Layout */}
+          <div className="block md:hidden">
+            {/* Primeira linha: Navegação e título */}
+            <div className="flex items-center gap-3 mb-3">
+              <button
+                onClick={() => setIsMenuOpen(true)}
+                className="p-2 hover:bg-blue-700 rounded-full transition-colors"
+                aria-label="Abrir menu"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+              <button
+                onClick={() => navigate("/private/pagina-paciente-ficha")}
+                className="p-2 hover:bg-blue-700 rounded-full transition-colors"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <h1 className="text-lg font-bold flex-1">
+                Lista de Pacientes
+              </h1>
+            </div>
+
+            {/* Segunda linha: Botões de ação - apenas ícones */}
+            <div className="flex gap-2 overflow-x-auto mb-3">
+              {/* Botão Colunas - apenas ícone */}
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setIsColumnsMenuOpen(!isColumnsMenuOpen);
+                    setIsExportMenuOpen(false);
+                  }}
+                  className="p-3 bg-white/10 text-white rounded-md hover:bg-white/20 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  title="Colunas"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                  </svg>
+                </button>
+                <ColumnsMenu isOpen={isColumnsMenuOpen} />
+              </div>
+
+              {/* Botão Exportar - apenas ícone */}
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setIsExportMenuOpen(!isExportMenuOpen);
+                    setIsColumnsMenuOpen(false);
+                  }}
+                  className="p-3 bg-white/10 text-white rounded-md hover:bg-white/20 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  title="Exportar"
+                >
+                  <Download className="h-5 w-5" />
+                </button>
+                <ExportMenu isOpen={isExportMenuOpen} />
+              </div>
+
+              {/* Botão Nova Paciente - apenas ícone */}
+              <button
+                onClick={() => navigate("/private/pacientes/nova")}
+                className="p-3 bg-white/10 text-white rounded-md hover:bg-white/20 transition-colors ml-auto touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                title="Novo Paciente"
+              >
+                <Plus className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Terceira linha: Busca */}
+            <div className="flex gap-2">
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  value={searchParams.term}
+                  onChange={(e) => {
+                    setSearchParams((prev) => ({
+                      ...prev,
+                      term: e.target.value,
+                    }));
+                    setCurrentPage(1);
+                    setTempPage("1");
+                  }}
+                  placeholder="Buscar pacientes..."
+                  className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 text-sm"
+                />
+                {searchParams.term && searchParams.term.length < 3 && (
+                  <div className="absolute -bottom-6 left-0 text-xs text-yellow-200">
+                    Digite pelo menos 3 caracteres para buscar
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => {/* setIsBuscaModalOpen(true) */}}
+                className="p-2 bg-white/10 text-white rounded-md hover:bg-white/20 transition-colors"
+                title="Busca avançada"
+              >
+                <Search className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Desktop Layout */}
+          <div className="hidden md:flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setIsMenuOpen(true)}
@@ -928,11 +1029,8 @@ const ListaPacientes = () => {  const navigate = useNavigate();
                     <ChevronDown className="w-4 h-4" />
                   )}
                 </button>
-
                 <ColumnsMenu isOpen={isColumnsMenuOpen} />
               </div>
-
-              {/* Removido o botão de Ordenação */}
 
               {/* Botão Exportar */}
               <div className="relative">
@@ -951,47 +1049,39 @@ const ListaPacientes = () => {  const navigate = useNavigate();
                     <ChevronDown className="w-4 h-4" />
                   )}
                 </button>
-
                 <ExportMenu isOpen={isExportMenuOpen} />
               </div>
 
               {/* Campo de busca */}
-              <div className="relative">
-                <div className="flex items-center">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Buscar por nome, CPF ou nome da mãe..."
-                      value={searchParams.term}
-                      onChange={(e) => {
-                        setSearchParams({
-                          ...searchParams,
-                          term: e.target.value,
-                        });
-                        if (e.target.value.length === 0) {
-                          setCurrentPage(1);
-                          setTempPage("1");
-                        }
-                      }}
-                      className="pl-9 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64 text-gray-800" // Garantir texto escuro
-                    />
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Search className="h-4 w-4 text-gray-400" />
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={searchParams.term}
+                    onChange={(e) => {
+                      setSearchParams((prev) => ({
+                        ...prev,
+                        term: e.target.value,
+                      }));
+                      setCurrentPage(1);
+                      setTempPage("1");
+                    }}
+                    placeholder="Buscar pacientes..."
+                    className="w-64 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
+                  />
+                  {searchParams.term && searchParams.term.length < 3 && (
+                    <div className="absolute -bottom-6 left-0 text-xs text-yellow-600">
+                      Digite pelo menos 3 caracteres para buscar
                     </div>
-                    {searchParams.term && searchParams.term.length < 3 && (
-                      <div className="absolute -bottom-6 left-0 text-xs text-yellow-600">
-                        Digite pelo menos 3 caracteres para buscar
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => setIsBuscaModalOpen(true)}
-                    className="ml-2 p-2 bg-white text-blue-600 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
-                    title="Busca avançada"
-                  >
-                    <Search className="h-4 w-4" />
-                  </button>
+                  )}
                 </div>
+                <button
+                  onClick={() => {/* setIsBuscaModalOpen(true) */}}
+                  className="ml-2 p-2 bg-white text-blue-600 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
+                  title="Busca avançada"
+                >
+                  <Search className="h-4 w-4" />
+                </button>
               </div>
 
               {/* Botão Novo */}
@@ -1011,26 +1101,111 @@ const ListaPacientes = () => {  const navigate = useNavigate();
       <SideMenu
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
-        selectedLanguage={selectedLanguage}
-        onLanguageChange={(language) => setSelectedLanguage(language)}
       />
 
       {/* Conteúdo principal */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="overflow-x-auto">
-          <div className="bg-white rounded-xl shadow-md overflow-x-auto">
-            {error && (
-              <div className="bg-red-50 text-red-700 p-4 mb-4 flex justify-between items-center">
-                <span>{error}</span>
-                <button
-                  onClick={() => setError(null)}
-                  className="text-red-700 hover:text-red-800"
-                >
-                  ×
-                </button>
+        <div className="bg-white rounded-xl shadow-md overflow-hidden">
+          {error && (
+            <div className="bg-red-50 text-red-700 p-4 mb-4 flex justify-between items-center">
+              <span>{error}</span>
+              <button
+                onClick={() => setError(null)}
+                className="text-red-700 hover:text-red-800"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          {/* Mobile: Cards Layout */}
+          <div className="block md:hidden">
+            {isLoading ? (
+              <div className="p-8 text-center">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                <p className="mt-2 text-gray-500">Carregando...</p>
+              </div>
+            ) : pacientes.length === 0 ? (
+              <div className="p-8 text-center text-gray-500">
+                <p>
+                  {searchParams.term
+                    ? `Nenhum paciente encontrado para "${searchParams.term}"`
+                    : "Nenhum paciente cadastrado"}
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-200">
+                {pacientes.map((paciente) => (
+                  <div
+                    key={paciente.idpaciente}
+                    className="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                    onClick={() =>
+                      navigate(`/private/pacientes/editar/${paciente.idpaciente}`)
+                    }
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-gray-900 truncate">
+                          {paciente.nome || 'Nome não informado'}
+                        </h3>
+                        <div className="mt-1 text-sm text-gray-600 space-y-1">
+                          {paciente.cpf && (
+                            <div className="flex items-center">
+                              <span className="font-medium mr-2">CPF:</span>
+                              <span>{formatCPF(paciente.cpf)}</span>
+                            </div>
+                          )}
+                          {paciente.data_nascimento && (
+                            <div className="flex items-center">
+                              <span className="font-medium mr-2">Nascimento:</span>
+                              <span>{formatDate(paciente.data_nascimento)}</span>
+                            </div>
+                          )}
+                          {paciente.tipo_genero?.descricao && (
+                            <div className="flex items-center">
+                              <span className="font-medium mr-2">Gênero:</span>
+                              <span>{paciente.tipo_genero.descricao}</span>
+                            </div>
+                          )}
+                          {paciente.contato && (
+                            <div className="flex items-center">
+                              <span className="font-medium mr-2">Contato:</span>
+                              <span>{formatPhoneNumber(paciente.contato)}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex space-x-1 ml-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/private/pacientes/editar/${paciente.idpaciente}`);
+                          }}
+                          className="p-3 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-md transition-colors touch-manipulation"
+                          title="Editar"
+                        >
+                          <Edit className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(paciente.idpaciente!);
+                          }}
+                          className="p-3 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-md transition-colors touch-manipulation"
+                          title="Excluir"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
+          </div>
 
+          {/* Desktop: Table Layout */}
+          <div className="hidden md:block">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-blue-600 text-white">
@@ -1253,8 +1428,9 @@ const ListaPacientes = () => {  const navigate = useNavigate();
                 </tbody>
               </table>
             </div>
+          </div>
 
-            {/* Paginação */}
+          {/* Paginação */}
             <div className="px-6 py-4 border-t flex flex-wrap items-center justify-between">
               <div className="text-sm text-gray-500">
                 Mostrando{" "}
@@ -1364,15 +1540,8 @@ const ListaPacientes = () => {  const navigate = useNavigate();
                 </div>
               </div>
             </div>
-          </div>
-        </div>      </main>
-
-      {/* Modal de busca avançada */}
-      <ModalBuscaPaciente
-        isOpen={isBuscaModalOpen}
-        onClose={() => setIsBuscaModalOpen(false)}
-        onSelectPaciente={handleSelectPaciente}
-      />
+        </div>
+      </main>
     </div>
   );
 };

@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from "react";
 import { PainelLateral } from "./components/PainelLateral";
 import { MapaContainer } from "./components/MapaContainer";
 import { BotoesControle } from "./components/BotoesControle";
+import { MapProviderOverlay } from "./components/MapProviderOverlay";
 import { useGeolocation } from "./hooks/useGeolocation";
 import { useEstabelecimentos } from "./hooks/useEstabelecimentos";
 import { useRouting } from "./hooks/useRouting";
@@ -11,11 +12,12 @@ import { RoutingServiceOSRM } from "./services/routingServiceOSRM";
 // Componentes do desktop
 import type { Language } from "@/i18n/types";
 import { SideMenu } from "@/features/home/components/SideMenu";
+import { Home, Map, Heart, User, FileText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 import {
   DEFAULT_CENTER,
   DEFAULT_RADIUS,
-  SUPPORTED_LANGUAGES,
 } from "./utils/constants";
 import { Local, LatLngLiteral, TempoViagem } from "./types";
 // Import Leaflet types
@@ -26,6 +28,8 @@ import L from 'leaflet';
  * Versão corrigida sem loops infinitos
  */
 const MapaLeaflet: React.FC = () => {
+  const navigate = useNavigate();
+  
   // Hook de Geolocalização
   const {
     userLocation,
@@ -78,7 +82,8 @@ const MapaLeaflet: React.FC = () => {
   }, []);
 
   // Exibição lateral e seleção de marcadores
-  const [menuAberto, setMenuAberto] = useState(false);
+  const [menuAberto, setMenuAberto] = useState(false);  // Para o SideMenu principal
+  const [painelEstabelecimentosAberto, setPainelEstabelecimentosAberto] = useState(false);  // Para o painel de estabelecimentos (inicia fechado para que o botão seja visível)
   const [selectedMarker, setSelectedMarker] = useState<Local | null>(null);
 
   // Rota e informações relacionadas
@@ -460,13 +465,13 @@ const MapaLeaflet: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       {/* Header do Governo do Pará */}
-      <header className="bg-blue-600 shadow-lg" role="banner">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+      <header className="bg-blue-600 shadow-lg flex-shrink-0" role="banner">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
             {/* Seção esquerda: Menu + Logos */}
-            <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-3 sm:space-x-6">
               <button
                 onClick={() => setMenuAberto(!menuAberto)}
                 className="p-2 rounded-lg hover:bg-blue-500/50 transition-colors focus:outline-none focus:ring-2 focus:ring-white/30"
@@ -474,7 +479,7 @@ const MapaLeaflet: React.FC = () => {
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6 text-white"
+                  className="h-5 w-5 sm:h-6 sm:w-6 text-white"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -497,108 +502,68 @@ const MapaLeaflet: React.FC = () => {
                 </svg>
               </button>
 
-              {/* Logos com melhor espaçamento */}
-              <div className="flex items-center space-x-3">
+              {/* Logos com melhor espaçamento responsivo */}
+              <div className="flex items-center space-x-2 sm:space-x-3">
                 <img
                   src="./images/logos/Logo Topo Sespa.png"
                   alt="Secretaria de Estado de Saúde Pública do Pará"
-                  className="h-12 w-auto"
+                  className="h-8 sm:h-10 lg:h-12 w-auto"
                 />
-                <div className="h-10 w-px bg-white/20 hidden md:block"></div>
+                <div className="h-6 sm:h-8 lg:h-10 w-px bg-white/20 hidden sm:block"></div>
                 <img
                   src="./images/logos/Logo Topo Saude Para.png"
                   alt="Saúde Pará"
-                  className="h-11 w-auto"
+                  className="h-7 sm:h-9 lg:h-11 w-auto"
                 />
                 <img
                   src="./images/logos/Logo Topo Bandeira.png"
                   alt="Governo do Estado do Pará"
-                  className="h-9 w-auto"
+                  className="h-6 sm:h-7 lg:h-9 w-auto"
                 />
               </div>
             </div>
 
-            {/* Navegação principal centralizada - Desktop */}
-            <nav className="hidden lg:flex items-center space-x-8" role="navigation">
-              <a
-                href="/"
-                className="text-white font-medium hover:text-blue-100 transition-colors py-2 px-3 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
-              >
-                Início
-              </a>
-              <a
-                href="/unidades"
-                className="text-white font-medium hover:text-blue-100 transition-colors py-2 px-3 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
-              >
-                Locais
-              </a>
-              <a
-                href="/campanhas"
-                className="text-white font-medium hover:text-blue-100 transition-colors py-2 px-3 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
-              >
-                Campanhas
-              </a>
-              <a
-                href="/fale-conosco"
-                className="text-white font-medium hover:text-blue-100 transition-colors py-2 px-3 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
-              >
-                Fale Conosco
-              </a>
-            </nav>
-
-            {/* Seção direita: Seletor de idiomas + Controles */}
-            <div className="flex items-center space-x-4">
-              {/* Seletor de idiomas */}
-              <select
-                value={selectedLanguage}
-                onChange={(e) =>
-                  setSelectedLanguage(e.target.value as Language)
-                }
-                className="w-32 p-2 bg-[#4D6FFF]/40 border border-white/10 rounded-full text-white text-sm focus:outline-none focus:ring-2 focus:ring-white/50 focus:bg-[#4D6FFF]/60 focus:border-white/20 transition-all"
-              >
-                {SUPPORTED_LANGUAGES.map(({ code, label, flag }) => (
-                  <option key={code} value={code} className="text-gray-900">
-                    {flag} {label}
-                  </option>
-                ))}
-              </select>
+            {/* Seção direita: Navegação para desktop */}
+            <div className="hidden md:flex items-center space-x-4">
+              <nav className="flex items-center space-x-6">
+                <a
+                  href="/"
+                  className="text-white hover:text-blue-200 transition-colors text-sm font-medium"
+                >
+                  Início
+                </a>
+                <a
+                  href="/mapa"
+                  className="text-blue-200 font-medium text-sm"
+                >
+                  Mapa
+                </a>
+                <a
+                  href="/campanhas"
+                  className="text-white hover:text-blue-200 transition-colors text-sm font-medium"
+                >
+                  Campanhas
+                </a>
+                <a
+                  href="/private/comunicacao-de-caso/nova"
+                  className="bg-blue-500 hover:bg-blue-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                >
+                  Nova Notificação
+                </a>
+                <a
+                  href="/login"
+                  className="text-white hover:text-blue-200 transition-colors text-sm font-medium"
+                >
+                  Entrar
+                </a>
+              </nav>
             </div>
           </div>
-
-          {/* Navegação mobile (tablet) */}
-          <nav className="lg:hidden mt-4 pt-4 border-t border-white/10" role="navigation">
-            <div className="flex flex-wrap justify-center gap-6">
-              <a
-                href="/"
-                className="text-white font-medium hover:text-blue-100 transition-colors py-2 px-3 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
-              >
-                Início
-              </a>
-              <a
-                href="/unidades"
-                className="text-white font-medium hover:text-blue-100 transition-colors py-2 px-3 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
-              >
-                Locais
-              </a>
-              <a
-                href="/campanhas"
-                className="text-white font-medium hover:text-blue-100 transition-colors py-2 px-3 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
-              >
-                Campanhas
-              </a>
-              <a
-                href="/fale-conosco"
-                className="text-white font-medium hover:text-blue-100 transition-colors py-2 px-3 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
-              >
-                Fale Conosco
-              </a>
-            </div>
-          </nav>
         </div>
       </header>
 
-      {/* Container do mapa com altura flexível */}
-      <div className="flex-1 relative">
+      {/* Container do mapa - ESTA É A PARTE PRINCIPAL DA CORREÇÃO */}
+      <div className="flex-1 relative overflow-hidden">
         {geoIsLoading && (
           <div className="absolute top-4 right-4 z-50 bg-white p-3 rounded-lg shadow-lg border">
             <div className="flex items-center space-x-2">
@@ -630,8 +595,8 @@ const MapaLeaflet: React.FC = () => {
 
         {/* Botão para abrir filtros no mobile/tablet */}
         <button
-          onClick={() => setMenuAberto(!menuAberto)}
-          className="absolute top-4 left-4 z-50 lg:hidden p-3 bg-white rounded-lg shadow-lg hover:bg-gray-50 transition-colors"
+          onClick={() => setPainelEstabelecimentosAberto(!painelEstabelecimentosAberto)}
+          className="absolute top-4 left-4 z-[1500] lg:hidden p-3 bg-white rounded-lg shadow-lg hover:bg-gray-50 transition-colors"
           aria-label="Abrir filtros"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -639,11 +604,23 @@ const MapaLeaflet: React.FC = () => {
           </svg>
         </button>
 
-        {/* Layout com painel lateral no desktop */}
-        <div className="flex flex-1 overflow-hidden">
-        {/* Painel lateral (sempre visível no desktop, deslizante no mobile) */}
+        {/* Botão para mostrar/esconder filtros no desktop - posicionado diferente */}
+        <button
+          onClick={() => setPainelEstabelecimentosAberto(!painelEstabelecimentosAberto)}
+          className="absolute top-20 left-4 z-[1500] hidden lg:block p-3 bg-white rounded-lg shadow-lg hover:bg-gray-50 transition-colors"
+          aria-label={painelEstabelecimentosAberto ? "Esconder filtros" : "Mostrar filtros"}
+          title={painelEstabelecimentosAberto ? "Esconder painel de filtros" : "Mostrar painel de filtros"}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707v4.172a1 1 0 01-.447.894l-2 1A1 1 0 0111 18.828v-5.172a1 1 0 00-.293-.707L4.293 7.535A1 1 0 014 6.828V4z" />
+          </svg>
+        </button>
+
+        {/* Layout com painel lateral no desktop - SIMPLIFICADO */}
+        <div className="absolute inset-0 flex">
+        {/* Painel lateral */}
         <PainelLateral
-          menuAberto={menuAberto}
+          menuAberto={painelEstabelecimentosAberto}
           tiposHabilitacoes={tiposHabilitacoes}
           tiposQualificacoes={tiposQualificacoes}
           habilitacaoSelecionada={habilitacaoSelecionada}
@@ -659,103 +636,146 @@ const MapaLeaflet: React.FC = () => {
           onTracarRota={tracarRota}
           onLoadMore={() => setVisibleCount((prev) => prev + 20)}
           onSearch={onSearch}
-          onClose={() => setMenuAberto(false)}
-          currentMapProvider={currentProvider}
-          onMapProviderChange={setCurrentProvider}
-          isMapboxAvailable={isAvailable('mapbox')}
-          onMapboxConfig={handleMapboxConfig}
-          mapboxApiKey={mapboxApiKey}
+          onClose={() => setPainelEstabelecimentosAberto(false)}
         />
 
-        {/* Container do mapa que se adapta ao painel lateral */}
-        <div className="flex-1 relative">
+        {/* Container do mapa - SIMPLIFICADO */}
+        <div className="flex-1 relative" style={{ paddingBottom: window.innerWidth < 768 ? '64px' : '0' }}>
           {/* O mapa em si, com marcadores */}
           <MapaContainer
-            center={mapCenter}
-            userLocation={userLocation}
-            filteredPlaces={filteredPlaces}
-            selectedMarker={selectedMarker}
-            visibleCount={visibleCount}
-            onMapLoad={handleMapLoad}
-            onMapIdle={() => {}}
-            onMarkerClick={setSelectedMarker}
-            onInfoWindowClose={() => setSelectedMarker(null)}
-            onTracarRota={tracarRota}
-            mapboxApiKey={mapboxApiKey}
-          />
+              center={mapCenter}
+              userLocation={userLocation}
+              filteredPlaces={filteredPlaces}
+              selectedMarker={selectedMarker}
+              visibleCount={visibleCount}
+              onMapLoad={handleMapLoad}
+              onMapIdle={() => {}}
+              onMarkerClick={setSelectedMarker}
+              onInfoWindowClose={() => setSelectedMarker(null)}
+              onTracarRota={tracarRota}
+              mapboxApiKey={mapboxApiKey}
+            />
 
-          {/* Botões de controle */}
-          <BotoesControle
-            directions={selectedLocal ? {} as any : null}
-            voiceGuidanceActive={voiceGuidanceActive}
-            routeInfo={{
-              hasRoute: !!routeState.route,
-              isCalculating: routeState.isCalculating,
-              distance: routeState.route ? RoutingServiceOSRM.formatDistance(routeState.route.distance) : undefined,
-              duration: routeState.route ? RoutingServiceOSRM.formatDuration(routeState.route.duration) : undefined,
-            }}
-            onCentralizarUsuario={centralizarNoUsuario}
-            onCarregarDados={buscarNovamente}
-            onLimparRota={limparRota}
-            onToggleVoiceGuidance={() => setVoiceGuidanceActive(!voiceGuidanceActive)}
-          />
-        </div>
-      </div>
+            {/* Overlay para seleção de servidor de mapa */}
+            <MapProviderOverlay />
 
-      {/* Tela de carregamento caso dados ainda estejam sendo lidos */}
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80 z-50">
-          <div className="text-xl">Carregando...</div>
+            {/* Botões de controle */}
+            <BotoesControle
+              directions={selectedLocal ? {} as any : null}
+              voiceGuidanceActive={voiceGuidanceActive}
+              routeInfo={{
+                hasRoute: !!routeState.route,
+                isCalculating: routeState.isCalculating,
+                distance: routeState.route ? RoutingServiceOSRM.formatDistance(routeState.route.distance) : undefined,
+                duration: routeState.route ? RoutingServiceOSRM.formatDuration(routeState.route.duration) : undefined,
+              }}
+              onCentralizarUsuario={centralizarNoUsuario}
+              onCarregarDados={buscarNovamente}
+              onLimparRota={limparRota}
+              onToggleVoiceGuidance={() => setVoiceGuidanceActive(!voiceGuidanceActive)}
+            />
         </div>
-      )}
+        </div>
 
-      {/* Mensagem de erro de localização, se existir */}
-      {locationError && (
-        <div
-          className="fixed top-20 left-4 right-4 bg-red-100 border border-red-400 
-          text-red-700 px-4 py-3 rounded-lg z-50 md:absolute"
-        >
-          {locationError}
-        </div>
-      )}
+        {/* Tela de carregamento caso dados ainda estejam sendo lidos */}
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80 z-50">
+            <div className="text-xl">Carregando...</div>
+          </div>
+        )}
+
+        {/* Mensagem de erro de localização, se existir */}
+        {locationError && (
+          <div className="absolute top-20 left-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg z-50 md:relative">
+            {locationError}
+          </div>
+        )}
       </div>
 
       {/* SideMenu da Home */}
       <SideMenu 
         isOpen={menuAberto}
         onClose={() => setMenuAberto(false)}
-        selectedLanguage={selectedLanguage}
-        onLanguageChange={setSelectedLanguage}
       />
 
-      {/* Footer do Governo do Pará */}
-      <footer className="bg-blue-900 text-white py-12">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-            <div>
-              <h3 className="text-lg font-medium mb-4">Contato</h3>
-              <ul className="space-y-2">
+      {/* Botões FAB - Bottom Navigation - APENAS MOBILE */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-[1300] flex-shrink-0">
+        <div className="flex items-center h-16 relative px-2">
+          <div className="flex-1 flex justify-around items-center">
+            <button
+              className="flex flex-col items-center"
+              onClick={() => navigate("/")}
+            >
+              <Home className="w-6 h-6 text-gray-400" />
+              <span className="text-xs text-gray-400">Início</span>
+            </button>
+            
+            <button
+              className="flex flex-col items-center"
+              onClick={() => navigate("/mapa")}
+            >
+              <Map className="w-6 h-6 text-blue-600" />
+              <span className="text-xs text-blue-600">Mapa</span>
+            </button>
+          </div>
+
+          {/* FAB Button Central */}
+          <div className="w-12"></div>
+          <button 
+            className="absolute -top-6 left-1/2 -translate-x-1/2 w-14 h-14 bg-blue-600 rounded-full flex flex-col items-center justify-center shadow-lg"
+            onClick={() => navigate("/private/comunicacao-de-caso/nova")}
+          >
+            <FileText className="w-6 h-6 text-white" />
+          </button>
+
+          <div className="flex-1 flex justify-around items-center">
+            <button
+              className="flex flex-col items-center"
+              onClick={() => navigate("/campanhas")}
+            >
+              <Heart className="w-6 h-6 text-gray-400" />
+              <span className="text-xs text-gray-400">Campanhas</span>
+            </button>
+
+            <button
+              className="flex flex-col items-center"
+              onClick={() => navigate("/login")}
+            >
+              <User className="w-6 h-6 text-gray-400" />
+              <span className="text-xs text-gray-400">Entrar</span>
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* Footer do Governo do Pará - APENAS DESKTOP - VERSÃO COMPACTA */}
+      <footer className="hidden md:block bg-blue-900 text-white py-4 flex-shrink-0">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <div className="sm:col-span-2 lg:col-span-1">
+              <h3 className="text-sm font-medium mb-2">Contato</h3>
+              <ul className="space-y-1 text-xs">
                 <li className="flex items-start">
-                  <span className="mr-2 text-pink-500">📍</span>
+                  <span className="mr-1 text-pink-500">📍</span>
                   <span>Rua Boaventura da Silva, 883 - Nazaré, Belém - PA</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="mr-2 text-red-500">📞</span>
+                  <span className="mr-1 text-red-500">📞</span>
                   <span>(91) 4006-4200</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="mr-2 text-blue-400">✉️</span>
-                  <span>http://www.saude.pa.gov.br</span>
+                  <span className="mr-1 text-blue-400">✉️</span>
+                  <span className="break-words">http://www.saude.pa.gov.br</span>
                 </li>
               </ul>
-              <div className="flex space-x-4 mt-4">
+              <div className="flex space-x-2 mt-2">
                 <a
                   href="https://www.facebook.com/sespaPARA"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="h-10 w-10 rounded-full bg-[#3B5998] flex items-center justify-center hover:opacity-90 transition"
+                  className="h-6 w-6 rounded-full bg-[#3B5998] flex items-center justify-center hover:opacity-90 transition"
                 >
-                  <svg className="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <svg className="h-3 w-3 text-white" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                   </svg>
                 </a>
@@ -763,9 +783,9 @@ const MapaLeaflet: React.FC = () => {
                   href="https://www.instagram.com/sespapara"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="h-10 w-10 rounded-full bg-[#C13584] flex items-center justify-center hover:opacity-90 transition"
+                  className="h-6 w-6 rounded-full bg-[#C13584] flex items-center justify-center hover:opacity-90 transition"
                 >
-                  <svg className="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <svg className="h-3 w-3 text-white" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 6.62 5.367 11.987 11.988 11.987c6.62 0 11.987-5.367 11.987-11.987C24.014 5.367 18.637.001 12.017.001zM8.449 16.988c-1.297 0-2.448-.611-3.132-1.551-.684-.94-.684-2.284 0-3.224.684-.94 1.835-1.551 3.132-1.551s2.448.611 3.132 1.551c.684.94.684 2.284 0 3.224-.684.94-1.835 1.551-3.132 1.551z"/>
                   </svg>
                 </a>
@@ -773,9 +793,9 @@ const MapaLeaflet: React.FC = () => {
                   href="https://x.com/SespaPara"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="h-10 w-10 rounded-full bg-black flex items-center justify-center hover:opacity-90 transition"
+                  className="h-6 w-6 rounded-full bg-black flex items-center justify-center hover:opacity-90 transition"
                 >
-                  <svg className="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <svg className="h-3 w-3 text-white" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                   </svg>
                 </a>
@@ -783,33 +803,33 @@ const MapaLeaflet: React.FC = () => {
                   href="https://www.youtube.com/sespapara"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="h-10 w-10 rounded-full bg-[#FF0000] flex items-center justify-center hover:opacity-90 transition"
+                  className="h-6 w-6 rounded-full bg-[#FF0000] flex items-center justify-center hover:opacity-90 transition"
                 >
-                  <svg className="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <svg className="h-3 w-3 text-white" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
                   </svg>
                 </a>
               </div>
             </div>
-            <div>
-              <h3 className="text-lg font-medium mb-4">Horário de Funcionamento</h3>
-              <p>Segunda a Sexta: 8h às 18h</p>
-              <p className="mt-4">A SESPA é o órgão responsável pela gestão da saúde pública no Estado do Pará.</p>
+            <div className="sm:col-span-2 lg:col-span-1">
+              <h3 className="text-sm font-medium mb-2">Horário de Funcionamento</h3>
+              <p className="text-xs">Segunda a Sexta: 8h às 18h</p>
+              <p className="mt-1 text-xs">A SESPA é o órgão responsável pela gestão da saúde pública no Estado do Pará.</p>
             </div>
-            <div>
-              <h3 className="text-lg font-medium mb-4">Ouvidoria</h3>
-              <p>Dúvidas, críticas ou sugestões?</p>
-              <p className="mt-2">Entre em contato com nossa ouvidoria:</p>
-              <p className="mt-2">📞 0800-280-9209</p>
-              <p className="mt-2">✉️ ouvidoria@saude.pa.gov.br</p>
+            <div className="sm:col-span-2 lg:col-span-1">
+              <h3 className="text-sm font-medium mb-2">Ouvidoria</h3>
+              <p className="text-xs">Dúvidas, críticas ou sugestões?</p>
+              <p className="mt-1 text-xs">Entre em contato com nossa ouvidoria:</p>
+              <p className="mt-1 text-xs">📞 0800-280-9209</p>
+              <p className="mt-1 text-xs break-words">✉️ ouvidoria@saude.pa.gov.br</p>
             </div>
-            <div>
-              <h3 className="text-lg font-medium mb-4">Portal Saúde Pará</h3>
-              <p>Sistema integrado de informações de saúde do Estado do Pará.</p>
-              <p className="mt-2">Desenvolvido pela SESPA</p>
+            <div className="sm:col-span-2 lg:col-span-1">
+              <h3 className="text-sm font-medium mb-2">Portal Saúde Pará</h3>
+              <p className="text-xs">Sistema integrado de informações de saúde do Estado do Pará.</p>
+              <p className="mt-1 text-xs">Desenvolvido pela SESPA</p>
             </div>
           </div>
-          <div className="text-center text-sm border-t border-white/20 pt-6">
+          <div className="text-center text-xs border-t border-white/20 pt-2">
             <p>© {new Date().getFullYear()} Secretaria de Estado de Saúde Pública do Pará - SESPA. Todos os direitos reservados.</p>
           </div>
         </div>

@@ -20,7 +20,7 @@ const SortingMenu: React.FC<SortingMenuProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="absolute left-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 p-2">
+    <div className="absolute left-0 md:left-0 right-0 md:right-auto mt-2 w-48 md:w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 p-2">
       {columns
         .filter((col) => col.sortable !== false)
         .map((col) => (

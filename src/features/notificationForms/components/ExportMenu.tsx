@@ -37,7 +37,7 @@ const CompactExportMenu: React.FC<CompactExportMenuProps> = ({
   const currentPdfType = pdfTypes.find(type => type.type === selectedPdfType) || pdfTypes[2];
 
   return (
-    <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+    <div className="absolute right-0 md:right-0 left-0 md:left-auto mt-2 w-full md:w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
       {/* Header Compacto */}
       <div className="px-4 py-2 bg-blue-600 text-white rounded-t-lg">
         <div className="flex items-center">

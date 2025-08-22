@@ -24,7 +24,12 @@ export const useEstabelecimentos = () => {
         console.log('🔍 Primeiro estabelecimento já convertido:', estabelecimentos[0]);
       }
       
-      setAllPlaces(estabelecimentos);
+      // Filtrar estabelecimentos com endereço válido e converter para o tipo esperado
+      const estabelecimentosValidos = estabelecimentos
+        .filter(est => est.endereco !== undefined)
+        .map(est => ({ ...est, endereco: est.endereco! }));
+      
+      setAllPlaces(estabelecimentosValidos);
 
       // Extrair habilitações e qualificações únicas dos estabelecimentos já convertidos
       const habilitacoes = EstabelecimentoMapaService.getHabilitacoesUnicas(estabelecimentos);

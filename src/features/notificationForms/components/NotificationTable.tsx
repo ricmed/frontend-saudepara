@@ -62,7 +62,7 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-md overflow-x-auto">
+    <div className="bg-white rounded-xl shadow-md overflow-hidden">
       {error && (
         <div className="bg-red-50 text-red-700 p-4 mb-4 flex justify-between items-center">
           <span>{error}</span>
@@ -75,7 +75,92 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
         </div>
       )}
 
-      <div className="overflow-x-auto">
+      {/* Mobile: Cards Layout */}
+      <div className="block md:hidden">
+        {isLoading ? (
+          <div className="p-8 text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <p className="mt-2 text-gray-500">Carregando...</p>
+          </div>
+        ) : notificacoes.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">
+            <p>
+              {searchTerm
+                ? `Nenhuma notificação encontrada para "${searchTerm}"`
+                : "Nenhuma notificação cadastrada"}
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-200">
+            {notificacoes.map((notificacao) => (
+              <div
+                key={notificacao.id}
+                className="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                onClick={() =>
+                  navigate(
+                    `/private/comunicacao-de-caso/editar/${notificacao.id}`
+                  )
+                }
+              >
+                <div className="flex justify-between items-start">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium text-gray-900 truncate">
+                      {notificacao.paciente || 'Paciente não informado'}
+                    </h3>
+                    <div className="mt-1 text-sm text-gray-600 space-y-1">
+                      {notificacao.tipoEvento && (
+                        <div className="flex items-center">
+                          <span className="font-medium mr-2">Evento:</span>
+                          <span>{notificacao.tipoEvento}</span>
+                        </div>
+                      )}
+                      {notificacao.dataOcorrencia && (
+                        <div className="flex items-center">
+                          <span className="font-medium mr-2">Ocorrência:</span>
+                          <span>{formatDate(notificacao.dataOcorrencia)}</span>
+                        </div>
+                      )}
+                      {notificacao.tipoAtendimento && (
+                        <div className="flex items-center">
+                          <span className="font-medium mr-2">Atendimento:</span>
+                          <span>{notificacao.tipoAtendimento}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex space-x-1 ml-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(
+                          `/private/comunicacao-de-caso/editar/${notificacao.id}`
+                        );
+                      }}
+                      className="p-3 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-md transition-colors touch-manipulation"
+                      title="Editar"
+                    >
+                      <Edit className="h-5 w-5" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(notificacao.id);
+                      }}
+                      className="p-3 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-md transition-colors touch-manipulation"
+                      title="Excluir"
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Desktop: Table Layout */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-blue-600 text-white">
             <tr>

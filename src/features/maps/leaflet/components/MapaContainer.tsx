@@ -74,7 +74,7 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
       const map = L.map(mapContainerRef.current, {
         center: [center.lat, center.lng],
         zoom: 6,
-        zoomControl: true,
+        zoomControl: false,  // Removido para reposicionar
         attributionControl: true,
         // OTIMIZAÇÃO 1: Performance melhorada para eventos grandes
         preferCanvas: true,        // Usa Canvas ao invés de SVG - muito mais rápido
@@ -87,6 +87,11 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
         ],
         maxBoundsViscosity: 0.8,  // Resistência para sair dos limites
       });
+
+      // Adicionar controle de zoom no canto inferior direito
+      L.control.zoom({
+        position: 'bottomright'
+      }).addTo(map);
 
       // OTIMIZAÇÃO 2 & 3: Tile provider otimizado para COP 30 no Brasil
       const tileLayer = L.tileLayer(tileProvider.url, {
@@ -160,6 +165,34 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
       console.error('❌ Erro ao atualizar centro do mapa:', error);
     }
   }, [center.lat, center.lng, isMapReady]); // Dependências específicas
+
+  // Atualizar tile layer quando o provedor de mapa mudar
+  useEffect(() => {
+    if (!mapRef.current || !isMapReady) return;
+
+    try {
+      console.log('🔄 Atualizando tile layer para:', tileProvider.url);
+      
+      // Remover todas as camadas de tile existentes
+      mapRef.current.eachLayer((layer) => {
+        if (layer instanceof L.TileLayer) {
+          mapRef.current!.removeLayer(layer);
+        }
+      });
+
+      // Adicionar nova camada de tile
+      const newTileLayer = L.tileLayer(tileProvider.url, {
+        attribution: tileProvider.attribution,
+        maxZoom: tileProvider.maxZoom,
+        minZoom: 3,
+        ...TILE_OPTIONS, // Configurações de cache agressivo
+      });
+      
+      newTileLayer.addTo(mapRef.current);
+    } catch (error) {
+      console.error('❌ Erro ao atualizar tile layer:', error);
+    }
+  }, [tileProvider, isMapReady]); // Monitora mudanças no tileProvider
 
   // Gerenciar marcador do usuário
   useEffect(() => {
@@ -391,26 +424,26 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
       
       {/* Legenda */}
       {isMapReady && (
-        <div className="absolute bottom-4 left-4 bg-white p-3 rounded-lg shadow-lg z-[1000] max-w-xs">
-          <h4 className="text-sm font-semibold mb-2 text-gray-800">Legenda</h4>
-          <div className="space-y-2 text-xs">
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 bg-blue-500 rounded-full border-2 border-white shadow flex items-center justify-center">
-                <div className="w-2 h-2 bg-white rounded-full"></div>
+        <div className="absolute bottom-4 left-4 bg-white p-2 sm:p-3 rounded-lg shadow-lg z-[1000] max-w-[180px] sm:max-w-xs">
+          <h4 className="text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-gray-800">Legenda</h4>
+          <div className="space-y-1 sm:space-y-2 text-xs">
+            <div className="flex items-center gap-1 sm:gap-2">
+              <div className="w-4 h-4 sm:w-5 sm:h-5 bg-blue-500 rounded-full border-2 border-white shadow flex items-center justify-center">
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white rounded-full"></div>
               </div>
-              <span className="text-gray-700">Sua localização</span>
+              <span className="text-gray-700 text-xs">Sua localização</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 bg-red-500 rounded-full border-2 border-white shadow flex items-center justify-center text-white text-xs font-bold">
+            <div className="flex items-center gap-1 sm:gap-2">
+              <div className="w-4 h-4 sm:w-5 sm:h-5 bg-red-500 rounded-full border-2 border-white shadow flex items-center justify-center text-white text-xs font-bold">
                 P
               </div>
-              <span className="text-gray-700">Estabelecimento Público</span>
+              <span className="text-gray-700 text-xs">Estabelecimento Público</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 bg-yellow-500 rounded-full border-2 border-white shadow flex items-center justify-center text-black text-xs font-bold">
+            <div className="flex items-center gap-1 sm:gap-2">
+              <div className="w-4 h-4 sm:w-5 sm:h-5 bg-yellow-500 rounded-full border-2 border-white shadow flex items-center justify-center text-black text-xs font-bold">
                 V
               </div>
-              <span className="text-gray-700">Estabelecimento Privado</span>
+              <span className="text-gray-700 text-xs">Estabelecimento Privado</span>
             </div>
           </div>
         </div>

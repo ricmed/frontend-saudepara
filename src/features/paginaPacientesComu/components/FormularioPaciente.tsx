@@ -12,7 +12,7 @@ import {
   HelpCircle,
   Loader,
   Menu,
-  ArchiveX,
+  Trash2,
   WifiOff, // ✅ NOVO: Ícone offline
   Database // ✅ NOVO: Ícone cache
 } from "lucide-react";
@@ -26,7 +26,6 @@ import {
 } from "@/services/PacienteService";
 import { toast } from "react-toastify";
 import SideMenu from "@/features/home/components/SideMenu";
-import { useLanguage } from "@/contexts/LanguageContext";
 import { useOfflineSystem } from '@/hooks/useOfflineSystem';
 import ConnectionStatus from '@/components/ConnectionStatus';
 import indexedDBService from '@/services/indexedDB';
@@ -161,7 +160,6 @@ const FormularioPaciente = ({
 
   // Adicionando estado para o SideMenu
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { selectedLanguage, setSelectedLanguage } = useLanguage();
 
   // ✅ FUNÇÃO: Carregar opções do cache offline
   const loadOptionsFromCache = async (): Promise<{ hasData: boolean }> => {
@@ -1180,70 +1178,144 @@ const FormularioPaciente = ({
     <div className={isModal ? "" : "min-h-screen bg-gray-50"}>
       {/* Cabeçalho - só exibir se não for modal */}
       {!isModal && (
-        <header className="bg-gradient-to-r from-blue-600 to-blue-800 p-6 shadow-lg sticky top-0 z-10">
-          <div className="max-w-5xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-4 text-white">
-              <button
-                onClick={() => setIsMenuOpen(true)}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                title="Menu"
-              >
-                <Menu className="h-6 w-6 text-white" />
-              </button>
-              
-              <button
-                onClick={() => window.history.back()}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                title="Voltar"
-              >
-                <ArrowLeft className="h-6 w-6 text-white" />
-              </button>
-              <UserCircle className="h-8 w-8" />
-              <h1 className="text-2xl font-semibold">
-                {pacienteId ? "Editar Paciente" : "Cadastro de Paciente"}
-              </h1>
-              
-              {/* ✅ NOVO: Indicador de status offline no cabeçalho */}
-              {!isOnline && (
-                <div className="flex items-center gap-2 px-3 py-1 bg-yellow-500 text-yellow-900 rounded-full text-sm font-medium">
-                  <WifiOff className="h-4 w-4" />
-                  Offline
+        <header className="bg-gradient-to-r from-blue-600 to-blue-800 p-4 md:p-6 shadow-lg sticky top-0 z-10">
+          <div className="max-w-5xl mx-auto">
+            {/* Mobile Layout: Two rows */}
+            <div className="block md:hidden">
+              {/* First row: Navigation buttons and title */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2 text-white">
+                  <button
+                    onClick={() => setIsMenuOpen(true)}
+                    className="p-2 hover:bg-white/10 rounded-lg transition-colors touch-manipulation"
+                    title="Menu"
+                  >
+                    <Menu className="h-6 w-6 text-white" />
+                  </button>
+                  
+                  <button
+                    onClick={() => window.history.back()}
+                    className="p-2 hover:bg-white/10 rounded-lg transition-colors touch-manipulation"
+                    title="Voltar"
+                  >
+                    <ArrowLeft className="h-6 w-6 text-white" />
+                  </button>
+                  <UserCircle className="h-6 w-6" />
+                  <h1 className="text-lg font-semibold">
+                    {pacienteId ? "Editar" : "Novo"}
+                  </h1>
                 </div>
-              )}
+                
+                {/* Status offline indicator - mobile */}
+                {!isOnline && (
+                  <div className="flex items-center gap-1 px-2 py-1 bg-yellow-500 text-yellow-900 rounded text-xs font-medium">
+                    <WifiOff className="h-3 w-3" />
+                    Off
+                  </div>
+                )}
+              </div>
+              
+              {/* Second row: Action buttons - apenas ícones compactos */}
+              <div className="flex gap-1 ml-auto">
+                <button
+                  type="submit"
+                  form="paciente-form"
+                  disabled={isSaving || isLoadingOptions}
+                  className="p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed touch-manipulation"
+                  title="Salvar"
+                >
+                  {isSaving ? (
+                    <Loader className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  disabled={isSaving || isLoadingOptions}
+                  className="p-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors touch-manipulation"
+                  title="Limpar"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.history.back()}
+                  disabled={isSaving}
+                  className="p-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors touch-manipulation"
+                  title="Cancelar"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <button
-                type="submit"
-                form="paciente-form"
-                disabled={isSaving || isLoadingOptions}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {isSaving ? (
-                  <Loader className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4" />
+            {/* Desktop Layout: Single row */}
+            <div className="hidden md:flex items-center justify-between">
+              <div className="flex items-center gap-4 text-white">
+                <button
+                  onClick={() => setIsMenuOpen(true)}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                  title="Menu"
+                >
+                  <Menu className="h-6 w-6 text-white" />
+                </button>
+                
+                <button
+                  onClick={() => window.history.back()}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                  title="Voltar"
+                >
+                  <ArrowLeft className="h-6 w-6 text-white" />
+                </button>
+                <UserCircle className="h-8 w-8" />
+                <h1 className="text-2xl font-semibold">
+                  {pacienteId ? "Editar Paciente" : "Cadastro de Paciente"}
+                </h1>
+                
+                {/* Desktop offline indicator */}
+                {!isOnline && (
+                  <div className="flex items-center gap-2 px-3 py-1 bg-yellow-500 text-yellow-900 rounded-full text-sm font-medium">
+                    <WifiOff className="h-4 w-4" />
+                    Offline
+                  </div>
                 )}
-                {isSaving ? "Salvando..." : "Salvar"}
-              </button>
-              <button
-                type="button"
-                onClick={handleReset}
-                disabled={isSaving || isLoadingOptions}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
-              >
-                <ArchiveX className="h-4 w-4" />
-                Limpar
-              </button>
-              <button
-                type="button"
-                onClick={() => window.history.back()}
-                disabled={isSaving}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
-              >
-                <X className="h-4 w-4" />
-                Cancelar
-              </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="submit"
+                  form="paciente-form"
+                  disabled={isSaving || isLoadingOptions}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {isSaving ? (
+                    <Loader className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  {isSaving ? "Salvando..." : "Salvar"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  disabled={isSaving || isLoadingOptions}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Limpar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.history.back()}
+                  disabled={isSaving}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                  Cancelar
+                </button>
+              </div>
             </div>
           </div>
         </header>
@@ -1254,8 +1326,6 @@ const FormularioPaciente = ({
         <SideMenu 
           isOpen={isMenuOpen} 
           onClose={() => setIsMenuOpen(false)}
-          selectedLanguage={selectedLanguage}
-          onLanguageChange={(language) => setSelectedLanguage(language)}
         />
       )}
 
@@ -1379,10 +1449,10 @@ const FormularioPaciente = ({
               onToggle={() => toggleSection("identificacao_individuo")}
             />
             {expandedSections.identificacao_individuo && (
-              <div className="p-6 border-t">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-4 md:p-6 border-t">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
                   {/* Nome */}
-                  <div>
+                  <div className="sm:col-span-2 lg:col-span-1">
                     <label className="block mb-2 font-medium text-gray-700">
                       Nome <span className="text-red-500">*</span>
                     </label>
@@ -1392,7 +1462,7 @@ const FormularioPaciente = ({
                       placeholder="Nome do paciente"
                       className={`w-full p-3 border ${
                         errors.nome ? "border-red-500 bg-red-50" : "border-gray-200"
-                      } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
+                      } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none touch-manipulation`}
                       value={formData.nome}
                       onChange={handleChange}
                       maxLength={100}
@@ -1405,7 +1475,7 @@ const FormularioPaciente = ({
                   </div>
 
                   {/* Nome da Mãe */}
-                  <div>
+                  <div className="sm:col-span-2 lg:col-span-1">
                     <label className="block mb-2 font-medium text-gray-700">
                       Nome da Mãe
                     </label>
@@ -1415,7 +1485,7 @@ const FormularioPaciente = ({
                       placeholder="Nome da mãe do paciente"
                       className={`w-full p-3 border ${
                         errors.nome_mae ? "border-red-500 bg-red-50" : "border-gray-200"
-                      } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
+                      } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none touch-manipulation`}
                       value={formData.nome_mae}
                       onChange={handleChange}
                       maxLength={100}
@@ -1440,7 +1510,7 @@ const FormularioPaciente = ({
                         errors.data_nascimento
                           ? "border-red-500 bg-red-50"
                           : "border-gray-200"
-                      } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
+                      } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none touch-manipulation`}
                       value={formData.data_nascimento}
                       onChange={handleChange}
                       disabled={isLoading || isLoadingOptions}
@@ -1797,41 +1867,82 @@ const FormularioPaciente = ({
           </div>
 
           {/* Botões de Ação (Inferiores) */}
-          <div className="mt-8 flex justify-center space-x-4">
-            <button
-              type="submit"
-              disabled={isSaving || isLoadingOptions}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {isSaving ? (
-                <Loader className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
+          <div className="mt-6 md:mt-8">
+            {/* Mobile Layout: Full-width stacked buttons */}
+            <div className="flex flex-col gap-3 sm:hidden">
+              <button
+                type="submit"
+                disabled={isSaving || isLoadingOptions}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed touch-manipulation"
+              >
+                {isSaving ? (
+                  <Loader className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                {isSaving ? "Salvando..." : "Salvar"}
+              </button>
+              {!isModal && (
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  disabled={isSaving || isLoadingOptions}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors touch-manipulation"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Limpar
+                </button>
               )}
-              {isSaving ? "Salvando..." : "Salvar"}
-            </button>
-            {!isModal && (
               <button
                 type="button"
-                onClick={handleReset}
-                disabled={isSaving || isLoadingOptions}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+                onClick={
+                  isModal ? () => onClose?.() : () => window.history.back()
+                }
+                disabled={isSaving}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors touch-manipulation"
               >
-                <ArchiveX className="h-4 w-4" />
-                Limpar
+                <X className="h-4 w-4" />
+                {isModal ? "Cancelar" : "Cancelar"}
               </button>
-            )}
-            <button
-              type="button"
-              onClick={
-                isModal ? () => onClose?.() : () => window.history.back()
-              }
-              disabled={isSaving}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
-            >
-              <X className="h-4 w-4" />
-              {isModal ? "Cancelar" : "Cancelar"}
-            </button>
+            </div>
+
+            {/* Desktop Layout: Centered horizontal buttons */}
+            <div className="hidden sm:flex justify-center space-x-4">
+              <button
+                type="submit"
+                disabled={isSaving || isLoadingOptions}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isSaving ? (
+                  <Loader className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                {isSaving ? "Salvando..." : "Salvar"}
+              </button>
+              {!isModal && (
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  disabled={isSaving || isLoadingOptions}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Limpar
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={
+                  isModal ? () => onClose?.() : () => window.history.back()
+                }
+                disabled={isSaving}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+              >
+                <X className="h-4 w-4" />
+                {isModal ? "Cancelar" : "Cancelar"}
+              </button>
+            </div>
           </div>
         </form>
       </main>

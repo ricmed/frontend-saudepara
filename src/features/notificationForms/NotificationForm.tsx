@@ -9,14 +9,12 @@ import {
   Loader,
   FileChartColumnIncreasing,
   Files,
-  ArchiveX,
+  Trash2,
   Menu,
 } from "lucide-react";
 import ModalBuscaPaciente from "@/features/paginaPacientesComu/components/ModalBuscaPaciente";
 // Atualizar a importação do SideMenu
 import SideMenu from "@/features/home/components/SideMenu";
-// Adicionar importação do contexto de linguagem
-import { useLanguage } from "@/contexts/LanguageContext";
 import ConnectionStatus from "@/components/ConnectionStatus";
 
 // Import custom hooks
@@ -41,8 +39,7 @@ const NotificationForm: React.FC = () => {
   
   // Adicionar estado para controle do SideMenu
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  // Adicionar contexto de idioma
-  const { selectedLanguage, setSelectedLanguage } = useLanguage();  // Use the main form hook
+  // Use the main form hook
   const {
     formData,
     setFormData,
@@ -151,42 +148,55 @@ const NotificationForm: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Cabeçalho */}
-      <header className="bg-gradient-to-r from-blue-600 to-blue-800 p-6 shadow-lg sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4 text-white">
+      <header className="bg-gradient-to-r from-blue-600 to-blue-800 p-4 sm:p-6 shadow-lg sticky top-0 z-10">
+        <div className="max-w-5xl mx-auto">
+          {/* Linha 1: Controles de navegação e título */}
+          <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
             {/* Adicionar botão para abrir o SideMenu */}
             <button
               onClick={() => setIsMenuOpen(true)}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
               title="Menu"
             >
-              <Menu className="h-6 w-6 text-white" />
+              <Menu className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
             </button>
             
             <button
               onClick={() => navigate("/private/comunicacao-de-caso")}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
               title="Voltar"
             >
-              <ArrowLeft className="h-6 w-6 text-white" />
+              <ArrowLeft className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
             </button>
-            <h1 className="text-2xl font-semibold">
-              {isEditMode
-                ? "Editar Dados da Ficha de Comunicação"
-                : "Nova Comunicação"}
+            
+            <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-white truncate flex-1">
+              {/* Título responsivo */}
+              <span className="hidden lg:inline">
+                {isEditMode ? "Editar Dados da Ficha de Comunicação" : "Nova Comunicação"}
+              </span>
+              <span className="hidden sm:inline lg:hidden">
+                {isEditMode ? "Editar Comunicação" : "Nova Comunicação"}
+              </span>
+              <span className="sm:hidden">
+                {isEditMode ? "Editar" : "Nova"}
+              </span>
             </h1>
-          </div>          <div className="relative flex items-center gap-3">
-            {/* Botão Exportar com Dropdown */}
-            <div className="relative">
+          </div>
+
+          {/* Linha 2: Botões de ação - organizados responsivamente */}
+          <div className="flex items-center gap-2 sm:gap-2">
+            {/* Botão Exportar - responsivo */}
+            <div className="relative order-2 sm:order-1">
               <button
                 onClick={toggleExportDropdown}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 text-white rounded-md hover:bg-white/20 transition-colors"
+                className="p-2 sm:w-auto sm:inline-flex sm:items-center sm:justify-center sm:gap-2 sm:px-4 sm:py-2 bg-white/10 text-white rounded-md hover:bg-white/20 transition-colors"
+                title="Exportar PDF"
               >
                 <Download className="h-4 w-4" />
-                Exportar
+                <span className="hidden sm:inline">Exportar</span>
               </button>
 
-              {/* Dropdown de Exportação - Apenas PDF */}
+              {/* Dropdown de Exportação */}
               {isExportDropdownOpen && (
                 <div className="absolute right-0 mt-2 w-48 rounded-md shadow-xl bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
                   <div className="py-1" role="menu" aria-orientation="vertical">
@@ -201,47 +211,52 @@ const NotificationForm: React.FC = () => {
                 </div>
               )}
             </div>
-            <div className="h-6 w-px bg-white/20 mx-2" /> {/* Separador */}
-            {/* Botões de Ação (CABEÇALHO) */}
-            <button
-              type="submit"
-              form="notification-form"
-              disabled={isSaving}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {isSaving ? (
-                <Loader className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              {isSaving ? "Salvando..." : "Salvar"}
-            </button>
-            <button
-              type="button"
-              onClick={handleClearForm}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
-            >
-              <ArchiveX className="h-4 w-4" />
-              Limpar
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/private/comunicacao-de-caso")}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
-            >
-              <X className="h-4 w-4" />
-              Cancelar
-            </button>
+
+            {/* Grupo de botões principais - responsivo */}
+            <div className="flex gap-1 sm:gap-1 ml-auto">
+              <button
+                type="submit"
+                form="notification-form"
+                disabled={isSaving}
+                className="p-2 sm:w-auto sm:inline-flex sm:items-center sm:justify-center sm:gap-2 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                title="Salvar"
+              >
+                {isSaving ? (
+                  <Loader className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                <span className="hidden sm:inline">{isSaving ? "Salvando..." : "Salvar"}</span>
+              </button>
+              
+              <button
+                type="button"
+                onClick={handleClearForm}
+                className="p-2 sm:w-auto sm:inline-flex sm:items-center sm:justify-center sm:gap-2 sm:px-4 sm:py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+                title="Limpar"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Limpar</span>
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => navigate("/private/comunicacao-de-caso")}
+                className="p-2 sm:w-auto sm:inline-flex sm:items-center sm:justify-center sm:gap-2 sm:px-4 sm:py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                title="Cancelar"
+              >
+                <X className="h-4 w-4" />
+                <span className="hidden sm:inline">Cancelar</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* Adicionar o SideMenu com as props corretas */}
+      {/* Adicionar o SideMenu */}
       <SideMenu 
         isOpen={isMenuOpen} 
         onClose={() => setIsMenuOpen(false)}
-        selectedLanguage={selectedLanguage}
-        onLanguageChange={(language) => setSelectedLanguage(language)}
       />
 
       <main className="max-w-5xl mx-auto p-6">
@@ -431,7 +446,7 @@ const NotificationForm: React.FC = () => {
               onClick={handleClearForm}
               className="inline-flex items-center gap-2 px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
             >
-              <ArchiveX className="h-4 w-4" />
+              <Trash2 className="h-4 w-4" />
               Limpar
             </button>
             <button
