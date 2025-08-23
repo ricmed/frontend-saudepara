@@ -3,7 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Local, LatLngLiteral } from '../types';
 import { TILE_OPTIONS } from '../config/tileProviders';
-import { useMapProvider } from '../hooks/useMapProvider';
+import { useMapProvider } from '../contexts/MapProviderContext';
 
 // Fix para ícones do Leaflet no Webpack/Vite
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
@@ -32,8 +32,6 @@ interface MapaContainerProps {
   onMapIdle: () => void;
   onMarkerClick: (local: Local) => void;
   onInfoWindowClose: () => void;
-  onTracarRota: (local: Local, transportType?: string) => void;
-  mapboxApiKey?: string; // Nova prop para API key do Mapbox
 }
 
 export const MapaContainer: React.FC<MapaContainerProps> = ({
@@ -46,8 +44,6 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
   onMapIdle,
   onMarkerClick,
   onInfoWindowClose,
-  onTracarRota,
-  mapboxApiKey,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -58,10 +54,7 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
   const [isMapLoaded, setIsMapLoaded] = useState(false);
 
   // Hook para gerenciar provedor de mapa
-  const { tileProvider } = useMapProvider({
-    defaultProvider: 'openstreetmap',
-    mapboxApiKey
-  });
+  const { tileProvider } = useMapProvider();
 
   // Inicializar mapa uma única vez
   useEffect(() => {
@@ -93,15 +86,15 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
         position: 'bottomright'
       }).addTo(map);
 
-      // OTIMIZAÇÃO 2 & 3: Tile provider otimizado para COP 30 no Brasil
-      const tileLayer = L.tileLayer(tileProvider.url, {
+      // OTIMIZAÇÃO 2 & 3: Tile provider inicial (será atualizado pelo useEffect separado)
+      const initialTileLayer = L.tileLayer(tileProvider.url, {
         attribution: tileProvider.attribution,
         maxZoom: tileProvider.maxZoom,
         minZoom: 3,
         ...TILE_OPTIONS, // Configurações de cache agressivo
       });
       
-      tileLayer.addTo(map);
+      initialTileLayer.addTo(map);
       
       // Listener para recarregar marcadores quando o mapa se move (lazy loading)
       map.on('moveend', () => {
@@ -166,33 +159,46 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
     }
   }, [center.lat, center.lng, isMapReady]); // Dependências específicas
 
-  // Atualizar tile layer quando o provedor de mapa mudar
+  // Atualizar tile layer quando o provedor de mapa mudar - FORÇA ATUALIZAÇÃO INSTANTÂNEA
   useEffect(() => {
     if (!mapRef.current || !isMapReady) return;
 
     try {
       console.log('🔄 Atualizando tile layer para:', tileProvider.url);
+      console.log('📍 Provider atual:', tileProvider);
       
       // Remover todas as camadas de tile existentes
       mapRef.current.eachLayer((layer) => {
         if (layer instanceof L.TileLayer) {
+          console.log('🗑️ Removendo tile layer existente');
           mapRef.current!.removeLayer(layer);
         }
       });
 
-      // Adicionar nova camada de tile
-      const newTileLayer = L.tileLayer(tileProvider.url, {
-        attribution: tileProvider.attribution,
-        maxZoom: tileProvider.maxZoom,
-        minZoom: 3,
-        ...TILE_OPTIONS, // Configurações de cache agressivo
-      });
+      // Aguardar um tick para garantir que as camadas foram removidas
+      setTimeout(() => {
+        if (!mapRef.current) return;
+        
+        // Adicionar nova camada de tile
+        const newTileLayer = L.tileLayer(tileProvider.url, {
+          attribution: tileProvider.attribution,
+          maxZoom: tileProvider.maxZoom,
+          minZoom: 3,
+          ...TILE_OPTIONS, // Configurações de cache agressivo
+        });
+        
+        console.log('✅ Adicionando novo tile layer:', newTileLayer);
+        newTileLayer.addTo(mapRef.current);
+        
+        // Forçar redraw do mapa
+        mapRef.current.invalidateSize();
+        
+      }, 50); // Pequeno delay para garantir limpeza
       
-      newTileLayer.addTo(mapRef.current);
     } catch (error) {
       console.error('❌ Erro ao atualizar tile layer:', error);
     }
-  }, [tileProvider, isMapReady]); // Monitora mudanças no tileProvider
+  }, [tileProvider.url, tileProvider.attribution, tileProvider.maxZoom, isMapReady]); // Dependências mais específicas
 
   // Gerenciar marcador do usuário
   useEffect(() => {
@@ -382,7 +388,7 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
       if (selectedMarker) {
         console.log('📍 Abrindo popup para:', selectedMarker.nome);
 
-        const popupContent = createPopupContent(selectedMarker, onTracarRota);
+        const popupContent = createPopupContent(selectedMarker);
         
         popupRef.current = L.popup({
           maxWidth: 300,
@@ -479,11 +485,8 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
   );
 };
 
-// Função para criar conteúdo do popup
-const createPopupContent = (
-  local: Local, 
-  onTracarRota: (local: Local, transportType?: string) => void
-): HTMLElement => {
+// Função para criar conteúdo do popup - SIMPLIFICADO (somente navegação)
+const createPopupContent = (local: Local): HTMLElement => {
   const container = document.createElement('div');
   container.className = 'estabelecimento-popup-content';
   
@@ -572,66 +575,48 @@ const createPopupContent = (
         ` : ''}
       </div>
       
-      <div class="flex gap-2 mt-3 pt-2 border-t border-gray-200">
-        <div class="flex-1">
-          <label class="block text-xs text-gray-600 mb-1">Tipo de Transporte:</label>
-          <select 
-            id="transport-select-${local.id}" 
-            class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+      <div class="mt-3 pt-3 border-t border-gray-200">
+        <h4 class="text-sm font-medium text-gray-800 mb-2">Navegue até aqui:</h4>
+        <div class="flex gap-2">
+          <button
+            id="btn-google-maps-${local.id}"
+            class="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-blue-500 text-white text-xs rounded-md hover:bg-blue-600 transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
           >
-            <option value="driving-car">🚗 Carro</option>
-            <option value="foot-walking">🚶 A pé</option>
-            <option value="cycling-regular">🚴 Bicicleta</option>
-            <option value="motorcycle">🏍️ Motocicleta</option>
-            <option value="public-transport">🚌 Transporte Público</option>
-          </select>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+              <circle fill="#fff" cx="12" cy="9" r="2.5"/>
+            </svg>
+            Google
+          </button>
+          <button
+            id="btn-waze-${local.id}"
+            class="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-cyan-500 text-white text-xs rounded-md hover:bg-cyan-600 transition-colors font-medium"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1.5 10.5c0 .8.7 1.5 1.5 1.5s1.5-.7 1.5-1.5-.7-1.5-1.5-1.5-1.5.7-1.5 1.5zm3 0c0 .8.7 1.5 1.5 1.5s1.5-.7 1.5-1.5-.7-1.5-1.5-1.5-1.5.7-1.5 1.5z"/>
+            </svg>
+            Waze
+          </button>
+          <button
+            id="btn-apple-maps-${local.id}"
+            class="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-gray-700 text-white text-xs rounded-md hover:bg-gray-800 transition-colors font-medium"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+              <circle fill="#fff" cx="12" cy="9" r="1.5"/>
+            </svg>
+            Apple
+          </button>
         </div>
-        <button
-          id="btn-rota-${local.id}"
-          class="px-3 py-2 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
-        >
-          📍 Traçar Rota
-        </button>
-      </div>
-      
-      <div class="flex gap-2 mt-2">
-        <button
-          id="btn-google-maps-${local.id}"
-          class="flex-1 px-3 py-1.5 bg-green-500 text-white text-xs rounded-md hover:bg-green-600 transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
-        >
-          🗺️ Google Maps
-        </button>
-        <button
-          id="btn-waze-${local.id}"
-          class="flex-1 px-3 py-1.5 bg-indigo-500 text-white text-xs rounded-md hover:bg-indigo-600 transition-colors font-medium"
-        >
-          🚗 Waze
-        </button>
-        <button
-          id="btn-apple-maps-${local.id}"
-          class="flex-1 px-3 py-1.5 bg-gray-500 text-white text-xs rounded-md hover:bg-gray-600 transition-colors font-medium"
-        >
-          🍎 Apple Maps
-        </button>
       </div>
     </div>
   `;
 
   // Event listeners para os botões (com timeout para garantir que DOM esteja pronto)
   setTimeout(() => {
-    const btnRota = container.querySelector(`#btn-rota-${local.id}`) as HTMLButtonElement;
-    const transportSelect = container.querySelector(`#transport-select-${local.id}`) as HTMLSelectElement;
     const btnGoogleMaps = container.querySelector(`#btn-google-maps-${local.id}`) as HTMLButtonElement;
     const btnWaze = container.querySelector(`#btn-waze-${local.id}`) as HTMLButtonElement;
     const btnAppleMaps = container.querySelector(`#btn-apple-maps-${local.id}`) as HTMLButtonElement;
-
-    if (btnRota) {
-      btnRota.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const selectedTransport = transportSelect?.value || 'driving-car';
-        onTracarRota(local, selectedTransport);
-      });
-    }
 
     if (btnGoogleMaps) {
       btnGoogleMaps.addEventListener('click', (e) => {

@@ -6,11 +6,10 @@ import { MapProviderOverlay } from "./components/MapProviderOverlay";
 import { useGeolocation } from "./hooks/useGeolocation";
 import { useEstabelecimentos } from "./hooks/useEstabelecimentos";
 import { useRouting } from "./hooks/useRouting";
-import { useMapProvider } from "./hooks/useMapProvider";
+import { MapProviderProvider } from "./contexts/MapProviderContext";
 import { RoutingServiceOSRM } from "./services/routingServiceOSRM";
 
 // Componentes do desktop
-import type { Language } from "@/i18n/types";
 import { SideMenu } from "@/features/home/components/SideMenu";
 import { Home, Map, Heart, User, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -19,7 +18,7 @@ import {
   DEFAULT_CENTER,
   DEFAULT_RADIUS,
 } from "./utils/constants";
-import { Local, LatLngLiteral, TempoViagem } from "./types";
+import { Local, LatLngLiteral } from "./types";
 // Import Leaflet types
 import L from 'leaflet';
 
@@ -48,17 +47,7 @@ const MapaLeaflet: React.FC = () => {
   } = useEstabelecimentos();
 
   // Hook de Roteamento
-  const { routeState, calculateRoute, clearRoute } = useRouting();
-
-  // Hook para gerenciar provedor de mapa
-  const {
-    currentProvider,
-    setCurrentProvider,
-    isAvailable,
-    mapboxApiKey
-  } = useMapProvider({
-    defaultProvider: 'openstreetmap'
-  });
+  const { routeState, clearRoute } = useRouting();
 
   // Estado do Mapa
   const [mapCenter, setMapCenter] = useState<LatLngLiteral>(DEFAULT_CENTER);
@@ -99,7 +88,6 @@ const MapaLeaflet: React.FC = () => {
 
   // Fala/Voice e tradução
   const [voiceGuidanceActive, setVoiceGuidanceActive] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState<Language>("pt-BR");
 
   // Informações de viagem (apenas para exibição, rota será no Google Maps)
   // const [temposViagem, setTemposViagem] = useState<TempoViagem[]>([]);
@@ -128,15 +116,6 @@ const MapaLeaflet: React.FC = () => {
 
   // Hook de voz (desabilitado para compatibilidade de tipos)
   // const { speak } = useVoice(selectedLanguage);
-
-  /**
-   * Função para configurar API key do Mapbox
-   */
-  const handleMapboxConfig = useCallback((apiKey: string) => {
-    localStorage.setItem('mapbox-api-key', apiKey);
-    // Forçar reload da página para aplicar a nova configuração
-    window.location.reload();
-  }, []);
 
   /**
    * Callback para quando o mapa estiver carregado
@@ -260,122 +239,6 @@ const MapaLeaflet: React.FC = () => {
   /**
    * Calcular estimativas de tempo (apenas para exibição)
    */
-  const calcularEstimativasViagem = useCallback(
-    (destino: Local) => {
-      if (!userLocation) return;
-
-      console.log('⏱️ Calculando estimativas de viagem para:', destino.nome);
-
-      try {
-        const distanceMeters = calcularDistancia(userLocation.lat, userLocation.lng, destino.lat, destino.lng);
-        const distanceKm = distanceMeters / 1000;
-
-        console.log('📏 Distância calculada:', `${distanceKm.toFixed(1)} km`);
-
-        const estimativas: TempoViagem[] = [
-          {
-            modo: "DRIVING",
-            duracao: `${Math.max(Math.round(distanceKm * 2.5), 5)} min`,
-            distancia: `${distanceKm.toFixed(1)} km`,
-          },
-          {
-            modo: "TRANSIT",
-            duracao: `${Math.max(Math.round(distanceKm * 4), 10)} min`,
-            distancia: `${distanceKm.toFixed(1)} km`,
-          },
-          {
-            modo: "WALKING",
-            duracao: `${Math.max(Math.round(distanceKm * 12), 2)} min`,
-            distancia: `${distanceKm.toFixed(1)} km`,
-          },
-          {
-            modo: "BICYCLING",
-            duracao: `${Math.max(Math.round(distanceKm * 4.5), 3)} min`,
-            distancia: `${distanceKm.toFixed(1)} km`,
-          },
-        ];
-
-        // setTemposViagem(estimativas);
-        console.log('✅ Estimativas calculadas:', estimativas);
-      } catch (error) {
-        console.error('❌ Erro ao calcular estimativas:', error);
-      }
-    },
-    [userLocation, calcularDistancia]
-  );
-
-  /**
-   * Traçar rota usando serviço gratuito de roteamento
-   */
-  const tracarRota = useCallback(
-    async (destino: Local, transportType: string = 'driving-car') => {
-      if (!map) {
-        console.warn('❌ Mapa não está inicializado ainda');
-        return;
-      }
-
-      if (!userLocation) {
-        alert("Permita o acesso à sua localização para calcular a rota");
-        obterLocalizacao();
-        return;
-      }
-
-      console.log('🎯 Traçando rota para:', destino.nome, 'usando:', transportType);
-
-      try {
-        setSelectedLocal(destino);
-        setMenuAberto(false);
-
-        // Calcular rota usando o serviço gratuito
-        console.log('🚗 Chamando calculateRoute com:', {
-          map: !!map,
-          userLocation,
-          destino: { nome: destino.nome, lat: destino.lat, lng: destino.lng },
-          profile: transportType
-        });
-        
-        await calculateRoute(map, userLocation, destino, transportType as any, limparRota);
-        
-        console.log('✅ calculateRoute executado, estado da rota:', routeState);
-
-        // Manter estimativas locais também
-        calcularEstimativasViagem(destino);
-
-        if (voiceGuidanceActive) {
-          // const distanceKm = (calcularDistancia(userLocation.lat, userLocation.lng, destino.lat, destino.lng) / 1000).toFixed(1);
-          // let instruction = `Rota calculada para ${destino.nome}. Distância aproximada: ${distanceKm} quilômetros.`;
-          
-          // Adicionar informações da rota se disponível
-          if (routeState.route) {
-            // const routeDistance = (routeState.route.distance / 1000).toFixed(1);
-            // const routeDuration = Math.round(routeState.route.duration / 60);
-            // instruction = `Rota calculada para ${destino.nome}. Distância: ${routeDistance} quilômetros. Tempo estimado: ${routeDuration} minutos.`;
-          }
-          
-          // Funcionalidade de voz desabilitada temporariamente
-          /*
-          try {
-            if (selectedLanguage !== "pt-BR") {
-              const translatedText = await translateInstructions(instruction);
-              speak(translatedText);
-            } else {
-              speak(instruction);
-            }
-          } catch (error) {
-            console.error('❌ Erro ao falar instrução:', error);
-          }
-          */
-        }
-
-        console.log('✅ Rota traçada com sucesso!');
-      } catch (error) {
-        console.error('❌ Erro ao traçar rota:', error);
-        alert('Erro ao calcular rota. Tente novamente.');
-      }
-    },
-    [map, userLocation, calculateRoute, voiceGuidanceActive, selectedLanguage, calcularEstimativasViagem, calcularDistancia, obterLocalizacao, routeState.route]
-  );
-
   /**
    * Outras funções de controle
    */
@@ -473,9 +336,10 @@ const MapaLeaflet: React.FC = () => {
   }
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
-      {/* Header do Governo do Pará */}
-      <header className="bg-blue-600 shadow-lg flex-shrink-0" role="banner">
+    <MapProviderProvider defaultProvider="openstreetmap">
+      <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+        {/* Header do Governo do Pará */}
+        <header className="bg-blue-600 shadow-lg flex-shrink-0" role="banner">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
             {/* Seção esquerda: Menu + Logos */}
@@ -629,7 +493,6 @@ const MapaLeaflet: React.FC = () => {
           onQualificacaoChange={setQualificacaoSelecionada}
           onNaturezaChange={setNaturezaSelecionada}
           onRadiusChange={setSearchRadius}
-          onTracarRota={tracarRota}
           onLoadMore={() => setVisibleCount((prev) => prev + 20)}
           onSearch={onSearch}
           onClose={() => setPainelEstabelecimentosAberto(false)}
@@ -648,8 +511,6 @@ const MapaLeaflet: React.FC = () => {
               onMapIdle={() => {}}
               onMarkerClick={setSelectedMarker}
               onInfoWindowClose={() => setSelectedMarker(null)}
-              onTracarRota={tracarRota}
-              mapboxApiKey={mapboxApiKey}
             />
 
             {/* Overlay para seleção de servidor de mapa */}
@@ -750,7 +611,8 @@ const MapaLeaflet: React.FC = () => {
         ...conteúdo do footer...
       </footer>
       */}
-    </div>
+      </div>
+    </MapProviderProvider>
   );
 };
 

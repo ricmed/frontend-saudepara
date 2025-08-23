@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Settings, Globe, Zap, ChevronDown } from 'lucide-react';
 import { MapboxConfigModal } from './MapboxConfigModal';
-import { useMapProvider } from '../hooks/useMapProvider';
+import { useMapProvider } from '../contexts/MapProviderContext';
 
 export type MapProvider = 'openstreetmap' | 'mapbox';
 

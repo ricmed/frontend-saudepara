@@ -61,6 +61,15 @@ export function useMapProvider(options: UseMapProviderOptions = {}): UseMapProvi
 
   // Obtém o tile provider baseado no provedor atual
   const tileProvider = getOptimalTileProvider(currentProvider, apiKey);
+  
+  // Log para debug - ver quando o tileProvider muda
+  useEffect(() => {
+    console.log('🗺️ TileProvider atualizado:', {
+      provider: currentProvider,
+      url: tileProvider.url,
+      attribution: tileProvider.attribution
+    });
+  }, [currentProvider, tileProvider.url]);
 
   // Função para verificar se um provedor está disponível
   const isAvailable = (provider: MapProvider): boolean => {
@@ -69,6 +78,8 @@ export function useMapProvider(options: UseMapProviderOptions = {}): UseMapProvi
 
   // Função personalizada para trocar provedor com validação
   const handleSetCurrentProvider = (provider: MapProvider) => {
+    console.log('🔄 Trocando provedor de mapa para:', provider);
+    
     if (!isAvailable(provider)) {
       if (provider === 'mapbox') {
         console.warn('Mapbox requer API key. Configure uma API key válida.');
@@ -76,6 +87,8 @@ export function useMapProvider(options: UseMapProviderOptions = {}): UseMapProvi
         return;
       }
     }
+    
+    console.log('✅ Provedor alterado de', currentProvider, 'para', provider);
     setCurrentProvider(provider);
   };
 
