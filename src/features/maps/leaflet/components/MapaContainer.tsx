@@ -422,9 +422,9 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
         </div>
       )}
       
-      {/* Legenda */}
+      {/* Legenda - z-index baixo para não sobrepor painel lateral */}
       {isMapReady && (
-        <div className="absolute bottom-4 left-4 bg-white p-2 sm:p-3 rounded-lg shadow-lg z-[1000] max-w-[180px] sm:max-w-xs">
+        <div className="absolute bottom-4 left-4 bg-white p-2 sm:p-3 rounded-lg shadow-lg z-[500] max-w-[180px] sm:max-w-xs">
           <h4 className="text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-gray-800">Legenda</h4>
           <div className="space-y-1 sm:space-y-2 text-xs">
             <div className="flex items-center gap-1 sm:gap-2">

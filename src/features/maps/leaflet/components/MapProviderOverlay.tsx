@@ -59,8 +59,8 @@ export const MapProviderOverlay: React.FC = () => {
 
   return (
     <>
-      {/* Overlay para seleção de servidor de mapa */}
-      <div className="absolute top-4 right-4 z-[1000] bg-white rounded-lg shadow-lg border border-gray-200 max-w-[90vw] sm:max-w-none">
+      {/* Overlay para seleção de servidor de mapa - z-index baixo para não sobrepor painel */}
+      <div className="absolute top-4 right-4 z-[500] bg-white rounded-lg shadow-lg border border-gray-200 max-w-[90vw] sm:max-w-none">
         <div className="p-2 sm:p-3">
           <div className="text-xs sm:text-sm font-medium text-gray-700 mb-2 hidden sm:block">
             🗺️ Selecione o servidor de mapa:
@@ -88,8 +88,8 @@ export const MapProviderOverlay: React.FC = () => {
                   onClick={() => setIsOpen(false)}
                 />
                 
-                {/* Menu dropdown */}
-                <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[180px] max-w-[90vw]">
+                {/* Menu dropdown - z-index baixo para não sobrepor painel */}
+                <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-40 min-w-[180px] max-w-[90vw]">
                   {providers.map((provider) => {
                     const ProviderIcon = provider.icon;
                     return (

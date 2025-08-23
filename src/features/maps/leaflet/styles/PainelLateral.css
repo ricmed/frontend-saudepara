@@ -1,0 +1,155 @@
+/* Estilos customizados para PainelLateral - Leaflet */
+
+/* Estilos customizados para scrollbar */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Animação suave para hover nos cards */
+.establishment-card {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.establishment-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsividade melhorada para estabelecimentos */
+@media (max-width: 640px) {
+  .establishment-card {
+    padding: 0.75rem; /* 12px */
+  }
+  
+  .establishment-card .establishment-title {
+    font-size: 0.875rem; /* 14px */
+    line-height: 1.25rem; /* 20px */
+  }
+  
+  .establishment-card .establishment-address {
+    font-size: 0.75rem; /* 12px */
+    line-height: 1rem; /* 16px */
+  }
+  
+  .establishment-card .establishment-button {
+    padding: 0.5rem 0.75rem; /* 8px 12px */
+    font-size: 0.75rem; /* 12px */
+  }
+}
+
+@media (min-width: 641px) {
+  .establishment-card {
+    padding: 1rem; /* 16px */
+  }
+  
+  .establishment-card .establishment-title {
+    font-size: 1rem; /* 16px */
+    line-height: 1.5rem; /* 24px */
+  }
+  
+  .establishment-card .establishment-address {
+    font-size: 0.875rem; /* 14px */
+    line-height: 1.25rem; /* 20px */
+  }
+  
+  .establishment-card .establishment-button {
+    padding: 0.625rem 1rem; /* 10px 16px */
+    font-size: 0.875rem; /* 14px */
+  }
+}
+
+/* Container de estabelecimentos com altura otimizada */
+.establishment-list-container {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  .establishment-list-container {
+    max-height: 50vh; /* Menor no mobile para dar mais espaço */
+  }
+}
+
+@media (min-width: 1024px) {
+  .establishment-list-container {
+    max-height: 75vh; /* Muito maior no desktop para aproveitar melhor o espaço */
+    flex-grow: 1;
+  }
+}
+
+/* Indicador de scroll suave */
+.scroll-indicator {
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(transparent, #f8fafc);
+  height: 20px;
+  pointer-events: none;
+}
+
+/* Otimizações para painel lateral */
+.painel-lateral-mobile {
+  height: calc(100vh - 64px); /* Altura total menos bottom navigation */
+}
+
+.painel-lateral-desktop {
+  height: 100vh; /* Altura total da tela no desktop */
+  max-height: 100vh;
+}
+
+/* Animações suaves */
+.slide-in-left {
+  animation: slideInLeft 0.3s ease-out forwards;
+}
+
+.slide-out-left {
+  animation: slideOutLeft 0.3s ease-out forwards;
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOutLeft {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+/* Estilo para badges responsivos */
+.badge-responsive {
+  font-size: 0.75rem; /* 12px */
+  padding: 0.25rem 0.5rem; /* 4px 8px */
+}
+
+@media (min-width: 640px) {
+  .badge-responsive {
+    font-size: 0.75rem; /* 12px */
+    padding: 0.375rem 0.75rem; /* 6px 12px */
+  }
+}

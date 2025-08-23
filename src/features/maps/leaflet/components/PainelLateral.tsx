@@ -4,6 +4,9 @@ import { MIN_RADIUS, MAX_RADIUS } from '../utils/constants';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { QUALIFICACOES_PREDEFINIDAS } from '../../../../data/qualificacoesPredefinidas';
 
+// Importar estilos CSS customizados
+import '../styles/PainelLateral.css';
+
 interface PainelLateralProps {
   menuAberto: boolean;
   onClose: () => void;
@@ -84,20 +87,22 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
   return (
     <div
       className={`
-        fixed lg:static top-0 left-0 z-[1200] 
+        fixed md:static top-0 left-0 z-[800] 
         w-full sm:w-80 md:w-96 lg:w-64 xl:w-72 
-        h-full lg:max-h-[calc(100vh-120px)]
+        h-full md:h-screen
         bg-white shadow-lg transform transition-transform duration-300 ease-in-out
-        ${menuAberto ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        lg:block lg:shadow-none lg:border-r lg:border-gray-200
+        ${menuAberto ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        md:block md:shadow-none md:border-r md:border-gray-200
         overflow-y-auto flex flex-col
+        painel-lateral-mobile md:painel-lateral-desktop
+        scrollbar-thin
       `}
     >
       <div className="p-3 sm:p-4 relative">
         {/* Botão de fechar no mobile/tablet */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 lg:hidden p-2 text-gray-600 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+          className="absolute top-4 right-4 md:hidden p-2 text-gray-600 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -220,7 +225,7 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
         </div>
 
         {/* Lista de estabelecimentos */}
-        <div className="border-t border-gray-200 pt-4">
+        <div className="border-t border-gray-200 pt-4 flex-1 overflow-hidden">
           {searchFilteredPlaces.length === 0 ? (
             <div className="text-gray-500 text-center py-8 px-4">
               <svg className="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -246,32 +251,32 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
             </>
           )}
 
-          <div className="space-y-3">
+          <div className="space-y-3 establishment-list-container flex-1 overflow-y-auto">
             {displayedPlaces.map((local, index) => {
               const isExpanded = expandedCards.has(local.id);
               return (
                 <div
                   key={local.id || index}
-                  className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                  className="establishment-card bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
                 >
-                  <div className="font-semibold text-gray-900 text-sm mb-2">{local.nome}</div>
+                  <div className="establishment-title font-semibold text-gray-900 mb-2">{local.nome}</div>
                   
                   {/* Endereço */}
                   {local.endereco && (
-                    <div className="text-sm text-gray-600 mb-3 flex items-start">
-                      <svg className="h-4 w-4 text-gray-400 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="establishment-address text-gray-600 mb-2 sm:mb-3 flex items-start">
+                      <svg className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 mr-1 sm:mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
-                      <span className="leading-5">{local.endereco}</span>
+                      <span className="leading-4 sm:leading-5">{local.endereco}</span>
                     </div>
                   )}
                   
                   {/* Badges de natureza e turno */}
-                  <div className="flex flex-wrap gap-2 mb-3">
+                  <div className="flex flex-wrap gap-1 sm:gap-2 mb-2 sm:mb-3">
                     <span
                       className={`
-                        inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                        badge-responsive inline-flex items-center rounded-full font-medium
                         ${
                           local.natureza?.toLowerCase().includes('público') ||
                           local.natureza?.toLowerCase().includes('publico') ||
@@ -287,7 +292,7 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
                     </span>
                     
                     {local.turno && local.turno !== 'Não informado' && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      <span className="badge-responsive inline-flex items-center rounded-full font-medium bg-green-100 text-green-800">
                         {local.turno}
                       </span>
                     )}
@@ -297,7 +302,7 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
                   {(local.habilitacoes.length > 0 || local.qualificacoes.length > 0) && (
                     <button
                       onClick={() => toggleCard(local.id)}
-                      className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 mt-3 transition-colors"
+                      className="flex items-center gap-1 text-xs sm:text-sm text-blue-600 hover:text-blue-800 mt-2 sm:mt-3 transition-colors"
                     >
                       {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                       {isExpanded ? 'Ocultar detalhes' : 'Ver detalhes'}
@@ -348,15 +353,15 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
                     </div>
                   )}
 
-                  {/* Botão traçar rota */}
+                  {/* Botão traçar rota - menor em dispositivos móveis */}
                   <button
                     onClick={() => onTracarRota(local)}
-                    className="mt-4 w-full inline-flex items-center justify-center px-4 py-2.5 
+                    className="establishment-button mt-3 sm:mt-4 w-full inline-flex items-center justify-center 
                       bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors 
-                      text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 
+                      font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 
                       focus:ring-offset-2 shadow-sm"
                   >
-                    <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
                     </svg>
                     Traçar Rota

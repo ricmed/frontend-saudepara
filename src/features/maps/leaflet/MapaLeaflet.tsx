@@ -83,7 +83,15 @@ const MapaLeaflet: React.FC = () => {
 
   // Exibição lateral e seleção de marcadores
   const [menuAberto, setMenuAberto] = useState(false);  // Para o SideMenu principal
-  const [painelEstabelecimentosAberto, setPainelEstabelecimentosAberto] = useState(false);  // Para o painel de estabelecimentos (inicia fechado para que o botão seja visível)
+  
+  // Para o painel de estabelecimentos - aberto por padrão no desktop, fechado no mobile
+  const [painelEstabelecimentosAberto, setPainelEstabelecimentosAberto] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 768; // md breakpoint do Tailwind
+    }
+    return false;
+  });
+  
   const [selectedMarker, setSelectedMarker] = useState<Local | null>(null);
 
   // Rota e informações relacionadas
@@ -562,8 +570,8 @@ const MapaLeaflet: React.FC = () => {
         </div>
       </header>
 
-      {/* Container do mapa - ESTA É A PARTE PRINCIPAL DA CORREÇÃO */}
-      <div className="flex-1 relative overflow-hidden">
+      {/* Container do mapa - LAYOUT RESPONSIVO SEM FOOTER */}
+      <div className="flex-1 relative overflow-hidden">{/* Sem padding bottom - footer removido */}
         {geoIsLoading && (
           <div className="absolute top-4 right-4 z-50 bg-white p-3 rounded-lg shadow-lg border">
             <div className="flex items-center space-x-2">
@@ -593,23 +601,11 @@ const MapaLeaflet: React.FC = () => {
           </div>
         )}
 
-        {/* Botão para abrir filtros no mobile/tablet */}
+        {/* Botão para abrir filtros no mobile/tablet APENAS */}
         <button
           onClick={() => setPainelEstabelecimentosAberto(!painelEstabelecimentosAberto)}
-          className="absolute top-4 left-4 z-[1500] lg:hidden p-3 bg-white rounded-lg shadow-lg hover:bg-gray-50 transition-colors"
+          className="absolute top-4 left-4 z-[800] md:hidden p-3 bg-white rounded-lg shadow-lg hover:bg-gray-50 transition-colors"
           aria-label="Abrir filtros"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707v4.172a1 1 0 01-.447.894l-2 1A1 1 0 0111 18.828v-5.172a1 1 0 00-.293-.707L4.293 7.535A1 1 0 014 6.828V4z" />
-          </svg>
-        </button>
-
-        {/* Botão para mostrar/esconder filtros no desktop - posicionado diferente */}
-        <button
-          onClick={() => setPainelEstabelecimentosAberto(!painelEstabelecimentosAberto)}
-          className="absolute top-20 left-4 z-[1500] hidden lg:block p-3 bg-white rounded-lg shadow-lg hover:bg-gray-50 transition-colors"
-          aria-label={painelEstabelecimentosAberto ? "Esconder filtros" : "Mostrar filtros"}
-          title={painelEstabelecimentosAberto ? "Esconder painel de filtros" : "Mostrar painel de filtros"}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707v4.172a1 1 0 01-.447.894l-2 1A1 1 0 0111 18.828v-5.172a1 1 0 00-.293-.707L4.293 7.535A1 1 0 014 6.828V4z" />
@@ -618,7 +614,7 @@ const MapaLeaflet: React.FC = () => {
 
         {/* Layout com painel lateral no desktop - SIMPLIFICADO */}
         <div className="absolute inset-0 flex">
-        {/* Painel lateral */}
+        {/* Painel lateral - agora fica acima do footer no desktop */}
         <PainelLateral
           menuAberto={painelEstabelecimentosAberto}
           tiposHabilitacoes={tiposHabilitacoes}
@@ -639,8 +635,8 @@ const MapaLeaflet: React.FC = () => {
           onClose={() => setPainelEstabelecimentosAberto(false)}
         />
 
-        {/* Container do mapa - SIMPLIFICADO */}
-        <div className="flex-1 relative" style={{ paddingBottom: window.innerWidth < 768 ? '64px' : '0' }}>
+        {/* Container do mapa - ajustado para mobile com bottom padding */}
+        <div className="flex-1 relative pb-16 md:pb-0">{/* Padding bottom apenas no mobile para não sobrepor bottom nav */}
           {/* O mapa em si, com marcadores */}
           <MapaContainer
               center={mapCenter}
@@ -748,92 +744,12 @@ const MapaLeaflet: React.FC = () => {
         </div>
       </nav>
 
-      {/* Footer do Governo do Pará - APENAS DESKTOP - VERSÃO COMPACTA */}
-      <footer className="hidden md:block bg-blue-900 text-white py-4 flex-shrink-0">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-            <div className="sm:col-span-2 lg:col-span-1">
-              <h3 className="text-sm font-medium mb-2">Contato</h3>
-              <ul className="space-y-1 text-xs">
-                <li className="flex items-start">
-                  <span className="mr-1 text-pink-500">📍</span>
-                  <span>Rua Boaventura da Silva, 883 - Nazaré, Belém - PA</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-1 text-red-500">📞</span>
-                  <span>(91) 4006-4200</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-1 text-blue-400">✉️</span>
-                  <span className="break-words">http://www.saude.pa.gov.br</span>
-                </li>
-              </ul>
-              <div className="flex space-x-2 mt-2">
-                <a
-                  href="https://www.facebook.com/sespaPARA"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="h-6 w-6 rounded-full bg-[#3B5998] flex items-center justify-center hover:opacity-90 transition"
-                >
-                  <svg className="h-3 w-3 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                  </svg>
-                </a>
-                <a
-                  href="https://www.instagram.com/sespapara"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="h-6 w-6 rounded-full bg-[#C13584] flex items-center justify-center hover:opacity-90 transition"
-                >
-                  <svg className="h-3 w-3 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 6.62 5.367 11.987 11.988 11.987c6.62 0 11.987-5.367 11.987-11.987C24.014 5.367 18.637.001 12.017.001zM8.449 16.988c-1.297 0-2.448-.611-3.132-1.551-.684-.94-.684-2.284 0-3.224.684-.94 1.835-1.551 3.132-1.551s2.448.611 3.132 1.551c.684.94.684 2.284 0 3.224-.684.94-1.835 1.551-3.132 1.551z"/>
-                  </svg>
-                </a>
-                <a
-                  href="https://x.com/SespaPara"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="h-6 w-6 rounded-full bg-black flex items-center justify-center hover:opacity-90 transition"
-                >
-                  <svg className="h-3 w-3 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                  </svg>
-                </a>
-                <a
-                  href="https://www.youtube.com/sespapara"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="h-6 w-6 rounded-full bg-[#FF0000] flex items-center justify-center hover:opacity-90 transition"
-                >
-                  <svg className="h-3 w-3 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                  </svg>
-                </a>
-              </div>
-            </div>
-            <div className="sm:col-span-2 lg:col-span-1">
-              <h3 className="text-sm font-medium mb-2">Horário de Funcionamento</h3>
-              <p className="text-xs">Segunda a Sexta: 8h às 18h</p>
-              <p className="mt-1 text-xs">A SESPA é o órgão responsável pela gestão da saúde pública no Estado do Pará.</p>
-            </div>
-            <div className="sm:col-span-2 lg:col-span-1">
-              <h3 className="text-sm font-medium mb-2">Ouvidoria</h3>
-              <p className="text-xs">Dúvidas, críticas ou sugestões?</p>
-              <p className="mt-1 text-xs">Entre em contato com nossa ouvidoria:</p>
-              <p className="mt-1 text-xs">📞 0800-280-9209</p>
-              <p className="mt-1 text-xs break-words">✉️ ouvidoria@saude.pa.gov.br</p>
-            </div>
-            <div className="sm:col-span-2 lg:col-span-1">
-              <h3 className="text-sm font-medium mb-2">Portal Saúde Pará</h3>
-              <p className="text-xs">Sistema integrado de informações de saúde do Estado do Pará.</p>
-              <p className="mt-1 text-xs">Desenvolvido pela SESPA</p>
-            </div>
-          </div>
-          <div className="text-center text-xs border-t border-white/20 pt-2">
-            <p>© {new Date().getFullYear()} Secretaria de Estado de Saúde Pública do Pará - SESPA. Todos os direitos reservados.</p>
-          </div>
-        </div>
+      {/* Footer do Governo do Pará - OCULTO na página do mapa (não é relevante) */}
+      {/* Footer comentado para não interferir no layout do mapa
+      <footer className="hidden bg-blue-900 text-white py-4 mt-auto">
+        ...conteúdo do footer...
       </footer>
+      */}
     </div>
   );
 };

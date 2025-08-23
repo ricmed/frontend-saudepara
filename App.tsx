@@ -251,8 +251,9 @@ function App() {
           {/* Rotas Públicas */}
           <Route path="/" element={<DesktopPage />} />          
           <Route path="/teste" element={<HomePage />} />
-          <Route path="/mapa" element={<MapaPage />} />
-          <Route path="/mapa/fullscreen" element={<MapaPage fullScreen={true} />} />
+          <Route path="/mapa" element={<MapaLeaflet />} />
+          <Route path="/mapa-google" element={<MapaPage />} />
+          <Route path="/mapa-google/fullscreen" element={<MapaPage fullScreen={true} />} />
           <Route path="/mapa-original" element={<MapaLocais />} />
           <Route path="/mapa-leaflet" element={<MapaLeaflet />} />
           <Route path="/campanhas" element={<HealthCampaignsPage />} />
