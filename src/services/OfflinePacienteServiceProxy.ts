@@ -286,12 +286,22 @@ export const OfflinePacienteService = {
     // Formatação da data se necessário
     const formattedData = {
       ...data,
-      // Garantir que null seja enviado em vez de strings vazias
+      // Garantir que null seja enviado em vez de strings vazias, mas preservar valores válidos
       nome_mae: data.nome_mae?.trim() || null,
       cpf: data.cpf?.trim() || null,
       gestante: data.gestante?.trim() || null,
       contato: data.contato?.trim() || null,
     };
+    
+    // ✅ DEBUG: Log dos dados do paciente sendo salvos offline
+    console.log('🔍 DEBUG OfflinePacienteServiceProxy.create - Dados originais:', {
+      gestante: data.gestante,
+      gestante_tipo: typeof data.gestante
+    });
+    console.log('🔍 DEBUG OfflinePacienteServiceProxy.create - Dados formatados:', {
+      gestante: formattedData.gestante,
+      gestante_tipo: typeof formattedData.gestante
+    });
     
     // Gera um ID temporário negativo para identificar pacientes não sincronizados
     const tempId = -Date.now();

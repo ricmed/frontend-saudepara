@@ -1,5 +1,4 @@
 import indexedDBService from './indexedDB';
-import { NotificacaoService } from '@/services/NotificacaoService';
 import PacienteService from '@/services/PacienteService';
 import { EstabelecimentoFormService } from '@/services/EstabelecimentoFormService';
 import { salvarNotificacaoCompleta } from '@/utils/notificacaoAdapter';
@@ -107,6 +106,11 @@ class SyncService {
       for (const paciente of pacientesParaSincronizar) {
         try {
           console.log(`👤 Sincronizando paciente: ${paciente.nome} (ID temp: ${paciente.idpaciente})`);
+          console.log(`🔍 DEBUG - Dados originais do paciente:`, {
+            gestante: paciente.gestante,
+            gestante_tipo: typeof paciente.gestante,
+            dadosCompletos: paciente
+          });
           
           // ✅ VERIFICAR SE JÁ EXISTE NO SERVIDOR POR CPF (evitar duplicação)
           if (paciente.cpf) {
@@ -122,6 +126,27 @@ class SyncService {
                 
                 if (matchingPatient && matchingPatient.idpaciente) {
   console.log(`✅ Paciente ${paciente.nome} já existe no servidor (ID: ${matchingPatient.idpaciente})`);
+  console.log(`🔍 DEBUG - Dados do servidor:`, {
+    gestante: matchingPatient.gestante,
+    nome: matchingPatient.nome
+  });
+  console.log(`🔍 DEBUG - Dados locais:`, {
+    gestante: paciente.gestante,
+    nome: paciente.nome
+  });
+  
+  // ✅ ATUALIZAR DADOS LOCAIS COM DADOS DO SERVIDOR (para consistência)
+  const updatedPaciente = {
+    ...paciente,
+    ...matchingPatient, // Sobrescrever com dados do servidor
+    idpaciente: paciente.idpaciente, // Manter ID local para referência
+    serverIdpaciente: matchingPatient.idpaciente,
+    synced: 'true',
+    syncedAt: Date.now()
+  };
+  
+  // ✅ USAR savePaciente que já existe para atualizar
+  await indexedDBService.savePaciente(updatedPaciente);
   
   // ✅ USAR ID DO SERVIDOR E MARCAR COMO SINCRONIZADO
   pacienteIdMapping.set(paciente.idpaciente, matchingPatient.idpaciente);
@@ -142,7 +167,9 @@ class SyncService {
           
           console.log(`📤 Criando novo paciente no servidor:`, {
             nome: pacienteData.nome,
-            cpf: pacienteData.cpf
+            cpf: pacienteData.cpf,
+            gestante: pacienteData.gestante,
+            allData: pacienteData // ✅ DEBUG: Log completo dos dados
           });
           
           const result = await PacienteService.create(pacienteData);
@@ -153,6 +180,15 @@ class SyncService {
           }
           
           console.log(`✅ Novo paciente criado: ID temp ${idpaciente} → ID perm ${newPatientId}`);
+          console.log(`🔍 DEBUG - Dados enviados:`, {
+            gestante: pacienteData.gestante,
+            nome: pacienteData.nome
+          });
+          console.log(`🔍 DEBUG - Resposta do servidor:`, {
+            gestante: result.gestante,
+            nome: result.nome,
+            id: result.idpaciente
+          });
           
           pacienteIdMapping.set(idpaciente, newPatientId);
           await indexedDBService.markPacienteAsSynced(idpaciente);
@@ -306,9 +342,27 @@ class SyncService {
           await indexedDBService.markNotificacaoAsSynced(id);
           syncedCount++;
           
-        } catch (error) {
+        } catch (error: any) {
           console.error(`❌ Erro ao sincronizar notificação ${id}:`, error);
-          errorCount++;
+          
+          // ✅ TRATAMENTO ESPECIAL PARA ERROS 500 E NOTIFICAÇÕES ÓRFÃS
+          const isServerError = error?.response?.status === 500;
+          const isOrphanedNotification = id < 0;
+          const isInvalidData = error?.message?.includes('validation') || error?.message?.includes('required');
+          
+          if (isServerError || isOrphanedNotification || isInvalidData) {
+            console.log(`🗑️ Removendo notificação problemática ID ${id} - Motivo: ${
+              isServerError ? 'Erro 500 do servidor' : 
+              isOrphanedNotification ? 'ID negativo (órfã)' : 
+              'Dados inválidos'
+            }`);
+            
+            // Marcar como sincronizada para remover da lista de pendentes
+            await indexedDBService.markNotificacaoAsSynced(id);
+            toast.info(`Notificação problemática (ID: ${id}) foi removida da fila de sincronização`);
+          } else {
+            errorCount++;
+          }
         }
       }
 
@@ -385,6 +439,92 @@ class SyncService {
       
     } catch (error) {
       console.error('❌ Erro no debug:', error);
+    }
+  }
+
+  // ✅ NOVO: Método para limpar dados órfãos/corrompidos
+  async clearOrphanedData(): Promise<void> {
+    try {
+      console.log('🧹 === INICIANDO LIMPEZA DE DADOS ÓRFÃOS ===');
+      
+      // 1. Verificar notificações com IDs negativos ou dados inválidos
+      const pendingNotificacoes = await indexedDBService.getPendingNotificacoes();
+      let clearedCount = 0;
+      
+      for (const notif of pendingNotificacoes) {
+        let shouldClear = false;
+        let reason = '';
+        
+        // Verificar ID negativo
+        if (notif.id < 0) {
+          shouldClear = true;
+          reason = 'ID negativo';
+        }
+        
+        // Verificar se tem dados mínimos necessários
+        const formData = notif.formData as any;
+        if (!formData || !formData.tipoEvento) {
+          shouldClear = true;
+          reason = reason ? `${reason}, dados incompletos` : 'dados incompletos';
+        }
+        
+        // Verificar se paciente existe (se necessário)
+        const pacienteId = (formData as any)?.pacienteId || (formData as any)?.paciente_idpaciente;
+        if (pacienteId && pacienteId < 0) {
+          // Verificar se o paciente ainda existe no IndexedDB
+          try {
+            const pacienteExists = await indexedDBService.getAll('pacientes').then(pacientes => 
+              pacientes.some(p => p.idpaciente === pacienteId)
+            );
+            
+            if (!pacienteExists) {
+              shouldClear = true;
+              reason = reason ? `${reason}, paciente órfão` : 'paciente órfão';
+            }
+          } catch (error) {
+            console.warn(`⚠️ Erro ao verificar paciente ${pacienteId}:`, error);
+          }
+        }
+        
+        if (shouldClear) {
+          console.log(`🗑️ Removendo notificação órfã ID ${notif.id}: ${reason}`);
+          await indexedDBService.markNotificacaoAsSynced(notif.id); // Marca como sincronizada para remover da lista
+          clearedCount++;
+        }
+      }
+      
+      // 2. Limpar pacientes órfãos (sem notificações associadas)
+      const unsyncedPacientes = await indexedDBService.getUnsyncedPacientes();
+      const allNotifications = await indexedDBService.getAll('notificacoes');
+      
+      for (const paciente of unsyncedPacientes) {
+        const hasNotifications = allNotifications.some(notif => {
+          const formData = notif.formData as any;
+          const pacienteId = formData?.pacienteId || formData?.paciente_idpaciente;
+          return pacienteId === paciente.idpaciente;
+        });
+        
+        // Se não tem notificações e foi criado há mais de 24h, remover
+        const isOld = Date.now() - (paciente.timestamp || 0) > 24 * 60 * 60 * 1000;
+        
+        if (!hasNotifications && isOld && paciente.idpaciente < 0) {
+          console.log(`🗑️ Removendo paciente órfão: ${paciente.nome} (ID: ${paciente.idpaciente})`);
+          await indexedDBService.markPacienteAsSynced(paciente.idpaciente);
+          clearedCount++;
+        }
+      }
+      
+      if (clearedCount > 0) {
+        console.log(`✅ Limpeza concluída: ${clearedCount} registro(s) órfão(s) removido(s)`);
+        toast.success(`Limpeza concluída: ${clearedCount} registro(s) órfão(s) removido(s)`);
+      } else {
+        console.log('✅ Nenhum dado órfão encontrado');
+        toast.info('Nenhum dado órfão encontrado');
+      }
+      
+    } catch (error) {
+      console.error('❌ Erro na limpeza de dados órfãos:', error);
+      toast.error('Erro na limpeza de dados órfãos');
     }
   }
 
@@ -562,6 +702,26 @@ class SyncService {
     return true;
   }
 
+  // ✅ NOVO: Método para forçar limpeza de notificação específica
+  async forceRemovePendingNotification(id: number): Promise<boolean> {
+    try {
+      console.log(`🗑️ Forçando remoção da notificação pendente ID: ${id}`);
+      
+      await indexedDBService.markNotificacaoAsSynced(id);
+      
+      const newCount = await this.getPendingCount();
+      console.log(`✅ Notificação ${id} removida. Pendentes restantes: ${newCount.notificacoes}`);
+      
+      toast.success(`Notificação problemática (ID: ${id}) foi removida`);
+      return true;
+      
+    } catch (error) {
+      console.error(`❌ Erro ao remover notificação ${id}:`, error);
+      toast.error(`Erro ao remover notificação ${id}`);
+      return false;
+    }
+  }
+
   // ✅ NOVO: Verificação de CNES
   async checkCNESExists(cnes: string): Promise<boolean> {
     if (!cnes || cnes.length !== 7) return false;
@@ -655,4 +815,11 @@ class SyncService {
 
 // Exportar uma instância para uso em toda a aplicação
 const syncService = new SyncService();
+
+// ✅ EXPOR GLOBALMENTE PARA DEBUG NO CONSOLE (apenas em desenvolvimento)
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
+  (window as any).syncService = syncService;
+  console.log('🔧 syncService disponível globalmente para debug');
+}
+
 export default syncService;

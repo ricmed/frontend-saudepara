@@ -1317,11 +1317,19 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           cpf: formData.cpf || "",
           contato: formData.contatoTelefonico || "",
           ddi: formData.ddi || "55",
+          gestante: formData.gestante || null, // ✅ ADICIONADO: Incluir campo gestante
           tipo_genero_idtipo_genero: formData.identidadeGenero ? parseInt(formData.identidadeGenero) : 2,
           tipo_raca_idtipo_raca: formData.raca ? parseInt(formData.raca) : 1,
           escolaridade_idescolaridade: formData.escolaridade ? parseInt(formData.escolaridade) : 11,
           cbo_idcbo: formData.profissao ? parseInt(formData.profissao) : null
         };
+        
+        // ✅ DEBUG: Log para verificar se gestante está incluído
+        console.log('🔍 DEBUG - Criando paciente com gestante:', {
+          gestante: formData.gestante,
+          gestante_novoPaciente: novoPaciente.gestante,
+          tipo: typeof formData.gestante
+        });
 
         const pacienteCriado = await savePatientOfflineSafe(novoPaciente);
         formData.pacienteId = pacienteCriado.idpaciente;
@@ -1392,8 +1400,15 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           cpf: formData.cpf || "",
           contato: formData.contatoTelefonico || "",
           ddi: formData.ddi || "55",
-          gestante: formData.gestante || null,
+          gestante: formData.gestante || null, // ✅ Preservar valores "S" ou "N", converter "" para null
         };
+        
+        // ✅ DEBUG: Log para verificar valor de gestante
+        console.log('🔍 DEBUG useNotificationForm - Valor de gestante:', {
+          original: formData.gestante,
+          final: pacienteData.gestante,
+          tipo: typeof formData.gestante
+        });
 
         // CORREÇÃO: SEMPRE enviar data_nascimento (null se vazio)
         if (formData.dataNascimento && formData.dataNascimento.trim() !== '') {
@@ -2160,11 +2175,19 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         data_nascimento: formData.dataNascimento || null,
         cpf: formData.cpf || "",
         contato: formData.contatoTelefonico || "",
+        gestante: formData.gestante || null, // ✅ ADICIONADO: Incluir campo gestante
         tipo_genero_idtipo_genero: formData.identidadeGenero || null,
         tipo_raca_idtipo_raca: formData.raca || null,
         escolaridade_idescolaridade: formData.escolaridade || null,
         cbo_idcbo: formData.profissao || null,
       };
+      
+      // ✅ DEBUG: Log para verificar se gestante está incluído
+      console.log('🔍 DEBUG - Criando novo paciente com gestante:', {
+        gestante: formData.gestante,
+        gestante_novoPaciente: novoPaciente.gestante,
+        tipo: typeof formData.gestante
+      });
 
       const pacienteCriado = await savePatientOfflineSafe(novoPaciente);
 

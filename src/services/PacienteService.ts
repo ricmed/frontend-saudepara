@@ -228,12 +228,22 @@ export const PacienteService = {
       // Formatação da data se necessário
       const formattedData = {
         ...data,
-        // Garantir que null seja enviado em vez de strings vazias
+        // Garantir que null seja enviado em vez de strings vazias, mas preservar valores válidos
         nome_mae: data.nome_mae?.trim() || null,
         cpf: data.cpf?.trim() || null,
         gestante: data.gestante?.trim() || null,
         contato: data.contato?.trim() || null,
       };
+      
+      // ✅ DEBUG: Log dos dados sendo enviados para o servidor
+      console.log('🔍 DEBUG PacienteService.create - Dados originais:', {
+        gestante: data.gestante,
+        gestante_tipo: typeof data.gestante
+      });
+      console.log('🔍 DEBUG PacienteService.create - Dados formatados:', {
+        gestante: formattedData.gestante,
+        gestante_tipo: typeof formattedData.gestante
+      });
       
       const response = await api.post('/', formattedData);
       return response.data;
