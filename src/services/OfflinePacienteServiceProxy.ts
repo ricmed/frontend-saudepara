@@ -296,11 +296,15 @@ export const OfflinePacienteService = {
     // ✅ DEBUG: Log dos dados do paciente sendo salvos offline
     console.log('🔍 DEBUG OfflinePacienteServiceProxy.create - Dados originais:', {
       gestante: data.gestante,
-      gestante_tipo: typeof data.gestante
+      gestante_tipo: typeof data.gestante,
+      idade: data.idade,
+      idade_tipo: typeof data.idade
     });
     console.log('🔍 DEBUG OfflinePacienteServiceProxy.create - Dados formatados:', {
       gestante: formattedData.gestante,
-      gestante_tipo: typeof formattedData.gestante
+      gestante_tipo: typeof formattedData.gestante,
+      idade: formattedData.idade,
+      idade_tipo: typeof formattedData.idade
     });
     
     // Gera um ID temporário negativo para identificar pacientes não sincronizados

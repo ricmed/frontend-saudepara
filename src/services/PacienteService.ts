@@ -238,11 +238,15 @@ export const PacienteService = {
       // ✅ DEBUG: Log dos dados sendo enviados para o servidor
       console.log('🔍 DEBUG PacienteService.create - Dados originais:', {
         gestante: data.gestante,
-        gestante_tipo: typeof data.gestante
+        gestante_tipo: typeof data.gestante,
+        idade: data.idade,
+        idade_tipo: typeof data.idade
       });
       console.log('🔍 DEBUG PacienteService.create - Dados formatados:', {
         gestante: formattedData.gestante,
-        gestante_tipo: typeof formattedData.gestante
+        gestante_tipo: typeof formattedData.gestante,
+        idade: formattedData.idade,
+        idade_tipo: typeof formattedData.idade
       });
       
       const response = await api.post('/', formattedData);

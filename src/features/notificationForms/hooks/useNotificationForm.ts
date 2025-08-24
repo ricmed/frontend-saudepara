@@ -1310,7 +1310,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           dataNascimento: formData.dataNascimento,
           cpf: formData.cpf
         });        // ✅ USAR SISTEMA OFFLINE
-        const novoPaciente = {
+        const novoPaciente: any = {
           nome: formData.paciente.toUpperCase(),
           nome_mae: formData.nomeMae?.toUpperCase() || "",
           data_nascimento: formData.dataNascimento || null,
@@ -1324,11 +1324,20 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           cbo_idcbo: formData.profissao ? parseInt(formData.profissao) : null
         };
         
-        // ✅ DEBUG: Log para verificar se gestante está incluído
-        console.log('🔍 DEBUG - Criando paciente com gestante:', {
+        // ✅ CORREÇÃO: SEMPRE enviar idade em meses quando não há data de nascimento
+        if ((!formData.dataNascimento || formData.dataNascimento.trim() === '') && formData.idadeMeses) {
+          novoPaciente.idade = parseInt(formData.idadeMeses); // Envia o total de meses
+        } else {
+          novoPaciente.idade = null;
+        }
+        
+        // ✅ DEBUG: Log para verificar se gestante e idade estão incluídos
+        console.log('🔍 DEBUG - Criando paciente com gestante e idade:', {
           gestante: formData.gestante,
           gestante_novoPaciente: novoPaciente.gestante,
-          tipo: typeof formData.gestante
+          idade_formData: formData.idadeMeses,
+          idade_novoPaciente: novoPaciente.idade,
+          dataNascimento: formData.dataNascimento
         });
 
         const pacienteCriado = await savePatientOfflineSafe(novoPaciente);
@@ -2169,7 +2178,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
     try {
       // ✅ USAR SISTEMA OFFLINE
-      const novoPaciente = {
+      const novoPaciente: any = {
         nome: formData.paciente,
         nome_mae: formData.nomeMae || "",
         data_nascimento: formData.dataNascimento || null,
@@ -2182,10 +2191,20 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         cbo_idcbo: formData.profissao || null,
       };
       
-      // ✅ DEBUG: Log para verificar se gestante está incluído
-      console.log('🔍 DEBUG - Criando novo paciente com gestante:', {
+      // ✅ CORREÇÃO: SEMPRE enviar idade em meses quando não há data de nascimento
+      if ((!formData.dataNascimento || formData.dataNascimento.trim() === '') && formData.idadeMeses) {
+        novoPaciente.idade = parseInt(formData.idadeMeses); // Envia o total de meses
+      } else {
+        novoPaciente.idade = null;
+      }
+      
+      // ✅ DEBUG: Log para verificar se gestante e idade estão incluídos
+      console.log('🔍 DEBUG - Criando novo paciente com gestante e idade:', {
         gestante: formData.gestante,
         gestante_novoPaciente: novoPaciente.gestante,
+        idade_formData: formData.idadeMeses,
+        idade_novoPaciente: novoPaciente.idade,
+        dataNascimento: formData.dataNascimento,
         tipo: typeof formData.gestante
       });
 
