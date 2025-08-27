@@ -187,6 +187,8 @@ export interface FormData {
   // 🆕 NOVOS CAMPOS: Auditoria (só para exibição)
   created_at?: string;
   updated_at?: string;
+  created_by_userid?: string;    // ID do usuário que criou
+  updated_by_userid?: string;    // ID do usuário que atualizou
 }
 
 // 🆕 NOVA FUNÇÃO: Detectar timezone do usuário automaticamente

@@ -823,6 +823,8 @@ const prepareDataForExport = (
     // Seção 7: Campos de Auditoria
     "Data de Criação": formatarDataUniversal(formData.created_at),
     "Data de Atualização": formatarDataUniversal(formData.updated_at),
+    "Criado por (ID)": formData.created_by_userid || "—",
+    "Atualizado por (ID)": formData.updated_by_userid || "—",
   };
 };
 
@@ -1544,6 +1546,8 @@ const formatNotificacaoForExport = (
     // Campos de Auditoria
     "Data de Criação": formatarDataUniversal(original.created_at),
     "Data de Atualização": formatarDataUniversal(original.updated_at),
+    "Criado por (ID)": original.created_by_userid || "—",
+    "Atualizado por (ID)": original.updated_by_userid || "—",
   };
 };
 

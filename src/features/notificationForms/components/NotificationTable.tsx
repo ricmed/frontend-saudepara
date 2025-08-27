@@ -56,6 +56,23 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
         return notificacao.original
           ?.estabelecimento_notificacao_estabelecimento_idestabelecimentoToestabelecimento
           ?.nome || "";
+      // 🆕 NOVOS CASOS: Campos de auditoria
+      case "created_by_userid":
+        return (
+          <div className="text-sm text-gray-600">
+            {notificacao.original?.created_by_userid || "—"}
+          </div>
+        );
+      case "updated_by_userid":
+        return (
+          <div className="text-sm text-gray-600">
+            {notificacao.original?.updated_by_userid || "—"}
+          </div>
+        );
+      case "created_at":
+        return formatDate(notificacao.original?.created_at);
+      case "updated_at":
+        return formatDate(notificacao.original?.updated_at);
       default:
         return String(notificacao[key] || "");
     }

@@ -11,6 +11,10 @@ export interface Notificacao {
     original?: {
       idnotificacao: number;
       data_atendimento?: string;
+      created_at?: string;           // 🆕 Data de criação
+      updated_at?: string;           // 🆕 Data de atualização
+      created_by_userid?: string;    // 🆕 ID do usuário que criou
+      updated_by_userid?: string;    // 🆕 ID do usuário que atualizou
       paciente: {
         idpaciente: number;
         nome: string;
@@ -66,6 +70,11 @@ export interface Notificacao {
       label: "Unidade Notificadora",
       sortable: false,
     },
+    // 🆕 NOVAS COLUNAS: Auditoria de usuários
+    { key: "created_by_userid", label: "Criado por", sortable: true },
+    { key: "updated_by_userid", label: "Atualizado por", sortable: true },
+    { key: "created_at", label: "Data Criação", sortable: true },
+    { key: "updated_at", label: "Data Atualização", sortable: true },
   ];
   
   // Campos de busca disponíveis para a dropdown

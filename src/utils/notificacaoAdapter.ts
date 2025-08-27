@@ -268,6 +268,8 @@ export const formatFromBackend = async (
     // 🆕 CAMPOS DE AUDITORIA (se existirem no backend)
     created_at: backendData.created_at || undefined,
     updated_at: backendData.updated_at || undefined,
+    created_by_userid: backendData.created_by_userid || undefined,
+    updated_by_userid: backendData.updated_by_userid || undefined,
   };
   
   console.log("FormData processado:", {
