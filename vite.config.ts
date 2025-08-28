@@ -228,10 +228,23 @@ export default defineConfig({
         ],
         
         navigateFallback: '/index.html',
+        navigateFallbackAllowlist: [
+          /^\/$/,
+          /^\/dashboard/,
+          /^\/dashboard-page/,
+          /^\/private/,
+          /^\/public/,
+          /^\/comunicacao-de-caso/,
+          /^\/estabelecimentos/,
+          /^\/notificacoes/
+        ],
         navigateFallbackDenylist: [
           /^\/_/,
           /\/[^/?]+\.[^/]+$/,
-          /^\/api/
+          /^\/api/,
+          /^\/mnt/,
+          /^\/src/,
+          /^\/node_modules/
         ]
       }
     })

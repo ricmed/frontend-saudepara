@@ -18,6 +18,8 @@ export interface Local {
   cnpj?: string;
   codigo_unidade?: string;
   ativo: boolean;
+  // ID original do estabelecimento para referência cruzada
+  idestabelecimento?: number;
 }
 
 export interface TempoViagem {

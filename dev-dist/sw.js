@@ -79,12 +79,12 @@ define(['./workbox-26eaab98'], (function (workbox) { 'use strict';
    */
   workbox.precacheAndRoute([{
     "url": "/index.html",
-    "revision": "0.bnrfmldk4ko"
+    "revision": "0.t93vr1losc8"
   }], {});
   workbox.cleanupOutdatedCaches();
   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("/index.html"), {
     allowlist: [/^\/$/],
-    denylist: [/^\/_/, /\/[^/?]+\.[^/]+$/, /^\/api/]
+    denylist: [/^\/_/, /\/[^/?]+\.[^/]+$/, /^\/api/, /^\/mnt/, /^\/src/, /^\/node_modules/]
   }));
   workbox.registerRoute(/^https:\/\/app-api\.hml\.saude\.pa\.gov\.br\/api\/paciente\/check-cpf\/\d{11}.*$/i, new workbox.NetworkFirst({
     "cacheName": "check-cpf-network-only",

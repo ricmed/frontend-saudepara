@@ -450,6 +450,13 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
     existentes: trimmedData.arquivos?.filter(a => a.isExisting).length || 0
   });
 
+  // 🔧 CORREÇÃO: Detectar timezone automaticamente se não estiver presente
+  const timezoneInfo = trimmedData.timezone_name && trimmedData.timezone_offset_minutos !== undefined
+    ? { timezone_name: trimmedData.timezone_name, timezone_offset_minutos: trimmedData.timezone_offset_minutos }
+    : detectUserTimezone();
+
+  console.log('🌍 Timezone detectado para envio:', timezoneInfo);
+
   // Construir payload para o backend com datas ajustadas para UTC
   const payload: NotificacaoGenerica = {
     tipo_evento_idtipo_evento: parseInt(trimmedData.evento) || null,
@@ -465,13 +472,9 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
     // Adiciona campo surto com valor padrão
     surto: "N",
 
-    // 🆕 CAMPOS DE TIMEZONE: Adicionar informações de timezone da notificação
-    ...(trimmedData.timezone_name && {
-      timezone_name: trimmedData.timezone_name
-    }),
-    ...(trimmedData.timezone_offset_minutos !== undefined && {
-      timezone_offset_minutos: trimmedData.timezone_offset_minutos
-    }),
+    // 🆕 CAMPOS DE TIMEZONE: SEMPRE incluir informações de timezone detectadas
+    timezone_name: timezoneInfo.timezone_name,
+    timezone_offset_minutos: timezoneInfo.timezone_offset_minutos,
 
     // IMPORTANTE: Adicione estes campos sempre, mesmo que vazios
     observavao_incidente: trimmedData.observacaoIncidente || "",
@@ -503,8 +506,8 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
     ...(trimmedData.dataInicioSintomas && {
       data_inicio_sintomas: processarDataParaUTC(
         trimmedData.dataInicioSintomas,
-        trimmedData.timezone_name,
-        trimmedData.timezone_offset_minutos
+        timezoneInfo.timezone_name,
+        timezoneInfo.timezone_offset_minutos
       ),
     }),
     ...(trimmedData.observacaoSintomas && {
@@ -529,8 +532,8 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
     ...(trimmedData.dataAtendimento && {
       data_atendimento: processarDataParaUTC(
         trimmedData.dataAtendimento,
-        trimmedData.timezone_name,
-        trimmedData.timezone_offset_minutos
+        timezoneInfo.timezone_name,
+        timezoneInfo.timezone_offset_minutos
       ),
     }),
     ...(trimmedData.nomeNotificador && {
@@ -542,8 +545,8 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
     ...(trimmedData.dataEncerramento && {
       data_encerramento: processarDataParaUTC(
         trimmedData.dataEncerramento,
-        trimmedData.timezone_name,
-        trimmedData.timezone_offset_minutos
+        timezoneInfo.timezone_name,
+        timezoneInfo.timezone_offset_minutos
       ),
     }),
     

@@ -65,12 +65,16 @@ export const formatLocalDateForBackend = (
       // "YYYY-MM-DD HH:mm:ss" -> "YYYY-MM-DDTHH:mm:ss"
       isoString = dateString.replace(' ', 'T');
     } else if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      // "YYYY-MM-DD" -> "YYYY-MM-DDTHH:mm:ss" (meio-dia como padrão)
-      isoString = `${dateString}T12:00:00`;
+      // "YYYY-MM-DD" -> "YYYY-MM-DDTHH:mm:ss" (horário atual como padrão)
+      const now = new Date();
+      const currentTime = now.toTimeString().split(' ')[0]; // "HH:mm:ss"
+      isoString = `${dateString}T${currentTime}`;
     } else if (dateString.includes('/')) {
       // "DD/MM/YYYY" -> "YYYY-MM-DD"
       const [day, month, year] = dateString.split('/');
-      isoString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T12:00:00`;
+      const now = new Date();
+      const currentTime = now.toTimeString().split(' ')[0]; // "HH:mm:ss"
+      isoString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${currentTime}`;
     } else {
       isoString = dateString;
     }

@@ -4,6 +4,12 @@ const server = import.meta.env.VITE_API_SERVER;
 const port = import.meta.env.VITE_API_PORT;
 const API_URL = `${server}:${port}/api/estabelecimentos`;
 
+console.log('🔧 EstabelecimentoMapaService - Configuração API:', {
+  server,
+  port,
+  API_URL
+});
+
 // Interface para o estabelecimento do mapa (compatível com o tipo Local existente)
 export interface EstabelecimentoMapa {
   idestabelecimento: number;
@@ -118,7 +124,9 @@ const mapToLocal = (estabelecimento: EstabelecimentoMapa): Local => {
     cnes: estabelecimento.cnes || '',
     cnpj: '',
     codigo_unidade: '',
-    ativo: true // Já vem filtrado como ativo da API
+    ativo: true, // Já vem filtrado como ativo da API
+    // Manter também o ID original do estabelecimento para referência
+    idestabelecimento: estabelecimento.idestabelecimento
   };
 };
 
@@ -129,11 +137,16 @@ export const EstabelecimentoMapaService = {
    */
   getEstabelecimentosParaMapa: async (): Promise<Local[]> => {
     try {
-      console.log('Carregando estabelecimentos ativos da API...');
+      console.log('🚀 EstabelecimentoMapaService - Iniciando carregamento...');
+      console.log('📡 URL da API:', `${API_URL}/mapa`);
       
       const response = await axios.get<EstabelecimentoMapa[]>(`${API_URL}/mapa`);
       
-      console.log(`${response.data.length} estabelecimentos carregados da API`);
+      console.log('✅ Resposta da API recebida:', {
+        status: response.status,
+        dataLength: response.data.length,
+        primeiro: response.data[0] ? response.data[0].nome : 'nenhum'
+      });
       
       // Converter para o formato esperado pelo mapa
       const locais = response.data
@@ -145,12 +158,21 @@ export const EstabelecimentoMapaService = {
         )
         .map(mapToLocal);
 
-      console.log(`${locais.length} estabelecimentos com coordenadas válidas`);
+      console.log(`✅ Estabelecimentos processados: ${locais.length} com coordenadas válidas`);
       
       return locais;
     } catch (error) {
-      console.error('Erro ao carregar estabelecimentos:', error);
-      return handleApiError(error as AxiosError<APIError>);
+      console.error('❌ Erro ao carregar estabelecimentos:', error);
+      if (axios.isAxiosError(error)) {
+        console.error('❌ Detalhes do erro Axios:', {
+          message: error.message,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data
+        });
+      }
+      // Em caso de erro, retornar array vazio em vez de lançar exceção
+      return [];
     }
   },
 

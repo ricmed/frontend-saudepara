@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext } from "react";
+import NotificacaoService from '@/services/NotificacaoService';
 import {
   BarChart,
   Bar,
@@ -11,6 +12,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import { findRuleByHypothesis } from './config/vigilancia.config';
 import {
   User,
   Activity,
@@ -44,8 +46,16 @@ import {
   ChevronRight,
   Layers,
   MousePointer,
-  RotateCcw
+  RotateCcw,
+  Table
 } from "lucide-react";
+
+// 🆕 NOVOS IMPORTS: Componentes do dashboard aprimorado
+import DashboardTabs, { useDashboardTabs } from './components/DashboardTabs';
+import AtendimentosPorHoraChart from './components/AtendimentosPorHoraChart';
+import EstabelecimentosMapaAvancado from './components/EstabelecimentosMapaAvancado';
+import AlertasPanel from './components/AlertasPanel';
+import TestTimeForm from '../../components/TestTimeForm';
 
 // Funções de exportação para diferentes formatos
 const exportChartAsPNG = (chartId: string, title: string): void => {
@@ -243,32 +253,15 @@ const COLORS = {
   // Cores para as hipóteses diagnósticas alarmantes
   alarmante: "#f44336",     // Vermelho para hipóteses alarmantes
   alerta: "#ff9800",        // Laranja para alertas
+  medio: "#facc15",         // Amarelo para prioridade média
   normal: "#3b5bdb",        // Azul para casos normais
 };
-
-// Lista de hipóteses de notificação compulsória imediata para MS, SES e SMS
-// Baseado na Portaria nº 204/2016 do Ministério da Saúde e na lista fornecida
-const HIPOTESES_ALARMANTES = [
-  "BOTULISMO", "CÓLERA", "DIFTERIA", "DOENÇA DE CHAGAS AGUDA", 
-  "FEBRE AMARELA", "FEBRE DO NILO OCIDENTAL", "DOENÇA MENINGOCÓCICA", 
-  "OUTRAS MENINGITES", "SARAMPO", "RUBÉOLA", "PARALISIA FLÁCIDA AGUDA",
-  "DENGUE", "ZIKA VÍRUS", "COVID 19"
-];
-
-// Lista de hipóteses de notificação compulsória imediata para MS e SES
-// ou notificação semanal mas com necessidade de monitoramento rigoroso
-const HIPOTESES_ALERTA = [
-  "TÉTANO ACIDENTAL", "COQUELUCHE", "MALÁRIA", "LEPTOSPIROSE", 
-  "INFLUENZA SAZONAL", "FEBRE TIFÓIDE", "LEISHMANIOSE VISCERAL",
-  "HANSENIASE", "VARICELA", "HERPES ZOSTER", "LEISHMANIOSE TEG. AMERICANA", 
-  "CHIKUNGUNYA", "TUBERCULOSE", "ROTAVIROSE", 
-  "DOENÇAS DE TRANSMISSÃO HÍDRICA E ALIMENTAR", "CAXUMBA"
-];
 
 // Interface para as props do dashboard
 interface DashboardProps {
   notificacoes?: any[]; // Lista de notificações da API
   exportOptions?: any; // Opções de exportação com os tipos/categorias
+  onDataRefresh?: (newData: any[]) => void; // Callback para notificar sobre novos dados
 }
 
 // Define interface for chart data
@@ -291,6 +284,7 @@ interface StatCounts {
 const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   notificacoes = [],
   exportOptions = {},
+  onDataRefresh,
 }) => {
   // Para controlar se já fizemos o processamento inicial
   const initialProcessingDone = useRef(false);
@@ -300,7 +294,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   const refreshDataRef = useRef<any>(null);
   
   // Estado para controle de visualização
-  const [activeTab, setActiveTab] = useState("graficos");
+  const { activeTab, setActiveTab } = useDashboardTabs();
 
   // Estado para filtragem interativa
   const [loading, setLoading] = useState(false);
@@ -535,39 +529,29 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     return resultado;
   }, [exportOptions, checkAtendimentoType]);
 
-  // Função para determinar se uma hipótese é alarmante
+  // ✅ Função para determinar se uma hipótese é alarmante (baseado no GVS)
   const isHipotesisAlarmante = useCallback((hipotese: string): boolean => {
-    const hipoteseUpper = hipotese.toUpperCase();
-    // Verificar correspondência exata ou parcial com as hipóteses alarmantes
-    return HIPOTESES_ALARMANTES.some(alarmante => 
-      hipoteseUpper.includes(alarmante) || alarmante.includes(hipoteseUpper)
-    );
+    const match = findRuleByHypothesis(hipotese);
+    return !!match && match.rule.priority === 'critical';
   }, []);
 
-  // Função para determinar se uma hipótese está em alerta (média gravidade)
+  // ✅ Função para determinar se uma hipótese está em alerta (baseado no GVS)
   const isHipotesisAlerta = useCallback((hipotese: string): boolean => {
-    const hipoteseUpper = hipotese.toUpperCase();
-    // Verificar correspondência exata ou parcial com as hipóteses em alerta
-    return HIPOTESES_ALERTA.some(alerta => 
-      hipoteseUpper.includes(alerta) || alerta.includes(hipoteseUpper)
-    );
+    const match = findRuleByHypothesis(hipotese);
+    return !!match && match.rule.priority === 'high';
   }, []);
 
-  // Função para obter a cor adequada para cada hipótese diagnóstica
-  const getHipotesisColor = useCallback((hipotese: string, value: number): string => {
-    // Se for uma hipótese alarmante, mesmo com 1 caso já é vermelho
-    if (isHipotesisAlarmante(hipotese)) {
-      return COLORS.alarmante;
-    }
+  // ✅ Função para obter a cor adequada para cada hipótese diagnóstica (baseado no GVS)
+  const getHipotesisColor = useCallback((hipotese: string, _value: number): string => {
+    const match = findRuleByHypothesis(hipotese);
+    if (!match) return COLORS.normal; // azul padrão
     
-    // Se for uma hipótese de alerta, usar a cor de alerta
-    if (isHipotesisAlerta(hipotese)) {
-      return COLORS.alerta;
-    }
-    
-    // Casos normais, usar a paleta padrão
-    return COLORS.normal;
-  }, [isHipotesisAlarmante, isHipotesisAlerta]);
+    const pri = match.rule.priority;
+    if (pri === 'critical') return COLORS.alarmante; // vermelho
+    if (pri === 'high') return COLORS.alerta;        // laranja
+    if (pri === 'medium') return COLORS.medio;       // amarelo
+    return COLORS.normal;                            // azul
+  }, []);
 
   const processarCategoria = useCallback((
     dados: any[],
@@ -948,6 +932,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           return b.value - a.value;
         });
         
+        console.log("📈 Atualizando hipóteses diagnósticas:", sortedHipoteses.length, "itens");
         setFilteredHipoteses(sortedHipoteses);
         if (originalHipoteses.length === 0) {
           setOriginalHipoteses(sortedHipoteses);
@@ -1037,62 +1022,95 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       setStatCounts(counts);
 
       // Processar dados para gráficos
-      return processarDadosGraficos(dados);
+      console.log("📊 Iniciando processamento de dados para gráficos...");
+      const processResult = processarDadosGraficos(dados);
+      console.log("📊 Processamento de gráficos concluído:", processResult);
+      return processResult;
     } catch (error) {
       console.error("Erro ao calcular estatísticas:", error);
       return false;
     }
   }, [notificacoes, processarDadosGraficos, getAtendimentoDescById]);
 
-  // Função para buscar dados frescos do servidor usando o NotificacaoService
+  // Função para buscar dados frescos do servidor
   const fetchFreshData = useCallback(async () => {
     try {
-      console.log("Buscando dados frescos do servidor via NotificacaoService...");
+      console.log("Buscando dados frescos do servidor...");
       
-      // Simular busca de dados via serviço
-      const mockData = [...notificacoes];
-      console.log("Novos dados recebidos:", mockData.length, "notificações");
+      // Usar o NotificacaoService para buscar dados atualizados
+      const response = await NotificacaoService.getAll(1, 1000);
+      const freshData = response.data || [];
       
-      // Atualizar as notificações originais
-      originalNotificacoes.current = [...mockData];
+      console.log("Dados frescos recebidos:", freshData.length, "notificações");
       
-      return mockData;
+      // Verificar se temos dados novos
+      if (freshData && Array.isArray(freshData) && freshData.length > 0) {
+        // Atualizar as notificações originais
+        originalNotificacoes.current = [...freshData];
+        return freshData;
+      }
+      
+      return null;
     } catch (error) {
       console.error("Erro ao buscar dados do servidor:", error);
+      
+      // Em caso de erro, tentar usar dados locais se disponíveis
+      if (notificacoes && notificacoes.length > 0) {
+        console.log("Usando dados locais como fallback...");
+        const mockData = [...notificacoes];
+        originalNotificacoes.current = [...mockData];
+        return mockData;
+      }
+      
       return null;
     }
   }, [notificacoes]);
 
   // Função para atualizar os dados
   const refreshData = useCallback(async () => {
-    if (loading) return; // Evita atualizações simultâneas
+    console.log("🔄 Auto-atualização disparada!");
     
-    console.log("Atualizando dados automaticamente...");
+    if (loading) {
+      console.log("⏸️ Atualização pulada - carregamento em andamento");
+      return; // Evita atualizações simultâneas
+    }
+    
+    console.log("📡 Iniciando busca de dados frescos...");
     setLoading(true);
     
     try {
       // Buscar dados frescos do servidor usando o NotificacaoService
       const freshData = await fetchFreshData();
+      console.log(`📊 Dados recebidos: ${freshData?.length || 0} notificações`);
       
       // Se conseguimos novos dados, processar
       if (freshData) {
+        // Notificar o componente pai sobre novos dados
+        if (onDataRefresh && freshData.length !== notificacoes.length) {
+          console.log("🔔 Notificando componente pai sobre novos dados...");
+          onDataRefresh(freshData);
+        }
+        
+        console.log("📈 Atualizando dados locais...");
         // Atualizar dados originais
         if (selectedCategory) {
           // Se temos um filtro ativo, reaplicá-lo
+          console.log(`🎯 Reaplicando filtro: ${selectedCategory}`);
           const dadosFiltrados = filtrarNotificacoes(selectedCategory);
           filteredNotificacoes.current = dadosFiltrados;
           calcularEstatisticas(dadosFiltrados);
         } else {
           // Sem filtro, processar todos os dados originais
+          console.log("📋 Processando todos os dados sem filtro");
           filteredNotificacoes.current = originalNotificacoes.current;
           calcularEstatisticas(originalNotificacoes.current);
         }
       } else {
         // Se não conseguirmos novos dados, verificar props
-        console.log("Verificando notificações via props...");
+        console.log("⚠️ Nenhum dado fresco obtido, verificando notificações via props...");
         if (notificacoes && notificacoes.length > 0 && 
             notificacoes.length !== originalNotificacoes.current.length) {
-          console.log("Detectada diferença nas notificações:", 
+          console.log("🔄 Detectada diferença nas notificações:", 
                      "Original:", originalNotificacoes.current.length, 
                      "Novas:", notificacoes.length);
           
@@ -1114,14 +1132,17 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
       // Reativa processamento inicial para que o filtro de eventos funcione
       initialProcessingDone.current = true;
+      
+      console.log("✅ Auto-atualização concluída com sucesso");
 
     } catch (error) {
-      console.error("Erro na atualização:", error);
+      console.error("❌ Erro na atualização:", error);
     } finally {
       setLoading(false);
       setLastUpdate(new Date().toLocaleString());
+      console.log(`🕐 Última atualização: ${new Date().toLocaleString()}`);
     }
-  }, [loading, selectedCategory, fetchFreshData, notificacoes, filtrarNotificacoes, calcularEstatisticas]);
+  }, [loading, selectedCategory, fetchFreshData, notificacoes, filtrarNotificacoes, calcularEstatisticas, onDataRefresh]);
 
   // Efeito para gerenciar o auto refresh
   useEffect(() => {
@@ -1144,6 +1165,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         
         // Quando o contador chegar a zero, atualizar os dados
         if (countdown <= 0) {
+          console.log("🔄 Auto-atualização disparada! Contador zerou.");
           refreshDataRef.current && refreshDataRef.current();
           countdown = 60; // Resetar para 60 segundos
           setAutoRefreshCountdown(countdown);
@@ -1338,81 +1360,86 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   return (
     <div className="min-h-screen bg-gray-100 text-gray-800 pb-6">
       {/* Cabeçalho */}
-      <header className="bg-gradient-to-r from-blue-700 to-blue-900 p-4 shadow-md sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between">
-          <div className="flex items-center gap-3 text-white mb-4 md:mb-0">
+      <header className="bg-gradient-to-r from-blue-700 to-blue-900 p-3 sm:p-4 shadow-md sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 text-white">
             <button
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              className="p-1.5 sm:p-2 hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
               title="Voltar"
               onClick={handleBackButton}
             >
-              <ArrowLeft className="h-5 w-5 text-white" />
+              <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
             </button>
-            <ClipboardList className="h-7 w-7" />
-            <h1 className="text-xl md:text-2xl font-semibold">
+            <ClipboardList className="h-6 w-6 sm:h-7 sm:w-7 flex-shrink-0" />
+            <h1 className="text-sm sm:text-lg lg:text-xl xl:text-2xl font-semibold leading-tight">
               NOTIFICAÇÕES DURANTE EVENTOS EPIDEMIOLÓGICOS (NDEE)
             </h1>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 bg-white/10 p-2 rounded text-white text-sm">
-              <Clock className="h-4 w-4" />
-              <span>Última atualização: {lastUpdate}</span>
-              <span className="ml-2 text-yellow-200">
-                {autoRefreshEnabled && `Próxima em: ${autoRefreshCountdown}s`}
-              </span>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 w-full lg:w-auto">
+            <div className="flex items-center gap-2 bg-white/10 p-2 rounded text-white text-xs sm:text-sm">
+              <Clock className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="truncate">Última atualização: {lastUpdate}</span>
+              {autoRefreshEnabled && (
+                <span className="ml-2 text-yellow-200 whitespace-nowrap">
+                  Próxima em: {autoRefreshCountdown}s
+                </span>
+              )}
             </div>
 
-            <button
-              onClick={handleRefresh}
-              className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-              disabled={loading}
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
-              />
-              Atualizar
-            </button>
-
-            <button
-              onClick={toggleAutoRefresh}
-              className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${
-                autoRefreshEnabled 
-                  ? "bg-yellow-500 text-white hover:bg-yellow-600" 
-                  : "bg-gray-400 text-white hover:bg-gray-500"
-              }`}
-            >
-              <Clock className="h-4 w-4" />
-              {autoRefreshEnabled ? "Auto Atualização ON" : "Auto Atualização OFF"}
-            </button>
-
-            {/* Botão de exportação com dropdown */}
-            <div className="relative">
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               <button
-                onClick={() => setShowExportDropdown(!showExportDropdown)}
-                onBlur={() =>
-                  setTimeout(() => setShowExportDropdown(false), 200)
-                }
-                className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                onClick={handleRefresh}
+                className="flex items-center justify-center gap-2 px-2 sm:px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-xs sm:text-sm whitespace-nowrap"
+                disabled={loading}
               >
-                <Download className="h-4 w-4" />
-                Exportar
-                <ChevronDown className="h-3 w-3" />
+                <RefreshCw
+                  className={`h-3 w-3 sm:h-4 sm:w-4 ${loading ? "animate-spin" : ""}`}
+                />
+                <span className="hidden sm:inline">Atualizar</span>
               </button>
 
-              {showExportDropdown && (
-                <div className="absolute right-0 mt-1 bg-white rounded shadow-lg py-1 z-20 min-w-40">
-                  <button className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm hover:bg-gray-100">
-                    <FileSearch2 className="h-4 w-4 text-red-500" />
-                    Exportar PDF
-                  </button>
-                  <button className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm hover:bg-gray-100">
-                    <File className="h-4 w-4 text-blue-500" />
-                    Exportar Word
-                  </button>
-                  <button className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm hover:bg-gray-100">
-                    <FileImage className="h-4 w-4 text-green-500" />
-                    Exportar PNG
+              <button
+                onClick={toggleAutoRefresh}
+                className={`flex items-center justify-center gap-2 px-2 sm:px-3 py-2 rounded transition-colors text-xs sm:text-sm whitespace-nowrap ${
+                  autoRefreshEnabled 
+                    ? "bg-yellow-500 text-white hover:bg-yellow-600" 
+                    : "bg-gray-400 text-white hover:bg-gray-500"
+                }`}
+              >
+                <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">
+                  {autoRefreshEnabled ? "Auto ON" : "Auto OFF"}
+                </span>
+              </button>
+
+              {/* Botão de exportação com dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowExportDropdown(!showExportDropdown)}
+                  onBlur={() =>
+                    setTimeout(() => setShowExportDropdown(false), 200)
+                  }
+                  className="flex items-center justify-center gap-2 px-2 sm:px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-xs sm:text-sm whitespace-nowrap w-full sm:w-auto"
+                >
+                  <Download className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">Exportar</span>
+                  <ChevronDown className="h-3 w-3" />
+                </button>
+
+                {showExportDropdown && (
+                  <div className="absolute right-0 mt-1 bg-white rounded shadow-lg py-1 z-20 min-w-[160px] sm:min-w-40">
+                    <button className="flex items-center gap-2 w-full px-3 sm:px-4 py-2 text-left text-xs sm:text-sm hover:bg-gray-100">
+                      <FileSearch2 className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
+                      Exportar PDF
+                    </button>
+                    <button className="flex items-center gap-2 w-full px-3 sm:px-4 py-2 text-left text-xs sm:text-sm hover:bg-gray-100">
+                      <File className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500" />
+                      Exportar Word
+                    </button>
+                    <button className="flex items-center gap-2 w-full px-3 sm:px-4 py-2 text-left text-xs sm:text-sm hover:bg-gray-100">
+                      <FileImage className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
+                      Exportar PNG
                   </button>
                   <button className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm hover:bg-gray-100">
                     <File className="h-4 w-4 text-gray-500" />
@@ -1420,6 +1447,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                   </button>
                 </div>
               )}
+            </div>
             </div>
           </div>
         </div>
@@ -1467,67 +1495,57 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Abas para alternar entre Gráficos, Tabelas e Mapas */}
+      {/* Sistema de Abas do Dashboard Aprimorado */}
       <div className="max-w-7xl mx-auto px-4 mt-4">
-        <div className="flex border-b border-gray-300">
-          <button
-            className={`py-2 px-4 font-medium ${activeTab === "graficos" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-600 hover:text-blue-500"}`}
-            onClick={() => setActiveTab("graficos")}
-          >
-            <div className="flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              Gráficos
-            </div>
-          </button>
-        </div>
+        <DashboardTabs activeTab={activeTab} onTabChange={setActiveTab} />
       </div>
 
       {/* Conteúdo principal baseado na aba selecionada */}
       {activeTab === "graficos" && (
         <main
-          className="max-w-7xl mx-auto p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mt-2"
+          className="max-w-7xl mx-auto p-2 sm:p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 mt-2"
         >
           {/* Cards de Resumo */}
           <div
-            className={`bg-white p-4 rounded-lg shadow-sm flex items-center gap-4 cursor-pointer hover:shadow-md transition-shadow ${selectedCategory === null ? 'ring-2 ring-blue-400' : ''}`}
+            className={`bg-white p-3 sm:p-4 rounded-lg shadow-sm flex items-center gap-3 sm:gap-4 cursor-pointer hover:shadow-md transition-shadow sm:col-span-1 xl:col-span-1 ${selectedCategory === null ? 'ring-2 ring-blue-400' : ''}`}
             onClick={() => { setSelectedCategory(null); setSelectedEvento("Todos"); }}
           >
-            <div className="p-3 bg-blue-100 text-blue-800 rounded-full">
-              <FileText className="h-6 w-6" />
+            <div className="p-2 sm:p-3 bg-blue-100 text-blue-800 rounded-full flex-shrink-0">
+              <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
             </div>
-            <div>
-              <h3 className="text-sm text-gray-500">Total de Notificações</h3>
-              <p className="text-2xl font-bold text-blue-800">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-xs sm:text-sm text-gray-500 truncate">Total de Notificações</h3>
+              <p className="text-xl sm:text-2xl font-bold text-blue-800">
                 {totalNotifications.toLocaleString()}
               </p>
             </div>
           </div>
 
           <div
-            className={`bg-white p-4 rounded-lg shadow-sm flex items-center gap-4 cursor-pointer hover:shadow-md transition-shadow ${selectedCategory === 'Clínico' ? 'ring-2 ring-green-400' : ''}`}
+            className={`bg-white p-3 sm:p-4 rounded-lg shadow-sm flex items-center gap-3 sm:gap-4 cursor-pointer hover:shadow-md transition-shadow sm:col-span-1 xl:col-span-1 ${selectedCategory === 'Clínico' ? 'ring-2 ring-green-400' : ''}`}
             onClick={() => handleCardClick("clinico")}
           >
-            <div className="p-3 bg-green-100 text-green-800 rounded-full">
-              <Activity className="h-6 w-6" />
+            <div className="p-2 sm:p-3 bg-green-100 text-green-800 rounded-full flex-shrink-0">
+              <Activity className="h-5 w-5 sm:h-6 sm:w-6" />
             </div>
-            <div>
-              <h3 className="text-sm text-gray-500">Casos Clínicos</h3>
-              <p className="text-2xl font-bold text-green-800">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-xs sm:text-sm text-gray-500 truncate">Casos Clínicos</h3>
+              <p className="text-xl sm:text-2xl font-bold text-green-800">
                 {statCounts.clinico.toLocaleString()}
               </p>
             </div>
           </div>
 
           <div
-            className={`bg-white p-4 rounded-lg shadow-sm flex items-center gap-4 cursor-pointer hover:shadow-md transition-shadow ${selectedCategory === 'Trauma' ? 'ring-2 ring-red-400' : ''}`}
+            className={`bg-white p-3 sm:p-4 rounded-lg shadow-sm flex items-center gap-3 sm:gap-4 cursor-pointer hover:shadow-md transition-shadow sm:col-span-1 xl:col-span-1 ${selectedCategory === 'Trauma' ? 'ring-2 ring-red-400' : ''}`}
             onClick={() => handleCardClick("trauma")}
           >
-            <div className="p-3 bg-red-100 text-red-800 rounded-full">
-              <AlertCircle className="h-6 w-6" />
+            <div className="p-2 sm:p-3 bg-red-100 text-red-800 rounded-full flex-shrink-0">
+              <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6" />
             </div>
-            <div>
-              <h3 className="text-sm text-gray-500">Casos de Trauma</h3>
-              <p className="text-2xl font-bold text-red-800">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-xs sm:text-sm text-gray-500 truncate">Casos de Trauma</h3>
+              <p className="text-xl sm:text-2xl font-bold text-red-800">
                 {statCounts.trauma.toLocaleString()}
               </p>
             </div>
@@ -1535,15 +1553,15 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
           {/* NOVO CARD: Múltiplas Vítimas */}
           <div
-            className={`bg-white p-4 rounded-lg shadow-sm flex items-center gap-4 cursor-pointer hover:shadow-md transition-shadow ${selectedCategory === 'Múltiplas Vítimas' ? 'ring-2 ring-purple-400' : ''}`}
+            className={`bg-white p-3 sm:p-4 rounded-lg shadow-sm flex items-center gap-3 sm:gap-4 cursor-pointer hover:shadow-md transition-shadow sm:col-span-1 xl:col-span-1 ${selectedCategory === 'Múltiplas Vítimas' ? 'ring-2 ring-purple-400' : ''}`}
             onClick={() => handleCardClick("multiplas")}
           >
-            <div className="p-3 bg-purple-100 text-purple-800 rounded-full">
-              <AlertTriangle className="h-6 w-6" />
+            <div className="p-2 sm:p-3 bg-purple-100 text-purple-800 rounded-full flex-shrink-0">
+              <AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6" />
             </div>
-            <div>
-              <h3 className="text-sm text-gray-500">Múltiplas Vítimas</h3>
-              <p className="text-2xl font-bold text-purple-800">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-xs sm:text-sm text-gray-500 truncate">Múltiplas Vítimas</h3>
+              <p className="text-xl sm:text-2xl font-bold text-purple-800">
                 {statCounts.multiplas.toLocaleString()}
               </p>
             </div>
@@ -1551,30 +1569,30 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
           {/* NOVO CARD: Incidente QBRN */}
           <div
-            className={`bg-white p-4 rounded-lg shadow-sm flex items-center gap-4 cursor-pointer hover:shadow-md transition-shadow ${selectedCategory === 'Incidente QBRN' ? 'ring-2 ring-orange-400' : ''}`}
+            className={`bg-white p-3 sm:p-4 rounded-lg shadow-sm flex items-center gap-3 sm:gap-4 cursor-pointer hover:shadow-md transition-shadow sm:col-span-1 xl:col-span-1 ${selectedCategory === 'Incidente QBRN' ? 'ring-2 ring-orange-400' : ''}`}
             onClick={() => handleCardClick("qbrn")}
           >
-            <div className="p-3 bg-orange-100 text-orange-800 rounded-full">
-              <Bomb className="h-6 w-6" />
+            <div className="p-2 sm:p-3 bg-orange-100 text-orange-800 rounded-full flex-shrink-0">
+              <Bomb className="h-5 w-5 sm:h-6 sm:w-6" />
             </div>
-            <div>
-              <h3 className="text-sm text-gray-500">Incidente QBRN</h3>
-              <p className="text-2xl font-bold text-orange-800">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-xs sm:text-sm text-gray-500 truncate">Incidente QBRN</h3>
+              <p className="text-xl sm:text-2xl font-bold text-orange-800">
                 {statCounts.qbrn.toLocaleString()}
               </p>
             </div>
           </div>
 
           {/* Gráfico de Público Atendido */}
-          <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-2">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm sm:col-span-2 lg:col-span-2 xl:col-span-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
               <div className="flex items-center gap-2">
-                <Briefcase className="h-5 w-5 text-yellow-700" />
-                <h3 className="text-sm font-medium text-gray-700">
+                <Briefcase className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-700" />
+                <h3 className="text-xs sm:text-sm font-medium text-gray-700">
                   Distribuição por Público Atendido
                 </h3>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 self-start sm:self-auto">
                 <button 
                   onClick={() => toggleChartType('publico')}
                   className="p-1 text-gray-500 hover:text-blue-500 transition-colors"
@@ -2198,16 +2216,20 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 />
                 <div className="flex ml-2 space-x-2 text-xs">
                   <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full bg-red-500 mr-1"></div>
-                    <span>Alta Prioridade</span>
+                    <div className="w-3 h-3 rounded-full mr-1" style={{backgroundColor: COLORS.alarmante}}></div>
+                    <span>Crítica</span>
                   </div>
                   <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full bg-orange-500 mr-1"></div>
-                    <span>Monitoramento</span>
+                    <div className="w-3 h-3 rounded-full mr-1" style={{backgroundColor: COLORS.alerta}}></div>
+                    <span>Alta</span>
                   </div>
                   <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full bg-blue-500 mr-1"></div>
-                    <span>Regular</span>
+                    <div className="w-3 h-3 rounded-full mr-1" style={{backgroundColor: COLORS.medio}}></div>
+                    <span>Média</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 rounded-full mr-1" style={{backgroundColor: COLORS.normal}}></div>
+                    <span>Normal</span>
                   </div>
                 </div>
               </div>
@@ -2278,6 +2300,97 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           </div>
         </main>
       )}
+
+      {/* Aba de Fluxo Hospitalar - Análise por Hora */}
+      {activeTab === "fluxo" && (
+        <main className="max-w-7xl mx-auto px-4 py-6">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+              Análise de Fluxo Hospitalar
+            </h2>
+            <p className="text-gray-600">
+              Visualização dos atendimentos por hora para otimização dos recursos hospitalares
+            </p>
+          </div>
+          
+          <AtendimentosPorHoraChart 
+            key={`atendimentos-${lastUpdate}-${notificacoes.length}`}
+            notificacoes={notificacoes} 
+          />
+        </main>
+      )}
+
+      {/* Aba do Mapa - Distribuição Geográfica */}
+      {activeTab === "mapa" && (
+        <main className="max-w-7xl mx-auto px-4 py-6">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+              Mapa de Estabelecimentos
+            </h2>
+            <p className="text-gray-600">
+              Distribuição geográfica dos estabelecimentos de saúde com indicadores de urgência
+            </p>
+          </div>
+          
+          <EstabelecimentosMapaAvancado 
+            key={`mapa-${lastUpdate}-${notificacoes.length}`}
+            notificacoes={notificacoes} 
+          />
+        </main>
+      )}
+
+      {/* Aba de Tabelas - Dados Tabulares */}
+      {activeTab === "tabelas" && (
+        <main className="max-w-7xl mx-auto px-4 py-6">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+              Dados Tabulares
+            </h2>
+            <p className="text-gray-600">
+              Dados detalhados em formato de tabela para análise aprofundada
+            </p>
+          </div>
+          
+          <div className="bg-white p-6 rounded-lg shadow-sm">
+            <div className="text-center py-12 text-gray-500">
+              <Table className="h-12 w-12 mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">Tabelas em Desenvolvimento</h3>
+              <p>Esta funcionalidade será implementada em breve com tabelas interativas e filtros avançados.</p>
+            </div>
+          </div>
+        </main>
+      )}
+
+      {/* Aba de Histórico - Análise Temporal */}
+      {activeTab === "historico" && (
+        <main className="max-w-7xl mx-auto px-4 py-6">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+              Análise Histórica
+            </h2>
+            <p className="text-gray-600">
+              Tendências e padrões históricos dos dados de saúde
+            </p>
+          </div>
+          
+          <div className="bg-white p-6 rounded-lg shadow-sm">
+            <div className="text-center py-12 text-gray-500">
+              <Clock className="h-12 w-12 mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">Análise Histórica em Desenvolvimento</h3>
+              <p>Esta funcionalidade será implementada em breve com análises temporais e tendências.</p>
+            </div>
+          </div>
+          
+          {/* TEMPORÁRIO: Formulário de teste para investigar problema de horário */}
+          <TestTimeForm />
+        </main>
+      )}
+
+      {/* Sistema de Alertas - Sempre visível */}
+      <AlertasPanel 
+        key={`alertas-${lastUpdate}-${notificacoes.length}`}
+        notificacoes={notificacoes} 
+      />
 
       {/* Indicador de Carregamento */}
       {loading && (

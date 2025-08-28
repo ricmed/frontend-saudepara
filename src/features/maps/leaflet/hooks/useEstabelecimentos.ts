@@ -11,6 +11,7 @@ export const useEstabelecimentos = () => {
 
   const carregarDadosAPI = useCallback(async () => {
     try {
+      console.log('🚀 useEstabelecimentos - Iniciando carregamento...');
       setIsLoading(true);
       
       console.log('🔄 Carregando estabelecimentos ativos da API...');
@@ -22,6 +23,8 @@ export const useEstabelecimentos = () => {
       
       if (estabelecimentos.length > 0) {
         console.log('🔍 Primeiro estabelecimento já convertido:', estabelecimentos[0]);
+      } else {
+        console.warn('⚠️ Nenhum estabelecimento foi retornado da API');
       }
       
       // Filtrar estabelecimentos com endereço válido e converter para o tipo esperado
@@ -29,6 +32,7 @@ export const useEstabelecimentos = () => {
         .filter(est => est.endereco !== undefined)
         .map(est => ({ ...est, endereco: est.endereco! }));
       
+      console.log('✅ Estabelecimentos válidos:', estabelecimentosValidos.length);
       setAllPlaces(estabelecimentosValidos);
 
       // Extrair habilitações e qualificações únicas dos estabelecimentos já convertidos
@@ -38,19 +42,24 @@ export const useEstabelecimentos = () => {
       setTiposHabilitacoes(habilitacoes);
       setTiposQualificacoes(qualificacoes);
 
-      console.log(`${estabelecimentos.length} estabelecimentos ativos carregados com sucesso`);
-      console.log(`${habilitacoes.length - 1} habilitações únicas encontradas`);
-      console.log(`${qualificacoes.length - 1} qualificações únicas encontradas`);
+      console.log(`✅ ${estabelecimentos.length} estabelecimentos ativos carregados com sucesso`);
+      console.log(`📊 ${habilitacoes.length - 1} habilitações únicas encontradas`);
+      console.log(`📊 ${qualificacoes.length - 1} qualificações únicas encontradas`);
       
       setIsLoading(false);
     } catch (error) {
-      console.error("Erro ao carregar estabelecimentos da API:", error);
+      console.error("❌ Erro ao carregar estabelecimentos da API:", error);
       setIsLoading(false);
     }
   }, []);
 
   // Manter compatibilidade com o código existente
   const carregarEstabelecimentos = carregarDadosAPI;
+
+  // Carregar dados automaticamente quando o hook é inicializado
+  useEffect(() => {
+    carregarDadosAPI();
+  }, [carregarDadosAPI]);
 
   // Atualizar filteredPlaces quando allPlaces mudar
   useEffect(() => {
