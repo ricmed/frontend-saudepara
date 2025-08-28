@@ -41,18 +41,7 @@ export const useAtendimentosPorHora = ({
       if (dataAtendimento) {
         try {
           const dataLocal = new Date(dataAtendimento);
-          
-          // Verificar se a data é válida
-          if (isNaN(dataLocal.getTime())) {
-            console.warn('Data inválida encontrada na lista:', dataAtendimento);
-            return;
-          }
-          
-          // Usar o mesmo formato de normalização
-          const ano = dataLocal.getFullYear();
-          const mes = (dataLocal.getMonth() + 1).toString().padStart(2, '0');
-          const dia = dataLocal.getDate().toString().padStart(2, '0');
-          const dataFormatada = `${ano}-${mes}-${dia}`;
+          const dataFormatada = dataLocal.toISOString().split('T')[0]; // YYYY-MM-DD
           
           console.log('🔍 [DATAS DEBUG] Data processada para lista:', {
             original: dataAtendimento,
