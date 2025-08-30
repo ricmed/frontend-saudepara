@@ -47,11 +47,15 @@ import {
   Layers,
   MousePointer,
   RotateCcw,
-  Table
+  Table,
+  Brain
 } from "lucide-react";
 
 // 🆕 NOVOS IMPORTS: Componentes do dashboard aprimorado
 import DashboardTabs, { useDashboardTabs } from './components/DashboardTabs';
+import AIInsights from './components/AIInsights';
+import AIChat from './components/AIChat';
+import AIAlerts from './components/AIAlerts';
 import AtendimentosPorHoraChart from './components/AtendimentosPorHoraChart';
 import EstabelecimentosMapaAvancado from './components/EstabelecimentosMapaAvancado';
 import AlertasPanel from './components/AlertasPanel';
@@ -880,6 +884,23 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
   // Obter os spans calculados para os gráficos
   const chartSpans = getChartSpans();
+
+  // 🤖 FUNÇÃO PARA PREPARAR DADOS PARA OS COMPONENTES DE IA
+  const getAIDashboardData = useCallback(() => {
+    const currentData = getFilteredData();
+    
+    return {
+      totalNotifications: currentData.length,
+      topSymptoms: filteredSintomas.slice(0, 10),
+      criticalHypothesis: filteredHipoteses.filter(h => h.isAlarmante).slice(0, 5),
+      topTraumas: filteredTrauma.slice(0, 10),
+      demographics: {
+        gender: filteredGenero.slice(0, 5),
+        age: [] // Pode ser expandido se houver dados de idade
+      },
+      activeFilters: activeFilters
+    };
+  }, [getFilteredData, filteredSintomas, filteredHipoteses, filteredTrauma, filteredGenero, activeFilters]);
 
   // ✅ Função para determinar se uma hipótese é alarmante (baseado no GVS)
   const isHipotesisAlarmante = useCallback((hipotese: string): boolean => {
@@ -2994,6 +3015,70 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           
           {/* TEMPORÁRIO: Formulário de teste para investigar problema de horário */}
           <TestTimeForm />
+        </main>
+      )}
+
+      {/* Aba de IA - Análise Inteligente */}
+      {activeTab === "ia" && (
+        <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-2 flex items-center gap-3">
+              <Brain className="h-8 w-8 text-purple-600" />
+              Análise Inteligente com IA
+            </h2>
+            <p className="text-gray-600">
+              Insights automáticos, chat interativo e alertas inteligentes powered by Llama 3.1
+            </p>
+          </div>
+
+          {/* Grid responsivo com os 3 componentes de IA */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            
+            {/* Insights Automáticos */}
+            <div className="xl:col-span-2">
+              <AIInsights 
+                dashboardData={getAIDashboardData()} 
+                className="w-full"
+              />
+            </div>
+
+            {/* Chat com IA */}
+            <div className="xl:col-span-1">
+              <AIChat 
+                dashboardData={getAIDashboardData()} 
+                className="w-full"
+              />
+            </div>
+
+            {/* Alertas Inteligentes */}
+            <div className="xl:col-span-1">
+              <AIAlerts 
+                dashboardData={getAIDashboardData()} 
+                className="w-full"
+              />
+            </div>
+
+          </div>
+
+          {/* Info sobre o Ollama */}
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Brain className="h-5 w-5 text-blue-600" />
+              <h3 className="font-semibold text-blue-800">Powered by Llama 3.1 Local</h3>
+            </div>
+            <p className="text-blue-700 text-sm">
+              Este sistema usa IA local (Ollama) para garantir privacidade total dos dados de saúde. 
+              Todas as análises são processadas localmente, sem envio de informações para serviços externos.
+              <br />
+              <span className="text-blue-600 font-medium">
+                Status: {' '}
+                <span className="inline-flex items-center gap-1">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  Ollama rodando em localhost:11434
+                </span>
+              </span>
+            </p>
+          </div>
         </main>
       )}
 

@@ -5,10 +5,11 @@ import {
   Table, 
   Clock, 
   MapPin, 
-  TrendingUp
+  TrendingUp,
+  Brain
 } from 'lucide-react';
 
-export type DashboardTab = 'graficos' | 'fluxo' | 'mapa' | 'tabelas' | 'historico';
+export type DashboardTab = 'graficos' | 'fluxo' | 'mapa' | 'tabelas' | 'historico' | 'ia';
 
 interface DashboardTabsProps {
   activeTab: DashboardTab;
@@ -56,6 +57,12 @@ export const DashboardTabs: React.FC<DashboardTabsProps> = ({
       label: 'Histórico',
       icon: Clock,
       description: 'Séries temporais'
+    },
+    {
+      id: 'ia' as DashboardTab,
+      label: 'IA Insights',
+      icon: Brain,
+      description: 'Análise inteligente com Llama 3.1'
     }
   ];
 
@@ -125,7 +132,7 @@ export const useDashboardTabs = (initialTab: DashboardTab = 'graficos') => {
   const getStoredTab = (): DashboardTab => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('dashboard-active-tab');
-      if (stored && ['graficos', 'fluxo', 'mapa', 'tabelas', 'historico'].includes(stored)) {
+      if (stored && ['graficos', 'fluxo', 'mapa', 'tabelas', 'historico', 'ia'].includes(stored)) {
         return stored as DashboardTab;
       }
     }
