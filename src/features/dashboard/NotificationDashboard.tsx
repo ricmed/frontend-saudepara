@@ -747,6 +747,140 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     return applyFilters(originalNotificacoes.current);
   }, [hasActiveFilters, applyFilters]);
 
+  // 🆕 FUNÇÃO PARA DETERMINAR QUAIS GRÁFICOS DEVEM SER VISÍVEIS BASEADO NO TIPO DE ATENDIMENTO
+  const getVisibleCharts = useCallback(() => {
+    const tipoAtendimento = activeFilters.tipoAtendimento;
+    
+    if (!tipoAtendimento) {
+      // Se nenhum tipo de atendimento está selecionado, mostrar todos
+      return {
+        trauma: true,
+        sintomas: true,
+        hipoteses: true,
+        demograficos: true // público, gênero, raça
+      };
+    }
+
+    const tipoLower = tipoAtendimento.toLowerCase();
+    
+    // TRAUMA ou MÚLTIPLAS VÍTIMAS: apenas trauma
+    if (tipoLower.includes('trauma') || tipoLower.includes('múltiplas') || tipoLower.includes('multiplas')) {
+      return {
+        trauma: true,
+        sintomas: false,
+        hipoteses: false,
+        demograficos: true // mantém dados demográficos para análise
+      };
+    }
+    
+    // CLÍNICO: apenas sintomas e hipóteses
+    if (tipoLower.includes('clínico') || tipoLower.includes('clinico')) {
+      return {
+        trauma: false,
+        sintomas: true,
+        hipoteses: true,
+        demograficos: true // mantém dados demográficos para análise
+      };
+    }
+    
+    // INCIDENTE QBRN: todos os tipos
+    if (tipoLower.includes('qbrn') || tipoLower.includes('incidente')) {
+      return {
+        trauma: true,
+        sintomas: true,
+        hipoteses: true,
+        demograficos: true
+      };
+    }
+    
+    // Padrão: mostrar todos
+    return {
+      trauma: true,
+      sintomas: true,
+      hipoteses: true,
+      demograficos: true
+    };
+  }, [activeFilters.tipoAtendimento]);
+
+  // Usar a função para obter quais gráficos devem ser visíveis
+  const visibleCharts = getVisibleCharts();
+
+  // 🆕 FUNÇÃO PARA CALCULAR O LAYOUT DO GRID DINAMICAMENTE
+  const getGridLayout = useCallback(() => {
+    // SEMPRE manter o layout de 5 colunas para que os gráficos possam se expandir
+    // O que muda são os spans individuais, não o grid total
+    return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 mt-2";
+  }, [visibleCharts]);
+
+  // 🆕 FUNÇÃO PARA CALCULAR SPANS DOS GRÁFICOS DINAMICAMENTE  
+  const getChartSpans = useCallback(() => {
+    const { trauma, sintomas, hipoteses } = visibleCharts;
+    
+    // CASO 1: Todos os 3 gráficos visíveis (layout padrão)
+    if (trauma && sintomas && hipoteses) {
+      return {
+        sintomas: "md:col-span-2 lg:col-span-3", // 3/5 colunas
+        trauma: "md:col-span-2 lg:col-span-2",   // 2/5 colunas  
+        hipoteses: "md:col-span-2 lg:col-span-5" // 5/5 colunas (próxima linha)
+      };
+    }
+    
+    // CASO 2: CLÍNICO - só sintomas + hipóteses (sem trauma)
+    if (!trauma && sintomas && hipoteses) {
+      return {
+        sintomas: "md:col-span-2 lg:col-span-5",  // ocupa TODO o espaço da primeira linha (3+2=5)
+        trauma: "md:col-span-2 lg:col-span-2",    // não usado
+        hipoteses: "md:col-span-2 lg:col-span-5"  // mantém linha inteira
+      };
+    }
+    
+    // CASO 3: TRAUMA/MÚLTIPLAS - só trauma (sem sintomas e hipóteses)  
+    if (trauma && !sintomas && !hipoteses) {
+      return {
+        sintomas: "md:col-span-2 lg:col-span-3",  // não usado
+        trauma: "md:col-span-2 lg:col-span-5",    // ocupa linha inteira (2+3=5)
+        hipoteses: "md:col-span-2 lg:col-span-5"  // não usado
+      };
+    }
+    
+    // CASO 4: Outros casos de 2 gráficos
+    if ((trauma && sintomas && !hipoteses) || (trauma && !sintomas && hipoteses)) {
+      return {
+        sintomas: "md:col-span-2 lg:col-span-3",  // expande se visível
+        trauma: "md:col-span-2 lg:col-span-2",    // mantém tamanho se visível
+        hipoteses: "md:col-span-2 lg:col-span-5"  // linha inteira se visível
+      };
+    }
+    
+    // CASO 5: Apenas sintomas
+    if (!trauma && sintomas && !hipoteses) {
+      return {
+        sintomas: "md:col-span-2 lg:col-span-5",  // linha inteira
+        trauma: "md:col-span-2 lg:col-span-2",
+        hipoteses: "md:col-span-2 lg:col-span-5"
+      };
+    }
+    
+    // CASO 6: Apenas hipóteses  
+    if (!trauma && !sintomas && hipoteses) {
+      return {
+        sintomas: "md:col-span-2 lg:col-span-3",
+        trauma: "md:col-span-2 lg:col-span-2",
+        hipoteses: "md:col-span-2 lg:col-span-5"  // já ocupa linha inteira
+      };
+    }
+    
+    // Padrão (fallback)
+    return {
+      sintomas: "md:col-span-2 lg:col-span-3",
+      trauma: "md:col-span-2 lg:col-span-2", 
+      hipoteses: "md:col-span-2 lg:col-span-5"
+    };
+  }, [visibleCharts]);
+
+  // Obter os spans calculados para os gráficos
+  const chartSpans = getChartSpans();
+
   // ✅ Função para determinar se uma hipótese é alarmante (baseado no GVS)
   const isHipotesisAlarmante = useCallback((hipotese: string): boolean => {
     const match = findRuleByHypothesis(hipotese);
@@ -1951,7 +2085,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       {/* Conteúdo principal baseado na aba selecionada */}
       {activeTab === "graficos" && (
         <main
-          className="max-w-7xl mx-auto p-2 sm:p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 mt-2"
+          className={`max-w-7xl mx-auto p-2 sm:p-4 ${getGridLayout()}`}
         >
           {/* Cards de Resumo - com indicador de filtros ativos */}
           {hasActiveFilters && (
@@ -2528,7 +2662,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           </div>
 
           {/* Principais Sintomas */}
-          <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-3">
+          {visibleCharts.sintomas && (
+          <div className={`bg-white p-4 rounded-lg shadow-sm ${chartSpans.sintomas}`}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Heart className="h-5 w-5 text-red-700" />
@@ -2597,9 +2732,11 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
               )}
             </div>
           </div>
+          )}
 
           {/* Tipos de Trauma */}
-          <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-2">
+          {visibleCharts.trauma && (
+          <div className={`bg-white p-4 rounded-lg shadow-sm ${chartSpans.trauma}`}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <AlertCircle className="h-5 w-5 text-red-700" />
@@ -2668,9 +2805,11 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
               )}
             </div>
           </div>
+          )}
 
           {/* Hipóteses Diagnósticas */}
-          <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-5">
+          {visibleCharts.hipoteses && (
+          <div className={`bg-white p-4 rounded-lg shadow-sm ${chartSpans.hipoteses}`}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <BookOpen className="h-5 w-5 text-purple-700" />
@@ -2769,6 +2908,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
               </p>
             </div>
           </div>
+          )}
         </main>
       )}
 
