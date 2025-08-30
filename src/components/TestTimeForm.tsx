@@ -2,7 +2,12 @@ import React, { useState } from 'react';
 import { detectUserTimezone } from '../features/notificationForms/types/index2';
 
 const TestTimeForm: React.FC = () => {
-  const [dataAtendimento, setDataAtendimento] = useState('');
+  const agora = new Date();
+  const agoraFormatada = new Date(agora.getTime() - agora.getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 16);
+    
+  const [dataAtendimento, setDataAtendimento] = useState(agoraFormatada);
   const [resultado, setResultado] = useState<any>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -53,11 +58,6 @@ const TestTimeForm: React.FC = () => {
     }
   };
 
-  const agora = new Date();
-  const agoraFormatada = new Date(agora.getTime() - agora.getTimezoneOffset() * 60000)
-    .toISOString()
-    .slice(0, 16);
-
   return (
     <div className="max-w-md mx-auto mt-8 p-6 bg-white border border-gray-200 rounded-lg shadow-sm">
       <h2 className="text-lg font-semibold mb-4">🧪 Teste de Horário</h2>
@@ -72,7 +72,6 @@ const TestTimeForm: React.FC = () => {
             id="dataAtendimento"
             value={dataAtendimento}
             onChange={(e) => setDataAtendimento(e.target.value)}
-            defaultValue={agoraFormatada}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             required
           />

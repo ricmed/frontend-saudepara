@@ -32,6 +32,9 @@ import AttachmentsSection from "./components/sections/AttachmentsSection";
 // Import do novo componente de resumo de erros
 import ErrorSummary, { scrollToField } from "./components/ErrorSummary";
 
+// Import do gerador de casos fictícios
+import MockDataControls from "./components/MockDataControls";
+
 const NotificationForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -290,6 +293,14 @@ const NotificationForm: React.FC = () => {
           expandedSections={expandedSections as unknown as Record<string, boolean>}
           toggleSection={handleToggleSection}
         />
+
+        {/* Gerador de Casos Fictícios - apenas para novos formulários */}
+        {!isEditMode && (
+          <MockDataControls
+            setFormData={setFormData}
+            setErrors={setErrors}
+          />
+        )}
 
         {/* Adicionar o status de conexão */}
         <ConnectionStatus 

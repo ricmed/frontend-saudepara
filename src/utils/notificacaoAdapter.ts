@@ -237,9 +237,10 @@ export const formatFromBackend = async (
     observacaoSintomas: backendData.observacao_sintomas || "",
     hipoteseDiagnostica: hipotesesDiagnosticas,
     observacaoHipotese: backendData.observacao_hiposete || "",
-    tipoTrauma: backendData.tipo_trauma_idtipo_trauma
-      ? [backendData.tipo_trauma_idtipo_trauma.toString()]
-      : [],
+    // 🔧 CORREÇÃO: Extrair múltiplos traumas do array notificacao_has_tipo_trauma
+    tipoTrauma: backendData.notificacao_has_tipo_trauma && Array.isArray(backendData.notificacao_has_tipo_trauma)
+      ? backendData.notificacao_has_tipo_trauma.map((trauma: any) => trauma.tipo_trauma_idtipo_trauma.toString())
+      : (backendData.tipo_trauma_idtipo_trauma ? [backendData.tipo_trauma_idtipo_trauma.toString()] : []),
     observacaoTrauma: backendData.observacao_trauma || "",
     relacionadoSurto: "", // REMOVIDO: campo relacionadoSurto não é mais usado
     observacaoIncidente: backendData.observavao_incidente || "",
@@ -520,9 +521,10 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
     ...(trimmedData.observacaoHipotese && {
       observacao_hiposete: trimmedData.observacaoHipotese || "",
     }),
-    tipo_trauma_idtipo_trauma: trimmedData.tipoTrauma.length > 0 
-      ? parseInt(trimmedData.tipoTrauma[0]) 
-      : null,
+    // 🔧 CORREÇÃO: Enviar traumas como array para suporte a múltiplos traumas
+    ...(trimmedData.tipoTrauma.length > 0 && {
+      traumas: trimmedData.tipoTrauma.map(trauma => parseInt(trauma))
+    }),
     ...(trimmedData.observacaoTrauma && {
       observacao_trauma: trimmedData.observacaoTrauma || "",
     }),
@@ -1027,9 +1029,17 @@ export const extractHipotesesIds = (notificacao: NotificacaoGenerica): number[] 
 export const extractTraumaIds = (
   notificacao: NotificacaoGenerica
 ): number[] => {
+  // Primeiro, tentar extrair do campo formatado para frontend
   if ("tipoTrauma" in notificacao && Array.isArray(notificacao.tipoTrauma)) {
     return notificacao.tipoTrauma.map((id: string) => parseInt(id));
   }
+  
+  // 🔧 CORREÇÃO: Extrair do array notificacao_has_tipo_trauma (novo formato)
+  if (notificacao.notificacao_has_tipo_trauma && Array.isArray(notificacao.notificacao_has_tipo_trauma)) {
+    return notificacao.notificacao_has_tipo_trauma.map((trauma: any) => trauma.tipo_trauma_idtipo_trauma);
+  }
+  
+  // Fallback para campo single (compatibilidade com dados antigos)
   if (notificacao.tipo_trauma_idtipo_trauma) {
     return [notificacao.tipo_trauma_idtipo_trauma];
   }

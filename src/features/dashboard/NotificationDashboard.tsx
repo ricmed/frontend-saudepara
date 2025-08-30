@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import NotificacaoService from '@/services/NotificacaoService';
 import {
   BarChart,
@@ -305,6 +305,23 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const [autoRefreshCountdown, setAutoRefreshCountdown] = useState(60); // 60 segundos = 1 minuto
 
+  // 🆕 SISTEMA DE FILTROS CRUZADOS (CROSS-FILTER)
+  const [activeFilters, setActiveFilters] = useState<Record<string, any>>({
+    evento: null,
+    tipoAtendimento: null,
+    publico: null,
+    genero: null,
+    raca: null,
+    escolaridade: null,
+    unidade: null,
+    hipotese: null,
+    trauma: null,
+    sintoma: null
+  });
+  
+  // Estado para controlar a exibição da ajuda
+  const [showHelp, setShowHelp] = useState(false);
+
   // Dados base do dashboard
   const [totalNotifications, setTotalNotifications] = useState(0);
   const [statCounts, setStatCounts] = useState<StatCounts>({
@@ -528,6 +545,207 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     console.log(`Encontradas ${resultado.length} notificações para a categoria: ${categoriaLower}`);
     return resultado;
   }, [exportOptions, checkAtendimentoType]);
+
+  // 🆕 FUNÇÃO PARA APLICAR FILTROS CRUZADOS
+  const applyFilters = useCallback((notificacoes: any[]) => {
+    let filteredData = [...notificacoes];
+    
+    // Aplicar cada filtro ativo
+    Object.entries(activeFilters).forEach(([category, filterValue]) => {
+      if (filterValue !== null && filterValue !== undefined) {
+        switch (category) {
+          case 'evento':
+            filteredData = filteredData.filter(n => {
+              const eventoId = n?.original?.evento_idevento;
+              if (eventoId !== undefined && exportOptions?.eventoOptions?.length > 0) {
+                const evento = exportOptions.eventoOptions.find(
+                  (e: any) => String(e.idtipo_evento) === String(eventoId) || String(e.idevento) === String(eventoId)
+                );
+                return evento?.descricao === filterValue;
+              }
+              return false;
+            });
+            break;
+            
+          case 'tipoAtendimento':
+            filteredData = filteredData.filter(n => {
+              const tipoId = n?.original?.tipo_atendimento_idtipo_atendimento;
+              const tipoDesc = getAtendimentoDescById(tipoId);
+              return tipoDesc === filterValue;
+            });
+            break;
+            
+          case 'publico':
+            filteredData = filteredData.filter(n => {
+              const publicoId = n?.original?.tipo_publico_idtipo_publico;
+              if (publicoId !== undefined && exportOptions?.publicoOptions?.length > 0) {
+                const publico = exportOptions.publicoOptions.find(
+                  (p: any) => String(p.idtipo_publico) === String(publicoId)
+                );
+                return publico?.descricao === filterValue;
+              }
+              return false;
+            });
+            break;
+            
+          case 'genero':
+            filteredData = filteredData.filter(n => {
+              const generoId = n?.original?.paciente?.tipo_genero_idtipo_genero;
+              if (generoId !== undefined && exportOptions?.generoOptions?.length > 0) {
+                const genero = exportOptions.generoOptions.find(
+                  (g: any) => String(g.idtipo_genero) === String(generoId)
+                );
+                return genero?.descricao === filterValue;
+              }
+              return false;
+            });
+            break;
+            
+          case 'raca':
+            filteredData = filteredData.filter(n => {
+              const racaId = n?.original?.paciente?.tipo_raca_idtipo_raca;
+              if (racaId !== undefined && exportOptions?.racaOptions?.length > 0) {
+                const raca = exportOptions.racaOptions.find(
+                  (r: any) => String(r.idtipo_raca) === String(racaId)
+                );
+                return raca?.descricao === filterValue;
+              }
+              return false;
+            });
+            break;
+            
+          case 'escolaridade':
+            filteredData = filteredData.filter(n => {
+              const escolaridadeId = n?.original?.paciente?.escolaridade_idescolaridade;
+              if (escolaridadeId !== undefined && exportOptions?.escolaridadeOptions?.length > 0) {
+                const escolaridade = exportOptions.escolaridadeOptions.find(
+                  (e: any) => String(e.idtipo_escolaridade) === String(escolaridadeId)
+                );
+                return escolaridade?.descricao === filterValue;
+              }
+              return false;
+            });
+            break;
+            
+          case 'unidade':
+            filteredData = filteredData.filter(n => {
+              const unidadeId = n?.original?.estabelecimento_idestabelecimento;
+              if (unidadeId !== undefined && exportOptions?.estabelecimentoOptions?.length > 0) {
+                const unidade = exportOptions.estabelecimentoOptions.find(
+                  (u: any) => String(u.idestabelecimento) === String(unidadeId)
+                );
+                return unidade?.nome === filterValue;
+              }
+              return false;
+            });
+            break;
+            
+          case 'hipotese':
+            filteredData = filteredData.filter(n => {
+              const hipoteseId = n?.original?.tipo_hipotese_diag_idtipo_hipotese_diag;
+              if (hipoteseId !== undefined && exportOptions?.hipoteseDiagOptions?.length > 0) {
+                const hipotese = exportOptions.hipoteseDiagOptions.find(
+                  (h: any) => String(h.idtipo_hipotese_diag) === String(hipoteseId)
+                );
+                return hipotese?.descricao === filterValue;
+              }
+              return false;
+            });
+            break;
+            
+          case 'trauma':
+            console.log("🔍 Filtrando por trauma:", filterValue);
+            console.log("🔧 traumaOptions disponíveis:", exportOptions?.traumaOptions?.length || 0);
+            
+            filteredData = filteredData.filter(n => {
+              const traumas = n?.original?.notificacao_has_tipo_trauma;
+              console.log("🏥 Verificando traumas:", traumas, "na notificação");
+              
+              if (Array.isArray(traumas) && traumas.length > 0 && exportOptions?.traumaOptions?.length > 0) {
+                return traumas.some((traumaRel: any) => {
+                  const traumaId = traumaRel.tipo_trauma_idtipo_trauma;
+                  const trauma = exportOptions.traumaOptions.find(
+                    (t: any) => String(t.idtipo_trauma) === String(traumaId)
+                  );
+                  console.log("🔍 Trauma encontrado:", trauma?.descricao, "vs filtro:", filterValue);
+                  return trauma?.descricao === filterValue;
+                });
+              }
+              console.log("❌ Trauma não encontrado - traumas:", traumas, "traumaOptions:", exportOptions?.traumaOptions?.length);
+              return false;
+            });
+            break;
+            
+          case 'sintoma':
+            filteredData = filteredData.filter(n => {
+              const sintomas = n?.original?.notificacao_has_tipo_sintoma;
+              if (Array.isArray(sintomas) && exportOptions?.sintomaOptions?.length > 0) {
+                return sintomas.some((s: any) => {
+                  const sintoma = exportOptions.sintomaOptions.find(
+                    (opt: any) => String(opt.idtipo_sintoma) === String(s.tipo_sintoma_idtipo_sintoma)
+                  );
+                  return sintoma?.descricao === filterValue;
+                });
+              }
+              return false;
+            });
+            break;
+        }
+      }
+    });
+    
+    return filteredData;
+  }, [activeFilters, exportOptions, getAtendimentoDescById]);
+
+  // 🆕 FUNÇÃO PARA ALTERNAR FILTRO
+  const toggleFilter = useCallback((category: string, value: string) => {
+    setActiveFilters(prev => {
+      const newFilters = { ...prev };
+      
+      // Se o mesmo filtro já está ativo, removê-lo
+      if (newFilters[category] === value) {
+        newFilters[category] = null;
+      } else {
+        // Caso contrário, definir o novo filtro
+        newFilters[category] = value;
+      }
+      
+      console.log(`🎯 Filtro alterado:`, { category, value, newFilters });
+      return newFilters;
+    });
+  }, []);
+
+  // 🆕 FUNÇÃO PARA LIMPAR TODOS OS FILTROS
+  const clearAllFilters = useCallback(() => {
+    setActiveFilters({
+      evento: null,
+      tipoAtendimento: null,
+      publico: null,
+      genero: null,
+      raca: null,
+      escolaridade: null,
+      unidade: null,
+      hipotese: null,
+      trauma: null,
+      sintoma: null
+    });
+    setSelectedCategory(null);
+    setSelectedEvento("Todos");
+    console.log("🧹 Todos os filtros foram limpos");
+  }, []);
+
+  // 🆕 VERIFICAR SE HÁ FILTROS ATIVOS
+  const hasActiveFilters = useMemo(() => {
+    return Object.values(activeFilters).some(filter => filter !== null);
+  }, [activeFilters]);
+
+  // 🆕 FUNÇÃO PARA OBTER DADOS FILTRADOS
+  const getFilteredData = useCallback(() => {
+    if (!hasActiveFilters) {
+      return originalNotificacoes.current;
+    }
+    return applyFilters(originalNotificacoes.current);
+  }, [hasActiveFilters, applyFilters]);
 
   // ✅ Função para determinar se uma hipótese é alarmante (baseado no GVS)
   const isHipotesisAlarmante = useCallback((hipotese: string): boolean => {
@@ -939,16 +1157,35 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         }
       }
 
-      const traumaPorNotificacao = processarCategoria(
+      console.log("🔍 DEBUG: Processando traumas...");
+      console.log("📊 Dados filtrados para trauma:", dadosFiltrados.length, "notificações");
+      console.log("🔧 traumaOptions disponíveis:", exportOptions?.traumaOptions?.length || 0);
+      console.log("🔧 traumaOptions sample:", exportOptions?.traumaOptions?.slice(0, 3));
+      
+      // Verificar se há notificações com trauma - agora usando o relacionamento many-to-many
+      const notificacoesComTrauma = dadosFiltrados.filter(n => 
+        n?.original?.notificacao_has_tipo_trauma && 
+        Array.isArray(n.original.notificacao_has_tipo_trauma) && 
+        n.original.notificacao_has_tipo_trauma.length > 0
+      );
+      console.log("🏥 Notificações com trauma:", notificacoesComTrauma.length);
+      if (notificacoesComTrauma.length > 0) {
+        console.log("🏥 Amostra de traumas:", notificacoesComTrauma.slice(0, 5).map(n => 
+          n.original.notificacao_has_tipo_trauma.map((t: any) => t.tipo_trauma_idtipo_trauma)
+        ));
+      }
+
+      const traumaPorNotificacao = processarCategoriaMuitosParaMuitos(
         dadosFiltrados,
-        "original.tipo_trauma_idtipo_trauma",
+        "original.notificacao_has_tipo_trauma",
+        "tipo_trauma_idtipo_trauma",
         exportOptions.traumaOptions || [],
         "idtipo_trauma",
         "descricao",
-        COLORS.blue,
+        COLORS.trauma,
         'normal'
       );
-      console.log("Dados de trauma processados:", traumaPorNotificacao);
+      console.log("📈 Dados de trauma processados:", traumaPorNotificacao);
       if (traumaPorNotificacao.length > 0) {
         setFilteredTrauma(traumaPorNotificacao);
         if (originalTrauma.length === 0) {
@@ -1031,6 +1268,18 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       return false;
     }
   }, [notificacoes, processarDadosGraficos, getAtendimentoDescById]);
+
+  // 🆕 FUNÇÃO MELHORADA PARA PROCESSAR DADOS COM FILTROS CRUZADOS
+  const processarDadosComFiltros = useCallback(() => {
+    const dadosFiltrados = getFilteredData();
+    console.log(`📊 Processando ${dadosFiltrados.length} notificações com filtros cruzados`);
+    
+    // Atualizar dados filtrados de referência
+    filteredNotificacoes.current = dadosFiltrados;
+    
+    // Recalcular estatísticas e gráficos
+    calcularEstatisticas(dadosFiltrados);
+  }, [getFilteredData, calcularEstatisticas]);
 
   // Função para buscar dados frescos do servidor
   const fetchFreshData = useCallback(async () => {
@@ -1184,9 +1433,20 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     };
   }, [autoRefreshEnabled]);
 
-  // Quando a categoria selecionada mudar, aplicar filtro real
+  // 🆕 EFEITO PARA APLICAR FILTROS CRUZADOS
   useEffect(() => {
     if (!initialProcessingDone.current) return;
+    
+    console.log("🔄 Aplicando filtros cruzados...", activeFilters);
+    setLoading(true);
+    processarDadosComFiltros();
+    setLoading(false);
+  }, [activeFilters, processarDadosComFiltros]);
+
+  // Quando a categoria selecionada mudar, aplicar filtro real (LEGACY - manter compatibilidade)
+  useEffect(() => {
+    if (!initialProcessingDone.current || hasActiveFilters) return; // Não processar se há filtros cruzados ativos
+    
     setLoading(true);
     const dadosFiltrados = filtrarNotificacoes(selectedCategory);
     filteredNotificacoes.current = dadosFiltrados;
@@ -1203,7 +1463,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     }
 
     setLoading(false);
-  }, [selectedCategory, filtrarNotificacoes, calcularEstatisticas]);
+  }, [selectedCategory, filtrarNotificacoes, calcularEstatisticas, hasActiveFilters]);
 
   // useEffect para processamento inicial de dados
   useEffect(() => {
@@ -1306,26 +1566,47 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     setSelectedCategory(novoEvento !== "Todos" ? novoEvento : null);
   }, []);
 
-  // Handler para cards e charts
+  // Handler para cards e charts - ATUALIZADO para filtros cruzados
   const handleCardClick = useCallback((tipoAtendimento: string) => {
     console.log(`Card clicado: ${tipoAtendimento}`);
-    const filterKey = atendimentoToFilterKey[tipoAtendimento.toLowerCase()] || tipoAtendimento;
     
-    // Se já está selecionado, limpar filtro
-    if (selectedCategory === filterKey) {
-      console.log("Limpando filtro atual");
-      setSelectedCategory(null);
-      setSelectedEvento("Todos");
-    } else {
-      console.log(`Aplicando filtro: ${filterKey}`);
-      setSelectedCategory(filterKey);
-      
-      // Manter evento selecionado sincronizado se necessário
-      if (tipoAtendimento !== selectedEvento && !Object.values(atendimentoToFilterKey).includes(selectedEvento)) {
-        setSelectedEvento("Todos");
-      }
+    // Mapear para descrição correta
+    let descricao = tipoAtendimento;
+    
+    // Verificar se é um dos tipos especiais
+    const tipoLower = tipoAtendimento.toLowerCase();
+    if (tipoLower.includes('clinico') || tipoLower === 'clinico') {
+      // Buscar a descrição real do tipo clínico nas opções
+      const clinico = exportOptions?.atendimentoOptions?.find(
+        (opt: any) => opt.descricao.toLowerCase().includes('clínico') || opt.descricao.toLowerCase().includes('clinico')
+      );
+      descricao = clinico?.descricao || "Clínico";
+    } else if (tipoLower.includes('trauma') || tipoLower === 'trauma') {
+      const trauma = exportOptions?.atendimentoOptions?.find(
+        (opt: any) => opt.descricao.toLowerCase().includes('trauma')
+      );
+      descricao = trauma?.descricao || "Trauma";
+    } else if (tipoLower.includes('multiplas') || tipoLower === 'multiplas') {
+      const multiplas = exportOptions?.atendimentoOptions?.find(
+        (opt: any) => opt.descricao.toLowerCase().includes('múltiplas') || opt.descricao.toLowerCase().includes('multiplas')
+      );
+      descricao = multiplas?.descricao || "Múltiplas Vítimas";
+    } else if (tipoLower.includes('qbrn') || tipoLower === 'qbrn') {
+      const qbrn = exportOptions?.atendimentoOptions?.find(
+        (opt: any) => opt.descricao.toLowerCase().includes('qbrn') || opt.descricao.toLowerCase().includes('incidente q')
+      );
+      descricao = qbrn?.descricao || "Incidente QBRN";
     }
-  }, [selectedCategory, selectedEvento, atendimentoToFilterKey]);
+    
+    // Usar o novo sistema de filtros cruzados
+    toggleFilter('tipoAtendimento', descricao);
+  }, [exportOptions, toggleFilter]);
+
+  // 🆕 HANDLER GENÉRICO PARA CLIQUES EM GRÁFICOS
+  const handleChartClick = useCallback((category: string, itemName: string) => {
+    console.log(`🎯 Gráfico clicado: ${category} -> ${itemName}`);
+    toggleFilter(category, itemName);
+  }, [toggleFilter]);
 
   // Handler para o botão de voltar
   const handleBackButton = useCallback(() => {
@@ -1385,6 +1666,11 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                   Próxima em: {autoRefreshCountdown}s
                 </span>
               )}
+              {hasActiveFilters && (
+                <span className="ml-2 bg-blue-200 text-blue-800 px-2 py-1 rounded text-xs">
+                  {Object.values(activeFilters).filter(f => f !== null).length} filtro(s)
+                </span>
+              )}
             </div>
 
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
@@ -1413,7 +1699,19 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 </span>
               </button>
 
-              {/* Botão de exportação com dropdown */}
+              <button
+                onClick={() => setShowHelp(!showHelp)}
+                className={`flex items-center justify-center gap-2 px-2 sm:px-3 py-2 rounded transition-colors text-xs sm:text-sm whitespace-nowrap ${
+                  showHelp 
+                    ? "bg-indigo-500 text-white hover:bg-indigo-600" 
+                    : "bg-gray-400 text-white hover:bg-gray-500"
+                }`}
+              >
+                <Info className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">
+                  {showHelp ? "Ocultar Ajuda" : "Ajuda"}
+                </span>
+              </button>
               <div className="relative">
                 <button
                   onClick={() => setShowExportDropdown(!showExportDropdown)}
@@ -1455,45 +1753,195 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
       {/* Seção de Filtros */}
       <div className="max-w-7xl mx-auto mt-4 px-4">
-        <div className="bg-white p-4 rounded-lg shadow-sm flex flex-wrap gap-4 items-center">
-          <div className="flex items-center gap-2 text-blue-800">
-            <Filter className="h-5 w-5" />
-            <span className="font-medium">Filtro:</span>
-          </div>
-
-          <div className="flex-1">
-            <div className="w-full md:w-64">
-              <label className="block text-sm text-gray-600 mb-1">Evento</label>
-              <select
-                value={selectedEvento}
-                onChange={handleEventoChange}
-                className="w-full p-2 border border-gray-300 rounded text-sm"
-              >
-                {eventoOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
+        <div className="bg-white p-4 rounded-lg shadow-sm">
+          <div className="flex flex-wrap gap-4 items-center mb-4">
+            <div className="flex items-center gap-2 text-blue-800">
+              <Filter className="h-5 w-5" />
+              <span className="font-medium">Filtro:</span>
             </div>
+
+            <div className="flex-1">
+              <div className="w-full md:w-64">
+                <label className="block text-sm text-gray-600 mb-1">Evento</label>
+                <select
+                  value={selectedEvento}
+                  onChange={handleEventoChange}
+                  className="w-full p-2 border border-gray-300 rounded text-sm"
+                >
+                  {eventoOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Botão para limpar todos os filtros */}
+            {hasActiveFilters && (
+              <button
+                onClick={clearAllFilters}
+                className="flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors text-sm"
+                title="Limpar todos os filtros"
+              >
+                <X className="h-4 w-4" />
+                Limpar Filtros
+              </button>
+            )}
+
+            {selectedCategory && (
+              <div className="flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
+                <span>Filtro ativo: {selectedCategory}</span>
+                <button
+                  onClick={() => {
+                    setSelectedCategory(null);
+                    setSelectedEvento("Todos");
+                  }}
+                  className="hover:bg-blue-200 rounded-full p-1"
+                >
+                  ×
+                </button>
+              </div>
+            )}
           </div>
 
-          {selectedCategory && (
-            <div className="flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
-              <span>Filtro ativo: {selectedCategory}</span>
-              <button
-                onClick={() => {
-                  setSelectedCategory(null);
-                  setSelectedEvento("Todos");
-                }}
-                className="hover:bg-blue-200 rounded-full p-1"
-              >
-                ×
-              </button>
+          {/* Mostrar filtros ativos */}
+          {hasActiveFilters && (
+            <div className="border-t pt-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Layers className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium text-gray-700">Filtros Ativos:</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(activeFilters).map(([category, value]) => {
+                  if (value === null) return null;
+                  
+                  const categoryLabels: Record<string, string> = {
+                    evento: 'Evento',
+                    tipoAtendimento: 'Tipo de Atendimento',
+                    publico: 'Público',
+                    genero: 'Sexo',
+                    raca: 'Raça/Cor',
+                    escolaridade: 'Escolaridade',
+                    unidade: 'Unidade',
+                    hipotese: 'Hipótese Diagnóstica',
+                    trauma: 'Tipo de Trauma',
+                    sintoma: 'Sintoma'
+                  };
+                  
+                  return (
+                    <div
+                      key={category}
+                      className="flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs"
+                    >
+                      <span className="font-medium">{categoryLabels[category]}:</span>
+                      <span>{value}</span>
+                      <button
+                        onClick={() => toggleFilter(category, value)}
+                        className="ml-1 hover:bg-blue-200 rounded-full p-0.5"
+                        title={`Remover filtro ${categoryLabels[category]}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* Seção de Ajuda Expansível */}
+      {showHelp && (
+        <div className="max-w-7xl mx-auto mt-4 px-4">
+          <div className="bg-indigo-50 p-4 rounded-lg shadow-sm border border-indigo-200">
+            <div className="flex items-center gap-2 mb-3">
+              <Info className="h-5 w-5 text-indigo-600" />
+              <h3 className="text-lg font-semibold text-indigo-800">
+                Dashboard Interativo - Como Usar
+              </h3>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+              <div className="bg-white p-3 rounded border border-indigo-100">
+                <h4 className="font-semibold text-indigo-700 mb-2 flex items-center gap-1">
+                  <MousePointer className="h-4 w-4" />
+                  Filtros Interativos
+                </h4>
+                <p className="text-gray-700">
+                  Clique em qualquer barra, fatia de pizza ou card para filtrar todos os dados.
+                  O dashboard funciona como o Power BI - todos os gráficos se atualizam automaticamente.
+                </p>
+              </div>
+              
+              <div className="bg-white p-3 rounded border border-indigo-100">
+                <h4 className="font-semibold text-indigo-700 mb-2 flex items-center gap-1">
+                  <Layers className="h-4 w-4" />
+                  Filtros Múltiplos
+                </h4>
+                <p className="text-gray-700">
+                  Você pode aplicar vários filtros ao mesmo tempo. 
+                  Cada filtro ativo é mostrado na seção "Filtros Ativos" com opção de remoção individual.
+                </p>
+              </div>
+              
+              <div className="bg-white p-3 rounded border border-indigo-100">
+                <h4 className="font-semibold text-indigo-700 mb-2 flex items-center gap-1">
+                  <RotateCcw className="h-4 w-4" />
+                  Limpar Filtros
+                </h4>
+                <p className="text-gray-700">
+                  Clique no card "Total de Notificações" ou no botão "Limpar Filtros" 
+                  para remover todos os filtros e ver o dataset completo.
+                </p>
+              </div>
+              
+              <div className="bg-white p-3 rounded border border-indigo-100">
+                <h4 className="font-semibold text-indigo-700 mb-2 flex items-center gap-1">
+                  <Table className="h-4 w-4" />
+                  Visualizações
+                </h4>
+                <p className="text-gray-700">
+                  Alterne entre gráficos de barras e pizza usando os ícones no canto 
+                  superior direito de cada gráfico.
+                </p>
+              </div>
+              
+              <div className="bg-white p-3 rounded border border-indigo-100">
+                <h4 className="font-semibold text-indigo-700 mb-2 flex items-center gap-1">
+                  <RefreshCw className="h-4 w-4" />
+                  Auto-Atualização
+                </h4>
+                <p className="text-gray-700">
+                  Os dados são atualizados automaticamente a cada minuto. 
+                  Você pode desativar essa função ou forçar uma atualização manual.
+                </p>
+              </div>
+              
+              <div className="bg-white p-3 rounded border border-indigo-100">
+                <h4 className="font-semibold text-indigo-700 mb-2 flex items-center gap-1">
+                  <AlertTriangle className="h-4 w-4" />
+                  Alertas Visuais
+                </h4>
+                <p className="text-gray-700">
+                  Hipóteses diagnósticas alarmantes são destacadas com bordas vermelhas.
+                  Filtros ativos são indicados por bordas pretas nos elementos selecionados.
+                </p>
+              </div>
+            </div>
+            
+            <div className="mt-4 p-3 bg-white rounded border border-indigo-100">
+              <h4 className="font-semibold text-indigo-700 mb-2">💡 Dica Importante:</h4>
+              <p className="text-gray-700">
+                Este dashboard replica a funcionalidade do Power BI onde <strong>todos os elementos se comunicam entre si</strong>. 
+                Quando você filtra por um tipo de atendimento, por exemplo, todos os outros gráficos (gênero, raça, sintomas, etc.) 
+                mostram apenas os dados relacionados àquele tipo de atendimento selecionado.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Sistema de Abas do Dashboard Aprimorado */}
       <div className="max-w-7xl mx-auto px-4 mt-4">
@@ -1505,10 +1953,29 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         <main
           className="max-w-7xl mx-auto p-2 sm:p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 mt-2"
         >
+          {/* Cards de Resumo - com indicador de filtros ativos */}
+          {hasActiveFilters && (
+            <div className="bg-blue-50 p-3 rounded-lg shadow-sm sm:col-span-2 lg:col-span-3 xl:col-span-5 border-l-4 border-blue-500">
+              <div className="flex items-center gap-2 mb-2">
+                <Layers className="h-4 w-4 text-blue-600" />
+                <h3 className="text-sm font-semibold text-blue-800">
+                  Dashboard com Filtros Ativos - Dados Interconectados
+                </h3>
+              </div>
+              <p className="text-xs text-blue-700">
+                {Object.values(activeFilters).filter(f => f !== null).length} filtro(s) aplicado(s).
+                Todos os gráficos abaixo mostram apenas dados que correspondem aos filtros selecionados.
+                Clique em qualquer elemento de gráfico para adicionar/remover filtros.
+              </p>
+            </div>
+          )}
+
           {/* Cards de Resumo */}
           <div
-            className={`bg-white p-3 sm:p-4 rounded-lg shadow-sm flex items-center gap-3 sm:gap-4 cursor-pointer hover:shadow-md transition-shadow sm:col-span-1 xl:col-span-1 ${selectedCategory === null ? 'ring-2 ring-blue-400' : ''}`}
-            onClick={() => { setSelectedCategory(null); setSelectedEvento("Todos"); }}
+            className={`bg-white p-3 sm:p-4 rounded-lg shadow-sm flex items-center gap-3 sm:gap-4 cursor-pointer hover:shadow-md transition-shadow sm:col-span-1 xl:col-span-1 ${!hasActiveFilters && selectedCategory === null ? 'ring-2 ring-blue-400' : ''}`}
+            onClick={() => { 
+              clearAllFilters();
+            }}
           >
             <div className="p-2 sm:p-3 bg-blue-100 text-blue-800 rounded-full flex-shrink-0">
               <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -1522,7 +1989,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           </div>
 
           <div
-            className={`bg-white p-3 sm:p-4 rounded-lg shadow-sm flex items-center gap-3 sm:gap-4 cursor-pointer hover:shadow-md transition-shadow sm:col-span-1 xl:col-span-1 ${selectedCategory === 'Clínico' ? 'ring-2 ring-green-400' : ''}`}
+            className={`bg-white p-3 sm:p-4 rounded-lg shadow-sm flex items-center gap-3 sm:gap-4 cursor-pointer hover:shadow-md transition-shadow sm:col-span-1 xl:col-span-1 ${activeFilters.tipoAtendimento?.toLowerCase().includes('clínico') || activeFilters.tipoAtendimento?.toLowerCase().includes('clinico') ? 'ring-2 ring-green-400' : ''}`}
             onClick={() => handleCardClick("clinico")}
           >
             <div className="p-2 sm:p-3 bg-green-100 text-green-800 rounded-full flex-shrink-0">
@@ -1537,7 +2004,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           </div>
 
           <div
-            className={`bg-white p-3 sm:p-4 rounded-lg shadow-sm flex items-center gap-3 sm:gap-4 cursor-pointer hover:shadow-md transition-shadow sm:col-span-1 xl:col-span-1 ${selectedCategory === 'Trauma' ? 'ring-2 ring-red-400' : ''}`}
+            className={`bg-white p-3 sm:p-4 rounded-lg shadow-sm flex items-center gap-3 sm:gap-4 cursor-pointer hover:shadow-md transition-shadow sm:col-span-1 xl:col-span-1 ${activeFilters.tipoAtendimento?.toLowerCase().includes('trauma') ? 'ring-2 ring-red-400' : ''}`}
             onClick={() => handleCardClick("trauma")}
           >
             <div className="p-2 sm:p-3 bg-red-100 text-red-800 rounded-full flex-shrink-0">
@@ -1553,7 +2020,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
           {/* NOVO CARD: Múltiplas Vítimas */}
           <div
-            className={`bg-white p-3 sm:p-4 rounded-lg shadow-sm flex items-center gap-3 sm:gap-4 cursor-pointer hover:shadow-md transition-shadow sm:col-span-1 xl:col-span-1 ${selectedCategory === 'Múltiplas Vítimas' ? 'ring-2 ring-purple-400' : ''}`}
+            className={`bg-white p-3 sm:p-4 rounded-lg shadow-sm flex items-center gap-3 sm:gap-4 cursor-pointer hover:shadow-md transition-shadow sm:col-span-1 xl:col-span-1 ${activeFilters.tipoAtendimento?.toLowerCase().includes('múltiplas') || activeFilters.tipoAtendimento?.toLowerCase().includes('multiplas') ? 'ring-2 ring-purple-400' : ''}`}
             onClick={() => handleCardClick("multiplas")}
           >
             <div className="p-2 sm:p-3 bg-purple-100 text-purple-800 rounded-full flex-shrink-0">
@@ -1569,7 +2036,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
           {/* NOVO CARD: Incidente QBRN */}
           <div
-            className={`bg-white p-3 sm:p-4 rounded-lg shadow-sm flex items-center gap-3 sm:gap-4 cursor-pointer hover:shadow-md transition-shadow sm:col-span-1 xl:col-span-1 ${selectedCategory === 'Incidente QBRN' ? 'ring-2 ring-orange-400' : ''}`}
+            className={`bg-white p-3 sm:p-4 rounded-lg shadow-sm flex items-center gap-3 sm:gap-4 cursor-pointer hover:shadow-md transition-shadow sm:col-span-1 xl:col-span-1 ${activeFilters.tipoAtendimento?.toLowerCase().includes('qbrn') || activeFilters.tipoAtendimento?.toLowerCase().includes('incidente q') ? 'ring-2 ring-orange-400' : ''}`}
             onClick={() => handleCardClick("qbrn")}
           >
             <div className="p-2 sm:p-3 bg-orange-100 text-orange-800 rounded-full flex-shrink-0">
@@ -1591,6 +2058,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 <h3 className="text-xs sm:text-sm font-medium text-gray-700">
                   Distribuição por Público Atendido
                 </h3>
+                <MousePointer className="h-3 w-3 text-blue-500 opacity-60" />
               </div>
               <div className="flex gap-2 self-start sm:self-auto">
                 <button 
@@ -1629,7 +2097,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         }
                         onClick={(data) => {
                           if (data && data.name) {
-                            handleCardClick(data.name);
+                            handleChartClick('publico', data.name);
                           }
                         }}
                         cursor="pointer"
@@ -1638,8 +2106,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                           <Cell 
                             key={`cell-${i}`} 
                             fill={entry.fill}
-                            stroke={selectedCategory === entry.name ? "#000" : "none"}
-                            strokeWidth={selectedCategory === entry.name ? 2 : 0}
+                            stroke={activeFilters.publico === entry.name ? "#000" : "none"}
+                            strokeWidth={activeFilters.publico === entry.name ? 2 : 0}
                           />
                         ))}
                       </Pie>
@@ -1677,7 +2145,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         radius={[4, 4, 0, 0]}
                         onClick={(data) => {
                           if (data && data.name) {
-                            handleCardClick(data.name);
+                            handleChartClick('publico', data.name);
                           }
                         }}
                         cursor="pointer"
@@ -1686,8 +2154,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                           <Cell 
                             key={`cell-${i}`} 
                             fill={entry.fill}
-                            stroke={selectedCategory === entry.name ? "#000" : "none"}
-                            strokeWidth={selectedCategory === entry.name ? 2 : 0}
+                            stroke={activeFilters.publico === entry.name ? "#000" : "none"}
+                            strokeWidth={activeFilters.publico === entry.name ? 2 : 0}
                           />
                         ))}
                       </Bar>
@@ -1710,6 +2178,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 <h3 className="text-sm font-medium text-gray-700">
                   Distribuição por Tipo de Atendimento
                 </h3>
+                <MousePointer className="h-3 w-3 text-blue-500 opacity-60" />
               </div>
               <div className="flex gap-2">
                 <button 
@@ -1755,7 +2224,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         radius={[4, 4, 0, 0]}
                         onClick={(data) => {
                           if (data && data.name) {
-                            handleCardClick(data.name);
+                            handleChartClick('tipoAtendimento', data.name);
                           }
                         }}
                         cursor="pointer"
@@ -1764,8 +2233,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                           <Cell 
                             key={`cell-${i}`} 
                             fill={entry.fill}
-                            stroke={selectedCategory === entry.name ? "#000" : "none"}
-                            strokeWidth={selectedCategory === entry.name ? 2 : 0}
+                            stroke={activeFilters.tipoAtendimento === entry.name ? "#000" : "none"}
+                            strokeWidth={activeFilters.tipoAtendimento === entry.name ? 2 : 0}
                           />
                         ))}
                       </Bar>
@@ -1785,7 +2254,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         }
                         onClick={(data) => {
                           if (data && data.name) {
-                            handleCardClick(data.name);
+                            handleChartClick('tipoAtendimento', data.name);
                           }
                         }}
                         cursor="pointer"
@@ -1794,8 +2263,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                           <Cell 
                             key={`cell-${i}`} 
                             fill={entry.fill}
-                            stroke={selectedCategory === entry.name ? "#000" : "none"}
-                            strokeWidth={selectedCategory === entry.name ? 2 : 0}
+                            stroke={activeFilters.tipoAtendimento === entry.name ? "#000" : "none"}
+                            strokeWidth={activeFilters.tipoAtendimento === entry.name ? 2 : 0}
                           />
                         ))}
                       </Pie>
@@ -1828,6 +2297,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 <h3 className="text-sm font-medium text-gray-700">
                   Distribuição por Sexo
                 </h3>
+                <MousePointer className="h-3 w-3 text-blue-500 opacity-60" />
               </div>
               <div className="flex gap-2">
                 <button 
@@ -1866,7 +2336,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         cursor="pointer"
                         onClick={(data) => {
                           if (data && data.name) {
-                            handleCardClick(data.name);
+                            handleChartClick('genero', data.name);
                           }
                         }}
                       >
@@ -1874,8 +2344,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                           <Cell 
                             key={`cell-${i}`} 
                             fill={entry.fill}
-                            stroke={selectedCategory === entry.name ? "#000" : "none"}
-                            strokeWidth={selectedCategory === entry.name ? 2 : 0}
+                            stroke={activeFilters.genero === entry.name ? "#000" : "none"}
+                            strokeWidth={activeFilters.genero === entry.name ? 2 : 0}
                           />
                         ))}
                       </Pie>
@@ -1913,7 +2383,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         radius={[4, 4, 0, 0]}
                         onClick={(data) => {
                           if (data && data.name) {
-                            handleCardClick(data.name);
+                            handleChartClick('genero', data.name);
                           }
                         }}
                         cursor="pointer"
@@ -1922,8 +2392,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                           <Cell 
                             key={`cell-${i}`} 
                             fill={entry.fill}
-                            stroke={selectedCategory === entry.name ? "#000" : "none"}
-                            strokeWidth={selectedCategory === entry.name ? 2 : 0}
+                            stroke={activeFilters.genero === entry.name ? "#000" : "none"}
+                            strokeWidth={activeFilters.genero === entry.name ? 2 : 0}
                           />
                         ))}
                       </Bar>
@@ -1946,6 +2416,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 <h3 className="text-sm font-medium text-gray-700">
                   Distribuição por Raça e Cor
                 </h3>
+                <MousePointer className="h-3 w-3 text-blue-500 opacity-60" />
               </div>
               <div className="flex gap-2">
                 <button 
@@ -1991,7 +2462,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         radius={[4, 4, 0, 0]}
                         onClick={(data) => {
                           if (data && data.name) {
-                            handleCardClick(data.name);
+                            handleChartClick('raca', data.name);
                           }
                         }}
                         cursor="pointer"
@@ -2000,8 +2471,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                           <Cell 
                             key={`cell-${i}`} 
                             fill={entry.fill}
-                            stroke={selectedCategory === entry.name ? "#000" : "none"}
-                            strokeWidth={selectedCategory === entry.name ? 2 : 0}
+                            stroke={activeFilters.raca === entry.name ? "#000" : "none"}
+                            strokeWidth={activeFilters.raca === entry.name ? 2 : 0}
                           />
                         ))}
                       </Bar>
@@ -2021,7 +2492,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         }
                         onClick={(data) => {
                           if (data && data.name) {
-                            handleCardClick(data.name);
+                            handleChartClick('raca', data.name);
                           }
                         }}
                         cursor="pointer"
@@ -2030,8 +2501,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                           <Cell 
                             key={`cell-${i}`} 
                             fill={entry.fill}
-                            stroke={selectedCategory === entry.name ? "#000" : "none"}
-                            strokeWidth={selectedCategory === entry.name ? 2 : 0}
+                            stroke={activeFilters.raca === entry.name ? "#000" : "none"}
+                            strokeWidth={activeFilters.raca === entry.name ? 2 : 0}
                           />
                         ))}
                       </Pie>
@@ -2103,7 +2574,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                       dataKey="value"
                       onClick={(data) => {
                         if (data && data.name) {
-                          handleCardClick(data.name);
+                          handleChartClick('sintoma', data.name);
                         }
                       }}
                       cursor="pointer"
@@ -2112,8 +2583,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         <Cell 
                           key={`cell-${i}`} 
                           fill={entry.fill}
-                          stroke={selectedCategory === entry.name ? "#000" : "none"}
-                          strokeWidth={selectedCategory === entry.name ? 2 : 0}
+                          stroke={activeFilters.sintoma === entry.name ? "#000" : "none"}
+                          strokeWidth={activeFilters.sintoma === entry.name ? 2 : 0}
                         />
                       ))}
                     </Bar>
@@ -2174,7 +2645,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                       dataKey="value"
                       onClick={(data) => {
                         if (data && data.name) {
-                          handleCardClick(data.name);
+                          handleChartClick('trauma', data.name);
                         }
                       }}
                       cursor="pointer"
@@ -2183,8 +2654,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         <Cell 
                           key={`cell-${i}`} 
                           fill={entry.fill}
-                          stroke={selectedCategory === entry.name ? "#000" : "none"}
-                          strokeWidth={selectedCategory === entry.name ? 2 : 0}
+                          stroke={activeFilters.trauma === entry.name ? "#000" : "none"}
+                          strokeWidth={activeFilters.trauma === entry.name ? 2 : 0}
                         />
                       ))}
                     </Bar>
@@ -2265,7 +2736,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                       dataKey="value"
                       onClick={(data) => {
                         if (data && data.name) {
-                          handleCardClick(data.name);
+                          handleChartClick('hipotese', data.name);
                         }
                       }}
                       cursor="pointer"
@@ -2276,8 +2747,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                           fill={entry.fill}
                           // Adicionar uma borda especial para as hipóteses alarmantes
                           // E também destacar a seleção atual
-                          stroke={selectedCategory === entry.name ? "#000" : (entry.isAlarmante ? "#b71c1c" : "none")}
-                          strokeWidth={selectedCategory === entry.name ? 2 : (entry.isAlarmante ? 2 : 0)}
+                          stroke={activeFilters.hipotese === entry.name ? "#000" : (entry.isAlarmante ? "#b71c1c" : "none")}
+                          strokeWidth={activeFilters.hipotese === entry.name ? 2 : (entry.isAlarmante ? 2 : 0)}
                         />
                       ))}
                     </Bar>

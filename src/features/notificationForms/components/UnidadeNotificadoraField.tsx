@@ -4,6 +4,17 @@ import { Search, X, AlertCircle } from "lucide-react";
 import { createPortal } from "react-dom";
 import indexedDBService from '@/services/indexedDB';
 
+// Configuração da API usando variáveis de ambiente
+const server = import.meta.env.VITE_API_SERVER;
+const port = import.meta.env.VITE_API_PORT;
+const API_BASE_URL = `${server}:${port}/api`;
+
+console.log('🔧 UnidadeNotificadoraField - Configuração API:', {
+  server,
+  port,
+  API_BASE_URL
+});
+
 interface Estabelecimento {
   idestabelecimento: number;
   nome: string;
@@ -173,10 +184,11 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
           
           console.log('Buscando estabelecimentos com params:', params);
           
-          // URL completa da API - AJUSTE PARA SEU AMBIENTE
-          const apiUrl = 'https://app.hml.saude.pa.gov.br:443/api/estabelecimentos';
+          // URL da API usando variáveis de ambiente
+          const apiUrl = `${API_BASE_URL}/estabelecimentos`;
+          console.log('🌐 URL da API para busca de estabelecimentos:', apiUrl);
           
-          // Fazer a requisição à API com a URL completa
+          // Fazer a requisição à API com a URL correta
           const response = await axios.get(apiUrl, { 
             params,
             headers: {
@@ -295,7 +307,8 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
     // 2) Se não encontrou no cache, chama a API
     try {
       setLoadingUnidades(true);
-      const apiUrl = `https://app.trn.saude.pa.gov.br:443/api/estabelecimentos/${id}`;
+      const apiUrl = `${API_BASE_URL}/estabelecimentos/${id}`;
+      console.log('🌐 URL da API para busca por ID:', apiUrl);
       
       const response = await axios.get(apiUrl);
       
