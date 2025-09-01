@@ -41,18 +41,36 @@ const handleApiError = (error: AxiosError<APIError>) => {
 export const MunicipioService = {
   getAll: async (): Promise<Municipio[]> => {
     try {
-      const response = await axios.get<PaginatedResponse>(API_URL);
-      // Verificar se a resposta tem a estrutura esperada
-      if (response.data && response.data.data && Array.isArray(response.data.data)) {
-        return response.data.data;
-      } else if (Array.isArray(response.data)) {
+      // 🔧 CORREÇÃO: Usar endpoint select para buscar TODOS os municípios sem paginação
+      const response = await axios.get<Municipio[]>(`${API_URL}/select`);
+      
+      // Se o endpoint select retornar array direto
+      if (Array.isArray(response.data)) {
+        console.log(`✅ Carregados ${response.data.length} municípios (todos os estados)`);
         return response.data;
+      }
+      
+      // Fallback: tentar com limite alto no endpoint principal
+      const fallbackResponse = await axios.get<PaginatedResponse>(`${API_URL}?limit=10000`);
+      if (fallbackResponse.data && fallbackResponse.data.data && Array.isArray(fallbackResponse.data.data)) {
+        console.log(`✅ Carregados ${fallbackResponse.data.data.length} municípios (fallback com limite alto)`);
+        return fallbackResponse.data.data;
       } else {
-        console.error('Resposta inesperada do servidor:', response.data);
+        console.error('Resposta inesperada do servidor:', fallbackResponse.data);
         return [];
       }
     } catch (error) {
       console.error('Erro em getAll:', error);
+      // Último fallback: tentar endpoint principal com limite padrão
+      try {
+        const response = await axios.get<PaginatedResponse>(API_URL);
+        if (response.data && response.data.data && Array.isArray(response.data.data)) {
+          console.warn(`⚠️ Carregados apenas ${response.data.data.length} municípios (limitado)`);
+          return response.data.data;
+        }
+      } catch (fallbackError) {
+        console.error('Erro no fallback:', fallbackError);
+      }
       return [];
     }
   },

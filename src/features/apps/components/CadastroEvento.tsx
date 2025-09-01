@@ -49,6 +49,12 @@ const CadastroTipoEvento = () => {
   const [selectedEstado, setSelectedEstado] = useState<number>(0);
   const [isEventoNacional, setIsEventoNacional] = useState(false);
   const [allMunicipios, setAllMunicipios] = useState<Municipio[]>([]);
+  
+  // Filtros de pesquisa
+  const [estadoFilter, setEstadoFilter] = useState<string>('');
+  const [municipioFilter, setMunicipioFilter] = useState<string>('');
+  const [filteredEstados, setFilteredEstados] = useState<Estado[]>([]);
+  const [filteredMunicipios, setFilteredMunicipios] = useState<Municipio[]>([]);
 
   // React Query hooks
   const { data: tipoEvento, isLoading: loadingData } = useEvento(id ? parseInt(id) : 0);
@@ -60,10 +66,12 @@ const CadastroTipoEvento = () => {
   useEffect(() => {
     const loadEstados = async () => {
       try {
-        const estadosData = await EstadoService.getAll();
+        console.log('🔄 Carregando todos os estados...');
+        const estadosData = await EstadoService.getAllForSelect();
+        console.log(`✅ Carregados ${estadosData?.length || 0} estados do Brasil`);
         setEstados(estadosData || []);
       } catch (error) {
-        console.error('Erro ao carregar estados:', error);
+        console.error('❌ Erro ao carregar estados:', error);
         setError('Erro ao carregar estados');
       }
     };
@@ -75,10 +83,12 @@ const CadastroTipoEvento = () => {
   useEffect(() => {
     const loadAllMunicipios = async () => {
       try {
+        console.log('🔄 Carregando todos os municípios para eventos nacionais...');
         const municipiosData = await MunicipioService.getAll();
+        console.log(`✅ Carregados ${municipiosData?.length || 0} municípios do Brasil`);
         setAllMunicipios(municipiosData || []);
       } catch (error) {
-        console.error('Erro ao carregar todos os municípios:', error);
+        console.error('❌ Erro ao carregar todos os municípios:', error);
       }
     };
 
@@ -91,10 +101,13 @@ const CadastroTipoEvento = () => {
       const loadMunicipiosByEstado = async () => {
         setLoadingMunicipios(true);
         try {
-          const response = await MunicipioService.getAllPaginated(1, 1000, '', selectedEstado);
+          console.log(`🔄 Carregando municípios do estado ${selectedEstado}...`);
+          // 🔧 CORREÇÃO: Usar limite alto para carregar TODOS os municípios do estado
+          const response = await MunicipioService.getAllPaginated(1, 10000, '', selectedEstado);
+          console.log(`✅ Carregados ${response.data?.length || 0} municípios do estado`);
           setMunicipios(response.data || []);
         } catch (error) {
-          console.error('Erro ao carregar municípios do estado:', error);
+          console.error('❌ Erro ao carregar municípios do estado:', error);
           setError('Erro ao carregar municípios do estado');
         } finally {
           setLoadingMunicipios(false);
@@ -139,13 +152,40 @@ const CadastroTipoEvento = () => {
     }
   }, [tipoEvento, dataLoaded, allMunicipios]);
 
+  // Filtrar estados com base no campo de pesquisa
+  useEffect(() => {
+    if (estadoFilter.trim() === '') {
+      setFilteredEstados(estados);
+    } else {
+      const filtered = estados.filter(estado =>
+        estado.descricao.toLowerCase().includes(estadoFilter.toLowerCase())
+      );
+      setFilteredEstados(filtered);
+    }
+  }, [estados, estadoFilter]);
+
+  // Filtrar municípios com base no campo de pesquisa
+  useEffect(() => {
+    if (municipioFilter.trim() === '') {
+      setFilteredMunicipios(municipios);
+    } else {
+      const filtered = municipios.filter(municipio =>
+        municipio.descricao.toLowerCase().includes(municipioFilter.toLowerCase())
+      );
+      setFilteredMunicipios(filtered);
+    }
+  }, [municipios, municipioFilter]);
+
   const handleEventoNacionalToggle = () => {
     setIsEventoNacional(prev => {
       const newValue = !prev;
+      console.log(`🌍 Evento Nacional ${newValue ? 'ATIVADO' : 'DESATIVADO'}`);
+      
       if (newValue) {
         // Se ativou evento nacional, seleciona todos os municípios e limpa o estado
         setSelectedEstado(0);
         const allIds = allMunicipios.map(m => m.idtipo_municipio);
+        console.log(`✅ Selecionando ${allIds.length} municípios para evento nacional`);
         setSelectedMunicipios(allIds);
         setFormData(current => ({
           ...current,
@@ -153,6 +193,7 @@ const CadastroTipoEvento = () => {
         }));
       } else {
         // Se desativou evento nacional, limpa seleção
+        console.log('🔄 Limpando seleção de municípios');
         setSelectedMunicipios([]);
         setFormData(current => ({
           ...current,
@@ -175,12 +216,17 @@ const CadastroTipoEvento = () => {
   };
 
   const handleSelectAllMunicipios = () => {
-    if (municipios.length > 0) {
-      const allIds = municipios.map(m => m.idtipo_municipio);
-      setSelectedMunicipios(allIds);
+    // Se há filtro ativo, seleciona apenas os municípios filtrados, senão seleciona todos
+    const municipiosParaSelecionar = municipioFilter.trim() !== '' ? filteredMunicipios : municipios;
+    
+    if (municipiosParaSelecionar.length > 0) {
+      const allIds = municipiosParaSelecionar.map(m => m.idtipo_municipio);
+      // Adiciona os IDs aos já selecionados (não substitui)
+      const newSelectedIds = [...new Set([...selectedMunicipios, ...allIds])];
+      setSelectedMunicipios(newSelectedIds);
       setFormData(current => ({
         ...current,
-        municipios_ids: allIds
+        municipios_ids: newSelectedIds
       }));
     }
   };
@@ -362,6 +408,17 @@ const CadastroTipoEvento = () => {
               <label className="block text-sm font-medium text-gray-700">
                 Selecione o Estado
               </label>
+              
+              {/* Campo de pesquisa para estados */}
+              <input
+                type="text"
+                placeholder="Pesquisar estado..."
+                value={estadoFilter}
+                onChange={(e) => setEstadoFilter(e.target.value)}
+                disabled={createMutation.isPending || updateMutation.isPending}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 text-sm"
+              />
+              
               <select
                 value={selectedEstado}
                 onChange={(e) => handleEstadoChange(parseInt(e.target.value))}
@@ -369,7 +426,7 @@ const CadastroTipoEvento = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
               >
                 <option value={0}>Selecione um estado</option>
-                {estados.map((estado) => (
+                {filteredEstados.map((estado) => (
                   <option key={estado.idtipo_estado} value={estado.idtipo_estado}>
                     {estado.descricao}
                   </option>
@@ -391,7 +448,7 @@ const CadastroTipoEvento = () => {
                   className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
                   disabled={loadingMunicipios || createMutation.isPending || updateMutation.isPending}
                 >
-                  Selecionar Todos
+                  {municipioFilter.trim() !== '' ? 'Selecionar Filtrados' : 'Selecionar Todos'}
                 </button>
                 <button
                   type="button"
@@ -414,29 +471,68 @@ const CadastroTipoEvento = () => {
                   <span className="ml-2 text-sm text-gray-600">Carregando municípios...</span>
                 </div>
               ) : (
-                <div className="max-h-60 overflow-y-auto border border-gray-300 rounded-md">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 p-3">
-                    {municipios.map((municipio) => (
-                      <label
-                        key={municipio.idtipo_municipio}
-                        className="flex items-center space-x-2 text-sm cursor-pointer hover:bg-gray-50 p-1 rounded"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedMunicipios.includes(municipio.idtipo_municipio)}
-                          onChange={() => handleMunicipioToggle(municipio.idtipo_municipio)}
-                          disabled={createMutation.isPending || updateMutation.isPending}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                        <span className="text-gray-700">{municipio.descricao}</span>
-                      </label>
-                    ))}
+                <>
+                  {/* Campo de pesquisa para municípios */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Pesquisar Municípios
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Pesquisar município..."
+                      value={municipioFilter}
+                      onChange={(e) => setMunicipioFilter(e.target.value)}
+                      disabled={createMutation.isPending || updateMutation.isPending}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 text-sm"
+                    />
                   </div>
-                </div>
+                  
+                  <div className="max-h-60 overflow-y-auto border border-gray-300 rounded-md">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 p-3">
+                      {filteredMunicipios.map((municipio) => (
+                        <label
+                          key={municipio.idtipo_municipio}
+                          className="flex items-center space-x-2 text-sm cursor-pointer hover:bg-gray-50 p-1 rounded"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedMunicipios.includes(municipio.idtipo_municipio)}
+                            onChange={() => handleMunicipioToggle(municipio.idtipo_municipio)}
+                            disabled={createMutation.isPending || updateMutation.isPending}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                          <span className="text-gray-700">{municipio.descricao}</span>
+                        </label>
+                      ))}
+                    </div>
+                    
+                    {/* Mostrar mensagem se não houver resultados na pesquisa */}
+                    {filteredMunicipios.length === 0 && municipioFilter.trim() !== '' && (
+                      <div className="text-center py-4 text-gray-500 text-sm">
+                        Nenhum município encontrado para "{municipioFilter}"
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
 
               <div className="text-sm text-gray-600">
-                {selectedMunicipios.length} município{selectedMunicipios.length !== 1 ? 's' : ''} selecionado{selectedMunicipios.length !== 1 ? 's' : ''}
+                {isEventoNacional ? (
+                  <span className="font-medium">
+                    {selectedMunicipios.length} de {allMunicipios.length} municípios do Brasil selecionados
+                    {selectedMunicipios.length === allMunicipios.length && allMunicipios.length > 0 ? 
+                      ' ✅ (Todos os municípios)' : ''}
+                  </span>
+                ) : (
+                  <span>
+                    {selectedMunicipios.length} município{selectedMunicipios.length !== 1 ? 's' : ''} selecionado{selectedMunicipios.length !== 1 ? 's' : ''}
+                    {municipioFilter.trim() !== '' && (
+                      <span className="text-blue-600 ml-2">
+                        (Mostrando {filteredMunicipios.length} de {municipios.length} municípios)
+                      </span>
+                    )}
+                  </span>
+                )}
               </div>
             </>
           )}

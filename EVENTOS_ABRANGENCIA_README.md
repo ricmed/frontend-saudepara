@@ -26,15 +26,18 @@ Todas as alterações foram implementadas e testadas. O servidor de desenvolvime
   - ✅ Hooks `useCreateEvento` e `useUpdateEvento` atualizados
   - ✅ Novos hooks de compatibilidade `useCreateEventoSimple` e `useUpdateEventoSimple`
 
-### 3. **CadastroEvento_new.tsx** - 🆕 Criado
-- **Localização:** `src/features/apps/components/CadastroEvento_new.tsx`
+### 3. **CadastroEvento.tsx** - ✅ Atualizado (Componente Principal)
+- **Localização:** `src/features/apps/components/CadastroEvento.tsx`
 - **Características:**
   - ✅ Formulário com seleção múltipla de municípios
   - ✅ Carregamento automático da lista de municípios
+  - ✅ Opção "Evento Nacional" para selecionar todos os municípios
+  - ✅ Seleção por estado ou nacional
   - ✅ Botões "Selecionar Todos" / "Limpar Seleção"
   - ✅ Interface responsiva com checkbox grid
   - ✅ Validação: pelo menos 1 município deve ser selecionado
   - ✅ Suporte para edição (carrega municípios já associados)
+  - ✅ Logs de debug para facilitar troubleshooting
 
 ### 4. **ListaEventoAbrangencia.tsx** - 🆕 Criado
 - **Localização:** `src/features/apps/list/ListaEventoAbrangencia.tsx`
@@ -92,10 +95,10 @@ Todas as alterações foram implementadas e testadas. O servidor de desenvolvime
 
 ## 🚀 Como Usar
 
-### 1. Usar o Novo Formulário de Cadastro
+### 1. Formulário de Cadastro (Já Configurado)
 ```typescript
-// Substitua a importação no seu roteador
-import CadastroTipoEvento from '@/features/apps/components/CadastroEvento_new';
+// O componente principal já está configurado no App.tsx
+import CadastroTipoEvento from '@/features/apps/components/CadastroEvento';
 ```
 
 ### 2. Usar a Nova Lista com Abrangência
@@ -123,16 +126,16 @@ await createSimple.mutateAsync({
 });
 ```
 
-## ⚙️ Configuração das Rotas
+## ⚙️ Configuração das Rotas (Já Configuradas)
 
-Atualize suas rotas para usar os novos componentes:
+As rotas já estão configuradas no App.tsx:
 
 ```typescript
-// Em seu arquivo de rotas
-import CadastroEvento from '@/features/apps/components/CadastroEvento_new';
-import ListaEvento from '@/features/apps/list/ListaEventoAbrangencia';
+// Componentes já importados e configurados
+import CadastroEvento from '@/features/apps/components/CadastroEvento';
+import ListaEvento from '@/features/apps/list/ListaEvento';
 
-// Rotas
+// Rotas já configuradas
 {
   path: '/private/evento',
   element: <ListaEvento />
@@ -211,11 +214,11 @@ Certifique-se de que estas dependências estão instaladas:
    mv src/features/apps/list/ListaEvento.tsx src/features/apps/list/ListaEvento_backup.tsx
    ```
 
-2. **Ativar os novos componentes** nas rotas:
+2. **Componentes já ativados** nas rotas:
    ```typescript
-   // Substitua as importações
-   import CadastroEvento from '@/features/apps/components/CadastroEvento_new';
-   import ListaEvento from '@/features/apps/list/ListaEventoAbrangencia';
+   // Componentes já configurados no App.tsx
+   import CadastroEvento from '@/features/apps/components/CadastroEvento';
+   import ListaEvento from '@/features/apps/list/ListaEvento';
    ```
 
 3. **Testar** a funcionalidade completa
