@@ -72,6 +72,13 @@ const UserProfile = () => {
             <span className="font-semibold">E-mail:</span>
             <span className="break-all">{email}</span>
           </div>
+          <div className="flex items-center gap-2 text-gray-700 mb-2">
+            <UserIcon size={18} className="text-green-500" />
+            <span className="font-semibold">User ID:</span>
+            <span className="break-all font-mono text-sm bg-gray-100 px-2 py-1 rounded">
+              {user?.id || 'Não disponível'}
+            </span>
+          </div>
           {user.roles && (
             <div className="mb-2 text-gray-700 text-sm">
               <span className="font-semibold">Roles:</span> {user.roles.join(', ')}
