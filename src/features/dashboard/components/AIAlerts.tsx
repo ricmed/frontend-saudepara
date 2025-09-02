@@ -33,6 +33,12 @@ interface Alert {
   isRead: boolean;
 }
 
+interface AIConfig {
+  mode: 'localhost' | 'api';
+  apiKey?: string;
+  endpoint?: string;
+}
+
 interface DashboardData {
   totalNotifications: number;
   topSymptoms: Array<{ name: string; value: number }>;
@@ -58,6 +64,12 @@ export const AIAlerts: React.FC<AIAlertsProps> = ({
   const [loading, setLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
+
+  // Configuração da IA - reutiliza a mesma configuração do chat
+  const [aiConfig] = useState<AIConfig>(() => {
+    const saved = localStorage.getItem('aiChatConfig');
+    return saved ? JSON.parse(saved) : { mode: 'localhost' };
+  });
 
   const generateAlerts = useCallback(async () => {
     setLoading(true);
@@ -106,20 +118,65 @@ Gere 3-5 alertas baseados nos dados fornecidos. Seja específico e prático.
 
 JSON:`;
 
-      const response = await fetch('http://localhost:11434/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'llama3.1',
-          prompt: prompt,
-          stream: false,
-          options: {
+      let response;
+      
+      if (aiConfig.mode === 'localhost') {
+        // Chamada para Ollama local
+        response = await fetch('http://localhost:11434/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'llama3.1',
+            prompt: prompt,
+            stream: false,
+            options: {
+              temperature: 0.2,
+              top_p: 0.8,
+              max_tokens: 1200
+            }
+          })
+        });
+      } else {
+        // Chamada para API externa (reutiliza configuração do chat)
+        if (!aiConfig.apiKey) {
+          throw new Error('Chave de API não configurada. Configure no Chat com IA primeiro.');
+        }
+        
+        const endpoint = aiConfig.endpoint || 'https://openrouter.ai/api/v1/chat/completions';
+        let model = 'meta-llama/llama-4-maverick:free';
+        
+        if (endpoint.includes('groq.com')) {
+          model = 'llama3-8b-8192';
+        } else if (endpoint.includes('together')) {
+          model = 'meta-llama/Llama-3-8b-chat-hf';
+        }
+        
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${aiConfig.apiKey}`,
+            'HTTP-Referer': window.location.origin,
+            'X-Title': 'SaudePara AI Alerts'
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [
+              {
+                role: 'system',
+                content: 'Você é um especialista em epidemiologia e vigilância em saúde pública. Retorne sempre um JSON válido.'
+              },
+              {
+                role: 'user',
+                content: prompt
+              }
+            ],
             temperature: 0.2,
             top_p: 0.8,
             max_tokens: 1200
-          }
-        })
-      });
+          })
+        });
+      }
 
       if (!response.ok) {
         throw new Error(`Erro na API: ${response.status}`);
@@ -129,8 +186,16 @@ JSON:`;
       
       // Tentar extrair JSON da resposta
       let alertsData = [];
+      let rawResponse = '';
+      
+      if (aiConfig.mode === 'localhost') {
+        rawResponse = result.response;
+      } else {
+        rawResponse = result.choices?.[0]?.message?.content || '';
+      }
+      
       try {
-        const jsonMatch = result.response.match(/\[[\s\S]*\]/);
+        const jsonMatch = rawResponse.match(/\[[\s\S]*\]/);
         if (jsonMatch) {
           alertsData = JSON.parse(jsonMatch[0]);
         } else {

@@ -23,6 +23,12 @@ interface DashboardData {
   activeFilters: any;
 }
 
+interface AIConfig {
+  mode: 'localhost' | 'api';
+  apiKey?: string;
+  endpoint?: string;
+}
+
 interface AIInsightsProps {
   dashboardData: DashboardData;
   className?: string;
@@ -35,6 +41,12 @@ export const AIInsights: React.FC<AIInsightsProps> = ({
   const [insights, setInsights] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
+
+  // Configuração da IA - reutiliza a mesma configuração do chat
+  const [aiConfig] = useState<AIConfig>(() => {
+    const saved = localStorage.getItem('aiChatConfig');
+    return saved ? JSON.parse(saved) : { mode: 'localhost' };
+  });
 
   const generateInsights = useCallback(async () => {
     setLoading(true);
@@ -75,29 +87,81 @@ FOQUE EM:
 
 Seja CONCISO, PRÁTICO e focado em AÇÕES. Use emojis para destacar pontos importantes.`;
 
-      const response = await fetch('http://localhost:11434/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'llama3.1',
-          prompt: prompt,
-          stream: false,
-          options: {
+      let response;
+      
+      if (aiConfig.mode === 'localhost') {
+        // Chamada para Ollama local
+        response = await fetch('http://localhost:11434/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'llama3.1',
+            prompt: prompt,
+            stream: false,
+            options: {
+              temperature: 0.3,
+              top_p: 0.9,
+              max_tokens: 1000
+            }
+          })
+        });
+      } else {
+        // Chamada para API externa (reutiliza configuração do chat)
+        if (!aiConfig.apiKey) {
+          throw new Error('Chave de API não configurada. Configure no Chat com IA primeiro.');
+        }
+        
+        const endpoint = aiConfig.endpoint || 'https://openrouter.ai/api/v1/chat/completions';
+        let model = 'meta-llama/llama-4-maverick:free';
+        
+        if (endpoint.includes('groq.com')) {
+          model = 'llama3-8b-8192';
+        } else if (endpoint.includes('together')) {
+          model = 'meta-llama/Llama-3-8b-chat-hf';
+        }
+        
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${aiConfig.apiKey}`,
+            'HTTP-Referer': window.location.origin,
+            'X-Title': 'SaudePara AI Insights'
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [
+              {
+                role: 'system',
+                content: 'Você é um especialista em epidemiologia e vigilância em saúde pública.'
+              },
+              {
+                role: 'user',
+                content: prompt
+              }
+            ],
             temperature: 0.3,
             top_p: 0.9,
             max_tokens: 1000
-          }
-        })
-      });
+          })
+        });
+      }
 
       if (!response.ok) {
         throw new Error(`Erro na API: ${response.status}`);
       }
 
       const result = await response.json();
+      let aiResponse = '';
       
-      if (result.response) {
-        setInsights(result.response);
+      if (aiConfig.mode === 'localhost') {
+        aiResponse = result.response;
+      } else {
+        aiResponse = result.choices?.[0]?.message?.content || 'Resposta vazia da API';
+      }
+      
+      if (aiResponse) {
+        setInsights(aiResponse);
       } else {
         throw new Error('Resposta vazia da IA');
       }

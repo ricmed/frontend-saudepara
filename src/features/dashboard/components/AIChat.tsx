@@ -9,7 +9,13 @@ import {
   Trash2,
   Copy,
   Check,
-  AlertCircle
+  AlertCircle,
+  Settings,
+  Eye,
+  EyeOff,
+  Server,
+  Cloud,
+  Info
 } from 'lucide-react';
 
 interface Message {
@@ -17,6 +23,12 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+}
+
+interface AIConfig {
+  mode: 'localhost' | 'api';
+  apiKey?: string;
+  endpoint?: string;
 }
 
 interface DashboardData {
@@ -44,6 +56,16 @@ export const AIChat: React.FC<AIChatProps> = ({
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [showConfig, setShowConfig] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
+  
+  // Configuração da IA - salva no localStorage
+  const [aiConfig, setAiConfig] = useState<AIConfig>(() => {
+    const saved = localStorage.getItem('aiChatConfig');
+    return saved ? JSON.parse(saved) : { mode: 'localhost' };
+  });
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -54,6 +76,12 @@ export const AIChat: React.FC<AIChatProps> = ({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Salvar configuração no localStorage
+  const saveConfig = useCallback((config: AIConfig) => {
+    setAiConfig(config);
+    localStorage.setItem('aiChatConfig', JSON.stringify(config));
+  }, []);
 
   const copyToClipboard = useCallback(async (text: string, messageId: string) => {
     try {
@@ -69,8 +97,83 @@ export const AIChat: React.FC<AIChatProps> = ({
     setMessages([]);
   }, []);
 
+  // Estado para botão de teste da API
+  const [testingApi, setTestingApi] = useState(false);
+
+  // Função para testar a API
+  const testApiConnection = useCallback(async () => {
+    if (!aiConfig.apiKey) {
+      alert('❌ Insira uma chave de API primeiro');
+      return;
+    }
+
+    setTestingApi(true);
+    try {
+      const endpoint = aiConfig.endpoint || 'https://openrouter.ai/api/v1/chat/completions';
+      
+      let model = 'meta-llama/llama-4-maverick:free';
+      if (endpoint.includes('groq.com')) {
+        model = 'llama3-8b-8192';
+      } else if (endpoint.includes('together')) {
+        model = 'meta-llama/Llama-3-8b-chat-hf';
+      } else if (endpoint.includes('openrouter')) {
+        model = 'meta-llama/llama-4-maverick:free';
+      }
+
+      console.log('🧪 Testando conexão da API:', { endpoint, model });
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${aiConfig.apiKey}`,
+          'HTTP-Referer': window.location.origin,
+          'X-Title': 'SaudePara IA Chat Test'
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            {
+              role: 'user',
+              content: 'Diga apenas "Teste de conexão bem-sucedido!" em português.'
+            }
+          ],
+          max_tokens: 50
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const content = result.choices?.[0]?.message?.content || 'Resposta vazia';
+        alert(`✅ API funcionando!\n\nResposta: ${content}`);
+        console.log('✅ Teste de API bem-sucedido:', result);
+      } else {
+        const errorText = await response.text();
+        console.error('❌ Erro no teste de API:', { status: response.status, body: errorText });
+        alert(`❌ Erro na API: ${response.status}\n\n${errorText}`);
+      }
+    } catch (error) {
+      console.error('❌ Erro no teste:', error);
+      alert(`❌ Erro ao testar API: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+    } finally {
+      setTestingApi(false);
+    }
+  }, [aiConfig]);
+
   const sendMessage = useCallback(async () => {
     if (!input.trim() || loading) return;
+
+    // Validar configuração da API
+    if (aiConfig.mode === 'api' && !aiConfig.apiKey) {
+      const errorMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: `❌ Chave de API não configurada. Clique no ícone de configurações para inserir sua chave de API do Llama 3.1.`,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMsg]);
+      return;
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -116,32 +219,89 @@ PERGUNTA DO USUÁRIO: ${userMessage.content}
 
 RESPOSTA EM PORTUGUÊS:`;
 
-      const response = await fetch('http://localhost:11434/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'llama3.1',
-          prompt: prompt,
-          stream: false,
-          options: {
+      let response;
+      
+      if (aiConfig.mode === 'localhost') {
+        // Chamada para Ollama local
+        response = await fetch('http://localhost:11434/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'llama3.1',
+            prompt: prompt,
+            stream: false,
+            options: {
+              temperature: 0.4,
+              top_p: 0.9,
+              max_tokens: 800
+            }
+          })
+        });
+      } else {
+        // Chamada para API externa (ex: OpenRouter, TogetherAI, etc)
+        const endpoint = aiConfig.endpoint || 'https://openrouter.ai/api/v1/chat/completions';
+        
+        // Detectar o modelo baseado no endpoint - usar modelos que realmente existem
+        let model = 'meta-llama/llama-4-maverick:free'; // Modelo Llama 4 gratuito no OpenRouter
+        
+        if (endpoint.includes('groq.com')) {
+          model = 'llama3-8b-8192';
+        } else if (endpoint.includes('together')) {
+          model = 'meta-llama/Llama-3-8b-chat-hf';
+        } else if (endpoint.includes('openrouter')) {
+          // Usar modelo Llama 4 gratuito que existe no OpenRouter
+          model = 'meta-llama/llama-4-maverick:free'; // ✅ Modelo verificado
+        }
+        
+        console.log('🔗 Fazendo chamada para API:', { endpoint, model, hasApiKey: !!aiConfig.apiKey });
+        
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${aiConfig.apiKey}`,
+            'HTTP-Referer': window.location.origin,
+            'X-Title': 'SaudePara IA Chat'
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [
+              {
+                role: 'system',
+                content: 'Você é um assistente especialista em epidemiologia e vigilância em saúde pública.'
+              },
+              {
+                role: 'user',
+                content: prompt
+              }
+            ],
             temperature: 0.4,
             top_p: 0.9,
             max_tokens: 800
-          }
-        })
-      });
+          })
+        });
+      }
 
       if (!response.ok) {
-        throw new Error(`Erro na API: ${response.status}`);
+        const errorText = await response.text();
+        console.error('❌ Erro da API:', { status: response.status, statusText: response.statusText, body: errorText });
+        throw new Error(`Erro na API: ${response.status} - ${response.statusText}${errorText ? ` | ${errorText}` : ''}`);
       }
 
       const result = await response.json();
+      let aiResponse = '';
       
-      if (result.response) {
+      if (aiConfig.mode === 'localhost') {
+        aiResponse = result.response;
+      } else {
+        aiResponse = result.choices?.[0]?.message?.content || 'Resposta vazia da API';
+      }
+      
+      if (aiResponse) {
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: result.response,
+          content: aiResponse,
           timestamp: new Date()
         };
         
@@ -153,10 +313,26 @@ RESPOSTA EM PORTUGUÊS:`;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
       
+      let errorContent = `❌ Erro ao processar sua pergunta: ${errorMessage}`;
+      
+      if (aiConfig.mode === 'localhost') {
+        errorContent += `\n\n💡 Verifique se o Ollama está rodando (http://localhost:11434) e se o modelo llama3.1 está instalado.`;
+      } else {
+        if (errorMessage.includes('404')) {
+          errorContent += `\n\n💡 Erro 404: Verifique se o endpoint da API está correto. Para OpenRouter use: https://openrouter.ai/api/v1/chat/completions`;
+        } else if (errorMessage.includes('401') || errorMessage.includes('403')) {
+          errorContent += `\n\n💡 Erro de autenticação: Verifique se sua chave de API está correta e ativa.`;
+        } else if (errorMessage.includes('429')) {
+          errorContent += `\n\n💡 Limite de requisições excedido. Aguarde um momento e tente novamente.`;
+        } else {
+          errorContent += `\n\n💡 Verifique se sua chave de API está correta e se você tem créditos disponíveis.`;
+        }
+      }
+      
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: `❌ Erro ao processar sua pergunta: ${errorMessage}\n\nVerifique se o Ollama está rodando (http://localhost:11434) e tente novamente.`,
+        content: errorContent,
         timestamp: new Date()
       };
       
@@ -165,7 +341,7 @@ RESPOSTA EM PORTUGUÊS:`;
       setLoading(false);
       inputRef.current?.focus();
     }
-  }, [input, loading, dashboardData, messages]);
+  }, [input, loading, dashboardData, messages, aiConfig]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -192,21 +368,406 @@ RESPOSTA EM PORTUGUÊS:`;
           </div>
           <div>
             <h3 className="font-semibold text-blue-800">Chat com IA</h3>
-            <p className="text-sm text-blue-600">Pergunte sobre os dados de saúde</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-blue-600">
+                {aiConfig.mode === 'localhost' ? 'Ollama Local' : 'API Externa'}
+              </p>
+              {aiConfig.mode === 'localhost' ? (
+                <Server className="h-3 w-3 text-green-600" />
+              ) : (
+                <Cloud className="h-3 w-3 text-blue-600" />
+              )}
+            </div>
           </div>
         </div>
         
-        {messages.length > 0 && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={clearChat}
-            className="flex items-center gap-2 px-3 py-1.5 text-gray-600 hover:text-red-600 transition-colors"
-            title="Limpar conversa"
+            onClick={() => setShowInstructions(!showInstructions)}
+            className="flex items-center gap-2 px-3 py-1.5 text-gray-600 hover:text-blue-600 transition-colors"
+            title="Ver instruções de instalação"
           >
-            <Trash2 className="h-4 w-4" />
-            <span className="text-sm">Limpar</span>
+            <Info className="h-4 w-4" />
+            <span className="text-sm">Instruções</span>
           </button>
-        )}
+          
+          <button
+            onClick={() => setShowConfig(!showConfig)}
+            className="flex items-center gap-2 px-3 py-1.5 text-gray-600 hover:text-blue-600 transition-colors"
+            title="Configurações da IA"
+          >
+            <Settings className="h-4 w-4" />
+            <span className="text-sm">Config</span>
+          </button>
+          
+          {messages.length > 0 && (
+            <button
+              onClick={clearChat}
+              className="flex items-center gap-2 px-3 py-1.5 text-gray-600 hover:text-red-600 transition-colors"
+              title="Limpar conversa"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span className="text-sm">Limpar</span>
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Painel de Configurações */}
+      {showConfig && (
+        <div className="p-4 bg-yellow-50 border-b border-yellow-200">
+          <h4 className="font-medium text-gray-800 mb-3">⚙️ Configurações da IA</h4>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Modo de Operação
+              </label>
+              <div className="flex gap-4">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="aiMode"
+                    value="localhost"
+                    checked={aiConfig.mode === 'localhost'}
+                    onChange={(e) => saveConfig({ ...aiConfig, mode: e.target.value as 'localhost' | 'api' })}
+                    className="mr-2"
+                  />
+                  <Server className="h-4 w-4 mr-1 text-green-600" />
+                  <span className="text-sm">Localhost (Ollama)</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="aiMode"
+                    value="api"
+                    checked={aiConfig.mode === 'api'}
+                    onChange={(e) => saveConfig({ ...aiConfig, mode: e.target.value as 'localhost' | 'api' })}
+                    className="mr-2"
+                  />
+                  <Cloud className="h-4 w-4 mr-1 text-blue-600" />
+                  <span className="text-sm">API Externa</span>
+                </label>
+              </div>
+            </div>
+
+            {aiConfig.mode === 'api' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Chave de API
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showApiKey ? "text" : "password"}
+                      value={aiConfig.apiKey || ''}
+                      onChange={(e) => saveConfig({ ...aiConfig, apiKey: e.target.value })}
+                      placeholder="Insira sua chave de API do Llama 3.1"
+                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      className="absolute right-2 top-2 text-gray-500 hover:text-gray-700"
+                    >
+                      {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  
+                  {/* Links Rápidos para Obter API Keys */}
+                  <div className="mt-3 p-3 bg-blue-50 rounded border border-blue-200">
+                    <p className="text-xs font-medium text-blue-800 mb-2">🔗 Obter Chave de API:</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <a
+                        href="https://openrouter.ai"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-1 px-3 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
+                      >
+                        <Cloud className="h-3 w-3" />
+                        OpenRouter (Grátis)
+                      </a>
+                      <a
+                        href="https://console.groq.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-1 px-3 py-2 bg-orange-600 text-white text-xs rounded hover:bg-orange-700 transition-colors"
+                      >
+                        <Cloud className="h-3 w-3" />
+                        Groq (Rápido)
+                      </a>
+                      <a
+                        href="https://api.together.xyz"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-1 px-3 py-2 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 transition-colors"
+                      >
+                        <Cloud className="h-3 w-3" />
+                        Together AI
+                      </a>
+                    </div>
+                    <p className="text-xs text-blue-600 mt-2">
+                      💡 Clique em qualquer botão acima para abrir o site e obter sua chave gratuita
+                    </p>
+                  </div>
+                  
+                  {/* Botão de Teste da API */}
+                  {aiConfig.apiKey && (
+                    <div className="mt-3">
+                      <button
+                        onClick={testApiConnection}
+                        disabled={testingApi}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {testingApi ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                            Testando API...
+                          </>
+                        ) : (
+                          <>
+                            <Cloud className="h-4 w-4" />
+                            Testar Conexão da API
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Endpoint da API (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={aiConfig.endpoint || ''}
+                    onChange={(e) => saveConfig({ ...aiConfig, endpoint: e.target.value })}
+                    placeholder="https://openrouter.ai/api/v1/chat/completions"
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                  />
+                  <div className="mt-2 text-xs text-gray-500">
+                    <p className="mb-1">Padrão: OpenRouter (compatível com OpenAI API)</p>
+                    <details className="cursor-pointer">
+                      <summary className="text-blue-600 hover:text-blue-800">Ver endpoints para outros provedores</summary>
+                      <div className="mt-2 space-y-1 pl-4 border-l-2 border-gray-200">
+                        <div><strong>Groq:</strong> https://api.groq.com/openai/v1/chat/completions</div>
+                        <div><strong>Together AI:</strong> https://api.together.xyz/v1/chat/completions</div>
+                        <div><strong>OpenRouter:</strong> https://openrouter.ai/api/v1/chat/completions</div>
+                      </div>
+                    </details>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {aiConfig.mode === 'localhost' && (
+              <div className="bg-green-50 p-3 rounded border border-green-200">
+                <p className="text-sm text-green-700">
+                  <strong>Modo Local:</strong> Usando Ollama rodando em localhost:11434
+                </p>
+                <p className="text-xs text-green-600 mt-1">
+                  Certifique-se de que o Ollama está instalado e o modelo llama3.1 baixado.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Painel de Instruções */}
+      {showInstructions && (
+        <div className="p-4 bg-blue-50 border-b border-blue-200 max-h-96 overflow-y-auto">
+          <h4 className="font-medium text-gray-800 mb-3">📋 Como Instalar o Llama 3.1 Localmente</h4>
+          
+          <div className="space-y-4 text-sm">
+            <div>
+              <h5 className="font-medium text-gray-700 mb-2">🔧 Passo 1: Instalar o Ollama</h5>
+              <div className="bg-white p-3 rounded border">
+                <p className="mb-2"><strong>Windows:</strong></p>
+                <ol className="list-decimal list-inside space-y-1 text-gray-600">
+                  <li>Baixe o Ollama em: <code className="bg-gray-100 px-1 rounded">https://ollama.ai</code></li>
+                  <li>Execute o instalador baixado</li>
+                  <li>Abra o terminal (PowerShell ou CMD)</li>
+                </ol>
+              </div>
+            </div>
+
+            <div>
+              <h5 className="font-medium text-gray-700 mb-2">📦 Passo 2: Baixar o Modelo Llama 3.1</h5>
+              <div className="bg-white p-3 rounded border">
+                <p className="mb-2">Execute no terminal:</p>
+                <code className="bg-gray-800 text-green-400 p-2 rounded block">
+                  ollama pull llama3.1
+                </code>
+                <p className="text-xs text-gray-500 mt-2">
+                  Este comando baixará o modelo (aproximadamente 4.7GB)
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <h5 className="font-medium text-gray-700 mb-2">🚀 Passo 3: Iniciar o Ollama</h5>
+              <div className="bg-white p-3 rounded border">
+                <p className="mb-2">Execute no terminal:</p>
+                <code className="bg-gray-800 text-green-400 p-2 rounded block">
+                  ollama serve
+                </code>
+                <p className="text-xs text-gray-500 mt-2">
+                  O Ollama ficará disponível em: <code>http://localhost:11434</code>
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <h5 className="font-medium text-gray-700 mb-2">✅ Passo 4: Testar a Instalação</h5>
+              <div className="bg-white p-3 rounded border">
+                <p className="mb-2">Para testar se tudo está funcionando:</p>
+                <code className="bg-gray-800 text-green-400 p-2 rounded block">
+                  ollama run llama3.1 "Olá, como você está?"
+                </code>
+              </div>
+            </div>
+
+            <div className="bg-yellow-50 p-3 rounded border border-yellow-200">
+              <p className="text-sm text-yellow-700">
+                <strong>💡 Dica:</strong> Mantenha o terminal com "ollama serve" sempre aberto enquanto usar o chat local.
+              </p>
+            </div>
+
+            <div>
+              <h5 className="font-medium text-gray-700 mb-2">🌐 Alternativa: Usar API Externa</h5>
+              <div className="bg-white p-3 rounded border space-y-4">
+                <p className="mb-3 text-gray-700">
+                  <strong>Se preferir não instalar localmente</strong>, você pode usar serviços de IA na nuvem.
+                  Escolha uma das opções abaixo e siga o guia passo a passo:
+                </p>
+
+                {/* OpenRouter */}
+                <div className="border-l-4 border-blue-400 pl-4 py-2 bg-blue-50">
+                  <h6 className="font-semibold text-blue-800 mb-2">🔵 OpenRouter (Recomendado)</h6>
+                  <div className="space-y-2 text-sm">
+                    <div className="bg-white p-3 rounded border">
+                      <p className="font-medium mb-2">Passo a Passo:</p>
+                      <ol className="list-decimal list-inside space-y-1 text-gray-600">
+                        <li>Acesse: <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-mono">https://openrouter.ai</a></li>
+                        <li>Clique em "Sign Up" e crie sua conta gratuita</li>
+                        <li>Após login, vá em "Keys" no menu lateral</li>
+                        <li>Clique em "Create Key" e dê um nome (ex: "SaudePara")</li>
+                        <li>Copie a chave gerada (começa com "sk-or-...")</li>
+                        <li>Cole a chave no campo "Chave de API" acima</li>
+                      </ol>
+                      <div className="mt-2 p-2 bg-green-50 rounded">
+                        <p className="text-xs text-green-700">
+                          ✅ <strong>Vantagem:</strong> Oferece Llama 3.1 gratuito (modelo: meta-llama/llama-3.1-8b-instruct:free)
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Groq */}
+                <div className="border-l-4 border-orange-400 pl-4 py-2 bg-orange-50">
+                  <h6 className="font-semibold text-orange-800 mb-2">🟠 Groq (Muito Rápido)</h6>
+                  <div className="space-y-2 text-sm">
+                    <div className="bg-white p-3 rounded border">
+                      <p className="font-medium mb-2">Passo a Passo:</p>
+                      <ol className="list-decimal list-inside space-y-1 text-gray-600">
+                        <li>Acesse: <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-mono">https://console.groq.com</a></li>
+                        <li>Faça login com Google ou GitHub</li>
+                        <li>No dashboard, clique em "API Keys"</li>
+                        <li>Clique "Create API Key" e dê um nome</li>
+                        <li>Copie a chave gerada (começa com "gsk_...")</li>
+                        <li>Cole no campo "Chave de API" e mude o endpoint para:</li>
+                      </ol>
+                      <code className="block bg-gray-100 p-2 rounded mt-2 text-xs">
+                        https://api.groq.com/openai/v1/chat/completions
+                      </code>
+                      <div className="mt-2 p-2 bg-green-50 rounded">
+                        <p className="text-xs text-green-700">
+                          ✅ <strong>Vantagem:</strong> Respostas muito rápidas + tier gratuito generoso
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Together AI */}
+                <div className="border-l-4 border-purple-400 pl-4 py-2 bg-purple-50">
+                  <h6 className="font-semibold text-purple-800 mb-2">🟣 Together AI</h6>
+                  <div className="space-y-2 text-sm">
+                    <div className="bg-white p-3 rounded border">
+                      <p className="font-medium mb-2">Passo a Passo:</p>
+                      <ol className="list-decimal list-inside space-y-1 text-gray-600">
+                        <li>Acesse: <a href="https://api.together.xyz" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-mono">https://api.together.xyz</a></li>
+                        <li>Clique "Sign Up" e crie conta</li>
+                        <li>Vá em "API Keys" no menu</li>
+                        <li>Clique "Create new API Key"</li>
+                        <li>Copie a chave gerada</li>
+                        <li>Cole no campo "Chave de API" e mude o endpoint para:</li>
+                      </ol>
+                      <code className="block bg-gray-100 p-2 rounded mt-2 text-xs">
+                        https://api.together.xyz/v1/chat/completions
+                      </code>
+                      <div className="mt-2 p-2 bg-green-50 rounded">
+                        <p className="text-xs text-green-700">
+                          ✅ <strong>Vantagem:</strong> Boa variedade de modelos + créditos iniciais
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Configuração no Sistema */}
+                <div className="border border-gray-300 rounded p-3 bg-gray-50">
+                  <h6 className="font-semibold text-gray-800 mb-2">⚙️ Como Configurar no Sistema</h6>
+                  <ol className="list-decimal list-inside space-y-1 text-sm text-gray-600">
+                    <li>Após obter sua chave de API de qualquer provedor acima</li>
+                    <li>Clique no botão "Config" no canto superior direito deste chat</li>
+                    <li>Selecione "API Externa"</li>
+                    <li>Cole sua chave de API no campo correspondente</li>
+                    <li>Se necessário, ajuste o endpoint da API</li>
+                    <li>✅ Pronto! Comece a fazer perguntas</li>
+                  </ol>
+                </div>
+
+                {/* Dicas de Segurança */}
+                <div className="border border-yellow-300 rounded p-3 bg-yellow-50">
+                  <h6 className="font-semibold text-yellow-800 mb-2">🔒 Dicas de Segurança</h6>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-yellow-700">
+                    <li>Suas chaves de API ficam armazenadas apenas no seu navegador</li>
+                    <li>Nunca compartilhe suas chaves de API com outras pessoas</li>
+                    <li>Se suspeitar que a chave foi comprometida, gere uma nova</li>
+                    <li>Use o modo localhost para dados extremamente sensíveis</li>
+                  </ul>
+                </div>
+
+                {/* Comparação de Custos */}
+                <div className="border border-green-300 rounded p-3 bg-green-50">
+                  <h6 className="font-semibold text-green-800 mb-2">💰 Comparação de Custos (por mensagem)</h6>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+                    <div className="bg-white p-2 rounded">
+                      <strong>OpenRouter:</strong><br />
+                      Llama 3.1 gratuito<br />
+                      <span className="text-green-600">$0.00</span>
+                    </div>
+                    <div className="bg-white p-2 rounded">
+                      <strong>Groq:</strong><br />
+                      Tier gratuito robusto<br />
+                      <span className="text-green-600">$0.00</span>
+                    </div>
+                    <div className="bg-white p-2 rounded">
+                      <strong>Together AI:</strong><br />
+                      Créditos iniciais<br />
+                      <span className="text-blue-600">~$0.001</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
