@@ -10,9 +10,6 @@ import {
   Copy,
   Check,
   AlertCircle,
-  Settings,
-  Eye,
-  EyeOff,
   Server,
   Cloud,
   Info
@@ -56,14 +53,16 @@ export const AIChat: React.FC<AIChatProps> = ({
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [showConfig, setShowConfig] = useState(false);
-  const [showApiKey, setShowApiKey] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
   
-  // Configuração da IA - salva no localStorage
+  // Configuração da IA - carrega das configurações globais primeiro, depois do local antigo
   const [aiConfig, setAiConfig] = useState<AIConfig>(() => {
-    const saved = localStorage.getItem('aiChatConfig');
-    return saved ? JSON.parse(saved) : { mode: 'localhost' };
+    const globalSaved = localStorage.getItem('aiGlobalConfig');
+    if (globalSaved) {
+      return JSON.parse(globalSaved);
+    }
+    const localSaved = localStorage.getItem('aiChatConfig');
+    return localSaved ? JSON.parse(localSaved) : { mode: 'localhost' };
   });
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -77,10 +76,26 @@ export const AIChat: React.FC<AIChatProps> = ({
     scrollToBottom();
   }, [messages]);
 
-  // Salvar configuração no localStorage
-  const saveConfig = useCallback((config: AIConfig) => {
-    setAiConfig(config);
-    localStorage.setItem('aiChatConfig', JSON.stringify(config));
+  // Sincronizar com configurações globais
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const globalSaved = localStorage.getItem('aiGlobalConfig');
+      if (globalSaved) {
+        const config = JSON.parse(globalSaved);
+        setAiConfig(config);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Verificar se há configuração global no carregamento
+    const globalSaved = localStorage.getItem('aiGlobalConfig');
+    if (globalSaved) {
+      const config = JSON.parse(globalSaved);
+      setAiConfig(config);
+    }
+
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const copyToClipboard = useCallback(async (text: string, messageId: string) => {
@@ -97,69 +112,6 @@ export const AIChat: React.FC<AIChatProps> = ({
     setMessages([]);
   }, []);
 
-  // Estado para botão de teste da API
-  const [testingApi, setTestingApi] = useState(false);
-
-  // Função para testar a API
-  const testApiConnection = useCallback(async () => {
-    if (!aiConfig.apiKey) {
-      alert('❌ Insira uma chave de API primeiro');
-      return;
-    }
-
-    setTestingApi(true);
-    try {
-      const endpoint = aiConfig.endpoint || 'https://openrouter.ai/api/v1/chat/completions';
-      
-      let model = 'meta-llama/llama-4-maverick:free';
-      if (endpoint.includes('groq.com')) {
-        model = 'llama3-8b-8192';
-      } else if (endpoint.includes('together')) {
-        model = 'meta-llama/Llama-3-8b-chat-hf';
-      } else if (endpoint.includes('openrouter')) {
-        model = 'meta-llama/llama-4-maverick:free';
-      }
-
-      console.log('🧪 Testando conexão da API:', { endpoint, model });
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${aiConfig.apiKey}`,
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'SaudePara IA Chat Test'
-        },
-        body: JSON.stringify({
-          model: model,
-          messages: [
-            {
-              role: 'user',
-              content: 'Diga apenas "Teste de conexão bem-sucedido!" em português.'
-            }
-          ],
-          max_tokens: 50
-        })
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        const content = result.choices?.[0]?.message?.content || 'Resposta vazia';
-        alert(`✅ API funcionando!\n\nResposta: ${content}`);
-        console.log('✅ Teste de API bem-sucedido:', result);
-      } else {
-        const errorText = await response.text();
-        console.error('❌ Erro no teste de API:', { status: response.status, body: errorText });
-        alert(`❌ Erro na API: ${response.status}\n\n${errorText}`);
-      }
-    } catch (error) {
-      console.error('❌ Erro no teste:', error);
-      alert(`❌ Erro ao testar API: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-    } finally {
-      setTestingApi(false);
-    }
-  }, [aiConfig]);
-
   const sendMessage = useCallback(async () => {
     if (!input.trim() || loading) return;
 
@@ -168,7 +120,7 @@ export const AIChat: React.FC<AIChatProps> = ({
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: `❌ Chave de API não configurada. Clique no ícone de configurações para inserir sua chave de API do Llama 3.1.`,
+        content: `❌ Chave de API não configurada. Use a "Configuração Global de IA" na parte superior da seção de IA para inserir sua chave de API.`,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMsg]);
@@ -391,15 +343,6 @@ RESPOSTA EM PORTUGUÊS:`;
             <span className="text-sm">Instruções</span>
           </button>
           
-          <button
-            onClick={() => setShowConfig(!showConfig)}
-            className="flex items-center gap-2 px-3 py-1.5 text-gray-600 hover:text-blue-600 transition-colors"
-            title="Configurações da IA"
-          >
-            <Settings className="h-4 w-4" />
-            <span className="text-sm">Config</span>
-          </button>
-          
           {messages.length > 0 && (
             <button
               onClick={clearChat}
@@ -412,168 +355,6 @@ RESPOSTA EM PORTUGUÊS:`;
           )}
         </div>
       </div>
-
-      {/* Painel de Configurações */}
-      {showConfig && (
-        <div className="p-4 bg-yellow-50 border-b border-yellow-200">
-          <h4 className="font-medium text-gray-800 mb-3">⚙️ Configurações da IA</h4>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Modo de Operação
-              </label>
-              <div className="flex gap-4">
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="aiMode"
-                    value="localhost"
-                    checked={aiConfig.mode === 'localhost'}
-                    onChange={(e) => saveConfig({ ...aiConfig, mode: e.target.value as 'localhost' | 'api' })}
-                    className="mr-2"
-                  />
-                  <Server className="h-4 w-4 mr-1 text-green-600" />
-                  <span className="text-sm">Localhost (Ollama)</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="aiMode"
-                    value="api"
-                    checked={aiConfig.mode === 'api'}
-                    onChange={(e) => saveConfig({ ...aiConfig, mode: e.target.value as 'localhost' | 'api' })}
-                    className="mr-2"
-                  />
-                  <Cloud className="h-4 w-4 mr-1 text-blue-600" />
-                  <span className="text-sm">API Externa</span>
-                </label>
-              </div>
-            </div>
-
-            {aiConfig.mode === 'api' && (
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Chave de API
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showApiKey ? "text" : "password"}
-                      value={aiConfig.apiKey || ''}
-                      onChange={(e) => saveConfig({ ...aiConfig, apiKey: e.target.value })}
-                      placeholder="Insira sua chave de API do Llama 3.1"
-                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm pr-10"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      className="absolute right-2 top-2 text-gray-500 hover:text-gray-700"
-                    >
-                      {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                  
-                  {/* Links Rápidos para Obter API Keys */}
-                  <div className="mt-3 p-3 bg-blue-50 rounded border border-blue-200">
-                    <p className="text-xs font-medium text-blue-800 mb-2">🔗 Obter Chave de API:</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <a
-                        href="https://openrouter.ai"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-1 px-3 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
-                      >
-                        <Cloud className="h-3 w-3" />
-                        OpenRouter (Grátis)
-                      </a>
-                      <a
-                        href="https://console.groq.com"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-1 px-3 py-2 bg-orange-600 text-white text-xs rounded hover:bg-orange-700 transition-colors"
-                      >
-                        <Cloud className="h-3 w-3" />
-                        Groq (Rápido)
-                      </a>
-                      <a
-                        href="https://api.together.xyz"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-1 px-3 py-2 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 transition-colors"
-                      >
-                        <Cloud className="h-3 w-3" />
-                        Together AI
-                      </a>
-                    </div>
-                    <p className="text-xs text-blue-600 mt-2">
-                      💡 Clique em qualquer botão acima para abrir o site e obter sua chave gratuita
-                    </p>
-                  </div>
-                  
-                  {/* Botão de Teste da API */}
-                  {aiConfig.apiKey && (
-                    <div className="mt-3">
-                      <button
-                        onClick={testApiConnection}
-                        disabled={testingApi}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        {testingApi ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                            Testando API...
-                          </>
-                        ) : (
-                          <>
-                            <Cloud className="h-4 w-4" />
-                            Testar Conexão da API
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  )}
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Endpoint da API (opcional)
-                  </label>
-                  <input
-                    type="text"
-                    value={aiConfig.endpoint || ''}
-                    onChange={(e) => saveConfig({ ...aiConfig, endpoint: e.target.value })}
-                    placeholder="https://openrouter.ai/api/v1/chat/completions"
-                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
-                  />
-                  <div className="mt-2 text-xs text-gray-500">
-                    <p className="mb-1">Padrão: OpenRouter (compatível com OpenAI API)</p>
-                    <details className="cursor-pointer">
-                      <summary className="text-blue-600 hover:text-blue-800">Ver endpoints para outros provedores</summary>
-                      <div className="mt-2 space-y-1 pl-4 border-l-2 border-gray-200">
-                        <div><strong>Groq:</strong> https://api.groq.com/openai/v1/chat/completions</div>
-                        <div><strong>Together AI:</strong> https://api.together.xyz/v1/chat/completions</div>
-                        <div><strong>OpenRouter:</strong> https://openrouter.ai/api/v1/chat/completions</div>
-                      </div>
-                    </details>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {aiConfig.mode === 'localhost' && (
-              <div className="bg-green-50 p-3 rounded border border-green-200">
-                <p className="text-sm text-green-700">
-                  <strong>Modo Local:</strong> Usando Ollama rodando em localhost:11434
-                </p>
-                <p className="text-xs text-green-600 mt-1">
-                  Certifique-se de que o Ollama está instalado e o modelo llama3.1 baixado.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Painel de Instruções */}
       {showInstructions && (
@@ -723,7 +504,7 @@ RESPOSTA EM PORTUGUÊS:`;
                   <h6 className="font-semibold text-gray-800 mb-2">⚙️ Como Configurar no Sistema</h6>
                   <ol className="list-decimal list-inside space-y-1 text-sm text-gray-600">
                     <li>Após obter sua chave de API de qualquer provedor acima</li>
-                    <li>Clique no botão "Config" no canto superior direito deste chat</li>
+                    <li>Vá até a "Configuração Global de IA" na parte superior da seção de IA</li>
                     <li>Selecione "API Externa"</li>
                     <li>Cole sua chave de API no campo correspondente</li>
                     <li>Se necessário, ajuste o endpoint da API</li>

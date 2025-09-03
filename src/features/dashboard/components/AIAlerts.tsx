@@ -65,11 +65,37 @@ export const AIAlerts: React.FC<AIAlertsProps> = ({
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
 
-  // Configuração da IA - reutiliza a mesma configuração do chat
-  const [aiConfig] = useState<AIConfig>(() => {
-    const saved = localStorage.getItem('aiChatConfig');
-    return saved ? JSON.parse(saved) : { mode: 'localhost' };
+  // Configuração da IA - carrega das configurações globais primeiro
+  const [aiConfig, setAiConfig] = useState<AIConfig>(() => {
+    const globalSaved = localStorage.getItem('aiGlobalConfig');
+    if (globalSaved) {
+      return JSON.parse(globalSaved);
+    }
+    const localSaved = localStorage.getItem('aiChatConfig');
+    return localSaved ? JSON.parse(localSaved) : { mode: 'localhost' };
   });
+
+  // Sincronizar com configurações globais
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const globalSaved = localStorage.getItem('aiGlobalConfig');
+      if (globalSaved) {
+        const config = JSON.parse(globalSaved);
+        setAiConfig(config);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Verificar se há configuração global no carregamento
+    const globalSaved = localStorage.getItem('aiGlobalConfig');
+    if (globalSaved) {
+      const config = JSON.parse(globalSaved);
+      setAiConfig(config);
+    }
+
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   const generateAlerts = useCallback(async () => {
     setLoading(true);

@@ -56,6 +56,7 @@ import DashboardTabs, { useDashboardTabs } from './components/DashboardTabs';
 import AIInsights from './components/AIInsights';
 import AIChat from './components/AIChat';
 import AIAlerts from './components/AIAlerts';
+import AIGlobalConfig from './components/AIGlobalConfig';
 import AtendimentosPorHoraChart from './components/AtendimentosPorHoraChart';
 import EstabelecimentosMapaAvancado from './components/EstabelecimentosMapaAvancado';
 import AlertasPanel from './components/AlertasPanel';
@@ -3027,9 +3028,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
               Análise Inteligente com IA
             </h2>
             <p className="text-gray-600">
-              Insights automáticos, chat interativo e alertas inteligentes powered by Llama 3.1
+              Insights automáticos, chat interativo e alertas inteligentes com múltiplas opções de IA
             </p>
           </div>
+
+          {/* Configuração Global da IA */}
+          <AIGlobalConfig className="mb-6" />
 
           {/* Grid responsivo com os 3 componentes de IA */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -3060,22 +3064,18 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
           </div>
 
-          {/* Info sobre o Ollama */}
-          <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4">
+          {/* Informações sobre IA e Privacidade */}
+          <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <Brain className="h-5 w-5 text-blue-600" />
-              <h3 className="font-semibold text-blue-800">Powered by Llama 3.1 Local</h3>
+              <Brain className="h-5 w-5 text-purple-600" />
+              <h3 className="font-semibold text-purple-800">Sistema de IA Flexível</h3>
             </div>
-            <p className="text-blue-700 text-sm">
-              Este sistema usa IA local (Ollama) para garantir privacidade total dos dados de saúde. 
-              Todas as análises são processadas localmente, sem envio de informações para serviços externos.
+            <p className="text-purple-700 text-sm">
+              O sistema suporta tanto IA local (Ollama) quanto APIs externas (OpenRouter, OpenAI, Anthropic, etc). 
+              Use a configuração acima para escolher entre privacidade total com modelos locais ou acesso aos modelos mais avançados via API.
               <br />
-              <span className="text-blue-600 font-medium">
-                Status: {' '}
-                <span className="inline-flex items-center gap-1">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  Ollama rodando em localhost:11434
-                </span>
+              <span className="text-purple-600 font-medium">
+                💡 Dica: Modelos locais garantem privacidade total, enquanto APIs externas oferecem capacidades mais avançadas.
               </span>
             </p>
           </div>
