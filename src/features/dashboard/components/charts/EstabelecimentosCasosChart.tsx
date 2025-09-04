@@ -40,12 +40,12 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
     loadData();
   }, []);
 
-  // Recarregar dados quando filteredData mudar (apenas se não há filtros ativos nos novos gráficos)
+  // Recarregar dados quando filteredData mudar - com dependências corretas
   useEffect(() => {
-    if (filteredData && !activeFilters?.unidade) {
+    if (filteredData && Array.isArray(filteredData) && filteredData.length > 0) {
       loadData();
     }
-  }, [filteredData, activeFilters?.unidade]);
+  }, [filteredData?.length]); // Usar apenas o length para evitar loop
 
   const loadData = async () => {
     try {
@@ -144,11 +144,40 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
     return activeFilters?.unidade === estabelecimento;
   };
 
-  const getBarColor = (estabelecimento: string) => {
-    if (!activeFilters || Object.keys(activeFilters).length === 0) {
-      return "#8B5CF6";
+  const getCellColor = (estabelecimento: string, baseColor: string = "#8B5CF6") => {
+    // Se há filtro de unidade ativo
+    const hasUnidadeFilter = activeFilters?.unidade;
+    if (!hasUnidadeFilter) {
+      return baseColor; // Cor normal quando não há filtro
     }
-    return isEstabelecimentoFiltered(estabelecimento) ? "#7C3AED" : "#C4B5FD";
+    
+    // Se este estabelecimento está filtrado, usar cor destacada
+    if (isEstabelecimentoFiltered(estabelecimento)) {
+      return baseColor; // Manter cor original para item selecionado
+    }
+    
+    // Outros estabelecimentos ficam com transparência reduzida
+    return "rgba(139, 92, 246, 0.4)"; // Cor mais transparente mas ainda visível
+  };
+
+  // Função para obter propriedades da barra baseado no estado de filtro
+  const getBarProperties = (estabelecimento: string) => {
+    const isSelected = isEstabelecimentoFiltered(estabelecimento);
+    
+    return {
+      fill: getCellColor(estabelecimento, "#8B5CF6"),
+      stroke: isSelected ? "#5B21B6" : "transparent",
+      strokeWidth: isSelected ? 4 : 0,
+      // Remover transform que causava sobreposição
+      transform: 'none',
+      transformOrigin: 'center',
+      // z-index normal para todos os elementos
+      style: {
+        transition: 'all 0.3s ease',
+      },
+      // Usar uma sombra suave para destaque sem sobreposição
+      filter: isSelected ? 'drop-shadow(0 1px 3px rgba(91, 33, 182, 0.5))' : 'none'
+    };
   };
 
   if (loading) {
@@ -179,7 +208,14 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
           <Building className="h-6 w-6 text-purple-600" />
           <div>
             <h3 className="text-xl font-semibold text-gray-900">Estabelecimentos por Casos</h3>
-            <p className="text-sm text-gray-600">Top estabelecimentos notificadores</p>
+            <p className="text-sm text-gray-600">
+              Top estabelecimentos notificadores
+              {activeFilters?.unidade && (
+                <span className="text-purple-600 font-medium ml-2">
+                  • Filtrado: {activeFilters.unidade}
+                </span>
+              )}
+            </p>
           </div>
         </div>
         
@@ -194,13 +230,35 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
       </div>
 
       {/* Gráfico */}
-      <div className="h-96">
+      <div className="h-96 relative estabelecimentos-chart">
+        <style>{`
+          .estabelecimentos-chart .recharts-bar-rectangle:hover {
+            transform-origin: center !important;
+          }
+          .estabelecimentos-chart .recharts-bar-rectangle {
+            transition: all 0.2s ease !important;
+          }
+          .estabelecimentos-chart svg {
+            overflow: visible !important;
+          }
+          .estabelecimentos-chart .recharts-bar {
+            isolation: isolate;
+          }
+        `}</style>
         {data.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data}
-              margin={{ top: 20, right: 30, left: 20, bottom: 120 }}
+              margin={{ top: 20, right: 40, left: 20, bottom: 120 }}
               layout="vertical"
+              onClick={(data) => {
+                console.log('🖱️ Clicou na barra:', data);
+                if (data && data.activePayload && data.activePayload[0] && toggleFilter) {
+                  const payload = data.activePayload[0].payload;
+                  console.log('🎯 Estabelecimento selecionado:', payload.nome);
+                  toggleFilter('unidade', payload.nome);
+                }
+              }}
             >
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis type="number" />
@@ -215,22 +273,24 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
               <Bar 
                 dataKey="totalCasos" 
                 radius={[0, 4, 4, 0]}
-                onClick={(data) => {
-                  if (data && data.activePayload && data.activePayload[0] && toggleFilter) {
-                    const payload = data.activePayload[0].payload;
-                    toggleFilter('unidade', payload.nome);
-                  }
-                }}
                 cursor="pointer"
               >
-                {data.map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
-                    fill={getBarColor(entry.nome)}
-                    stroke={isEstabelecimentoFiltered(entry.nome) ? "#5B21B6" : "transparent"}
-                    strokeWidth={isEstabelecimentoFiltered(entry.nome) ? 2 : 0}
-                  />
-                ))}
+                {data.map((entry, index) => {
+                  const barProps = getBarProperties(entry.nome);
+                  return (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={barProps.fill}
+                      stroke={barProps.stroke}
+                      strokeWidth={barProps.strokeWidth}
+                      style={{
+                        ...barProps.style,
+                        transform: barProps.transform,
+                        transformOrigin: barProps.transformOrigin,
+                      }}
+                    />
+                  );
+                })}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -249,9 +309,21 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
             {data.map((item, index) => (
               <div 
                 key={index} 
-                className="flex items-center justify-between p-3 bg-gray-50 rounded"
+                className={`flex items-center justify-between p-3 rounded cursor-pointer transition-all duration-200 ${
+                  isEstabelecimentoFiltered(item.nome) 
+                    ? 'bg-purple-100 border-2 border-purple-400' 
+                    : 'bg-gray-50 hover:bg-gray-100'
+                }`}
+                onClick={() => toggleFilter?.('unidade', item.nome)}
               >
                 <div className="flex items-center gap-3">
+                  <div 
+                    className="w-4 h-4 rounded"
+                    style={{ 
+                      backgroundColor: getCellColor(item.nome, "#8B5CF6"),
+                      border: isEstabelecimentoFiltered(item.nome) ? '2px solid #5B21B6' : 'none'
+                    }}
+                  />
                   <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
                     <span className="text-purple-600 font-bold text-sm">{index + 1}</span>
                   </div>

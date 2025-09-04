@@ -34,7 +34,7 @@ const DesfechoCasosChart: React.FC<DesfechoCasosChartProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Cores para diferentes desfechos
+  // Cores para diferentes desfechos - mapeamento por nome
   const COLORS = [
     '#10B981', // Verde - Alta/Cura
     '#F59E0B', // Amarelo - Óbito
@@ -46,16 +46,37 @@ const DesfechoCasosChart: React.FC<DesfechoCasosChartProps> = ({
     '#EC4899'  // Rosa
   ];
 
+  // Função para obter cor específica baseada no nome do desfecho
+  const getColorByDesfecho = (desfecho: string, index: number): string => {
+    const desfechoLower = desfecho.toLowerCase();
+    
+    // Mapear cores específicas por tipo de desfecho
+    if (desfechoLower.includes('atendido') || desfechoLower.includes('liberado') || desfechoLower.includes('alta')) {
+      return '#10B981'; // Verde - para alta/liberado
+    } else if (desfechoLower.includes('observacao') || desfechoLower.includes('observação')) {
+      return '#3B82F6'; // Azul - para observação
+    } else if (desfechoLower.includes('óbito') || desfechoLower.includes('obito')) {
+      return '#EF4444'; // Vermelho - para óbito
+    } else if (desfechoLower.includes('internacao') || desfechoLower.includes('internação')) {
+      return '#F59E0B'; // Amarelo/Laranja - para internação
+    } else if (desfechoLower.includes('transfer')) {
+      return '#8B5CF6'; // Roxo - para transferência
+    } else {
+      // Para outros casos, usar o índice no array
+      return COLORS[index % COLORS.length];
+    }
+  };
+
   useEffect(() => {
     loadData();
   }, []);
 
-  // Recarregar dados quando filteredData mudar (apenas se não há filtros ativos nos novos gráficos)
+  // Recarregar dados quando filteredData mudar - com dependências corretas
   useEffect(() => {
-    if (filteredData && !activeFilters?.desfecho) {
+    if (filteredData && Array.isArray(filteredData) && filteredData.length > 0) {
       loadData();
     }
-  }, [filteredData, activeFilters?.desfecho]);
+  }, [filteredData?.length]); // Usar apenas o length para evitar loop
 
   const loadData = async () => {
     try {
@@ -112,12 +133,22 @@ const DesfechoCasosChart: React.FC<DesfechoCasosChartProps> = ({
     return activeFilters?.desfecho === desfecho;
   };
 
-  // Função para obter a cor baseada no filtro
+  // 🔧 FUNÇÃO CORRIGIDA: Obter a cor baseada no filtro mantendo cor original
   const getCellColor = (desfecho: string, baseColor: string) => {
-    if (!activeFilters || Object.keys(activeFilters).length === 0) {
+    const hasDesfechoFilter = activeFilters?.desfecho;
+    
+    // Se não há filtro ativo, usar cor original
+    if (!hasDesfechoFilter) {
       return baseColor;
     }
-    return isDesfechoFiltered(desfecho) ? baseColor : baseColor + "80"; // 80 = transparência 50%
+    
+    // Se este item está filtrado, usar cor original (destacada)
+    if (isDesfechoFiltered(desfecho)) {
+      return baseColor;
+    }
+    
+    // Se outro item está filtrado, usar cor original com transparência
+    return baseColor + "60"; // 60 = transparência ~40%
   };
 
   const exportToCSV = () => {
@@ -217,23 +248,32 @@ const DesfechoCasosChart: React.FC<DesfechoCasosChartProps> = ({
                 labelLine={false}
                 label={renderLabel}
                 outerRadius={120}
-                fill="#8884d8"
                 dataKey="valor"
                 onClick={(data) => {
+                  console.log('🖱️ Clicou na fatia:', data);
                   if (toggleFilter && data.descricao) {
                     toggleFilter('desfecho', data.descricao);
                   }
                 }}
                 style={{ cursor: 'pointer' }}
               >
-                {data.map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
-                    fill={getCellColor(entry.descricao, COLORS[index % COLORS.length])}
-                    stroke={isDesfechoFiltered(entry.descricao) ? '#000' : 'none'}
-                    strokeWidth={isDesfechoFiltered(entry.descricao) ? 3 : 0}
-                  />
-                ))}
+                {data.map((entry, index) => {
+                  const originalColor = getColorByDesfecho(entry.descricao, index);
+                  const finalColor = getCellColor(entry.descricao, originalColor);
+                  
+                  return (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={finalColor}
+                      stroke={isDesfechoFiltered(entry.descricao) ? '#374151' : 'transparent'}
+                      strokeWidth={isDesfechoFiltered(entry.descricao) ? 3 : 0}
+                      style={{ 
+                        cursor: 'pointer',
+                        filter: isDesfechoFiltered(entry.descricao) ? 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3))' : 'none'
+                      }}
+                    />
+                  );
+                })}
               </Pie>
               <Tooltip content={<CustomTooltip />} />
               <Legend 
@@ -260,21 +300,61 @@ const DesfechoCasosChart: React.FC<DesfechoCasosChartProps> = ({
             {data.map((item, index) => (
               <div 
                 key={index} 
-                className="flex items-center justify-between p-3 bg-gray-50 rounded"
+                className={`flex items-center justify-between p-3 rounded cursor-pointer transition-all hover:shadow-md ${
+                  isDesfechoFiltered(item.descricao) 
+                    ? 'bg-blue-100 border-2 border-blue-300 shadow-lg' 
+                    : activeFilters?.desfecho 
+                      ? 'bg-gray-50 opacity-60' 
+                      : 'bg-gray-50 hover:bg-gray-100'
+                }`}
+                onClick={() => {
+                  if (toggleFilter) {
+                    toggleFilter('desfecho', item.descricao);
+                  }
+                }}
+                title={`🎯 Clique para filtrar por: ${item.descricao}`}
               >
                 <div className="flex items-center gap-3">
                   <div 
                     className="w-4 h-4 rounded"
-                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                    style={{ 
+                      backgroundColor: getCellColor(item.descricao, getColorByDesfecho(item.descricao, index)),
+                      border: isDesfechoFiltered(item.descricao) ? '2px solid #374151' : 'none'
+                    }}
                   />
-                  <span className="font-medium">{item.descricao}</span>
+                  <span className={`font-medium ${
+                    isDesfechoFiltered(item.descricao) ? 'text-blue-900 font-semibold' : 'text-gray-700'
+                  }`}>
+                    {item.descricao}
+                    {isDesfechoFiltered(item.descricao) && <span className="ml-2 text-blue-600">✓</span>}
+                  </span>
                 </div>
                 <div className="text-right">
-                  <div className="font-bold text-gray-900">{item.valor}</div>
-                  <div className="text-sm text-gray-600">{item.percentual}%</div>
+                  <div className={`font-bold ${
+                    isDesfechoFiltered(item.descricao) ? 'text-blue-900' : 'text-gray-900'
+                  }`}>
+                    {item.valor}
+                  </div>
+                  <div className={`text-sm ${
+                    isDesfechoFiltered(item.descricao) ? 'text-blue-700' : 'text-gray-600'
+                  }`}>
+                    {item.percentual}%
+                  </div>
                 </div>
               </div>
             ))}
+            
+            {/* Botão para limpar filtro */}
+            {activeFilters?.desfecho && (
+              <div className="mt-4 text-center">
+                <button
+                  onClick={() => toggleFilter && toggleFilter('desfecho', activeFilters.desfecho)}
+                  className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
+                >
+                  🧹 Limpar Filtro de Desfecho
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

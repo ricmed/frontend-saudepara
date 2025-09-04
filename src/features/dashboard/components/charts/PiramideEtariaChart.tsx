@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Download } from 'lucide-react';
-import { NotificacaoService } from '../../../services/NotificacaoService';
+import { NotificacaoService } from '../../../../services/NotificacaoService';
 
 interface PiramideEtariaItem {
   faixaEtaria: string;
@@ -36,34 +36,36 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
     loadData();
   }, []);
 
-  // Recarregar dados quando filteredData mudar (apenas se não há filtros ativos nos novos gráficos)
+  // Recarregar dados quando filteredData mudar - com dependências corretas
   useEffect(() => {
-    if (filteredData && !activeFilters?.faixaEtaria) {
+    if (filteredData && Array.isArray(filteredData) && filteredData.length > 0) {
       loadData();
     }
-  }, [filteredData, activeFilters?.faixaEtaria]);
+  }, [filteredData?.length]); // Usar apenas o length para evitar loop
 
+  // Função para calcular faixa etária - DEVE MANTER O MESMO FORMATO do NotificationDashboard
   const getFaixaEtaria = (idadeMeses: number): string => {
     if (idadeMeses < 12) return 'Menor de 1 ano';
     
     const anos = Math.floor(idadeMeses / 12);
     
-    if (anos >= 1 && anos <= 4) return '1-4 anos';
-    if (anos >= 5 && anos <= 9) return '5-9 anos';
-    if (anos >= 10 && anos <= 14) return '10-14 anos';
-    if (anos >= 15 && anos <= 19) return '15-19 anos';
-    if (anos >= 20 && anos <= 24) return '20-24 anos';
-    if (anos >= 25 && anos <= 29) return '25-29 anos';
-    if (anos >= 30 && anos <= 34) return '30-34 anos';
-    if (anos >= 35 && anos <= 39) return '35-39 anos';
-    if (anos >= 40 && anos <= 44) return '40-44 anos';
-    if (anos >= 45 && anos <= 49) return '45-49 anos';
-    if (anos >= 50 && anos <= 54) return '50-54 anos';
-    if (anos >= 55 && anos <= 59) return '55-59 anos';
-    if (anos >= 60 && anos <= 64) return '60-64 anos';
-    if (anos >= 65 && anos <= 69) return '65-69 anos';
-    if (anos >= 70 && anos <= 74) return '70-74 anos';
-    if (anos >= 75 && anos <= 79) return '75-79 anos';
+    // ✅ CORRIGIDO: Usar o mesmo formato que o NotificationDashboard ("1 a 4 anos" em vez de "1-4 anos")
+    if (anos >= 1 && anos <= 4) return '1 a 4 anos';
+    if (anos >= 5 && anos <= 9) return '5 a 9 anos';
+    if (anos >= 10 && anos <= 14) return '10 a 14 anos';
+    if (anos >= 15 && anos <= 19) return '15 a 19 anos';
+    if (anos >= 20 && anos <= 24) return '20 a 24 anos';
+    if (anos >= 25 && anos <= 29) return '25 a 29 anos';
+    if (anos >= 30 && anos <= 34) return '30 a 34 anos';
+    if (anos >= 35 && anos <= 39) return '35 a 39 anos';
+    if (anos >= 40 && anos <= 44) return '40 a 44 anos';
+    if (anos >= 45 && anos <= 49) return '45 a 49 anos';
+    if (anos >= 50 && anos <= 54) return '50 a 54 anos';
+    if (anos >= 55 && anos <= 59) return '55 a 59 anos';
+    if (anos >= 60 && anos <= 64) return '60 a 64 anos';
+    if (anos >= 65 && anos <= 69) return '65 a 69 anos';
+    if (anos >= 70 && anos <= 74) return '70 a 74 anos';
+    if (anos >= 75 && anos <= 79) return '75 a 79 anos';
     
     return '80 ou mais anos';
   };
@@ -183,12 +185,12 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
       
       console.log('📈 Grupos etários processados:', grupos);
       
-      // Converter para array ordenado
+      // ✅ CORRIGIDO: Converter para array ordenado com formato consistente
       const faixasOrdenadas = [
-        'Menor de 1 ano', '1-4 anos', '5-9 anos', '10-14 anos', '15-19 anos',
-        '20-24 anos', '25-29 anos', '30-34 anos', '35-39 anos', '40-44 anos',
-        '45-49 anos', '50-54 anos', '55-59 anos', '60-64 anos', '65-69 anos',
-        '70-74 anos', '75-79 anos', '80 ou mais anos'
+        'Menor de 1 ano', '1 a 4 anos', '5 a 9 anos', '10 a 14 anos', '15 a 19 anos',
+        '20 a 24 anos', '25 a 29 anos', '30 a 34 anos', '35 a 39 anos', '40 a 44 anos',
+        '45 a 49 anos', '50 a 54 anos', '55 a 59 anos', '60 a 64 anos', '65 a 69 anos',
+        '70 a 74 anos', '75 a 79 anos', '80 ou mais anos'
       ];
       
       const processedData = faixasOrdenadas.map(faixa => {
@@ -249,19 +251,21 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
   // Função para obter a cor da barra baseada no filtro
   const getBarColor = (faixaEtaria: string, genero: string) => {
     const baseColors = {
-      homemCisgenero: "#3B82F6",
-      mulherCisgenero: "#EC4899",
-      outros: "#8B5CF6"
+      homemCisgenero: "#3B82F6",     // Azul
+      mulherCisgenero: "#EC4899",    // Rosa
+      outros: "#8B5CF6"              // Roxo
     };
     
-    if (!activeFilters || Object.keys(activeFilters).length === 0) {
-      return baseColors[genero as keyof typeof baseColors] || baseColors.outros;
-    }
-    
-    const isFiltered = isFaixaEtariaFiltered(faixaEtaria);
     const color = baseColors[genero as keyof typeof baseColors] || baseColors.outros;
     
-    return isFiltered ? color : color + "80"; // 80 = transparência 50%
+    // Se não há filtros de faixa etária ativos ou se esta faixa está filtrada, usar cor normal
+    const hasFaixaEtariaFilter = activeFilters?.faixaEtaria;
+    if (!hasFaixaEtariaFilter || isFaixaEtariaFiltered(faixaEtaria)) {
+      return color;
+    }
+    
+    // Se há filtro de faixa etária ativo mas esta faixa não está filtrada, usar cor com transparência
+    return color + "60"; // 60 = transparência ~40%
   };
 
   if (loading) {

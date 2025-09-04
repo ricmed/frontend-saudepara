@@ -31,8 +31,6 @@ import {
   FileSearch2,
   FileImage,
   Info,
-  Users,
-  Briefcase,
   Award,
   AlertTriangle,
   Bomb,
@@ -60,9 +58,16 @@ import AIGlobalConfig from './components/AIGlobalConfig';
 import AtendimentosPorHoraChart from './components/AtendimentosPorHoraChart';
 import EstabelecimentosMapaAvancado from './components/EstabelecimentosMapaAvancado';
 import AlertasPanel from './components/AlertasPanel';
-import PiramideEtariaChart from './components/PiramideEtariaChart';
-import DesfechoCasosChart from './components/DesfechoCasosChart';
-import EstabelecimentosCasosChart from './components/EstabelecimentosCasosChart';
+import PiramideEtariaChart from './components/charts/PiramideEtariaChart';
+import DesfechoCasosChart from './components/charts/DesfechoCasosChart';
+import EstabelecimentosCasosChart from './components/charts/EstabelecimentosCasosChart';
+import DistribuicaoPublicoAtendidoChart from './components/charts/DistribuicaoPublicoAtendidoChart';
+import DistribuicaoTipoAtendimentoChart from './components/charts/DistribuicaoTipoAtendimentoChart';
+import DistribuicaoSexoChart from './components/charts/DistribuicaoSexoChart';
+import DistribuicaoRacaCorChart from './components/charts/DistribuicaoRacaCorChart';
+import PrincipaisSintomasChart from './components/charts/PrincipaisSintomasChart';
+import TiposTraumaChart from './components/charts/TiposTraumaChart';
+import HipotesesDiagnosticasChart from './components/charts/HipotesesDiagnosticasChart';
 
 // Funções de exportação para diferentes formatos
 const exportChartAsPNG = (chartId: string, title: string): void => {
@@ -702,39 +707,56 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
           case 'faixaEtaria':
             filteredData = filteredData.filter(n => {
-              const dataNascimento = n?.original?.pessoa?.data_nascimento;
-              if (dataNascimento) {
-                const idade = new Date().getFullYear() - new Date(dataNascimento).getFullYear();
-                let faixaEtaria = '';
-                
-                if (idade < 1) faixaEtaria = 'Menor de 1 ano';
-                else if (idade >= 1 && idade <= 4) faixaEtaria = '1 a 4 anos';
-                else if (idade >= 5 && idade <= 9) faixaEtaria = '5 a 9 anos';
-                else if (idade >= 10 && idade <= 14) faixaEtaria = '10 a 14 anos';
-                else if (idade >= 15 && idade <= 19) faixaEtaria = '15 a 19 anos';
-                else if (idade >= 20 && idade <= 24) faixaEtaria = '20 a 24 anos';
-                else if (idade >= 25 && idade <= 29) faixaEtaria = '25 a 29 anos';
-                else if (idade >= 30 && idade <= 34) faixaEtaria = '30 a 34 anos';
-                else if (idade >= 35 && idade <= 39) faixaEtaria = '35 a 39 anos';
-                else if (idade >= 40 && idade <= 44) faixaEtaria = '40 a 44 anos';
-                else if (idade >= 45 && idade <= 49) faixaEtaria = '45 a 49 anos';
-                else if (idade >= 50 && idade <= 54) faixaEtaria = '50 a 54 anos';
-                else if (idade >= 55 && idade <= 59) faixaEtaria = '55 a 59 anos';
-                else if (idade >= 60 && idade <= 64) faixaEtaria = '60 a 64 anos';
-                else if (idade >= 65 && idade <= 69) faixaEtaria = '65 a 69 anos';
-                else if (idade >= 70 && idade <= 74) faixaEtaria = '70 a 74 anos';
-                else if (idade >= 75 && idade <= 79) faixaEtaria = '75 a 79 anos';
-                else faixaEtaria = '80 ou mais anos';
-                
-                return faixaEtaria === filterValue;
+              // ✅ CORRIGIDO: Usar a mesma fonte de dados do PiramideEtariaChart
+              const paciente = n?.original?.paciente;
+              if (!paciente || paciente.idade === null || paciente.idade === undefined) {
+                return false;
               }
-              return false;
+              
+              // Converter idade em meses para faixa etária usando a mesma lógica do gráfico
+              const idadeMeses = paciente.idade;
+              let faixaEtaria = '';
+              
+              if (idadeMeses < 12) {
+                faixaEtaria = 'Menor de 1 ano';
+              } else {
+                const anos = Math.floor(idadeMeses / 12);
+                
+                if (anos >= 1 && anos <= 4) faixaEtaria = '1 a 4 anos';
+                else if (anos >= 5 && anos <= 9) faixaEtaria = '5 a 9 anos';
+                else if (anos >= 10 && anos <= 14) faixaEtaria = '10 a 14 anos';
+                else if (anos >= 15 && anos <= 19) faixaEtaria = '15 a 19 anos';
+                else if (anos >= 20 && anos <= 24) faixaEtaria = '20 a 24 anos';
+                else if (anos >= 25 && anos <= 29) faixaEtaria = '25 a 29 anos';
+                else if (anos >= 30 && anos <= 34) faixaEtaria = '30 a 34 anos';
+                else if (anos >= 35 && anos <= 39) faixaEtaria = '35 a 39 anos';
+                else if (anos >= 40 && anos <= 44) faixaEtaria = '40 a 44 anos';
+                else if (anos >= 45 && anos <= 49) faixaEtaria = '45 a 49 anos';
+                else if (anos >= 50 && anos <= 54) faixaEtaria = '50 a 54 anos';
+                else if (anos >= 55 && anos <= 59) faixaEtaria = '55 a 59 anos';
+                else if (anos >= 60 && anos <= 64) faixaEtaria = '60 a 64 anos';
+                else if (anos >= 65 && anos <= 69) faixaEtaria = '65 a 69 anos';
+                else if (anos >= 70 && anos <= 74) faixaEtaria = '70 a 74 anos';
+                else if (anos >= 75 && anos <= 79) faixaEtaria = '75 a 79 anos';
+                else faixaEtaria = '80 ou mais anos';
+              }
+              
+              return faixaEtaria === filterValue;
             });
             break;
 
           case 'desfecho':
             filteredData = filteredData.filter(n => {
-              const desfecho = n?.original?.desfecho;
+              // ✅ CORRIGIDO: Usar a mesma fonte de dados do DesfechoCasosChart
+              const original = n?.original || n;
+              const tipoEncerramento = original?.tipo_encerramento;
+              
+              if (tipoEncerramento && tipoEncerramento.descricao) {
+                return tipoEncerramento.descricao === filterValue;
+              }
+              
+              // Fallback: tentar campo desfecho direto também
+              const desfecho = original?.desfecho;
               return desfecho === filterValue;
             });
             break;
@@ -2252,729 +2274,81 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           </div>
 
           {/* Gráfico de Público Atendido */}
-          <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm sm:col-span-2 lg:col-span-2 xl:col-span-2">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
-              <div className="flex items-center gap-2">
-                <Briefcase className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-700" />
-                <h3 className="text-xs sm:text-sm font-medium text-gray-700">
-                  Distribuição por Público Atendido
-                </h3>
-                <MousePointer className="h-3 w-3 text-blue-500 opacity-60" />
-              </div>
-              <div className="flex gap-2 self-start sm:self-auto">
-                <button 
-                  onClick={() => toggleChartType('publico')}
-                  className="p-1 text-gray-500 hover:text-blue-500 transition-colors"
-                  title="Alternar tipo de gráfico"
-                >
-                  {chartType.publico === 'bar' ? 
-                    <PieChartIcon className="h-4 w-4" /> : 
-                    <BarChart2 className="h-4 w-4" />}
-                </button>
-                <GraphExportMenu 
-                  chartId="chart-publico" 
-                  chartType={chartType.publico}
-                  chartData={filteredPublico}
-                  chartTitle="Distribuição por Público Atendido"
-                />
-              </div>
-            </div>
-            <div className="h-64" id="chart-publico">
-              {filteredPublico.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  {chartType.publico === 'pie' ? (
-                    <PieChart>
-                      <Pie
-                        data={filteredPublico}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={true}
-                        outerRadius={80}
-                        innerRadius={40}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label={({ name, percent }) =>
-                          `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`
-                        }
-                        onClick={(data) => {
-                          if (data && data.name) {
-                            handleChartClick('publico', data.name);
-                          }
-                        }}
-                        cursor="pointer"
-                      >
-                        {filteredPublico.map((entry, i) => (
-                          <Cell 
-                            key={`cell-${i}`} 
-                            fill={entry.fill}
-                            stroke={activeFilters.publico === entry.name ? "#000" : "none"}
-                            strokeWidth={activeFilters.publico === entry.name ? 2 : 0}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#fff",
-                          border: "1px solid #ddd",
-                        }}
-                        formatter={(value) => [
-                          value.toLocaleString(),
-                          "Notificações",
-                        ]}
-                      />
-                    </PieChart>
-                  ) : (
-                    <BarChart
-                      data={filteredPublico}
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="name" stroke="#666" />
-                      <YAxis stroke="#666" />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#fff",
-                          border: "1px solid #ddd",
-                        }}
-                        formatter={(value) => [
-                          value.toLocaleString(),
-                          "Notificações",
-                        ]}
-                      />
-                      <Bar
-                        dataKey="value"
-                        radius={[4, 4, 0, 0]}
-                        onClick={(data) => {
-                          if (data && data.name) {
-                            handleChartClick('publico', data.name);
-                          }
-                        }}
-                        cursor="pointer"
-                      >
-                        {filteredPublico.map((entry, i) => (
-                          <Cell 
-                            key={`cell-${i}`} 
-                            fill={entry.fill}
-                            stroke={activeFilters.publico === entry.name ? "#000" : "none"}
-                            strokeWidth={activeFilters.publico === entry.name ? 2 : 0}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  )}
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-64 flex items-center justify-center text-gray-500">
-                  Não há dados disponíveis para exibir
-                </div>
-              )}
-            </div>
-          </div>
+          <DistribuicaoPublicoAtendidoChart
+            data={filteredPublico}
+            onChartClick={(itemName) => handleChartClick('publico', itemName)}
+            activeFilter={activeFilters.publico}
+            chartId="chart-publico"
+            title="Distribuição por Público Atendido"
+          />
 
-          {/* Gráfico de Tipo de Atendimento - AGORA COMO BARRAS */}
-          <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-3">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <User className="h-5 w-5 text-blue-700" />
-                <h3 className="text-sm font-medium text-gray-700">
-                  Distribuição por Tipo de Atendimento
-                </h3>
-                <MousePointer className="h-3 w-3 text-blue-500 opacity-60" />
-              </div>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => toggleChartType('tipoAtendimento')}
-                  className="p-1 text-gray-500 hover:text-blue-500 transition-colors"
-                  title="Alternar tipo de gráfico"
-                >
-                  {chartType.tipoAtendimento === 'bar' ? 
-                    <PieChartIcon className="h-4 w-4" /> : 
-                    <BarChart2 className="h-4 w-4" />}
-                </button>
-                <GraphExportMenu 
-                  chartId="chart-tipo-atendimento" 
-                  chartType={chartType.tipoAtendimento}
-                  chartData={filteredTipoAtendimento}
-                  chartTitle="Distribuição por Tipo de Atendimento"
-                />
-              </div>
-            </div>
-            <div className="h-64" id="chart-tipo-atendimento">
-              {filteredTipoAtendimento.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  {chartType.tipoAtendimento === 'bar' ? (
-                    <BarChart
-                      data={filteredTipoAtendimento}
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="name" stroke="#666" />
-                      <YAxis stroke="#666" />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#fff",
-                          border: "1px solid #ddd",
-                        }}
-                        formatter={(value) => [
-                          value.toLocaleString(),
-                          "Notificações",
-                        ]}
-                      />
-                      <Bar
-                        dataKey="value"
-                        radius={[4, 4, 0, 0]}
-                        onClick={(data) => {
-                          if (data && data.name) {
-                            handleChartClick('tipoAtendimento', data.name);
-                          }
-                        }}
-                        cursor="pointer"
-                      >
-                        {filteredTipoAtendimento.map((entry, i) => (
-                          <Cell 
-                            key={`cell-${i}`} 
-                            fill={entry.fill}
-                            stroke={activeFilters.tipoAtendimento === entry.name ? "#000" : "none"}
-                            strokeWidth={activeFilters.tipoAtendimento === entry.name ? 2 : 0}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  ) : (
-                    <PieChart>
-                      <Pie
-                        data={filteredTipoAtendimento}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={true}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label={({ name, percent }) =>
-                          `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`
-                        }
-                        onClick={(data) => {
-                          if (data && data.name) {
-                            handleChartClick('tipoAtendimento', data.name);
-                          }
-                        }}
-                        cursor="pointer"
-                      >
-                        {filteredTipoAtendimento.map((entry, i) => (
-                          <Cell 
-                            key={`cell-${i}`} 
-                            fill={entry.fill}
-                            stroke={activeFilters.tipoAtendimento === entry.name ? "#000" : "none"}
-                            strokeWidth={activeFilters.tipoAtendimento === entry.name ? 2 : 0}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#fff",
-                          border: "1px solid #ddd",
-                        }}
-                        formatter={(value) => [
-                          value.toLocaleString(),
-                          "Notificações",
-                        ]}
-                      />
-                    </PieChart>
-                  )}
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-64 flex items-center justify-center text-gray-500">
-                  Não há dados disponíveis para exibir
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Gráfico de Tipo de Atendimento */}
+          <DistribuicaoTipoAtendimentoChart
+            data={filteredTipoAtendimento}
+            onChartClick={(itemName) => handleChartClick('tipoAtendimento', itemName)}
+            activeFilter={activeFilters.tipoAtendimento}
+            chartId="chart-tipo-atendimento"
+            title="Distribuição por Tipo de Atendimento"
+          />
 
           {/* Gráfico de Identidade de Gênero */}
-          <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-2">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <User className="h-5 w-5 text-blue-700" />
-                <h3 className="text-sm font-medium text-gray-700">
-                  Distribuição por Sexo
-                </h3>
-                <MousePointer className="h-3 w-3 text-blue-500 opacity-60" />
-              </div>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => toggleChartType('genero')}
-                  className="p-1 text-gray-500 hover:text-blue-500 transition-colors"
-                  title="Alternar tipo de gráfico"
-                >
-                  {chartType.genero === 'bar' ? 
-                    <PieChartIcon className="h-4 w-4" /> : 
-                    <BarChart2 className="h-4 w-4" />}
-                </button>
-                <GraphExportMenu 
-                  chartId="chart-genero" 
-                  chartType={chartType.genero}
-                  chartData={filteredGenero}
-                  chartTitle="Distribuição por Sexo"
-                />
-              </div>
-            </div>
-            <div className="h-64" id="chart-genero">
-              {filteredGenero.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  {chartType.genero === 'pie' ? (
-                    <PieChart>
-                      <Pie
-                        data={filteredGenero}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label={({ name, percent }) =>
-                          `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`
-                        }
-                        cursor="pointer"
-                        onClick={(data) => {
-                          if (data && data.name) {
-                            handleChartClick('genero', data.name);
-                          }
-                        }}
-                      >
-                        {filteredGenero.map((entry, i) => (
-                          <Cell 
-                            key={`cell-${i}`} 
-                            fill={entry.fill}
-                            stroke={activeFilters.genero === entry.name ? "#000" : "none"}
-                            strokeWidth={activeFilters.genero === entry.name ? 2 : 0}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#fff",
-                          border: "1px solid #ddd",
-                        }}
-                        formatter={(value) => [
-                          value.toLocaleString(),
-                          "Notificações",
-                        ]}
-                      />
-                    </PieChart>
-                  ) : (
-                    <BarChart
-                      data={filteredGenero}
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="name" stroke="#666" />
-                      <YAxis stroke="#666" />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#fff",
-                          border: "1px solid #ddd",
-                        }}
-                        formatter={(value) => [
-                          value.toLocaleString(),
-                          "Notificações",
-                        ]}
-                      />
-                      <Bar
-                        dataKey="value"
-                        radius={[4, 4, 0, 0]}
-                        onClick={(data) => {
-                          if (data && data.name) {
-                            handleChartClick('genero', data.name);
-                          }
-                        }}
-                        cursor="pointer"
-                      >
-                        {filteredGenero.map((entry, i) => (
-                          <Cell 
-                            key={`cell-${i}`} 
-                            fill={entry.fill}
-                            stroke={activeFilters.genero === entry.name ? "#000" : "none"}
-                            strokeWidth={activeFilters.genero === entry.name ? 2 : 0}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  )}
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-64 flex items-center justify-center text-gray-500">
-                  Não há dados disponíveis para exibir
-                </div>
-              )}
-            </div>
-          </div>
+          <DistribuicaoSexoChart
+            data={filteredGenero}
+            onChartClick={(itemName) => handleChartClick('genero', itemName)}
+            activeFilter={activeFilters.genero}
+            chartId="chart-genero"
+            title="Distribuição por Sexo"
+          />
 
           {/* Gráfico de Raça */}
-          <div className="bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-3">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Award className="h-5 w-5 text-green-700" />
-                <h3 className="text-sm font-medium text-gray-700">
-                  Distribuição por Raça e Cor
-                </h3>
-                <MousePointer className="h-3 w-3 text-blue-500 opacity-60" />
-              </div>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => toggleChartType('raca')}
-                  className="p-1 text-gray-500 hover:text-blue-500 transition-colors"
-                  title="Alternar tipo de gráfico"
-                >
-                  {chartType.raca === 'bar' ? 
-                    <PieChartIcon className="h-4 w-4" /> : 
-                    <BarChart2 className="h-4 w-4" />}
-                </button>
-                <GraphExportMenu 
-                  chartId="chart-raca" 
-                  chartType={chartType.raca}
-                  chartData={filteredRaca}
-                  chartTitle="Distribuição por Raça e Cor"
-                />
-              </div>
-            </div>
-            <div className="h-64" id="chart-raca">
-              {filteredRaca.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  {chartType.raca === 'bar' ? (
-                    <BarChart
-                      data={filteredRaca}
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="name" stroke="#666" />
-                      <YAxis stroke="#666" />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#fff",
-                          border: "1px solid #ddd",
-                        }}
-                        formatter={(value) => [
-                          value.toLocaleString(),
-                          "Notificações",
-                        ]}
-                      />
-                      <Bar
-                        dataKey="value"
-                        radius={[4, 4, 0, 0]}
-                        onClick={(data) => {
-                          if (data && data.name) {
-                            handleChartClick('raca', data.name);
-                          }
-                        }}
-                        cursor="pointer"
-                      >
-                        {filteredRaca.map((entry, i) => (
-                          <Cell 
-                            key={`cell-${i}`} 
-                            fill={entry.fill}
-                            stroke={activeFilters.raca === entry.name ? "#000" : "none"}
-                            strokeWidth={activeFilters.raca === entry.name ? 2 : 0}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  ) : (
-                    <PieChart>
-                      <Pie
-                        data={filteredRaca}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={true}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label={({ name, percent }) =>
-                          `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`
-                        }
-                        onClick={(data) => {
-                          if (data && data.name) {
-                            handleChartClick('raca', data.name);
-                          }
-                        }}
-                        cursor="pointer"
-                      >
-                        {filteredRaca.map((entry, i) => (
-                          <Cell 
-                            key={`cell-${i}`} 
-                            fill={entry.fill}
-                            stroke={activeFilters.raca === entry.name ? "#000" : "none"}
-                            strokeWidth={activeFilters.raca === entry.name ? 2 : 0}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#fff",
-                          border: "1px solid #ddd",
-                        }}
-                        formatter={(value) => [
-                          value.toLocaleString(),
-                          "Notificações",
-                        ]}
-                      />
-                    </PieChart>
-                  )}
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-64 flex items-center justify-center text-gray-500">
-                  Não há dados disponíveis para exibir
-                </div>
-              )}
-            </div>
-          </div>
+          <DistribuicaoRacaCorChart
+            data={filteredRaca}
+            onChartClick={(itemName) => handleChartClick('raca', itemName)}
+            activeFilter={activeFilters.raca}
+            chartId="chart-raca"
+            title="Distribuição por Raça e Cor"
+          />
 
           {/* Principais Sintomas */}
           {visibleCharts.sintomas && (
-          <div className={`bg-white p-4 rounded-lg shadow-sm ${chartSpans.sintomas}`}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Heart className="h-5 w-5 text-red-700" />
-                <h3 className="text-sm font-medium text-gray-700">
-                  Principais Sinais e Sintomas
-                </h3>
-              </div>
-              <GraphExportMenu 
-                chartId="chart-sintomas" 
-                chartType="bar"
-                chartData={filteredSintomas.slice(0, 10)}
-                chartTitle="Principais Sinais e Sintomas"
-              />
-            </div>
-            <div className="h-64" id="chart-sintomas">
-              {filteredSintomas.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={filteredSintomas.slice(0, 10)}
-                    layout="vertical"
-                    margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis type="number" stroke="#666" />
-                    <YAxis
-                      dataKey="name"
-                      type="category"
-                      stroke="#666"
-                      width={100}
-                      tick={{ fontSize: 10 }}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "#fff",
-                        border: "1px solid #ddd",
-                      }}
-                      formatter={(value) => [
-                        value.toLocaleString(),
-                        "Notificações",
-                      ]}
-                    />
-                    <Bar
-                      dataKey="value"
-                      onClick={(data) => {
-                        if (data && data.name) {
-                          handleChartClick('sintoma', data.name);
-                        }
-                      }}
-                      cursor="pointer"
-                    >
-                      {filteredSintomas.slice(0, 10).map((entry, i) => (
-                        <Cell 
-                          key={`cell-${i}`} 
-                          fill={entry.fill}
-                          stroke={activeFilters.sintoma === entry.name ? "#000" : "none"}
-                          strokeWidth={activeFilters.sintoma === entry.name ? 2 : 0}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-64 flex items-center justify-center text-gray-500">
-                  Não há dados disponíveis para exibir
-                </div>
-              )}
-            </div>
-          </div>
+            <PrincipaisSintomasChart
+              data={filteredSintomas}
+              onChartClick={(itemName) => handleChartClick('sintoma', itemName)}
+              activeFilter={activeFilters.sintoma}
+              chartId="chart-sintomas"
+              title="Principais Sinais e Sintomas"
+              className={`bg-white p-4 rounded-lg shadow-sm ${chartSpans.sintomas}`}
+              maxItems={10}
+              isVisible={visibleCharts.sintomas}
+            />
           )}
 
           {/* Tipos de Trauma */}
           {visibleCharts.trauma && (
-          <div className={`bg-white p-4 rounded-lg shadow-sm ${chartSpans.trauma}`}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-red-700" />
-                <h3 className="text-sm font-medium text-gray-700">
-                  Tipos de Trauma
-                </h3>
-              </div>
-              <GraphExportMenu 
-                chartId="chart-trauma" 
-                chartType="bar"
-                chartData={filteredTrauma}
-                chartTitle="Tipos de Trauma"
-              />
-            </div>
-            <div className="h-64" id="chart-trauma">
-              {filteredTrauma.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={filteredTrauma}
-                    layout="vertical"
-                    margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis type="number" stroke="#666" />
-                    <YAxis
-                      dataKey="name"
-                      type="category"
-                      stroke="#666"
-                      width={80}
-                      tick={{ fontSize: 10 }}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "#fff",
-                        border: "1px solid #ddd",
-                      }}
-                      formatter={(value) => [
-                        value.toLocaleString(),
-                        "Casos",
-                      ]}
-                    />
-                    <Bar
-                      dataKey="value"
-                      onClick={(data) => {
-                        if (data && data.name) {
-                          handleChartClick('trauma', data.name);
-                        }
-                      }}
-                      cursor="pointer"
-                    >
-                      {filteredTrauma.map((entry, i) => (
-                        <Cell 
-                          key={`cell-${i}`} 
-                          fill={entry.fill}
-                          stroke={activeFilters.trauma === entry.name ? "#000" : "none"}
-                          strokeWidth={activeFilters.trauma === entry.name ? 2 : 0}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-64 flex items-center justify-center text-gray-500">
-                  Nenhum caso de trauma registrado
-                </div>
-              )}
-            </div>
-          </div>
+            <TiposTraumaChart
+              data={filteredTrauma}
+              onChartClick={(itemName) => handleChartClick('trauma', itemName)}
+              activeFilter={activeFilters.trauma}
+              chartId="chart-trauma"
+              title="Tipos de Trauma"
+              className={`bg-white p-4 rounded-lg shadow-sm ${chartSpans.trauma}`}
+              isVisible={visibleCharts.trauma}
+            />
           )}
 
           {/* Hipóteses Diagnósticas */}
           {visibleCharts.hipoteses && (
-          <div className={`bg-white p-4 rounded-lg shadow-sm ${chartSpans.hipoteses}`}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-purple-700" />
-                <h3 className="text-sm font-medium text-gray-700">
-                  Hipóteses Diagnósticas
-                </h3>
-              </div>
-              <div className="flex gap-2">
-                <GraphExportMenu 
-                  chartId="chart-hipoteses" 
-                  chartType="bar"
-                  chartData={filteredHipoteses.slice(0, 15)}
-                  chartTitle="Hipóteses Diagnósticas"
-                />
-                <div className="flex ml-2 space-x-2 text-xs">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full mr-1" style={{backgroundColor: COLORS.alarmante}}></div>
-                    <span>Crítica</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full mr-1" style={{backgroundColor: COLORS.alerta}}></div>
-                    <span>Alta</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full mr-1" style={{backgroundColor: COLORS.medio}}></div>
-                    <span>Média</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full mr-1" style={{backgroundColor: COLORS.normal}}></div>
-                    <span>Normal</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="h-96" id="chart-hipoteses">
-              {filteredHipoteses.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={filteredHipoteses.slice(0, 15)}
-                    layout="vertical"
-                    margin={{ top: 5, right: 30, left: 140, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis type="number" stroke="#666" />
-                    <YAxis
-                      dataKey="name"
-                      type="category"
-                      stroke="#666"
-                      width={140}
-                      tick={{ fontSize: 10 }}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "#fff",
-                        border: "1px solid #ddd",
-                      }}
-                      formatter={(value) => [
-                        value.toLocaleString(),
-                        "Notificações",
-                      ]}
-                    />
-                    <Bar
-                      dataKey="value"
-                      onClick={(data) => {
-                        if (data && data.name) {
-                          handleChartClick('hipotese', data.name);
-                        }
-                      }}
-                      cursor="pointer"
-                    >
-                      {filteredHipoteses.slice(0, 15).map((entry, i) => (
-                        <Cell 
-                          key={`cell-${i}`} 
-                          fill={entry.fill}
-                          // Adicionar uma borda especial para as hipóteses alarmantes
-                          // E também destacar a seleção atual
-                          stroke={activeFilters.hipotese === entry.name ? "#000" : (entry.isAlarmante ? "#b71c1c" : "none")}
-                          strokeWidth={activeFilters.hipotese === entry.name ? 2 : (entry.isAlarmante ? 2 : 0)}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-64 flex items-center justify-center text-gray-500">
-                  Não há dados disponíveis para exibir
-                </div>
-              )}
-            </div>
-            <div className="mt-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
-              <p className="text-xs text-gray-600">
-                <span className="text-red-500 font-bold">⚠️ Atenção: </span>
-                As hipóteses em <span className="text-red-500 font-bold">vermelho</span> requerem notificação imediata e vigilância rigorosa mesmo com um único caso.
-                As hipóteses em <span className="text-orange-500 font-bold">laranja</span> requerem monitoramento cuidadoso.
-                Todas seguem a classificação de vigilância epidemiológica do Ministério da Saúde.
-              </p>
-            </div>
-          </div>
+            <HipotesesDiagnosticasChart
+              data={filteredHipoteses}
+              onChartClick={(itemName) => handleChartClick('hipotese', itemName)}
+              activeFilter={activeFilters.hipotese}
+              chartId="chart-hipoteses"
+              title="Hipóteses Diagnósticas"
+              className={`bg-white p-4 rounded-lg shadow-sm ${chartSpans.hipoteses}`}
+              maxItems={15}
+              isVisible={visibleCharts.hipoteses}
+              COLORS={COLORS}
+            />
           )}
 
           {/* Novos Gráficos Solicitados */}
