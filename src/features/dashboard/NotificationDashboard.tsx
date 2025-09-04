@@ -60,7 +60,9 @@ import AIGlobalConfig from './components/AIGlobalConfig';
 import AtendimentosPorHoraChart from './components/AtendimentosPorHoraChart';
 import EstabelecimentosMapaAvancado from './components/EstabelecimentosMapaAvancado';
 import AlertasPanel from './components/AlertasPanel';
-import TestTimeForm from '../../components/TestTimeForm';
+import PiramideEtariaChart from './components/PiramideEtariaChart';
+import DesfechoCasosChart from './components/DesfechoCasosChart';
+import EstabelecimentosCasosChart from './components/EstabelecimentosCasosChart';
 
 // Funções de exportação para diferentes formatos
 const exportChartAsPNG = (chartId: string, title: string): void => {
@@ -321,7 +323,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     unidade: null,
     hipotese: null,
     trauma: null,
-    sintoma: null
+    sintoma: null,
+    faixaEtaria: null,
+    desfecho: null
   });
   
   // Estado para controlar a exibição da ajuda
@@ -695,6 +699,45 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
               return false;
             });
             break;
+
+          case 'faixaEtaria':
+            filteredData = filteredData.filter(n => {
+              const dataNascimento = n?.original?.pessoa?.data_nascimento;
+              if (dataNascimento) {
+                const idade = new Date().getFullYear() - new Date(dataNascimento).getFullYear();
+                let faixaEtaria = '';
+                
+                if (idade < 1) faixaEtaria = 'Menor de 1 ano';
+                else if (idade >= 1 && idade <= 4) faixaEtaria = '1 a 4 anos';
+                else if (idade >= 5 && idade <= 9) faixaEtaria = '5 a 9 anos';
+                else if (idade >= 10 && idade <= 14) faixaEtaria = '10 a 14 anos';
+                else if (idade >= 15 && idade <= 19) faixaEtaria = '15 a 19 anos';
+                else if (idade >= 20 && idade <= 24) faixaEtaria = '20 a 24 anos';
+                else if (idade >= 25 && idade <= 29) faixaEtaria = '25 a 29 anos';
+                else if (idade >= 30 && idade <= 34) faixaEtaria = '30 a 34 anos';
+                else if (idade >= 35 && idade <= 39) faixaEtaria = '35 a 39 anos';
+                else if (idade >= 40 && idade <= 44) faixaEtaria = '40 a 44 anos';
+                else if (idade >= 45 && idade <= 49) faixaEtaria = '45 a 49 anos';
+                else if (idade >= 50 && idade <= 54) faixaEtaria = '50 a 54 anos';
+                else if (idade >= 55 && idade <= 59) faixaEtaria = '55 a 59 anos';
+                else if (idade >= 60 && idade <= 64) faixaEtaria = '60 a 64 anos';
+                else if (idade >= 65 && idade <= 69) faixaEtaria = '65 a 69 anos';
+                else if (idade >= 70 && idade <= 74) faixaEtaria = '70 a 74 anos';
+                else if (idade >= 75 && idade <= 79) faixaEtaria = '75 a 79 anos';
+                else faixaEtaria = '80 ou mais anos';
+                
+                return faixaEtaria === filterValue;
+              }
+              return false;
+            });
+            break;
+
+          case 'desfecho':
+            filteredData = filteredData.filter(n => {
+              const desfecho = n?.original?.desfecho;
+              return desfecho === filterValue;
+            });
+            break;
         }
       }
     });
@@ -732,7 +775,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       unidade: null,
       hipotese: null,
       trauma: null,
-      sintoma: null
+      sintoma: null,
+      faixaEtaria: null,
+      desfecho: null
     });
     setSelectedCategory(null);
     setSelectedEvento("Todos");
@@ -2931,6 +2976,34 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
           )}
+
+          {/* Novos Gráficos Solicitados */}
+          {/* Pirâmide Etária por Sexo */}
+          <div className="sm:col-span-2 lg:col-span-3 xl:col-span-3">
+            <PiramideEtariaChart 
+              toggleFilter={toggleFilter}
+              activeFilters={activeFilters}
+              filteredData={getFilteredData()}
+            />
+          </div>
+
+          {/* Desfecho dos Casos */}
+          <div className="sm:col-span-2 lg:col-span-2 xl:col-span-2">
+            <DesfechoCasosChart 
+              toggleFilter={toggleFilter}
+              activeFilters={activeFilters}
+              filteredData={getFilteredData()}
+            />
+          </div>
+
+          {/* Estabelecimentos por Número de Casos */}
+          <div className="sm:col-span-2 lg:col-span-3 xl:col-span-5">
+            <EstabelecimentosCasosChart 
+              toggleFilter={toggleFilter}
+              activeFilters={activeFilters}
+              filteredData={getFilteredData()}
+            />
+          </div>
         </main>
       )}
 
@@ -2969,53 +3042,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             key={`mapa-${lastUpdate}-${notificacoes.length}`}
             notificacoes={notificacoes} 
           />
-        </main>
-      )}
-
-      {/* Aba de Tabelas - Dados Tabulares */}
-      {activeTab === "tabelas" && (
-        <main className="max-w-7xl mx-auto px-4 py-6">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              Dados Tabulares
-            </h2>
-            <p className="text-gray-600">
-              Dados detalhados em formato de tabela para análise aprofundada
-            </p>
-          </div>
-          
-          <div className="bg-white p-6 rounded-lg shadow-sm">
-            <div className="text-center py-12 text-gray-500">
-              <Table className="h-12 w-12 mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">Tabelas em Desenvolvimento</h3>
-              <p>Esta funcionalidade será implementada em breve com tabelas interativas e filtros avançados.</p>
-            </div>
-          </div>
-        </main>
-      )}
-
-      {/* Aba de Histórico - Análise Temporal */}
-      {activeTab === "historico" && (
-        <main className="max-w-7xl mx-auto px-4 py-6">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              Análise Histórica
-            </h2>
-            <p className="text-gray-600">
-              Tendências e padrões históricos dos dados de saúde
-            </p>
-          </div>
-          
-          <div className="bg-white p-6 rounded-lg shadow-sm">
-            <div className="text-center py-12 text-gray-500">
-              <Clock className="h-12 w-12 mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">Análise Histórica em Desenvolvimento</h3>
-              <p>Esta funcionalidade será implementada em breve com análises temporais e tendências.</p>
-            </div>
-          </div>
-          
-          {/* TEMPORÁRIO: Formulário de teste para investigar problema de horário */}
-          <TestTimeForm />
         </main>
       )}
 
