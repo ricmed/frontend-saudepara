@@ -51,6 +51,7 @@ import {
 } from "lucide-react";
 
 // 🆕 NOVOS IMPORTS: Componentes do dashboard aprimorado
+import GeographicLocationPanel from './components/GeographicLocationPanel';
 import DashboardTabs, { useDashboardTabs } from './components/DashboardTabs';
 import AIInsights from './components/AIInsights';
 import AIChat from './components/AIChat';
@@ -332,7 +333,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     sintoma: null,
     faixaEtaria: null,
     desfecho: null,
-    dataNotificacao: null // 🆕 Novo filtro por data de criação da notificação
+    dataNotificacao: null, // 🆕 Novo filtro por data de criação da notificação
+    // 🆕 NOVOS FILTROS PARA LOCALIZAÇÃO GEOGRÁFICA
+    pais: null,
+    estado: null,
+    municipio: null,
+    bairro: null
   });
   
   // 🆕 ESTADOS PARA FILTRO POR DATA DE NOTIFICAÇÃO
@@ -363,6 +369,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   const [originalTrauma, setOriginalTrauma] = useState<ChartDataItem[]>([]);
   const [originalGenero, setOriginalGenero] = useState<ChartDataItem[]>([]);
   
+  // 🆕 ESTADOS PARA DADOS DE LOCALIZAÇÃO GEOGRÁFICA
+  const [originalPais, setOriginalPais] = useState<ChartDataItem[]>([]);
+  const [originalEstado, setOriginalEstado] = useState<ChartDataItem[]>([]);
+  const [originalMunicipio, setOriginalMunicipio] = useState<ChartDataItem[]>([]);
+  const [originalBairro, setOriginalBairro] = useState<ChartDataItem[]>([]);
+  
   // Estado para os dados filtrados de cada categoria
   const [filteredRaca, setFilteredRaca] = useState<ChartDataItem[]>([]);
   const [filteredEscolaridade, setFilteredEscolaridade] = useState<ChartDataItem[]>([]);
@@ -373,6 +385,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   const [filteredHipoteses, setFilteredHipoteses] = useState<ChartDataItem[]>([]);
   const [filteredTrauma, setFilteredTrauma] = useState<ChartDataItem[]>([]);
   const [filteredGenero, setFilteredGenero] = useState<ChartDataItem[]>([]);
+  
+  // 🆕 ESTADOS PARA DADOS DE LOCALIZAÇÃO GEOGRÁFICA FILTRADOS
+  const [filteredPais, setFilteredPais] = useState<ChartDataItem[]>([]);
+  const [filteredEstado, setFilteredEstado] = useState<ChartDataItem[]>([]);
+  const [filteredMunicipio, setFilteredMunicipio] = useState<ChartDataItem[]>([]);
+  const [filteredBairro, setFilteredBairro] = useState<ChartDataItem[]>([]);
   
   // Mapeamentos de tipos de atendimento (serão inicializados com base nos dados)
   const [tipoAtendimentoMap, setTipoAtendimentoMap] = useState<Record<string, string>>({});
@@ -785,6 +803,59 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
               return false;
             });
             break;
+            
+          // 🆕 NOVOS FILTROS PARA LOCALIZAÇÃO GEOGRÁFICA
+          case 'pais':
+            filteredData = filteredData.filter(n => {
+              const paisId = n?.original?.tipo_pais_idtipo_pais;
+              if (paisId !== undefined && exportOptions?.paisOptions?.length > 0) {
+                const pais = exportOptions.paisOptions.find(
+                  (p: any) => String(p.idtipo_pais) === String(paisId)
+                );
+                return pais?.descricao === filterValue;
+              }
+              return false;
+            });
+            break;
+            
+          case 'estado':
+            filteredData = filteredData.filter(n => {
+              const estadoId = n?.original?.tipo_estado_idtipo_estado;
+              if (estadoId !== undefined && exportOptions?.estadoOptions?.length > 0) {
+                const estado = exportOptions.estadoOptions.find(
+                  (e: any) => String(e.idtipo_estado) === String(estadoId)
+                );
+                return estado?.descricao === filterValue;
+              }
+              return false;
+            });
+            break;
+            
+          case 'municipio':
+            filteredData = filteredData.filter(n => {
+              const municipioId = n?.original?.tipo_municipio_idtipo_municipio;
+              if (municipioId !== undefined && exportOptions?.municipioOptions?.length > 0) {
+                const municipio = exportOptions.municipioOptions.find(
+                  (m: any) => String(m.idtipo_municipio) === String(municipioId)
+                );
+                return municipio?.descricao === filterValue;
+              }
+              return false;
+            });
+            break;
+            
+          case 'bairro':
+            filteredData = filteredData.filter(n => {
+              const bairroId = n?.original?.tipo_bairro_idtipo_bairro;
+              if (bairroId !== undefined && exportOptions?.bairroOptions?.length > 0) {
+                const bairro = exportOptions.bairroOptions.find(
+                  (b: any) => String(b.idtipo_bairro) === String(bairroId)
+                );
+                return bairro?.descricao === filterValue;
+              }
+              return false;
+            });
+            break;
         }
       }
     });
@@ -825,7 +896,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       sintoma: null,
       faixaEtaria: null,
       desfecho: null,
-      dataNotificacao: null // 🆕 Incluir filtro de data
+      dataNotificacao: null, // 🆕 Incluir filtro de data
+      // 🆕 INCLUIR FILTROS DE LOCALIZAÇÃO GEOGRÁFICA
+      pais: null,
+      estado: null,
+      municipio: null,
+      bairro: null
     });
     setSelectedCategory(null);
     setSelectedEvento("Todos");
@@ -1151,13 +1227,360 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     return COLORS.normal;                            // azul
   }, []);
 
+  // 🏳️ FUNÇÃO ESPECIAL PARA PROCESSAR ESTADOS COM CORES ESPECÍFICAS
+  const processarEstados = useCallback((
+    dados: any[],
+    campoId: string,
+    opcoes: any[] = [],
+    idField: string,
+    descField: string
+  ) => {
+    // Função que mapeia estados brasileiros para cores características
+    const getStateColorFromBackend = (stateName: string): string => {
+      // Cores características baseadas na identidade visual/bandeira de cada estado brasileiro
+      const stateSpecificColors: Record<string, string> = {
+        // Região Norte
+        "Acre": "#006837", // Verde da floresta amazônica
+        "Amapá": "#1B5E20", // Verde escuro amazônico
+        "Amazonas": "#2E7D32", // Verde da Amazônia
+        "Pará": "#1976D2", // Azul do rio e céu amazônico - DESTAQUE ESPECIAL PARA O PARÁ!
+        "Rondônia": "#8BC34A", // Verde claro
+        "Roraima": "#4CAF50", // Verde médio
+        "Tocantins": "#81C784", // Verde claro dourado
+        
+        // Região Nordeste  
+        "Alagoas": "#0277BD", // Azul do mar
+        "Bahia": "#FF9800", // Laranja/dourado
+        "Ceará": "#F57C00", // Laranja do sol
+        "Maranhão": "#D32F2F", // Vermelho
+        "Paraíba": "#1976D2", // Azul
+        "Pernambuco": "#FF5722", // Vermelho/laranja
+        "Piauí": "#795548", // Marrom/terra
+        "Rio Grande do Norte": "#00BCD4", // Azul claro do litoral
+        "Sergipe": "#009688", // Verde azulado
+        
+        // Região Centro-Oeste
+        "Distrito Federal": "#9C27B0", // Roxo (Brasília)
+        "Goiás": "#CDDC39", // Verde amarelado do cerrado
+        "Mato Grosso": "#8BC34A", // Verde do pantanal
+        "Mato Grosso do Sul": "#4CAF50", // Verde pantanal
+        
+        // Região Sudeste
+        "Espírito Santo": "#00E676", // Verde claro
+        "Minas Gerais": "#FFC107", // Amarelo/dourado das montanhas
+        "Rio de Janeiro": "#2196F3", // Azul carioca
+        "São Paulo": "#E91E63", // Rosa/magenta industrial
+        
+        // Região Sul
+        "Paraná": "#4CAF50", // Verde do pinheiro
+        "Rio Grande do Sul": "#F44336", // Vermelho gaúcho
+        "Santa Catarina": "#03A9F4"  // Azul catarinense
+      };
+      
+      return stateSpecificColors[stateName] || "#757575"; // Cinza como fallback
+    };
+
+    // Contar ocorrências usando a mesma lógica da processarCategoria
+    const contagem: Record<string, {count: number, items: any[]}> = {};
+    
+    const getPropSafely = (obj: any, path: string): any => {
+      if (!obj) return undefined;
+      
+      const partes = path.split('.');
+      let valor = obj;
+      
+      for (const parte of partes) {
+        if (valor && typeof valor === 'object' && parte in valor) {
+          valor = valor[parte];
+        } else {
+          return undefined;
+        }
+      }
+      
+      return valor;
+    };
+
+    dados.forEach((item) => {
+      let valor = getPropSafely(item, campoId);
+      
+      if (valor !== undefined && valor !== null) {
+        const id = String(valor);
+        if (!contagem[id]) {
+          contagem[id] = { count: 0, items: [] };
+        }
+        contagem[id].count += 1;
+        contagem[id].items.push(item);
+      } else {
+        if (!contagem["unknown"]) {
+          contagem["unknown"] = { count: 0, items: [] };
+        }
+        contagem["unknown"].count += 1;
+        contagem["unknown"].items.push(item);
+      }
+    });
+
+    // Converter para o formato de gráfico com cores específicas baseadas na identidade do estado
+    const resultado: ChartDataItem[] = [];
+
+    for (const [id, data] of Object.entries(contagem)) {
+      if (id === "unknown") {
+        resultado.push({
+          name: "Ignorado",
+          value: data.count,
+          fill: COLORS.ignorado,
+          original: data.items
+        });
+        continue;
+      }
+
+      // Buscar a descrição nas opções do backend
+      const opcaoEncontrada = opcoes.find((opt) => String(opt[idField]) === id);
+      const descricao = opcaoEncontrada ? opcaoEncontrada[descField] : `Estado ${id}`;
+      
+      // Usar cor específica baseada na identidade do estado brasileiro
+      const fill = getStateColorFromBackend(descricao);
+
+      resultado.push({
+        name: descricao,
+        value: data.count,
+        fill: fill,
+        original: data.items
+      });
+    }
+
+    return resultado.sort((a, b) => b.value - a.value); // Ordenar pelo valor
+  }, []);
+
+  // 🏳️ FUNÇÃO ESPECIAL PARA PROCESSAR PAÍSES COM CORES ESPECÍFICAS
+  const processarPaises = useCallback((
+    dados: any[],
+    campoId: string,
+    opcoes: any[] = [],
+    idField: string,
+    descField: string
+  ) => {
+    // Função que mapeia países para cores características baseadas em suas bandeiras/identidade
+    const getCountryColorFromBackend = (countryName: string): string => {
+      // Mapeamento de cores específicas para países baseado em suas bandeiras e identidade nacional
+      const countrySpecificColors: Record<string, string> = {
+        // Brasil - Verde e amarelo, usando verde como predominante
+        "Brasil": "#009B3A", // Verde bandeira brasileira
+        
+        // Países das Américas
+        "Argentina": "#74ACDF", // Azul celeste da bandeira
+        "Estados Unidos": "#B22234", // Vermelho da bandeira
+        "Canadá": "#FF0000", // Vermelho da folha de bordo
+        "México": "#006341", // Verde da bandeira mexicana
+        "Chile": "#0033A0", // Azul da bandeira chilena
+        "Colômbia": "#FCDD09", // Amarelo da bandeira
+        "Peru": "#D91023", // Vermelho da bandeira
+        "Venezuela": "#FCDD09", // Amarelo da bandeira
+        "Uruguai": "#0038A8", // Azul da bandeira
+        "Paraguai": "#D52B1E", // Vermelho da bandeira
+        "Bolívia, Estado Plurinacional da": "#D52B1E", // Vermelho da bandeira
+        "Equador": "#FFE800", // Amarelo da bandeira
+        "Costa Rica": "#002868", // Azul da bandeira
+        "Panamá": "#005293", // Azul da bandeira
+        "Cuba": "#002A8F", // Azul da bandeira
+        "Jamaica": "#009B3A", // Verde da bandeira
+        "República Dominicana": "#002D62", // Azul da bandeira
+        
+        // Europa
+        "França": "#002654", // Azul da bandeira francesa
+        "Alemanha": "#000000", // Preto da bandeira alemã
+        "Itália": "#009246", // Verde da bandeira italiana
+        "Espanha": "#C60B1E", // Vermelho da bandeira
+        "Portugal": "#046A38", // Verde da bandeira portuguesa
+        "Reino Unido": "#012169", // Azul da bandeira
+        "Países Baixos (Holanda)": "#21468B", // Azul da bandeira holandesa
+        "Bélgica": "#000000", // Preto da bandeira
+        "Suíça": "#DC143C", // Vermelho da bandeira
+        "Áustria": "#ED2939", // Vermelho da bandeira
+        "Suécia": "#006AA7", // Azul da bandeira
+        "Noruega": "#002868", // Azul da bandeira
+        "Dinamarca": "#C60C30", // Vermelho da bandeira
+        "Finlândia": "#002F6C", // Azul da bandeira
+        "Grécia": "#0D5EAF", // Azul da bandeira grega
+        "Turquia": "#E30A17", // Vermelho da bandeira
+        "Rússia, Federação da": "#0033A0", // Azul da bandeira
+        "Polônia, República da": "#DC143C", // Vermelho da bandeira
+        "Ucrânia": "#005BBB", // Azul da bandeira
+        
+        // Ásia e Oceania
+        "China, República Popular": "#DE2910", // Vermelho da bandeira chinesa
+        "Japão": "#BC002D", // Vermelho da bandeira japonesa
+        "Coréia (do Sul), República da": "#003478", // Azul da bandeira
+        "Índia": "#FF9933", // Açafrão da bandeira indiana
+        "Austrália": "#012169", // Azul da bandeira
+        "Nova Zelândia": "#012169", // Azul da bandeira
+        "Israel": "#0038B8", // Azul da bandeira
+        "Arábia Saudita": "#006C35", // Verde da bandeira
+        "Emirados Árabes Unidos": "#00732F", // Verde da bandeira
+        "Irã, República Islâmica do": "#239F40", // Verde da bandeira
+        "Iraque": "#CE1126", // Vermelho da bandeira
+        "Tailândia": "#2E2D68", // Azul da bandeira
+        "Vietnã": "#DA020E", // Vermelho da bandeira
+        "Indonésia": "#CE1126", // Vermelho da bandeira
+        "Filipinas": "#0038A8", // Azul da bandeira
+        "Malásia": "#010066", // Azul da bandeira
+        "Cingapura": "#EE0000", // Vermelho da bandeira
+        
+        // África
+        "Egito": "#CE1126", // Vermelho da bandeira
+        "África do Sul": "#007749", // Verde da bandeira
+        "Nigéria": "#008751", // Verde da bandeira
+        "Marrocos": "#C1272D", // Vermelho da bandeira
+        "Tunísia": "#E70013", // Vermelho da bandeira
+        "Angola": "#CE1126", // Vermelho da bandeira
+        "Moçambique": "#009639", // Verde da bandeira
+        "Cabo Verde, República de": "#003893", // Azul da bandeira
+        "Gana": "#006B3F", // Verde da bandeira
+        "Quênia": "#BB0000", // Vermelho da bandeira
+        "Etiópia": "#009639", // Verde da bandeira
+        
+        // Países adicionais com cores representativas
+        "Formosa (Taiwan)": "#FE0000", // Vermelho da bandeira
+        "Hong Kong": "#BA0000", // Vermelho
+        "Macau": "#00785E", // Verde
+        "Coreia do Norte": "#024FA2", // Azul da bandeira
+        "Paquistão": "#01411C", // Verde da bandeira
+        "Bangladesh": "#006A4E", // Verde da bandeira
+        "Sri Lanka": "#8D153A", // Vermelho da bandeira
+        "Mianmar (Birmânia)": "#FECB00", // Amarelo da bandeira
+        "Camboja": "#032EA1", // Azul da bandeira
+        "Laos, Rep.Pop.Democr.do": "#CE1126", // Vermelho da bandeira
+        "Nepal": "#003893", // Azul da bandeira
+        "Butão": "#FFD520", // Amarelo da bandeira
+        "Afeganistão": "#000000", // Preto da bandeira
+        "Cazaquistão, República do": "#00AFCA", // Azul da bandeira
+        "Uzbequistão, República do": "#1EB53A", // Verde da bandeira
+        "Turcomenistão, República do": "#00B04F", // Verde da bandeira
+        "Quirguiz, República da": "#E4002B", // Vermelho da bandeira
+        "Tadjiquistão, República do": "#006600", // Verde da bandeira
+        "Mongólia": "#0066CC", // Azul da bandeira
+        "Geórgia, República da": "#FFFFFF", // Branco - usar cinza claro
+        "Armênia, República da": "#D90012", // Vermelho da bandeira
+        "Azerbaijão, República do": "#3F9C35" // Verde da bandeira
+      };
+      
+      // Se temos uma cor específica para o país, usar ela
+      if (countrySpecificColors[countryName]) {
+        return countrySpecificColors[countryName];
+      }
+      
+      // Para países não mapeados, usar uma paleta de cores harmoniosas
+      const fallbackColors = [
+        "#2E8B57", // Sea Green
+        "#4682B4", // Steel Blue  
+        "#CD853F", // Peru
+        "#8FBC8F", // Dark Sea Green
+        "#B8860B", // Dark Goldenrod
+        "#9370DB", // Medium Purple
+        "#20B2AA", // Light Sea Green
+        "#CD5C5C", // Indian Red
+        "#4169E1", // Royal Blue
+        "#32CD32", // Lime Green
+        "#FF6347", // Tomato
+        "#1E90FF", // Dodger Blue
+        "#FF8C00", // Dark Orange
+        "#00CED1", // Dark Turquoise
+        "#FFD700", // Gold
+        "#DC143C", // Crimson
+        "#00FA9A", // Medium Spring Green
+        "#8A2BE2", // Blue Violet
+        "#FF1493", // Deep Pink
+        "#00BFFF"  // Deep Sky Blue
+      ];
+      
+      // Gerar índice baseado no nome do país para consistência
+      let hash = 0;
+      for (let i = 0; i < countryName.length; i++) {
+        const char = countryName.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+      }
+      
+      return fallbackColors[Math.abs(hash) % fallbackColors.length];
+    };
+
+    // Contar ocorrências usando a mesma lógica da processarCategoria
+    const contagem: Record<string, {count: number, items: any[]}> = {};
+    
+    const getPropSafely = (obj: any, path: string): any => {
+      if (!obj) return undefined;
+      
+      const partes = path.split('.');
+      let valor = obj;
+      
+      for (const parte of partes) {
+        if (valor && typeof valor === 'object' && parte in valor) {
+          valor = valor[parte];
+        } else {
+          return undefined;
+        }
+      }
+      
+      return valor;
+    };
+
+    dados.forEach((item) => {
+      let valor = getPropSafely(item, campoId);
+      
+      if (valor !== undefined && valor !== null) {
+        const id = String(valor);
+        if (!contagem[id]) {
+          contagem[id] = { count: 0, items: [] };
+        }
+        contagem[id].count += 1;
+        contagem[id].items.push(item);
+      } else {
+        if (!contagem["unknown"]) {
+          contagem["unknown"] = { count: 0, items: [] };
+        }
+        contagem["unknown"].count += 1;
+        contagem["unknown"].items.push(item);
+      }
+    });
+
+    // Converter para o formato de gráfico com cores específicas baseadas na lista do backend
+    const resultado: ChartDataItem[] = [];
+
+    for (const [id, data] of Object.entries(contagem)) {
+      if (id === "unknown") {
+        resultado.push({
+          name: "Ignorado",
+          value: data.count,
+          fill: COLORS.ignorado,
+          original: data.items
+        });
+        continue;
+      }
+
+      // Buscar a descrição nas opções do backend
+      const opcaoEncontrada = opcoes.find((opt) => String(opt[idField]) === id);
+      const descricao = opcaoEncontrada ? opcaoEncontrada[descField] : `País ${id}`;
+      
+      // Usar cor específica baseada na identidade do país
+      const fill = getCountryColorFromBackend(descricao);
+
+      resultado.push({
+        name: descricao,
+        value: data.count,
+        fill: fill,
+        original: data.items
+      });
+    }
+
+    return resultado.sort((a, b) => b.value - a.value); // Ordenar pelo valor
+  }, []);
+
   const processarCategoria = useCallback((
     dados: any[],
     campoId: string,
     opcoes: any[] = [],
     idField: string,
     descField: string,
-    cores: string[],
+    _cores: string[],
     tipoCores: 'normal' | 'pie' = 'normal'
   ) => {
     // Primeiro contar ocorrências
@@ -1309,7 +1732,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     opcoes: any[] = [],
     idField: string,
     descField: string,
-    cores: string[],
+    _cores: string[],
     tipoCores: 'normal' | 'pie' = 'normal'
   ) => {
     // Contagem para os tipos relacionados
@@ -1556,15 +1979,89 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         }
       }
       
+      // 🆕 PROCESSAMENTO DOS DADOS DE LOCALIZAÇÃO GEOGRÁFICA
+      // País de residência - usar função específica com cores individuais
+      console.log("🏳️ Processando países do backend:", exportOptions.paisOptions?.length || 0, "países disponíveis");
+      if (exportOptions.paisOptions?.length > 0) {
+        console.log("🌍 Lista de países:", exportOptions.paisOptions.map((p: any) => p.descricao).sort());
+      }
+      
+      const paisPorNotificacao = processarPaises(
+        dadosFiltrados,
+        "original.tipo_pais_idtipo_pais",
+        exportOptions.paisOptions || [],
+        "idtipo_pais",
+        "descricao"
+      );
+      if (paisPorNotificacao.length > 0) {
+        console.log("🏳️ Países com dados:", paisPorNotificacao.map(p => `${p.name} (${p.value})`));
+        setFilteredPais(paisPorNotificacao);
+        if (originalPais.length === 0) {
+          setOriginalPais(paisPorNotificacao);
+        }
+      }
+
+      // Estado/UF de residência com cores características dos estados brasileiros
+      const estadoPorNotificacao = processarEstados(
+        dadosFiltrados,
+        "original.tipo_estado_idtipo_estado",
+        exportOptions.estadoOptions || [],
+        "idtipo_estado", 
+        "descricao"
+      );
+      if (estadoPorNotificacao.length > 0) {
+        setFilteredEstado(estadoPorNotificacao);
+        if (originalEstado.length === 0) {
+          setOriginalEstado(estadoPorNotificacao);
+        }
+      }
+
+      // Municípios de residência
+      const municipioPorNotificacao = processarCategoria(
+        dadosFiltrados,
+        "original.tipo_municipio_idtipo_municipio",
+        exportOptions.municipioOptions || [],
+        "idtipo_municipio",
+        "descricao", 
+        COLORS.blue,
+        'normal'
+      );
+      
+      if (municipioPorNotificacao.length > 0) {
+        setFilteredMunicipio(municipioPorNotificacao);
+        if (originalMunicipio.length === 0) {
+          setOriginalMunicipio(municipioPorNotificacao);
+        }
+      }
+
+      // Bairros de residência (específicos de Belém)
+      const bairroPorNotificacao = processarCategoria(
+        dadosFiltrados,
+        "original.tipo_bairro_idtipo_bairro",
+        exportOptions.bairroOptions || [],
+        "idtipo_bairro",
+        "descricao",
+        COLORS.blue,
+        'normal'
+      );
+      if (bairroPorNotificacao.length > 0) {
+        setFilteredBairro(bairroPorNotificacao);
+        if (originalBairro.length === 0) {
+          setOriginalBairro(bairroPorNotificacao);
+        }
+      }
+      
       return true;
     } catch (error) {
       console.error("Erro ao processar dados para gráficos:", error);
       return false;
     }
-  }, [exportOptions, processarCategoria, processarCategoriaMuitosParaMuitos, 
+  }, [exportOptions, processarCategoria, processarCategoriaMuitosParaMuitos, processarPaises,
       originalRaca, originalEscolaridade, originalUnidades, originalGenero, 
       originalSintomas, originalTipoAtendimento, originalPublico, 
-      originalHipoteses, originalTrauma]);
+      originalHipoteses, originalTrauma, 
+      // 🆕 INCLUIR ESTADOS ORIGINAIS DE LOCALIZAÇÃO GEOGRÁFICA
+      originalPais, originalEstado, originalMunicipio, originalBairro]);
 
   // Função para calcular estatísticas a partir das notificações
   const calcularEstatisticas = useCallback((dadosFiltrados: any[] = []) => {
@@ -2653,6 +3150,18 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 {statCounts.qbrn.toLocaleString()}
               </p>
             </div>
+          </div>
+
+          {/* 🆕 PAINEL DE LOCALIZAÇÃO GEOGRÁFICA */}
+          <div className="sm:col-span-2 lg:col-span-3 xl:col-span-5">
+            <GeographicLocationPanel
+              paisData={filteredPais}
+              estadoData={filteredEstado}
+              municipioData={filteredMunicipio}
+              bairroData={filteredBairro}
+              onFilterClick={toggleFilter}
+              activeFilters={activeFilters}
+            />
           </div>
 
           {/* Gráfico de Público Atendido */}

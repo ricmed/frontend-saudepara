@@ -25,6 +25,7 @@ const DashboardPage: React.FC = () => {
           publicoOptions,
           paisOptions,
           estadoOptions,
+          municipioOptions,
           racaOptions,
           escolaridadeOptions,
           generoOptions,
@@ -41,6 +42,7 @@ const DashboardPage: React.FC = () => {
           NotificacaoService.getPublicoOptions(),
           NotificacaoService.getPaisOptions(),
           NotificacaoService.getEstadoOptions(),
+          NotificacaoService.getMunicipioOptions(), // 🆕 CORRIGIDO: Carregar municípios
           NotificacaoService.getRacaOptions(),
           NotificacaoService.getEscolaridadeOptions(),
           NotificacaoService.getGeneroOptions(),
@@ -60,7 +62,7 @@ const DashboardPage: React.FC = () => {
           publicoOptions,
           paisOptions,
           estadoOptions,
-          municipioOptions: [], // Serão carregados sob demanda quando necessário
+          municipioOptions, // 🆕 CORRIGIDO: Usar a variável carregada
           bairroOptions,
           generoOptions,
           racaOptions,
@@ -86,6 +88,7 @@ const DashboardPage: React.FC = () => {
           publicos: publicoOptions.length,
           paises: paisOptions.length,
           estados: estadoOptions.length,
+          municipios: municipioOptions.length, // 🆕 ADICIONADO: Log de municípios
           racas: racaOptions.length,
           escolaridades: escolaridadeOptions.length,
           generos: generoOptions.length,

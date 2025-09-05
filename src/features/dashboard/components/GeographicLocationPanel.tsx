@@ -1,0 +1,955 @@
+import React, { useState } from 'react';
+import { MapPin, Globe, Building, Home } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+
+// 🏳️ FUNÇÃO PARA OBTER URL DA BANDEIRA
+const getFlagUrl = (countryName: string): string | null => {
+  const countryCode = getCountryFlagCode(countryName);
+  if (!countryCode) return null;
+  return `https://flagcdn.com/w20/${countryCode}.png`;
+};
+
+// 🏳️ MAPEAMENTO DINÂMICO DE PAÍSES PARA CÓDIGOS DE BANDEIRAS
+// Sistema completo que mapeia todos os 247 países do backend para códigos ISO
+const getCountryFlagCode = (countryName: string): string | null => {
+  // Mapeamento direto dos nomes do backend para códigos ISO 3166-1 alpha-2
+  const countryMappings: Record<string, string> = {
+    "Afeganistão": "af",
+    "Aland, Ilhas": "ax", 
+    "Albânia, República da": "al",
+    "Alemanha": "de",
+    "Andorra": "ad",
+    "Angola": "ao",
+    "Anguilla": "ai",
+    "Antigua E Barbuda": "ag",
+    "Antilhas Holandesas": "an", // Código histórico
+    "Argentina": "ar",
+    "Argélia": "dz",
+    "Armênia, República da": "am",
+    "Aruba": "aw",
+    "Arábia Saudita": "sa",
+    "Austrália": "au",
+    "Azerbaijão, República do": "az",
+    "Bahamas, Ilhas": "bs",
+    "Bahrein, Ilhas": "bh",
+    "Bangladesh": "bd",
+    "Barbados": "bb",
+    "Belarus, República da": "by",
+    "Belize": "bz",
+    "Benin": "bj",
+    "Bermudas": "bm",
+    "Bolívia, Estado Plurinacional da": "bo",
+    "Bonaire, Saint Eustatius e Saba": "bq",
+    "Bosnia-Herzegovina (República da)": "ba",
+    "Botsuana": "bw",
+    "Bouvet, Ilhas": "bv",
+    "Brasil": "br",
+    "Brunei": "bn",
+    "Bulgária, República da": "bg",
+    "Burkina Faso": "bf",
+    "Burundi": "bi",
+    "Butão": "bt",
+    "Bélgica": "be",
+    "Cabo Verde, República de": "cv",
+    "Camarões": "cm",
+    "Camboja": "kh",
+    "Canadá": "ca",
+    "Canárias, Ilhas": "es", // Usar código da Espanha
+    "Catar": "qa",
+    "Cayman, Ilhas": "ky",
+    "Cazaquistão, República do": "kz",
+    "Chade": "td",
+    "Chile": "cl",
+    "China, República Popular": "cn",
+    "Chipre": "cy",
+    "Christmas,Ilhas (Navidad)": "cx",
+    "Cingapura": "sg",
+    "Cocos-Keeling, Ilhas": "cc",
+    "Colômbia": "co",
+    "Comores, Ilhas": "km",
+    "Congo": "cg",
+    "Congo, República Democrática do": "cd",
+    "Cook, Ilhas": "ck",
+    "Coréia (do Norte), Rep.Pop.Democrática": "kp",
+    "Coréia (do Sul), República da": "kr",
+    "Costa Rica": "cr",
+    "Costa do Marfim": "ci",
+    "Coveite": "kw", // Kuwait
+    "Croácia, República da": "hr",
+    "Cuba": "cu",
+    "Curaçao": "cw",
+    "Dinamarca": "dk",
+    "Djibuti": "dj",
+    "Dominica, Ilha": "dm",
+    "Egito": "eg",
+    "El Salvador": "sv",
+    "Emirados Árabes Unidos": "ae",
+    "Equador": "ec",
+    "Eritreia": "er",
+    "Eslovaca, República": "sk",
+    "Eslovênia, República da": "si",
+    "Espanha": "es",
+    "Estados Unidos": "us",
+    "Estônia, República da": "ee",
+    "Etiópia": "et",
+    "Falkland (Ilhas Malvinas)": "fk",
+    "Fiji": "fj",
+    "Filipinas": "ph",
+    "Finlândia": "fi",
+    "Formosa (Taiwan)": "tw",
+    "França": "fr",
+    "Féroe, Ilhas": "fo",
+    "Gabão": "ga",
+    "Gana": "gh",
+    "Geórgia, República da": "ge",
+    "Gibraltar": "gi",
+    "Granada": "gd",
+    "Groenlândia": "gl",
+    "Grécia": "gr",
+    "Guadalupe": "gp",
+    "Guam": "gu",
+    "Guatemala": "gt",
+    "Guiana": "gy",
+    "Guiana Francesa": "gf",
+    "Guiné": "gn",
+    "Guiné Equatorial": "gq",
+    "Guiné-Bissau": "gw",
+    "Gâmbia": "gm",
+    "Haiti": "ht",
+    "Honduras": "hn",
+    "Hong Kong": "hk",
+    "Hungria, República da": "hu",
+    "Iemen": "ye",
+    "Ilhas do Canal (Jersey e Guernsey)": "je", // Jersey como representativo
+    "Indonésia": "id",
+    "Iraque": "iq",
+    "Irlanda": "ie",
+    "Irã, República Islâmica do": "ir",
+    "Islândia": "is",
+    "Israel": "il",
+    "Itália": "it",
+    "Jamaica": "jm",
+    "Japão": "jp",
+    "Johnston, Ilhas": "um", // US Minor Outlying Islands
+    "Jordânia": "jo",
+    "Kiribati": "ki",
+    "Laos, Rep.Pop.Democr.do": "la",
+    "Lebuan, Ilhas": "my", // Parte da Malásia
+    "Lesoto": "ls",
+    "Letônia, República da": "lv",
+    "Libéria": "lr",
+    "Liechtenstein": "li",
+    "Lituânia, República da": "lt",
+    "Luxemburgo": "lu",
+    "Líbano": "lb",
+    "Líbia": "ly",
+    "Macau": "mo",
+    "Macedônia, Ant.Rep.Iugoslava": "mk",
+    "Madagascar": "mg",
+    "Madeira, Ilha da": "pt", // Território português
+    "Malavi": "mw",
+    "Maldivas": "mv",
+    "Mali": "ml",
+    "Malta": "mt",
+    "Malásia": "my",
+    "Man, Ilha de": "im",
+    "Marianas do Norte": "mp",
+    "Marrocos": "ma",
+    "Marshall, Ilhas": "mh",
+    "Martinica": "mq",
+    "Mauritânia": "mr",
+    "Maurício": "mu",
+    "Mianmar (Birmânia)": "mm",
+    "Micronésia": "fm",
+    "Midway, Ilhas": "um", // US Minor Outlying Islands
+    "Moldavia, República da": "md",
+    "Mongólia": "mn",
+    "Montenegro": "me",
+    "Montserrat, Ilhas": "ms",
+    "Moçambique": "mz",
+    "México": "mx",
+    "Mônaco": "mc",
+    "Namíbia": "na",
+    "Nauru": "nr",
+    "Nepal": "np",
+    "Nicarágua": "ni",
+    "Niger": "ne",
+    "Nigéria": "ng",
+    "Niue, Ilha": "nu",
+    "Norfolk, Ilha": "nf",
+    "Noruega": "no",
+    "Nova Caledônia": "nc",
+    "Nova Zelândia": "nz",
+    "Omã": "om",
+    "Pacífico, Ilhas do (possessão dos EUA)": "um",
+    "Palau": "pw",
+    "Palestina": "ps",
+    "Panamá": "pa",
+    "Papua Nova Guiné": "pg",
+    "Paquistão": "pk",
+    "Paraguai": "py",
+    "Países Baixos (Holanda)": "nl",
+    "Peru": "pe",
+    "Pitcairn, Ilha De": "pn",
+    "Polinésia Francesa": "pf",
+    "Polônia, República da": "pl",
+    "Porto Rico": "pr",
+    "Portugal": "pt",
+    "Quirguiz, República da": "kg",
+    "Quênia": "ke",
+    "Reino Unido": "gb",
+    "República Centro-Africana": "cf",
+    "República Dominicana": "do",
+    "Reunião, Ilha": "re",
+    "Romênia": "ro",
+    "Ruanda": "rw",
+    "Rússia, Federação da": "ru",
+    "Saara Ocidental": "eh",
+    "Salomão, Ilhas": "sb",
+    "Samoa": "ws",
+    "Samoa Americana": "as",
+    "San Marino": "sm",
+    "Santa Helena": "sh",
+    "Santa Lúcia": "lc",
+    "Senegal": "sn",
+    "Serra Leoa": "sl",
+    "Servia": "rs",
+    "Seychelles": "sc",
+    "Sint Maarten": "sx",
+    "Somália": "so",
+    "Sri Lanka": "lk",
+    "Suazilândia": "sz",
+    "Sudão": "sd",
+    "Suriname": "sr",
+    "Suécia": "se",
+    "Suíça": "ch",
+    "São Bartolomeu": "bl",
+    "São Cristovão e Neves, Ilhas": "kn",
+    "São Pedro e Miquelon": "pm",
+    "São Tomé e Príncipe, Ilhas": "st",
+    "São Vicente e Granadinas": "vc",
+    "Síria, República Árabe da": "sy",
+    "Tadjiquistão, República do": "tj",
+    "Tailândia": "th",
+    "Tanzania, Rep. Unida da": "tz",
+    "Tcheca, República": "cz",
+    "Território Britânico no Oceano Índico": "io",
+    "Timor Leste": "tl",
+    "Togo": "tg",
+    "Tonga": "to",
+    "Toquelau, Ilhas": "tk",
+    "Trinidad e Tobago": "tt",
+    "Tunísia": "tn",
+    "Turcas e Caicos, Ilhas": "tc",
+    "Turcomenistão, República do": "tm",
+    "Turquia": "tr",
+    "Tuvalu": "tv",
+    "Ucrânia": "ua",
+    "Uganda": "ug",
+    "Uruguai": "uy",
+    "Uzbequistão, República do": "uz",
+    "Vanuatu": "vu",
+    "Vaticano, Est. da Cidade do": "va",
+    "Venezuela": "ve",
+    "Vietnã": "vn",
+    "Virgens, Ilhas (Britânicas)": "vg",
+    "Virgens, Ilhas (E.U.A.)": "vi",
+    "Wake, Ilha": "um", // US Minor Outlying Islands
+    "Wallis e Futuna, Ilhas": "wf",
+    "Zimbabue": "zw",
+    "Zâmbia": "zm",
+    "África do Sul": "za",
+    "Áustria": "at",
+    "Índia": "in"
+  };
+  
+  return countryMappings[countryName] || null;
+};
+
+// Interface para dados de gráfico
+interface ChartDataItem {
+  name: string;
+  value: number;
+  fill: string;
+  isAlarmante?: boolean;
+  original?: any;
+}
+
+// Interface para as props do componente
+interface GeographicLocationPanelProps {
+  paisData: ChartDataItem[];
+  estadoData: ChartDataItem[];
+  municipioData: ChartDataItem[];
+  bairroData: ChartDataItem[];
+  onFilterClick?: (category: string, value: string) => void;
+  activeFilters?: Record<string, any>;
+  exportMenu?: React.ReactNode;
+}
+
+// Componente de tooltip personalizado
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0];
+    return (
+      <div className="bg-white p-3 border rounded-lg shadow-lg">
+        <p className="font-semibold text-gray-800">{label}</p>
+        <p className="text-blue-600">
+          <span className="inline-block w-3 h-3 rounded-full mr-2" style={{ backgroundColor: data.fill }}></span>
+          Casos: <span className="font-bold">{data.value}</span>
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
+// Componente de gráfico de barra interativo
+const InteractiveBarChart: React.FC<{
+  data: ChartDataItem[];
+  title: string;
+  icon: React.ReactNode;
+  onBarClick?: (category: string, value: string) => void;
+  filterCategory: string;
+  activeFilter?: string;
+  maxItems?: number;
+}> = ({ data, title, icon, onBarClick, filterCategory, activeFilter, maxItems = 10 }) => {
+  // Limitar dados para visualização
+  const displayData = data.slice(0, maxItems);
+  
+  const handleBarClick = (data: any) => {
+    if (onBarClick && data && data.name) {
+      onBarClick(filterCategory, data.name);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          {icon}
+          <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
+          <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+            {data.length} {data.length === 1 ? 'item' : 'itens'}
+          </span>
+        </div>
+        {activeFilter && (
+          <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded">
+            <span>Filtro ativo: </span>
+            <span className="font-medium">{activeFilter}</span>
+          </div>
+        )}
+      </div>
+
+      {displayData.length > 0 ? (
+        <ResponsiveContainer width="100%" height={Math.max(200, displayData.length * 25)}>
+          <BarChart data={displayData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis 
+              dataKey="name" 
+              angle={-45}
+              textAnchor="end"
+              height={80}
+              fontSize={12}
+            />
+            <YAxis fontSize={12} />
+            <Tooltip content={<CustomTooltip />} />
+            <Bar 
+              dataKey="value" 
+              fill="#3b5bdb"
+              cursor="pointer"
+              onClick={handleBarClick}
+              radius={[2, 2, 0, 0]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      ) : (
+        <div className="flex items-center justify-center h-40 text-gray-500">
+          <div className="text-center">
+            <MapPin className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+            <p>Nenhum dado disponível</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// �️ FUNÇÃO PARA OBTER CÓDIGO DO ESTADO BRASILEIRO PARA BANDEIRAS
+const getStateFlagCode = (stateName: string): string | null => {
+  // Mapeamento dos estados brasileiros para suas siglas
+  const stateMappings: Record<string, string> = {
+    "Acre": "ac",
+    "Alagoas": "al", 
+    "Amapá": "ap",
+    "Amazonas": "am",
+    "Bahia": "ba",
+    "Ceará": "ce",
+    "Distrito Federal": "df",
+    "Espírito Santo": "es",
+    "Goiás": "go",
+    "Maranhão": "ma",
+    "Mato Grosso": "mt",
+    "Mato Grosso do Sul": "ms",
+    "Minas Gerais": "mg",
+    "Pará": "pa",
+    "Paraíba": "pb",
+    "Paraná": "pr",
+    "Pernambuco": "pe",
+    "Piauí": "pi",
+    "Rio de Janeiro": "rj",
+    "Rio Grande do Norte": "rn",
+    "Rio Grande do Sul": "rs",
+    "Rondônia": "ro",
+    "Roraima": "rr",
+    "Santa Catarina": "sc",
+    "São Paulo": "sp",
+    "Sergipe": "se",
+    "Tocantins": "to"
+  };
+  
+  return stateMappings[stateName] || null;
+};
+
+// 🎨 FUNÇÃO PARA OBTER COR CARACTERÍSTICA DO ESTADO BRASILEIRO
+const getStateColor = (stateName: string): string => {
+  // Cores características baseadas na identidade visual/bandeira de cada estado
+  const stateColors: Record<string, string> = {
+    // Região Norte
+    "Acre": "#006837", // Verde da floresta amazônica
+    "Amapá": "#1B5E20", // Verde escuro amazônico
+    "Amazonas": "#2E7D32", // Verde da Amazônia
+    "Pará": "#1976D2", // Azul do rio e céu amazônico - DESTAQUE ESPECIAL PARA O PARÁ!
+    "Rondônia": "#8BC34A", // Verde claro
+    "Roraima": "#4CAF50", // Verde médio
+    "Tocantins": "#81C784", // Verde claro dourado
+    
+    // Região Nordeste  
+    "Alagoas": "#0277BD", // Azul do mar
+    "Bahia": "#FF9800", // Laranja/dourado
+    "Ceará": "#F57C00", // Laranja do sol
+    "Maranhão": "#D32F2F", // Vermelho
+    "Paraíba": "#1976D2", // Azul
+    "Pernambuco": "#FF5722", // Vermelho/laranja
+    "Piauí": "#795548", // Marrom/terra
+    "Rio Grande do Norte": "#00BCD4", // Azul claro do litoral
+    "Sergipe": "#009688", // Verde azulado
+    
+    // Região Centro-Oeste
+    "Distrito Federal": "#9C27B0", // Roxo (Brasília)
+    "Goiás": "#CDDC39", // Verde amarelado do cerrado
+    "Mato Grosso": "#8BC34A", // Verde do pantanal
+    "Mato Grosso do Sul": "#4CAF50", // Verde pantanal
+    
+    // Região Sudeste
+    "Espírito Santo": "#00E676", // Verde claro
+    "Minas Gerais": "#FFC107", // Amarelo/dourado das montanhas
+    "Rio de Janeiro": "#2196F3", // Azul carioca
+    "São Paulo": "#E91E63", // Rosa/magenta industrial
+    
+    // Região Sul
+    "Paraná": "#4CAF50", // Verde do pinheiro
+    "Rio Grande do Sul": "#F44336", // Vermelho gaúcho
+    "Santa Catarina": "#03A9F4"  // Azul catarinense
+  };
+  
+  return stateColors[stateName] || "#757575"; // Cinza como fallback
+};
+
+// 🔗 FUNÇÃO PARA OBTER URL DA BANDEIRA DO ESTADO
+const getStateFlagUrl = (stateName: string): string => {
+  const stateCode = getStateFlagCode(stateName);
+  if (!stateCode) return "";
+  
+  // 🎯 Usando o repositório oficial de bandeiras dos estados brasileiros
+  // https://github.com/pierrelapalu/icones-bandeiras-br-uf
+  // Formato: https://raw.githubusercontent.com/pierrelapalu/icones-bandeiras-br-uf/main/png-200/BR-XX-circle.png
+  return `https://raw.githubusercontent.com/pierrelapalu/icones-bandeiras-br-uf/main/png-200/BR-${stateCode?.toUpperCase()}-circle.png`;
+};
+
+// 🎨 COMPONENTE PERSONALIZADO PARA BANDEIRA/ÍCONE DE ESTADO
+const StateFlagIcon: React.FC<{
+  stateName: string;
+  className?: string;
+  showFallback?: boolean;
+}> = ({ stateName, className = "w-6 h-4", showFallback = true }) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const stateColor = getStateColor(stateName);
+  const flagUrl = getStateFlagUrl(stateName);
+  const stateCode = getStateFlagCode(stateName);
+
+  // Se não há URL ou já deu erro, mostrar ícone personalizado
+  if (!flagUrl || imageError || !showFallback) {
+    return (
+      <div 
+        className={`${className} rounded border border-gray-200 flex items-center justify-center text-xs font-bold text-white shadow-sm`}
+        style={{ backgroundColor: stateColor }}
+        title={`${stateName} (${stateCode?.toUpperCase()})`}
+      >
+        {stateCode?.toUpperCase()}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${className} rounded border border-gray-200 overflow-hidden bg-white relative`}>
+      <img 
+        src={flagUrl}
+        alt={`Bandeira ${stateName}`}
+        className="w-full h-full object-cover"
+        onError={() => setImageError(true)}
+        onLoad={() => setImageLoaded(true)}
+        style={{ display: imageError ? 'none' : 'block' }}
+      />
+      
+      {/* Fallback enquanto carrega ou se der erro */}
+      {(!imageLoaded || imageError) && (
+        <div 
+          className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white"
+          style={{ backgroundColor: stateColor }}
+          title={`${stateName} (${stateCode?.toUpperCase()})`}
+        >
+          {stateCode?.toUpperCase()}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// �🆕 COMPONENTE HÍBRIDO ESTADOS: Gráfico de Barras + Tabela Interativa
+const StatesChartWithTable: React.FC<{
+  data: ChartDataItem[];
+  title: string;
+  icon: React.ReactNode;
+  onItemClick?: (category: string, value: string) => void;
+  filterCategory: string;
+  activeFilter?: string;
+}> = ({ data, title, icon, onItemClick, filterCategory, activeFilter }) => {
+  // Top 10 estados para o gráfico
+  const top10States = data.slice(0, 10);
+  
+  const handleBarClick = (item: any) => {
+    if (onItemClick && item && item.name) {
+      onItemClick(filterCategory, item.name);
+    }
+  };
+
+  const handleTableClick = (stateName: string) => {
+    if (onItemClick) {
+      onItemClick(filterCategory, stateName);
+    }
+  };
+
+  // Componente de célula personalizada para as barras com cores específicas
+  const CustomStateCell = (props: any) => {
+    const { payload } = props;
+    const stateColor = getStateColor(payload.name);
+    return <Cell {...props} fill={stateColor} />;
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          {icon}
+          <h3 className="text-xl font-semibold text-gray-800">{title}</h3>
+          <span className="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full">
+            {data.length} {data.length === 1 ? 'estado' : 'estados'}
+          </span>
+        </div>
+        {activeFilter && (
+          <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
+            <span>Filtro ativo: </span>
+            <span className="font-semibold">{activeFilter}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Gráfico de Barras - Top 10 */}
+        <div className="xl:col-span-2">
+          <div className="mb-4">
+            <h4 className="text-lg font-medium text-gray-700 mb-2">Top 10 Estados</h4>
+            <p className="text-sm text-gray-500">Clique nas barras para filtrar por estado</p>
+          </div>
+          
+          {top10States.length > 0 ? (
+            <ResponsiveContainer width="100%" height={400}>
+              <BarChart data={top10States} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis 
+                  dataKey="name" 
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                  fontSize={12}
+                  interval={0}
+                />
+                <YAxis fontSize={12} />
+                <Tooltip 
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0];
+                      
+                      return (
+                        <div className="bg-white p-4 border rounded-lg shadow-lg min-w-48">
+                          <div className="flex items-center gap-3 mb-2">
+                            <StateFlagIcon stateName={label} className="w-8 h-6" />
+                            <div>
+                              <p className="font-semibold text-gray-800">{label}</p>
+                              <p className="text-xs text-gray-500 uppercase">{getStateFlagCode(label)}</p>
+                            </div>
+                          </div>
+                          <p className="text-blue-600">
+                            <span className="inline-block w-3 h-3 rounded-full mr-2" style={{ backgroundColor: getStateColor(label) }}></span>
+                            <span className="font-bold">{data.value}</span> {data.value === 1 ? 'caso' : 'casos'}
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar 
+                  dataKey="value" 
+                  cursor="pointer"
+                  onClick={handleBarClick}
+                  radius={[4, 4, 0, 0]}
+                >
+                  {top10States.map((entry, index) => (
+                    <CustomStateCell key={`cell-${index}`} payload={entry} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-64 text-gray-500">
+              <div className="text-center">
+                <Building className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                <p>Nenhum dado de estado disponível</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Tabela Completa - Todos os Estados */}
+        <div className="xl:col-span-1">
+          <div className="mb-4">
+            <h4 className="text-lg font-medium text-gray-700 mb-2">Todos os Estados</h4>
+            <p className="text-sm text-gray-500">Clique para filtrar por estado</p>
+          </div>
+          
+          <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
+            <div className="space-y-2">
+              {data.map((item, index) => {
+                const isActive = activeFilter === item.name;
+                
+                return (
+                  <div
+                    key={index}
+                    className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all duration-200 ${
+                      isActive 
+                        ? 'bg-blue-100 border border-blue-300 shadow-sm' 
+                        : 'bg-white hover:bg-gray-100 border border-transparent hover:shadow-sm'
+                    }`}
+                    onClick={() => handleTableClick(item.name)}
+                  >
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className="flex items-center gap-2">
+                        <StateFlagIcon stateName={item.name} className="w-6 h-4" />
+                        <div>
+                          <span className={`font-medium text-sm ${isActive ? 'text-blue-800' : 'text-gray-700'}`}>
+                            {item.name}
+                          </span>
+                          <div className="text-xs text-gray-500 uppercase">{getStateFlagCode(item.name)}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm font-semibold ${isActive ? 'text-blue-700' : 'text-gray-600'}`}>
+                        {item.value}
+                      </span>
+                      {isActive && <span className="text-blue-500 text-xs">●</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+const CountriesChartWithTable: React.FC<{
+  data: ChartDataItem[];
+  title: string;
+  icon: React.ReactNode;
+  onItemClick?: (category: string, value: string) => void;
+  filterCategory: string;
+  activeFilter?: string;
+}> = ({ data, title, icon, onItemClick, filterCategory, activeFilter }) => {
+  // Top 10 países para o gráfico
+  const top10Countries = data.slice(0, 10);
+  
+  const handleItemClick = (countryName: string) => {
+    if (onItemClick) {
+      onItemClick(filterCategory, countryName);
+    }
+  };
+
+  const handleBarClick = (clickData: any) => {
+    if (clickData && clickData.name) {
+      handleItemClick(clickData.name);
+    }
+  };
+
+  const handleTableRowClick = (countryName: string) => {
+    handleItemClick(countryName);
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          {icon}
+          <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
+          <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+            {data.length} {data.length === 1 ? 'país' : 'países'}
+          </span>
+        </div>
+        {activeFilter && (
+          <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded">
+            <span>Filtro ativo: </span>
+            <span className="font-medium">{activeFilter}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Gráfico de Barras - Top 10 */}
+        <div className="lg:col-span-2">
+          <h4 className="text-sm font-medium text-gray-700 mb-3">Top 10 Países</h4>
+          {top10Countries.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={top10Countries} margin={{ top: 5, right: 30, left: 20, bottom: 60 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis 
+                  dataKey="name" 
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                  fontSize={11}
+                  interval={0}
+                />
+                <YAxis fontSize={12} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar 
+                  dataKey="value" 
+                  cursor="pointer"
+                  onClick={handleBarClick}
+                  radius={[2, 2, 0, 0]}
+                >
+                  {top10Countries.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-60 text-gray-500 bg-gray-50 rounded">
+              <div className="text-center">
+                <Globe className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                <p className="text-sm">Nenhum país registrado</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Tabela Interativa - Todos os países */}
+        <div className="lg:col-span-1">
+          <h4 className="text-sm font-medium text-gray-700 mb-3">Todos os Países ({data.length})</h4>
+          {data.length > 0 ? (
+            <div className="border rounded-lg max-h-80 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="text-left p-2 font-medium text-gray-700">País</th>
+                    <th className="text-right p-2 font-medium text-gray-700">Casos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.map((country, index) => (
+                    <tr 
+                      key={index}
+                      className={`cursor-pointer hover:bg-blue-50 transition-colors border-b border-gray-100 ${
+                        activeFilter === country.name ? 'bg-blue-100' : ''
+                      }`}
+                      onClick={() => handleTableRowClick(country.name)}
+                      title={`Clique para filtrar por ${country.name}`}
+                    >
+                      <td className="p-2">
+                        <div className="flex items-center gap-2">
+                          {getFlagUrl(country.name) ? (
+                            <div className="flex items-center justify-center w-5 h-4 rounded border border-gray-200 bg-white overflow-hidden flex-shrink-0">
+                              <img 
+                                src={getFlagUrl(country.name)!} 
+                                alt={`Bandeira ${country.name}`}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  // Se a imagem falhar, mostrar o quadradinho colorido
+                                  const target = e.target as HTMLImageElement;
+                                  const parent = target.parentElement;
+                                  if (parent) {
+                                    parent.innerHTML = `<div class="w-3 h-3 rounded-full" style="background-color: ${country.fill}"></div>`;
+                                  }
+                                }}
+                              />
+                            </div>
+                          ) : (
+                            <div 
+                              className="w-3 h-3 rounded-full flex-shrink-0" 
+                              style={{ backgroundColor: country.fill }}
+                            ></div>
+                          )}
+                          <span className="truncate">{country.name}</span>
+                        </div>
+                      </td>
+                      <td className="text-right p-2 font-medium text-gray-800">
+                        {country.value}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-40 text-gray-500 bg-gray-50 rounded border">
+              <div className="text-center">
+                <Globe className="h-6 w-6 mx-auto mb-1 text-gray-300" />
+                <p className="text-xs">Sem dados</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Componente principal do painel de localização geográfica
+const GeographicLocationPanel: React.FC<GeographicLocationPanelProps> = ({
+  paisData,
+  estadoData,
+  municipioData, 
+  bairroData,
+  onFilterClick,
+  activeFilters = {},
+  exportMenu
+}) => {
+  return (
+    <div className="space-y-6">
+      {/* Cabeçalho do painel */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-blue-100 rounded-lg">
+            <MapPin className="h-6 w-6 text-blue-600" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800">Localização Geográfica</h2>
+            <p className="text-sm text-gray-600">Distribuição dos casos por localização de residência</p>
+          </div>
+        </div>
+        {exportMenu}
+      </div>
+
+      {/* Grade responsiva dos gráficos */}
+      <div className="space-y-6">
+        {/* Países - Gráfico Híbrido (Barras + Tabela) */}
+        <CountriesChartWithTable
+          data={paisData}
+          title="Países de Residência"
+          icon={<Globe className="h-5 w-5 text-blue-600" />}
+          onItemClick={onFilterClick}
+          filterCategory="pais"
+          activeFilter={activeFilters?.pais}
+        />
+
+        {/* Grade para Estados, Municípios e Bairros */}
+        <div className="grid grid-cols-1 gap-6">
+          {/* Componente Híbrido - Estados/UF com Gráfico + Tabela */}
+          <div className="col-span-1">
+            <StatesChartWithTable
+              data={estadoData}
+              title="Estados/UF de Residência"
+              icon={<Building className="h-5 w-5 text-blue-600" />}
+              onItemClick={onFilterClick}
+              filterCategory="estado"
+              activeFilter={activeFilters?.estado}
+            />
+          </div>
+
+          {/* Gráfico de Barras - Municípios */}
+          <div className="col-span-1">
+            <InteractiveBarChart
+              data={municipioData}
+              title="Municípios de Residência"
+              icon={<Building className="h-5 w-5 text-green-600" />}
+              onBarClick={onFilterClick}
+              filterCategory="municipio"
+              activeFilter={activeFilters?.municipio}
+              maxItems={20}
+            />
+          </div>
+
+          {/* Gráfico de Barras - Bairros */}
+          <div className="col-span-1">
+            <InteractiveBarChart
+              data={bairroData}
+              title="Bairros de Residência"
+              icon={<Home className="h-5 w-5 text-purple-600" />}
+              onBarClick={onFilterClick}
+              filterCategory="bairro"
+              activeFilter={activeFilters?.bairro}
+              maxItems={25}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Informações adicionais */}
+      {(activeFilters?.pais || activeFilters?.estado || activeFilters?.municipio || activeFilters?.bairro) && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <MapPin className="h-5 w-5 text-blue-600" />
+            <span className="font-medium text-blue-800">Filtros de Localização Ativos</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {activeFilters?.pais && (
+              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">
+                País: {activeFilters.pais}
+              </span>
+            )}
+            {activeFilters?.estado && (
+              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">
+                Estado: {activeFilters.estado}
+              </span>
+            )}
+            {activeFilters?.municipio && (
+              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">
+                Município: {activeFilters.municipio}
+              </span>
+            )}
+            {activeFilters?.bairro && (
+              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">
+                Bairro: {activeFilters.bairro}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default GeographicLocationPanel;
