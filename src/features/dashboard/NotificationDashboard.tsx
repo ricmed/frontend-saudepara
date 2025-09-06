@@ -3145,18 +3145,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
 
-          {/* 🆕 PAINEL DE LOCALIZAÇÃO GEOGRÁFICA */}
-          <div className="sm:col-span-2 lg:col-span-3 xl:col-span-5">
-            <GeographicLocationPanel
-              paisData={filteredPais}
-              estadoData={filteredEstado}
-              municipioData={filteredMunicipio}
-              bairroData={filteredBairro}
-              onFilterClick={toggleFilter}
-              activeFilters={activeFilters}
-            />
-          </div>
-
+          {/* =============================================== */}
+          {/* LINHA 1: Distribuição por Público e Tipo de Atendimento */}
+          {/* =============================================== */}
+          
           {/* Gráfico de Público Atendido */}
           <DistribuicaoPublicoAtendidoChart
             data={filteredPublico}
@@ -3175,6 +3167,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             title="Distribuição por Tipo de Atendimento"
           />
 
+          {/* =============================================== */}
+          {/* LINHA 2: Distribuição por Sexo e Raça/Cor */}
+          {/* =============================================== */}
+          
           {/* Gráfico de Identidade de Gênero */}
           <DistribuicaoSexoChart
             data={filteredGenero}
@@ -3193,6 +3189,39 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             title="Distribuição por Raça e Cor"
           />
 
+          {/* =============================================== */}
+          {/* LINHA 3: Localização Geográfica */}
+          {/* =============================================== */}
+          
+          {/* 🆕 PAINEL DE LOCALIZAÇÃO GEOGRÁFICA */}
+          <div className="sm:col-span-2 lg:col-span-3 xl:col-span-5">
+            <GeographicLocationPanel
+              paisData={filteredPais}
+              estadoData={filteredEstado}
+              municipioData={filteredMunicipio}
+              bairroData={filteredBairro}
+              onFilterClick={toggleFilter}
+              activeFilters={activeFilters}
+            />
+          </div>
+
+          {/* =============================================== */}
+          {/* LINHA 4: Estabelecimentos */}
+          {/* =============================================== */}
+          
+          {/* Estabelecimentos por Número de Casos */}
+          <div className="sm:col-span-2 lg:col-span-3 xl:col-span-5">
+            <EstabelecimentosCasosChart 
+              toggleFilter={toggleFilter}
+              activeFilters={activeFilters}
+              filteredData={getFilteredData()}
+            />
+          </div>
+
+          {/* =============================================== */}
+          {/* LINHA 5: Sinais e Sintomas e Traumas */}
+          {/* =============================================== */}
+          
           {/* Principais Sintomas */}
           {visibleCharts.sintomas && (
             <PrincipaisSintomasChart
@@ -3220,6 +3249,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             />
           )}
 
+          {/* =============================================== */}
+          {/* LINHA 6: Hipóteses Diagnósticas */}
+          {/* =============================================== */}
+          
           {/* Hipóteses Diagnósticas */}
           {visibleCharts.hipoteses && (
             <HipotesesDiagnosticasChart
@@ -3235,7 +3268,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             />
           )}
 
-          {/* Novos Gráficos Solicitados */}
+          {/* =============================================== */}
+          {/* LINHA 7: Pirâmide Etária e Desfecho */}
+          {/* =============================================== */}
+          
           {/* Pirâmide Etária por Sexo */}
           <div className="sm:col-span-2 lg:col-span-3 xl:col-span-3">
             <PiramideEtariaChart 
@@ -3248,15 +3284,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           {/* Desfecho dos Casos */}
           <div className="sm:col-span-2 lg:col-span-2 xl:col-span-2">
             <DesfechoCasosChart 
-              toggleFilter={toggleFilter}
-              activeFilters={activeFilters}
-              filteredData={getFilteredData()}
-            />
-          </div>
-
-          {/* Estabelecimentos por Número de Casos */}
-          <div className="sm:col-span-2 lg:col-span-3 xl:col-span-5">
-            <EstabelecimentosCasosChart 
               toggleFilter={toggleFilter}
               activeFilters={activeFilters}
               filteredData={getFilteredData()}
