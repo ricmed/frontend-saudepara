@@ -1,8 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapPin, Globe, Building, Home } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-// 🏳️ FUNÇÃO PARA OBTER URL DA BANDEIRA
+// 🏳️ BANDEIRAS - FONTES E LICENÇAS
+// =====================================
+// 🌍 Países: https://flagcdn.com/ (Licença livre para uso)
+// 🇧🇷 Estados BR: https://github.com/pierrelapalu/icones-bandeiras-br-uf (CC0 License - Uso livre)
+// 
+// Estrutura real do repositório brasileiro:
+// - 4 estilos: "circle", "square-rounded", "rounded", "full"
+// - 3 formatos: SVG ⭐ (preferido), PDF, PNG (200px e 800px)
+// - Nomenclatura: {número}-{nome}-{estilo}.{ext}
+// - Exemplo SVG: /dist/rounded/svg/15-para-rounded.svg
+// - Exemplo PNG: /dist/circle/png-200/15-para-circle.png
+
+// 🏳️ FUNÇÃO PARA OBTER URL DA BANDEIRA DE PAÍSES
 const getFlagUrl = (countryName: string): string | null => {
   const countryCode = getCountryFlagCode(countryName);
   if (!countryCode) return null;
@@ -456,60 +468,214 @@ const getStateColor = (stateName: string): string => {
 };
 
 // 🔗 FUNÇÃO PARA OBTER URL DA BANDEIRA DO ESTADO
-const getStateFlagUrl = (stateName: string): string => {
-  const stateCode = getStateFlagCode(stateName);
-  if (!stateCode) return "";
-  
-  // 🎯 Usando o repositório oficial de bandeiras dos estados brasileiros
-  // https://github.com/pierrelapalu/icones-bandeiras-br-uf
-  // Formato: https://raw.githubusercontent.com/pierrelapalu/icones-bandeiras-br-uf/main/png-200/BR-XX-circle.png
-  return `https://raw.githubusercontent.com/pierrelapalu/icones-bandeiras-br-uf/main/png-200/BR-${stateCode?.toUpperCase()}-circle.png`;
+// 🎯 Usando o repositório oficial de bandeiras dos estados brasileiros (CC0 License)
+// Fonte: https://github.com/pierrelapalu/icones-bandeiras-br-uf
+
+// ⚡ BASES (Múltiplos CDNs para maior confiabilidade)
+const UF_FLAGS_BASES = {
+  raw: "https://raw.githubusercontent.com/pierrelapalu/icones-bandeiras-br-uf/master/dist",
+  cdn: "https://cdn.jsdelivr.net/gh/pierrelapalu/icones-bandeiras-br-uf@master/dist",
+  unpkg: "https://unpkg.com/icones-bandeiras-br-uf@latest/dist",
+} as const;
+
+// 🗺️ MAPEAMENTO REAL DOS ESTADOS PARA OS ARQUIVOS DO REPOSITÓRIO
+// Baseado na estrutura real do repositório pierrelapalu/icones-bandeiras-br-uf
+const STATE_FILE_MAPPING: Record<string, { number: string; name: string }> = {
+  "Acre": { number: "02", name: "acre" },
+  "Alagoas": { number: "03", name: "alagoas" },
+  "Amapá": { number: "04", name: "amapa" },
+  "Amazonas": { number: "05", name: "amazonas" },
+  "Bahia": { number: "06", name: "bahia" },
+  "Ceará": { number: "07", name: "ceara" },
+  "Distrito Federal": { number: "08", name: "distrito-federal" },
+  "Espírito Santo": { number: "09", name: "espirito-santo" },
+  "Goiás": { number: "10", name: "goias" },
+  "Maranhão": { number: "11", name: "maranhao" },
+  "Mato Grosso": { number: "12", name: "mato-grosso" },
+  "Mato Grosso do Sul": { number: "13", name: "mato-grosso-do-sul" },
+  "Minas Gerais": { number: "14", name: "minas-gerais" },
+  "Pará": { number: "15", name: "para" },
+  "Paraíba": { number: "16", name: "paraiba" },
+  "Paraná": { number: "17", name: "parana" },
+  "Pernambuco": { number: "18", name: "pernambuco" },
+  "Piauí": { number: "19", name: "piaui" },
+  "Rio de Janeiro": { number: "20", name: "rio-de-janeiro" },
+  "Rio Grande do Norte": { number: "21", name: "rio-grande-do-norte" },
+  "Rio Grande do Sul": { number: "22", name: "rio-grande-do-sul" },
+  "Rondônia": { number: "23", name: "rondonia" },
+  "Roraima": { number: "24", name: "roraima" },
+  "Santa Catarina": { number: "25", name: "santa-catarina" },
+  "São Paulo": { number: "26", name: "sao-paulo" },
+  "Sergipe": { number: "27", name: "sergipe" },
+  "Tocantins": { number: "28", name: "tocantins" }
 };
 
-// 🎨 COMPONENTE PERSONALIZADO PARA BANDEIRA/ÍCONE DE ESTADO
+type FlagStyle = "circle" | "square-rounded" | "rounded" | "full";
+type FlagFormat = "svg" | "pdf" | "png";
+type FlagSize = 200 | 800;
+
+interface FlagOptions {
+  format?: FlagFormat;
+  size?: FlagSize;
+  style?: FlagStyle;
+}
+
+// 🔗 FUNÇÃO ATUALIZADA PARA GERAR URLs DOS ARQUIVOS REAIS
+const makeUrl = (base: string, stateName: string, opts: FlagOptions) => {
+  const { format = "png", size = 200, style = "circle" } = opts || {};
+  const stateInfo = STATE_FILE_MAPPING[stateName];
+  
+  if (!stateInfo) return null;
+  
+  const { number, name } = stateInfo;
+  
+  // Estrutura real do repositório:
+  // /dist/{style}/png-{size}/{number}-{name}-{style}.png
+  // /dist/{style}/svg/{number}-{name}-{style}.svg
+  
+  if (format === "svg") {
+    return `${base}/${style}/svg/${number}-${name}-${style}.svg`;
+  } else if (format === "pdf") {
+    return `${base}/${style}/pdf/${number}-${name}-${style}.pdf`;
+  } else {
+    return `${base}/${style}/png-${size}/${number}-${name}-${style}.png`;
+  }
+};
+
+export const getStateFlagUrl = (stateName: string, opts: FlagOptions = {}) => {
+  const url = makeUrl(UF_FLAGS_BASES.raw, stateName, opts);
+  if (!url) return "";
+  console.log(`🔗 URL gerada para ${stateName}:`, url);
+  return url;
+};
+
+// 🎨 FUNÇÕES UTILITÁRIAS PARA DIFERENTES ESTILOS DE BANDEIRAS DOS ESTADOS
+// Exemplos de uso:
+// - getStateFlagSVG("São Paulo", "rounded") → bandeira SVG arredondada ⭐ RECOMENDADO
+// - getStateFlagCircular("Pará", 200) → bandeira PNG circular 200px
+// - getStateFlagSquareRounded("Rio de Janeiro", 800) → bandeira PNG quadrada arredondada HD 800px
+
+export const getStateFlagSVG = (stateName: string, style: FlagStyle = "rounded") => 
+  getStateFlagUrl(stateName, { format: "svg", style });
+
+export const getStateFlagCircular = (stateName: string, size: FlagSize = 200) => {
+  const url = getStateFlagUrl(stateName, { format: "png", size, style: "circle" });
+  console.log(`🏳️ Bandeira PNG circular ${stateName}:`, url);
+  return url;
+};
+
+export const getStateFlagSquareRounded = (stateName: string, size: FlagSize = 200) => 
+  getStateFlagUrl(stateName, { format: "png", size, style: "square-rounded" });
+
+// ✅ COMPONENTE PERSONALIZADO PARA BANDEIRA/ÍCONE DE ESTADO COM FALLBACK AUTOMÁTICO
 const StateFlagIcon: React.FC<{
   stateName: string;
   className?: string;
   showFallback?: boolean;
-}> = ({ stateName, className = "w-6 h-4", showFallback = true }) => {
-  const [imageError, setImageError] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const stateColor = getStateColor(stateName);
-  const flagUrl = getStateFlagUrl(stateName);
-  const stateCode = getStateFlagCode(stateName);
+  flagOptions?: FlagOptions;
+}> = ({ 
+  stateName, 
+  className = "w-6 h-4", 
+  showFallback = true, 
+  flagOptions = {} 
+}) => {
+  const [imgError, setImgError] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [urlIndex, setUrlIndex] = useState(0);
 
-  // Se não há URL ou já deu erro, mostrar ícone personalizado
-  if (!flagUrl || imageError || !showFallback) {
+  // Verificar se o estado existe no mapeamento
+  if (!STATE_FILE_MAPPING[stateName]) {
     return (
       <div 
-        className={`${className} rounded border border-gray-200 flex items-center justify-center text-xs font-bold text-white shadow-sm`}
-        style={{ backgroundColor: stateColor }}
-        title={`${stateName} (${stateCode?.toUpperCase()})`}
+        className={`${className} rounded border border-gray-200 flex items-center justify-center text-xs font-bold text-white`} 
+        style={{ backgroundColor: "#9CA3AF" }}
+        title={`Estado não encontrado: ${stateName}`}
       >
-        {stateCode?.toUpperCase()}
+        --
       </div>
     );
   }
 
+  // Lista de URLs para tentar em sequência com diferentes estilos e fontes
+  const urls = [
+    // 🎯 PRIORIDADE 1: SVGs (melhor qualidade, vetorial, mais leves)
+    makeUrl(UF_FLAGS_BASES.raw, stateName, { ...flagOptions, format: "svg", style: "rounded" }),
+    makeUrl(UF_FLAGS_BASES.cdn, stateName, { ...flagOptions, format: "svg", style: "rounded" }),
+    makeUrl(UF_FLAGS_BASES.unpkg, stateName, { ...flagOptions, format: "svg", style: "rounded" }),
+    
+    // 🎯 PRIORIDADE 2: SVGs circulares como alternativa
+    makeUrl(UF_FLAGS_BASES.raw, stateName, { ...flagOptions, format: "svg", style: "circle" }),
+    makeUrl(UF_FLAGS_BASES.cdn, stateName, { ...flagOptions, format: "svg", style: "circle" }),
+    
+    // 🎯 PRIORIDADE 3: PNGs (fallback)
+    makeUrl(UF_FLAGS_BASES.raw, stateName, { ...flagOptions, format: "png", style: "circle" }),
+    makeUrl(UF_FLAGS_BASES.cdn, stateName, { ...flagOptions, format: "png", style: "circle" }),
+    
+    // 🎯 FALLBACK FINAL: Bandeira genérica do Brasil
+    `https://flagcdn.com/w160/br.png`
+  ].filter((url): url is string => url !== null);
+
+  const [src, setSrc] = useState(urls[0] || "");
+
+  // Reset quando mudar o estado ou opções
+  useEffect(() => {
+    const newSrc = urls[0] || "";
+    setSrc(newSrc);
+    setImgError(false);
+    setLoaded(false);
+    setUrlIndex(0);
+    console.log(`🔄 Reset para ${stateName}: ${newSrc}`);
+  }, [stateName, JSON.stringify(flagOptions)]);
+
+  const stateColor = getStateColor(stateName);
+
+  const handleError = () => {
+    console.log(`❌ Erro ao carregar: ${src} para ${stateName} (tentativa ${urlIndex + 1}/${urls.length})`);
+    
+    const nextIndex = urlIndex + 1;
+    if (nextIndex < urls.length) {
+      const nextUrl = urls[nextIndex];
+      console.log(`⚠️ Tentando próxima URL (${nextIndex + 1}/${urls.length}): ${nextUrl}`);
+      setSrc(nextUrl);
+      setUrlIndex(nextIndex);
+      setLoaded(false);
+    } else {
+      console.log(`❌ Todas as URLs falharam para ${stateName} - mostrando fallback`);
+      setImgError(true);
+    }
+  };
+
+  const handleLoad = () => {
+    setLoaded(true);
+    const sourceType = src.includes('jsdelivr') ? 'CDN JSDelivr' : 
+                      src.includes('unpkg') ? 'UNPKG' : 
+                      src.includes('.svg') ? `SVG ${src.includes('rounded') ? 'Arredondado' : 'Circular'}` :
+                      src.includes('square-rounded') ? 'PNG Quadrado Arredondado' :
+                      src.includes('circle') ? 'PNG Circular' : 'Fallback';
+    console.log(`✅ Bandeira carregada: ${stateName} (tentativa ${urlIndex + 1}, fonte: ${sourceType})`);
+  };
+
+  const uf = getStateFlagCode(stateName)?.toUpperCase() || stateName.substring(0, 2).toUpperCase();
+
   return (
     <div className={`${className} rounded border border-gray-200 overflow-hidden bg-white relative`}>
-      <img 
-        src={flagUrl}
-        alt={`Bandeira ${stateName}`}
-        className="w-full h-full object-cover"
-        onError={() => setImageError(true)}
-        onLoad={() => setImageLoaded(true)}
-        style={{ display: imageError ? 'none' : 'block' }}
-      />
-      
-      {/* Fallback enquanto carrega ou se der erro */}
-      {(!imageLoaded || imageError) && (
+      {!imgError && src && (
+        <img
+          src={src}
+          alt={`Bandeira ${stateName}`}
+          className="w-full h-full object-cover"
+          onLoad={handleLoad}
+          onError={handleError}
+          referrerPolicy="no-referrer"
+        />
+      )}
+      {(!loaded || imgError) && showFallback && (
         <div 
-          className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white"
+          className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white" 
           style={{ backgroundColor: stateColor }}
-          title={`${stateName} (${stateCode?.toUpperCase()})`}
+          title={`${stateName} (${uf}) - ${imgError ? 'Erro ao carregar todas as fontes' : 'Carregando...'}`}
         >
-          {stateCode?.toUpperCase()}
+          {uf}
         </div>
       )}
     </div>
