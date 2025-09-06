@@ -19,8 +19,19 @@ import {
   MoreVertical,
   Filter,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Settings,
+  Eye,
+  X
 } from 'lucide-react';
+
+// Importar service de gestão de usuários
+import {
+  usuarioGestaoService,
+  Usuario,
+  UsuarioAcesso,
+  PERMISSOES_LABELS
+} from '@/services/UsuarioGestaoService';
 
 interface User {
   id: string;
@@ -33,6 +44,10 @@ interface User {
   createdTimestamp: number;
 }
 
+interface UserWithAccess extends User {
+  acessos?: UsuarioAcesso[];
+}
+
 interface UserFilters {
   search: string;
   enabled?: boolean;
@@ -43,13 +58,18 @@ const UsersList: React.FC = () => {
   const { selectedLanguage } = useLanguage();
   const { t } = useTranslation(selectedLanguage);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserWithAccess[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<UserFilters>({ search: '' });
   const [pagination, setPagination] = useState({ first: 0, max: 20, total: 0 });
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState<string | null>(null);
+  
+  // Estados para modal de acessos
+  const [showAccessModal, setShowAccessModal] = useState(false);
+  const [selectedUserForAccess, setSelectedUserForAccess] = useState<UserWithAccess | null>(null);
+  const [userAcessos, setUserAcessos] = useState<UsuarioAcesso[]>([]);
 
   useEffect(() => {
     loadUsers();
@@ -68,38 +88,26 @@ const UsersList: React.FC = () => {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({
-        first: pagination.first.toString(),
-        max: pagination.max.toString(),
-      });
+      // Usar o novo service para carregar usuários
+      const usersData = await usuarioGestaoService.getUsuarios();
+      
+      // Converter formato do Keycloak para o formato esperado
+      const convertedUsers: UserWithAccess[] = usersData.map(user => ({
+        id: user.id,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        enabled: user.enabled,
+        emailVerified: true, // Assumir como verificado por padrão
+        createdTimestamp: user.createdTimestamp || Date.now()
+      }));
 
-      if (filters.search) params.append('search', filters.search);
-      if (filters.enabled !== undefined) params.append('enabled', filters.enabled.toString());
-
-      const response = await fetch(`/api-auth/admin/users?${params}`, {
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Erro ao carregar usuários');
-      }
-
-      const data = await response.json();
-      setUsers(data);
-
-      // Carregar total de usuários
-      const countResponse = await fetch('/api-auth/admin/users/count', {
-        credentials: 'include',
-      });
-      if (countResponse.ok) {
-        const countData = await countResponse.json();
-        setPagination(prev => ({ ...prev, total: countData.count }));
-      }
+      setUsers(convertedUsers);
+      setPagination(prev => ({ ...prev, total: convertedUsers.length }));
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
+      alert('Erro ao carregar usuários. Verifique se a API está funcionando.');
     } finally {
       setLoading(false);
     }
@@ -107,54 +115,54 @@ const UsersList: React.FC = () => {
 
   const handleUserAction = async (userId: string, action: string) => {
     try {
-      let endpoint = '';
-      let method = 'PUT';
-      let body = {};
+      const user = users.find(u => u.id === userId);
+      if (!user) return;
 
       switch (action) {
         case 'enable':
-          endpoint = `/api-auth/admin/users/${userId}/enabled`;
-          body = { enabled: true };
+          await usuarioGestaoService.toggleUsuarioStatus(userId, true);
           break;
         case 'disable':
-          endpoint = `/api-auth/admin/users/${userId}/enabled`;
-          body = { enabled: false };
+          await usuarioGestaoService.toggleUsuarioStatus(userId, false);
           break;
-        case 'logout':
-          endpoint = `/api-auth/admin/users/${userId}/logout`;
-          method = 'DELETE';
-          break;
-        case 'verify-email':
-          endpoint = `/api-auth/admin/users/${userId}/send-verify-email`;
-          break;
+        case 'reset-password':
+          const newPassword = prompt('Digite a nova senha:');
+          if (newPassword) {
+            await usuarioGestaoService.resetarSenhaUsuario(userId, newPassword);
+          }
+          return; // Não recarregar se cancelou
         case 'delete':
           if (!window.confirm(t('admin.users.confirmDelete'))) return;
-          endpoint = `/api-auth/admin/users/${userId}`;
-          method = 'DELETE';
+          await usuarioGestaoService.excluirUsuario(userId);
           break;
+        case 'view-access':
+          await handleViewUserAccess(userId);
+          return; // Não recarregar
         default:
           return;
       }
 
-      const response = await fetch(endpoint, {
-        method,
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        ...(method !== 'DELETE' && Object.keys(body).length > 0 ? { body: JSON.stringify(body) } : {}),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro ao executar ação: ${action}`);
-      }
-
-      // Recarregar lista
-      loadUsers();
+      // Recarregar lista após ações que modificam dados
+      await loadUsers();
       setActionMenuOpen(null);
     } catch (error) {
       console.error('Erro na ação:', error);
-      alert(t('admin.users.actionError'));
+      alert(`Erro ao executar ação: ${error}`);
+    }
+  };
+
+  const handleViewUserAccess = async (userId: string) => {
+    try {
+      const user = users.find(u => u.id === userId);
+      if (!user) return;
+
+      setSelectedUserForAccess(user);
+      const acessos = await usuarioGestaoService.getUsuarioAcessos(userId);
+      setUserAcessos(acessos);
+      setShowAccessModal(true);
+    } catch (error) {
+      console.error('Erro ao carregar acessos:', error);
+      alert('Erro ao carregar acessos do usuário');
     }
   };
 
@@ -298,6 +306,9 @@ const UsersList: React.FC = () => {
                       {t('admin.users.table.status')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Acessos
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       {t('admin.users.table.created')}
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -308,7 +319,7 @@ const UsersList: React.FC = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {loading ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                      <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
                         {t('admin.users.loading')}
                       </td>
                     </tr>
@@ -374,6 +385,15 @@ const UsersList: React.FC = () => {
                             </span>
                           )}
                         </td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => handleViewUserAccess(user.id)}
+                            className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition"
+                          >
+                            <Shield className="h-3 w-3 mr-1" />
+                            Ver Acessos
+                          </button>
+                        </td>
                         <td className="px-6 py-4 text-sm text-gray-500">
                           {new Date(user.createdTimestamp).toLocaleDateString(selectedLanguage)}
                         </td>
@@ -389,12 +409,20 @@ const UsersList: React.FC = () => {
                               <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border z-10">
                                 <div className="py-1">
                                   <button
+                                    onClick={() => handleViewUserAccess(user.id)}
+                                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                  >
+                                    <Eye className="h-4 w-4 mr-3" />
+                                    Ver Acessos
+                                  </button>
+                                  <button
                                     onClick={() => window.location.href = `/admin/users/${user.id}/edit`}
                                     className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                                   >
                                     <Edit className="h-4 w-4 mr-3" />
                                     {t('admin.users.actions.edit')}
                                   </button>
+                                  <div className="border-t border-gray-100"></div>
                                   <button
                                     onClick={() => handleUserAction(user.id, user.enabled ? 'disable' : 'enable')}
                                     className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -412,12 +440,13 @@ const UsersList: React.FC = () => {
                                     )}
                                   </button>
                                   <button
-                                    onClick={() => handleUserAction(user.id, 'verify-email')}
+                                    onClick={() => handleUserAction(user.id, 'reset-password')}
                                     className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                                   >
-                                    <Mail className="h-4 w-4 mr-3" />
-                                    {t('admin.users.actions.sendVerifyEmail')}
+                                    <Key className="h-4 w-4 mr-3" />
+                                    Resetar Senha
                                   </button>
+                                  <div className="border-t border-gray-100"></div>
                                   <button
                                     onClick={() => window.location.href = `/admin/users/${user.id}/reset-password`}
                                     className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -482,6 +511,127 @@ const UsersList: React.FC = () => {
         </div>
       </main>
 
+      {/* Modal de Acessos do Usuário */}
+      {showAccessModal && selectedUserForAccess && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center">
+                    <Shield className="h-6 w-6 text-blue-600 mr-3" />
+                    <h3 className="text-lg font-medium text-gray-900">
+                      Acessos de {selectedUserForAccess.username}
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => setShowAccessModal(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+
+                <div className="mt-4">
+                  {userAcessos.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Shield className="mx-auto h-12 w-12 text-gray-400" />
+                      <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhum acesso encontrado</h3>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Este usuário ainda não possui acessos configurados.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                      <table className="min-w-full divide-y divide-gray-300">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Nível
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Local
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Permissões
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Status
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Criado em
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {userAcessos.map((acesso) => (
+                            <tr key={acesso.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                  {acesso.nivel_acesso.charAt(0).toUpperCase() + acesso.nivel_acesso.slice(1)}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {acesso.estabelecimento?.nome ||
+                                 acesso.tipo_municipio?.descricao ||
+                                 acesso.tipo_estado?.descricao ||
+                                 '-'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                  {PERMISSOES_LABELS[acesso.permissoes as keyof typeof PERMISSOES_LABELS] || 
+                                   `Permissão ${acesso.permissoes}`}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                  acesso.ativo === 'S' 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {acesso.ativo === 'S' ? 'Ativo' : 'Inativo'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {new Date(acesso.created_at).toLocaleDateString('pt-BR')}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={() => {
+                    // Aqui você pode adicionar lógica para redirecionar para a página de criação de acesso
+                    window.location.href = `/admin/users/${selectedUserForAccess.id}/access/new`;
+                  }}
+                >
+                  Novo Acesso
+                </button>
+                <button
+                  type="button"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={() => setShowAccessModal(false)}
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Rodapé */}
       <Footer selectedLanguage={selectedLanguage} />
       
@@ -489,8 +639,6 @@ const UsersList: React.FC = () => {
       <SideMenu
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
-        selectedLanguage={selectedLanguage}
-        onLanguageChange={() => {}}
       />
     </div>
   );

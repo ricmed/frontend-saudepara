@@ -9,14 +9,22 @@ import {
   ArrowLeft, 
   Save, 
   User, 
-  Mail, 
   Key, 
   Shield,
   Eye,
   EyeOff,
   AlertCircle,
-  Check
+  Check,
+  Building,
+  MapPin,
+  Globe
 } from 'lucide-react';
+
+// Importar service de gestão de usuários
+import {
+  usuarioGestaoService,
+  PERMISSOES
+} from '@/services/UsuarioGestaoService';
 
 interface UserFormData {
   username: string;
@@ -28,6 +36,12 @@ interface UserFormData {
   password?: string;
   confirmPassword?: string;
   temporaryPassword: boolean;
+  // Campos de controle de acesso
+  nivelAcesso: 'unidade' | 'municipio' | 'estado';
+  estabelecimentoId?: number;
+  municipioId?: number;
+  estadoId?: number;
+  permissoes: number;
 }
 
 interface Role {
@@ -51,6 +65,21 @@ const UserForm: React.FC = () => {
   const [userRoles, setUserRoles] = useState<Role[]>([]);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+  // Estados para opções de dropdown
+  const [estabelecimentos, setEstabelecimentos] = useState<Array<{id: number; nome: string}>>([]);
+  const [municipios, setMunicipios] = useState<Array<{id: number; descricao: string}>>([]);
+  const [estados, setEstados] = useState<Array<{id: number; descricao: string}>>([]);
+
+  // Estados para pesquisa nos dropdowns
+  const [searchEstabelecimento, setSearchEstabelecimento] = useState('');
+  const [searchMunicipio, setSearchMunicipio] = useState('');
+  const [searchEstado, setSearchEstado] = useState('');
+
+  // Estados filtrados para exibição
+  const [estabelecimentosFiltrados, setEstabelecimentosFiltrados] = useState<Array<{id: number; nome: string}>>([]);
+  const [municipiosFiltrados, setMunicipiosFiltrados] = useState<Array<{id: number; descricao: string}>>([]);
+  const [estadosFiltrados, setEstadosFiltrados] = useState<Array<{id: number; descricao: string}>>([]);
+
   const isEditMode = !!id;
   const [formData, setFormData] = useState<UserFormData>({
     username: '',
@@ -62,15 +91,225 @@ const UserForm: React.FC = () => {
     password: '',
     confirmPassword: '',
     temporaryPassword: false,
+    // Valores padrão para controle de acesso
+    nivelAcesso: 'unidade',
+    permissoes: PERMISSOES.READ_WRITE,
   });
 
   useEffect(() => {
     loadRoles();
+    loadDropdownData();
     if (isEditMode) {
       loadUser();
       loadUserRoles();
     }
   }, [id]);
+
+  // Filtrar estabelecimentos baseado na pesquisa
+  useEffect(() => {
+    const filtrados = estabelecimentos.filter(est => 
+      est.nome.toLowerCase().includes(searchEstabelecimento.toLowerCase())
+    );
+    setEstabelecimentosFiltrados(filtrados);
+  }, [estabelecimentos, searchEstabelecimento]);
+
+  // Filtrar municípios baseado na pesquisa e estado selecionado
+  useEffect(() => {
+    let filtrados = municipios.filter(mun => 
+      mun.descricao.toLowerCase().includes(searchMunicipio.toLowerCase())
+    );
+    setMunicipiosFiltrados(filtrados);
+  }, [municipios, searchMunicipio]);
+
+  // Filtrar estados baseado na pesquisa
+  useEffect(() => {
+    const filtrados = estados.filter(est => 
+      est.descricao.toLowerCase().includes(searchEstado.toLowerCase())
+    );
+    setEstadosFiltrados(filtrados);
+  }, [estados, searchEstado]);
+
+  // Quando o estado muda, recarregar municípios se necessário
+  useEffect(() => {
+    if (formData.estadoId && formData.nivelAcesso !== 'estado') {
+      loadMunicipiosPorEstado(formData.estadoId);
+    }
+  }, [formData.estadoId, formData.nivelAcesso]);
+
+  const loadMunicipiosPorEstado = async (estadoId: number) => {
+    try {
+      const municipiosEstado = await usuarioGestaoService.getMunicipiosPorEstado(estadoId);
+      setMunicipios(municipiosEstado);
+      setMunicipiosFiltrados(municipiosEstado);
+    } catch (error) {
+      console.error('Erro ao carregar municípios do estado:', error);
+    }
+  };
+
+  const loadDropdownData = async () => {
+    try {
+      const [estabelecimentosData, municipiosData, estadosData] = await Promise.all([
+        usuarioGestaoService.getEstabelecimentos(),
+        usuarioGestaoService.getMunicipios(),
+        usuarioGestaoService.getEstados(),
+      ]);
+
+      setEstabelecimentos(estabelecimentosData);
+      setMunicipios(municipiosData);
+      setEstados(estadosData);
+
+      // Inicializar arrays filtrados
+      setEstabelecimentosFiltrados(estabelecimentosData);
+      setMunicipiosFiltrados(municipiosData);
+      setEstadosFiltrados(estadosData);
+    } catch (error) {
+      console.error('Erro ao carregar opções:', error);
+    }
+  };
+
+  // Função para buscar município e estado baseado no estabelecimento
+  const handleEstabelecimentoChange = async (estabelecimentoId: number) => {
+    try {
+      // Buscar o estabelecimento completo com suas relações
+      const response = await fetch(`/api/estabelecimentos/${estabelecimentoId}`, {
+        credentials: 'include',
+      });
+      
+      if (response.ok) {
+        const estabelecimento = await response.json();
+        
+        // Atualizar os campos automaticamente
+        setFormData(prev => ({
+          ...prev,
+          estabelecimentoId,
+          municipioId: estabelecimento.tipo_municipio?.idtipo_municipio || undefined,
+          estadoId: estabelecimento.tipo_municipio?.tipo_estado?.idtipo_estado || undefined
+        }));
+
+        // Filtrar as opções para mostrar apenas os relacionados
+        if (estabelecimento.tipo_municipio) {
+          const municipioFormatado = {
+            id: estabelecimento.tipo_municipio.idtipo_municipio,
+            descricao: estabelecimento.tipo_municipio.descricao
+          };
+          setMunicipiosFiltrados([municipioFormatado]);
+          
+          if (estabelecimento.tipo_municipio.tipo_estado) {
+            const estadoFormatado = {
+              id: estabelecimento.tipo_municipio.tipo_estado.idtipo_estado,
+              descricao: estabelecimento.tipo_municipio.tipo_estado.descricao
+            };
+            setEstadosFiltrados([estadoFormatado]);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao buscar dados do estabelecimento:', error);
+    }
+  };
+
+  // Função para buscar estabelecimentos baseado no município
+  const handleMunicipioChange = async (municipioId: number) => {
+    try {
+      // Buscar estabelecimentos do município
+      const response = await fetch(`/api/estabelecimentos/municipio/${municipioId}`, {
+        credentials: 'include',
+      });
+      
+      if (response.ok) {
+        const estabelecimentosDoMunicipio = await response.json();
+        // Formatar os estabelecimentos para o padrão esperado
+        const estabelecimentosFormatados = estabelecimentosDoMunicipio.map((est: any) => ({
+          id: est.idestabelecimento,
+          nome: est.nome
+        }));
+        setEstabelecimentosFiltrados(estabelecimentosFormatados);
+
+        // Buscar dados do município para pegar o estado
+        const municipioResponse = await fetch(`/api/municipios/${municipioId}`, {
+          credentials: 'include',
+        });
+        
+        if (municipioResponse.ok) {
+          const municipio = await municipioResponse.json();
+          
+          setFormData(prev => ({
+            ...prev,
+            municipioId,
+            estadoId: municipio.tipo_estado?.idtipo_estado || undefined,
+            // Limpar estabelecimento se não estiver na lista filtrada
+            estabelecimentoId: estabelecimentosFormatados.find((est: any) => est.id === prev.estabelecimentoId)
+              ? prev.estabelecimentoId 
+              : undefined
+          }));
+
+          if (municipio.tipo_estado) {
+            const estadoFormatado = {
+              id: municipio.tipo_estado.idtipo_estado,
+              descricao: municipio.tipo_estado.descricao
+            };
+            setEstadosFiltrados([estadoFormatado]);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao buscar dados do município:', error);
+    }
+  };
+
+  // Função para buscar municípios e estabelecimentos baseado no estado
+  const handleEstadoChange = async (estadoId: number) => {
+    try {
+      // Buscar municípios do estado
+      const municipiosResponse = await fetch(`/api/municipios/estado/${estadoId}`, {
+        credentials: 'include',
+      });
+      
+      if (municipiosResponse.ok) {
+        const municipiosDoEstado = await municipiosResponse.json();
+        // Formatar os municípios para o padrão esperado
+        const municipiosFormatados = municipiosDoEstado.map((mun: any) => ({
+          id: mun.idtipo_municipio,
+          descricao: mun.descricao
+        }));
+        setMunicipiosFiltrados(municipiosFormatados);
+
+        // Buscar estabelecimentos do estado
+        const estabelecimentosResponse = await fetch(`/api/estabelecimentos/estado/${estadoId}`, {
+          credentials: 'include',
+        });
+        
+        if (estabelecimentosResponse.ok) {
+          const estabelecimentosDoEstado = await estabelecimentosResponse.json();
+          // Formatar os estabelecimentos para o padrão esperado
+          const estabelecimentosFormatados = estabelecimentosDoEstado.map((est: any) => ({
+            id: est.idestabelecimento,
+            nome: est.nome
+          }));
+          setEstabelecimentosFiltrados(estabelecimentosFormatados);
+        }
+
+        setFormData(prev => ({
+          ...prev,
+          estadoId,
+          // Limpar município e estabelecimento se não estiverem nas listas filtradas
+          municipioId: municipiosFormatados.find((mun: any) => mun.id === prev.municipioId)
+            ? prev.municipioId 
+            : undefined,
+          estabelecimentoId: undefined // Sempre limpar estabelecimento ao mudar estado
+        }));
+      }
+    } catch (error) {
+      console.error('Erro ao buscar dados do estado:', error);
+    }
+  };
+
+  // Função para resetar filtros
+  const resetFiltros = () => {
+    setEstabelecimentosFiltrados(estabelecimentos);
+    setMunicipiosFiltrados(municipios);
+    setEstadosFiltrados(estados);
+  };
 
   const loadRoles = async () => {
     try {
@@ -108,6 +347,9 @@ const UserForm: React.FC = () => {
         enabled: user.enabled ?? true,
         emailVerified: user.emailVerified ?? false,
         temporaryPassword: false,
+        // Valores padrão para modo de edição - estes serão carregados separadamente
+        nivelAcesso: 'unidade',
+        permissoes: PERMISSOES.READ_WRITE,
       });
     } catch (error) {
       console.error('Erro ao carregar usuário:', error);
@@ -163,6 +405,28 @@ const UserForm: React.FC = () => {
       }
     } else if (formData.password && formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = t('admin.userForm.validation.passwordMismatch');
+    }
+
+    // Validações para controle de acesso
+    if (!formData.nivelAcesso) {
+      newErrors.nivelAcesso = 'Nível de acesso é obrigatório';
+    }
+
+    if (!formData.permissoes) {
+      newErrors.permissoes = 'Permissões são obrigatórias';
+    }
+
+    // Validações específicas por nível de acesso
+    if (formData.nivelAcesso === 'unidade' && !formData.estabelecimentoId) {
+      newErrors.estabelecimentoId = 'Estabelecimento é obrigatório para acesso de unidade';
+    }
+
+    if (formData.nivelAcesso === 'municipio' && !formData.municipioId) {
+      newErrors.municipioId = 'Município é obrigatório para acesso municipal';
+    }
+
+    if (formData.nivelAcesso === 'estado' && !formData.estadoId) {
+      newErrors.estadoId = 'Estado é obrigatório para acesso estadual';
     }
 
     setErrors(newErrors);
@@ -233,6 +497,36 @@ const UserForm: React.FC = () => {
             })
           }),
         });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Erro ao criar usuário');
+        }
+
+        // Se usuário foi criado com sucesso, criar registro de acesso
+        const responseData = await response.json();
+        const userId = responseData.id || formData.username;
+
+        // Criar registro de acesso baseado no nível selecionado
+        if (formData.nivelAcesso === 'unidade' && formData.estabelecimentoId) {
+          await usuarioGestaoService.createAcessoUnidade(
+            userId,
+            formData.estabelecimentoId,
+            formData.permissoes
+          );
+        } else if (formData.nivelAcesso === 'municipio' && formData.municipioId) {
+          await usuarioGestaoService.createAcessoMunicipio(
+            userId,
+            formData.municipioId,
+            formData.permissoes
+          );
+        } else if (formData.nivelAcesso === 'estado' && formData.estadoId) {
+          await usuarioGestaoService.createAcessoEstado(
+            userId,
+            formData.estadoId,
+            formData.permissoes
+          );
+        }
       }
 
       if (!response.ok) {
@@ -566,6 +860,223 @@ const UserForm: React.FC = () => {
               )}
             </div>
 
+            {/* Controle de Acesso */}
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <Shield className="h-5 w-5 mr-2" />
+                Controle de Acesso
+              </h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Nível de Acesso */}
+                <div>
+                  <label htmlFor="nivelAcesso" className="block text-sm font-medium text-gray-700 mb-2">
+                    Nível de Acesso *
+                  </label>
+                  <select
+                    id="nivelAcesso"
+                    value={formData.nivelAcesso}
+                    onChange={(e) => {
+                      const novoNivel = e.target.value as 'unidade' | 'municipio' | 'estado';
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        nivelAcesso: novoNivel,
+                        // Limpar campos relacionados ao mudar nível
+                        estabelecimentoId: undefined,
+                        municipioId: undefined,
+                        estadoId: undefined
+                      }));
+                      // Resetar filtros para mostrar todas as opções
+                      resetFiltros();
+                    }}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.nivelAcesso ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    required
+                  >
+                    <option value="">Selecione o nível de acesso</option>
+                    <option value="unidade">Unidade</option>
+                    <option value="municipio">Município</option>
+                    <option value="estado">Estado</option>
+                  </select>
+                  {errors.nivelAcesso && (
+                    <p className="mt-1 text-sm text-red-600">{errors.nivelAcesso}</p>
+                  )}
+                </div>
+
+                {/* Permissões */}
+                <div>
+                  <label htmlFor="permissoes" className="block text-sm font-medium text-gray-700 mb-2">
+                    Permissões *
+                  </label>
+                  <select
+                    id="permissoes"
+                    value={formData.permissoes}
+                    onChange={(e) => setFormData(prev => ({ ...prev, permissoes: parseInt(e.target.value) }))}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.permissoes ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    required
+                  >
+                    <option value="">Selecione as permissões</option>
+                    <option value={PERMISSOES.READ}>Leitura (4)</option>
+                    <option value={PERMISSOES.READ_WRITE}>Leitura + Escrita (6)</option>
+                    <option value={PERMISSOES.ALL}>Todas as Permissões (7)</option>
+                  </select>
+                  {errors.permissoes && (
+                    <p className="mt-1 text-sm text-red-600">{errors.permissoes}</p>
+                  )}
+                </div>
+
+                {/* Estabelecimento - Mostrar apenas se nível for 'unidade' */}
+                {formData.nivelAcesso === 'unidade' && (
+                  <div>
+                    <label htmlFor="estabelecimentoId" className="block text-sm font-medium text-gray-700 mb-2">
+                      <Building className="h-4 w-4 inline mr-1" />
+                      Estabelecimento *
+                    </label>
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        placeholder="Pesquisar estabelecimento..."
+                        value={searchEstabelecimento}
+                        onChange={(e) => setSearchEstabelecimento(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <select
+                        id="estabelecimentoId"
+                        value={formData.estabelecimentoId || ''}
+                        onChange={(e) => {
+                          const value = e.target.value ? parseInt(e.target.value) : undefined;
+                          if (value) {
+                            handleEstabelecimentoChange(value);
+                          } else {
+                            setFormData(prev => ({ ...prev, estabelecimentoId: undefined }));
+                            resetFiltros();
+                          }
+                        }}
+                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          errors.estabelecimentoId ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                        required={formData.nivelAcesso === 'unidade'}
+                        size={Math.min(estabelecimentosFiltrados.length + 1, 8)}
+                      >
+                        <option value="">Selecionar Estabelecimento</option>
+                        {estabelecimentosFiltrados.map(est => (
+                          <option key={est.id} value={est.id}>{est.nome}</option>
+                        ))}
+                      </select>
+                      {errors.estabelecimentoId && (
+                        <p className="mt-1 text-sm text-red-600">{errors.estabelecimentoId}</p>
+                      )}
+                      {estabelecimentosFiltrados.length === 0 && searchEstabelecimento && (
+                        <p className="text-sm text-gray-500">Nenhum estabelecimento encontrado</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Município - Mostrar se nível for 'municipio' ou 'unidade' */}
+                {(formData.nivelAcesso === 'municipio' || formData.nivelAcesso === 'unidade') && (
+                  <div>
+                    <label htmlFor="municipioId" className="block text-sm font-medium text-gray-700 mb-2">
+                      <MapPin className="h-4 w-4 inline mr-1" />
+                      Município {formData.nivelAcesso === 'municipio' && '*'}
+                    </label>
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        placeholder="Pesquisar município..."
+                        value={searchMunicipio}
+                        onChange={(e) => setSearchMunicipio(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <select
+                        id="municipioId"
+                        value={formData.municipioId || ''}
+                        onChange={(e) => {
+                          const value = e.target.value ? parseInt(e.target.value) : undefined;
+                          if (value) {
+                            handleMunicipioChange(value);
+                          } else {
+                            setFormData(prev => ({ ...prev, municipioId: undefined }));
+                            // Resetar estabelecimentos para mostrar todos do estado atual
+                            if (formData.estadoId) {
+                              handleEstadoChange(formData.estadoId);
+                            } else {
+                              resetFiltros();
+                            }
+                          }
+                        }}
+                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          errors.municipioId ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                        required={formData.nivelAcesso === 'municipio'}
+                        size={Math.min(municipiosFiltrados.length + 1, 8)}
+                      >
+                        <option value="">Selecionar Município</option>
+                        {municipiosFiltrados.map(mun => (
+                          <option key={mun.id} value={mun.id}>{mun.descricao}</option>
+                        ))}
+                      </select>
+                      {errors.municipioId && (
+                        <p className="mt-1 text-sm text-red-600">{errors.municipioId}</p>
+                      )}
+                      {municipiosFiltrados.length === 0 && searchMunicipio && (
+                        <p className="text-sm text-gray-500">Nenhum município encontrado</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Estado - Sempre mostrar */}
+                <div>
+                  <label htmlFor="estadoId" className="block text-sm font-medium text-gray-700 mb-2">
+                    <Globe className="h-4 w-4 inline mr-1" />
+                    Estado {formData.nivelAcesso === 'estado' && '*'}
+                  </label>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      placeholder="Pesquisar estado..."
+                      value={searchEstado}
+                      onChange={(e) => setSearchEstado(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <select
+                      id="estadoId"
+                      value={formData.estadoId || ''}
+                      onChange={(e) => {
+                        const value = e.target.value ? parseInt(e.target.value) : undefined;
+                        if (value) {
+                          handleEstadoChange(value);
+                        } else {
+                          setFormData(prev => ({ ...prev, estadoId: undefined, municipioId: undefined, estabelecimentoId: undefined }));
+                          resetFiltros();
+                        }
+                      }}
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        errors.estadoId ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      required={formData.nivelAcesso === 'estado'}
+                      size={Math.min(estadosFiltrados.length + 1, 8)}
+                    >
+                      <option value="">Selecionar Estado</option>
+                      {estadosFiltrados.map(est => (
+                        <option key={est.id} value={est.id}>{est.descricao}</option>
+                      ))}
+                    </select>
+                    {errors.estadoId && (
+                      <p className="mt-1 text-sm text-red-600">{errors.estadoId}</p>
+                    )}
+                    {estadosFiltrados.length === 0 && searchEstado && (
+                      <p className="text-sm text-gray-500">Nenhum estado encontrado</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Roles (apenas em modo de edição) */}
             {isEditMode && (
               <div className="bg-white rounded-lg shadow-sm border p-6">
@@ -639,8 +1150,6 @@ const UserForm: React.FC = () => {
       <SideMenu
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
-        selectedLanguage={selectedLanguage}
-        onLanguageChange={() => {}}
       />
     </div>
   );

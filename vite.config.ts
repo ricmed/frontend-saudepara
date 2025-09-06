@@ -289,7 +289,7 @@ export default defineConfig({
       // *** PROXY CORRIGIDO - USAR PRODUÇÃO QUANDO DEV NÃO DISPONÍVEL ***
       '/api-auth': {
         // Sempre usar produção se dev não estiver disponível
-        target: 'https://app.hml.saude.pa.gov.br/',
+        target: 'http://localhost:4000/',
         changeOrigin: true,
         secure: false,
         timeout: 10000,
