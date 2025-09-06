@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Globe, Building, Home } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import ChartExportMenu from '../../../components/common/ChartExportMenu';
+import DashboardExportMenu from '../../../components/common/DashboardExportMenu';
 
 // 🏳️ BANDEIRAS - FONTES E LICENÇAS
 // =====================================
@@ -18,7 +20,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 const getFlagUrl = (countryName: string): string | null => {
   const countryCode = getCountryFlagCode(countryName);
   if (!countryCode) return null;
-  return `https://flagcdn.com/w20/${countryCode}.png`;
+  return `https://flagcdn.com/${countryCode}.svg`;
 };
 
 // 🏳️ MAPEAMENTO DINÂMICO DE PAÍSES PARA CÓDIGOS DE BANDEIRAS
@@ -567,37 +569,24 @@ export const getStateFlagCircular = (stateName: string, size: FlagSize = 200) =>
 export const getStateFlagSquareRounded = (stateName: string, size: FlagSize = 200) => 
   getStateFlagUrl(stateName, { format: "png", size, style: "square-rounded" });
 
-// ✅ COMPONENTE PERSONALIZADO PARA BANDEIRA/ÍCONE DE ESTADO COM FALLBACK AUTOMÁTICO
+// ✅ COMPONENTE PERSONALIZADO PARA BANDEIRA/ÍCONE DE ESTADO
 const StateFlagIcon: React.FC<{
   stateName: string;
   className?: string;
-  showFallback?: boolean;
   flagOptions?: FlagOptions;
 }> = ({ 
   stateName, 
   className = "w-6 h-4", 
-  showFallback = true, 
   flagOptions = {} 
 }) => {
   const [imgError, setImgError] = useState(false);
-  const [loaded, setLoaded] = useState(false);
   const [urlIndex, setUrlIndex] = useState(0);
 
-  // Verificar se o estado existe no mapeamento
-  if (!STATE_FILE_MAPPING[stateName]) {
-    return (
-      <div 
-        className={`${className} rounded border border-gray-200 flex items-center justify-center text-xs font-bold text-white`} 
-        style={{ backgroundColor: "#9CA3AF" }}
-        title={`Estado não encontrado: ${stateName}`}
-      >
-        --
-      </div>
-    );
-  }
+  // ✅ CORRIGIDO: Declarar todas as variáveis e hooks ANTES de qualquer return
+  const stateExists = STATE_FILE_MAPPING[stateName];
 
   // Lista de URLs para tentar em sequência com diferentes estilos e fontes
-  const urls = [
+  const urls = stateExists ? [
     // 🎯 PRIORIDADE 1: SVGs (melhor qualidade, vetorial, mais leves)
     makeUrl(UF_FLAGS_BASES.raw, stateName, { ...flagOptions, format: "svg", style: "rounded" }),
     makeUrl(UF_FLAGS_BASES.cdn, stateName, { ...flagOptions, format: "svg", style: "rounded" }),
@@ -612,22 +601,21 @@ const StateFlagIcon: React.FC<{
     makeUrl(UF_FLAGS_BASES.cdn, stateName, { ...flagOptions, format: "png", style: "circle" }),
     
     // 🎯 FALLBACK FINAL: Bandeira genérica do Brasil
-    `https://flagcdn.com/w160/br.png`
-  ].filter((url): url is string => url !== null);
+    `https://flagcdn.com/br.svg`
+  ].filter((url): url is string => url !== null) : [];
 
   const [src, setSrc] = useState(urls[0] || "");
 
   // Reset quando mudar o estado ou opções
   useEffect(() => {
+    if (!stateExists || urls.length === 0) return;
+    
     const newSrc = urls[0] || "";
     setSrc(newSrc);
     setImgError(false);
-    setLoaded(false);
     setUrlIndex(0);
     console.log(`🔄 Reset para ${stateName}: ${newSrc}`);
-  }, [stateName, JSON.stringify(flagOptions)]);
-
-  const stateColor = getStateColor(stateName);
+  }, [stateName, JSON.stringify(flagOptions), stateExists, urls.length]);
 
   const handleError = () => {
     console.log(`❌ Erro ao carregar: ${src} para ${stateName} (tentativa ${urlIndex + 1}/${urls.length})`);
@@ -638,15 +626,13 @@ const StateFlagIcon: React.FC<{
       console.log(`⚠️ Tentando próxima URL (${nextIndex + 1}/${urls.length}): ${nextUrl}`);
       setSrc(nextUrl);
       setUrlIndex(nextIndex);
-      setLoaded(false);
     } else {
-      console.log(`❌ Todas as URLs falharam para ${stateName} - mostrando fallback`);
+      console.log(`❌ Todas as URLs falharam para ${stateName} - sem fallback visual`);
       setImgError(true);
     }
   };
 
   const handleLoad = () => {
-    setLoaded(true);
     const sourceType = src.includes('jsdelivr') ? 'CDN JSDelivr' : 
                       src.includes('unpkg') ? 'UNPKG' : 
                       src.includes('.svg') ? `SVG ${src.includes('rounded') ? 'Arredondado' : 'Circular'}` :
@@ -655,7 +641,18 @@ const StateFlagIcon: React.FC<{
     console.log(`✅ Bandeira carregada: ${stateName} (tentativa ${urlIndex + 1}, fonte: ${sourceType})`);
   };
 
-  const uf = getStateFlagCode(stateName)?.toUpperCase() || stateName.substring(0, 2).toUpperCase();
+  // ✅ AGORA os returns condicionais vêm DEPOIS dos hooks
+  if (!stateExists) {
+    return (
+      <div 
+        className={`${className} rounded border border-gray-200 flex items-center justify-center text-xs font-bold text-gray-400`} 
+        style={{ backgroundColor: "#F3F4F6" }}
+        title={`Estado não encontrado: ${stateName}`}
+      >
+        --
+      </div>
+    );
+  }
 
   return (
     <div className={`${className} rounded border border-gray-200 overflow-hidden bg-white relative`}>
@@ -669,20 +666,452 @@ const StateFlagIcon: React.FC<{
           referrerPolicy="no-referrer"
         />
       )}
-      {(!loaded || imgError) && showFallback && (
-        <div 
-          className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white" 
-          style={{ backgroundColor: stateColor }}
-          title={`${stateName} (${uf}) - ${imgError ? 'Erro ao carregar todas as fontes' : 'Carregando...'}`}
-        >
-          {uf}
-        </div>
-      )}
     </div>
   );
 };
 
-// �🆕 COMPONENTE HÍBRIDO ESTADOS: Gráfico de Barras + Tabela Interativa
+// �️ COMPONENTE HÍBRIDO MUNICÍPIOS: Gráfico de Barras + Tabela Interativa
+const MunicipalitiesChartWithTable: React.FC<{
+  data: ChartDataItem[];
+  title: string;
+  icon: React.ReactNode;
+  onItemClick?: (category: string, value: string) => void;
+  filterCategory: string;
+  activeFilter?: string;
+  stateFilter?: string; // Novo: para mostrar se há filtro de estado ativo
+}> = ({ data, title, icon, onItemClick, filterCategory, activeFilter, stateFilter }) => {
+  // Top 10 municípios para o gráfico
+  const top10Municipalities = data.slice(0, 10);
+  
+  const handleBarClick = (item: any) => {
+    if (onItemClick && item && item.name) {
+      onItemClick(filterCategory, item.name);
+    }
+  };
+
+  const handleTableClick = (municipalityName: string) => {
+    if (onItemClick) {
+      onItemClick(filterCategory, municipalityName);
+    }
+  };
+
+  // Componente de célula personalizada para as barras com cores graduais
+  const CustomMunicipalityCell = (props: any) => {
+    const { index } = props;
+    // Gradiente de azul para verde para os municípios
+    const colors = [
+      "#1976D2", "#1E88E5", "#2196F3", "#42A5F5", "#64B5F6",
+      "#81C784", "#66BB6A", "#4CAF50", "#43A047", "#388E3C"
+    ];
+    const color = colors[index % colors.length];
+    return <Cell {...props} fill={color} />;
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          {icon}
+          <h3 className="text-xl font-semibold text-gray-800">{title}</h3>
+          <span className="bg-green-100 text-green-800 text-sm font-medium px-3 py-1 rounded-full">
+            {data.length} {data.length === 1 ? 'município' : 'municípios'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <ChartExportMenu
+            chartId={`${filterCategory}-chart`}
+            chartData={data}
+            chartTitle={title}
+            buttonVariant="icon"
+          />
+          {stateFilter && (
+            <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 px-3 py-2 rounded-lg">
+              <span>Estado: </span>
+              <span className="font-semibold">{stateFilter}</span>
+            </div>
+          )}
+          {activeFilter && (
+            <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
+              <span>Município: </span>
+              <span className="font-semibold">{activeFilter}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Gráfico de Barras - Top 10 */}
+        <div className="xl:col-span-2">
+          <div className="mb-4">
+            <h4 className="text-lg font-medium text-gray-700 mb-2">
+              Top 10 Municípios{stateFilter ? ` de ${stateFilter}` : ''}
+            </h4>
+            <p className="text-sm text-gray-500">Clique nas barras para filtrar por município</p>
+          </div>
+          
+          {top10Municipalities.length > 0 ? (
+            <div id={`${filterCategory}-chart`}>
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart data={top10Municipalities} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis 
+                    dataKey="name" 
+                    angle={-45}
+                    textAnchor="end"
+                    height={100}
+                    fontSize={11}
+                    interval={0}
+                  />
+                  <YAxis fontSize={12} />
+                  <Tooltip 
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0];
+                        
+                        return (
+                          <div className="bg-white p-4 border rounded-lg shadow-lg min-w-48">
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className="w-6 h-6 rounded border border-gray-200 bg-green-100 flex items-center justify-center">
+                                <Building className="h-3 w-3 text-green-600" />
+                              </div>
+                              <div>
+                                <p className="font-semibold text-gray-800">{label}</p>
+                                {stateFilter && <p className="text-xs text-gray-500">{stateFilter}</p>}
+                              </div>
+                            </div>
+                            <p className="text-green-600">
+                              <span className="inline-block w-3 h-3 rounded-full mr-2" style={{ backgroundColor: payload?.[0]?.color || '#4CAF50' }}></span>
+                              <span className="font-bold">{data.value}</span> {data.value === 1 ? 'caso' : 'casos'}
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar 
+                    dataKey="value" 
+                    cursor="pointer"
+                    onClick={handleBarClick}
+                    radius={[4, 4, 0, 0]}
+                  >
+                    {top10Municipalities.map((_, index) => (
+                      <CustomMunicipalityCell key={`cell-${index}`} index={index} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-64 text-gray-500">
+              <div className="text-center">
+                <Building className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                <p>Nenhum dado de município disponível</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Tabela Completa - Todos os Municípios */}
+        <div className="xl:col-span-1">
+          <div className="mb-4">
+            <h4 className="text-lg font-medium text-gray-700 mb-2">
+              Todos os Municípios{stateFilter ? ` (${stateFilter})` : ''}
+            </h4>
+            <p className="text-sm text-gray-500">Clique para filtrar por município</p>
+          </div>
+          
+          <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
+            <div className="space-y-2">
+              {data.map((item, index) => {
+                const isActive = activeFilter === item.name;
+                // Cores alternadas baseadas no índice
+                const colors = [
+                  "#1976D2", "#2196F3", "#4CAF50", "#FF9800", "#9C27B0", 
+                  "#F44336", "#00BCD4", "#CDDC39", "#FF5722", "#795548"
+                ];
+                const itemColor = colors[index % colors.length];
+                
+                return (
+                  <div
+                    key={index}
+                    className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all duration-200 ${
+                      isActive 
+                        ? 'bg-green-100 border border-green-300 shadow-sm' 
+                        : 'bg-white hover:bg-gray-100 border border-transparent hover:shadow-sm'
+                    }`}
+                    onClick={() => handleTableClick(item.name)}
+                    title={`Clique para filtrar por ${item.name}`}
+                  >
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-4 h-4 rounded border border-gray-200 flex items-center justify-center"
+                          style={{ backgroundColor: itemColor + '20' }}
+                        >
+                          <div 
+                            className="w-2 h-2 rounded-full"
+                            style={{ backgroundColor: itemColor }}
+                          ></div>
+                        </div>
+                        <div>
+                          <span className={`font-medium text-sm ${isActive ? 'text-green-800' : 'text-gray-700'}`}>
+                            {item.name}
+                          </span>
+                          {stateFilter && (
+                            <div className="text-xs text-gray-500">{stateFilter}</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm font-semibold ${isActive ? 'text-green-700' : 'text-gray-600'}`}>
+                        {item.value}
+                      </span>
+                      {isActive && <span className="text-green-500 text-xs">●</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// �️ COMPONENTE HÍBRIDO BAIRROS: Gráfico de Barras + Tabela Interativa
+const NeighborhoodsChartWithTable: React.FC<{
+  data: ChartDataItem[];
+  title: string;
+  icon: React.ReactNode;
+  onItemClick?: (category: string, value: string) => void;
+  filterCategory: string;
+  activeFilter?: string;
+  municipalityFilter?: string; // Novo: para mostrar se há filtro de município ativo
+  stateFilter?: string; // Novo: para mostrar se há filtro de estado ativo
+}> = ({ data, title, icon, onItemClick, filterCategory, activeFilter, municipalityFilter, stateFilter }) => {
+  // Top 10 bairros para o gráfico
+  const top10Neighborhoods = data.slice(0, 10);
+  
+  const handleBarClick = (item: any) => {
+    if (onItemClick && item && item.name) {
+      onItemClick(filterCategory, item.name);
+    }
+  };
+
+  const handleTableClick = (neighborhoodName: string) => {
+    if (onItemClick) {
+      onItemClick(filterCategory, neighborhoodName);
+    }
+  };
+
+  // Componente de célula personalizada para as barras com cores graduais
+  const CustomNeighborhoodCell = (props: any) => {
+    const { index } = props;
+    // Gradiente de roxo para rosa para os bairros
+    const colors = [
+      "#9C27B0", "#AB47BC", "#BA68C8", "#CE93D8", "#E1BEE7",
+      "#F48FB1", "#F06292", "#EC407A", "#E91E63", "#AD1457"
+    ];
+    const color = colors[index % colors.length];
+    return <Cell {...props} fill={color} />;
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          {icon}
+          <h3 className="text-xl font-semibold text-gray-800">{title}</h3>
+          <span className="bg-purple-100 text-purple-800 text-sm font-medium px-3 py-1 rounded-full">
+            {data.length} {data.length === 1 ? 'bairro' : 'bairros'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <ChartExportMenu
+            chartId={`${filterCategory}-chart`}
+            chartData={data}
+            chartTitle={title}
+            buttonVariant="icon"
+          />
+          {stateFilter && (
+            <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
+              <span>Estado: </span>
+              <span className="font-semibold">{stateFilter}</span>
+            </div>
+          )}
+          {municipalityFilter && (
+            <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 px-3 py-2 rounded-lg">
+              <span>Município: </span>
+              <span className="font-semibold">{municipalityFilter}</span>
+            </div>
+          )}
+          {activeFilter && (
+            <div className="flex items-center gap-2 text-sm text-purple-600 bg-purple-50 px-3 py-2 rounded-lg">
+              <span>Bairro: </span>
+              <span className="font-semibold">{activeFilter}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Gráfico de Barras - Top 15 */}
+        <div className="xl:col-span-2">
+          <div className="mb-4">
+            <h4 className="text-lg font-medium text-gray-700 mb-2">
+              Top 10 Bairros
+              {municipalityFilter && ` de ${municipalityFilter}`}
+              {stateFilter && !municipalityFilter && ` de ${stateFilter}`}
+            </h4>
+            <p className="text-sm text-gray-500">Clique nas barras para filtrar por bairro</p>
+          </div>
+          
+          {top10Neighborhoods.length > 0 ? (
+            <div id={`${filterCategory}-chart`}>
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart data={top10Neighborhoods} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis 
+                    dataKey="name" 
+                    angle={-45}
+                    textAnchor="end"
+                    height={100}
+                    fontSize={11}
+                    interval={0}
+                  />
+                  <YAxis fontSize={12} />
+                  <Tooltip 
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0];
+                        
+                        return (
+                          <div className="bg-white p-4 border rounded-lg shadow-lg min-w-48">
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className="w-6 h-6 rounded border border-gray-200 bg-purple-100 flex items-center justify-center">
+                                <Home className="h-3 w-3 text-purple-600" />
+                              </div>
+                              <div>
+                                <p className="font-semibold text-gray-800">{label}</p>
+                                {municipalityFilter && <p className="text-xs text-gray-500">{municipalityFilter}</p>}
+                                {stateFilter && !municipalityFilter && <p className="text-xs text-gray-500">{stateFilter}</p>}
+                                {stateFilter && municipalityFilter && <p className="text-xs text-gray-400">{stateFilter}</p>}
+                              </div>
+                            </div>
+                            <p className="text-purple-600">
+                              <span className="inline-block w-3 h-3 rounded-full mr-2" style={{ backgroundColor: payload?.[0]?.color || '#9C27B0' }}></span>
+                              <span className="font-bold">{data.value}</span> {data.value === 1 ? 'caso' : 'casos'}
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar 
+                    dataKey="value" 
+                    cursor="pointer"
+                    onClick={handleBarClick}
+                    radius={[4, 4, 0, 0]}
+                  >
+                    {top10Neighborhoods.map((_, index) => (
+                      <CustomNeighborhoodCell key={`cell-${index}`} index={index} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-64 text-gray-500">
+              <div className="text-center">
+                <Home className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                <p>Nenhum dado de bairro disponível</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Tabela Completa - Todos os Bairros */}
+        <div className="xl:col-span-1">
+          <div className="mb-4">
+            <h4 className="text-lg font-medium text-gray-700 mb-2">
+              Todos os Bairros
+              {municipalityFilter && ` (${municipalityFilter})`}
+              {stateFilter && !municipalityFilter && ` (${stateFilter})`}
+            </h4>
+            <p className="text-sm text-gray-500">Clique para filtrar por bairro</p>
+          </div>
+          
+          <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
+            <div className="space-y-2">
+              {data.map((item, index) => {
+                const isActive = activeFilter === item.name;
+                // Cores alternadas baseadas no índice
+                const colors = [
+                  "#9C27B0", "#E91E63", "#F44336", "#FF9800", "#4CAF50", 
+                  "#2196F3", "#00BCD4", "#795548", "#607D8B", "#9E9E9E"
+                ];
+                const itemColor = colors[index % colors.length];
+                
+                return (
+                  <div
+                    key={index}
+                    className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all duration-200 ${
+                      isActive 
+                        ? 'bg-purple-100 border border-purple-300 shadow-sm' 
+                        : 'bg-white hover:bg-gray-100 border border-transparent hover:shadow-sm'
+                    }`}
+                    onClick={() => handleTableClick(item.name)}
+                    title={`Clique para filtrar por ${item.name}`}
+                  >
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-4 h-4 rounded border border-gray-200 flex items-center justify-center"
+                          style={{ backgroundColor: itemColor + '20' }}
+                        >
+                          <div 
+                            className="w-2 h-2 rounded-full"
+                            style={{ backgroundColor: itemColor }}
+                          ></div>
+                        </div>
+                        <div>
+                          <span className={`font-medium text-sm ${isActive ? 'text-purple-800' : 'text-gray-700'}`}>
+                            {item.name}
+                          </span>
+                          {municipalityFilter && (
+                            <div className="text-xs text-gray-500">{municipalityFilter}</div>
+                          )}
+                          {stateFilter && !municipalityFilter && (
+                            <div className="text-xs text-gray-500">{stateFilter}</div>
+                          )}
+                          {stateFilter && municipalityFilter && (
+                            <div className="text-xs text-gray-400">{stateFilter}</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm font-semibold ${isActive ? 'text-purple-700' : 'text-gray-600'}`}>
+                        {item.value}
+                      </span>
+                      {isActive && <span className="text-purple-500 text-xs">●</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// �🏛️ COMPONENTE HÍBRIDO ESTADOS: Gráfico de Barras + Tabela Interativa
 const StatesChartWithTable: React.FC<{
   data: ChartDataItem[];
   title: string;
@@ -723,12 +1152,20 @@ const StatesChartWithTable: React.FC<{
             {data.length} {data.length === 1 ? 'estado' : 'estados'}
           </span>
         </div>
-        {activeFilter && (
-          <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
-            <span>Filtro ativo: </span>
-            <span className="font-semibold">{activeFilter}</span>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <ChartExportMenu
+            chartId={`${filterCategory}-chart`}
+            chartData={data}
+            chartTitle={title}
+            buttonVariant="icon"
+          />
+          {activeFilter && (
+            <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
+              <span>Filtro ativo: </span>
+              <span className="font-semibold">{activeFilter}</span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -740,54 +1177,56 @@ const StatesChartWithTable: React.FC<{
           </div>
           
           {top10States.length > 0 ? (
-            <ResponsiveContainer width="100%" height={400}>
-              <BarChart data={top10States} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="name" 
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                  fontSize={12}
-                  interval={0}
-                />
-                <YAxis fontSize={12} />
-                <Tooltip 
-                  content={({ active, payload, label }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0];
-                      
-                      return (
-                        <div className="bg-white p-4 border rounded-lg shadow-lg min-w-48">
-                          <div className="flex items-center gap-3 mb-2">
-                            <StateFlagIcon stateName={label} className="w-8 h-6" />
-                            <div>
-                              <p className="font-semibold text-gray-800">{label}</p>
-                              <p className="text-xs text-gray-500 uppercase">{getStateFlagCode(label)}</p>
+            <div id={`${filterCategory}-chart`}>
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart data={top10States} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis 
+                    dataKey="name" 
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                    fontSize={12}
+                    interval={0}
+                  />
+                  <YAxis fontSize={12} />
+                  <Tooltip 
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0];
+                        
+                        return (
+                          <div className="bg-white p-4 border rounded-lg shadow-lg min-w-48">
+                            <div className="flex items-center gap-3 mb-2">
+                              <StateFlagIcon stateName={label} className="w-8 h-6" />
+                              <div>
+                                <p className="font-semibold text-gray-800">{label}</p>
+                                <p className="text-xs text-gray-500 uppercase">{getStateFlagCode(label)}</p>
+                              </div>
                             </div>
+                            <p className="text-blue-600">
+                              <span className="inline-block w-3 h-3 rounded-full mr-2" style={{ backgroundColor: getStateColor(label) }}></span>
+                              <span className="font-bold">{data.value}</span> {data.value === 1 ? 'caso' : 'casos'}
+                            </p>
                           </div>
-                          <p className="text-blue-600">
-                            <span className="inline-block w-3 h-3 rounded-full mr-2" style={{ backgroundColor: getStateColor(label) }}></span>
-                            <span className="font-bold">{data.value}</span> {data.value === 1 ? 'caso' : 'casos'}
-                          </p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Bar 
-                  dataKey="value" 
-                  cursor="pointer"
-                  onClick={handleBarClick}
-                  radius={[4, 4, 0, 0]}
-                >
-                  {top10States.map((entry, index) => (
-                    <CustomStateCell key={`cell-${index}`} payload={entry} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar 
+                    dataKey="value" 
+                    cursor="pointer"
+                    onClick={handleBarClick}
+                    radius={[4, 4, 0, 0]}
+                  >
+                    {top10States.map((entry, index) => (
+                      <CustomStateCell key={`cell-${index}`} payload={entry} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           ) : (
             <div className="flex items-center justify-center h-64 text-gray-500">
               <div className="text-center">
@@ -884,12 +1323,20 @@ const CountriesChartWithTable: React.FC<{
             {data.length} {data.length === 1 ? 'país' : 'países'}
           </span>
         </div>
-        {activeFilter && (
-          <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded">
-            <span>Filtro ativo: </span>
-            <span className="font-medium">{activeFilter}</span>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <ChartExportMenu
+            chartId={`${filterCategory}-chart`}
+            chartData={data}
+            chartTitle={title}
+            buttonVariant="icon"
+          />
+          {activeFilter && (
+            <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded">
+              <span>Filtro ativo: </span>
+              <span className="font-medium">{activeFilter}</span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -897,31 +1344,82 @@ const CountriesChartWithTable: React.FC<{
         <div className="lg:col-span-2">
           <h4 className="text-sm font-medium text-gray-700 mb-3">Top 10 Países</h4>
           {top10Countries.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={top10Countries} margin={{ top: 5, right: 30, left: 20, bottom: 60 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="name" 
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                  fontSize={11}
-                  interval={0}
-                />
-                <YAxis fontSize={12} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar 
-                  dataKey="value" 
-                  cursor="pointer"
-                  onClick={handleBarClick}
-                  radius={[2, 2, 0, 0]}
-                >
-                  {top10Countries.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <div id={`${filterCategory}-chart`}>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={top10Countries} margin={{ top: 5, right: 30, left: 20, bottom: 60 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis 
+                    dataKey="name" 
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                    fontSize={11}
+                    interval={0}
+                  />
+                  <YAxis fontSize={12} />
+                  <Tooltip 
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0];
+                        const countryData = data.payload; // Acessar dados originais do país
+                        
+                        return (
+                          <div className="bg-white p-4 border rounded-lg shadow-lg min-w-48">
+                            <div className="flex items-center gap-3 mb-2">
+                              {getFlagUrl(label) ? (
+                                <div className="flex items-center justify-center w-8 h-6 rounded border border-gray-200 bg-white overflow-hidden">
+                                  <img 
+                                    src={getFlagUrl(label)!} 
+                                    alt={`Bandeira ${label}`}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      // Se a imagem falhar, mostrar um ícone de globo
+                                      const target = e.target as HTMLImageElement;
+                                      const parent = target.parentElement;
+                                      if (parent) {
+                                        parent.innerHTML = `<div class="w-6 h-6 rounded border border-gray-200 bg-blue-100 flex items-center justify-center"><svg class="h-3 w-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="m6.93 6.93 10.14 10.14"></path><path d="M6.93 17.07 17.07 6.93"></path></svg></div>`;
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              ) : (
+                                <div 
+                                  className="w-8 h-6 rounded border border-gray-200 flex items-center justify-center"
+                                  style={{ backgroundColor: countryData?.fill ? countryData.fill + '20' : '#3b82f620' }}
+                                >
+                                  <Globe className="h-3 w-3" style={{ color: countryData?.fill || '#3b82f6' }} />
+                                </div>
+                              )}
+                              <div>
+                                <p className="font-semibold text-gray-800">{label}</p>
+                                <p className="text-xs text-gray-500 uppercase">
+                                  {getCountryFlagCode(label) || 'País'}
+                                </p>
+                              </div>
+                            </div>
+                            <p className="text-blue-600">
+                              <span className="inline-block w-3 h-3 rounded-full mr-2" style={{ backgroundColor: countryData?.fill || '#3b82f6' }}></span>
+                              <span className="font-bold">{data.value}</span> {data.value === 1 ? 'caso' : 'casos'}
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar 
+                    dataKey="value" 
+                    cursor="pointer"
+                    onClick={handleBarClick}
+                    radius={[2, 2, 0, 0]}
+                  >
+                    {top10Countries.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           ) : (
             <div className="flex items-center justify-center h-60 text-gray-500 bg-gray-50 rounded">
               <div className="text-center">
@@ -1014,7 +1512,7 @@ const GeographicLocationPanel: React.FC<GeographicLocationPanelProps> = ({
   exportMenu
 }) => {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-dashboard="geographic-location">
       {/* Cabeçalho do painel */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -1026,7 +1524,23 @@ const GeographicLocationPanel: React.FC<GeographicLocationPanelProps> = ({
             <p className="text-sm text-gray-600">Distribuição dos casos por localização de residência</p>
           </div>
         </div>
-        {exportMenu}
+        <div className="flex items-center gap-2">
+          <DashboardExportMenu
+            paisData={paisData}
+            estadoData={estadoData}
+            municipioData={municipioData}
+            bairroData={bairroData}
+            totalRecords={paisData.reduce((sum, item) => sum + item.value, 0) + 
+                         estadoData.reduce((sum, item) => sum + item.value, 0) + 
+                         municipioData.reduce((sum, item) => sum + item.value, 0) + 
+                         bairroData.reduce((sum, item) => sum + item.value, 0)}
+            activeFilters={activeFilters}
+            buttonVariant="button"
+            className="text-sm"
+            title="Painel Geográfico"
+          />
+          {exportMenu}
+        </div>
       </div>
 
       {/* Grade responsiva dos gráficos */}
@@ -1055,29 +1569,30 @@ const GeographicLocationPanel: React.FC<GeographicLocationPanelProps> = ({
             />
           </div>
 
-          {/* Gráfico de Barras - Municípios */}
+          {/* Componente Híbrido - Municípios com Gráfico + Tabela */}
           <div className="col-span-1">
-            <InteractiveBarChart
+            <MunicipalitiesChartWithTable
               data={municipioData}
               title="Municípios de Residência"
               icon={<Building className="h-5 w-5 text-green-600" />}
-              onBarClick={onFilterClick}
+              onItemClick={onFilterClick}
               filterCategory="municipio"
               activeFilter={activeFilters?.municipio}
-              maxItems={20}
+              stateFilter={activeFilters?.estado} // Passa o filtro de estado ativo
             />
           </div>
 
-          {/* Gráfico de Barras - Bairros */}
+          {/* Componente Híbrido - Bairros com Gráfico + Tabela */}
           <div className="col-span-1">
-            <InteractiveBarChart
+            <NeighborhoodsChartWithTable
               data={bairroData}
               title="Bairros de Residência"
               icon={<Home className="h-5 w-5 text-purple-600" />}
-              onBarClick={onFilterClick}
+              onItemClick={onFilterClick}
               filterCategory="bairro"
               activeFilter={activeFilters?.bairro}
-              maxItems={25}
+              municipalityFilter={activeFilters?.municipio} // Passa o filtro de município ativo
+              stateFilter={activeFilters?.estado} // Passa o filtro de estado ativo
             />
           </div>
         </div>

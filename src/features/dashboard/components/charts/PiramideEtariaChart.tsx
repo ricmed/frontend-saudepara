@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Download } from 'lucide-react';
+import { Users } from 'lucide-react';
 import { NotificacaoService } from '../../../../services/NotificacaoService';
+import ChartExportMenu from '../../../../components/common/ChartExportMenu';
 
 interface PiramideEtariaItem {
   faixaEtaria: string;
@@ -20,10 +21,12 @@ interface PiramideEtariaChartProps {
   toggleFilter?: (category: string, value: string) => void;
   activeFilters?: Record<string, any>;
   filteredData?: any[];
+  exportMenu?: React.ReactNode; // 🆕 Prop opcional para menu de exportação personalizado
 }
 
 const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({ 
   className = "",
+  exportMenu, // 🆕 Prop para menu de exportação personalizado
   toggleFilter,
   activeFilters = {},
   filteredData
@@ -223,26 +226,6 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
     }
   };
 
-  const exportToCSV = () => {
-    const headers = ['Faixa Etária', 'Homem Cisgênero', 'Mulher Cisgênero', 'Homem Transgênero', 'Mulher Transgênero', 'Travesti', 'Não Binário', 'Ignorado', 'Não se Aplica', 'Total'];
-    const csvContent = [
-      headers.join(','),
-      ...data.map(item => 
-        `"${item.faixaEtaria}",${item.homemCisgenero},${item.mulherCisgenero},${item.homemTransgenero},${item.mulherTransgenero},${item.travesti},${item.naoBinario},${item.ignorado},${item.naoSeAplica},${item.total}`
-      )
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `piramide-etaria-${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   // Função para verificar se uma faixa etária está filtrada
   const isFaixaEtariaFiltered = (faixaEtaria: string) => {
     return activeFilters?.faixaEtaria === faixaEtaria;
@@ -300,18 +283,18 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
           </div>
         </div>
         
-        <button
-          onClick={exportToCSV}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-          title="Exportar dados"
-        >
-          <Download className="h-4 w-4" />
-          CSV
-        </button>
+        {exportMenu || (
+          <ChartExportMenu 
+            chartId="piramide-etaria" 
+            chartData={data.map(item => ({ name: item.faixaEtaria, value: item.total }))} 
+            chartTitle="Pirâmide Etária por Sexo" 
+            buttonVariant="icon"
+          />
+        )}
       </div>
 
       {/* Gráfico */}
-      <div className="h-96">
+      <div id="piramide-etaria" className="h-96">
         {data.length > 0 ? (
           <div className="h-full">
             {/* Pirâmide Etária Simplificada */}

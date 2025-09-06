@@ -8,8 +8,9 @@ import {
   Tooltip,
   Legend
 } from 'recharts';
-import { CheckCircle, Download } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
 import NotificacaoService from '@/services/NotificacaoService';
+import ChartExportMenu from '../../../../components/common/ChartExportMenu';
 
 interface DesfechoItem {
   descricao: string;
@@ -21,11 +22,12 @@ interface DesfechoCasosChartProps {
   className?: string;
   toggleFilter?: (category: string, value: string) => void;
   activeFilters?: Record<string, any>;
-  filteredData?: any[];
+  filteredData?: any[];  exportMenu?: React.ReactNode; // 🆕 Prop opcional para menu de exportação personalizado
 }
 
 const DesfechoCasosChart: React.FC<DesfechoCasosChartProps> = ({ 
   className = "",
+  exportMenu, // 🆕 Prop para menu de exportação personalizado
   toggleFilter,
   activeFilters = {},
   filteredData
@@ -151,26 +153,6 @@ const DesfechoCasosChart: React.FC<DesfechoCasosChartProps> = ({
     return baseColor + "60"; // 60 = transparência ~40%
   };
 
-  const exportToCSV = () => {
-    const headers = ['Desfecho', 'Quantidade', 'Percentual'];
-    const csvContent = [
-      headers.join(','),
-      ...data.map(item => 
-        `"${item.descricao}",${item.valor},${item.percentual}%`
-      )
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `desfecho-casos-${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   // Tooltip customizado
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
@@ -226,18 +208,18 @@ const DesfechoCasosChart: React.FC<DesfechoCasosChartProps> = ({
           </div>
         </div>
         
-        <button
-          onClick={exportToCSV}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-          title="Exportar dados"
-        >
-          <Download className="h-4 w-4" />
-          CSV
-        </button>
+        {exportMenu || (
+          <ChartExportMenu 
+            chartId="desfecho-casos" 
+            chartData={data.map(item => ({ name: item.descricao, value: item.valor }))} 
+            chartTitle="Desfecho dos Casos" 
+            buttonVariant="icon"
+          />
+        )}
       </div>
 
       {/* Gráfico */}
-      <div className="h-96">
+      <div id="desfecho-casos" className="h-96">
         {data.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>

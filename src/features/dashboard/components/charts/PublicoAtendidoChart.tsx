@@ -11,16 +11,8 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { 
-  Users, 
-  Download, 
-  FileImage, 
-  FileSearch2, 
-  File, 
-  BarChart3, 
-  PieChart as PieChartIcon,
-  Filter
-} from "lucide-react";
+import { Users, Filter, BarChart3, PieChart as PieChartIcon } from "lucide-react";
+import ChartExportMenu from '../../../../components/common/ChartExportMenu';
 import { useChartData } from "../../hooks/useChartData";
 
 // Interface das props do componente (simplificada - dados vêm do contexto)
@@ -31,131 +23,8 @@ interface PublicoAtendidoChartProps {
   className?: string;
   isVisible?: boolean;
   showToggle?: boolean;
+  exportMenu?: React.ReactNode; // 🆕 Prop opcional para menu de exportação personalizado
 }
-
-// Funções de exportação
-const exportChartAsPNG = (chartId: string, title: string): void => {
-  const element = document.getElementById(chartId);
-  if (!element) {
-    alert('Elemento não encontrado!');
-    return;
-  }
-  console.log(`Exportando ${title} como PNG`);
-  alert(`Exportação PNG simulada para: ${title}`);
-};
-
-const exportChartAsPDF = (chartId: string, title: string): void => {
-  const element = document.getElementById(chartId);
-  if (!element) {
-    alert('Elemento não encontrado!');
-    return;
-  }
-  console.log(`Exportando ${title} como PDF`);
-  alert(`Exportação PDF simulada para: ${title}`);
-};
-
-const exportChartAsWord = (chartId: string, title: string): void => {
-  const element = document.getElementById(chartId);
-  if (!element) {
-    alert('Elemento não encontrado!');
-    return;
-  }
-  console.log(`Exportando ${title} como Word`);
-  alert(`Exportação Word simulada para: ${title}`);
-};
-
-const exportChartAsCSV = (data: any[], title: string): void => {
-  try {
-    const headers = ['Categoria', 'Valor'];
-    const rows = [
-      headers.join(','),
-      ...data.map(item => `"${item.name.replace(/"/g, '""')}",${item.value}`)
-    ];
-    const csvContent = rows.join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `${title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.csv`;
-    link.click();
-  } catch (error) {
-    console.error('Erro ao exportar CSV:', error);
-    alert('Erro ao exportar CSV');
-  }
-};
-
-// Componente de menu de exportação
-const GraphExportMenu: React.FC<{
-  chartId: string;
-  chartData: any[];
-  chartTitle: string;
-}> = ({ chartId, chartData, chartTitle }) => {
-  const [showMenu, setShowMenu] = useState(false);
-  
-  const handleExport = (format: string) => {
-    switch (format) {
-      case 'png':
-        exportChartAsPNG(chartId, chartTitle);
-        break;
-      case 'pdf':
-        exportChartAsPDF(chartId, chartTitle);
-        break;
-      case 'word':
-        exportChartAsWord(chartId, chartTitle);
-        break;
-      case 'csv':
-        exportChartAsCSV(chartData, chartTitle);
-        break;
-      default:
-        break;
-    }
-    setShowMenu(false);
-  };
-  
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setShowMenu(!showMenu)}
-        className="p-1 text-gray-500 hover:text-blue-500 transition-colors"
-        title="Exportar gráfico"
-      >
-        <Download className="h-4 w-4" />
-      </button>
-      
-      {showMenu && (
-        <div className="absolute right-0 mt-1 bg-white rounded shadow-lg py-1 z-20 min-w-40">
-          <button 
-            className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-            onClick={() => handleExport('png')}
-          >
-            <FileImage className="h-4 w-4 text-green-500" />
-            Exportar PNG
-          </button>
-          <button 
-            className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-            onClick={() => handleExport('pdf')}
-          >
-            <FileSearch2 className="h-4 w-4 text-red-500" />
-            Exportar PDF
-          </button>
-          <button 
-            className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-            onClick={() => handleExport('word')}
-          >
-            <File className="h-4 w-4 text-blue-500" />
-            Exportar Word
-          </button>
-          <button 
-            className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-            onClick={() => handleExport('csv')}
-          >
-            <File className="h-4 w-4 text-gray-500" />
-            Exportar CSV
-          </button>
-        </div>
-      )}
-    </div>
-  );
-};
 
 // Componente principal (com contexto global)
 const PublicoAtendidoChart: React.FC<PublicoAtendidoChartProps> = ({
@@ -163,6 +32,7 @@ const PublicoAtendidoChart: React.FC<PublicoAtendidoChartProps> = ({
   chartId = "chart-publico-atendido",
   title = "Distribuição por Público Atendido",
   className = "bg-white p-4 rounded-lg shadow-sm",
+  exportMenu, // 🆕 Prop para menu de exportação personalizado
   isVisible = true,
   showToggle = true
 }) => {
@@ -202,12 +72,14 @@ const PublicoAtendidoChart: React.FC<PublicoAtendidoChartProps> = ({
           )}
         </div>
         
-        <div className="flex items-center gap-2">
-          <GraphExportMenu 
-            chartId={chartId} 
-            chartData={data}
-            chartTitle={title}
-          />
+        <div className="flex items-center gap-2">          {exportMenu || (
+            <ChartExportMenu 
+              chartId={chartId} 
+              chartData={data}
+              chartTitle={title}
+              buttonVariant="icon"
+            />
+          )}
           
           {showToggle && (
             <div className="flex bg-gray-100 rounded-md p-1">

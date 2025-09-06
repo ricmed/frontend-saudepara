@@ -10,8 +10,9 @@ import {
   ResponsiveContainer,
   Cell
 } from 'recharts';
-import { Building, Download } from 'lucide-react';
+import { Building } from 'lucide-react';
 import NotificacaoService from '@/services/NotificacaoService';
+import ChartExportMenu from '../../../../components/common/ChartExportMenu';
 
 interface EstabelecimentoItem {
   nome: string;
@@ -23,11 +24,12 @@ interface EstabelecimentosCasosChartProps {
   className?: string;
   toggleFilter?: (category: string, value: string) => void;
   activeFilters?: Record<string, any>;
-  filteredData?: any[];
+  filteredData?: any[];  exportMenu?: React.ReactNode; // 🆕 Prop opcional para menu de exportação personalizado
 }
 
 const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({ 
   className = "",
+  exportMenu, // 🆕 Prop para menu de exportação personalizado
   toggleFilter,
   activeFilters = {},
   filteredData
@@ -97,26 +99,6 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
     } finally {
       setLoading(false);
     }
-  };
-
-  const exportToCSV = () => {
-    const headers = ['Estabelecimento', 'Total de Casos', 'Percentual'];
-    const csvContent = [
-      headers.join(','),
-      ...data.map(item => 
-        `"${item.nome}",${item.totalCasos},${item.percentual}%`
-      )
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `estabelecimentos-casos-${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   // Tooltip customizado
@@ -219,18 +201,18 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
           </div>
         </div>
         
-        <button
-          onClick={exportToCSV}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-          title="Exportar dados"
-        >
-          <Download className="h-4 w-4" />
-          CSV
-        </button>
+        {exportMenu || (
+          <ChartExportMenu 
+            chartId="estabelecimentos-casos" 
+            chartData={data.map(item => ({ name: item.nome, value: item.totalCasos }))} 
+            chartTitle="Estabelecimentos por Número de Casos" 
+            buttonVariant="icon"
+          />
+        )}
       </div>
 
       {/* Gráfico */}
-      <div className="h-96 relative estabelecimentos-chart">
+      <div id="estabelecimentos-casos" className="h-96 relative estabelecimentos-chart">
         <style>{`
           .estabelecimentos-chart .recharts-bar-rectangle:hover {
             transform-origin: center !important;

@@ -23,7 +23,7 @@ const BrazilianPhoneInput: React.FC<BrazilianPhoneInputProps> = ({
   const initialLoadRef = useRef(true);
   
   const [phoneNumber, setPhoneNumber] = useState<string>("");
-  const brazilFlag = "https://flagcdn.com/w20/br.png";
+  const brazilFlag = "https://flagcdn.com/br.svg";
   const brazilDialCode = "55"; // Remover o "+" para salvar no formato esperado pelo backend
 
   // Função para aplicar a máscara ao número de telefone

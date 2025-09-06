@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import NotificacaoService from '@/services/NotificacaoService';
+import DashboardExportMenu from '../../components/common/DashboardExportMenu';
 import {
   BarChart,
   Bar,
@@ -51,7 +52,7 @@ import {
 } from "lucide-react";
 
 // 🆕 NOVOS IMPORTS: Componentes do dashboard aprimorado
-import GeographicLocationPanel from './components/GeographicLocationPanel';
+import GeographicLocationPanel from './components/charts/GeographicLocationPanel';
 import DashboardTabs, { useDashboardTabs } from './components/DashboardTabs';
 import AIInsights from './components/AIInsights';
 import AIChat from './components/AIChat';
@@ -70,6 +71,11 @@ import DistribuicaoRacaCorChart from './components/charts/DistribuicaoRacaCorCha
 import PrincipaisSintomasChart from './components/charts/PrincipaisSintomasChart';
 import TiposTraumaChart from './components/charts/TiposTraumaChart';
 import HipotesesDiagnosticasChart from './components/charts/HipotesesDiagnosticasChart';
+
+// 🆕 SISTEMA DE EXPORTAÇÃO DISPONÍVEL:
+// Para integrar exportação em um gráfico individual, importe:
+// import ChartExportMenu from '../../components/common/ChartExportMenu';
+// E adicione como prop ou elemento ao lado do gráfico
 
 // Funções de exportação para diferentes formatos
 const exportChartAsPNG = (chartId: string, title: string): void => {
@@ -2674,7 +2680,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-100 text-gray-800 pb-6">
+    <div data-dashboard="main" className="min-h-screen bg-gray-100 text-gray-800 pb-6">
       {/* Cabeçalho */}
       <header className="bg-gradient-to-r from-blue-700 to-blue-900 p-3 sm:p-4 shadow-md sticky top-0 z-10">
         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
@@ -2747,40 +2753,23 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                   {showHelp ? "Ocultar Ajuda" : "Ajuda"}
                 </span>
               </button>
-              <div className="relative">
-                <button
-                  onClick={() => setShowExportDropdown(!showExportDropdown)}
-                  onBlur={() =>
-                    setTimeout(() => setShowExportDropdown(false), 200)
-                  }
-                  className="flex items-center justify-center gap-2 px-2 sm:px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-xs sm:text-sm whitespace-nowrap w-full sm:w-auto"
-                >
-                  <Download className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <span className="hidden sm:inline">Exportar</span>
-                  <ChevronDown className="h-3 w-3" />
-                </button>
-
-                {showExportDropdown && (
-                  <div className="absolute right-0 mt-1 bg-white rounded shadow-lg py-1 z-20 min-w-[160px] sm:min-w-40">
-                    <button className="flex items-center gap-2 w-full px-3 sm:px-4 py-2 text-left text-xs sm:text-sm hover:bg-gray-100">
-                      <FileSearch2 className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
-                      Exportar PDF
-                    </button>
-                    <button className="flex items-center gap-2 w-full px-3 sm:px-4 py-2 text-left text-xs sm:text-sm hover:bg-gray-100">
-                      <File className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500" />
-                      Exportar Word
-                    </button>
-                    <button className="flex items-center gap-2 w-full px-3 sm:px-4 py-2 text-left text-xs sm:text-sm hover:bg-gray-100">
-                      <FileImage className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
-                      Exportar PNG
-                  </button>
-                  <button className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm hover:bg-gray-100">
-                    <File className="h-4 w-4 text-gray-500" />
-                    Exportar CSV
-                  </button>
-                </div>
-              )}
-            </div>
+              <DashboardExportMenu
+                paisData={filteredPais}
+                estadoData={filteredEstado}
+                municipioData={filteredMunicipio}
+                bairroData={filteredBairro}
+                publicoData={filteredPublico}
+                tipoAtendimentoData={filteredTipoAtendimento}
+                generoData={filteredGenero}
+                racaData={filteredRaca}
+                sintomasData={filteredSintomas}
+                traumaData={filteredTrauma}
+                hipotesesData={filteredHipoteses}
+                totalRecords={filteredNotificacoes.current.length}
+                activeFilters={activeFilters}
+                buttonVariant="button"
+                className="text-xs sm:text-sm"
+              />
             </div>
           </div>
         </div>

@@ -883,7 +883,7 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
 
   // Função para obter URL da bandeira
   const getFlagUrl = (countryCode: string) => {
-    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
+    return `https://flagcdn.com/${countryCode.toLowerCase()}.svg`;
   };
 
   // Filtra países baseado na busca
