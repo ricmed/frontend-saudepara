@@ -2463,8 +2463,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           const totalDia = contarNotificacoesPorData(dadosParaContar, dataAtual);
           setTotalNotificacoesDia(totalDia);
           console.log('📊 DEBUG: Total de notificações para', dataAtual, ':', totalDia);
-          
-          initialProcessingDone.current = true;
         }
       } else if (selectedDataNotificacao) {
         // Se já temos uma data selecionada, verificar sincronização com activeFilters
@@ -2538,9 +2536,14 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           setFilteredGenero([]);
         } else {
           console.log("Iniciando processamento de dados com", notificacoes.length, "notificações");
-          // Processar todas as notificações (sem filtro inicialmente)
-          filteredNotificacoes.current = notificacoes;
-          const success = calcularEstatisticas(notificacoes);
+          
+          // Aplicar filtros se houver filtros ativos, caso contrário usar todos os dados
+          const hasActiveFilter = Object.values(activeFilters).some(f => f !== null);
+          const base = Array.isArray(notificacoes) ? notificacoes : [];
+          const dadosFiltrados = hasActiveFilter ? applyFilters(base) : base;
+          
+          filteredNotificacoes.current = dadosFiltrados;
+          const success = calcularEstatisticas(dadosFiltrados);
           console.log("Processamento de dados concluído com sucesso:", success);
         }
         
@@ -2858,7 +2861,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                     unidade: 'Unidade',
                     hipotese: 'Hipótese Diagnóstica',
                     trauma: 'Tipo de Trauma',
-                    sintoma: 'Sintoma'
+                    sintoma: 'Sintoma',
+                    dataNotificacao: 'Data'
                   };
                   
                   return (
