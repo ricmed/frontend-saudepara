@@ -1,5 +1,5 @@
 // src/features/notificationForms/components/sections/NotifierInfoSection.tsx
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { FormSectionProps } from '@/features/notificationForms/types/index2';
 import SectionHeader from '../shared/SectionHeader';
@@ -7,6 +7,8 @@ import FormField from '../shared/FormField';
 import CustomDateInput from '@/features/notificationForms/components/CustomDateInput';
 import UnidadeNotificadoraField from '@/features/notificationForms/components/UnidadeNotificadoraField';
 import BrazilianPhoneInput from '@/features/notificationForms/components/BrazilianPhoneInput';
+import useUserPermissions from '@/hooks/useUserPermissions';
+import { usuarioGestaoService } from '@/services/UsuarioGestaoService';
 
 const NotifierInfoSection: React.FC<FormSectionProps> = ({
   formData,
@@ -16,6 +18,58 @@ const NotifierInfoSection: React.FC<FormSectionProps> = ({
   isExpanded,
   toggleSection
 }) => {
+  const permissions = useUserPermissions();
+  const [unidadesPermitidas, setUnidadesPermitidas] = useState<Array<{id: number; nome: string}>>([]);
+  const [loadingUnidades, setLoadingUnidades] = useState(false);
+
+  // Carregar unidades permitidas baseado no nível de acesso
+  useEffect(() => {
+    const loadUnidadesPermitidas = async () => {
+      if (permissions.loading) return;
+      
+      try {
+        setLoadingUnidades(true);
+        console.log('🔍 Carregando unidades baseado no nível:', permissions.nivel);
+        
+        let unidades: Array<{id: number; nome: string}> = [];
+        
+        if (permissions.nivel === 'unidade' && permissions.estabelecimentoId) {
+          // Para usuário de unidade: apenas sua unidade
+          const response = await usuarioGestaoService.getEstabelecimentoComHierarquia(permissions.estabelecimentoId);
+          unidades = [{
+            id: response.idestabelecimento,
+            nome: response.nome
+          }];
+          
+          // Pré-selecionar automaticamente a unidade do usuário
+          if (formData.unidadeNotificadora === '') {
+            console.log('🏥 Pré-selecionando unidade do usuário:', response.nome);
+            setFormData(prev => ({
+              ...prev,
+              unidadeNotificadora: response.idestabelecimento.toString()
+            }));
+          }
+        } else if (permissions.nivel === 'municipio' && permissions.municipioId) {
+          // Para usuário de município: todas as unidades do município
+          unidades = await usuarioGestaoService.getEstabelecimentosPorMunicipio(permissions.municipioId);
+        } else if (permissions.nivel === 'estado' && permissions.estadoId) {
+          // Para usuário de estado: todas as unidades do estado (Pará)
+          unidades = await usuarioGestaoService.getEstabelecimentosPorEstado(permissions.estadoId);
+        }
+        
+        setUnidadesPermitidas(unidades);
+        console.log(`✅ ${unidades.length} unidades carregadas para nível ${permissions.nivel}`);
+        
+      } catch (error) {
+        console.error('❌ Erro ao carregar unidades permitidas:', error);
+      } finally {
+        setLoadingUnidades(false);
+      }
+    };
+
+    loadUnidadesPermitidas();
+  }, [permissions.loading, permissions.nivel, permissions.estabelecimentoId, permissions.municipioId, permissions.estadoId, formData.unidadeNotificadora]);
+
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
       <SectionHeader
@@ -55,6 +109,9 @@ const NotifierInfoSection: React.FC<FormSectionProps> = ({
             <div>
               <label className="block mb-2 font-medium text-gray-700">
                 Unidade Notificadora <span className="text-red-500">*</span>
+                {permissions.nivel === 'unidade' && permissions.estabelecimentoId && (
+                  <span className="text-sm text-blue-600 ml-1">(Pré-selecionada)</span>
+                )}
               </label>
               <UnidadeNotificadoraField
                 value={formData.unidadeNotificadora}
@@ -65,13 +122,39 @@ const NotifierInfoSection: React.FC<FormSectionProps> = ({
                   }))
                 }
                 label=""
-                placeholder="Buscar unidade notificadora..."
+                placeholder={
+                  loadingUnidades 
+                    ? "Carregando unidades..." 
+                    : permissions.nivel === 'unidade' 
+                      ? "Sua unidade será selecionada automaticamente"
+                      : permissions.nivel === 'municipio'
+                        ? "Buscar unidades do seu município..."
+                        : "Buscar unidades do Pará..."
+                }
+                specificEstablishments={
+                  unidadesPermitidas.length > 0 ? unidadesPermitidas.map(u => u.nome) : undefined
+                }
                 hasError={!!errors.unidadeNotificadora}
                 className={`${errors.unidadeNotificadora ? "border-red-500 bg-red-50" : ""}`}
               />
               {errors.unidadeNotificadora && (
                 <p className="mt-1 text-sm text-red-500">
                   {errors.unidadeNotificadora}
+                </p>
+              )}
+              {permissions.nivel === 'unidade' && unidadesPermitidas.length > 0 && (
+                <p className="mt-1 text-xs text-blue-600">
+                  ℹ️ Como usuário de unidade, você só pode notificar por: {unidadesPermitidas[0].nome}
+                </p>
+              )}
+              {permissions.nivel === 'municipio' && (
+                <p className="mt-1 text-xs text-green-600">
+                  ℹ️ Você pode escolher qualquer unidade do seu município
+                </p>
+              )}
+              {permissions.nivel === 'estado' && (
+                <p className="mt-1 text-xs text-purple-600">
+                  ℹ️ Você pode escolher qualquer unidade do Estado do Pará
                 </p>
               )}
             </div>

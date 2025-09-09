@@ -11,7 +11,7 @@ const LoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { user, login, loading } = useAuth();
+  const { user, login, loading, retryMessage } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { selectedLanguage, setSelectedLanguage } = useLanguage();
@@ -73,6 +73,12 @@ const LoginPage = () => {
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
               <span className="block sm:inline">{error}</span>
+            </div>
+          )}
+
+          {retryMessage && (
+            <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative">
+              <span className="block sm:inline">⚠️ {retryMessage}</span>
             </div>
           )}
           
@@ -142,8 +148,6 @@ const LoginPage = () => {
       <SideMenu 
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
-        selectedLanguage={selectedLanguage}
-        onLanguageChange={setSelectedLanguage}
       />
     </div>
   );

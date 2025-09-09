@@ -6,6 +6,26 @@ import "./index.css";
 import App from "../App.tsx";
 import { registerServiceWorker } from "./registerSW";
 import { AuthProvider } from './keycloak/AuthProvider';
+import { RetryNotification } from './components/RetryNotification';
+import { useRetryNotification } from './hooks/useRetryNotification';
+import './utils/axiosRetry'; // Importar para configurar interceptors
+
+// Componente wrapper para a notificação
+function AppWithNotifications() {
+  const retryState = useRetryNotification();
+  
+  return (
+    <>
+      <App />
+      <RetryNotification 
+        show={retryState.isRetrying}
+        message={retryState.message}
+        delay={retryState.delay}
+      />
+      <ReactQueryDevtools initialIsOpen={false} />
+    </>
+  );
+}
 
 // Cria o cliente do React Query
 const queryClient = new QueryClient({
@@ -21,8 +41,7 @@ createRoot(document.getElementById("root")!).render(
   <AuthProvider>
     <QueryClientProvider client={queryClient}>
       <StrictMode>
-        <App />
-        <ReactQueryDevtools initialIsOpen={false} />
+        <AppWithNotifications />
       </StrictMode>
     </QueryClientProvider>
   </AuthProvider>

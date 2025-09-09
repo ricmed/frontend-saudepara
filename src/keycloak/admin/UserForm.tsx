@@ -113,13 +113,22 @@ const UserForm: React.FC = () => {
     setEstabelecimentosFiltrados(filtrados);
   }, [estabelecimentos, searchEstabelecimento]);
 
-  // Filtrar municípios baseado na pesquisa e estado selecionado
+  // Estados para armazenar dados base para busca
+  const [municipiosDisponiveis, setMunicipiosDisponiveis] = useState<Array<{id: number; descricao: string}>>([]);
+
+  // Filtrar municípios baseado na pesquisa - usa municípiosDisponiveis como base
   useEffect(() => {
-    let filtrados = municipios.filter(mun => 
-      mun.descricao.toLowerCase().includes(searchMunicipio.toLowerCase())
-    );
-    setMunicipiosFiltrados(filtrados);
-  }, [municipios, searchMunicipio]);
+    if (!searchMunicipio) {
+      // Se não há busca, usar todos os municípios disponíveis (do estado selecionado)
+      setMunicipiosFiltrados(municipiosDisponiveis);
+    } else {
+      // Se há busca, filtrar dentro dos municípios disponíveis
+      const filtrados = municipiosDisponiveis.filter(mun => 
+        mun.descricao.toLowerCase().includes(searchMunicipio.toLowerCase())
+      );
+      setMunicipiosFiltrados(filtrados);
+    }
+  }, [municipiosDisponiveis, searchMunicipio]);
 
   // Filtrar estados baseado na pesquisa
   useEffect(() => {
@@ -129,38 +138,30 @@ const UserForm: React.FC = () => {
     setEstadosFiltrados(filtrados);
   }, [estados, searchEstado]);
 
+  // COMENTADO: Este useEffect estava causando filtragem automática indesejada
   // Quando o estado muda, recarregar municípios se necessário
-  useEffect(() => {
-    if (formData.estadoId && formData.nivelAcesso !== 'estado') {
-      loadMunicipiosPorEstado(formData.estadoId);
-    }
-  }, [formData.estadoId, formData.nivelAcesso]);
+  // useEffect(() => {
+  //   if (formData.estadoId && formData.nivelAcesso !== 'estado') {
+  //     loadMunicipiosPorEstado(formData.estadoId);
+  //   }
+  // }, [formData.estadoId, formData.nivelAcesso]);
 
-  const loadMunicipiosPorEstado = async (estadoId: number) => {
-    try {
-      const municipiosEstado = await usuarioGestaoService.getMunicipiosPorEstado(estadoId);
-      setMunicipios(municipiosEstado);
-      setMunicipiosFiltrados(municipiosEstado);
-    } catch (error) {
-      console.error('Erro ao carregar municípios do estado:', error);
-    }
-  };
+  // FUNÇÃO REMOVIDA: loadMunicipiosPorEstado era usada apenas pelo useEffect problemático comentado acima
 
   const loadDropdownData = async () => {
     try {
-      const [estabelecimentosData, municipiosData, estadosData] = await Promise.all([
+      const [estabelecimentosData, estadosData] = await Promise.all([
         usuarioGestaoService.getEstabelecimentos(),
-        usuarioGestaoService.getMunicipios(),
         usuarioGestaoService.getEstados(),
       ]);
 
       setEstabelecimentos(estabelecimentosData);
-      setMunicipios(municipiosData);
+      setMunicipios([]); // Não carregar todos os municípios - serão carregados por estado
       setEstados(estadosData);
 
       // Inicializar arrays filtrados
       setEstabelecimentosFiltrados(estabelecimentosData);
-      setMunicipiosFiltrados(municipiosData);
+      setMunicipiosFiltrados([]); // Lista vazia - será preenchida quando um estado for selecionado
       setEstadosFiltrados(estadosData);
     } catch (error) {
       console.error('Erro ao carregar opções:', error);
@@ -186,22 +187,23 @@ const UserForm: React.FC = () => {
           estadoId: estabelecimento.tipo_municipio?.tipo_estado?.idtipo_estado || undefined
         }));
 
-        // Filtrar as opções para mostrar apenas os relacionados
-        if (estabelecimento.tipo_municipio) {
-          const municipioFormatado = {
-            id: estabelecimento.tipo_municipio.idtipo_municipio,
-            descricao: estabelecimento.tipo_municipio.descricao
-          };
-          setMunicipiosFiltrados([municipioFormatado]);
-          
-          if (estabelecimento.tipo_municipio.tipo_estado) {
-            const estadoFormatado = {
-              id: estabelecimento.tipo_municipio.tipo_estado.idtipo_estado,
-              descricao: estabelecimento.tipo_municipio.tipo_estado.descricao
-            };
-            setEstadosFiltrados([estadoFormatado]);
-          }
-        }
+        // NÃO FILTRAR as opções - apenas preencher os campos automaticamente
+        // O usuário deve poder alterar município/estado se desejar
+        // if (estabelecimento.tipo_municipio) {
+        //   const municipioFormatado = {
+        //     id: estabelecimento.tipo_municipio.idtipo_municipio,
+        //     descricao: estabelecimento.tipo_municipio.descricao
+        //   };
+        //   setMunicipiosFiltrados([municipioFormatado]);
+        //   
+        //   if (estabelecimento.tipo_municipio.tipo_estado) {
+        //     const estadoFormatado = {
+        //       id: estabelecimento.tipo_municipio.tipo_estado.idtipo_estado,
+        //       descricao: estabelecimento.tipo_municipio.tipo_estado.descricao
+        //     };
+        //     setEstadosFiltrados([estadoFormatado]);
+        //   }
+        // }
       }
     } catch (error) {
       console.error('Erro ao buscar dados do estabelecimento:', error);
@@ -211,70 +213,91 @@ const UserForm: React.FC = () => {
   // Função para buscar estabelecimentos baseado no município
   const handleMunicipioChange = async (municipioId: number) => {
     try {
-      // Buscar estabelecimentos do município
-      const response = await fetch(`/api/estabelecimentos/municipio/${municipioId}`, {
+      // Buscar dados do município para pegar o estado
+      const municipioResponse = await fetch(`/api/municipios/${municipioId}`, {
         credentials: 'include',
       });
       
-      if (response.ok) {
-        const estabelecimentosDoMunicipio = await response.json();
-        // Formatar os estabelecimentos para o padrão esperado
-        const estabelecimentosFormatados = estabelecimentosDoMunicipio.map((est: any) => ({
-          id: est.idestabelecimento,
-          nome: est.nome
+      if (municipioResponse.ok) {
+        const municipio = await municipioResponse.json();
+        
+        setFormData(prev => ({
+          ...prev,
+          municipioId,
+          estadoId: municipio.tipo_estado?.idtipo_estado || undefined,
+          // Não limpar estabelecimento automaticamente - deixar o usuário decidir
         }));
-        setEstabelecimentosFiltrados(estabelecimentosFormatados);
 
-        // Buscar dados do município para pegar o estado
-        const municipioResponse = await fetch(`/api/municipios/${municipioId}`, {
+        // Não filtrar estados - manter todos os estados disponíveis para seleção livre
+        // setEstadosFiltrados([estadoFormatado]); // Comentado para permitir seleção livre
+      }
+
+      // Buscar estabelecimentos do município (pode retornar array vazio se não houver)
+      try {
+        const response = await fetch(`/api/estabelecimentos/municipio/${municipioId}`, {
           credentials: 'include',
         });
         
-        if (municipioResponse.ok) {
-          const municipio = await municipioResponse.json();
-          
-          setFormData(prev => ({
-            ...prev,
-            municipioId,
-            estadoId: municipio.tipo_estado?.idtipo_estado || undefined,
-            // Limpar estabelecimento se não estiver na lista filtrada
-            estabelecimentoId: estabelecimentosFormatados.find((est: any) => est.id === prev.estabelecimentoId)
-              ? prev.estabelecimentoId 
-              : undefined
+        if (response.ok) {
+          const estabelecimentosDoMunicipio = await response.json();
+          // Formatar os estabelecimentos para o padrão esperado
+          const estabelecimentosFormatados = estabelecimentosDoMunicipio.map((est: any) => ({
+            id: est.idestabelecimento,
+            nome: est.nome
           }));
-
-          if (municipio.tipo_estado) {
-            const estadoFormatado = {
-              id: municipio.tipo_estado.idtipo_estado,
-              descricao: municipio.tipo_estado.descricao
-            };
-            setEstadosFiltrados([estadoFormatado]);
-          }
+          setEstabelecimentosFiltrados(estabelecimentosFormatados);
+        } else {
+          // Se não houver estabelecimentos, mostrar lista vazia
+          setEstabelecimentosFiltrados([]);
         }
+      } catch (estabelecimentoError) {
+        console.log('Nenhum estabelecimento encontrado para este município - lista vazia');
+        setEstabelecimentosFiltrados([]);
       }
+      
     } catch (error) {
       console.error('Erro ao buscar dados do município:', error);
+      // Em caso de erro, não alterar as listas filtradas
     }
   };
 
   // Função para buscar municípios e estabelecimentos baseado no estado
   const handleEstadoChange = async (estadoId: number) => {
     try {
-      // Buscar municípios do estado
-      const municipiosResponse = await fetch(`/api/municipios/estado/${estadoId}`, {
-        credentials: 'include',
-      });
-      
-      if (municipiosResponse.ok) {
-        const municipiosDoEstado = await municipiosResponse.json();
-        // Formatar os municípios para o padrão esperado
-        const municipiosFormatados = municipiosDoEstado.map((mun: any) => ({
-          id: mun.idtipo_municipio,
-          descricao: mun.descricao
-        }));
-        setMunicipiosFiltrados(municipiosFormatados);
+      setFormData(prev => ({
+        ...prev,
+        estadoId,
+        // Não limpar município e estabelecimento automaticamente - deixar o usuário decidir
+      }));
 
-        // Buscar estabelecimentos do estado
+      // Buscar municípios do estado (pode retornar array vazio se não houver)
+      try {
+        const municipiosResponse = await fetch(`/api/municipios/estado/${estadoId}`, {
+          credentials: 'include',
+        });
+        
+        if (municipiosResponse.ok) {
+          const municipiosDoEstado = await municipiosResponse.json();
+          // Formatar os municípios para o padrão esperado
+          const municipiosFormatados = municipiosDoEstado.map((mun: any) => ({
+            id: mun.id,
+            descricao: mun.descricao
+          }));
+          setMunicipiosDisponiveis(municipiosFormatados); // Atualizar base para busca
+          setMunicipiosFiltrados(municipiosFormatados);    // Atualizar lista exibida
+        } else {
+          // Se não houver municípios, mostrar lista vazia
+          setMunicipiosDisponiveis([]);
+          setMunicipiosFiltrados([]);
+        }
+      } catch (municipioError) {
+        console.log('Nenhum município encontrado para este estado - lista vazia');
+        setMunicipiosDisponiveis([]);
+        setMunicipiosFiltrados([]);
+      }
+
+      // Buscar estabelecimentos do estado (pode retornar array vazio se não houver)
+      try {
         const estabelecimentosResponse = await fetch(`/api/estabelecimentos/estado/${estadoId}`, {
           credentials: 'include',
         });
@@ -287,20 +310,18 @@ const UserForm: React.FC = () => {
             nome: est.nome
           }));
           setEstabelecimentosFiltrados(estabelecimentosFormatados);
+        } else {
+          // Se não houver estabelecimentos, mostrar lista vazia
+          setEstabelecimentosFiltrados([]);
         }
-
-        setFormData(prev => ({
-          ...prev,
-          estadoId,
-          // Limpar município e estabelecimento se não estiverem nas listas filtradas
-          municipioId: municipiosFormatados.find((mun: any) => mun.id === prev.municipioId)
-            ? prev.municipioId 
-            : undefined,
-          estabelecimentoId: undefined // Sempre limpar estabelecimento ao mudar estado
-        }));
+      } catch (estabelecimentoError) {
+        console.log('Nenhum estabelecimento encontrado para este estado - lista vazia');
+        setEstabelecimentosFiltrados([]);
       }
+
     } catch (error) {
       console.error('Erro ao buscar dados do estado:', error);
+      // Em caso de erro, não alterar as listas filtradas
     }
   };
 
@@ -313,15 +334,28 @@ const UserForm: React.FC = () => {
 
   const loadRoles = async () => {
     try {
+      console.log('🔑 Carregando roles do Keycloak...');
       const response = await fetch('/api-auth/admin/roles', {
         credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
       });
+      
+      console.log('🔑 Resposta do carregamento de roles:', response.status, response.statusText);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ Roles carregadas:', data);
         setRoles(data);
+      } else {
+        console.error('❌ Erro ao carregar roles:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('❌ Detalhes do erro:', errorText);
       }
     } catch (error) {
-      console.error('Erro ao carregar roles:', error);
+      console.error('❌ Erro ao carregar roles:', error);
     }
   };
 
@@ -330,6 +364,9 @@ const UserForm: React.FC = () => {
     
     try {
       setLoading(true);
+      console.log('📥 Carregando dados do usuário:', id);
+      
+      // Carregar dados básicos do Keycloak
       const response = await fetch(`/api-auth/admin/users/${id}`, {
         credentials: 'include',
       });
@@ -339,7 +376,27 @@ const UserForm: React.FC = () => {
       }
 
       const user = await response.json();
-      setFormData({
+      console.log('👤 Dados básicos do usuário carregados:', user);
+      
+      // Carregar dados de acesso do backend
+      let acessosData = null;
+      try {
+        console.log('🔍 Buscando acessos do usuário...');
+        const acessos = await usuarioGestaoService.getUsuarioAcessos(id);
+        console.log('🎯 Acessos encontrados:', acessos);
+        
+        if (acessos && acessos.length > 0) {
+          // Pegar o primeiro acesso (assumindo que usuário tem apenas um tipo de acesso)
+          acessosData = acessos[0];
+          console.log('📊 Dados de acesso processados:', acessosData);
+        }
+      } catch (acessoError) {
+        console.warn('⚠️ Erro ao carregar acessos do usuário:', acessoError);
+        // Não interrompe o carregamento se não conseguir carregar acessos
+      }
+
+      // Montar dados do formulário combinando Keycloak + Backend
+      const formDataUpdate: any = {
         username: user.username || '',
         firstName: user.firstName || '',
         lastName: user.lastName || '',
@@ -347,12 +404,76 @@ const UserForm: React.FC = () => {
         enabled: user.enabled ?? true,
         emailVerified: user.emailVerified ?? false,
         temporaryPassword: false,
-        // Valores padrão para modo de edição - estes serão carregados separadamente
+        // Valores padrão
         nivelAcesso: 'unidade',
         permissoes: PERMISSOES.READ_WRITE,
-      });
+        estabelecimentoId: null,
+        municipioId: null,
+        estadoId: null,
+      };
+
+      // Preencher dados de acesso se encontrados
+      if (acessosData) {
+        if (acessosData.estabelecimento_id) {
+          formDataUpdate.nivelAcesso = 'unidade';
+          formDataUpdate.estabelecimentoId = acessosData.estabelecimento_id;
+          console.log('🏥 Definido acesso de unidade:', acessosData.estabelecimento_id);
+          
+          // Auto-preencher município e estado baseado no estabelecimento
+          if (acessosData.estabelecimento) {
+            console.log('🔍 Buscando município e estado para o estabelecimento...');
+            try {
+              // Buscar detalhes completos do estabelecimento para obter município e estado
+              const estabelecimentoCompleto = await usuarioGestaoService.getEstabelecimentoComHierarquia(acessosData.estabelecimento_id);
+              
+              if (estabelecimentoCompleto && estabelecimentoCompleto.idmunicipio) {
+                console.log('📍 Município encontrado:', estabelecimentoCompleto.idmunicipio);
+                formDataUpdate.municipioId = estabelecimentoCompleto.idmunicipio;
+                
+                // Buscar estado do município
+                if (estabelecimentoCompleto.idestado) {
+                  console.log('🗺️ Estado encontrado:', estabelecimentoCompleto.idestado);
+                  formDataUpdate.estadoId = estabelecimentoCompleto.idestado;
+                }
+              }
+            } catch (estabError) {
+              console.warn('⚠️ Erro ao buscar dados geográficos do estabelecimento:', estabError);
+            }
+          }
+          
+        } else if (acessosData.tipo_municipio_id) {
+          formDataUpdate.nivelAcesso = 'municipio';
+          formDataUpdate.municipioId = acessosData.tipo_municipio_id;
+          console.log('🏛️ Definido acesso de município:', acessosData.tipo_municipio_id);
+        } else if (acessosData.tipo_estado_id) {
+          formDataUpdate.nivelAcesso = 'estado';
+          formDataUpdate.estadoId = acessosData.tipo_estado_id;
+          console.log('🗺️ Definido acesso de estado:', acessosData.tipo_estado_id);
+        }
+        
+        if (acessosData.permissoes !== undefined) {
+          formDataUpdate.permissoes = acessosData.permissoes;
+          console.log('🔑 Definidas permissões:', acessosData.permissoes);
+        }
+      }
+
+      setFormData(formDataUpdate);
+      console.log('✅ Dados do formulário atualizados:', formDataUpdate);
+      
+      // Se o usuário tem estado definido (seja por acesso de estado ou por estabelecimento), carregar municípios
+      if (formDataUpdate.estadoId) {
+        console.log('🗺️ Carregando municípios do estado para edição:', formDataUpdate.estadoId);
+        try {
+          const municipiosDoEstado = await usuarioGestaoService.getMunicipiosPorEstado(formDataUpdate.estadoId);
+          setMunicipiosDisponiveis(municipiosDoEstado);
+          console.log('✅ Municípios carregados para edição:', municipiosDoEstado.length);
+        } catch (municipioError) {
+          console.warn('⚠️ Erro ao carregar municípios para edição:', municipioError);
+        }
+      }
+      
     } catch (error) {
-      console.error('Erro ao carregar usuário:', error);
+      console.error('❌ Erro ao carregar usuário:', error);
       showNotification(t('admin.userForm.loadError'), 'error');
     } finally {
       setLoading(false);
@@ -433,6 +554,55 @@ const UserForm: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Função para atualizar acessos do usuário (modo edição)
+  const updateUserAccess = async (userId: string) => {
+    try {
+      console.log('🔄 Atualizando acessos do usuário:', userId);
+      console.log('📋 Dados do formulário:', {
+        nivelAcesso: formData.nivelAcesso,
+        estabelecimentoId: formData.estabelecimentoId,
+        municipioId: formData.municipioId,
+        estadoId: formData.estadoId,
+        permissoes: formData.permissoes
+      });
+
+      // Primeiro, remover todos os acessos existentes do usuário
+      console.log('🗑️ Removendo acessos existentes...');
+      await usuarioGestaoService.deleteUserAccess(userId);
+
+      // Depois, criar novo acesso baseado no formulário
+      if (formData.nivelAcesso === 'unidade' && formData.estabelecimentoId) {
+        console.log('🏥 Criando novo acesso de unidade...');
+        await usuarioGestaoService.createAcessoUnidade(
+          userId,
+          formData.estabelecimentoId,
+          formData.permissoes,
+          formData.municipioId || undefined,
+          formData.estadoId || undefined
+        );
+      } else if (formData.nivelAcesso === 'municipio' && formData.municipioId) {
+        console.log('🏛️ Criando novo acesso de município...');
+        await usuarioGestaoService.createAcessoMunicipio(
+          userId,
+          formData.municipioId,
+          formData.permissoes
+        );
+      } else if (formData.nivelAcesso === 'estado' && formData.estadoId) {
+        console.log('🗺️ Criando novo acesso de estado...');
+        await usuarioGestaoService.createAcessoEstado(
+          userId,
+          formData.estadoId,
+          formData.permissoes
+        );
+      }
+
+      console.log('✅ Acessos atualizados com sucesso');
+    } catch (error) {
+      console.error('❌ Erro ao atualizar acessos:', error);
+      throw error;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -478,8 +648,14 @@ const UserForm: React.FC = () => {
             }),
           });
         }
+
+        // Atualizar acessos no modo de edição
+        console.log('✏️ Atualizando acessos do usuário em edição...');
+        await updateUserAccess(id);
+        
       } else {
         // Criar usuário
+        console.log('🚀 Iniciando criação de usuário...');
         response = await fetch('/api-auth/admin/users', {
           method: 'POST',
           credentials: 'include',
@@ -503,34 +679,120 @@ const UserForm: React.FC = () => {
           throw new Error(error.error || 'Erro ao criar usuário');
         }
 
-        // Se usuário foi criado com sucesso, criar registro de acesso
-        const responseData = await response.json();
-        const userId = responseData.id || formData.username;
+        // Se usuário foi criado com sucesso, buscar o ID real do usuário
+        let userId;
+        try {
+          // Tentar obter o ID da resposta primeiro
+          const responseData = await response.json();
+          userId = responseData.id;
+          
+          // Se não tiver ID na resposta, buscar o usuário pelo username
+          if (!userId) {
+            console.log('🔍 Buscando ID do usuário criado pelo username:', formData.username);
+            const searchResponse = await fetch(`/api-auth/admin/users?username=${encodeURIComponent(formData.username)}`, {
+              credentials: 'include',
+            });
+            
+            if (searchResponse.ok) {
+              const users = await searchResponse.json();
+              if (users && users.length > 0) {
+                userId = users[0].id;
+                console.log('✅ ID do usuário encontrado:', userId);
+              }
+            }
+          }
+          
+          if (!userId) {
+            throw new Error('Não foi possível obter o ID do usuário criado');
+          }
+        } catch (parseError) {
+          console.error('❌ Erro ao processar resposta de criação:', parseError);
+          // Como último recurso, tentar buscar por username
+          console.log('🔍 Tentativa final: buscando usuário pelo username');
+          const searchResponse = await fetch(`/api-auth/admin/users?username=${encodeURIComponent(formData.username)}`, {
+            credentials: 'include',
+          });
+          
+          if (searchResponse.ok) {
+            const users = await searchResponse.json();
+            if (users && users.length > 0) {
+              userId = users[0].id;
+              console.log('✅ ID do usuário encontrado na busca:', userId);
+            }
+          }
+          
+          if (!userId) {
+            throw new Error('Falha crítica: não foi possível obter ID do usuário para configurar acessos');
+          }
+        }
+
+        console.log('🆔 ID do usuário para configurar acessos:', userId);
+
+        console.log('🎯 Pronto para configurar acessos - verificando se estamos no modo criação...');
+
+        // Atribuir roles selecionadas ao usuário recém-criado
+        if (userRoles.length > 0) {
+          console.log('🔑 Atribuindo roles ao usuário criado:', userRoles.map(r => r.name));
+          try {
+            await fetch(`/api-auth/admin/users/${userId}/roles`, {
+              method: 'POST',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(userRoles),
+            });
+            console.log('✅ Roles atribuídas com sucesso');
+          } catch (roleError) {
+            console.error('❌ Erro ao atribuir roles:', roleError);
+            // Não interromper o fluxo se houver erro nas roles
+          }
+        }
 
         // Criar registro de acesso baseado no nível selecionado
+        console.log('📊 Configurando acessos do usuário...');
+        console.log('  - Nível de acesso:', formData.nivelAcesso);
+        console.log('  - Estabelecimento ID:', formData.estabelecimentoId);
+        console.log('  - Município ID:', formData.municipioId);
+        console.log('  - Estado ID:', formData.estadoId);
+        console.log('  - Permissões:', formData.permissoes);
+        
         if (formData.nivelAcesso === 'unidade' && formData.estabelecimentoId) {
+          console.log('🏥 Criando acesso de unidade...');
           await usuarioGestaoService.createAcessoUnidade(
             userId,
             formData.estabelecimentoId,
-            formData.permissoes
+            formData.permissoes,
+            formData.municipioId || undefined,
+            formData.estadoId || undefined
           );
+          console.log('✅ Acesso de unidade criado');
         } else if (formData.nivelAcesso === 'municipio' && formData.municipioId) {
+          console.log('🏛️ Criando acesso de município...');
           await usuarioGestaoService.createAcessoMunicipio(
             userId,
             formData.municipioId,
             formData.permissoes
           );
+          console.log('✅ Acesso de município criado');
         } else if (formData.nivelAcesso === 'estado' && formData.estadoId) {
+          console.log('🗺️ Criando acesso de estado...');
           await usuarioGestaoService.createAcessoEstado(
             userId,
             formData.estadoId,
             formData.permissoes
           );
+          console.log('✅ Acesso de estado criado');
+        } else {
+          console.warn('⚠️ Nenhum acesso criado - verifique os dados do formulário');
         }
       }
 
+      console.log('🔄 Verificando resposta da API:', response.status, response.ok);
+
       if (!response.ok) {
         const error = await response.json();
+        console.error('❌ Erro na resposta da API:', error);
         throw new Error(error.error || 'Erro ao salvar usuário');
       }
 
@@ -554,13 +816,28 @@ const UserForm: React.FC = () => {
   };
 
   const handleRoleToggle = async (role: Role) => {
-    if (!id) return;
+    // No modo de criação, apenas atualizar o estado local
+    if (!id) {
+      const hasRole = userRoles.some(ur => ur.id === role.id);
+      
+      if (hasRole) {
+        // Remover role do estado local
+        setUserRoles(prev => prev.filter(ur => ur.id !== role.id));
+        console.log('🔑 Role removida (modo criação):', role.name);
+      } else {
+        // Adicionar role ao estado local
+        setUserRoles(prev => [...prev, role]);
+        console.log('🔑 Role adicionada (modo criação):', role.name);
+      }
+      return;
+    }
 
+    // No modo de edição, atualizar via API
     try {
       const hasRole = userRoles.some(ur => ur.id === role.id);
       
       if (hasRole) {
-        // Remover role
+        // Remover role via API
         await fetch(`/api-auth/admin/users/${id}/roles`, {
           method: 'DELETE',
           credentials: 'include',
@@ -570,8 +847,9 @@ const UserForm: React.FC = () => {
           body: JSON.stringify([role]),
         });
         setUserRoles(prev => prev.filter(ur => ur.id !== role.id));
+        console.log('🔑 Role removida (modo edição):', role.name);
       } else {
-        // Adicionar role
+        // Adicionar role via API
         await fetch(`/api-auth/admin/users/${id}/roles`, {
           method: 'POST',
           credentials: 'include',
@@ -581,6 +859,7 @@ const UserForm: React.FC = () => {
           body: JSON.stringify([role]),
         });
         setUserRoles(prev => [...prev, role]);
+        console.log('🔑 Role adicionada (modo edição):', role.name);
       }
 
       showNotification(
@@ -996,16 +1275,12 @@ const UserForm: React.FC = () => {
                         value={formData.municipioId || ''}
                         onChange={(e) => {
                           const value = e.target.value ? parseInt(e.target.value) : undefined;
+                          setFormData(prev => ({ ...prev, municipioId: value }));
                           if (value) {
                             handleMunicipioChange(value);
                           } else {
-                            setFormData(prev => ({ ...prev, municipioId: undefined }));
-                            // Resetar estabelecimentos para mostrar todos do estado atual
-                            if (formData.estadoId) {
-                              handleEstadoChange(formData.estadoId);
-                            } else {
-                              resetFiltros();
-                            }
+                            // Se desmarcou o município, apenas limpar estabelecimentos
+                            setEstabelecimentosFiltrados(estabelecimentos);
                           }
                         }}
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
@@ -1048,10 +1323,11 @@ const UserForm: React.FC = () => {
                       value={formData.estadoId || ''}
                       onChange={(e) => {
                         const value = e.target.value ? parseInt(e.target.value) : undefined;
+                        setFormData(prev => ({ ...prev, estadoId: value }));
                         if (value) {
                           handleEstadoChange(value);
                         } else {
-                          setFormData(prev => ({ ...prev, estadoId: undefined, municipioId: undefined, estabelecimentoId: undefined }));
+                          // Se desmarcou o estado, resetar para mostrar todos
                           resetFiltros();
                         }
                       }}
@@ -1075,29 +1351,47 @@ const UserForm: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Botão para resetar filtros e mostrar todas as opções */}
+              <div className="bg-blue-50 rounded-lg border border-blue-200 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-medium text-blue-900">Opções Filtradas</h3>
+                    <p className="text-sm text-blue-700">
+                      Clique para ver todas as opções disponíveis (não apenas as relacionadas)
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={resetFiltros}
+                    className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                  >
+                    Mostrar Todas as Opções
+                  </button>
+                </div>
+              </div>
             </div>
 
-            {/* Roles (apenas em modo de edição) */}
-            {isEditMode && (
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                  <Shield className="h-5 w-5 mr-2" />
-                  {t('admin.userForm.roles')}
-                </h2>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {roles.map((role) => {
-                    const hasRole = userRoles.some(ur => ur.id === role.id);
-                    return (
-                      <div
-                        key={role.id}
-                        onClick={() => handleRoleToggle(role)}
-                        className={`cursor-pointer p-3 border rounded-lg transition ${
-                          hasRole 
-                            ? 'border-blue-500 bg-blue-50 text-blue-700' 
-                            : 'border-gray-300 hover:border-gray-400'
-                        }`}
-                      >
+            {/* Roles (disponível tanto na criação quanto na edição) */}
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <Shield className="h-5 w-5 mr-2" />
+                {t('admin.userForm.roles')}
+              </h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {roles.map((role) => {
+                  const hasRole = userRoles.some(ur => ur.id === role.id);
+                  return (
+                    <div
+                      key={role.id}
+                      onClick={() => handleRoleToggle(role)}
+                      className={`cursor-pointer p-3 border rounded-lg transition ${
+                        hasRole 
+                          ? 'border-blue-500 bg-blue-50 text-blue-700' 
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
                         <div className="flex items-center justify-between">
                           <span className="font-medium">{role.name}</span>
                           {hasRole && <Check className="h-4 w-4" />}
@@ -1110,7 +1404,6 @@ const UserForm: React.FC = () => {
                   })}
                 </div>
               </div>
-            )}
 
             {/* Botões de ação */}
             <div className="flex justify-end space-x-4">

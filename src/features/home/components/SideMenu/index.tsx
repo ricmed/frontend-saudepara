@@ -4,6 +4,7 @@ import { useTranslation } from "@/i18n/useTranslations";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { useAuth } from '@/keycloak/AuthProvider';
+import useUserPermissions from '@/hooks/useUserPermissions';
 import UserProfileHeader from "@/keycloak/components/UserProfileHeader";
 import {
   FileText,
@@ -48,6 +49,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
   const { selectedLanguage, setSelectedLanguage } = useLanguage();
   const { t } = useTranslation(selectedLanguage);
   const { user } = useAuth();
+  const permissions = useUserPermissions();
   const [showAppsSubmenu, setShowAppsSubmenu] = useState(false);
 
   // Função para verificar se o usuário é admin
@@ -57,125 +59,123 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     return user.roles?.includes('admin');
   };
 
-  // Função para verificar se o usuário é notificador
-  const isNotificador = () => {
-    if (!user) return false;
-    return user.roles?.includes('notificador');
-  };
-
-  // Função para verificar se o usuário é qualificador
-  const isQualificador = () => {
-    if (!user) return false;
-    return user.roles?.includes('qualificador');
-  };
-
-  // List of auxiliary apps
+  // List of auxiliary apps - FILTRADOS POR NÍVEL DE PERMISSÃO
   const appsMenuItems = [
-    {
-      icon: <Building2 className="h-6 w-6 text-white" />,
-      nome: t("apps.components"),
-      link: "/private/componente",
-    },
-    {
-      icon: <FileSpreadsheet className="h-6 w-6 text-white" />,
-      nome: t("apps.establishments"),
-      link: "/private/tipo-estabelecimentos/lista",
-    },
-    {
-      icon: <Award className="h-6 w-6 text-white" />,
-      nome: t("apps.qualifications"),
-      link: "/relatorio-qualificacao",
-    },
-    {
-      icon: <FileCheck className="h-6 w-6 text-white" />,
-      nome: t("apps.enablings"),
-      link: "/private/habilitacao",
-    },
-    {
-      icon: <CheckCircle className="h-6 w-6 text-white" />,
-      nome: t("apps.closure_types"),
-      link: "/private/encerramento",
-    },
-    {
-      icon: <Users className="h-6 w-6 text-white" />,
-      nome: t("apps.public_types"),
-      link: "/private/publico",
-    },
-    {
+    // ✅ APPS PARA TODOS OS NÍVEIS (estabelecimento, município, estado, admin)
+    ...(user ? [{
       icon: <Calendar className="h-6 w-6 text-white" />,
       nome: t("apps.event_types"),
-      link: "/private/evento",
-    },
-    {
-      icon: <AlertTriangle className="h-6 w-6 text-white" />,
-      nome: t("apps.trauma_types"),
-      link: "/private/trauma",
-    },
-    {
-      icon: <HeartPulse className="h-6 w-6 text-white" />,
-      nome: t("apps.care_types"),
-      link: "/private/atendimento",
-    },
-    {
-      icon: <Stethoscope className="h-6 w-6 text-white" />,
-      nome: t("apps.diagnostic_hypothesis_types"),
-      link: "/private/hipotese-diagnostica",
-    },
-    {
-      icon: <Thermometer className="h-6 w-6 text-white" />,
-      nome: t("apps.symptom_types"),
-      link: "/private/sintoma",
-    },
-    {
-      icon: <Clock className="h-6 w-6 text-white" />,
-      nome: t("apps.shift"),
-      link: "/private/turnos",
-    },
-    {
-      icon: <Leaf className="h-6 w-6 text-white" />,
-      nome: t("apps.nature"),
-      link: "/private/naturezas",
-    },
-    {
-      icon: <UserSquare className="h-6 w-6 text-white" />,
-      nome: t("apps.race"),
-      link: "/private/raca",
-    },
-    {
-      icon: <GraduationCap className="h-6 w-6 text-white" />,
-      nome: t("apps.education"),
-      link: "/private/escolaridade",
-    },
-    {
-      icon: <Building2 className="h-6 w-6 text-white" />,
-      nome: t("apps.cbo"),
-      link: "/private/cbo",
-    },
-    {
-      icon: <MapPin className="h-6 w-6 text-white" />,
-      nome: t("apps.countries"),
-      link: "/private/pais",
-    },
-    {
-      icon: <Map className="h-6 w-6 text-white" />,
-      nome: t("apps.states"),
-      link: "/private/estado",
-    },
-    {
-      icon: <MapPin className="h-6 w-6 text-white" />,
-      nome: t("apps.cities"),
-      link: "/private/municipio",
-    },
-    {
-      icon: <MapPin className="h-6 w-6 text-white" />,
-      nome: t("apps.gender"),
-      link: "/private/genero",
-    },
-    {
-      icon: <MapPin className="h-6 w-6 text-white" />,
-      nome: t("apps.sexual_orientation"),
-      link: "/orientacao-sexual/lista",
-    },
+      link: "/private/evento", // USUÁRIO DE ESTABELECIMENTO: verá apenas seus eventos
+    }] : []),
+
+    // ⚠️ APPS RESTRITOS: NÃO disponíveis para usuários de estabelecimento
+    // Apenas município, estado e admin têm acesso a estes recursos
+    ...(!permissions.isEstabelecimento && user ? [
+      {
+        icon: <Building2 className="h-6 w-6 text-white" />,
+        nome: t("apps.components"),
+        link: "/private/componente",
+      },
+      {
+        icon: <FileSpreadsheet className="h-6 w-6 text-white" />,
+        nome: t("apps.establishments"),
+        link: "/private/tipo-estabelecimentos/lista", // Lista todos os estabelecimentos
+      },
+      {
+        icon: <Award className="h-6 w-6 text-white" />,
+        nome: t("apps.qualifications"),
+        link: "/relatorio-qualificacao",
+      },
+      {
+        icon: <FileCheck className="h-6 w-6 text-white" />,
+        nome: t("apps.enablings"),
+        link: "/private/habilitacao",
+      },
+      {
+        icon: <CheckCircle className="h-6 w-6 text-white" />,
+        nome: t("apps.closure_types"),
+        link: "/private/encerramento",
+      },
+      {
+        icon: <Users className="h-6 w-6 text-white" />,
+        nome: t("apps.public_types"),
+        link: "/private/publico",
+      },
+      {
+        icon: <AlertTriangle className="h-6 w-6 text-white" />,
+        nome: t("apps.trauma_types"),
+        link: "/private/trauma",
+      },
+      {
+        icon: <HeartPulse className="h-6 w-6 text-white" />,
+        nome: t("apps.care_types"),
+        link: "/private/atendimento",
+      },
+      {
+        icon: <Stethoscope className="h-6 w-6 text-white" />,
+        nome: t("apps.diagnostic_hypothesis_types"),
+        link: "/private/hipotese-diagnostica",
+      },
+      {
+        icon: <Thermometer className="h-6 w-6 text-white" />,
+        nome: t("apps.symptom_types"),
+        link: "/private/sintoma",
+      },
+    ] : []),
+
+    // Apps disponíveis apenas para administradores
+    ...(permissions.isAdmin ? [
+      {
+        icon: <Clock className="h-6 w-6 text-white" />,
+        nome: t("apps.shift"),
+        link: "/private/turnos",
+      },
+      {
+        icon: <Leaf className="h-6 w-6 text-white" />,
+        nome: t("apps.nature"),
+        link: "/private/naturezas",
+      },
+      {
+        icon: <UserSquare className="h-6 w-6 text-white" />,
+        nome: t("apps.race"),
+        link: "/private/raca",
+      },
+      {
+        icon: <GraduationCap className="h-6 w-6 text-white" />,
+        nome: t("apps.education"),
+        link: "/private/escolaridade",
+      },
+      {
+        icon: <Building2 className="h-6 w-6 text-white" />,
+        nome: t("apps.cbo"),
+        link: "/private/cbo",
+      },
+      {
+        icon: <MapPin className="h-6 w-6 text-white" />,
+        nome: t("apps.countries"),
+        link: "/private/pais",
+      },
+      {
+        icon: <Map className="h-6 w-6 text-white" />,
+        nome: t("apps.states"),
+        link: "/private/estado",
+      },
+      {
+        icon: <MapPin className="h-6 w-6 text-white" />,
+        nome: t("apps.cities"),
+        link: "/private/municipio",
+      },
+      {
+        icon: <MapPin className="h-6 w-6 text-white" />,
+        nome: t("apps.gender"),
+        link: "/private/genero",
+      },
+      {
+        icon: <MapPin className="h-6 w-6 text-white" />,
+        nome: t("apps.sexual_orientation"),
+        link: "/orientacao-sexual/lista",
+      },
+    ] : []),
   ];
 
   // ✅ NOVO: Main menu items reorganizados com Home e Gerenciamento Offline
@@ -188,14 +188,14 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     },
     
     // Menu Qualificar Estabelecimentos - apenas para qualificadores
-    ...(user && isQualificador() ? [{
+    ...(permissions.isQualificador ? [{
       icon: <Award />,
       label: t("menu.qualify_establishments"),
       onClick: () => navigate("/private/relatorio-estabelecimentos"),
     }] : []),
     
     // Menu Notificação - apenas para notificadores
-    ...(user && isNotificador() ? [{
+    ...(permissions.isNotificador ? [{
       icon: <FileText />,
       label: t("menu.notification"),
       onClick: () => navigate("/private/pagina-paciente-ficha"),

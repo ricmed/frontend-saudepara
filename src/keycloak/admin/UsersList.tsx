@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/keycloak/AuthProvider';
 import { useTranslation } from '@/i18n/useTranslations';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Header } from '@/features/desktop/components/Header';
@@ -15,22 +14,17 @@ import {
   Power, 
   PowerOff, 
   Key, 
-  Mail,
   MoreVertical,
   Filter,
   ChevronLeft,
   ChevronRight,
-  Settings,
-  Eye,
-  X
+  Eye
 } from 'lucide-react';
 
 // Importar service de gestão de usuários
 import {
   usuarioGestaoService,
-  Usuario,
-  UsuarioAcesso,
-  PERMISSOES_LABELS
+  UsuarioAcesso
 } from '@/services/UsuarioGestaoService';
 
 interface User {
@@ -65,11 +59,6 @@ const UsersList: React.FC = () => {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState<string | null>(null);
-  
-  // Estados para modal de acessos
-  const [showAccessModal, setShowAccessModal] = useState(false);
-  const [selectedUserForAccess, setSelectedUserForAccess] = useState<UserWithAccess | null>(null);
-  const [userAcessos, setUserAcessos] = useState<UsuarioAcesso[]>([]);
 
   useEffect(() => {
     loadUsers();
@@ -88,26 +77,52 @@ const UsersList: React.FC = () => {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      // Usar o novo service para carregar usuários
+      console.log('🔄 Iniciando carregamento de usuários...');
+      
+      // Testar se a API está acessível
       const usersData = await usuarioGestaoService.getUsuarios();
       
+      console.log('📝 Dados recebidos da API:', usersData);
+      
+      // Verificar se os dados são válidos
+      if (!Array.isArray(usersData)) {
+        console.error('❌ Dados inválidos recebidos da API:', usersData);
+        throw new Error('Dados inválidos recebidos da API de usuários');
+      }
+      
       // Converter formato do Keycloak para o formato esperado
-      const convertedUsers: UserWithAccess[] = usersData.map(user => ({
-        id: user.id,
-        username: user.username,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        enabled: user.enabled,
-        emailVerified: true, // Assumir como verificado por padrão
-        createdTimestamp: user.createdTimestamp || Date.now()
-      }));
+      const convertedUsers: UserWithAccess[] = usersData.map((user, index) => {
+        console.log(`👤 Processando usuário ${index + 1}:`, user);
+        
+        return {
+          id: user.id || `user-${index}`,
+          username: user.username || `user-${index}`,
+          firstName: user.firstName || '',
+          lastName: user.lastName || '',
+          email: user.email || '',
+          enabled: user.enabled !== false,
+          emailVerified: true, // Assumir como verificado por padrão já que não temos esse campo
+          createdTimestamp: user.createdTimestamp || Date.now()
+        };
+      });
 
+      console.log(`✅ ${convertedUsers.length} usuários processados com sucesso`);
       setUsers(convertedUsers);
       setPagination(prev => ({ ...prev, total: convertedUsers.length }));
-    } catch (error) {
-      console.error('Erro ao carregar usuários:', error);
-      alert('Erro ao carregar usuários. Verifique se a API está funcionando.');
+      
+    } catch (error: any) {
+      console.error('💥 Erro ao carregar usuários:', error);
+      
+      // Mostrar mensagem de erro mais detalhada
+      const errorMessage = error.response?.data?.error || 
+                          error.message || 
+                          'Erro desconhecido ao carregar usuários';
+      
+      alert(`❌ Erro ao carregar usuários: ${errorMessage}\n\nVerifique se:\n• A API do Keycloak está rodando (porta 4000)\n• Você está autenticado no sistema\n• Tem permissões de administrador`);
+      
+      // Definir lista vazia em caso de erro
+      setUsers([]);
+      setPagination(prev => ({ ...prev, total: 0 }));
     } finally {
       setLoading(false);
     }
@@ -125,12 +140,6 @@ const UsersList: React.FC = () => {
         case 'disable':
           await usuarioGestaoService.toggleUsuarioStatus(userId, false);
           break;
-        case 'reset-password':
-          const newPassword = prompt('Digite a nova senha:');
-          if (newPassword) {
-            await usuarioGestaoService.resetarSenhaUsuario(userId, newPassword);
-          }
-          return; // Não recarregar se cancelou
         case 'delete':
           if (!window.confirm(t('admin.users.confirmDelete'))) return;
           await usuarioGestaoService.excluirUsuario(userId);
@@ -156,14 +165,74 @@ const UsersList: React.FC = () => {
       const user = users.find(u => u.id === userId);
       if (!user) return;
 
-      setSelectedUserForAccess(user);
+      console.log(`🔍 Buscando acessos para usuário: ${user.username} (${userId})`);
+      
+      // Buscar acessos do usuário
       const acessos = await usuarioGestaoService.getUsuarioAcessos(userId);
-      setUserAcessos(acessos);
-      setShowAccessModal(true);
+      console.log(`✅ Acessos encontrados:`, acessos);
+      
+      // Verificar se acessos é um array
+      if (!Array.isArray(acessos)) {
+        console.error('❌ Acessos não é um array:', typeof acessos, acessos);
+        alert(`Erro: Dados de acesso inválidos recebidos do servidor.`);
+        return;
+      }
+      
+      if (acessos.length === 0) {
+        alert(`USUÁRIO SEM ACESSOS CONFIGURADOS\n\nUsuário: ${user.username}\nEmail: ${user.email || 'N/A'}\n\nEste usuário ainda não possui acessos configurados no sistema.`);
+        return;
+      }
+      
+      // Criar uma mensagem detalhada dos acessos
+      let mensagem = `ACESSOS DO USUÁRIO: ${user.username}\n`;
+      mensagem += `Email: ${user.email || 'N/A'}\n`;
+      mensagem += `Total de acessos: ${acessos.length}\n\n`;
+      
+      acessos.forEach((acesso, index) => {
+        mensagem += `${index + 1}. Nível: ${acesso.nivel_acesso.toUpperCase()}\n`;
+        
+        if (acesso.estabelecimento) {
+          mensagem += `   Estabelecimento: ${acesso.estabelecimento.nome}\n`;
+          mensagem += `   ID: ${acesso.estabelecimento.idestabelecimento}\n`;
+        }
+        
+        if (acesso.tipo_municipio) {
+          mensagem += `   Município: ${acesso.tipo_municipio.descricao}\n`;
+        }
+        
+        if (acesso.tipo_estado) {
+          mensagem += `   Estado: ${acesso.tipo_estado.descricao}\n`;
+        }
+        
+        const permissoes = {
+          4: 'Leitura',
+          6: 'Leitura e Escrita', 
+          7: 'Todas as Permissões'
+        };
+        
+        mensagem += `   Permissões: ${permissoes[acesso.permissoes as keyof typeof permissoes] || `Código ${acesso.permissoes}`}\n`;
+        mensagem += `   Status: ${acesso.ativo === 'S' ? 'ATIVO' : 'INATIVO'}\n`;
+        mensagem += `   Criado em: ${new Date(acesso.created_at).toLocaleDateString('pt-BR')}\n\n`;
+      });
+      
+      alert(mensagem);
+      
     } catch (error) {
       console.error('Erro ao carregar acessos:', error);
-      alert('Erro ao carregar acessos do usuário');
+      alert(`Erro ao carregar acessos do usuário: ${error}`);
     }
+  };
+
+  const handleEditUser = (user: UserWithAccess) => {
+    // Navegar para a página completa de edição do usuário
+    console.log('📝 Navegando para edição do usuário:', user.username);
+    window.location.href = `/admin/users/${user.id}/edit`;
+  };
+
+  const handleResetPassword = (user: UserWithAccess) => {
+    // Navegar para a página completa de reset de senha
+    console.log('🔑 Navegando para reset de senha do usuário:', user.username);
+    window.location.href = `/admin/users/${user.id}/reset-password`;
   };
 
   const handleSelectAll = () => {
@@ -270,12 +339,30 @@ const UsersList: React.FC = () => {
                     <option value="false">{t('admin.users.disabled')}</option>
                   </select>
                 </div>
-                <div className="flex items-end">
+                <div className="flex items-end gap-2">
                   <button
                     onClick={loadUsers}
-                    className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
                   >
                     {t('admin.users.applyFilters')}
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        console.log('🔍 Testando conexão com API Keycloak...');
+                        const response = await fetch('/api-auth/status');
+                        const data = await response.text();
+                        console.log('✅ Status da API:', response.status, data);
+                        alert(`API Status: ${response.status}\nResponse: ${data}`);
+                      } catch (error) {
+                        console.error('❌ Erro na API:', error);
+                        alert(`Erro na API: ${error}`);
+                      }
+                    }}
+                    className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition"
+                    title="Testar conexão com API"
+                  >
+                    🔧 Debug
                   </button>
                 </div>
               </div>
@@ -416,7 +503,7 @@ const UsersList: React.FC = () => {
                                     Ver Acessos
                                   </button>
                                   <button
-                                    onClick={() => window.location.href = `/admin/users/${user.id}/edit`}
+                                    onClick={() => handleEditUser(user)}
                                     className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                                   >
                                     <Edit className="h-4 w-4 mr-3" />
@@ -440,26 +527,11 @@ const UsersList: React.FC = () => {
                                     )}
                                   </button>
                                   <button
-                                    onClick={() => handleUserAction(user.id, 'reset-password')}
+                                    onClick={() => handleResetPassword(user)}
                                     className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                                   >
                                     <Key className="h-4 w-4 mr-3" />
                                     Resetar Senha
-                                  </button>
-                                  <div className="border-t border-gray-100"></div>
-                                  <button
-                                    onClick={() => window.location.href = `/admin/users/${user.id}/reset-password`}
-                                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                  >
-                                    <Key className="h-4 w-4 mr-3" />
-                                    {t('admin.users.actions.resetPassword')}
-                                  </button>
-                                  <button
-                                    onClick={() => handleUserAction(user.id, 'logout')}
-                                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                  >
-                                    <PowerOff className="h-4 w-4 mr-3" />
-                                    {t('admin.users.actions.logout')}
                                   </button>
                                   <hr className="my-1" />
                                   <button
@@ -510,127 +582,6 @@ const UsersList: React.FC = () => {
           </div>
         </div>
       </main>
-
-      {/* Modal de Acessos do Usuário */}
-      {showAccessModal && selectedUserForAccess && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-            </div>
-
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center">
-                    <Shield className="h-6 w-6 text-blue-600 mr-3" />
-                    <h3 className="text-lg font-medium text-gray-900">
-                      Acessos de {selectedUserForAccess.username}
-                    </h3>
-                  </div>
-                  <button
-                    onClick={() => setShowAccessModal(false)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="h-6 w-6" />
-                  </button>
-                </div>
-
-                <div className="mt-4">
-                  {userAcessos.length === 0 ? (
-                    <div className="text-center py-8">
-                      <Shield className="mx-auto h-12 w-12 text-gray-400" />
-                      <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhum acesso encontrado</h3>
-                      <p className="mt-1 text-sm text-gray-500">
-                        Este usuário ainda não possui acessos configurados.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
-                      <table className="min-w-full divide-y divide-gray-300">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Nível
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Local
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Permissões
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Status
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Criado em
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {userAcessos.map((acesso) => (
-                            <tr key={acesso.id} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                  {acesso.nivel_acesso.charAt(0).toUpperCase() + acesso.nivel_acesso.slice(1)}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {acesso.estabelecimento?.nome ||
-                                 acesso.tipo_municipio?.descricao ||
-                                 acesso.tipo_estado?.descricao ||
-                                 '-'}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                  {PERMISSOES_LABELS[acesso.permissoes as keyof typeof PERMISSOES_LABELS] || 
-                                   `Permissão ${acesso.permissoes}`}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                  acesso.ativo === 'S' 
-                                    ? 'bg-green-100 text-green-800' 
-                                    : 'bg-red-100 text-red-800'
-                                }`}>
-                                  {acesso.ativo === 'S' ? 'Ativo' : 'Inativo'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {new Date(acesso.created_at).toLocaleDateString('pt-BR')}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button
-                  type="button"
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
-                  onClick={() => {
-                    // Aqui você pode adicionar lógica para redirecionar para a página de criação de acesso
-                    window.location.href = `/admin/users/${selectedUserForAccess.id}/access/new`;
-                  }}
-                >
-                  Novo Acesso
-                </button>
-                <button
-                  type="button"
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                  onClick={() => setShowAccessModal(false)}
-                >
-                  Fechar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Rodapé */}
       <Footer selectedLanguage={selectedLanguage} />

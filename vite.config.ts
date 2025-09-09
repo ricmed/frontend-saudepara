@@ -307,14 +307,20 @@ export default defineConfig({
       },
       
       '/api': {
-        // Para APIs gerais, tentar localhost primeiro, produção como fallback
-        target: 'https://app-api.hml.saude.pa.gov.br/',
+        // Para APIs gerais, usar backend local quando disponível
+        target: 'http://localhost:3000/',
         changeOrigin: true,
         secure: false,
         timeout: 10000,
         configure: (proxy, options) => {
           proxy.on('error', (err, req, res) => {
-            console.log('❌ API Proxy error:', (err as any).code || err.message);
+            console.log('❌ API Proxy error (tentando localhost:3000):', (err as any).code || err.message);
+          });
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            console.log('🔄 API Request:', req.method, req.url, '-> http://localhost:3000');
+          });
+          proxy.on('proxyRes', (proxyRes, req, res) => {
+            console.log('✅ API Response:', proxyRes.statusCode, req.url);
           });
         }
       }

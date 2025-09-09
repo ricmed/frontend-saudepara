@@ -1,8 +1,9 @@
 import axios from 'axios';
+import useFilteredRequests from '@/hooks/useFilteredRequests';
 
 // Configurações das APIs
-const KEYCLOAK_API_URL = 'http://localhost:4000/api-auth';
-const BACKEND_API_URL = `${import.meta.env.VITE_API_SERVER}:${import.meta.env.VITE_API_PORT}`;
+const KEYCLOAK_API_URL = '/api-auth'; // Usar proxy do Vite
+const BACKEND_API_URL = ''; // Usar proxy do Vite (apenas /api)
 
 // Interfaces
 export interface Usuario {
@@ -138,6 +139,24 @@ class UsuarioGestaoService {
   }
 
   /**
+   * Atualizar dados do usuário no Keycloak
+   */
+  async updateUsuario(userId: string, userData: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    enabled?: boolean;
+  }): Promise<void> {
+    try {
+      console.log('Atualizando usuário via API:', userId, userData);
+      await this.keycloakApi.put(`/admin/users/${userId}`, userData);
+    } catch (error: any) {
+      console.error('Erro ao atualizar usuário:', error);
+      throw new Error(this.getErrorMessage(error, 'Erro ao atualizar usuário'));
+    }
+  }
+
+  /**
    * Resetar senha do usuário
    */
   async resetarSenhaUsuario(userId: string, novaSenha: string): Promise<void> {
@@ -172,11 +191,45 @@ class UsuarioGestaoService {
    */
   async getUsuarioAcessos(userId: string): Promise<UsuarioAcesso[]> {
     try {
-      const response = await this.backendApi.get(`/usuario-acesso/usuario/${userId}`);
-      return response.data;
+      console.log('🔑 URL da API para busca de acesso do usuário:', `/usuario-acesso/user/${userId}`);
+      const response = await this.backendApi.get(`/usuario-acesso/user/${userId}`);
+      console.log('✅ Dados de acesso do usuário:', response.data);
+      
+      // A API retorna { status: "success", data: [] }, então extrair apenas os dados
+      if (response.data && response.data.data) {
+        return response.data.data;
+      }
+      
+      // Se a resposta for diretamente um array
+      if (Array.isArray(response.data)) {
+        return response.data;
+      }
+      
+      // Se não houver dados, retornar array vazio
+      return [];
+      
     } catch (error: any) {
       console.error('Erro ao buscar acessos do usuário:', error);
       throw new Error(this.getErrorMessage(error, 'Erro ao carregar acessos do usuário'));
+    }
+  }
+
+  /**
+   * Deletar todos os acessos de um usuário (para atualização)
+   */
+  async deleteUserAccess(userId: string): Promise<void> {
+    try {
+      console.log('🗑️ Deletando acessos do usuário:', userId);
+      await this.backendApi.delete(`/usuario-acesso/user/${userId}`);
+      console.log('✅ Acessos do usuário deletados');
+    } catch (error: any) {
+      console.error('Erro ao deletar acessos do usuário:', error);
+      // Não lançar erro se o usuário não tiver acessos (404) ou endpoint não existir
+      if (error.response?.status === 404) {
+        console.log('ℹ️ Nenhum acesso existente para deletar ou endpoint não disponível');
+      } else {
+        throw new Error(this.getErrorMessage(error, 'Erro ao deletar acessos do usuário'));
+      }
     }
   }
 
@@ -199,16 +252,55 @@ class UsuarioGestaoService {
   /**
    * Criar acesso para unidade
    */
-  async createAcessoUnidade(userId: string, estabelecimentoId: number, permissoes: number = PERMISSOES.READ_WRITE): Promise<UsuarioAcesso> {
+  async createAcessoUnidade(userId: string, estabelecimentoId: number, permissoes: number = PERMISSOES.READ_WRITE, municipioId?: number, estadoId?: number): Promise<UsuarioAcesso> {
     try {
-      const response = await this.backendApi.post('/usuario-acesso/unidade', {
+      console.log('🔧 UsuarioGestaoService.createAcessoUnidade chamado com:', {
+        userId,
+        estabelecimentoId,
+        municipioId,
+        estadoId,
+        permissoes
+      });
+      
+      const payload: any = {
         userId,
         estabelecimentoId,
         permissoes
+      };
+      
+      console.log('🔍 Valores antes da validação:', {
+        municipioId, 
+        estadoId, 
+        'typeof municipioId': typeof municipioId,
+        'typeof estadoId': typeof estadoId,
+        'municipioId == null': municipioId == null,
+        'estadoId == null': estadoId == null
       });
+      
+      // Adicionar município e estado se fornecidos
+      if (municipioId) {
+        payload.municipioId = municipioId;
+        console.log('✅ MunicipioId adicionado ao payload:', municipioId);
+      } else {
+        console.log('❌ MunicipioId NÃO adicionado - valor:', municipioId);
+      }
+      
+      if (estadoId) {
+        payload.estadoId = estadoId;
+        console.log('✅ EstadoId adicionado ao payload:', estadoId);
+      } else {
+        console.log('❌ EstadoId NÃO adicionado - valor:', estadoId);
+      }
+      
+      console.log('📤 Payload final sendo enviado:', payload);
+      
+      const response = await this.backendApi.post('/usuario-acesso/unidade', payload);
+      
+      console.log('✅ Acesso de unidade criado com sucesso:', response.data);
       return response.data.data;
     } catch (error: any) {
-      console.error('Erro ao criar acesso à unidade:', error);
+      console.error('❌ Erro ao criar acesso à unidade:', error);
+      console.error('  - Dados enviados:', { userId, estabelecimentoId, municipioId, estadoId, permissoes });
       throw new Error(this.getErrorMessage(error, 'Erro ao criar acesso à unidade'));
     }
   }
@@ -218,14 +310,23 @@ class UsuarioGestaoService {
    */
   async createAcessoMunicipio(userId: string, municipioId: number, permissoes: number = PERMISSOES.READ_WRITE): Promise<UsuarioAcesso> {
     try {
+      console.log('🔧 UsuarioGestaoService.createAcessoMunicipio chamado com:', {
+        userId,
+        municipioId,
+        permissoes
+      });
+      
       const response = await this.backendApi.post('/usuario-acesso/municipio', {
         userId,
         municipioId,
         permissoes
       });
+      
+      console.log('✅ Acesso de município criado com sucesso:', response.data);
       return response.data.data;
     } catch (error: any) {
-      console.error('Erro ao criar acesso ao município:', error);
+      console.error('❌ Erro ao criar acesso ao município:', error);
+      console.error('  - Dados enviados:', { userId, municipioId, permissoes });
       throw new Error(this.getErrorMessage(error, 'Erro ao criar acesso ao município'));
     }
   }
@@ -235,14 +336,23 @@ class UsuarioGestaoService {
    */
   async createAcessoEstado(userId: string, estadoId: number, permissoes: number = PERMISSOES.ALL): Promise<UsuarioAcesso> {
     try {
+      console.log('🔧 UsuarioGestaoService.createAcessoEstado chamado com:', {
+        userId,
+        estadoId,
+        permissoes
+      });
+      
       const response = await this.backendApi.post('/usuario-acesso/estado', {
         userId,
         estadoId,
         permissoes
       });
+      
+      console.log('✅ Acesso de estado criado com sucesso:', response.data);
       return response.data.data;
     } catch (error: any) {
-      console.error('Erro ao criar acesso ao estado:', error);
+      console.error('❌ Erro ao criar acesso ao estado:', error);
+      console.error('  - Dados enviados:', { userId, estadoId, permissoes });
       throw new Error(this.getErrorMessage(error, 'Erro ao criar acesso ao estado'));
     }
   }
@@ -277,35 +387,90 @@ class UsuarioGestaoService {
   // ================================
 
   /**
-   * Buscar opções para dropdowns
+   * Buscar opções para dropdowns - usando o mesmo padrão do UnidadeNotificadoraField
    */
-  async getEstabelecimentos(): Promise<Array<{id: number; nome: string}>> {
+  // Método para buscar estabelecimentos com filtro por usuário
+  async getEstabelecimentosFiltrados(userPermissions?: any): Promise<Array<{id: number; nome: string}>> {
     try {
-      // Primeiro tenta o endpoint específico para mapa que retorna TODOS os estabelecimentos ativos
-      try {
-        const response = await this.backendApi.get('/estabelecimentos/mapa');
-        const data = response.data || [];
-        console.log(`✅ Carregados ${data.length} estabelecimentos ativos do endpoint /mapa`);
-        return data.map((est: any) => ({
-          id: est.idestabelecimento,
-          nome: est.nome
-        }));
-      } catch (error) {
-        console.error('Erro ao carregar do endpoint /mapa, tentando endpoint normal:', error);
+      let apiUrl = `${BACKEND_API_URL}/api/estabelecimentos`;
+      const params: any = {
+        limit: 1000,
+        ativo: 'S'
+      };
+
+      // Aplicar filtros baseado no nível de acesso do usuário
+      if (userPermissions?.isEstabelecimento && userPermissions.estabelecimentoId) {
+        // Usuário de estabelecimento só vê seu próprio estabelecimento
+        apiUrl = `${BACKEND_API_URL}/api/estabelecimentos/${userPermissions.estabelecimentoId}`;
+      } else if (userPermissions?.isMunicipio && userPermissions.municipioId) {
+        // Usuário de município só vê estabelecimentos do seu município
+        params.municipio_id = userPermissions.municipioId;
+      } else if (userPermissions?.isEstado && userPermissions.estadoId) {
+        // Usuário de estado só vê estabelecimentos do seu estado
+        params.estado_id = userPermissions.estadoId;
       }
 
-      // Fallback para o endpoint normal com limite alto (seguindo padrão do UnidadeNotificadoraField)
-      const response = await this.backendApi.get('/estabelecimentos', {
+      console.log('🏥 URL da API para busca de estabelecimentos filtrados:', apiUrl, params);
+      
+      const response = await axios.get(apiUrl, {
+        params: apiUrl.includes('/estabelecimentos/') ? undefined : params,
+        headers: { 'Accept': 'application/json' },
+        withCredentials: true
+      });
+      
+      let data = response.data?.data || response.data || [];
+      
+      // Se é busca por ID específico, transformar em array
+      if (apiUrl.includes('/estabelecimentos/') && !Array.isArray(data)) {
+        data = [data];
+      }
+      
+      console.log(`✅ Carregados ${data.length} estabelecimentos filtrados`);
+      return data.map((est: any) => ({
+        id: est.idestabelecimento,
+        nome: est.nome
+      }));
+    } catch (error) {
+      console.error('Erro ao buscar estabelecimentos filtrados:', error);
+      throw new Error(this.getErrorMessage(error, 'Erro ao buscar estabelecimentos'));
+    }
+  }
+
+  async getEstabelecimentos(): Promise<Array<{id: number; nome: string}>> {
+    try {
+      // Usar axios diretamente como no UnidadeNotificadoraField que funciona
+      const apiUrl = `${BACKEND_API_URL}/api/estabelecimentos`;
+      console.log('🌐 URL da API para busca de estabelecimentos:', apiUrl);
+      
+      const response = await axios.get(apiUrl, {
         params: {
           limit: 11000, // Limite alto para carregar todos
           ativo: 'S',   // Apenas estabelecimentos ativos
           orderBy: 'nome',
           orderDir: 'asc'
-        }
+        },
+        headers: {
+          'Accept': 'application/json'
+        },
+        withCredentials: true
       });
       
-      const data = response.data?.data || response.data || [];
-      const estabelecimentosAtivos = data.filter((est: any) => est.ativo === 'S');
+      console.log('Resposta da API de estabelecimentos:', response);
+      
+      let estabelecimentosAtivos: any[] = [];
+      
+      // A resposta do backend tem formato { data: [...], pagination: {...} }
+      if (response && response.data && response.data.data) {
+        estabelecimentosAtivos = response.data.data.filter((est: any) => 
+          est.ativo === 'S'
+        );
+      } else if (response && response.data && Array.isArray(response.data)) {
+        // Caso a API retorne diretamente um array
+        estabelecimentosAtivos = response.data.filter((est: any) => 
+          est.ativo === 'S'
+        );
+      }
+      
       console.log(`✅ Carregados ${estabelecimentosAtivos.length} estabelecimentos ativos`);
       
       return estabelecimentosAtivos.map((est: any) => ({
@@ -314,20 +479,28 @@ class UsuarioGestaoService {
       }));
     } catch (error) {
       console.error('Erro ao buscar estabelecimentos:', error);
-      return [];
+      throw new Error(this.getErrorMessage(error, 'Erro ao buscar estabelecimentos'));
     }
   }
 
   async getMunicipios(): Promise<Array<{id: number; descricao: string}>> {
     try {
-      // Usar limite alto para carregar todos os municípios (seguindo padrão do LocationInput)
-      const response = await this.backendApi.get('/tipo-municipio', {
+      // Usar axios diretamente como no padrão que funciona
+      const apiUrl = `${BACKEND_API_URL}/api/tipo-municipio`;
+      console.log('🌐 URL da API para busca de municípios:', apiUrl);
+      
+      const response = await axios.get(apiUrl, {
         params: {
           limit: 1000, // Limite usado no LocationInput
           orderBy: 'descricao',
           orderDir: 'asc'
-        }
+        },
+        headers: {
+          'Accept': 'application/json'
+        },
+        withCredentials: true
       });
+      
       const data = response.data?.data || response.data || [];
       console.log(`✅ Carregados ${data.length} municípios`);
       return data.map((mun: any) => ({
@@ -336,43 +509,54 @@ class UsuarioGestaoService {
       }));
     } catch (error) {
       console.error('Erro ao buscar municípios:', error);
-      return [];
+      throw new Error(this.getErrorMessage(error, 'Erro ao buscar municípios'));
     }
   }
 
   async getMunicipiosPorEstado(estadoId: number): Promise<Array<{id: number; descricao: string}>> {
     try {
-      // Buscar municípios filtrados por estado (seguindo padrão do LocationInput)
-      const response = await this.backendApi.get('/tipo-municipio', {
-        params: {
-          tipo_estado_idtipo_estado: estadoId, // Parâmetro correto usado no LocationInput
-          limit: 1000,
-          orderBy: 'descricao',
-          orderDir: 'asc'
-        }
+      // Usar axios diretamente e o endpoint correto que funciona
+      const apiUrl = `${BACKEND_API_URL}/api/municipios/estado/${estadoId}`;
+      console.log('🌐 URL da API para busca de municípios por estado:', apiUrl);
+      
+      const response = await axios.get(apiUrl, {
+        headers: {
+          'Accept': 'application/json'
+        },
+        withCredentials: true
       });
-      const data = response.data?.data || response.data || [];
+      
+      // A resposta já vem no formato correto do novo endpoint
+      const data = response.data || [];
       console.log(`✅ Carregados ${data.length} municípios para estado ${estadoId}`);
       return data.map((mun: any) => ({
-        id: mun.idtipo_municipio,
+        id: mun.id || mun.idtipo_municipio,
         descricao: mun.descricao
       }));
     } catch (error) {
       console.error('Erro ao buscar municípios por estado:', error);
-      return [];
+      throw new Error(this.getErrorMessage(error, 'Erro ao buscar municípios por estado'));
     }
   }
 
   async getEstados(): Promise<Array<{id: number; descricao: string}>> {
     try {
-      // Carregar todos os estados (seguindo padrão do LocationInput)
-      const response = await this.backendApi.get('/tipo-estado', {
+      // Usar axios diretamente como no padrão que funciona
+      const apiUrl = `${BACKEND_API_URL}/api/tipo-estado`;
+      console.log('🌐 URL da API para busca de estados:', apiUrl);
+      
+      const response = await axios.get(apiUrl, {
         params: {
           limit: 1000, // Limite para todos os estados
           orderBy: 'descricao',
           orderDir: 'asc'
-        }
+        },
+        headers: {
+          'Accept': 'application/json'
+        },
+        withCredentials: true
       });
+      
       const data = response.data?.data || response.data || [];
       console.log(`✅ Carregados ${data.length} estados`);
       return data.map((est: any) => ({
@@ -381,7 +565,7 @@ class UsuarioGestaoService {
       }));
     } catch (error) {
       console.error('Erro ao buscar estados:', error);
-      return [];
+      throw new Error(this.getErrorMessage(error, 'Erro ao buscar estados'));
     }
   }
 
@@ -421,7 +605,13 @@ class UsuarioGestaoService {
    */
   async getEstabelecimentoComHierarquia(id: number) {
     try {
-      const response = await axios.get(`${BACKEND_API_URL}/api/estabelecimentos/${id}`, {
+      const apiUrl = `${BACKEND_API_URL}/api/estabelecimentos/${id}`;
+      console.log('🌐 URL da API para busca de estabelecimento com hierarquia:', apiUrl);
+      
+      const response = await axios.get(apiUrl, {
+        headers: {
+          'Accept': 'application/json'
+        },
         withCredentials: true
       });
       return response.data;
@@ -436,7 +626,13 @@ class UsuarioGestaoService {
    */
   async getEstabelecimentosPorMunicipio(municipioId: number) {
     try {
-      const response = await axios.get(`${BACKEND_API_URL}/api/estabelecimentos/municipio/${municipioId}`, {
+      const apiUrl = `${BACKEND_API_URL}/api/estabelecimentos/municipio/${municipioId}`;
+      console.log('🌐 URL da API para busca de estabelecimentos por município:', apiUrl);
+      
+      const response = await axios.get(apiUrl, {
+        headers: {
+          'Accept': 'application/json'
+        },
         withCredentials: true
       });
       // Formatar para o padrão esperado pelo frontend
@@ -455,7 +651,13 @@ class UsuarioGestaoService {
    */
   async getEstabelecimentosPorEstado(estadoId: number) {
     try {
-      const response = await axios.get(`${BACKEND_API_URL}/api/estabelecimentos/estado/${estadoId}`, {
+      const apiUrl = `${BACKEND_API_URL}/api/estabelecimentos/estado/${estadoId}`;
+      console.log('🌐 URL da API para busca de estabelecimentos por estado:', apiUrl);
+      
+      const response = await axios.get(apiUrl, {
+        headers: {
+          'Accept': 'application/json'
+        },
         withCredentials: true
       });
       // Formatar para o padrão esperado pelo frontend
@@ -474,13 +676,122 @@ class UsuarioGestaoService {
    */
   async getMunicipioComEstado(municipioId: number) {
     try {
-      const response = await axios.get(`${BACKEND_API_URL}/api/municipios/${municipioId}`, {
+      const apiUrl = `${BACKEND_API_URL}/api/municipios/${municipioId}`;
+      console.log('🌐 URL da API para busca de município com estado:', apiUrl);
+      
+      const response = await axios.get(apiUrl, {
+        headers: {
+          'Accept': 'application/json'
+        },
         withCredentials: true
       });
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar município com estado:', error);
       throw new Error(this.getErrorMessage(error, 'Erro ao buscar município'));
+    }
+  }
+
+  // Método para obter dados de acesso do usuário (usuario_acesso)
+  async getUserAccess(userId?: number): Promise<any> {
+    try {
+      const apiUrl = userId 
+        ? `${BACKEND_API_URL}/api/usuario-acesso/${userId}`
+        : `${BACKEND_API_URL}/api/usuario-acesso/current`;
+      
+      console.log('🔑 URL da API para busca de acesso do usuário:', apiUrl);
+      
+      const response = await axios.get(apiUrl, {
+        headers: { 'Accept': 'application/json' },
+        withCredentials: true
+      });
+      
+      const accessData = response.data?.data || response.data || {};
+      console.log('✅ Dados de acesso do usuário:', accessData);
+      
+      return {
+        estabelecimentoId: accessData.idestabelecimento,
+        municipioId: accessData.idmunicipio,
+        estadoId: accessData.idestado,
+        nivel: accessData.nivel || 'estabelecimento'
+      };
+    } catch (error) {
+      console.warn('Aviso: não foi possível buscar dados de acesso do usuário:', error);
+      return null;
+    }
+  }
+
+  // Método para buscar comunicados filtrados por usuário
+  async getComunicadosFiltrados(userPermissions?: any): Promise<any[]> {
+    try {
+      const apiUrl = `${BACKEND_API_URL}/api/comunicacao-realizada`;
+      const params: any = {
+        limit: 1000,
+        orderBy: 'data_criacao',
+        orderDir: 'desc'
+      };
+
+      // Aplicar filtros baseado no nível de acesso do usuário
+      if (userPermissions?.isEstabelecimento && userPermissions.estabelecimentoId) {
+        params.estabelecimento_id = userPermissions.estabelecimentoId;
+      } else if (userPermissions?.isMunicipio && userPermissions.municipioId) {
+        params.municipio_id = userPermissions.municipioId;
+      } else if (userPermissions?.isEstado && userPermissions.estadoId) {
+        params.estado_id = userPermissions.estadoId;
+      }
+
+      console.log('📢 URL da API para busca de comunicados filtrados:', apiUrl, params);
+      
+      const response = await axios.get(apiUrl, {
+        params,
+        headers: { 'Accept': 'application/json' },
+        withCredentials: true
+      });
+      
+      const data = response.data?.data || response.data || [];
+      console.log(`✅ Carregados ${data.length} comunicados filtrados`);
+      
+      return data;
+    } catch (error) {
+      console.error('Erro ao buscar comunicados filtrados:', error);
+      throw new Error(this.getErrorMessage(error, 'Erro ao buscar comunicados'));
+    }
+  }
+
+  // Método para buscar eventos filtrados por usuário
+  async getEventosFiltrados(userPermissions?: any): Promise<any[]> {
+    try {
+      const apiUrl = `${BACKEND_API_URL}/api/eventos`;
+      const params: any = {
+        limit: 1000,
+        orderBy: 'data_criacao',
+        orderDir: 'desc'
+      };
+
+      // Aplicar filtros baseado no nível de acesso do usuário
+      if (userPermissions?.isEstabelecimento && userPermissions.estabelecimentoId) {
+        params.estabelecimento_id = userPermissions.estabelecimentoId;
+      } else if (userPermissions?.isMunicipio && userPermissions.municipioId) {
+        params.municipio_id = userPermissions.municipioId;
+      } else if (userPermissions?.isEstado && userPermissions.estadoId) {
+        params.estado_id = userPermissions.estadoId;
+      }
+
+      console.log('📅 URL da API para busca de eventos filtrados:', apiUrl, params);
+      
+      const response = await axios.get(apiUrl, {
+        params,
+        headers: { 'Accept': 'application/json' },
+        withCredentials: true
+      });
+      
+      const data = response.data?.data || response.data || [];
+      console.log(`✅ Carregados ${data.length} eventos filtrados`);
+      
+      return data;
+    } catch (error) {
+      console.error('Erro ao buscar eventos filtrados:', error);
+      throw new Error(this.getErrorMessage(error, 'Erro ao buscar eventos'));
     }
   }
 }
