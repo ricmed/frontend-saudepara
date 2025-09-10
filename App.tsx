@@ -257,8 +257,11 @@ function App() {
           <Route path="/mapa-original" element={<MapaLocais />} />
           <Route path="/mapa-leaflet" element={<MapaLeaflet />} />
           <Route path="/campanhas" element={<HealthCampaignsPage />} />
-          <Route path="/dashboard" element={<NotificationDashboard />} />
-          <Route path="/dashboard-page" element={<DashboardPage />} />
+          
+          {/* Rotas do Dashboard - Protegidas para Notificador */}
+          <Route path="/dashboard" element={<ProtectedRoute requiredRoles={['notificador']} requiredGroups={['/grupo_notificador']}><NotificationDashboard /></ProtectedRoute>} />
+          <Route path="/dashboard-page" element={<ProtectedRoute requiredRoles={['notificador']} requiredGroups={['/grupo_notificador']}><DashboardPage /></ProtectedRoute>} />
+          
           {/* Rotas de Campanhas */}
           <Route path="/janeiro-roxo" element={<JaneiroRoxoPage />} />
           <Route path="/campanha-dezembro-vermelho" element={<DezembroVermelho />} />

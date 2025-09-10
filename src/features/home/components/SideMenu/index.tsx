@@ -201,11 +201,12 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       onClick: () => navigate("/private/pagina-paciente-ficha"),
     }] : []),
     
-    {
+    // Menu Dashboard - apenas para notificadores
+    ...(permissions.isNotificador ? [{
       icon: <ChartSpline />,
       label: t("menu.dashboard"),
       onClick: () => navigate("/dashboard-page"),
-    },
+    }] : []),
     
     // ✅ NOVO: Gerenciamento Offline - disponível para todos os usuários logados
     ...(user ? [{
