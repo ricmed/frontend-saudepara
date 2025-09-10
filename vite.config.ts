@@ -286,10 +286,10 @@ export default defineConfig({
     host: true,
     
     proxy: {
-      // *** PROXY CORRIGIDO - USAR PRODUÇÃO QUANDO DEV NÃO DISPONÍVEL ***
+      // *** PROXY COM TARGETS ORIGINAIS + VARIÁVEIS ***
       '/api-auth': {
-        // Sempre usar produção se dev não estiver disponível
-        target: 'http://localhost:4000/',
+        // Para api-auth, usar localhost:4000 ou variável de ambiente
+        target: process.env.VITE_AUTH_TARGET || 'http://localhost:4000/',
         changeOrigin: true,
         secure: false,
         timeout: 10000,
@@ -307,20 +307,14 @@ export default defineConfig({
       },
       
       '/api': {
-        // Para APIs gerais, usar backend local quando disponível
-        target: 'http://localhost:3000/',
+        // Para api geral, usar homologação ou variável de ambiente
+        target: process.env.VITE_API_TARGET || 'https://app-api.hml.saude.pa.gov.br/',
         changeOrigin: true,
         secure: false,
         timeout: 10000,
         configure: (proxy, options) => {
-          proxy.on('error', (err, req, res) => {
-            console.log('❌ API Proxy error (tentando localhost:3000):', (err as any).code || err.message);
-          });
-          proxy.on('proxyReq', (proxyReq, req, res) => {
-            console.log('🔄 API Request:', req.method, req.url, '-> http://localhost:3000');
-          });
-          proxy.on('proxyRes', (proxyRes, req, res) => {
-            console.log('✅ API Response:', proxyRes.statusCode, req.url);
+          proxy.on('error', (err) => {
+            console.log('❌ API Proxy error:', (err as any).code || err.message);
           });
         }
       }
