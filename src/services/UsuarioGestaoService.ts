@@ -3,7 +3,7 @@ import useFilteredRequests from '@/hooks/useFilteredRequests';
 
 // Configurações das APIs
 const KEYCLOAK_API_URL = '/api-auth'; // Usar proxy do Vite
-const BACKEND_API_URL = ''; // Usar proxy do Vite (apenas /api)
+const BACKEND_API_URL = ''; // Usar proxy do Vite (apenas se o backend estiver em porta diferente)
 
 // Interfaces
 export interface Usuario {
@@ -116,9 +116,42 @@ class UsuarioGestaoService {
   /**
    * Criar novo usuário no Keycloak
    */
-  async createUsuario(userData: CreateUsuarioRequest): Promise<void> {
+  async createUsuario(userData: CreateUsuarioRequest): Promise<string | null> {
     try {
-      await this.keycloakApi.post('/admin/users', userData);
+      const response = await this.keycloakApi.post('/admin/users', userData);
+      
+      // Keycloak retorna 201 sem body, mas com header Location contendo o ID
+      let userId: string | null = null;
+      
+      if (response.status === 201 && response.headers.location) {
+        // Extrair ID do header Location: /admin/users/{userId}
+        const locationMatch = response.headers.location.match(/\/admin\/users\/([^\/]+)$/);
+        if (locationMatch) {
+          userId = locationMatch[1];
+          console.log('✅ Usuário criado com ID extraído do Location:', userId);
+          return userId;
+        }
+      }
+      
+      // Fallback: buscar por username se não conseguir extrair do Location
+      if (userData.username) {
+        try {
+          const usuarios = await this.keycloakApi.get('/admin/users', {
+            params: { username: userData.username, exact: true }
+          });
+          
+          if (usuarios.data && usuarios.data.length > 0) {
+            userId = usuarios.data[0].id;
+            console.log('✅ Usuário criado, ID encontrado via busca:', userId);
+            return userId;
+          }
+        } catch (searchError) {
+          console.warn('Aviso: não foi possível buscar o usuário criado:', searchError);
+        }
+      }
+      
+      console.warn('Usuário criado, mas não foi possível obter o ID');
+      return null;
     } catch (error: any) {
       console.error('Erro ao criar usuário:', error);
       throw new Error(this.getErrorMessage(error, 'Erro ao criar usuário'));
@@ -162,7 +195,9 @@ class UsuarioGestaoService {
   async resetarSenhaUsuario(userId: string, novaSenha: string): Promise<void> {
     try {
       await this.keycloakApi.put(`/admin/users/${userId}/reset-password`, {
-        password: novaSenha
+        type: 'password',
+        value: novaSenha,
+        temporary: false
       });
     } catch (error: any) {
       console.error('Erro ao resetar senha:', error);
@@ -242,7 +277,18 @@ class UsuarioGestaoService {
   }> {
     try {
       const response = await this.backendApi.get(`/usuario-acesso?page=${page}&limit=${limit}`);
-      return response.data;
+      
+      // Normalizar paginação: backend usa 'pagination', frontend espera 'meta'
+      const { data, pagination } = response.data;
+      return {
+        data,
+        meta: {
+          total: pagination.total,
+          totalPages: pagination.pages,
+          page: pagination.currentPage,
+          limit: pagination.perPage
+        }
+      };
     } catch (error: any) {
       console.error('Erro ao buscar todos os acessos:', error);
       throw new Error(this.getErrorMessage(error, 'Erro ao carregar acessos'));
@@ -390,7 +436,7 @@ class UsuarioGestaoService {
    * Buscar opções para dropdowns - usando o mesmo padrão do UnidadeNotificadoraField
    */
   // Método para buscar estabelecimentos com filtro por usuário
-  async getEstabelecimentosFiltrados(userPermissions?: any): Promise<Array<{id: number; nome: string}>> {
+  async getEstabelecimentosFiltrados(userPermissions?: any): Promise<Array<{id: number; nome: string; cnes?: string}>> {
     try {
       let apiUrl = `${BACKEND_API_URL}/api/estabelecimentos`;
       const params: any = {
@@ -428,7 +474,8 @@ class UsuarioGestaoService {
       console.log(`✅ Carregados ${data.length} estabelecimentos filtrados`);
       return data.map((est: any) => ({
         id: est.idestabelecimento,
-        nome: est.nome
+        nome: est.nome,
+        cnes: est.cnes || undefined
       }));
     } catch (error) {
       console.error('Erro ao buscar estabelecimentos filtrados:', error);
@@ -436,7 +483,7 @@ class UsuarioGestaoService {
     }
   }
 
-  async getEstabelecimentos(): Promise<Array<{id: number; nome: string}>> {
+  async getEstabelecimentos(): Promise<Array<{id: number; nome: string; cnes?: string}>> {
     try {
       // Usar axios diretamente como no UnidadeNotificadoraField que funciona
       const apiUrl = `${BACKEND_API_URL}/api/estabelecimentos`;
@@ -475,7 +522,8 @@ class UsuarioGestaoService {
       
       return estabelecimentosAtivos.map((est: any) => ({
         id: est.idestabelecimento,
-        nome: est.nome
+        nome: est.nome,
+        cnes: est.cnes || undefined
       }));
     } catch (error) {
       console.error('Erro ao buscar estabelecimentos:', error);
@@ -491,7 +539,7 @@ class UsuarioGestaoService {
       
       const response = await axios.get(apiUrl, {
         params: {
-          limit: 1000, // Limite usado no LocationInput
+          limit: 20000, // Limite aumentado para carregar TODOS os municípios
           orderBy: 'descricao',
           orderDir: 'asc'
         },
@@ -598,6 +646,68 @@ class UsuarioGestaoService {
     return fallback;
   }
 
+  // ========== MÉTODOS DE DADOS GEOGRÁFICOS ==========
+
+  /**
+   * 🚀 Buscar toda a hierarquia (estados, municípios, estabelecimentos) de forma otimizada
+   * Este método usa o endpoint /api/hierarquia/slim que retorna tudo em uma única requisição
+   * com mapeamento correto de relacionamentos para filtros instantâneos em memória
+   */
+  async getHierarquiaCompleta(): Promise<{
+    estados: Array<{id: number; sigla: string; descricao: string}>;
+    municipios: Array<{id: number; descricao: string; estadoId: number}>;
+    estabelecimentos: Array<{id: number; nome: string; cnes?: string; municipioId: number; estadoId: number}>;
+  }> {
+    try {
+      console.log('🏗️ Carregando hierarquia completa (método otimizado)...');
+      
+      const apiUrl = `${BACKEND_API_URL}/api/hierarquia/slim`;
+      const response = await axios.get(apiUrl, {
+        headers: {
+          'Accept': 'application/json'
+        },
+        withCredentials: true
+      });
+      
+      const data = response.data;
+      
+      console.log('✅ Hierarquia completa carregada:', {
+        estados: data.estados.length,
+        municipios: data.municipios.length,
+        estabelecimentos: data.estabelecimentos.length
+      });
+      
+      return data;
+    } catch (error) {
+      console.warn('⚠️ Endpoint slim não disponível, usando métodos individuais como fallback...');
+      
+      // Fallback: usar os métodos individuais existentes
+      try {
+        const [estados, municipios, estabelecimentos] = await Promise.all([
+          this.getEstados(),
+          this.getMunicipios(),
+          this.getEstabelecimentos()
+        ]);
+        
+        // Converter para o formato esperado (sem mapeamento de relacionamentos)
+        return {
+          estados: estados.map(e => ({ ...e, sigla: '' })), // sigla não disponível no fallback
+          municipios: municipios.map(m => ({ ...m, estadoId: 0 })), // estadoId não disponível no fallback
+          estabelecimentos: estabelecimentos.map(est => ({ 
+            id: est.id, 
+            nome: est.nome, 
+            cnes: est.cnes,
+            municipioId: 0, // relacionamentos não disponíveis no fallback
+            estadoId: 0
+          }))
+        };
+      } catch (fallbackError) {
+        console.error('❌ Erro no fallback para hierarquia:', fallbackError);
+        throw new Error(this.getErrorMessage(fallbackError, 'Erro ao carregar dados geográficos'));
+      }
+    }
+  }
+
   // ========== MÉTODOS DE FILTRAGEM HIERÁRQUICA ==========
 
   /**
@@ -638,7 +748,8 @@ class UsuarioGestaoService {
       // Formatar para o padrão esperado pelo frontend
       return response.data.map((est: any) => ({
         id: est.idestabelecimento,
-        nome: est.nome || `Estabelecimento ${est.cnes}` // Fallback para nome vazio
+        nome: est.nome || `Estabelecimento ${est.cnes}`, // Fallback para nome vazio
+        cnes: est.cnes || undefined
       }));
     } catch (error) {
       console.error('Erro ao buscar estabelecimentos por município:', error);
@@ -663,7 +774,8 @@ class UsuarioGestaoService {
       // Formatar para o padrão esperado pelo frontend
       return response.data.map((est: any) => ({
         id: est.idestabelecimento,
-        nome: est.nome || `Estabelecimento ${est.cnes}` // Fallback para nome vazio
+        nome: est.nome || `Estabelecimento ${est.cnes}`, // Fallback para nome vazio
+        cnes: est.cnes || undefined
       }));
     } catch (error) {
       console.error('Erro ao buscar estabelecimentos por estado:', error);
@@ -693,10 +805,10 @@ class UsuarioGestaoService {
   }
 
   // Método para obter dados de acesso do usuário (usuario_acesso)
-  async getUserAccess(userId?: number): Promise<any> {
+  async getUserAccess(userId?: string): Promise<any> {
     try {
-      const apiUrl = userId 
-        ? `${BACKEND_API_URL}/api/usuario-acesso/${userId}`
+      const apiUrl = userId
+        ? `${BACKEND_API_URL}/api/usuario-acesso/user/${userId}`
         : `${BACKEND_API_URL}/api/usuario-acesso/current`;
       
       console.log('🔑 URL da API para busca de acesso do usuário:', apiUrl);
@@ -706,14 +818,21 @@ class UsuarioGestaoService {
         withCredentials: true
       });
       
-      const accessData = response.data?.data || response.data || {};
-      console.log('✅ Dados de acesso do usuário:', accessData);
+      const payload = response.data?.data ?? response.data;
+      console.log('✅ Dados de acesso do usuário (payload):', payload);
+      
+      // Pega o primeiro se vier lista
+      const acesso = Array.isArray(payload) ? payload[0] : payload;
+      console.log('✅ Dados de acesso processados:', acesso);
       
       return {
-        estabelecimentoId: accessData.idestabelecimento,
-        municipioId: accessData.idmunicipio,
-        estadoId: accessData.idestado,
-        nivel: accessData.nivel || 'estabelecimento'
+        estabelecimentoId: acesso?.estabelecimento_id ?? acesso?.estabelecimentoId ?? null,
+        municipioId: acesso?.tipo_municipio_id ?? acesso?.municipioId ?? null,
+        estadoId: acesso?.tipo_estado_id ?? acesso?.estadoId ?? null,
+        nivel: acesso?.nivel_acesso ?? acesso?.nivel ?? 'unidade',
+        isEstabelecimento: (acesso?.nivel_acesso ?? acesso?.nivel) === 'unidade',
+        isMunicipio: (acesso?.nivel_acesso ?? acesso?.nivel) === 'municipio',
+        isEstado: (acesso?.nivel_acesso ?? acesso?.nivel) === 'estado',
       };
     } catch (error) {
       console.warn('Aviso: não foi possível buscar dados de acesso do usuário:', error);

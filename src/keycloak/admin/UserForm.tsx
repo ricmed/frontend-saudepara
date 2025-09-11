@@ -26,6 +26,16 @@ import {
   PERMISSOES
 } from '@/services/UsuarioGestaoService';
 
+// 💡 Para permitir busca por CNES
+type EstabelecimentoOption = { id: number; nome: string; cnes?: string };
+
+// 🔤 Normalizador para busca acento/case-insensitive
+const norm = (s?: string) =>
+  (s || '')
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase();
+
 interface UserFormData {
   username: string;
   firstName: string;
@@ -66,9 +76,12 @@ const UserForm: React.FC = () => {
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Estados para opções de dropdown
-  const [estabelecimentos, setEstabelecimentos] = useState<Array<{id: number; nome: string}>>([]);
-  const [municipios, setMunicipios] = useState<Array<{id: number; descricao: string}>>([]);
+  const [estabelecimentos, setEstabelecimentos] = useState<EstabelecimentoOption[]>([]);
+  const [municipios, setMunicipios] = useState<Array<{id: number; descricao: string; estadoId?: number}>>([]);
   const [estados, setEstados] = useState<Array<{id: number; descricao: string}>>([]);
+
+  // Bases para reuso/reset
+  const [municipiosDisponiveis, setMunicipiosDisponiveis] = useState<Array<{id: number; descricao: string; estadoId?: number}>>([]);
 
   // Estados para pesquisa nos dropdowns
   const [searchEstabelecimento, setSearchEstabelecimento] = useState('');
@@ -76,7 +89,7 @@ const UserForm: React.FC = () => {
   const [searchEstado, setSearchEstado] = useState('');
 
   // Estados filtrados para exibição
-  const [estabelecimentosFiltrados, setEstabelecimentosFiltrados] = useState<Array<{id: number; nome: string}>>([]);
+  const [estabelecimentosFiltrados, setEstabelecimentosFiltrados] = useState<EstabelecimentoOption[]>([]);
   const [municipiosFiltrados, setMunicipiosFiltrados] = useState<Array<{id: number; descricao: string}>>([]);
   const [estadosFiltrados, setEstadosFiltrados] = useState<Array<{id: number; descricao: string}>>([]);
 
@@ -105,37 +118,36 @@ const UserForm: React.FC = () => {
     }
   }, [id]);
 
-  // Filtrar estabelecimentos baseado na pesquisa
+  // Estabelecimentos: por nome (acento-insensitive) e CNES (numérico)
   useEffect(() => {
-    const filtrados = estabelecimentos.filter(est => 
-      est.nome.toLowerCase().includes(searchEstabelecimento.toLowerCase())
-    );
+    const q = norm(searchEstabelecimento);
+    const onlyDigits = searchEstabelecimento.replace(/\D/g, '');
+    const filtrados = estabelecimentos.filter(est => {
+      const byName = norm(est.nome).includes(q);
+      const byCnes = onlyDigits ? (est.cnes || '').includes(onlyDigits) : false;
+      return q ? (byName || byCnes) : true;
+    });
     setEstabelecimentosFiltrados(filtrados);
   }, [estabelecimentos, searchEstabelecimento]);
 
-  // Estados para armazenar dados base para busca
-  const [municipiosDisponiveis, setMunicipiosDisponiveis] = useState<Array<{id: number; descricao: string}>>([]);
-
-  // Filtrar municípios baseado na pesquisa - usa municípiosDisponiveis como base
+  // Municípios: acento-insensitive, sobre os "disponíveis" (dependem do estado selecionado)
   useEffect(() => {
     if (!searchMunicipio) {
-      // Se não há busca, usar todos os municípios disponíveis (do estado selecionado)
       setMunicipiosFiltrados(municipiosDisponiveis);
     } else {
-      // Se há busca, filtrar dentro dos municípios disponíveis
-      const filtrados = municipiosDisponiveis.filter(mun => 
-        mun.descricao.toLowerCase().includes(searchMunicipio.toLowerCase())
+      const q = norm(searchMunicipio);
+      setMunicipiosFiltrados(
+        municipiosDisponiveis.filter(m => norm(m.descricao).includes(q))
       );
-      setMunicipiosFiltrados(filtrados);
     }
   }, [municipiosDisponiveis, searchMunicipio]);
 
-  // Filtrar estados baseado na pesquisa
+  // Estados: acento-insensitive
   useEffect(() => {
-    const filtrados = estados.filter(est => 
-      est.descricao.toLowerCase().includes(searchEstado.toLowerCase())
+    const q = norm(searchEstado);
+    setEstadosFiltrados(
+      q ? estados.filter(est => norm(est.descricao).includes(q)) : estados
     );
-    setEstadosFiltrados(filtrados);
   }, [estados, searchEstado]);
 
   // COMENTADO: Este useEffect estava causando filtragem automática indesejada
@@ -150,69 +162,97 @@ const UserForm: React.FC = () => {
 
   const loadDropdownData = async () => {
     try {
-      const [estabelecimentosData, estadosData] = await Promise.all([
-        usuarioGestaoService.getEstabelecimentos(),
-        usuarioGestaoService.getEstados(),
-      ]);
+      console.log('🚀 Carregando dados com hierarquia otimizada...');
+      
+      // Tentar usar o método otimizado primeiro
+      try {
+        const hierarquia = await usuarioGestaoService.getHierarquiaCompleta();
+        
+        console.log('✅ Hierarquia completa carregada:', {
+          estados: hierarquia.estados.length,
+          municipios: hierarquia.municipios.length,
+          estabelecimentos: hierarquia.estabelecimentos.length
+        });
+        
+        // Converter estabelecimentos para o formato correto
+        const estabelecimentosFormatados: EstabelecimentoOption[] = hierarquia.estabelecimentos.map(est => ({
+          id: est.id,
+          nome: est.nome,
+          cnes: est.cnes
+        }));
+        
+        // Converter municípios para incluir estadoId
+        const municipiosFormatados = hierarquia.municipios.map(mun => ({
+          id: mun.id,
+          descricao: mun.descricao,
+          estadoId: mun.estadoId
+        }));
+        
+        setEstabelecimentos(estabelecimentosFormatados);
+        setEstados(hierarquia.estados);
+        setMunicipios(municipiosFormatados);
 
-      setEstabelecimentos(estabelecimentosData);
-      setMunicipios([]); // Não carregar todos os municípios - serão carregados por estado
-      setEstados(estadosData);
+        // Base inicial = tudo
+        setEstabelecimentosFiltrados(estabelecimentosFormatados);
+        setEstadosFiltrados(hierarquia.estados);
+        setMunicipiosDisponiveis(municipiosFormatados);
+        setMunicipiosFiltrados(municipiosFormatados);
+        
+        console.log('✅ Dados carregados com relacionamentos mapeados!');
+        return;
+        
+      } catch (hierarquiaError) {
+        console.warn('⚠️ Método otimizado não disponível, usando método tradicional...');
+        
+        // Fallback para o método tradicional
+        const [estabelecimentosData, estadosData, municipiosDataRaw] = await Promise.all([
+          usuarioGestaoService.getEstabelecimentos(),
+          usuarioGestaoService.getEstados(),
+          usuarioGestaoService.getMunicipios(),
+        ]);
 
-      // Inicializar arrays filtrados
-      setEstabelecimentosFiltrados(estabelecimentosData);
-      setMunicipiosFiltrados([]); // Lista vazia - será preenchida quando um estado for selecionado
-      setEstadosFiltrados(estadosData);
+        // Converter para o formato esperado (sem relacionamentos)
+        const municipiosData = municipiosDataRaw.map((m) => ({ ...m }));
+
+        setEstabelecimentos(estabelecimentosData);
+        setEstados(estadosData);
+        setMunicipios(municipiosData);
+
+        // Base inicial = tudo
+        setEstabelecimentosFiltrados(estabelecimentosData);
+        setEstadosFiltrados(estadosData);
+        setMunicipiosDisponiveis(municipiosData);
+        setMunicipiosFiltrados(municipiosData);
+        
+        console.log('✅ Dados carregados via método tradicional');
+      }
+      
     } catch (error) {
-      console.error('Erro ao carregar opções:', error);
+      console.error('❌ Erro ao carregar opções:', error);
     }
   };
 
   // Função para buscar município e estado baseado no estabelecimento
   const handleEstabelecimentoChange = async (estabelecimentoId: number) => {
     try {
-      console.log('🔧 handleEstabelecimentoChange chamado com estabelecimentoId:', estabelecimentoId);
-      console.log('🔧 Tipo do estabelecimentoId:', typeof estabelecimentoId);
-      
-      // Buscar o estabelecimento completo com suas relações
-      const response = await fetch(`/api/estabelecimentos/${estabelecimentoId}`, {
-        credentials: 'include',
+      const response = await fetch(`/api/estabelecimentos/${estabelecimentoId}`, { 
+        credentials: 'include' 
       });
-      
-      console.log('🔧 Response status:', response.status);
       
       if (response.ok) {
         const estabelecimento = await response.json();
-        console.log('🔧 Estabelecimento retornado pela API:', estabelecimento);
-        
-        // Atualizar os campos automaticamente
-        const newFormData = {
-          ...formData,
-          estabelecimentoId,
-          municipioId: estabelecimento.tipo_municipio?.idtipo_municipio || undefined,
-          estadoId: estabelecimento.tipo_municipio?.tipo_estado?.idtipo_estado || undefined
-        };
-        
-        console.log('🔧 Atualizando formData para:', newFormData);
-        setFormData(newFormData);
 
-        // NÃO FILTRAR as opções - apenas preencher os campos automaticamente
-        // O usuário deve poder alterar município/estado se desejar
-        // if (estabelecimento.tipo_municipio) {
-        //   const municipioFormatado = {
-        //     id: estabelecimento.tipo_municipio.idtipo_municipio,
-        //     descricao: estabelecimento.tipo_municipio.descricao
-        //   };
-        //   setMunicipiosFiltrados([municipioFormatado]);
-        //   
-        //   if (estabelecimento.tipo_municipio.tipo_estado) {
-        //     const estadoFormatado = {
-        //       id: estabelecimento.tipo_municipio.tipo_estado.idtipo_estado,
-        //       descricao: estabelecimento.tipo_municipio.tipo_estado.descricao
-        //     };
-        //     setEstadosFiltrados([estadoFormatado]);
-        //   }
-        // }
+        const municipioId = estabelecimento.tipo_municipio?.idtipo_municipio || undefined;
+        const estadoId = estabelecimento.tipo_municipio?.tipo_estado?.idtipo_estado || undefined;
+
+        setFormData(prev => ({ ...prev, estabelecimentoId, municipioId, estadoId }));
+
+        // Atualiza as listas derivadas (se já temos municípios carregados)
+        if (estadoId) {
+          const mDisp = municipios.filter(m => (m as any).estadoId === estadoId);
+          setMunicipiosDisponiveis(mDisp);
+          setMunicipiosFiltrados(mDisp);
+        }
       }
     } catch (error) {
       console.error('Erro ao buscar dados do estabelecimento:', error);
@@ -222,121 +262,111 @@ const UserForm: React.FC = () => {
   // Função para buscar estabelecimentos baseado no município
   const handleMunicipioChange = async (municipioId: number) => {
     try {
-      // Buscar dados do município para pegar o estado
-      const municipioResponse = await fetch(`/api/municipios/${municipioId}`, {
-        credentials: 'include',
-      });
-      
-      if (municipioResponse.ok) {
-        const municipio = await municipioResponse.json();
-        
-        setFormData(prev => ({
-          ...prev,
-          municipioId,
-          estadoId: municipio.tipo_estado?.idtipo_estado || undefined,
-          // Não limpar estabelecimento automaticamente - deixar o usuário decidir
-        }));
-
-        // Não filtrar estados - manter todos os estados disponíveis para seleção livre
-        // setEstadosFiltrados([estadoFormatado]); // Comentado para permitir seleção livre
+      // 1) Tenta resolver o estado em memória
+      const munLocal = municipios.find(m => m.id === municipioId);
+      if (munLocal && (munLocal as any).estadoId) {
+        setFormData(prev => ({ ...prev, municipioId, estadoId: (munLocal as any).estadoId }));
+      } else {
+        // 2) Fallback: buscar no backend
+        const municipioResponse = await fetch(`/api/municipios/${municipioId}`, { 
+          credentials: 'include' 
+        });
+        if (municipioResponse.ok) {
+          const municipio = await municipioResponse.json();
+          setFormData(prev => ({
+            ...prev,
+            municipioId,
+            estadoId: municipio.tipo_estado?.idtipo_estado || undefined,
+          }));
+        }
       }
 
-      // Buscar estabelecimentos do município (pode retornar array vazio se não houver)
+      // 3) Unidades do município — mantém sua lógica de backend (caso não tenhamos mapeamento local)
       try {
-        const response = await fetch(`/api/estabelecimentos/municipio/${municipioId}`, {
-          credentials: 'include',
+        const response = await fetch(`/api/estabelecimentos/municipio/${municipioId}`, { 
+          credentials: 'include' 
         });
-        
         if (response.ok) {
           const estabelecimentosDoMunicipio = await response.json();
-          // Formatar os estabelecimentos para o padrão esperado
-          const estabelecimentosFormatados = estabelecimentosDoMunicipio.map((est: any) => ({
+          const estabelecimentosFormatados: EstabelecimentoOption[] = estabelecimentosDoMunicipio.map((est: any) => ({
             id: est.idestabelecimento,
-            nome: est.nome
+            nome: est.nome,
+            cnes: est.cnes || undefined
           }));
           setEstabelecimentosFiltrados(estabelecimentosFormatados);
         } else {
-          // Se não houver estabelecimentos, mostrar lista vazia
           setEstabelecimentosFiltrados([]);
         }
-      } catch (estabelecimentoError) {
-        console.log('Nenhum estabelecimento encontrado para este município - lista vazia');
+      } catch {
         setEstabelecimentosFiltrados([]);
       }
-      
     } catch (error) {
       console.error('Erro ao buscar dados do município:', error);
-      // Em caso de erro, não alterar as listas filtradas
     }
   };
 
   // Função para buscar municípios e estabelecimentos baseado no estado
   const handleEstadoChange = async (estadoId: number) => {
     try {
-      setFormData(prev => ({
-        ...prev,
-        estadoId,
-        // Não limpar município e estabelecimento automaticamente - deixar o usuário decidir
-      }));
+      setFormData(prev => ({ ...prev, estadoId }));
 
-      // Buscar municípios do estado (pode retornar array vazio se não houver)
-      try {
-        const municipiosResponse = await fetch(`/api/municipios/estado/${estadoId}`, {
-          credentials: 'include',
-        });
-        
-        if (municipiosResponse.ok) {
-          const municipiosDoEstado = await municipiosResponse.json();
-          // Formatar os municípios para o padrão esperado
-          const municipiosFormatados = municipiosDoEstado.map((mun: any) => ({
-            id: mun.id,
-            descricao: mun.descricao
-          }));
-          setMunicipiosDisponiveis(municipiosFormatados); // Atualizar base para busca
-          setMunicipiosFiltrados(municipiosFormatados);    // Atualizar lista exibida
-        } else {
-          // Se não houver municípios, mostrar lista vazia
+      // 1) Municípios: tenta filtrar em memória (se tivermos estadoId mapeado)
+      const temEstadoMapeado = municipios.some(m => (m as any).estadoId != null);
+      if (temEstadoMapeado) {
+        const mDoEstado = municipios.filter(m => (m as any).estadoId === estadoId);
+        setMunicipiosDisponiveis(mDoEstado);
+        setMunicipiosFiltrados(mDoEstado);
+      } else {
+        // 2) Fallback para seu endpoint
+        try {
+          const municipiosResponse = await fetch(`/api/municipios/estado/${estadoId}`, { 
+            credentials: 'include' 
+          });
+          if (municipiosResponse.ok) {
+            const municipiosDoEstado = await municipiosResponse.json();
+            const municipiosFormatados = municipiosDoEstado.map((mun: any) => ({
+              id: mun.id || mun.idtipo_municipio,
+              descricao: mun.descricao
+            }));
+            setMunicipiosDisponiveis(municipiosFormatados);
+            setMunicipiosFiltrados(municipiosFormatados);
+          } else {
+            setMunicipiosDisponiveis([]);
+            setMunicipiosFiltrados([]);
+          }
+        } catch {
           setMunicipiosDisponiveis([]);
           setMunicipiosFiltrados([]);
         }
-      } catch (municipioError) {
-        console.log('Nenhum município encontrado para este estado - lista vazia');
-        setMunicipiosDisponiveis([]);
-        setMunicipiosFiltrados([]);
       }
 
-      // Buscar estabelecimentos do estado (pode retornar array vazio se não houver)
+      // 3) Estabelecimentos do estado (mantém seu backend)
       try {
-        const estabelecimentosResponse = await fetch(`/api/estabelecimentos/estado/${estadoId}`, {
-          credentials: 'include',
+        const estabelecimentosResponse = await fetch(`/api/estabelecimentos/estado/${estadoId}`, { 
+          credentials: 'include' 
         });
-        
         if (estabelecimentosResponse.ok) {
           const estabelecimentosDoEstado = await estabelecimentosResponse.json();
-          // Formatar os estabelecimentos para o padrão esperado
-          const estabelecimentosFormatados = estabelecimentosDoEstado.map((est: any) => ({
+          const estabelecimentosFormatados: EstabelecimentoOption[] = estabelecimentosDoEstado.map((est: any) => ({
             id: est.idestabelecimento,
-            nome: est.nome
+            nome: est.nome,
+            cnes: est.cnes || undefined
           }));
           setEstabelecimentosFiltrados(estabelecimentosFormatados);
         } else {
-          // Se não houver estabelecimentos, mostrar lista vazia
           setEstabelecimentosFiltrados([]);
         }
-      } catch (estabelecimentoError) {
-        console.log('Nenhum estabelecimento encontrado para este estado - lista vazia');
+      } catch {
         setEstabelecimentosFiltrados([]);
       }
-
     } catch (error) {
       console.error('Erro ao buscar dados do estado:', error);
-      // Em caso de erro, não alterar as listas filtradas
     }
   };
 
-  // Função para resetar filtros
   const resetFiltros = () => {
     setEstabelecimentosFiltrados(estabelecimentos);
+    setMunicipiosDisponiveis(municipios);
     setMunicipiosFiltrados(municipios);
     setEstadosFiltrados(estados);
   };
@@ -435,15 +465,21 @@ const UserForm: React.FC = () => {
               // Buscar detalhes completos do estabelecimento para obter município e estado
               const estabelecimentoCompleto = await usuarioGestaoService.getEstabelecimentoComHierarquia(acessosData.estabelecimento_id);
               
-              if (estabelecimentoCompleto && estabelecimentoCompleto.idmunicipio) {
-                console.log('📍 Município encontrado:', estabelecimentoCompleto.idmunicipio);
-                formDataUpdate.municipioId = estabelecimentoCompleto.idmunicipio;
-                
-                // Buscar estado do município
-                if (estabelecimentoCompleto.idestado) {
-                  console.log('🗺️ Estado encontrado:', estabelecimentoCompleto.idestado);
-                  formDataUpdate.estadoId = estabelecimentoCompleto.idestado;
-                }
+              // Usar as relações do Prisma ou os campos formatados do controller
+              if (estabelecimentoCompleto?.tipo_municipio_idtipo_municipio) {
+                console.log('📍 Município encontrado (Prisma):', estabelecimentoCompleto.tipo_municipio_idtipo_municipio);
+                formDataUpdate.municipioId = estabelecimentoCompleto.tipo_municipio_idtipo_municipio;
+              } else if (estabelecimentoCompleto?.municipio?.id) {
+                console.log('📍 Município encontrado (formatado):', estabelecimentoCompleto.municipio.id);
+                formDataUpdate.municipioId = estabelecimentoCompleto.municipio.id;
+              }
+              
+              if (estabelecimentoCompleto?.tipo_municipio?.tipo_estado?.idtipo_estado) {
+                console.log('🗺️ Estado encontrado (Prisma):', estabelecimentoCompleto.tipo_municipio.tipo_estado.idtipo_estado);
+                formDataUpdate.estadoId = estabelecimentoCompleto.tipo_municipio.tipo_estado.idtipo_estado;
+              } else if (estabelecimentoCompleto?.municipio?.estado?.id) {
+                console.log('🗺️ Estado encontrado (formatado):', estabelecimentoCompleto.municipio.estado.id);
+                formDataUpdate.estadoId = estabelecimentoCompleto.municipio.estado.id;
               }
             } catch (estabError) {
               console.warn('⚠️ Erro ao buscar dados geográficos do estabelecimento:', estabError);
@@ -652,7 +688,8 @@ const UserForm: React.FC = () => {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              password: formData.password,
+              type: 'password',
+              value: formData.password,
               temporary: formData.temporaryPassword,
             }),
           });
