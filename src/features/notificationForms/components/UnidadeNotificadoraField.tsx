@@ -33,6 +33,14 @@ interface UnidadeNotificadoraFieldProps {
   specificEstablishments?: string[]; // Nova prop para filtrar estabelecimentos específicos
   hasError?: boolean; // Nova prop para indicar erro
   errorMessage?: string; // Nova prop para mensagem de erro personalizada
+  /** IDs permitidos (municipal/unidade). Se informado + restrictToAllowed=true, só estes podem ser selecionados */
+  allowedEstablishmentIds?: number[];
+  /** Caso você já tenha a lista completa permitida, passe-a e o componente NÃO chamará a API */
+  allowedOptions?: Array<{ idestabelecimento: number; nome: string; cidade?: string; bairro?: string; cnes?: string }>;
+  /** Se true, bloqueia escolha fora dos permitidos (default: false) */
+  restrictToAllowed?: boolean;
+  /** Mensagem de erro quando tentar escolher unidade fora do permitido */
+  denyOutsideMessage?: string;
 }
 
 const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
@@ -46,7 +54,11 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   hasError = false, // Valor padrão
   errorMessage = isForEncaminhamento ? 
     "O local de encaminhamento é obrigatório" : 
-    "O campo estabelecimento é obrigatório" // Mensagem padrão
+    "O campo estabelecimento é obrigatório", // Mensagem padrão
+  allowedEstablishmentIds,
+  allowedOptions,
+  restrictToAllowed = false,
+  denyOutsideMessage = "Unidade não permitida para o seu perfil",
 }) => {
   const [unidadesNotificadoras, setUnidadesNotificadoras] = useState<Estabelecimento[]>([]);
   const [loadingUnidades, setLoadingUnidades] = useState(false);
@@ -67,6 +79,26 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   const estabelecimentosCache = useRef<Record<string, Estabelecimento[]>>({});
   // Track if initial load happened
   const initialLoadDone = useRef<boolean>(false);
+  
+  // 🔤 Normalizador para busca acento/case-insensitive
+  const norm = (s?: string) =>
+    (s || "")
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .toLowerCase();
+  
+  // 🔒 Helper para saber se uma unidade é permitida
+  const isAllowed = (id: number) => {
+    if (!restrictToAllowed) return true;
+    // allowedOptions tem precedência (caso você mande a lista completa)
+    if (allowedOptions?.length) {
+      return allowedOptions.some(o => o.idestabelecimento === id);
+    }
+    if (allowedEstablishmentIds?.length) {
+      return allowedEstablishmentIds.includes(id);
+    }
+    return true; // se nada foi passado, não restringe
+  };
   
   // Função para lidar com erros de CORS ou conectividade
   const handleApiError = (error: any) => {
@@ -93,16 +125,26 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
       setLoadingUnidades(true);
       setErrorUnidades(null);
       
-      // Exigir sempre 3+ caracteres para pesquisar - modificação principal
+      // Sempre exigir 3+ chars pra abrir resultados
       if (searchTerm.length < 3) {
-        if (searchTerm.length > 0) {
-          setErrorUnidades("Digite pelo menos 3 caracteres para pesquisar");
-        } else {
-          setErrorUnidades("Digite pelo menos 3 caracteres para ver as unidades");
-        }
-        
-        // Limpar os resultados se não tiver caracteres suficientes
         setUnidadesNotificadoras([]);
+        setLoadingUnidades(false);
+        setErrorUnidades(searchTerm.length > 0
+          ? "Digite pelo menos 3 caracteres para pesquisar"
+          : "Digite pelo menos 3 caracteres para ver as unidades");
+        return;
+      }
+
+      // 👉 Se vieram opções permitidas completas, filtra localmente e sai
+      if (allowedOptions && allowedOptions.length) {
+        const q = norm(searchTerm);
+        const onlyDigits = searchTerm.replace(/\D/g, "");
+        const filtradas = allowedOptions.filter(est => {
+          const byName = norm(est.nome).includes(q);
+          const byCnes = onlyDigits ? (est.cnes || "").includes(onlyDigits) : false;
+          return q ? (byName || byCnes) : true;
+        });
+        setUnidadesNotificadoras(filtradas);
         setLoadingUnidades(false);
         return;
       }
@@ -272,6 +314,18 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
         console.log(`Filtered to ${estabelecimentosAtivos.length} specific establishments: ${specificEstablishments.join(', ')}`);
       }
       
+      // 🔒 Se for pra restringir, filtre pelos IDs permitidos
+      if (restrictToAllowed && (allowedEstablishmentIds?.length || allowedOptions?.length)) {
+        const allowedIds = new Set(
+          allowedOptions?.map(o => o.idestabelecimento) ??
+          allowedEstablishmentIds!
+        );
+        estabelecimentosAtivos = estabelecimentosAtivos.filter(est =>
+          allowedIds.has(est.idestabelecimento)
+        );
+        console.log(`Restricted to ${estabelecimentosAtivos.length} allowed establishments`);
+      }
+      
       setUnidadesNotificadoras(estabelecimentosAtivos);
       console.log(`Encontrados ${estabelecimentosAtivos.length} estabelecimentos ativos`);
       
@@ -297,6 +351,11 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
       const cached: any[] = (await indexedDBService.getOpcoes("estabelecimentos")) || [];
       const found = cached.find(item => String(item.idestabelecimento) === id);
       if (found) {
+        // 1.7. Garanta o valor inicial permitido
+        if (restrictToAllowed && !isAllowed(found.idestabelecimento)) {
+          console.warn(`Estabelecimento ${found.nome} (ID: ${id}) não está na lista permitida.`);
+          return;
+        }
         setSelectedEstabelecimento(found);
         setDisplayValue(found.nome);
         return;
@@ -313,6 +372,13 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
       const response = await axios.get(apiUrl);
       
       if (response.data && response.data.idestabelecimento) {
+        // 1.7. Garanta o valor inicial permitido
+        if (restrictToAllowed && !isAllowed(response.data.idestabelecimento)) {
+          console.warn(`Estabelecimento ${response.data.nome} (ID: ${id}) não está na lista permitida.`);
+          setSelectedEstabelecimento(null);
+          setDisplayValue("");
+          return;
+        }
         setSelectedEstabelecimento(response.data);
         setDisplayValue(response.data.nome);
         console.log(`Estabelecimento encontrado: ${response.data.nome} (ID: ${response.data.idestabelecimento})`);
@@ -518,6 +584,12 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   };
 
   const handleEstabelecimentoSelect = (estabelecimento: Estabelecimento) => {
+    // 1.6. Bloqueie seleção fora do permitido
+    if (restrictToAllowed && !isAllowed(estabelecimento.idestabelecimento)) {
+      alert(denyOutsideMessage);
+      return;
+    }
+    
     // Definir valor local e notificar imediatamente
     setDisplayValue(estabelecimento.nome);
     onChange(estabelecimento.idestabelecimento.toString());

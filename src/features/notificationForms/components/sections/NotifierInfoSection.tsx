@@ -131,8 +131,22 @@ const NotifierInfoSection: React.FC<FormSectionProps> = ({
                         ? "Buscar unidades do seu município..."
                         : "Buscar unidades do Pará..."
                 }
-                specificEstablishments={
-                  unidadesPermitidas.length > 0 ? unidadesPermitidas.map(u => u.nome) : undefined
+                /** 🔒 Chave para travar por ID - componente filtra tudo localmente */
+                restrictToAllowed={true}
+                allowedOptions={unidadesPermitidas.map(u => ({
+                  idestabelecimento: u.id,
+                  nome: u.nome,
+                  // Se você tiver mais campos disponíveis, inclua aqui:
+                  // cnes: u.cnes,
+                  // cidade: u.cidade,
+                  // bairro: u.bairro,
+                }))}
+                denyOutsideMessage={
+                  permissions.nivel === 'unidade' 
+                    ? "Você só pode selecionar sua própria unidade"
+                    : permissions.nivel === 'municipio'
+                      ? "Você só pode selecionar unidades do seu município"
+                      : "Você só pode selecionar unidades do Estado do Pará"
                 }
                 hasError={!!errors.unidadeNotificadora}
                 className={`${errors.unidadeNotificadora ? "border-red-500 bg-red-50" : ""}`}
@@ -149,12 +163,12 @@ const NotifierInfoSection: React.FC<FormSectionProps> = ({
               )}
               {permissions.nivel === 'municipio' && (
                 <p className="mt-1 text-xs text-green-600">
-                  ℹ️ Você pode escolher qualquer unidade do seu município
+                  ℹ️ Você pode escolher qualquer unidade do seu município ({unidadesPermitidas.length} unidades disponíveis)
                 </p>
               )}
               {permissions.nivel === 'estado' && (
                 <p className="mt-1 text-xs text-purple-600">
-                  ℹ️ Você pode escolher qualquer unidade do Estado do Pará
+                  ℹ️ Você pode escolher qualquer unidade do Estado do Pará ({unidadesPermitidas.length} unidades disponíveis)
                 </p>
               )}
             </div>

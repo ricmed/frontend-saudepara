@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/i18n/useTranslations';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { Header } from '@/features/desktop/components/Header';
+import { AdminHeader } from './components/AdminHeader';
 import Footer from '@/features/desktop/components/Footer';
 import { SideMenu } from '@/features/home/components/SideMenu';
 import { 
@@ -266,9 +266,8 @@ const UsersList: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       {/* Cabeçalho */}
-      <Header 
+      <AdminHeader 
         onMenuToggle={() => setIsMenuOpen(!isMenuOpen)} 
-        isMobile={false}
         selectedLanguage={selectedLanguage}
       />
 

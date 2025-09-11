@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from '@/i18n/useTranslations';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { Header } from '@/features/desktop/components/Header';
+import { AdminHeader } from './components/AdminHeader';
 import Footer from '@/features/desktop/components/Footer';
 import { SideMenu } from '@/features/home/components/SideMenu';
 import { 
@@ -923,9 +923,8 @@ const UserForm: React.FC = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col bg-gray-50">
-        <Header 
+        <AdminHeader 
           onMenuToggle={() => setIsMenuOpen(!isMenuOpen)} 
-          isMobile={false}
           selectedLanguage={selectedLanguage}
         />
         <main className="flex-1 flex items-center justify-center">
@@ -942,9 +941,8 @@ const UserForm: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       {/* Cabeçalho */}
-      <Header 
+      <AdminHeader 
         onMenuToggle={() => setIsMenuOpen(!isMenuOpen)} 
-        isMobile={false}
         selectedLanguage={selectedLanguage}
       />
 

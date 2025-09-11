@@ -2,15 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/keycloak/AuthProvider';
 import { useTranslation } from '@/i18n/useTranslations';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { Header } from '@/features/desktop/components/Header';
+import { AdminHeader } from './components/AdminHeader';
 import Footer from '@/features/desktop/components/Footer';
 import { SideMenu } from '@/features/home/components/SideMenu';
 import { 
   Users, 
   UserPlus, 
   Shield, 
-  BarChart3, 
-  Activity,
   UserCheck,
   UserX,
   RefreshCw
@@ -19,8 +17,15 @@ import {
 interface AdminStats {
   totalUsers: number;
   totalRoles: number;
-  recentEvents: number;
   timestamp: string;
+}
+
+interface RecentActivity {
+  id: string;
+  type: 'userCreated' | 'roleAssigned' | 'userDisabled';
+  at: string;
+  who?: string;
+  details?: string;
 }
 
 const AdminDashboard: React.FC = () => {
@@ -29,32 +34,81 @@ const AdminDashboard: React.FC = () => {
   const { t } = useTranslation(selectedLanguage);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [stats, setStats] = useState<AdminStats | null>(null);
+  const [activity, setActivity] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Função para interpolação de strings de tradução
+  const interpolate = (s?: string, vars: Record<string, string> = {}) =>
+    (s || '').replace(/\{\{?(\w+)\}?\}/g, (_, k) => vars[k] ?? '');
+
+  // Função para formatação de tempo relativo
+  const formatRelative = (date: Date, locale = 'pt-BR') => {
+    const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+    const diff = (Date.now() - date.getTime()) / 1000;
+    const abs = Math.abs(diff);
+    if (abs < 60) return rtf.format(-Math.round(diff), 'second');
+    if (abs < 3600) return rtf.format(-Math.round(diff / 60), 'minute');
+    if (abs < 86400) return rtf.format(-Math.round(diff / 3600), 'hour');
+    return rtf.format(-Math.round(diff / 86400), 'day');
+  };
+
+  // Função para mapear dados da API
+  const mapStats = (raw: any): AdminStats => {
+    const src = raw?.data ?? raw; // suporta { data: {...} } ou direto
+    return {
+      totalUsers: Number(src?.totalUsers ?? 0),
+      totalRoles: Number(src?.totalRoles ?? 0),
+      timestamp: src?.timestamp ?? new Date().toISOString(),
+    };
+  };
 
   useEffect(() => {
     loadStats();
+    loadActivity();
+    
+    // Auto refresh a cada 30 segundos
+    const interval = setInterval(() => {
+      loadStats();
+      loadActivity();
+    }, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const loadStats = async () => {
     try {
       setLoading(true);
+      setError(null);
+      
       const response = await fetch('/api-auth/admin/stats', {
         credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Accept': 'application/json' },
       });
 
       if (!response.ok) {
-        throw new Error('Erro ao carregar estatísticas');
+        throw new Error(`${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json();
-      setStats(data);
-    } catch (error) {
-      console.error('Erro ao carregar stats:', error);
+      const json = await response.json();
+      setStats(mapStats(json));
+    } catch (e: any) {
+      console.error('Erro ao carregar stats:', e);
+      setError('Não foi possível carregar as estatísticas.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadActivity = async () => {
+    try {
+      const resp = await fetch('/api-auth/admin/recent-activity?limit=5', { 
+        credentials: 'include' 
+      });
+      if (!resp.ok) return;
+      const json = await resp.json();
+      setActivity(Array.isArray(json?.data) ? json.data : json);
+    } catch (e) {
+      console.warn('Sem atividade ou endpoint indisponível');
     }
   };
 
@@ -79,98 +133,98 @@ const AdminDashboard: React.FC = () => {
       icon: Shield,
       color: 'bg-purple-500',
       href: '/admin/roles'
-    },
-    {
-      title: t('admin.dashboard.actions.viewReports'),
-      description: t('admin.dashboard.actions.viewReportsDesc'),
-      icon: BarChart3,
-      color: 'bg-orange-500',
-      href: '/admin/reports'
     }
   ];
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      {/* Cabeçalho */}
-      <Header 
+      {/* Cabeçalho customizado para admin */}
+      <AdminHeader 
         onMenuToggle={() => setIsMenuOpen(!isMenuOpen)} 
-        isMobile={false}
         selectedLanguage={selectedLanguage}
       />
 
       {/* Conteúdo principal */}
-      <main className="flex-1 p-4 sm:p-8">
+      <main className="flex-1 px-3 sm:px-4 lg:px-8 py-4">
         <div className="max-w-7xl mx-auto">
           {/* Título da página */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              {t('admin.dashboard.title')}
-            </h1>
-            <p className="text-gray-600">
-              {t('admin.dashboard.welcome', { name: user?.name || user?.preferred_username })}
-            </p>
+          <div className="mb-6 sm:mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 truncate">
+                  {t('admin.dashboard.title')}
+                </h1>
+                <p className="text-gray-600 truncate">
+                  {interpolate(t('admin.dashboard.welcome'), { 
+                    name: user?.name || user?.preferred_username || t('common.user') || 'Usuário' 
+                  })}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  loadStats();
+                  loadActivity();
+                }}
+                className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors whitespace-nowrap"
+                disabled={loading}
+                title="Atualizar estatísticas"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Atualizar</span>
+              </button>
+            </div>
+
+            {error && (
+              <div className="mb-4 p-3 rounded bg-red-50 text-red-700 text-sm">
+                {error}
+              </div>
+            )}
           </div>
 
           {/* Cards de estatísticas */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-lg shadow p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+            <div className="bg-white rounded-lg shadow p-4 sm:p-6 min-w-0">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <Users className="h-8 w-8 text-blue-500" />
+                  <Users className="h-6 w-6 sm:h-8 sm:w-8 text-blue-500" />
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">
+                <div className="ml-3 sm:ml-4 min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm font-medium text-gray-500 truncate">
                     {t('admin.dashboard.stats.totalUsers')}
                   </p>
-                  <p className="text-2xl font-semibold text-gray-900">
+                  <p className="text-xl sm:text-2xl font-semibold text-gray-900 truncate">
                     {loading ? '...' : stats?.totalUsers || 0}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white rounded-lg shadow p-4 sm:p-6 min-w-0">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <Shield className="h-8 w-8 text-green-500" />
+                  <Shield className="h-6 w-6 sm:h-8 sm:w-8 text-green-500" />
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">
+                <div className="ml-3 sm:ml-4 min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm font-medium text-gray-500 truncate">
                     {t('admin.dashboard.stats.totalRoles')}
                   </p>
-                  <p className="text-2xl font-semibold text-gray-900">
+                  <p className="text-xl sm:text-2xl font-semibold text-gray-900 truncate">
                     {loading ? '...' : stats?.totalRoles || 0}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white rounded-lg shadow p-4 sm:p-6 min-w-0">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <Activity className="h-8 w-8 text-purple-500" />
+                  <RefreshCw className="h-6 w-6 sm:h-8 sm:w-8 text-orange-500" />
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">
-                    {t('admin.dashboard.stats.recentEvents')}
-                  </p>
-                  <p className="text-2xl font-semibold text-gray-900">
-                    {loading ? '...' : stats?.recentEvents || 0}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <RefreshCw className="h-8 w-8 text-orange-500" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">
+                <div className="ml-3 sm:ml-4 min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm font-medium text-gray-500 truncate">
                     {t('admin.dashboard.stats.lastUpdate')}
                   </p>
-                  <p className="text-sm font-semibold text-gray-900">
+                  <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">
                     {loading ? '...' : stats?.timestamp ? 
                       new Date(stats.timestamp).toLocaleString(selectedLanguage) : 
                       t('admin.dashboard.stats.never')
@@ -182,26 +236,30 @@ const AdminDashboard: React.FC = () => {
           </div>
 
           {/* Ações rápidas */}
-          <div className="mb-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">
+          <div className="mb-6 sm:mb-8">
+            <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4 truncate">
               {t('admin.dashboard.quickActions')}
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {quickActions.map((action, index) => (
                 <a
                   key={index}
                   href={action.href}
-                  className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 group"
+                  className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-4 sm:p-6 group min-w-0"
                 >
-                  <div className="flex items-center mb-4">
-                    <div className={`${action.color} rounded-lg p-3 group-hover:scale-110 transition-transform`}>
-                      <action.icon className="h-6 w-6 text-white" />
+                  <div className="flex items-center mb-3 sm:mb-4">
+                    <div className={`${action.color} rounded-lg p-2 sm:p-3 group-hover:scale-110 transition-transform flex-shrink-0`}>
+                      <action.icon className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                     </div>
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2 truncate">
                     {action.title}
                   </h3>
-                  <p className="text-gray-600 text-sm">
+                  <p className="text-gray-600 text-xs sm:text-sm overflow-hidden text-ellipsis" style={{
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                  }}>
                     {action.description}
                   </p>
                 </a>
@@ -211,44 +269,32 @@ const AdminDashboard: React.FC = () => {
 
           {/* Seção de atividades recentes */}
           <div className="bg-white rounded-lg shadow">
-            <div className="p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+            <div className="p-4 sm:p-6">
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4 truncate">
                 {t('admin.dashboard.recentActivity')}
               </h2>
-              <div className="space-y-4">
-                <div className="flex items-center p-4 bg-gray-50 rounded-lg">
-                  <UserCheck className="h-5 w-5 text-green-500 mr-3" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {t('admin.dashboard.activity.userCreated')}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {t('admin.dashboard.activity.timeAgo', { time: '2 horas' })}
-                    </p>
+              <div className="space-y-3 sm:space-y-4">
+                {activity.length === 0 && (
+                  <div className="p-3 sm:p-4 bg-gray-50 rounded-lg text-xs sm:text-sm text-gray-500">
+                    Sem atividades recentes.
                   </div>
-                </div>
-                <div className="flex items-center p-4 bg-gray-50 rounded-lg">
-                  <Shield className="h-5 w-5 text-blue-500 mr-3" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {t('admin.dashboard.activity.roleAssigned')}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {t('admin.dashboard.activity.timeAgo', { time: '4 horas' })}
-                    </p>
+                )}
+                {activity.map(a => (
+                  <div key={a.id} className="flex items-center p-3 sm:p-4 bg-gray-50 rounded-lg min-w-0">
+                    {a.type === 'userCreated' && <UserCheck className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 mr-2 sm:mr-3 flex-shrink-0" />}
+                    {a.type === 'roleAssigned' && <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 mr-2 sm:mr-3 flex-shrink-0" />}
+                    {a.type === 'userDisabled' && <UserX className="h-4 w-4 sm:h-5 sm:w-5 text-red-500 mr-2 sm:mr-3 flex-shrink-0" />}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">
+                        {t(`admin.dashboard.activity.${a.type}`)}
+                        {a.who && <span className="text-gray-600"> - {a.who}</span>}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {formatRelative(new Date(a.at), selectedLanguage || 'pt-BR')}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center p-4 bg-gray-50 rounded-lg">
-                  <UserX className="h-5 w-5 text-red-500 mr-3" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {t('admin.dashboard.activity.userDisabled')}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {t('admin.dashboard.activity.timeAgo', { time: '1 dia' })}
-                    </p>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           </div>
@@ -262,8 +308,6 @@ const AdminDashboard: React.FC = () => {
       <SideMenu
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
-        selectedLanguage={selectedLanguage}
-        onLanguageChange={() => {}}
       />
     </div>
   );
