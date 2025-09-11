@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '@/i18n/useTranslations';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { AdminHeader } from './components/AdminHeader';
@@ -14,7 +15,8 @@ import {
   AlertCircle,
   Check,
   X,
-  MoreVertical
+  MoreVertical,
+  ArrowLeft
 } from 'lucide-react';
 import { useRoles, useUsers } from '@/keycloak/admin/hooks/useAdminApi';
 import type { Role, Notification } from  './types/admin.types';
@@ -25,6 +27,7 @@ interface RoleFormData {
 }
 
 const RolesManagement: React.FC = () => {
+  const navigate = useNavigate();
   const { selectedLanguage } = useLanguage();
   const { t } = useTranslation(selectedLanguage);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -116,7 +119,7 @@ const RolesManagement: React.FC = () => {
     }
 
     try {
-      // Nota: Implementar endpoint de delete se necessário
+      await rolesApi.deleteRole(role.name);
       showNotification(t('admin.roles.deleteSuccess'), 'success');
       loadRoles();
     } catch (error) {
@@ -142,7 +145,7 @@ const RolesManagement: React.FC = () => {
 
       if (editingRole) {
         // Atualizar role existente
-        // Nota: Implementar endpoint de update se necessário
+        await rolesApi.updateRole(editingRole.name, roleData);
         showNotification(t('admin.roles.updateSuccess'), 'success');
       } else {
         // Criar nova role
@@ -197,13 +200,22 @@ const RolesManagement: React.FC = () => {
         <div className="max-w-7xl mx-auto">
           {/* Título e ações */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                {t('admin.roles.title')}
-              </h1>
-              <p className="text-gray-600">
-                {t('admin.roles.subtitle')}
-              </p>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate('/admin')}
+                className="flex items-center px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                title="Voltar ao Painel Administrativo"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                  {t('admin.roles.title')}
+                </h1>
+                <p className="text-gray-600">
+                  {t('admin.roles.subtitle')}
+                </p>
+              </div>
             </div>
             <div className="flex gap-3 mt-4 sm:mt-0">
               <button

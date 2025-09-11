@@ -195,6 +195,21 @@ export const useRoles = () => {
     });
   }, [api]);
 
+  const updateRole = useCallback((roleName: string, roleData: any) => {
+    return api.execute({
+      endpoint: `/roles/${roleName}`,
+      method: 'PUT',
+      body: JSON.stringify(roleData),
+    });
+  }, [api]);
+
+  const deleteRole = useCallback((roleName: string) => {
+    return api.execute({
+      endpoint: `/roles/${roleName}`,
+      method: 'DELETE',
+    });
+  }, [api]);
+
   const getUserRoles = useCallback((userId: string) => {
     return api.execute({
       endpoint: `/users/${userId}/roles`,
@@ -222,6 +237,8 @@ export const useRoles = () => {
     ...api,
     listRoles,
     createRole,
+    updateRole,
+    deleteRole,
     getUserRoles,
     addUserRoles,
     removeUserRoles,
