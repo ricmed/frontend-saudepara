@@ -364,13 +364,6 @@ const UserForm: React.FC = () => {
     }
   };
 
-  const resetFiltros = () => {
-    setEstabelecimentosFiltrados(estabelecimentos);
-    setMunicipiosDisponiveis(municipios);
-    setMunicipiosFiltrados(municipios);
-    setEstadosFiltrados(estados);
-  };
-
   const loadRoles = async () => {
     try {
       console.log('🔑 Carregando roles do Keycloak...');
@@ -1209,8 +1202,6 @@ const UserForm: React.FC = () => {
                         municipioId: undefined,
                         estadoId: undefined
                       }));
-                      // Resetar filtros para mostrar todas as opções
-                      resetFiltros();
                     }}
                     className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                       errors.nivelAcesso ? 'border-red-500' : 'border-gray-300'
@@ -1279,7 +1270,6 @@ const UserForm: React.FC = () => {
                           } else {
                             console.log('🔧 Resetando estabelecimento para undefined');
                             setFormData(prev => ({ ...prev, estabelecimentoId: undefined }));
-                            resetFiltros();
                           }
                         }}
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
@@ -1375,8 +1365,7 @@ const UserForm: React.FC = () => {
                         if (value) {
                           handleEstadoChange(value);
                         } else {
-                          // Se desmarcou o estado, resetar para mostrar todos
-                          resetFiltros();
+                          // Se desmarcou o estado, não fazer nada especial
                         }
                       }}
                       className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
@@ -1397,25 +1386,6 @@ const UserForm: React.FC = () => {
                       <p className="text-sm text-gray-500">Nenhum estado encontrado</p>
                     )}
                   </div>
-                </div>
-              </div>
-
-              {/* Botão para resetar filtros e mostrar todas as opções */}
-              <div className="bg-blue-50 rounded-lg border border-blue-200 p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-medium text-blue-900">Opções Filtradas</h3>
-                    <p className="text-sm text-blue-700">
-                      Clique para ver todas as opções disponíveis (não apenas as relacionadas)
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={resetFiltros}
-                    className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                  >
-                    Mostrar Todas as Opções
-                  </button>
                 </div>
               </div>
             </div>

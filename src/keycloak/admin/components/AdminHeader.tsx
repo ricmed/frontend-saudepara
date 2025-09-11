@@ -31,18 +31,18 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
             {/* Logos compactas para admin */}
             <div className="flex items-center space-x-2 sm:space-x-3">
               <img
-                src="./images/logos/Logo Topo Sespa.png"
+                src="/images/logos/Logo Topo Sespa.png"
                 alt="Secretaria de Estado de Saúde Pública do Pará"
                 className="h-8 sm:h-10 lg:h-12 w-auto"
               />
               <div className="h-6 sm:h-8 lg:h-10 w-px bg-white/20 hidden sm:block"></div>
               <img
-                src="./images/logos/Logo Topo Saude Para.png"
+                src="/images/logos/Logo Topo Saude Para.png"
                 alt="Saúde Pará"
                 className="h-7 sm:h-9 lg:h-11 w-auto"
               />
               <img
-                src="./images/logos/Logo Topo Bandeira.png"
+                src="/images/logos/Logo Topo Bandeira.png"
                 alt="Governo do Estado do Pará"
                 className="h-6 sm:h-7 lg:h-9 w-auto"
               />

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '@/i18n/useTranslations';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { AdminHeader } from './components/AdminHeader';
@@ -18,7 +19,8 @@ import {
   Filter,
   ChevronLeft,
   ChevronRight,
-  Eye
+  Eye,
+  ArrowLeft
 } from 'lucide-react';
 
 // Importar service de gestão de usuários
@@ -49,6 +51,7 @@ interface UserFilters {
 }
 
 const UsersList: React.FC = () => {
+  const navigate = useNavigate();
   const { selectedLanguage } = useLanguage();
   const { t } = useTranslation(selectedLanguage);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -276,13 +279,22 @@ const UsersList: React.FC = () => {
         <div className="max-w-7xl mx-auto">
           {/* Título e ações */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                {t('admin.users.title')}
-              </h1>
-              <p className="text-gray-600">
-                {t('admin.users.subtitle')}
-              </p>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate('/admin')}
+                className="flex items-center px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                title="Voltar ao Painel Administrativo"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                  {t('admin.users.title')}
+                </h1>
+                <p className="text-gray-600">
+                  {t('admin.users.subtitle')}
+                </p>
+              </div>
             </div>
             <div className="flex gap-3 mt-4 sm:mt-0">
               <button
