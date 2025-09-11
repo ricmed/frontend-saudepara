@@ -3,6 +3,27 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// 🔧 DETECÇÃO AUTOMÁTICA DE AMBIENTE
+const isHomologacao = process.env.NODE_ENV === 'production' && 
+                      !process.env.VITE_DEV_MODE && // Flag para forçar dev
+                      (process.env.VITE_ENV === 'homologacao' ||
+                       process.cwd().includes('homol') ||
+                       process.cwd().includes('hml'));
+
+// 🌐 URLs baseadas no ambiente
+const API_AUTH_URL = isHomologacao 
+  ? 'https://app.hml.saude.pa.gov.br/'  // Homologação: usar app.hml (não api-app.hml)
+  : 'http://localhost:4000';
+
+const API_BACKEND_URL = isHomologacao 
+  ? 'https://app-api.hml.saude.pa.gov.br/'  // Homologação: API backend
+  : 'http://localhost:3000';
+
+console.log('🚀 Configuração Vite:');
+console.log('📍 Ambiente:', isHomologacao ? 'HOMOLOGAÇÃO' : 'DESENVOLVIMENTO');
+console.log('🔐 API Auth:', API_AUTH_URL);
+console.log('⚡ API Backend:', API_BACKEND_URL);
+
 export default defineConfig({
   plugins: [
     react(),
@@ -286,33 +307,32 @@ export default defineConfig({
     host: true,
     
     proxy: {
-      // *** PROXY COM TARGETS ORIGINAIS + VARIÁVEIS ***
+      // 🔐 PROXY PARA API DE AUTENTICAÇÃO
       '/api-auth': {
-        // Para api-auth, usar localhost:4000 ou variável de ambiente
-        target: process.env.VITE_AUTH_TARGET || 'http://localhost:4000/',
+        target: API_AUTH_URL,
         changeOrigin: true,
         secure: false,
         timeout: 10000,
-        configure: (proxy, options) => {
-          proxy.on('error', (err, req, res) => {
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
             console.log('❌ Proxy error - usando fallback para produção:', (err as any).code || err.message);
           });
-          proxy.on('proxyReq', (proxyReq, req, res) => {
+          proxy.on('proxyReq', (_proxyReq, req) => {
             console.log('🔄 Request:', req.method, req.url);
           });
-          proxy.on('proxyRes', (proxyRes, req, res) => {
+          proxy.on('proxyRes', (proxyRes, req) => {
             console.log('✅ Response:', proxyRes.statusCode, req.url);
           });
         }
       },
       
+      // ⚡ PROXY PARA API BACKEND PRINCIPAL  
       '/api': {
-        // Para api geral, usar homologação ou variável de ambiente
-        target: process.env.VITE_API_TARGET || 'https://app-api.hml.saude.pa.gov.br/',
+        target: API_BACKEND_URL,
         changeOrigin: true,
         secure: false,
         timeout: 10000,
-        configure: (proxy, options) => {
+        configure: (proxy) => {
           proxy.on('error', (err) => {
             console.log('❌ API Proxy error:', (err as any).code || err.message);
           });

@@ -171,21 +171,30 @@ const UserForm: React.FC = () => {
   // Função para buscar município e estado baseado no estabelecimento
   const handleEstabelecimentoChange = async (estabelecimentoId: number) => {
     try {
+      console.log('🔧 handleEstabelecimentoChange chamado com estabelecimentoId:', estabelecimentoId);
+      console.log('🔧 Tipo do estabelecimentoId:', typeof estabelecimentoId);
+      
       // Buscar o estabelecimento completo com suas relações
       const response = await fetch(`/api/estabelecimentos/${estabelecimentoId}`, {
         credentials: 'include',
       });
       
+      console.log('🔧 Response status:', response.status);
+      
       if (response.ok) {
         const estabelecimento = await response.json();
+        console.log('🔧 Estabelecimento retornado pela API:', estabelecimento);
         
         // Atualizar os campos automaticamente
-        setFormData(prev => ({
-          ...prev,
+        const newFormData = {
+          ...formData,
           estabelecimentoId,
           municipioId: estabelecimento.tipo_municipio?.idtipo_municipio || undefined,
           estadoId: estabelecimento.tipo_municipio?.tipo_estado?.idtipo_estado || undefined
-        }));
+        };
+        
+        console.log('🔧 Atualizando formData para:', newFormData);
+        setFormData(newFormData);
 
         // NÃO FILTRAR as opções - apenas preencher os campos automaticamente
         // O usuário deve poder alterar município/estado se desejar
@@ -1226,10 +1235,14 @@ const UserForm: React.FC = () => {
                         id="estabelecimentoId"
                         value={formData.estabelecimentoId || ''}
                         onChange={(e) => {
+                          console.log('🔧 Estabelecimento selecionado - valor do select:', e.target.value);
                           const value = e.target.value ? parseInt(e.target.value) : undefined;
+                          console.log('🔧 Valor convertido para int:', value);
                           if (value) {
+                            console.log('🔧 Chamando handleEstabelecimentoChange com:', value);
                             handleEstabelecimentoChange(value);
                           } else {
+                            console.log('🔧 Resetando estabelecimento para undefined');
                             setFormData(prev => ({ ...prev, estabelecimentoId: undefined }));
                             resetFiltros();
                           }
