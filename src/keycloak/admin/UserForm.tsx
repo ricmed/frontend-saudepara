@@ -667,19 +667,19 @@ const UserForm: React.FC = () => {
     try {
       setSaving(true);
 
-      if (isEditMode) {
-        // Modo de edição - manter lógica existente
-        const userData = {
-          username: formData.username,
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
-          enabled: formData.enabled,
-          emailVerified: formData.emailVerified,
-        };
+      const userData = {
+        username: formData.username,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        enabled: formData.enabled,
+        emailVerified: formData.emailVerified,
+      };
 
+      let response;
+      if (isEditMode) {
         // Atualizar usuário
-        await fetch(`/api-auth/admin/users/${id}`, {
+        response = await fetch(`/api-auth/admin/users/${id}`, {
           method: 'PUT',
           credentials: 'include',
           headers: {
@@ -709,107 +709,77 @@ const UserForm: React.FC = () => {
         await updateUserAccess(id);
         
       } else {
-        // Modo de criação - fluxos diferentes para master e não-master
+        // Criar usuário
         console.log('🚀 Iniciando criação de usuário...');
+        response = await fetch('/api-auth/admin/users', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...userData,
+            ...(formData.password && {
+              credentials: [{
+                type: 'password',
+                value: formData.password,
+                temporary: formData.temporaryPassword,
+              }]
+            })
+          }),
+        });
+
+        // Processar resposta da criação do usuário
+        let userId;
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Erro ao criar usuário');
+        }
+
+        // Se usuário foi criado com sucesso, buscar o ID real do usuário
+        try {
+          // Primeiro, tentar obter o ID da resposta JSON
+          const responseData = await response.json();
+          userId = responseData.userId; // API retorna { userId: "...", message: "..." }
+          console.log('✅ ID obtido da resposta de criação:', userId);
+        } catch (parseError) {
+          console.warn('⚠️ Erro ao processar resposta JSON, tentando extrair do header Location:', parseError);
+          
+          // Fallback: tentar extrair do header Location (padrão Keycloak)
+          const locationHeader = response.headers.get('location');
+          if (locationHeader) {
+            userId = locationHeader.split('/').pop();
+            console.log('✅ ID extraído do header Location:', userId);
+          }
+        }
         
-        if (!isMaster) {
-          // ===============================
-          // FLUXO PARA NÃO-MASTER (SIMPLIFICADO)
-          // ===============================
-          console.log('👤 Criação via backend (não-master)');
-          
-          // Payload correto para o backend:
-          // - username, firstName, lastName, email, password, temporaryPassword
-          // - Backend cria automaticamente no escopo do admin logado
-          // - Backend retorna user_id diretamente
-          // - Não precisa criar usuario_acesso separadamente
-          const userData = {
-            username: formData.username,
-            firstName: formData.firstName,
-            lastName: formData.lastName,
-            email: formData.email,
-            password: formData.password,
-            temporaryPassword: formData.temporaryPassword,
-          };
-
-          // Chamar createUsuarioScoped - backend cria usuário no Keycloak + usuario_acesso automaticamente
-          const userId = await usuarioGestaoService.createUsuarioScoped(userData);
-          console.log('✅ Usuário criado via backend com ID:', userId);
-          console.log('✅ Backend já criou o usuario_acesso automaticamente');
-          
-        } else {
-          // ===============================
-          // FLUXO PARA MASTER (COMPLETO)
-          // ===============================
-          console.log('👑 Criação via Keycloak (master)');
-          
-          const userData = {
-            username: formData.username,
-            firstName: formData.firstName,
-            lastName: formData.lastName,
-            email: formData.email,
-            enabled: formData.enabled,
-            emailVerified: formData.emailVerified,
-          };
-
-          const response = await fetch('/api-auth/admin/users', {
-            method: 'POST',
+        // Se ainda não conseguiu obter o ID, buscar o usuário pelo username
+        if (!userId) {
+          console.log('🔍 Buscando ID do usuário criado pelo username:', formData.username);
+          const searchResponse = await fetch(`/api-auth/admin/users?username=${encodeURIComponent(formData.username)}`, {
             credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              ...userData,
-              ...(formData.password && {
-                credentials: [{
-                  type: 'password',
-                  value: formData.password,
-                  temporary: formData.temporaryPassword,
-                }]
-              })
-            }),
           });
-
-          // Processar resposta da criação do usuário
-          let userId;
-          if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Erro ao criar usuário');
-          }
-
-          // Se usuário foi criado com sucesso, buscar o ID real do usuário
-          try {
-            // Tentar obter o ID da resposta primeiro
-            const responseData = await response.json();
-            userId = responseData.id;
-            console.log('✅ ID obtido da resposta de criação:', userId);
-          } catch (parseError) {
-            console.warn('⚠️ Erro ao processar resposta de criação, buscando por username:', parseError);
-            userId = null;
-          }
           
-          // Se não conseguiu obter o ID da resposta, buscar o usuário pelo username
-          if (!userId) {
-            console.log('🔍 Buscando ID do usuário criado pelo username:', formData.username);
-            const searchResponse = await fetch(`/api-auth/admin/users?username=${encodeURIComponent(formData.username)}`, {
-              credentials: 'include',
-            });
-            
-            if (searchResponse.ok) {
-              const users = await searchResponse.json();
-              if (users && users.length > 0) {
-                userId = users[0].id;
-                console.log('✅ ID do usuário encontrado na busca:', userId);
-              }
+          if (searchResponse.ok) {
+            const users = await searchResponse.json();
+            if (users && users.length > 0) {
+              userId = users[0].id;
+              console.log('✅ ID do usuário encontrado na busca:', userId);
             }
           }
+        }
+        
+        if (!userId) {
+          throw new Error('Falha crítica: não foi possível obter ID do usuário para configurar acessos');
+        }
+
+        console.log('🆔 ID do usuário para configurar acessos:', userId);
+
+        // Para usuários master: continuar o fluxo normal de configuração de acessos
+        // Para usuários hierárquicos: o backend já criou os acessos automaticamente
+        if (isMaster) {
+          console.log('🎯 Master admin: configurando acessos manuais...');
           
-          if (!userId) {
-            throw new Error('Falha crítica: não foi possível obter ID do usuário para configurar acessos');
-          }
-
-          console.log('🆔 ID do usuário para configurar acessos:', userId);
-
           // Atribuir roles selecionadas ao usuário recém-criado
           if (userRoles.length > 0) {
             console.log('🔑 Atribuindo roles ao usuário criado:', userRoles.map(r => r.name));
@@ -866,6 +836,8 @@ const UserForm: React.FC = () => {
           } else {
             console.warn('⚠️ Nenhum acesso criado - verifique os dados do formulário');
           }
+        } else {
+          console.log('🎯 Admin hierárquico: acessos criados automaticamente pelo backend');
         }
       }
 
@@ -1209,6 +1181,34 @@ const UserForm: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Informação para usuários hierárquicos */}
+            {!isMaster && (
+              <div className="bg-blue-50 rounded-lg border border-blue-200 p-6">
+                <h2 className="text-lg font-semibold text-blue-900 mb-4 flex items-center">
+                  <Shield className="h-5 w-5 mr-2" />
+                  Configuração Automática de Acesso
+                </h2>
+                
+                <div className="text-sm text-blue-700">
+                  <p className="mb-3">
+                    <strong>🎯 Como administrador hierárquico, os acessos serão configurados automaticamente:</strong>
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 ml-4">
+                    <li>O usuário criado herdará seu escopo administrativo</li>
+                    <li>Permissões serão definidas automaticamente (Leitura + Escrita)</li>
+                    <li>Não é necessário configurar estabelecimento, município ou estado</li>
+                    <li>O sistema garantirá que o usuário tenha acesso apenas aos dados do seu escopo</li>
+                  </ul>
+                  <div className="mt-4 p-3 bg-blue-100 rounded-md">
+                    <p className="text-xs">
+                      <strong>ℹ️ Nota:</strong> Esta configuração automática garante que você só crie usuários 
+                      dentro da sua área de responsabilidade, mantendo a segurança e hierarquia do sistema.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Controle de Acesso - Apenas para Master */}
             {isMaster && (
