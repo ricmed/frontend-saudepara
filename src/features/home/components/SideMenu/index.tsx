@@ -52,11 +52,26 @@ export const SideMenu: React.FC<SideMenuProps> = ({
   const permissions = useUserPermissions();
   const [showAppsSubmenu, setShowAppsSubmenu] = useState(false);
 
-  // Função para verificar se o usuário é admin
+  // Função para verificar se o usuário é admin (qualquer nível)
   const isAdmin = () => {
     if (!user) return false;
     // Baseado no ProtectedRoute, as roles estão em user.roles
-    return user.roles?.includes('admin');
+    // Incluir todos os níveis administrativos
+    const roles = user.roles ?? [];
+    return roles.includes('admin') ||
+           roles.includes('admin.estado') ||
+           roles.includes('admin.municipio') ||
+           roles.includes('admin.unidade');
+  };
+
+  // Função específica para verificar se pode gerenciar usuários
+  const canManageUsers = () => {
+    if (!user) return false;
+    const roles = user.roles ?? [];
+    return roles.includes('admin') ||
+           roles.includes('admin.estado') ||
+           roles.includes('admin.municipio') ||
+           roles.includes('admin.unidade');
   };
 
   // List of auxiliary apps - FILTRADOS POR NÍVEL DE PERMISSÃO
@@ -221,7 +236,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       onClick: () => {},
     },
     
-    // Menu de Apps Auxiliares - apenas para admins logados
+    // Menu de Apps Auxiliares - para todos os níveis administrativos
     ...(user && isAdmin() ? [{
       icon: <Building2 />,
       label: t("menu.apps"),
@@ -247,8 +262,8 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       onClick: () => {},
     },
     
-    // Menu de Gerenciar Usuários - apenas para admins logados
-    ...(user && isAdmin() ? [{
+    // Menu de Gerenciar Usuários - para todos os níveis administrativos
+    ...(user && canManageUsers() ? [{
       icon: <UserCog />,
       label: t("menu.manage_users"),
       onClick: () => navigate("/admin"),

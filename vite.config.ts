@@ -326,6 +326,25 @@ export default defineConfig({
         }
       },
       
+      // 🔧 PROXY PARA API DE ADMINISTRAÇÃO HIERÁRQUICA
+      '/admin-scoped': {
+        target: API_BACKEND_URL,
+        changeOrigin: true,
+        secure: false,
+        timeout: 10000,
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
+            console.log('❌ Admin Proxy error:', (err as any).code || err.message);
+          });
+          proxy.on('proxyReq', (_proxyReq, req) => {
+            console.log('🔄 Admin Request:', req.method, req.url);
+          });
+          proxy.on('proxyRes', (proxyRes, req) => {
+            console.log('✅ Admin Response:', proxyRes.statusCode, req.url);
+          });
+        }
+      },
+      
       // ⚡ PROXY PARA API BACKEND PRINCIPAL  
       '/api': {
         target: API_BACKEND_URL,
