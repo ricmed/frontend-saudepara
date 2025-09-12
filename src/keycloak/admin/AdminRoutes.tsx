@@ -10,22 +10,12 @@ import PasswordReset from './PasswordReset';
 import RolesManagement from './RolesManagement';
 import AdminReports from './AdminReports';
 
-// Importar componente de teste do hook de escopo
-import AccessScopeDemo from '@/components/AccessScopeDemo';
-import RouteGuardsDemo from '@/components/RouteGuardsDemo';
-import HierarchicalRoutes from '@/components/HierarchicalRoutes';
-import SmartSelectsDemo from '@/components/SmartSelectsDemo';
-
-// Componente de proteção para verificar se o usuário tem role admin (qualquer nível)
+// Componente de proteção para verificar se o usuário tem role admin
 const AdminProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   
-  // Verificar se o usuário tem qualquer role administrativa
-  const roles = user?.roles ?? [];
-  const isAdmin = roles.includes('admin') ||
-                  roles.includes('admin.estado') ||
-                  roles.includes('admin.municipio') ||
-                  roles.includes('admin.unidade');
+  // Verificar se o usuário tem a role 'admin'
+  const isAdmin = user?.roles?.includes('admin') || false;
   
   if (!isAdmin) {
     return (
@@ -78,18 +68,6 @@ const AdminRoutes: React.FC = () => {
         
         {/* Relatórios */}
         <Route path="/reports" element={<AdminReports />} />
-        
-        {/* Teste do Hook de Escopo */}
-        <Route path="/scope-test" element={<AccessScopeDemo />} />
-        
-        {/* Teste dos Route Guards */}
-        <Route path="/guards-test" element={<RouteGuardsDemo />} />
-        
-        {/* Teste dos Selects Inteligentes */}
-        <Route path="/smart-selects" element={<SmartSelectsDemo />} />
-        
-        {/* Rotas Hierárquicas com Guards */}
-        <Route path="/hierarchical/*" element={<HierarchicalRoutes />} />
         
         {/* Configurações */}
         <Route path="/settings" element={<div>Configurações - Em desenvolvimento</div>} />

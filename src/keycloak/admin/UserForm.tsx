@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from '@/i18n/useTranslations';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useIsMaster } from '@/hooks/useAccessScope';
 import { AdminHeader } from './components/AdminHeader';
 import Footer from '@/features/desktop/components/Footer';
 import { SideMenu } from '@/features/home/components/SideMenu';
@@ -66,7 +65,6 @@ const UserForm: React.FC = () => {
   const navigate = useNavigate();
   const { selectedLanguage } = useLanguage();
   const { t } = useTranslation(selectedLanguage);
-  const { isMaster, isLoading: isMasterLoading } = useIsMaster();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -112,21 +110,13 @@ const UserForm: React.FC = () => {
   });
 
   useEffect(() => {
-    // Só carrega roles se for master
-    if (isMasterLoading) return; // Aguarda carregar info do usuário
-    
-    if (isMaster) {
-      loadRoles();
-    }
-    
+    loadRoles();
     loadDropdownData();
     if (isEditMode) {
       loadUser();
-      if (isMaster) {
-        loadUserRoles(); // Só carrega roles do usuário se for master
-      }
+      loadUserRoles();
     }
-  }, [id, isMaster, isMasterLoading]);
+  }, [id]);
 
   // Estabelecimentos: por nome (acento-insensitive) e CNES (numérico)
   useEffect(() => {
@@ -395,12 +385,6 @@ const UserForm: React.FC = () => {
         console.error('❌ Erro ao carregar roles:', response.status, response.statusText);
         const errorText = await response.text();
         console.error('❌ Detalhes do erro:', errorText);
-        
-        // Para admins não-master, não é erro - simplesmente não mostrar as roles
-        if (response.status === 403) {
-          console.log('ℹ️ Admin não-master - roles não disponíveis');
-          setRoles([]);
-        }
       }
     } catch (error) {
       console.error('❌ Erro ao carregar roles:', error);
@@ -729,33 +713,41 @@ const UserForm: React.FC = () => {
           }),
         });
 
-        // Processar resposta da criação do usuário
-        let userId;
         if (!response.ok) {
           const error = await response.json();
           throw new Error(error.error || 'Erro ao criar usuário');
         }
 
         // Se usuário foi criado com sucesso, buscar o ID real do usuário
+        let userId;
         try {
-          // Primeiro, tentar obter o ID da resposta JSON
+          // Tentar obter o ID da resposta primeiro
           const responseData = await response.json();
-          userId = responseData.userId; // API retorna { userId: "...", message: "..." }
-          console.log('✅ ID obtido da resposta de criação:', userId);
-        } catch (parseError) {
-          console.warn('⚠️ Erro ao processar resposta JSON, tentando extrair do header Location:', parseError);
+          userId = responseData.id;
           
-          // Fallback: tentar extrair do header Location (padrão Keycloak)
-          const locationHeader = response.headers.get('location');
-          if (locationHeader) {
-            userId = locationHeader.split('/').pop();
-            console.log('✅ ID extraído do header Location:', userId);
+          // Se não tiver ID na resposta, buscar o usuário pelo username
+          if (!userId) {
+            console.log('🔍 Buscando ID do usuário criado pelo username:', formData.username);
+            const searchResponse = await fetch(`/api-auth/admin/users?username=${encodeURIComponent(formData.username)}`, {
+              credentials: 'include',
+            });
+            
+            if (searchResponse.ok) {
+              const users = await searchResponse.json();
+              if (users && users.length > 0) {
+                userId = users[0].id;
+                console.log('✅ ID do usuário encontrado:', userId);
+              }
+            }
           }
-        }
-        
-        // Se ainda não conseguiu obter o ID, buscar o usuário pelo username
-        if (!userId) {
-          console.log('🔍 Buscando ID do usuário criado pelo username:', formData.username);
+          
+          if (!userId) {
+            throw new Error('Não foi possível obter o ID do usuário criado');
+          }
+        } catch (parseError) {
+          console.error('❌ Erro ao processar resposta de criação:', parseError);
+          // Como último recurso, tentar buscar por username
+          console.log('🔍 Tentativa final: buscando usuário pelo username');
           const searchResponse = await fetch(`/api-auth/admin/users?username=${encodeURIComponent(formData.username)}`, {
             credentials: 'include',
           });
@@ -767,78 +759,80 @@ const UserForm: React.FC = () => {
               console.log('✅ ID do usuário encontrado na busca:', userId);
             }
           }
-        }
-        
-        if (!userId) {
-          throw new Error('Falha crítica: não foi possível obter ID do usuário para configurar acessos');
+          
+          if (!userId) {
+            throw new Error('Falha crítica: não foi possível obter ID do usuário para configurar acessos');
+          }
         }
 
         console.log('🆔 ID do usuário para configurar acessos:', userId);
 
-        // Para usuários master: continuar o fluxo normal de configuração de acessos
-        // Para usuários hierárquicos: o backend já criou os acessos automaticamente
-        if (isMaster) {
-          console.log('🎯 Master admin: configurando acessos manuais...');
-          
-          // Atribuir roles selecionadas ao usuário recém-criado
-          if (userRoles.length > 0) {
-            console.log('🔑 Atribuindo roles ao usuário criado:', userRoles.map(r => r.name));
-            try {
-              await fetch(`/api-auth/admin/users/${userId}/roles`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(userRoles),
-              });
-              console.log('✅ Roles atribuídas com sucesso');
-            } catch (roleError) {
-              console.error('❌ Erro ao atribuir roles:', roleError);
-              // Não interromper o fluxo se houver erro nas roles
-            }
-          }
+        console.log('🎯 Pronto para configurar acessos - verificando se estamos no modo criação...');
 
-          // Criar registro de acesso baseado no nível selecionado
-          console.log('📊 Configurando acessos do usuário...');
-          console.log('  - Nível de acesso:', formData.nivelAcesso);
-          console.log('  - Estabelecimento ID:', formData.estabelecimentoId);
-          console.log('  - Município ID:', formData.municipioId);
-          console.log('  - Estado ID:', formData.estadoId);
-          console.log('  - Permissões:', formData.permissoes);
-          
-          if (formData.nivelAcesso === 'unidade' && formData.estabelecimentoId) {
-            console.log('🏥 Criando acesso de unidade...');
-            await usuarioGestaoService.createAcessoUnidade(
-              userId,
-              formData.estabelecimentoId,
-              formData.permissoes,
-              formData.municipioId || undefined,
-              formData.estadoId || undefined
-            );
-            console.log('✅ Acesso de unidade criado');
-          } else if (formData.nivelAcesso === 'municipio' && formData.municipioId) {
-            console.log('🏛️ Criando acesso de município...');
-            await usuarioGestaoService.createAcessoMunicipio(
-              userId,
-              formData.municipioId,
-              formData.permissoes
-            );
-            console.log('✅ Acesso de município criado');
-          } else if (formData.nivelAcesso === 'estado' && formData.estadoId) {
-            console.log('🗺️ Criando acesso de estado...');
-            await usuarioGestaoService.createAcessoEstado(
-              userId,
-              formData.estadoId,
-              formData.permissoes
-            );
-            console.log('✅ Acesso de estado criado');
-          } else {
-            console.warn('⚠️ Nenhum acesso criado - verifique os dados do formulário');
+        // Atribuir roles selecionadas ao usuário recém-criado
+        if (userRoles.length > 0) {
+          console.log('🔑 Atribuindo roles ao usuário criado:', userRoles.map(r => r.name));
+          try {
+            await fetch(`/api-auth/admin/users/${userId}/roles`, {
+              method: 'POST',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(userRoles),
+            });
+            console.log('✅ Roles atribuídas com sucesso');
+          } catch (roleError) {
+            console.error('❌ Erro ao atribuir roles:', roleError);
+            // Não interromper o fluxo se houver erro nas roles
           }
-        } else {
-          console.log('🎯 Admin hierárquico: acessos criados automaticamente pelo backend');
         }
+
+        // Criar registro de acesso baseado no nível selecionado
+        console.log('📊 Configurando acessos do usuário...');
+        console.log('  - Nível de acesso:', formData.nivelAcesso);
+        console.log('  - Estabelecimento ID:', formData.estabelecimentoId);
+        console.log('  - Município ID:', formData.municipioId);
+        console.log('  - Estado ID:', formData.estadoId);
+        console.log('  - Permissões:', formData.permissoes);
+        
+        if (formData.nivelAcesso === 'unidade' && formData.estabelecimentoId) {
+          console.log('🏥 Criando acesso de unidade...');
+          await usuarioGestaoService.createAcessoUnidade(
+            userId,
+            formData.estabelecimentoId,
+            formData.permissoes,
+            formData.municipioId || undefined,
+            formData.estadoId || undefined
+          );
+          console.log('✅ Acesso de unidade criado');
+        } else if (formData.nivelAcesso === 'municipio' && formData.municipioId) {
+          console.log('🏛️ Criando acesso de município...');
+          await usuarioGestaoService.createAcessoMunicipio(
+            userId,
+            formData.municipioId,
+            formData.permissoes
+          );
+          console.log('✅ Acesso de município criado');
+        } else if (formData.nivelAcesso === 'estado' && formData.estadoId) {
+          console.log('🗺️ Criando acesso de estado...');
+          await usuarioGestaoService.createAcessoEstado(
+            userId,
+            formData.estadoId,
+            formData.permissoes
+          );
+          console.log('✅ Acesso de estado criado');
+        } else {
+          console.warn('⚠️ Nenhum acesso criado - verifique os dados do formulário');
+        }
+      }
+
+      console.log('🔄 Verificando resposta da API:', response.status, response.ok);
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('❌ Erro na resposta da API:', error);
+        throw new Error(error.error || 'Erro ao salvar usuário');
       }
 
       showNotification(
@@ -1182,61 +1176,32 @@ const UserForm: React.FC = () => {
               )}
             </div>
 
-            {/* Informação para usuários hierárquicos */}
-            {!isMaster && (
-              <div className="bg-blue-50 rounded-lg border border-blue-200 p-6">
-                <h2 className="text-lg font-semibold text-blue-900 mb-4 flex items-center">
-                  <Shield className="h-5 w-5 mr-2" />
-                  Configuração Automática de Acesso
-                </h2>
-                
-                <div className="text-sm text-blue-700">
-                  <p className="mb-3">
-                    <strong>🎯 Como administrador hierárquico, os acessos serão configurados automaticamente:</strong>
-                  </p>
-                  <ul className="list-disc list-inside space-y-1 ml-4">
-                    <li>O usuário criado herdará seu escopo administrativo</li>
-                    <li>Permissões serão definidas automaticamente (Leitura + Escrita)</li>
-                    <li>Não é necessário configurar estabelecimento, município ou estado</li>
-                    <li>O sistema garantirá que o usuário tenha acesso apenas aos dados do seu escopo</li>
-                  </ul>
-                  <div className="mt-4 p-3 bg-blue-100 rounded-md">
-                    <p className="text-xs">
-                      <strong>ℹ️ Nota:</strong> Esta configuração automática garante que você só crie usuários 
-                      dentro da sua área de responsabilidade, mantendo a segurança e hierarquia do sistema.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Controle de Acesso - Apenas para Master */}
-            {isMaster && (
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                  <Shield className="h-5 w-5 mr-2" />
-                  Controle de Acesso
-                </h2>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Nível de Acesso */}
-                  <div>
-                    <label htmlFor="nivelAcesso" className="block text-sm font-medium text-gray-700 mb-2">
-                      Nível de Acesso *
-                    </label>
-                    <select
-                      id="nivelAcesso"
-                      value={formData.nivelAcesso}
-                      onChange={(e) => {
-                        const novoNivel = e.target.value as 'unidade' | 'municipio' | 'estado';
-                        setFormData(prev => ({ 
-                          ...prev, 
-                          nivelAcesso: novoNivel,
-                          // Limpar campos relacionados ao mudar nível
-                          estabelecimentoId: undefined,
-                          municipioId: undefined,
-                          estadoId: undefined
-                        }));
+            {/* Controle de Acesso */}
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <Shield className="h-5 w-5 mr-2" />
+                Controle de Acesso
+              </h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Nível de Acesso */}
+                <div>
+                  <label htmlFor="nivelAcesso" className="block text-sm font-medium text-gray-700 mb-2">
+                    Nível de Acesso *
+                  </label>
+                  <select
+                    id="nivelAcesso"
+                    value={formData.nivelAcesso}
+                    onChange={(e) => {
+                      const novoNivel = e.target.value as 'unidade' | 'municipio' | 'estado';
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        nivelAcesso: novoNivel,
+                        // Limpar campos relacionados ao mudar nível
+                        estabelecimentoId: undefined,
+                        municipioId: undefined,
+                        estadoId: undefined
+                      }));
                     }}
                     className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                       errors.nivelAcesso ? 'border-red-500' : 'border-gray-300'
@@ -1422,31 +1387,29 @@ const UserForm: React.FC = () => {
                     )}
                   </div>
                 </div>
-                </div>
               </div>
-            )}
+            </div>
 
-            {/* Roles (disponível apenas para master) */}
-            {isMaster && (
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                  <Shield className="h-5 w-5 mr-2" />
-                  {t('admin.userForm.roles')}
-                </h2>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {roles.map((role) => {
-                    const hasRole = userRoles.some(ur => ur.id === role.id);
-                    return (
-                      <div
-                        key={role.id}
-                        onClick={() => handleRoleToggle(role)}
-                        className={`cursor-pointer p-3 border rounded-lg transition ${
-                          hasRole 
-                            ? 'border-blue-500 bg-blue-50 text-blue-700' 
-                            : 'border-gray-300 hover:border-gray-400'
-                        }`}
-                      >
+            {/* Roles (disponível tanto na criação quanto na edição) */}
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <Shield className="h-5 w-5 mr-2" />
+                {t('admin.userForm.roles')}
+              </h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {roles.map((role) => {
+                  const hasRole = userRoles.some(ur => ur.id === role.id);
+                  return (
+                    <div
+                      key={role.id}
+                      onClick={() => handleRoleToggle(role)}
+                      className={`cursor-pointer p-3 border rounded-lg transition ${
+                        hasRole 
+                          ? 'border-blue-500 bg-blue-50 text-blue-700' 
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
                         <div className="flex items-center justify-between">
                           <span className="font-medium">{role.name}</span>
                           {hasRole && <Check className="h-4 w-4" />}
@@ -1459,7 +1422,6 @@ const UserForm: React.FC = () => {
                   })}
                 </div>
               </div>
-            )}
 
             {/* Botões de ação */}
             <div className="flex justify-end space-x-4">
