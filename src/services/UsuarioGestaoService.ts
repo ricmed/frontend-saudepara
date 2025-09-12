@@ -50,6 +50,7 @@ export interface CreateUsuarioRequest {
   firstName?: string;
   lastName?: string;
   password: string;
+  temporaryPassword?: boolean;
 }
 
 export interface CreateUsuarioAcessoRequest {
@@ -114,39 +115,38 @@ class UsuarioGestaoService {
   }
 
   /**
-   * Criar novo usuário no Keycloak
+   * Criar usuário via backend (método simplificado)
+   * Para uso de não-masters - criação escopada automática
+   */
+  async createUsuarioScoped(userData: { 
+    username: string; 
+    email: string; 
+    firstName?: string; 
+    lastName?: string; 
+    password?: string; 
+    temporaryPassword?: boolean;
+  }): Promise<string> {
+    const resp = await this.backendApi.post('/admin-scoped/users', userData);
+    const userId = resp.data?.user_id;
+    if (!userId) throw new Error('Backend não retornou user_id');
+    return userId;
+  }
+
+  /**
+   * Criar novo usuário no Keycloak (APENAS PARA MASTERS)
+   * NOTA: Este método usa Keycloak direto e só funciona para usuários master
    */
   async createUsuario(userData: CreateUsuarioRequest): Promise<string | null> {
     try {
       const response = await this.keycloakApi.post('/admin/users', userData);
       
-      // Keycloak retorna 201 sem body, mas com header Location contendo o ID
-      let userId: string | null = null;
-      
+      // Para masters usando Keycloak direto, extrair do header Location
       if (response.status === 201 && response.headers.location) {
-        // Extrair ID do header Location: /admin/users/{userId}
         const locationMatch = response.headers.location.match(/\/admin\/users\/([^\/]+)$/);
         if (locationMatch) {
-          userId = locationMatch[1];
-          console.log('✅ Usuário criado com ID extraído do Location:', userId);
+          const userId = locationMatch[1];
+          console.log('✅ Usuário criado com ID extraído do Location (master):', userId);
           return userId;
-        }
-      }
-      
-      // Fallback: buscar por username se não conseguir extrair do Location
-      if (userData.username) {
-        try {
-          const usuarios = await this.keycloakApi.get('/admin/users', {
-            params: { username: userData.username, exact: true }
-          });
-          
-          if (usuarios.data && usuarios.data.length > 0) {
-            userId = usuarios.data[0].id;
-            console.log('✅ Usuário criado, ID encontrado via busca:', userId);
-            return userId;
-          }
-        } catch (searchError) {
-          console.warn('Aviso: não foi possível buscar o usuário criado:', searchError);
         }
       }
       
@@ -155,6 +155,105 @@ class UsuarioGestaoService {
     } catch (error: any) {
       console.error('Erro ao criar usuário:', error);
       throw new Error(this.getErrorMessage(error, 'Erro ao criar usuário'));
+    }
+  }
+
+  /**
+   * Criar usuário via backend (para não-masters)
+   * O backend cria no Keycloak e na base local automaticamente
+   */
+  async createUsuarioBackend(userData: CreateUsuarioRequest): Promise<string> {
+    try {
+      console.log('🏗️ Criando usuário via backend:', userData.username);
+      
+      const payload = {
+        username: userData.username,
+        email: userData.email,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        password: userData.password,
+        temporaryPassword: userData.temporaryPassword ?? true
+      };
+
+      const response = await this.backendApi.post('/admin-scoped/users', payload);
+      
+      if (response.data.success && response.data.user_id) {
+        console.log('✅ Usuário criado via backend com ID:', response.data.user_id);
+        return response.data.user_id;
+      }
+      
+      throw new Error(response.data.error || 'Falha ao criar usuário via backend');
+    } catch (error: any) {
+      console.error('❌ Erro ao criar usuário via backend:', error);
+      throw new Error(this.getErrorMessage(error, 'Erro ao criar usuário'));
+    }
+  }
+
+  /**
+   * Criar usuário via backend para masters (com controle total)
+   * O backend cria no Keycloak e na base local com os parâmetros especificados
+   */
+  async createUsuarioBackendMaster(userData: CreateUsuarioRequest & {
+    nivel: 'estado' | 'municipio' | 'unidade';
+    alvoId: number;
+    permissoes: number;
+  }): Promise<string> {
+    try {
+      console.log('🔓 Master criando usuário via backend:', userData.username);
+      
+      const payload = {
+        username: userData.username,
+        email: userData.email,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        password: userData.password,
+        temporaryPassword: userData.temporaryPassword ?? true,
+        nivel: userData.nivel,
+        alvoId: userData.alvoId,
+        permissoes: userData.permissoes
+      };
+
+      const response = await this.backendApi.post('/admin-scoped/users', payload);
+      
+      if (response.data.success && response.data.user_id) {
+        console.log('✅ Usuário criado via backend (master) com ID:', response.data.user_id);
+        return response.data.user_id;
+      }
+      
+      throw new Error(response.data.error || 'Falha ao criar usuário via backend');
+    } catch (error: any) {
+      console.error('❌ Erro ao criar usuário via backend (master):', error);
+      throw new Error(this.getErrorMessage(error, 'Erro ao criar usuário'));
+    }
+  }
+
+  /**
+   * Método unificado para criação de usuários
+   * Detecta automaticamente se deve usar backend (não-masters) ou Keycloak direto (masters)
+   */
+  async createUsuarioUnificado(
+    userData: CreateUsuarioRequest,
+    isMaster: boolean = false,
+    masterData?: {
+      nivel: 'estado' | 'municipio' | 'unidade';
+      alvoId: number;
+      permissoes: number;
+    }
+  ): Promise<string> {
+    try {
+      if (isMaster && masterData) {
+        // Master: usar backend com controle total
+        return await this.createUsuarioBackendMaster({
+          ...userData,
+          ...masterData
+        });
+      } else {
+        // Não-master: usar backend com escopo automático
+        return await this.createUsuarioBackend(userData);
+      }
+    } catch (error: any) {
+      console.error('❌ Erro no método unificado de criação:', error);
+      throw error; // Propagar o erro original
     }
   }
 
