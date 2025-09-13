@@ -11,8 +11,18 @@ import {
   Shield, 
   UserCheck,
   UserX,
-  RefreshCw
+  RefreshCw,
+  Building2,
+  MapPin,
+  Globe,
+  Bell,
+  Eye,
+  Calendar,
+  AlertCircle
 } from 'lucide-react';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
+import { useNotificacoesByUserAccess, useNotificacoesStats } from '@/hooks/useNotificacoesHierarquicas';
+import { usuarioGestaoService } from '@/services/UsuarioGestaoService';
 
 interface AdminStats {
   totalUsers: number;
@@ -37,6 +47,30 @@ const AdminDashboard: React.FC = () => {
   const [activity, setActivity] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Estados para funcionalidades hierárquicas
+  const [showNotifications, setShowNotifications] = useState(false);
+  
+  // Hook para permissões do usuário atual
+  const userPermissions = useUserPermissions();
+  
+  // Hook para notificações hierárquicas baseado no nível de acesso do usuário atual
+  const notificationsData = useNotificacoesByUserAccess(
+    !userPermissions.loading && userPermissions.nivel && 
+    ['municipio', 'estado', 'unidade', 'estabelecimento'].includes(userPermissions.nivel) ? {
+      nivel: userPermissions.nivel === 'estabelecimento' ? 'unidade' : userPermissions.nivel as 'municipio' | 'estado' | 'unidade',
+      estabelecimentoId: userPermissions.estabelecimentoId,
+      municipioId: userPermissions.municipioId,
+      estadoId: userPermissions.estadoId
+    } : null,
+    { page: 1, limit: 10 }
+  );
+  
+  // Hook para estatísticas das notificações
+  const notificationStats = useNotificacoesStats(
+    Array.isArray(notificationsData.data) ? notificationsData.data : 
+    notificationsData.data?.data || null
+  );
 
   // Função para interpolação de strings de tradução
   const interpolate = (s?: string, vars: Record<string, string> = {}) =>
