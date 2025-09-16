@@ -152,21 +152,21 @@ const AdminDashboard: React.FC = () => {
       description: t('admin.dashboard.actions.createUserDesc'),
       icon: UserPlus,
       color: 'bg-blue-500',
-      href: '/admin/users/new'
+      href: '/admin/master/users/new'
     },
     {
       title: t('admin.dashboard.actions.manageUsers'),
       description: t('admin.dashboard.actions.manageUsersDesc'),
       icon: Users,
       color: 'bg-green-500',
-      href: '/admin/users'
+      href: '/admin/master/users'
     },
     {
       title: t('admin.dashboard.actions.manageRoles'),
       description: t('admin.dashboard.actions.manageRolesDesc'),
       icon: Shield,
       color: 'bg-purple-500',
-      href: '/admin/roles'
+      href: '/admin/master/roles'
     }
   ];
 

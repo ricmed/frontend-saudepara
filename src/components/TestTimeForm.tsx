@@ -39,7 +39,8 @@ const TestTimeForm: React.FC = () => {
       
       console.log('📤 Enviando payload:', payload);
       
-      const response = await fetch('http://localhost:3000/api/notificacao', {
+      // Usar o proxy do Vite em vez de hardcode
+      const response = await fetch('/api/notificacao', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

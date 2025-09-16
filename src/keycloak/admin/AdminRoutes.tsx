@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '@/keycloak/AuthProvider';
+import { useAdminUrls } from './hooks/useAdminContext';
 
 // Importar as páginas administrativas
 import AdminDashboard from './AdminDashboard';
@@ -10,12 +11,38 @@ import PasswordReset from './PasswordReset';
 import RolesManagement from './RolesManagement';
 import AdminReports from './AdminReports';
 
-// Componente de proteção para verificar se o usuário tem role admin
+// Importar as páginas administrativas hierárquicas
+import DashboardUnidade from './DashboardUnidade';
+import DashboardMunicipio from './DashboardMunicipio';
+import DashboardEstado from './DashboardEstado';
+import UserFormUnidade from './UserFormUnidade';
+import UserFormMunicipio from './UserFormMunicipio';
+import UserFormEstado from './UserFormEstado';
+import UserListUnidade from './UserListUnidade';
+import UserListMunicipio from './UserListMunicipio';
+import UserListEstado from './UserListEstado';
+
+// Componente de proteção para verificar se o usuário tem role admin hierárquica
 const AdminProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   
-  // Verificar se o usuário tem a role 'admin'
-  const isAdmin = user?.roles?.includes('admin') || false;
+  // Verificar se o usuário tem alguma role admin (master ou hierárquica)
+  const isAdmin = user?.roles?.includes('admin') || 
+                  user?.roles?.includes('admin.unidade') ||
+                  user?.roles?.includes('admin.municipio') ||
+                  user?.roles?.includes('admin.estado') || 
+                  false;
+
+  // Log das verificações de role para debug
+  console.log('🛡️ Verificação de proteção admin:', {
+    username: user?.preferred_username,
+    roles: user?.roles,
+    isAdmin,
+    hasAdminMaster: user?.roles?.includes('admin'),
+    hasAdminUnidade: user?.roles?.includes('admin.unidade'),
+    hasAdminMunicipio: user?.roles?.includes('admin.municipio'),
+    hasAdminEstado: user?.roles?.includes('admin.estado')
+  });
   
   if (!isAdmin) {
     return (
@@ -34,6 +61,9 @@ const AdminProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children
           <p className="text-sm text-gray-500 mb-4">
             Você não tem permissão para acessar esta área. É necessário ter privilégios de administrador.
           </p>
+          <div className="text-xs text-gray-400 mb-4">
+            Roles disponíveis: {user?.roles?.join(', ') || 'Nenhuma'}
+          </div>
           <button
             onClick={() => window.history.back()}
             className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
@@ -48,26 +78,84 @@ const AdminProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children
   return <>{children}</>;
 };
 
-// Componente principal das rotas administrativas
+// Componente principal das rotas administrativas com redirecionamento inteligente
+const AdminRedirect: React.FC = () => {
+  const { user } = useAuth();
+  const { dashboard } = useAdminUrls();
+  
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Log do redirecionamento para debug
+  console.log('🔄 Redirecionando admin:', {
+    username: user.preferred_username,
+    roles: user.roles,
+    dashboardUrl: dashboard
+  });
+  
+  return <Navigate to={dashboard} replace />;
+};
+
 const AdminRoutes: React.FC = () => {
   return (
     <AdminProtectedRoute>
       <Routes>
-        {/* Dashboard principal */}
-        <Route path="/" element={<AdminDashboard />} />
-        <Route path="/dashboard" element={<Navigate to="/admin" replace />} />
+        {/* Redirecionamento automático baseado no nível do admin */}
+        <Route path="/" element={<AdminRedirect />} />
+        <Route path="/dashboard" element={<AdminRedirect />} />
         
-        {/* Gestão de usuários */}
-        <Route path="/users" element={<UsersList />} />
-        <Route path="/users/new" element={<UserForm />} />
-        <Route path="/users/:id/edit" element={<UserForm />} />
-        <Route path="/users/:id/reset-password" element={<PasswordReset />} />
+        {/* Dashboard principal - admin master */}
+        <Route path="/master" element={<AdminDashboard />} />
+        <Route path="/master/dashboard" element={<Navigate to="/admin/master" replace />} />
         
-        {/* Gestão de roles */}
-        <Route path="/roles" element={<RolesManagement />} />
+        {/* Gestão de usuários - admin master */}
+        <Route path="/master/users" element={<UsersList />} />
+        <Route path="/master/users/new" element={<UserForm />} />
+        <Route path="/master/users/:id/edit" element={<UserForm />} />
+        <Route path="/master/users/:id/reset-password" element={<PasswordReset />} />
         
-        {/* Relatórios */}
-        <Route path="/reports" element={<AdminReports />} />
+        {/* Gestão de roles - admin master */}
+        <Route path="/master/roles" element={<RolesManagement />} />
+        
+        {/* Relatórios - admin master */}
+        <Route path="/master/reports" element={<AdminReports />} />
+        
+        {/* Rotas legacy do admin master (para compatibilidade) */}
+        <Route path="/users" element={<Navigate to="/admin/master/users" replace />} />
+        <Route path="/users/new" element={<Navigate to="/admin/master/users/new" replace />} />
+        <Route path="/roles" element={<Navigate to="/admin/master/roles" replace />} />
+        <Route path="/reports" element={<Navigate to="/admin/master/reports" replace />} />
+        
+        {/* =============================================== */}
+        {/* ROTAS HIERÁRQUICAS - ADMIN.UNIDADE */}
+        {/* =============================================== */}
+        <Route path="/unidade" element={<DashboardUnidade />} />
+        <Route path="/unidade/dashboard" element={<Navigate to="/admin/unidade" replace />} />
+        <Route path="/unidade/users" element={<UserListUnidade />} />
+        <Route path="/unidade/users/new" element={<UserFormUnidade />} />
+        <Route path="/unidade/users/:id/edit" element={<UserFormUnidade />} />
+        <Route path="/unidade/users/:id/reset-password" element={<PasswordReset />} />
+        
+        {/* =============================================== */}
+        {/* ROTAS HIERÁRQUICAS - ADMIN.MUNICIPIO */}
+        {/* =============================================== */}
+        <Route path="/municipio" element={<DashboardMunicipio />} />
+        <Route path="/municipio/dashboard" element={<Navigate to="/admin/municipio" replace />} />
+        <Route path="/municipio/users" element={<UserListMunicipio />} />
+        <Route path="/municipio/users/new" element={<UserFormMunicipio />} />
+        <Route path="/municipio/users/:id/edit" element={<UserFormMunicipio />} />
+        <Route path="/municipio/users/:id/reset-password" element={<PasswordReset />} />
+        
+        {/* =============================================== */}
+        {/* ROTAS HIERÁRQUICAS - ADMIN.ESTADO */}
+        {/* =============================================== */}
+        <Route path="/estado" element={<DashboardEstado />} />
+        <Route path="/estado/dashboard" element={<Navigate to="/admin/estado" replace />} />
+        <Route path="/estado/users" element={<UserListEstado />} />
+        <Route path="/estado/users/new" element={<UserFormEstado />} />
+        <Route path="/estado/users/:id/edit" element={<UserFormEstado />} />
+        <Route path="/estado/users/:id/reset-password" element={<PasswordReset />} />
         
         {/* Configurações */}
         <Route path="/settings" element={<div>Configurações - Em desenvolvimento</div>} />

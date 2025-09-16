@@ -105,7 +105,13 @@ class UsuarioGestaoService {
    */
   async getUsuarios(): Promise<Usuario[]> {
     try {
+      console.log('🔄 Fazendo requisição para /admin/users...');
       const response = await this.keycloakApi.get('/admin/users');
+      console.log('📡 Resposta recebida:', {
+        status: response.status,
+        dataLength: Array.isArray(response.data) ? response.data.length : 'não é array',
+        data: response.data
+      });
       return response.data;
     } catch (error: any) {
       console.error('Erro ao buscar usuários:', error);
@@ -118,14 +124,30 @@ class UsuarioGestaoService {
    */
   async createUsuario(userData: CreateUsuarioRequest): Promise<string | null> {
     try {
+      console.log('🚀 Tentando criar usuário:', userData);
       const response = await this.keycloakApi.post('/admin/users', userData);
       
-      // Keycloak retorna 201 sem body, mas com header Location contendo o ID
+      console.log('📊 Resposta da criação:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+        data: response.data
+      });
+      
       let userId: string | null = null;
       
+      // Primeiro, verificar se a API intermediária retornou o userId no JSON
+      if (response.data && response.data.userId) {
+        userId = response.data.userId;
+        console.log('✅ Usuário criado com ID retornado pela API intermediária:', userId);
+        return userId;
+      }
+      
+      // Fallback: tentar extrair do header Location (se disponível)
       if (response.status === 201 && response.headers.location) {
-        // Extrair ID do header Location: /admin/users/{userId}
         const locationMatch = response.headers.location.match(/\/admin\/users\/([^\/]+)$/);
+        console.log('🔍 Location header:', response.headers.location);
+        console.log('🔍 Regex match:', locationMatch);
         if (locationMatch) {
           userId = locationMatch[1];
           console.log('✅ Usuário criado com ID extraído do Location:', userId);
@@ -133,12 +155,15 @@ class UsuarioGestaoService {
         }
       }
       
-      // Fallback: buscar por username se não conseguir extrair do Location
+      // Fallback: buscar por username se não conseguir extrair o ID
       if (userData.username) {
+        console.log('🔄 Tentando buscar usuário por username:', userData.username);
         try {
           const usuarios = await this.keycloakApi.get('/admin/users', {
             params: { username: userData.username, exact: true }
           });
+          
+          console.log('🔍 Resultado da busca:', usuarios.data);
           
           if (usuarios.data && usuarios.data.length > 0) {
             userId = usuarios.data[0].id;
@@ -146,11 +171,11 @@ class UsuarioGestaoService {
             return userId;
           }
         } catch (searchError) {
-          console.warn('Aviso: não foi possível buscar o usuário criado:', searchError);
+          console.warn('⚠️ Aviso: não foi possível buscar o usuário criado:', searchError);
         }
       }
       
-      console.warn('Usuário criado, mas não foi possível obter o ID');
+      console.warn('❌ Usuário criado, mas não foi possível obter o ID');
       return null;
     } catch (error: any) {
       console.error('Erro ao criar usuário:', error);
@@ -307,6 +332,15 @@ class UsuarioGestaoService {
         estadoId,
         permissoes
       });
+      
+      // Validação básica dos parâmetros obrigatórios
+      if (!userId) {
+        throw new Error('userId é obrigatório');
+      }
+      
+      if (!estabelecimentoId || isNaN(estabelecimentoId)) {
+        throw new Error('estabelecimentoId é obrigatório e deve ser um número válido');
+      }
       
       const payload: any = {
         userId,

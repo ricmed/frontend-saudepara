@@ -52,11 +52,16 @@ export const SideMenu: React.FC<SideMenuProps> = ({
   const permissions = useUserPermissions();
   const [showAppsSubmenu, setShowAppsSubmenu] = useState(false);
 
-  // Função para verificar se o usuário é admin
+  // Função para verificar se o usuário é admin (incluindo admins hierárquicos)
   const isAdmin = () => {
     if (!user) return false;
-    // Baseado no ProtectedRoute, as roles estão em user.roles
-    return user.roles?.includes('admin');
+    // Verifica se o usuário tem qualquer tipo de role admin
+    return user.roles?.some((role: string) => 
+      role === 'admin' || 
+      role === 'admin.unidade' || 
+      role === 'admin.municipio' || 
+      role === 'admin.estado'
+    );
   };
 
   // List of auxiliary apps - FILTRADOS POR NÍVEL DE PERMISSÃO

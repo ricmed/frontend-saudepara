@@ -229,13 +229,13 @@ const UsersList: React.FC = () => {
   const handleEditUser = (user: UserWithAccess) => {
     // Navegar para a página completa de edição do usuário
     console.log('📝 Navegando para edição do usuário:', user.username);
-    window.location.href = `/admin/users/${user.id}/edit`;
+    navigate(`/admin/master/users/${user.id}/edit`);
   };
 
   const handleResetPassword = (user: UserWithAccess) => {
     // Navegar para a página completa de reset de senha
     console.log('🔑 Navegando para reset de senha do usuário:', user.username);
-    window.location.href = `/admin/users/${user.id}/reset-password`;
+    navigate(`/admin/master/users/${user.id}/reset-password`);
   };
 
   const handleSelectAll = () => {
@@ -304,13 +304,13 @@ const UsersList: React.FC = () => {
                 <Filter className="h-4 w-4 mr-2" />
                 {t('admin.users.filters')}
               </button>
-              <a
-                href="/admin/users/new"
+              <button
+                onClick={() => navigate('/admin/master/users/new')}
                 className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
               >
                 <UserPlus className="h-4 w-4 mr-2" />
                 {t('admin.users.createUser')}
-              </a>
+              </button>
             </div>
           </div>
 
