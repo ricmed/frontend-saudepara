@@ -1175,7 +1175,7 @@ const EnhancedNotificationDashboard = ({
             </button>
             <ClipboardList className="h-7 w-7" />
             <h1 className="text-xl md:text-2xl font-semibold">
-              NOTIFICAÇÕES DURANTE EVENTOS EPIDEMIOLÓGICOS (NDEE)
+              Comunicação de Eventos
             </h1>
           </div>
 

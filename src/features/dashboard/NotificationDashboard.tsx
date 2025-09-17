@@ -2695,7 +2695,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             </button>
             <ClipboardList className="h-6 w-6 sm:h-7 sm:w-7 flex-shrink-0" />
             <h1 className="text-sm sm:text-lg lg:text-xl xl:text-2xl font-semibold leading-tight">
-              NOTIFICAÇÕES DURANTE EVENTOS EPIDEMIOLÓGICOS (NDEE)
+              Comunicação de Eventos
             </h1>
           </div>
 

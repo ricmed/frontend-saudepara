@@ -51,7 +51,7 @@ const DashboardExportMenu: React.FC<DashboardExportMenuProps> = ({
   activeFilters = {},
   className = '',
   buttonVariant = 'button',
-  title = 'Dashboard Completo'
+  title = 'Comunicação de Eventos'
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -78,7 +78,7 @@ const DashboardExportMenu: React.FC<DashboardExportMenuProps> = ({
     if (hipotesesData.length > 0) sections.push({ name: 'Hipóteses Diagnósticas', data: hipotesesData });
 
     return {
-      title: 'Dashboard de Notificações - Dados Completos',
+      title: 'Comunicação de Eventos - Dados Completos',
       sections,
       metadata: {
         totalRecords,

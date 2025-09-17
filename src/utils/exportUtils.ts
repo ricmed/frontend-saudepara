@@ -267,7 +267,7 @@ export const exportChartAsWord = async (chartId: string, data: ChartDataItem[], 
           <div class="metadata">
             <p><strong>Total de registros:</strong> ${data.reduce((sum, item) => sum + item.value, 0)}</p>
             <p><strong>Documento gerado em:</strong> ${new Date().toLocaleString('pt-BR')}</p>
-            <p><strong>Sistema:</strong> Sistema de Saúde Pará - Dashboard de Notificações</p>
+            <p><strong>Sistema:</strong> Sistema de Saúde Pará - Comunicação de Eventos</p>
           </div>
         </body>
       </html>
@@ -324,7 +324,7 @@ const exportDashboardAsExcel = async (data: DashboardData, filename: string): Pr
   
   // Aba de resumo
   const summaryData = [
-    ['Dashboard de Notificações - Resumo Executivo'],
+    ['Comunicação de Eventos - Resumo Executivo'],
     [''],
     ['Total de Registros:', data.metadata?.totalRecords || 0],
     ['Data de Geração:', data.metadata?.dateGenerated || new Date().toLocaleString('pt-BR')],
@@ -369,7 +369,7 @@ const exportDashboardAsCSV = async (data: DashboardData, filename: string): Prom
   let csvContent = BOM;
   
   // Cabeçalho do dashboard
-  csvContent += `"Dashboard de Notificações - Dados Completos"\n`;
+  csvContent += `"Comunicação de Eventos - Dados Completos"\n`;
   csvContent += `"Total de Registros:","${data.metadata?.totalRecords || 0}"\n`;
   csvContent += `"Data de Geração:","${data.metadata?.dateGenerated || new Date().toLocaleString('pt-BR')}"\n\n`;
   
@@ -527,7 +527,7 @@ const exportDashboardAsWord = async (data: DashboardData, filename: string): Pro
         
         <div style="margin-top: 40px; font-size: 12px; color: #666; text-align: center;">
           <p>Documento gerado automaticamente pelo Sistema de Saúde Pará</p>
-          <p>Dashboard de Notificações - ${new Date().toLocaleString('pt-BR')}</p>
+          <p>Comunicação de Eventos - ${new Date().toLocaleString('pt-BR')}</p>
         </div>
       </body>
     </html>
