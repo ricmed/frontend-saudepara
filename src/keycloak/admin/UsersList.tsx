@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '@/i18n/useTranslations';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -23,117 +23,65 @@ import {
   ArrowLeft
 } from 'lucide-react';
 
+// Importar hook de filtragem hierárquica
+import { useHierarchicalFilter, UserWithAccess } from '@/hooks/useHierarchicalFilter';
+
 // Importar service de gestão de usuários
 import {
-  usuarioGestaoService,
-  UsuarioAcesso
+  usuarioGestaoService
 } from '@/services/UsuarioGestaoService';
-
-interface User {
-  id: string;
-  username: string;
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-  enabled: boolean;
-  emailVerified: boolean;
-  createdTimestamp: number;
-}
-
-interface UserWithAccess extends User {
-  acessos?: UsuarioAcesso[];
-}
-
-interface UserFilters {
-  search: string;
-  enabled?: boolean;
-  emailVerified?: boolean;
-}
 
 const UsersList: React.FC = () => {
   const navigate = useNavigate();
   const { selectedLanguage } = useLanguage();
   const { t } = useTranslation(selectedLanguage);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [users, setUsers] = useState<UserWithAccess[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState<UserFilters>({ search: '' });
-  const [pagination, setPagination] = useState({ first: 0, max: 20, total: 0 });
+  
+  // Usar hook de filtragem hierárquica
+  const {
+    filteredUsers,
+    loading,
+    error,
+    totalUsers,
+    shouldFilter,
+    adminLevel,
+    refreshUsers
+  } = useHierarchicalFilter();
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [pagination, setPagination] = useState({ first: 0, max: 20 });
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadUsers();
-  }, [pagination.first, pagination.max]);
+  // Filtro de busca local
+  const displayUsers = React.useMemo(() => {
+    if (!searchTerm) return filteredUsers;
+    
+    const search = searchTerm.toLowerCase();
+    return filteredUsers.filter(user => 
+      user.username.toLowerCase().includes(search) ||
+      user.email?.toLowerCase().includes(search) ||
+      user.firstName?.toLowerCase().includes(search) ||
+      user.lastName?.toLowerCase().includes(search)
+    );
+  }, [filteredUsers, searchTerm]);
 
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (filters.search !== '') {
-        loadUsers();
-      }
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, [filters.search]);
+  // Paginação local
+  const paginatedUsers = React.useMemo(() => {
+    const start = pagination.first;
+    const end = start + pagination.max;
+    return displayUsers.slice(start, end);
+  }, [displayUsers, pagination]);
 
   const loadUsers = async () => {
-    try {
-      setLoading(true);
-      console.log('🔄 Iniciando carregamento de usuários...');
-      
-      // Testar se a API está acessível
-      const usersData = await usuarioGestaoService.getUsuarios();
-      
-      console.log('📝 Dados recebidos da API:', usersData);
-      
-      // Verificar se os dados são válidos
-      if (!Array.isArray(usersData)) {
-        console.error('❌ Dados inválidos recebidos da API:', usersData);
-        throw new Error('Dados inválidos recebidos da API de usuários');
-      }
-      
-      // Converter formato do Keycloak para o formato esperado
-      const convertedUsers: UserWithAccess[] = usersData.map((user, index) => {
-        console.log(`👤 Processando usuário ${index + 1}:`, user);
-        
-        return {
-          id: user.id || `user-${index}`,
-          username: user.username || `user-${index}`,
-          firstName: user.firstName || '',
-          lastName: user.lastName || '',
-          email: user.email || '',
-          enabled: user.enabled !== false,
-          emailVerified: true, // Assumir como verificado por padrão já que não temos esse campo
-          createdTimestamp: user.createdTimestamp || Date.now()
-        };
-      });
-
-      console.log(`✅ ${convertedUsers.length} usuários processados com sucesso`);
-      setUsers(convertedUsers);
-      setPagination(prev => ({ ...prev, total: convertedUsers.length }));
-      
-    } catch (error: any) {
-      console.error('💥 Erro ao carregar usuários:', error);
-      
-      // Mostrar mensagem de erro mais detalhada
-      const errorMessage = error.response?.data?.error || 
-                          error.message || 
-                          'Erro desconhecido ao carregar usuários';
-      
-      alert(`❌ Erro ao carregar usuários: ${errorMessage}\n\nVerifique se:\n• A API do Keycloak está rodando (porta 4000)\n• Você está autenticado no sistema\n• Tem permissões de administrador`);
-      
-      // Definir lista vazia em caso de erro
-      setUsers([]);
-      setPagination(prev => ({ ...prev, total: 0 }));
-    } finally {
-      setLoading(false);
-    }
+    // Função mantida para compatibilidade - agora chama refreshUsers
+    await refreshUsers();
   };
 
   const handleUserAction = async (userId: string, action: string) => {
     try {
-      const user = users.find(u => u.id === userId);
+      const user = filteredUsers.find(u => u.id === userId);
       if (!user) return;
 
       switch (action) {
@@ -155,7 +103,7 @@ const UsersList: React.FC = () => {
       }
 
       // Recarregar lista após ações que modificam dados
-      await loadUsers();
+      await refreshUsers();
       setActionMenuOpen(null);
     } catch (error) {
       console.error('Erro na ação:', error);
@@ -165,7 +113,7 @@ const UsersList: React.FC = () => {
 
   const handleViewUserAccess = async (userId: string) => {
     try {
-      const user = users.find(u => u.id === userId);
+      const user = filteredUsers.find(u => u.id === userId);
       if (!user) return;
 
       console.log(`🔍 Buscando acessos para usuário: ${user.username} (${userId})`);
@@ -239,10 +187,10 @@ const UsersList: React.FC = () => {
   };
 
   const handleSelectAll = () => {
-    if (selectedUsers.length === users.length) {
+    if (selectedUsers.length === displayUsers.length) {
       setSelectedUsers([]);
     } else {
-      setSelectedUsers(users.map(u => u.id));
+      setSelectedUsers(displayUsers.map(u => u.id));
     }
   };
 
@@ -255,7 +203,7 @@ const UsersList: React.FC = () => {
   };
 
   const nextPage = () => {
-    if (pagination.first + pagination.max < pagination.total) {
+    if (pagination.first + pagination.max < displayUsers.length) {
       setPagination(prev => ({ ...prev, first: prev.first + prev.max }));
     }
   };
@@ -327,28 +275,25 @@ const UsersList: React.FC = () => {
                     <input
                       type="text"
                       placeholder={t('admin.users.searchPlaceholder')}
-                      value={filters.search}
-                      onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('admin.users.status')}
+                    Status do filtro hierárquico
                   </label>
-                  <select
-                    value={filters.enabled === undefined ? 'all' : filters.enabled.toString()}
-                    onChange={(e) => setFilters(prev => ({ 
-                      ...prev, 
-                      enabled: e.target.value === 'all' ? undefined : e.target.value === 'true'
-                    }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="all">{t('admin.users.allStatuses')}</option>
-                    <option value="true">{t('admin.users.enabled')}</option>
-                    <option value="false">{t('admin.users.disabled')}</option>
-                  </select>
+                  <div className="text-sm p-2 bg-gray-50 rounded-lg">
+                    {loading ? (
+                      <span className="text-blue-600">🔄 Carregando...</span>
+                    ) : shouldFilter ? (
+                      <span className="text-green-600">✅ Filtro ativo ({adminLevel})</span>
+                    ) : (
+                      <span className="text-gray-600">ℹ️ Admin master - sem filtros</span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-end gap-2">
                   <button
@@ -389,7 +334,7 @@ const UsersList: React.FC = () => {
                     <th className="px-6 py-3 text-left">
                       <input
                         type="checkbox"
-                        checked={selectedUsers.length === users.length && users.length > 0}
+                        checked={selectedUsers.length === displayUsers.length && displayUsers.length > 0}
                         onChange={handleSelectAll}
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
@@ -421,14 +366,14 @@ const UsersList: React.FC = () => {
                         {t('admin.users.loading')}
                       </td>
                     </tr>
-                  ) : users.length === 0 ? (
+                  ) : displayUsers.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                        {t('admin.users.noUsers')}
+                        {error ? `Erro: ${error}` : t('admin.users.noUsers')}
                       </td>
                     </tr>
                   ) : (
-                    users.map((user) => (
+                    paginatedUsers.map((user) => (
                       <tr key={user.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4">
                           <input
@@ -569,7 +514,12 @@ const UsersList: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <p className="text-sm text-gray-700">
-                    {t('admin.users.pagination.showing')} {pagination.first + 1} - {Math.min(pagination.first + pagination.max, pagination.total)} {t('admin.users.pagination.of')} {pagination.total}
+                    Mostrando {pagination.first + 1} - {Math.min(pagination.first + pagination.max, displayUsers.length)} de {displayUsers.length} usuários
+                    {shouldFilter && totalUsers > 0 && (
+                      <span className="text-blue-600 ml-2">
+                        (filtrados de {totalUsers} total)
+                      </span>
+                    )}
                   </p>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -582,7 +532,7 @@ const UsersList: React.FC = () => {
                   </button>
                   <button
                     onClick={nextPage}
-                    disabled={pagination.first + pagination.max >= pagination.total}
+                    disabled={pagination.first + pagination.max >= displayUsers.length}
                     className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <ChevronRight className="h-4 w-4" />
