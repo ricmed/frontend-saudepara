@@ -47,17 +47,18 @@ import {
   MousePointer,
   RotateCcw,
   Table,
-  Brain,
+  // Brain, // Temporariamente comentado
   Calendar
 } from "lucide-react";
 
 // 🆕 NOVOS IMPORTS: Componentes do dashboard aprimorado
 import GeographicLocationPanel from './components/charts/GeographicLocationPanel';
 import DashboardTabs, { useDashboardTabs } from './components/DashboardTabs';
-import AIInsights from './components/AIInsights';
-import AIChat from './components/AIChat';
-import AIAlerts from './components/AIAlerts';
-import AIGlobalConfig from './components/AIGlobalConfig';
+// Componentes de IA temporariamente comentados - serão usados no futuro
+// import AIInsights from './components/AIInsights';
+// import AIChat from './components/AIChat';
+// import AIAlerts from './components/AIAlerts';
+// import AIGlobalConfig from './components/AIGlobalConfig';
 import AtendimentosPorHoraChart from './components/AtendimentosPorHoraChart';
 import EstabelecimentosMapaAvancado from './components/EstabelecimentosMapaAvancado';
 import AlertasPanel from './components/AlertasPanel';
@@ -3330,8 +3331,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         </main>
       )}
 
-      {/* Aba de IA - Análise Inteligente */}
-      {activeTab === "ia" && (
+      {/* Aba de IA - Temporariamente desabilitada, será usada no futuro */}
+      {false && (
         <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-gray-800 mb-2 flex items-center gap-3">
@@ -3343,14 +3344,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             </p>
           </div>
 
-          {/* Configuração Global da IA */}
           <AIGlobalConfig className="mb-6" />
 
-          {/* Grid responsivo com os 3 componentes de IA */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             
             {/* Insights Automáticos */}
-            <div className="xl:col-span-2">
+            /*<div className="xl:col-span-2">
               <AIInsights 
                 dashboardData={getAIDashboardData()} 
                 className="w-full"
@@ -3358,7 +3357,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             </div>
 
             {/* Chat com IA */}
-            <div className="xl:col-span-1">
+            /*<div className="xl:col-span-1">
               <AIChat 
                 dashboardData={getAIDashboardData()} 
                 className="w-full"
@@ -3366,7 +3365,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             </div>
 
             {/* Alertas Inteligentes */}
-            <div className="xl:col-span-1">
+            /*<div className="xl:col-span-1">
               <AIAlerts 
                 dashboardData={getAIDashboardData()} 
                 className="w-full"
@@ -3376,7 +3375,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           </div>
 
           {/* Informações sobre IA e Privacidade */}
-          <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4">
+          /*<div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
               <Brain className="h-5 w-5 text-purple-600" />
               <h3 className="font-semibold text-purple-800">Sistema de IA Flexível</h3>
@@ -3391,7 +3390,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             </p>
           </div>
         </main>
-      )}
+      )} */
 
       {/* Sistema de Alertas - Sempre visível */}
       <AlertasPanel 

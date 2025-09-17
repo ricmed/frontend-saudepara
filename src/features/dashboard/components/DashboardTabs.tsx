@@ -3,11 +3,11 @@ import React from 'react';
 import { 
   BarChart3, 
   MapPin, 
-  TrendingUp,
-  Brain
+  TrendingUp
+  // Brain - temporariamente comentado, será usado no futuro
 } from 'lucide-react';
 
-export type DashboardTab = 'graficos' | 'fluxo' | 'mapa' | 'ia';
+export type DashboardTab = 'graficos' | 'fluxo' | 'mapa'; // | 'ia' - temporariamente removido
 
 interface DashboardTabsProps {
   activeTab: DashboardTab;
@@ -43,13 +43,14 @@ export const DashboardTabs: React.FC<DashboardTabsProps> = ({
       label: 'Mapa',
       icon: MapPin,
       description: 'Distribuição geográfica'
-    },
-    {
-      id: 'ia' as DashboardTab,
-      label: 'IA Insights',
-      icon: Brain,
-      description: 'Análise inteligente com Llama 3.1'
     }
+    // Aba temporariamente oculta - será usada no futuro
+    // {
+    //   id: 'ia' as DashboardTab,
+    //   label: 'IA Insights',
+    //   icon: Brain,
+    //   description: 'Análise inteligente com Llama 3.1'
+    // }
   ];
 
   return (
