@@ -79,13 +79,13 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
         <div className="mb-8 flex justify-center">
           <div 
             onClick={notificationButton.onClick}
-            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white flex flex-col items-center p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:scale-105 min-w-[280px]"
+            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white flex flex-col items-center p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:scale-105 min-w-[220px]"
           >
-            <div className="mb-4">
+            <div className="mb-3">
               {notificationButton.icon}
             </div>
-            <span className="text-xl font-semibold mb-2">Comunicar Caso</span>
-            <span className="text-sm text-blue-100 text-center">
+            <span className="text-lg font-semibold mb-1">Comunicar Caso</span>
+            <span className="text-xs text-blue-100 text-center">
               Registre um novo caso rapidamente
             </span>
           </div>

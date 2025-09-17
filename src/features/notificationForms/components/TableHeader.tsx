@@ -67,7 +67,7 @@ const TableHeader: React.FC<TableHeaderProps> = ({
               <Menu className="h-5 w-5" />
             </button>
             <button
-              onClick={() => navigate("/private/pagina-paciente-ficha")}
+              onClick={() => navigate("/")}
               className="p-2 hover:bg-blue-700 rounded-full transition-colors"
             >
               <ArrowLeft className="h-5 w-5" />
@@ -170,7 +170,7 @@ const TableHeader: React.FC<TableHeaderProps> = ({
               <Menu className="h-6 w-6" />
             </button>
             <button
-              onClick={() => navigate("/private/pagina-paciente-ficha")}
+              onClick={() => navigate("/")}
               className="p-2 hover:bg-blue-700 rounded-full transition-colors"
             >
               <ArrowLeft className="h-6 w-6" />
