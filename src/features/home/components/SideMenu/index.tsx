@@ -203,7 +203,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     ...(permissions.isNotificador ? [{
       icon: <FileText />,
       label: t("menu.notification"),
-      onClick: () => navigate("/private/pagina-paciente-ficha"),
+      onClick: () => navigate("/private/comunicacao-de-caso"),
     }] : []),
     
     // Menu Dashboard - apenas para notificadores

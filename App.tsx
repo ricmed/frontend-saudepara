@@ -90,7 +90,8 @@ import ListaPacientes from "@/features/paginaPacientesComu/components/ListaPacie
 // Páginas
 import LoginPage from "@/paginas/LoginPage";
 import QualificarEstabelecimentos from "@/features/forms/EstablishmentForm";
-import PaginaPacientesFicha from "@/features/paginaPacientesComu/components/PaginaPacientesFicha";
+// Importação temporariamente comentada - será usada no futuro
+// import PaginaPacientesFicha from "@/features/paginaPacientesComu/components/PaginaPacientesFicha";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import RelatorioEstabelecimento from "@/features/list/views/RelatorioEstabelecimento";
 // Formulários de Notificação
@@ -239,7 +240,8 @@ function App() {
               <Route path="/private/pacientes" element={<ListaPacientes />} />
               <Route path="/private/pacientes/nova" element={<FormularioPaciente />} />
               <Route path="/private/pacientes/editar/:id" element={<FormularioPaciente />} />
-              <Route path="/private/pagina-paciente-ficha" element={<PaginaPacientesFicha />} />
+              {/* Rota temporariamente desabilitada - módulo será usado no futuro */}
+              {/* <Route path="/private/pagina-paciente-ficha" element={<PaginaPacientesFicha />} /> */}
               <Route path="/private/comunicacao-de-caso" element={<ListaNotificacoes />} />
               <Route path="/private/comunicacao-de-caso/nova" element={<NotificationForm />} />
               <Route path="/private/comunicacao-de-caso/editar/:id" element={<NotificationForm />} />

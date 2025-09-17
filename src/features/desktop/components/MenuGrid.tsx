@@ -1,8 +1,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building, Heart, Book, MessageCircle } from 'lucide-react';
+import { Building, Heart, Book, MessageCircle, FileText, Plus } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslations';
 import { Language } from '@/i18n/types';
+import { useAuth } from '@/keycloak/AuthProvider';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
 
 interface MenuGridProps {
   isMobile?: boolean;
@@ -15,6 +17,8 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
 }) => {
   const navigate = useNavigate();
   const { t } = useTranslation(selectedLanguage || 'pt-BR');
+  const { user } = useAuth();
+  const permissions = useUserPermissions();
 
   const menuItems = [
     {
@@ -39,6 +43,18 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
     }
   ];
 
+  // Botão especial para comunicação de caso (apenas para notificadores e apenas na versão desktop)
+  const notificationButton = user && permissions.isNotificador && !isMobile ? {
+    icon: (
+      <div className="relative">
+        <FileText className="h-10 w-10 text-white" />
+        <Plus className="h-4 w-4 text-white absolute -top-1 -right-1 bg-green-500 rounded-full p-0.5" />
+      </div>
+    ),
+    onClick: () => navigate('/private/comunicacao-de-caso/nova'),
+    isSpecial: true
+  } : null;
+
   if (isMobile) {
     return (
       <div className="grid grid-cols-2 gap-4 p-4 bg-white rounded-t-3xl">
@@ -58,6 +74,25 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
 
   return (
     <div className="py-12 max-w-6xl mx-auto px-6">
+      {/* Botão especial de comunicação de caso - destaque superior */}
+      {notificationButton && (
+        <div className="mb-8 flex justify-center">
+          <div 
+            onClick={notificationButton.onClick}
+            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white flex flex-col items-center p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:scale-105 min-w-[280px]"
+          >
+            <div className="mb-4">
+              {notificationButton.icon}
+            </div>
+            <span className="text-xl font-semibold mb-2">Comunicar Caso</span>
+            <span className="text-sm text-blue-100 text-center">
+              Registre um novo caso rapidamente
+            </span>
+          </div>
+        </div>
+      )}
+      
+      {/* Grid de menus principais */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
         {menuItems.map((item, index) => (
           <div 
