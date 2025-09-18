@@ -126,8 +126,81 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json'
   },
-  withCredentials: true // Para enviar cookies de autenticação automaticamente
+  withCredentials: false // 🔧 MUDANÇA: Não usar cookies, usar token JWT
 });
+
+// 🔧 NOVA FUNÇÃO: Buscar token JWT do Keycloak
+let cachedToken: string | null = null;
+let tokenPromise: Promise<string> | null = null;
+
+const getAuthToken = async (): Promise<string> => {
+  // Se já tem token em cache, usar
+  if (cachedToken) {
+    return cachedToken;
+  }
+  
+  // Se já está buscando token, aguardar a mesma promise
+  if (tokenPromise) {
+    return tokenPromise;
+  }
+  
+  // Buscar novo token
+  tokenPromise = (async (): Promise<string> => {
+    try {
+      const response = await axios.get('/api-auth/protected/token', { 
+        withCredentials: true // Apenas para buscar o token, ainda usa cookies
+      });
+      
+      const token = response.data.access_token;
+      if (!token) {
+        throw new Error('Token não encontrado na resposta');
+      }
+      
+      cachedToken = token;
+      console.log('✅ Token JWT obtido com sucesso');
+      return token;
+    } catch (error) {
+      console.error('❌ Erro ao obter token JWT:', error);
+      throw new Error('Falha na autenticação: não foi possível obter token');
+    } finally {
+      tokenPromise = null;
+    }
+  })();
+  
+  return tokenPromise;
+};
+
+// 🔧 INTERCEPTOR: Adicionar token JWT automaticamente
+api.interceptors.request.use(
+  async (config) => {
+    try {
+      const token = await getAuthToken();
+      config.headers.Authorization = `Bearer ${token}`;
+    } catch (error) {
+      console.warn('⚠️ Não foi possível adicionar token:', error);
+      // Continuar sem token (pode falhar na API, mas não quebra a requisição)
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// 🔧 INTERCEPTOR: Limpar cache de token em caso de 401
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      console.log('🔄 Token expirado, limpando cache...');
+      cachedToken = null;
+      tokenPromise = null;
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Instância do axios
 
 // Função para tratar erros da API
 const handleApiError = (error: any): never => {

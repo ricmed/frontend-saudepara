@@ -4,13 +4,78 @@ const server = import.meta.env.VITE_API_SERVER;
 const port = import.meta.env.VITE_API_PORT;
 const API_URL = `${server}:${port}/api/tipo-evento`;
 
-// 🔧 CONFIGURAÇÃO: Axios com withCredentials para autenticação
+// 🔧 CONFIGURAÇÃO: Axios com token JWT para autenticação
 const axiosInstance = axios.create({
-  withCredentials: true,
+  withCredentials: false, // Não usar cookies, usar token JWT
   headers: {
     'Content-Type': 'application/json',
   }
 });
+
+// 🔧 FUNÇÃO: Buscar token JWT (reutilizada do NotificacaoService)
+let cachedToken: string | null = null;
+let tokenPromise: Promise<string> | null = null;
+
+const getAuthToken = async (): Promise<string> => {
+  if (cachedToken) {
+    return cachedToken;
+  }
+  
+  if (tokenPromise) {
+    return tokenPromise;
+  }
+  
+  tokenPromise = (async (): Promise<string> => {
+    try {
+      const response = await axios.get('/api-auth/protected/token', { 
+        withCredentials: true 
+      });
+      
+      const token = response.data.access_token;
+      if (!token) {
+        throw new Error('Token não encontrado na resposta');
+      }
+      
+      cachedToken = token;
+      console.log('✅ Token JWT obtido para EventoService');
+      return token;
+    } catch (error) {
+      console.error('❌ Erro ao obter token JWT no EventoService:', error);
+      throw new Error('Falha na autenticação: não foi possível obter token');
+    } finally {
+      tokenPromise = null;
+    }
+  })();
+  
+  return tokenPromise;
+};
+
+// 🔧 INTERCEPTOR: Adicionar token JWT automaticamente
+axiosInstance.interceptors.request.use(
+  async (config) => {
+    try {
+      const token = await getAuthToken();
+      config.headers.Authorization = `Bearer ${token}`;
+    } catch (error) {
+      console.warn('⚠️ EventoService: Não foi possível adicionar token:', error);
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// 🔧 INTERCEPTOR: Limpar cache de token em caso de 401
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      console.log('🔄 EventoService: Token expirado, limpando cache...');
+      cachedToken = null;
+      tokenPromise = null;
+    }
+    return Promise.reject(error);
+  }
+);
 
 interface TipoEvento {
   idtipo_evento: number;
