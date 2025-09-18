@@ -4,6 +4,14 @@ const server = import.meta.env.VITE_API_SERVER;
 const port = import.meta.env.VITE_API_PORT;
 const API_URL = `${server}:${port}/api/tipo-evento`;
 
+// 🔧 CONFIGURAÇÃO: Axios com withCredentials para autenticação
+const axiosInstance = axios.create({
+  withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json',
+  }
+});
+
 interface TipoEvento {
   idtipo_evento: number;
   descricao: string;
@@ -71,7 +79,7 @@ export const TiposEventoService = {
   // 🆕 NOVO MÉTODO - Buscar apenas ativos
   getAllAtivos: async (): Promise<TipoEvento[]> => {
     try {
-      const response = await axios.get<TipoEvento[]>(`${API_URL}/ativos`);
+      const response = await axiosInstance.get<TipoEvento[]>(`${API_URL}/ativos`);
       return response.data;
     } catch (error) {
       return handleApiError(error as AxiosError<APIError>);

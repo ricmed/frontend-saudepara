@@ -854,7 +854,8 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
   };
 
   // ✅ FUNÇÃO MODIFICADA PARA CARREGAR TODAS AS OPÇÕES (ONLINE/OFFLINE)
-  const loadAllOptions = async () => {
+  // ✅ FUNÇÃO OTIMIZADA: Carregar dados essenciais primeiro, resto em background
+  const loadEssentialOptions = async () => {
     setIsLoading(true);
     
     try {
@@ -871,67 +872,29 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         }
       }
 
-      // ✅ MODO ONLINE: carregar dados normalmente
-      console.log('🌐 Modo online: carregando dados da API...');
+      // ✅ MODO ONLINE: carregar apenas dados ESSENCIAIS primeiro
+      console.log('🌐 Modo online: carregando dados essenciais...');
       
+      // Primeiro: carregar apenas dados essenciais para abrir o formulário
       const [
         eventos,
         publicos,
         paises,
         estados,
-        municipios,
-        bairros,
         generos,
-        racas,
-        escolaridades,
-        atendimentos,
-        sintomas,
-        hipoteseDiag,
-        traumas,
-        encerramentos,
-        estabelecimentos,
+        atendimentos
       ] = await Promise.all([
         NotificacaoService.getEventoOptions(),
         NotificacaoService.getPublicoOptions(),
         NotificacaoService.getPaisOptions(),
         NotificacaoService.getEstadoOptions(),
-        NotificacaoService.getMunicipioOptions(), // Todos os municípios
-        NotificacaoService.getBairroOptions(),
         NotificacaoService.getGeneroOptions(),
-        NotificacaoService.getRacaOptions(),
-        NotificacaoService.getEscolaridadeOptions(),
-        NotificacaoService.getAtendimentoOptions(),
-        NotificacaoService.getSintomaOptions(),
-        NotificacaoService.getHipoteseDiagOptions(),
-        NotificacaoService.getTraumaOptions(),
-        NotificacaoService.getEncerramentoOptions(),
-        NotificacaoService.getEstabelecimentoOptions(),
+        NotificacaoService.getAtendimentoOptions()
       ]);
 
-      // ✅ SALVAR NO CACHE PARA USO OFFLINE FUTURO
-      try {
-        await Promise.all([
-          indexedDBService.saveOpcoes('eventos', eventos),
-          indexedDBService.saveOpcoes('publicos', publicos),
-          indexedDBService.saveOpcoes('paises', paises),
-          indexedDBService.saveOpcoes('estados', estados),
-          indexedDBService.saveOpcoes('municipios', municipios),
-          indexedDBService.saveOpcoes('bairros', bairros),
-          indexedDBService.saveOpcoes('generos', generos),
-          indexedDBService.saveOpcoes('racas', racas),
-          indexedDBService.saveOpcoes('escolaridades', escolaridades),
-          indexedDBService.saveOpcoes('atendimentos', atendimentos),
-          indexedDBService.saveOpcoes('sintomas', sintomas),
-          indexedDBService.saveOpcoes('hipoteses', hipoteseDiag),
-          indexedDBService.saveOpcoes('traumas', traumas),
-          indexedDBService.saveOpcoes('encerramentos', encerramentos),
-          indexedDBService.saveOpcoes('estabelecimentos', estabelecimentos),
-        ]);
-        console.log('✅ Dados salvos no cache para uso offline futuro');
-      } catch (cacheError) {
-        console.warn('⚠️ Erro ao salvar no cache:', cacheError);
-      }
-
+      // ✅ FILTRAR: Apenas eventos ativos para o formulário
+      const eventosAtivos = eventos.filter((evento: any) => evento.ativo === 'S' || evento.ativo === undefined);
+      
       // Converter todas as descrições para caixa alta
       const convertOptionsToUpperCase = (options: any[]) => {
         return options.map((option) => {
@@ -943,13 +906,9 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         });
       };
 
-      // Ordenar e atribuir as opções
-      setPaisOptions(convertOptionsToUpperCase(paises));
-      
-      // 🆕 FILTRAR: Apenas eventos ativos para o formulário
-      const eventosAtivos = eventos.filter((evento: any) => evento.ativo === 'S' || evento.ativo === undefined);
+      // Definir opções essenciais imediatamente com ordenações específicas
       setEventoOptions(convertOptionsToUpperCase(eventosAtivos));
-
+      
       // Ordenação específica para público atendido
       const ordenacaoPublico = [
         "Participante",
@@ -968,7 +927,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         return 0;
       });
       setPublicoOptions(publicosOrdenados);
-
+      
+      setPaisOptions(convertOptionsToUpperCase(paises));
+      setEstadoOptions(convertOptionsToUpperCase(estados));
+      
       // Ordenação específica para identidade de gênero
       const ordenacaoGenero = [
         "Mulher cisgênero",
@@ -991,8 +953,8 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         return 0;
       });
       setGeneroOptions(generosOrdenados);
-
-      // Ordenação específica para tipo de atendimento (REMOVIDO "Surto")
+      
+      // Ordenação específica para tipo de atendimento
       const ordenacaoAtendimento = [
         "Clínico",
         "Trauma",
@@ -1010,7 +972,65 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         return 0;
       });
       setAtendimentoOptions(atendimentosOrdenados);
+      
+      setIsLoading(false);
+      
+      // ✅ BACKGROUND: Carregar resto dos dados em background
+      loadRemainingOptions();
 
+    } catch (error) {
+      console.error('❌ Erro ao carregar opções essenciais:', error);
+      setIsLoading(false);
+      
+      // Tentar usar cache como fallback
+      try {
+        const cachedData = await loadOptionsFromCache();
+        if (cachedData.hasData) {
+          console.log('✅ Fallback: usando dados do cache');
+        }
+      } catch (cacheError) {
+        console.error('❌ Erro no fallback do cache:', cacheError);
+      }
+    }
+  };
+
+  // ✅ FUNÇÃO: Carregar dados restantes em background
+  const loadRemainingOptions = async () => {
+    try {
+      console.log('🔄 Carregando dados restantes em background...');
+      
+      const [
+        racas,
+        escolaridades,
+        sintomas,
+        hipoteseDiag,
+        traumas,
+        encerramentos,
+        estabelecimentos
+      ] = await Promise.all([
+        NotificacaoService.getRacaOptions(),
+        NotificacaoService.getEscolaridadeOptions(),
+        NotificacaoService.getSintomaOptions(),
+        NotificacaoService.getHipoteseDiagOptions(),
+        NotificacaoService.getTraumaOptions(),
+        NotificacaoService.getEncerramentoOptions(),
+        NotificacaoService.getEstabelecimentoOptions()
+      ]);
+
+      // Converter descrições para caixa alta
+      const convertOptionsToUpperCase = (options: any[]) => {
+        return options.map((option) => {
+          const newOption = { ...option };
+          if (newOption.descricao) {
+            newOption.descricao = normalizeText(newOption.descricao);
+          }
+          return newOption;
+        });
+      };
+
+      // Definir opções restantes com ordenações específicas
+      setRacaOptions(convertOptionsToUpperCase(racas));
+      
       // Ordenação específica para escolaridade
       const ordenacaoEscolaridade = [
         "Analfabeto",
@@ -1035,7 +1055,11 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         return 0;
       });
       setEscolaridadeOptions(escolaridadesOrdenadas);
-
+      
+      setSintomaOptions(convertOptionsToUpperCase(sintomas));
+      setHipoteseDiagOptions(convertOptionsToUpperCase(hipoteseDiag));
+      setTraumaOptions(convertOptionsToUpperCase(traumas));
+      
       // Ordenação específica para tipo de encerramento
       const ordenacaoEncerramento = [
         "Atendido e liberado",
@@ -1047,7 +1071,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
       const encerramentosUpperCase = convertOptionsToUpperCase(encerramentos);
       const encerramentosOrdenados = [...encerramentosUpperCase].sort((a, b) => {
-        const getPosition = (option: EncerramentoOption) => {
+        const getPosition = (option: any) => {
           const exactIndex = ordenacaoEncerramento.findIndex((item) => option.descricao === item);
           if (exactIndex !== -1) return exactIndex;
           return ordenacaoEncerramento.findIndex((item) => option.descricao.includes(item));
@@ -1061,37 +1085,30 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         return 0;
       });
       setEncerramentoOptions(encerramentosOrdenados);
-
-      // Outras opções
-      setEstadoOptions(convertOptionsToUpperCase(estados));
-      setMunicipioOptions(convertOptionsToUpperCase(municipios));
-      setBairroOptions(convertOptionsToUpperCase(bairros));
-      setRacaOptions(convertOptionsToUpperCase(racas));
-      setSintomaOptions(convertOptionsToUpperCase(sintomas));
-      setHipoteseDiagOptions(convertOptionsToUpperCase(hipoteseDiag));
-      setTraumaOptions(convertOptionsToUpperCase(traumas));
+      
       setEstabelecimentoOptions(convertOptionsToUpperCase(estabelecimentos));
+
+      // ✅ SALVAR NO CACHE após carregar tudo
+      await Promise.all([
+        indexedDBService.saveOpcoes('racas', racas),
+        indexedDBService.saveOpcoes('escolaridades', escolaridades),
+        indexedDBService.saveOpcoes('sintomas', sintomas),
+        indexedDBService.saveOpcoes('hipoteses', hipoteseDiag),
+        indexedDBService.saveOpcoes('traumas', traumas),
+        indexedDBService.saveOpcoes('encerramentos', encerramentos),
+        indexedDBService.saveOpcoes('estabelecimentos', estabelecimentos)
+      ]);
       
+      console.log('✅ Dados restantes carregados e salvos no cache');
+
     } catch (error) {
-      console.error("Erro ao carregar opções:", error);
-      
-      // ✅ FALLBACK: TENTAR USAR CACHE EM CASO DE ERRO
-      try {
-        console.log('⚠️ Erro online, tentando usar cache...');
-        const cachedData = await loadOptionsFromCache();
-        
-        if (cachedData.hasData) {
-          toast.warning("Usando dados offline. Algumas informações podem estar desatualizadas.");
-        } else {
-          throw new Error("Nenhum dado encontrado offline");
-        }
-      } catch (cacheError) {
-        console.error("Erro ao carregar cache:", cacheError);
-        toast.error("Erro ao carregar opções. Conecte-se à internet e baixe os dados offline primeiro.");
-      }
-    } finally {
-      setIsLoading(false);
+      console.warn('⚠️ Erro ao carregar dados restantes em background:', error);
     }
+  };
+
+  // ✅ FUNÇÃO ORIGINAL (renomeada para compatibilidade)
+  const loadAllOptions = async () => {
+    return loadEssentialOptions();
   };
 
   // ✅ FUNÇÃO MODIFICADA PARA CARREGAR MUNICÍPIOS (ONLINE/OFFLINE)

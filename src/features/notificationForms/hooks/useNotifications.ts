@@ -1,9 +1,10 @@
 // useNotifications.ts - Versão CORRIGIDA com SyncService
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useOfflineSystem } from '@/hooks/useOfflineSystem';
 import { NotificacaoService } from '@/services/NotificacaoService';
+import { TiposEventoService } from '@/services/EventoService';
 import syncService from '@/services/syncService'; // ✅ AGORA SERÁ USADO
 import indexedDBService from '@/services/indexedDB';
 import { Notificacao, PaginationMeta, SearchParams } from '../types';
@@ -26,29 +27,101 @@ export const useNotifications = () => {
     pendingData
   } = useOfflineSystem();
 
-  // 🆕 FUNÇÃO: Filtrar notificações com eventos ativos apenas
-  const filterNotificacoesComEventosAtivos = useCallback(async (notificacoes: Notificacao[]): Promise<Notificacao[]> => {
+  // 🆕 REFS: Para controlar execuções e evitar loops
+  const lastFetchTime = useRef<number>(0);
+  const isFetching = useRef<boolean>(false);
+
+  // 🆕 CACHE: Para eventos ativos (evitar buscar múltiplas vezes)
+  const [eventosAtivosCache, setEventosAtivosCache] = useState<Set<number> | null>(null);
+
+  // 🆕 FUNÇÃO: Carregar eventos ativos uma única vez
+  const loadEventosAtivos = useCallback(async (): Promise<Set<number>> => {
+    if (eventosAtivosCache) {
+      console.log(`✅ Usando cache de eventos ativos: ${eventosAtivosCache.size} eventos`);
+      return eventosAtivosCache;
+    }
+
     try {
-      // Buscar lista de eventos ativos do cache
-      const eventosAtivos = await indexedDBService.getOpcoes('eventos') || [];
+      console.log('🔄 Carregando eventos ativos do IndexedDB...');
+      let eventosAtivos = await indexedDBService.getOpcoes('eventos') || [];
       
-      // 🔄 ATUALIZADO: Considerar também o campo `ativo` se presente
+      // Se não há eventos no cache local, tentar buscar da API
+      if (eventosAtivos.length === 0 && isOnline) {
+        console.log('📡 Cache de eventos vazio, buscando da API...');
+        try {
+          const eventosResponse = await TiposEventoService.getAllAtivos();
+          eventosAtivos = eventosResponse || [];
+          
+          // Salvar no cache para uso offline
+          if (eventosAtivos.length > 0) {
+            await indexedDBService.saveOpcoes('eventos', eventosAtivos);
+            console.log(`✅ ${eventosAtivos.length} eventos salvos no cache offline`);
+          }
+        } catch (apiError) {
+          console.warn('⚠️ Erro ao buscar eventos da API:', apiError);
+        }
+      }
+      
       const eventosAtivosFiltrados = eventosAtivos.filter((evento: any) => {
         return evento.ativo === undefined || evento.ativo === 'S' || evento.ativo === '1' || evento.ativo === true;
       });
       
       const idsEventosAtivos = new Set(eventosAtivosFiltrados.map((evento: any) => evento.idtipo_evento));
+      setEventosAtivosCache(idsEventosAtivos);
+      
+      console.log(`✅ Cache de eventos ativos carregado: ${idsEventosAtivos.size} eventos ativos de ${eventosAtivos.length} totais`);
+      return idsEventosAtivos;
+    } catch (error) {
+      console.warn('⚠️ Erro ao carregar eventos ativos:', error);
+      return new Set(); // Retorna conjunto vazio em caso de erro
+    }
+  }, [eventosAtivosCache, isOnline]);
+
+  // 🆕 FUNÇÃO OTIMIZADA: Filtrar notificações com eventos ativos apenas
+  const filterNotificacoesComEventosAtivos = useCallback(async (notificacoes: Notificacao[]): Promise<Notificacao[]> => {
+    try {
+      // 🛠️ DEBUG: Verificar se o filtro está desabilitado globalmente
+      if ((window as any).DISABLE_EVENT_FILTER) {
+        console.log('🛠️ DEBUG: Filtro de eventos desabilitado globalmente');
+        return notificacoes;
+      }
+      
+      const idsEventosAtivos = await loadEventosAtivos();
+      
+      // 🐛 FIX: Se não há eventos ativos carregados, não filtrar (manter todas)
+      if (idsEventosAtivos.size === 0) {
+        console.log('⚠️ Nenhum evento ativo carregado, mantendo todas as notificações');
+        return notificacoes;
+      }
       
       // Filtrar notificações que tenham eventos ativos
-      return notificacoes.filter(notificacao => {
+      const notificacoesFiltradas = notificacoes.filter(notificacao => {
         const idEvento = notificacao.original?.tipo_evento?.idtipo_evento;
-        return idEvento ? idsEventosAtivos.has(idEvento) : true; // Manter se não tiver evento definido
+        const hasEvent = idEvento ? idsEventosAtivos.has(idEvento) : true;
+        
+        // Log detalhado para debug
+        if (!hasEvent && idEvento) {
+          console.log(`🔍 Notificação filtrada - ID evento: ${idEvento}, disponíveis: [${Array.from(idsEventosAtivos).join(', ')}]`);
+        }
+        
+        return hasEvent;
       });
+      
+      console.log(`✅ Filtro de eventos ativos: ${notificacoes.length} → ${notificacoesFiltradas.length} notificações`);
+      
+      // Se muitas notificações foram filtradas, log adicional
+      if (notificacoes.length > 0 && notificacoesFiltradas.length === 0) {
+        console.warn('🚨 TODAS as notificações foram filtradas! Verificar eventos ativos.');
+        console.log('📊 Eventos ativos disponíveis:', Array.from(idsEventosAtivos));
+        console.log('📋 Eventos das notificações:', notificacoes.map(n => n.original?.tipo_evento?.idtipo_evento).filter(Boolean));
+      }
+      
+      return notificacoesFiltradas;
     } catch (error) {
       console.warn('⚠️ Erro ao filtrar eventos ativos, mantendo todas as notificações:', error);
       return notificacoes; // Em caso de erro, retornar todas
     }
-  }, []);
+  }, [loadEventosAtivos]);
 
   // Estados existentes...
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
@@ -149,37 +222,51 @@ export const useNotifications = () => {
         return dadosFiltrados;
       }
 
-      // ✅ MODO ONLINE: buscar normalmente + salvar cache
+      // ✅ OTIMIZADO: Buscar dados de forma mais eficiente
       let allNotificacoes: Notificacao[] = [];
-      let page = 1;
-      let hasMore = true;
-      const LARGE_PAGE_SIZE = 500;
+      
+      // Primeiro tentar usar dados do cache se disponível
+      const cachedData = await indexedDBService.getOpcoes('notificacoes-cache') || [];
+      
+      if (cachedData.length > 0) {
+        console.log(`✅ Usando ${cachedData.length} notificações do cache`);
+        allNotificacoes = cachedData;
+      } else {
+        // Se não há cache, buscar dados da API de forma otimizada
+        let page = 1;
+        let hasMore = true;
+        const MODERATE_PAGE_SIZE = 100; // Reduzido de 500 para 100
 
-      while (hasMore) {
-        const response = await NotificacaoService.getAll(page, LARGE_PAGE_SIZE);
+        console.log('🌐 Buscando notificações da API...');
+        
+        while (hasMore && page <= 5) { // Limitar a 5 páginas (500 registros) por vez
+          const response = await NotificacaoService.getAll(page, MODERATE_PAGE_SIZE);
 
-        if (response && response.data && response.data.length > 0) {
-          allNotificacoes = [...allNotificacoes, ...response.data];
+          if (response && response.data && response.data.length > 0) {
+            allNotificacoes = [...allNotificacoes, ...response.data];
 
-          if (
-            page >= response.meta.totalPages ||
-            response.data.length < LARGE_PAGE_SIZE
-          ) {
-            hasMore = false;
+            if (
+              page >= response.meta.totalPages ||
+              response.data.length < MODERATE_PAGE_SIZE
+            ) {
+              hasMore = false;
+            } else {
+              page++;
+            }
           } else {
-            page++;
+            hasMore = false;
           }
-        } else {
-          hasMore = false;
         }
-      }
 
-      // ✅ SALVAR NO CACHE PARA USO OFFLINE FUTURO
-      try {
-        await indexedDBService.saveOpcoes('notificacoes-cache', allNotificacoes);
-        console.log(`✅ ${allNotificacoes.length} notificações salvas no cache offline`);
-      } catch (cacheError) {
-        console.warn('⚠️ Erro ao salvar notificações no cache:', cacheError);
+        // ✅ SALVAR NO CACHE apenas se conseguiu buscar dados
+        if (allNotificacoes.length > 0) {
+          try {
+            await indexedDBService.saveOpcoes('notificacoes-cache', allNotificacoes);
+            console.log(`✅ ${allNotificacoes.length} notificações salvas no cache offline`);
+          } catch (cacheError) {
+            console.warn('⚠️ Erro ao salvar notificações no cache:', cacheError);
+          }
+        }
       }
 
       // 🆕 FILTRAR: Aplicar filtro de eventos ativos antes de retornar
@@ -216,6 +303,16 @@ export const useNotifications = () => {
   // ✅ CARREGAR DADOS (online/offline) - useEffect principal
   useEffect(() => {
     const fetchData = async () => {
+      // 🆕 THROTTLING: Evitar execuções muito frequentes
+      const now = Date.now();
+      if (isFetching.current || (now - lastFetchTime.current < 500)) {
+        console.log('⏳ Throttling: aguardando para evitar múltiplas execuções...');
+        return;
+      }
+      
+      isFetching.current = true;
+      lastFetchTime.current = now;
+      
       try {
         setIsLoading(true);
 
@@ -274,13 +371,25 @@ export const useNotifications = () => {
             setHasSearched(true);
             console.log(`🔍 Buscando por "${debouncedSearchParams.term}" no campo "${debouncedSearchParams.field}"`);
             
-            // ✅ USAR CACHE + API para busca
+            // ✅ OTIMIZADO: Usar cache primeiro, API apenas se necessário
             try {
-              response = await NotificacaoService.getAll(1, 1000);
+              // Primeiro tentar usar dados do cache
+              const cachedData = await indexedDBService.getOpcoes('notificacoes-cache') || [];
               
-              // Salvar busca no cache
-              if (response && response.data) {
-                await indexedDBService.saveOpcoes('notificacoes-cache', response.data);
+              if (cachedData.length > 0) {
+                // Usar dados do cache para busca
+                response = {
+                  data: cachedData,
+                  meta: {
+                    total: cachedData.length,
+                    totalPages: Math.ceil(cachedData.length / itemsPerPage),
+                    page: 1,
+                    limit: itemsPerPage
+                  }
+                };
+              } else {
+                // Se não há cache, buscar apenas os dados necessários da API
+                response = await NotificacaoService.getAll(currentPage, itemsPerPage);
               }
             } catch (error) {
               // Fallback para cache se API falhar
@@ -366,14 +475,25 @@ export const useNotifications = () => {
             try {
               response = await NotificacaoService.getAll(currentPage, itemsPerPage);
               
-              // Salvar primeira página no cache
+              // ✅ OTIMIZADO: Cache inteligente apenas quando necessário
               if (response && response.data && currentPage === 1) {
-                // Buscar dados completos para cache em background
-                NotificacaoService.getAll(1, 1000).then(allData => {
-                  if (allData && allData.data) {
-                    indexedDBService.saveOpcoes('notificacoes-cache', allData.data);
-                  }
-                }).catch(err => console.warn('Erro ao salvar cache em background:', err));
+                // Apenas salvar os dados já carregados no cache, sem buscar mais
+                const existingCache = await indexedDBService.getOpcoes('notificacoes-cache') || [];
+                
+                // Se o cache está vazio ou muito antigo, buscar mais dados em background
+                if (existingCache.length < 100) {
+                  setTimeout(async () => {
+                    try {
+                      const moreData = await NotificacaoService.getAll(1, 200); // Reduzido de 1000 para 200
+                      if (moreData && moreData.data) {
+                        await indexedDBService.saveOpcoes('notificacoes-cache', moreData.data);
+                        console.log('✅ Cache atualizado em background');
+                      }
+                    } catch (err) {
+                      console.warn('⚠️ Erro ao atualizar cache em background:', err);
+                    }
+                  }, 2000); // Aguardar 2s antes de buscar
+                }
               }
             } catch (error) {
               // Fallback para cache
@@ -460,11 +580,21 @@ export const useNotifications = () => {
         }
       } finally {
         setIsLoading(false);
+        isFetching.current = false; // 🆕 THROTTLING: Liberar para próxima execução
       }
     };
 
     fetchData();
-  }, [currentPage, itemsPerPage, debouncedSearchParams, isUsingLocalSort, sortKey, sortOrder, hasSearched, allNotificacoes, isOnline, isReadyForOffline, fetchNotificacoesOffline]);
+  }, [
+    currentPage, 
+    itemsPerPage, 
+    debouncedSearchParams.term, 
+    debouncedSearchParams.field,
+    isUsingLocalSort, 
+    sortKey, 
+    sortOrder, 
+    isOnline
+  ]);
 
   // ✅ FUNÇÃO: Exclusão (apenas online)
   const handleDelete = async (id: number) => {

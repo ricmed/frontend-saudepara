@@ -69,7 +69,8 @@ const api = axios.create({
   timeout: 5000,
   headers: {
     'Content-Type': 'application/json'
-  }
+  },
+  withCredentials: true // Para enviar cookies de autenticação automaticamente
 });
 
 // Função para extrair o array de dados da resposta da API
