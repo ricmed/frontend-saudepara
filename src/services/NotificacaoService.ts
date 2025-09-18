@@ -129,56 +129,22 @@ const api = axios.create({
   withCredentials: false // 🔧 MUDANÇA: Não usar cookies, usar token JWT
 });
 
-// 🔧 NOVA FUNÇÃO: Buscar token JWT do Keycloak
-let cachedToken: string | null = null;
-let tokenPromise: Promise<string> | null = null;
-
-const getAuthToken = async (): Promise<string> => {
-  // Se já tem token em cache, usar
-  if (cachedToken) {
-    return cachedToken;
+// 🔧 FUNÇÃO SIMPLIFICADA: Token do localStorage (obtido no login)
+const getAuthToken = (): string | null => {
+  const token = localStorage.getItem('jwt_token');
+  if (!token) {
+    console.warn('⚠️ Token JWT não encontrado no localStorage');
+    return null;
   }
-  
-  // Se já está buscando token, aguardar a mesma promise
-  if (tokenPromise) {
-    return tokenPromise;
-  }
-  
-  // Buscar novo token
-  tokenPromise = (async (): Promise<string> => {
-    try {
-      const response = await axios.get('/api-auth/protected/token', { 
-        withCredentials: true // Apenas para buscar o token, ainda usa cookies
-      });
-      
-      const token = response.data.access_token;
-      if (!token) {
-        throw new Error('Token não encontrado na resposta');
-      }
-      
-      cachedToken = token;
-      console.log('✅ Token JWT obtido com sucesso');
-      return token;
-    } catch (error) {
-      console.error('❌ Erro ao obter token JWT:', error);
-      throw new Error('Falha na autenticação: não foi possível obter token');
-    } finally {
-      tokenPromise = null;
-    }
-  })();
-  
-  return tokenPromise;
+  return token;
 };
 
 // 🔧 INTERCEPTOR: Adicionar token JWT automaticamente
 api.interceptors.request.use(
-  async (config) => {
-    try {
-      const token = await getAuthToken();
+  (config) => {
+    const token = getAuthToken();
+    if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-    } catch (error) {
-      console.warn('⚠️ Não foi possível adicionar token:', error);
-      // Continuar sem token (pode falhar na API, mas não quebra a requisição)
     }
     return config;
   },
@@ -187,14 +153,14 @@ api.interceptors.request.use(
   }
 );
 
-// 🔧 INTERCEPTOR: Limpar cache de token em caso de 401
+// 🔧 INTERCEPTOR: Limpar token em caso de 401
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      console.log('🔄 Token expirado, limpando cache...');
-      cachedToken = null;
-      tokenPromise = null;
+      console.log('🔄 Token expirado, redirecionando para login...');
+      localStorage.removeItem('jwt_token');
+      // Pode adicionar redirecionamento para login aqui se necessário
     }
     return Promise.reject(error);
   }

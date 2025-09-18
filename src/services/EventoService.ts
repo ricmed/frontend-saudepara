@@ -12,66 +12,35 @@ const axiosInstance = axios.create({
   }
 });
 
-// 🔧 FUNÇÃO: Buscar token JWT (reutilizada do NotificacaoService)
-let cachedToken: string | null = null;
-let tokenPromise: Promise<string> | null = null;
-
-const getAuthToken = async (): Promise<string> => {
-  if (cachedToken) {
-    return cachedToken;
+// 🔧 FUNÇÃO SIMPLIFICADA: Token do localStorage (obtido no login)
+const getAuthToken = (): string | null => {
+  const token = localStorage.getItem('jwt_token');
+  if (!token) {
+    console.warn('⚠️ EventoService: Token JWT não encontrado no localStorage');
+    return null;
   }
-  
-  if (tokenPromise) {
-    return tokenPromise;
-  }
-  
-  tokenPromise = (async (): Promise<string> => {
-    try {
-      const response = await axios.get('/api-auth/protected/token', { 
-        withCredentials: true 
-      });
-      
-      const token = response.data.access_token;
-      if (!token) {
-        throw new Error('Token não encontrado na resposta');
-      }
-      
-      cachedToken = token;
-      console.log('✅ Token JWT obtido para EventoService');
-      return token;
-    } catch (error) {
-      console.error('❌ Erro ao obter token JWT no EventoService:', error);
-      throw new Error('Falha na autenticação: não foi possível obter token');
-    } finally {
-      tokenPromise = null;
-    }
-  })();
-  
-  return tokenPromise;
+  return token;
 };
 
 // 🔧 INTERCEPTOR: Adicionar token JWT automaticamente
 axiosInstance.interceptors.request.use(
-  async (config) => {
-    try {
-      const token = await getAuthToken();
+  (config) => {
+    const token = getAuthToken();
+    if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-    } catch (error) {
-      console.warn('⚠️ EventoService: Não foi possível adicionar token:', error);
     }
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// 🔧 INTERCEPTOR: Limpar cache de token em caso de 401
+// 🔧 INTERCEPTOR: Limpar token em caso de 401
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      console.log('🔄 EventoService: Token expirado, limpando cache...');
-      cachedToken = null;
-      tokenPromise = null;
+      console.log('🔄 EventoService: Token expirado, redirecionando para login...');
+      localStorage.removeItem('jwt_token');
     }
     return Promise.reject(error);
   }

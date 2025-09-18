@@ -88,13 +88,47 @@ export const PERMISSOES_LABELS = {
 class UsuarioGestaoService {
   private keycloakApi = axios.create({
     baseURL: KEYCLOAK_API_URL,
-    withCredentials: true, // Para enviar cookies automaticamente
+    withCredentials: false, // 🔧 JWT ao invés de cookies
   });
 
   private backendApi = axios.create({
     baseURL: `${BACKEND_API_URL}/api`,
-    withCredentials: true,
+    withCredentials: false, // 🔧 JWT ao invés de cookies
   });
+
+  constructor() {
+    // 🔧 CONFIGURAR INTERCEPTORS JWT para Keycloak API
+    this.keycloakApi.interceptors.request.use((config) => {
+      const token = localStorage.getItem('jwt_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    });
+
+    // 🔧 CONFIGURAR INTERCEPTORS JWT para Backend API
+    this.backendApi.interceptors.request.use((config) => {
+      const token = localStorage.getItem('jwt_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    });
+
+    // 🔧 INTERCEPTOR de resposta para ambas as APIs
+    [this.keycloakApi, this.backendApi].forEach(api => {
+      api.interceptors.response.use(
+        (response) => response,
+        (error) => {
+          if (error.response?.status === 401) {
+            console.log('🔄 UsuarioGestaoService: Token expirado');
+            localStorage.removeItem('jwt_token');
+          }
+          return Promise.reject(error);
+        }
+      );
+    });
+  }
 
   // ================================
   // MÉTODOS KEYCLOAK (Usuários)
@@ -495,7 +529,7 @@ class UsuarioGestaoService {
       const response = await axios.get(apiUrl, {
         params: apiUrl.includes('/estabelecimentos/') ? undefined : params,
         headers: { 'Accept': 'application/json' },
-        withCredentials: true
+        
       });
       
       let data = response.data?.data || response.data || [];
@@ -533,7 +567,7 @@ class UsuarioGestaoService {
         headers: {
           'Accept': 'application/json'
         },
-        withCredentials: true
+        
       });
       
       console.log('Resposta da API de estabelecimentos:', response);
@@ -580,7 +614,7 @@ class UsuarioGestaoService {
         headers: {
           'Accept': 'application/json'
         },
-        withCredentials: true
+        
       });
       
       const data = response.data?.data || response.data || [];
@@ -605,7 +639,7 @@ class UsuarioGestaoService {
         headers: {
           'Accept': 'application/json'
         },
-        withCredentials: true
+        
       });
       
       // A resposta já vem no formato correto do novo endpoint
@@ -636,7 +670,7 @@ class UsuarioGestaoService {
         headers: {
           'Accept': 'application/json'
         },
-        withCredentials: true
+        
       });
       
       const data = response.data?.data || response.data || [];
@@ -700,7 +734,7 @@ class UsuarioGestaoService {
         headers: {
           'Accept': 'application/json'
         },
-        withCredentials: true
+        
       });
       
       const data = response.data;
@@ -756,7 +790,7 @@ class UsuarioGestaoService {
         headers: {
           'Accept': 'application/json'
         },
-        withCredentials: true
+        
       });
       return response.data;
     } catch (error) {
@@ -777,7 +811,7 @@ class UsuarioGestaoService {
         headers: {
           'Accept': 'application/json'
         },
-        withCredentials: true
+        
       });
       // Formatar para o padrão esperado pelo frontend
       return response.data.map((est: any) => ({
@@ -803,7 +837,7 @@ class UsuarioGestaoService {
         headers: {
           'Accept': 'application/json'
         },
-        withCredentials: true
+        
       });
       // Formatar para o padrão esperado pelo frontend
       return response.data.map((est: any) => ({
@@ -829,7 +863,7 @@ class UsuarioGestaoService {
         headers: {
           'Accept': 'application/json'
         },
-        withCredentials: true
+        
       });
       return response.data;
     } catch (error) {
@@ -847,9 +881,8 @@ class UsuarioGestaoService {
       
       console.log('🔑 URL da API para busca de acesso do usuário:', apiUrl);
       
-      const response = await axios.get(apiUrl, {
+      const response = await this.backendApi.get(userId ? `/usuario-acesso/user/${userId}` : `/usuario-acesso/current`, {
         headers: { 'Accept': 'application/json' },
-        withCredentials: true
       });
       
       const payload = response.data?.data ?? response.data;
@@ -898,7 +931,7 @@ class UsuarioGestaoService {
       const response = await axios.get(apiUrl, {
         params,
         headers: { 'Accept': 'application/json' },
-        withCredentials: true
+        
       });
       
       const data = response.data?.data || response.data || [];
@@ -935,7 +968,7 @@ class UsuarioGestaoService {
       const response = await axios.get(apiUrl, {
         params,
         headers: { 'Accept': 'application/json' },
-        withCredentials: true
+        
       });
       
       const data = response.data?.data || response.data || [];

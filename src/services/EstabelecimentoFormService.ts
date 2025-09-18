@@ -35,8 +35,28 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json'
   },
-  withCredentials: true // Para enviar cookies de autenticação automaticamente
+  withCredentials: false // 🔧 JWT ao invés de cookies
 });
+
+// 🔧 INTERCEPTOR JWT para EstabelecimentoFormService
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('jwt_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      console.log('🔄 EstabelecimentoFormService: Token expirado');
+      localStorage.removeItem('jwt_token');
+    }
+    return Promise.reject(error);
+  }
+);
 
 interface DuplicateCheckResponse {
   isDuplicate: boolean;

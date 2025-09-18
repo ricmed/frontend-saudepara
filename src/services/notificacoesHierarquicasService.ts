@@ -76,8 +76,30 @@ export interface NotificacoesParams {
 class NotificacoesHierarquicasService {
   private api = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001',
-    withCredentials: true, // Para enviar cookies automaticamente
+    withCredentials: false, // 🔧 JWT ao invés de cookies
   });
+
+  constructor() {
+    // 🔧 INTERCEPTOR JWT para NotificacoesHierarquicasService
+    this.api.interceptors.request.use((config) => {
+      const token = localStorage.getItem('jwt_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    });
+
+    this.api.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          console.log('🔄 NotificacoesHierarquicasService: Token expirado');
+          localStorage.removeItem('jwt_token');
+        }
+        return Promise.reject(error);
+      }
+    );
+  }
 
   /**
    * Buscar notificações por estabelecimento
