@@ -123,8 +123,6 @@ const api = axios.create({
   baseURL: API_BASE_URL,
   // Aumenta timeout para 60s para operações mais demoradas
   timeout: 60000,
-  // 🔧 CORREÇÃO: Configurar para enviar cookies automaticamente (autenticação)
-  withCredentials: true,
   headers: {
     'Content-Type': 'application/json'
   }
