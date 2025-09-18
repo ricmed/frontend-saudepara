@@ -361,8 +361,7 @@ const UsersList: React.FC = () => {
                     onClick={async () => {
                       try {
                         console.log('🔍 Testando conexão com API Keycloak...');
-                        const authBaseUrl = import.meta.env.VITE_API_AUTH_URL || 'http://localhost:4000';
-                        const response = await fetch(`${authBaseUrl}/api-auth/status`);
+                        const response = await fetch('/api-auth/status');
                         const data = await response.text();
                         console.log('✅ Status da API:', response.status, data);
                         alert(`API Status: ${response.status}\nResponse: ${data}`);

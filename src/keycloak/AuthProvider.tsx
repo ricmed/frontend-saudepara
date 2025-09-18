@@ -8,22 +8,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [retryMessage, setRetryMessage] = useState<string | null>(null);
 
-  // 🔧 USAR URL CORRETA DO KEYCLOAK
-  const authBaseUrl = import.meta.env.VITE_API_AUTH_URL || 'http://localhost:4000';
-
   useEffect(() => {
-    axios.get(`${authBaseUrl}/api-auth/protected/profile`, { withCredentials: true })
+    axios.get('/api-auth/protected/profile', { withCredentials: true })
       .then(res => setUser(res.data))
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
-  }, [authBaseUrl]);
+  }, []);
 
   const login = async (username: string, password: string) => {
     try {
       setRetryMessage(null);
       
-      await axios.post(`${authBaseUrl}/api-auth/auth/login`, { username, password }, { withCredentials: true });
-      const res = await axios.get(`${authBaseUrl}/api-auth/protected/profile`, { withCredentials: true });
+      await axios.post('/api-auth/auth/login', { username, password }, { withCredentials: true });
+      const res = await axios.get('/api-auth/protected/profile', { withCredentials: true });
       
       setUser(res.data);
     } catch (error: any) {
@@ -36,7 +33,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     try {
-      await axios.post(`${authBaseUrl}/api-auth/auth/logout`, {}, { withCredentials: true });
+      await axios.post('/api-auth/auth/logout', {}, { withCredentials: true });
     } catch (error) {
       console.warn('Erro no logout, mas prosseguindo...', error);
     } finally {
