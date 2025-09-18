@@ -1,8 +1,9 @@
 import axios from 'axios';
 import useFilteredRequests from '@/hooks/useFilteredRequests';
 
-// Configurações das APIs
-const KEYCLOAK_API_URL = '/api-auth'; // Usar proxy do Vite
+// 🔧 CONFIGURAÇÕES DAS APIs - USAR VARIÁVEIS DE AMBIENTE
+const authBaseUrl = import.meta.env.VITE_API_AUTH_URL || 'http://localhost:4000';
+const KEYCLOAK_API_URL = `${authBaseUrl}/api-auth`; // URL completa do Keycloak
 const BACKEND_API_URL = ''; // Usar proxy do Vite (apenas se o backend estiver em porta diferente)
 
 // Interfaces
