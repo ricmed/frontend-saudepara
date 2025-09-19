@@ -16,7 +16,7 @@ const API_AUTH_URL = isHomologacao
   : 'http://localhost:4000';
 
 const API_BACKEND_URL = isHomologacao 
-  ? 'https://app-api.hml.saude.pa.gov.br/'  // Homologação: API backend
+  ? 'https://app.hml.saude.pa.gov.br/'  // Homologação: domínio unificado
   : 'http://localhost:3000';
 
 console.log('🚀 Configuração Vite:');
