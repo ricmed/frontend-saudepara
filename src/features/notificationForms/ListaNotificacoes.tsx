@@ -62,7 +62,7 @@ const ListaNotificacoes: React.FC = () => {
       <SideMenu 
         isOpen={tableControls.isMenuOpen} 
         onClose={() => tableControls.setIsMenuOpen(false)}
-        selectedLanguages={selectedLanguage}
+        selectedLanguage={selectedLanguage}
         onLanguageChange={(language) => setSelectedLanguage(language)}
       />      {/* Conteúdo principal */}
       <main className="max-w-7xl mx-auto px-4 py-8">
