@@ -70,28 +70,8 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json'
   },
-  withCredentials: false // 🔧 JWT ao invés de cookies
+  withCredentials: true // Para enviar cookies de autenticação automaticamente
 });
-
-// 🔧 INTERCEPTOR JWT para PacienteService
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('jwt_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      console.log('🔄 PacienteService: Token expirado');
-      localStorage.removeItem('jwt_token');
-    }
-    return Promise.reject(error);
-  }
-);
 
 // Função para extrair o array de dados da resposta da API
 function unwrapApiResponse<T>(response: any): T[] {

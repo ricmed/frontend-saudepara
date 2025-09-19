@@ -19,17 +19,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       setRetryMessage(null);
       
-      // 🔧 LOGIN CAPTURA TOKEN JWT DA RESPOSTA
-      const loginRes = await axios.post('/api-auth/auth/login', { username, password }, { withCredentials: true });
-      
-      // Armazenar token JWT no localStorage
-      if (loginRes.data.access_token) {
-        localStorage.setItem('jwt_token', loginRes.data.access_token);
-        console.log('✅ Token JWT salvo no localStorage:', loginRes.data.access_token.substring(0, 50) + '...');
-      } else {
-        console.warn('⚠️ Login não retornou access_token:', loginRes.data);
-      }
-      
+      await axios.post('/api-auth/auth/login', { username, password }, { withCredentials: true });
       const res = await axios.get('/api-auth/protected/profile', { withCredentials: true });
       
       setUser(res.data);
@@ -47,8 +37,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       console.warn('Erro no logout, mas prosseguindo...', error);
     } finally {
-      // 🔧 LIMPAR TOKEN JWT NO LOGOUT
-      localStorage.removeItem('jwt_token');
       setUser(null);
       setRetryMessage(null);
     }
