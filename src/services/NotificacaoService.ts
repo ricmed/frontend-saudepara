@@ -126,7 +126,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json'
   },
-  withCredentials: true // 🍪 MUDANÇA: Usar cookies ao invés de JWT headers
+  withCredentials: false // 🔧 MUDANÇA: Não usar cookies, usar token JWT
 });
 
 // 🔧 FUNÇÃO SIMPLIFICADA: Token do localStorage (obtido no login)
@@ -138,6 +138,20 @@ const getAuthToken = (): string | null => {
   }
   return token;
 };
+
+// 🔧 INTERCEPTOR: Adicionar token JWT automaticamente
+api.interceptors.request.use(
+  (config) => {
+    const token = getAuthToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 // 🔧 INTERCEPTOR: Limpar token em caso de 401
 api.interceptors.response.use(
@@ -151,6 +165,8 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Instância do axios
 
 // Função para tratar erros da API
 const handleApiError = (error: any): never => {

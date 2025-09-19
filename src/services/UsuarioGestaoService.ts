@@ -88,15 +88,33 @@ export const PERMISSOES_LABELS = {
 class UsuarioGestaoService {
   private keycloakApi = axios.create({
     baseURL: KEYCLOAK_API_URL,
-    withCredentials: true, // 🍪 Usar cookies ao invés de JWT headers
+    withCredentials: false, // 🔧 JWT ao invés de cookies
   });
 
   private backendApi = axios.create({
     baseURL: `${BACKEND_API_URL}/api`,
-    withCredentials: true, // 🍪 Usar cookies ao invés de JWT headers
+    withCredentials: false, // 🔧 JWT ao invés de cookies
   });
 
   constructor() {
+    // 🔧 CONFIGURAR INTERCEPTORS JWT para Keycloak API
+    this.keycloakApi.interceptors.request.use((config) => {
+      const token = localStorage.getItem('jwt_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    });
+
+    // 🔧 CONFIGURAR INTERCEPTORS JWT para Backend API
+    this.backendApi.interceptors.request.use((config) => {
+      const token = localStorage.getItem('jwt_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    });
+
     // 🔧 INTERCEPTOR de resposta para ambas as APIs
     [this.keycloakApi, this.backendApi].forEach(api => {
       api.interceptors.response.use(
