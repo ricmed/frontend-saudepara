@@ -19,7 +19,8 @@ import {
   ChevronRight,
   ArrowLeft,
   Edit,
-  Trash2
+  Trash2,
+  Shield
 } from 'lucide-react';
 
 // Importar service de gestão de usuários
@@ -41,12 +42,133 @@ interface User {
 
 interface UserWithAccess extends User {
   acessos?: UsuarioAcesso[];
+  roles?: string[]; // Roles do Keycloak
+  userLevel?: 'admin.municipio' | 'admin.unidade' | 'user' | 'admin.estado' | 'notificador';
+  canBeDeleted?: boolean; // Se o usuário atual pode excluir este usuário
 }
 
 interface UserFilters {
   search: string;
   enabled?: boolean;
 }
+
+// Determinar o nível de um usuário baseado em suas ROLES do Keycloak (não níveis de acesso)
+const getUserLevelFromRoles = (roles: string[]): 'admin.municipio' | 'admin.unidade' | 'notificador' | 'user' | 'admin.estado' => {
+  console.log(`🎭 Analisando roles (${roles.length}):`, roles);
+  
+  // PRIORIDADE HIERÁRQUICA: Admin roles sempre têm prioridade sobre outras roles
+  // Ordem: admin > admin.estado > admin.municipio > admin.unidade > notificador > user
+  
+  // 1. Admin master (maior prioridade)
+  if (roles.includes('admin')) {
+    console.log(`🏆 Admin master detectado (prioridade máxima) - ignora outras roles: ${roles.filter(r => r !== 'admin').join(', ')}`);
+    return 'admin.estado'; // Admin master = admin.estado para fins de UI
+  }
+  
+  // 2. Admin estado
+  if (roles.includes('admin.estado')) {
+    console.log(`🏅 Admin estado detectado (prioridade alta) - ignora outras roles: ${roles.filter(r => r !== 'admin.estado').join(', ')}`);
+    return 'admin.estado';
+  }
+  
+  // 3. Admin município
+  if (roles.includes('admin.municipio')) {
+    console.log(`🥇 Admin município detectado (prioridade média-alta) - ignora outras roles: ${roles.filter(r => r !== 'admin.municipio').join(', ')}`);
+    return 'admin.municipio';
+  }
+  
+  // 4. Admin unidade
+  if (roles.includes('admin.unidade')) {
+    console.log(`🥈 Admin unidade detectado (prioridade média) - ignora outras roles: ${roles.filter(r => r !== 'admin.unidade').join(', ')}`);
+    return 'admin.unidade';
+  }
+  
+  // 5. Notificador (prioridade baixa)
+  if (roles.includes('notificador')) {
+    console.log(`🥉 Notificador detectado (prioridade baixa)`);
+    return 'notificador';
+  }
+  
+  // 6. Usuário comum (menor prioridade)
+  console.log(`👤 Usuário comum (roles não reconhecidas: ${roles.join(', ')})`);
+  return 'user';
+};
+
+// Determinar o nível de um usuário baseado em seus acessos (FUNÇÃO LEGACY - manter por compatibilidade)
+const getUserLevel = (user: UserWithAccess): 'admin.municipio' | 'admin.unidade' | 'user' | 'admin.estado' | 'notificador' => {
+  // Se tem roles do Keycloak, usar essa informação (mais confiável)
+  if (user.roles && user.roles.length > 0) {
+    return getUserLevelFromRoles(user.roles);
+  }
+  
+  // Fallback para análise baseada em acessos (caso não tenha roles carregadas)
+  if (!user.acessos || user.acessos.length === 0) return 'user';
+  
+  // Para admin.estado, incluir todos os usuários do estado (mais permissivo que município)
+  if (user.acessos.some(acesso => acesso.nivel_acesso === 'estado')) {
+    return 'admin.estado';
+  }
+  
+  if (user.acessos.some(acesso => acesso.nivel_acesso === 'municipio')) {
+    return 'admin.municipio';
+  }
+  
+  if (user.acessos.some(acesso => acesso.nivel_acesso === 'unidade')) {
+    const unidadeAcessos = user.acessos.filter(acesso => acesso.nivel_acesso === 'unidade');
+    
+    if (unidadeAcessos.length > 1) {
+      return 'admin.unidade';
+    }
+    
+    const hasAdminPermissions = unidadeAcessos.some(acesso => acesso.permissoes >= 10);
+    if (hasAdminPermissions) {
+      return 'admin.unidade';
+    }
+    
+    const hasOtherAccess = user.acessos.some(acesso => acesso.nivel_acesso !== 'unidade');
+    if (hasOtherAccess) {
+      return 'admin.unidade';
+    }
+    
+    return 'notificador';
+  }
+  
+  return 'user';
+};
+
+// Determinar se um usuário pode ser excluído pelo admin atual
+const canUserBeDeleted = (targetUser: UserWithAccess, currentAdminLevel: string): boolean => {
+  const targetUserLevel = getUserLevel(targetUser);
+  
+  switch (currentAdminLevel) {
+    case 'admin':
+      // Admin master pode excluir qualquer um
+      return true;
+      
+    case 'admin.estado':
+      // Admin estado pode excluir admin.municipio, admin.unidade, notificadores e users
+      return ['admin.municipio', 'admin.unidade', 'notificador', 'user'].includes(targetUserLevel);
+      
+    case 'admin.municipio':
+      // Admin município pode excluir APENAS admin.unidade, notificadores e users, NÃO outros admin.municipio
+      return ['admin.unidade', 'notificador', 'user'].includes(targetUserLevel);
+      
+    case 'admin.unidade':
+      // Admin unidade pode excluir apenas notificadores e users
+      return ['notificador', 'user'].includes(targetUserLevel);
+      
+    default:
+      return false;
+  }
+};
+
+// Verificar se um usuário é notificador de unidade
+const isNotificadorUnidade = (user: UserWithAccess): boolean => {
+  const userLevel = getUserLevel(user);
+  
+  // Usuário é notificador se tem role específica de notificador
+  return userLevel === 'notificador';
+};
 
 const UserListEstado: React.FC = () => {
   const navigate = useNavigate();
@@ -125,7 +247,10 @@ const UserListEstado: React.FC = () => {
         try {
           // Para admin master, incluir todos os usuários
           if (isAdminMaster) {
-            usersWithAccess.push({
+            // Buscar roles do usuário
+            const userRoles = await usuarioGestaoService.getUserRoles(userData.id);
+            
+            const userWithBasicInfo = {
               id: userData.id || `user-${usersWithAccess.length}`,
               username: userData.username || `user-${usersWithAccess.length}`,
               firstName: userData.firstName || '',
@@ -134,7 +259,18 @@ const UserListEstado: React.FC = () => {
               enabled: userData.enabled !== false,
               emailVerified: true,
               createdTimestamp: userData.createdTimestamp || Date.now(),
-              acessos: []
+              acessos: [],
+              roles: userRoles
+            };
+            
+            // Adicionar informações de nível e permissão
+            const userLevel = getUserLevel(userWithBasicInfo);
+            const canBeDeleted = canUserBeDeleted(userWithBasicInfo, 'admin');
+            
+            usersWithAccess.push({
+              ...userWithBasicInfo,
+              userLevel,
+              canBeDeleted
             });
             continue;
           }
@@ -143,23 +279,57 @@ const UserListEstado: React.FC = () => {
           if (isAdminEstado) {
             const userAcessos = await usuarioGestaoService.getUsuarioAcessos(userData.id);
             
-            // Verificar se o usuário tem acesso ao estado do admin
-            // Usar userPermissions.estadoId em vez de adminContext.estadoId
+            // Debug: Verificar estrutura completa dos dados - APENAS UMA VEZ
+            if (userData.username === 'debug_user' || usersWithAccess.length === 0) {
+              console.log('🔍 ESTRUTURA COMPLETA DOS DADOS DE ACESSO:', JSON.stringify(userAcessos, null, 2));
+            }
+            
+            // Admin.estado deve ver todos os usuários que têm algum acesso no estado dele
             const adminEstadoId = userPermissions.estadoId;
             
-            const hasEstadoAccess = userAcessos.some(acesso => 
-              acesso.nivel_acesso === 'estado' && 
-              acesso.tipo_estado_id === adminEstadoId
-            );
-            
-            console.log(`🔍 Verificando usuário ${userData.username}:`, {
-              userAcessos,
-              adminEstadoId,
-              hasEstadoAccess
+            // CRITÉRIOS DE INCLUSÃO para admin.estado (versão simplificada para debug):
+            const hasStateAccess = userAcessos.some(acesso => {
+              // 1. Acesso direto ao estado
+              if (acesso.nivel_acesso === 'estado' && acesso.tipo_estado_id === adminEstadoId) {
+                return true;
+              }
+              
+              // 2. Acesso a municípios do estado - VERIFICAR SE CAMPO EXISTE
+              if (acesso.nivel_acesso === 'municipio') {
+                // TEMPORÁRIO: aceitar qualquer acesso a município dentro do estado
+                console.log('🏛️ Acesso município encontrado:', acesso);
+                return true; // TEMPORÁRIO para debug
+              }
+              
+              // 3. Acesso a unidades - VERIFICAR SE CAMPO EXISTE
+              if (acesso.nivel_acesso === 'unidade') {
+                // TEMPORÁRIO: aceitar qualquer acesso a unidade dentro do estado
+                console.log('🏥 Acesso unidade encontrado:', acesso);
+                return true; // TEMPORÁRIO para debug
+              }
+              
+              return false;
             });
             
-            if (hasEstadoAccess) {
-              usersWithAccess.push({
+            console.log(`🔍 Verificando usuário ${userData.username}:`, {
+              userAcessos: userAcessos.length,
+              adminEstadoId,
+              hasStateAccess,
+              acessosDetalhados: userAcessos.map(a => ({
+                nivel: a.nivel_acesso,
+                tipo_estado_id: a.tipo_estado_id,
+                tipo_municipio_id: a.tipo_municipio_id,
+                estabelecimento_id: a.estabelecimento_id,
+                estabelecimento_nome: a.estabelecimento?.nome,
+                tipo_municipio_desc: a.tipo_municipio?.descricao
+              }))
+            });
+            
+            if (hasStateAccess) {
+              // Buscar roles do usuário
+              const userRoles = await usuarioGestaoService.getUserRoles(userData.id);
+              
+              const userWithAccess = {
                 id: userData.id || `user-${usersWithAccess.length}`,
                 username: userData.username || `user-${usersWithAccess.length}`,
                 firstName: userData.firstName || '',
@@ -168,7 +338,33 @@ const UserListEstado: React.FC = () => {
                 enabled: userData.enabled !== false,
                 emailVerified: true,
                 createdTimestamp: userData.createdTimestamp || Date.now(),
-                acessos: userAcessos
+                acessos: userAcessos,
+                roles: userRoles
+              };
+              
+              // Adicionar informações de nível e permissão de exclusão
+              const userLevel = getUserLevel(userWithAccess);
+              const canBeDeleted = canUserBeDeleted(userWithAccess, 'admin.estado');
+              const isNotificador = isNotificadorUnidade(userWithAccess);
+              
+              console.log(`✅ Incluindo usuário ${userData.username}:`, {
+                userLevel,
+                isNotificador,
+                canBeDeleted,
+                roles: userRoles,
+                totalAcessos: userAcessos.length,
+                acessosDetalhados: userAcessos.map(a => ({
+                  nivel: a.nivel_acesso,
+                  permissoes: a.permissoes,
+                  estabelecimento_id: a.estabelecimento_id,
+                  estado_id: a.tipo_estado_id
+                }))
+              });
+              
+              usersWithAccess.push({
+                ...userWithAccess,
+                userLevel,
+                canBeDeleted
               });
             }
           }
@@ -176,7 +372,15 @@ const UserListEstado: React.FC = () => {
           console.warn(`⚠️ Erro ao buscar acessos do usuário ${userData.username}:`, error);
           // Em caso de erro para admin master, incluir mesmo assim
           if (isAdminMaster) {
-            usersWithAccess.push({
+            // Tentar buscar roles mesmo se acessos falharam
+            let userRoles: string[] = [];
+            try {
+              userRoles = await usuarioGestaoService.getUserRoles(userData.id);
+            } catch (roleError) {
+              console.warn(`⚠️ Erro ao buscar roles do usuário ${userData.username}:`, roleError);
+            }
+            
+            const userWithBasicInfo = {
               id: userData.id || `user-${usersWithAccess.length}`,
               username: userData.username || `user-${usersWithAccess.length}`,
               firstName: userData.firstName || '',
@@ -185,7 +389,18 @@ const UserListEstado: React.FC = () => {
               enabled: userData.enabled !== false,
               emailVerified: true,
               createdTimestamp: userData.createdTimestamp || Date.now(),
-              acessos: []
+              acessos: [],
+              roles: userRoles
+            };
+            
+            // Adicionar informações de nível e permissão
+            const userLevel = getUserLevel(userWithBasicInfo);
+            const canBeDeleted = canUserBeDeleted(userWithBasicInfo, 'admin');
+            
+            usersWithAccess.push({
+              ...userWithBasicInfo,
+              userLevel,
+              canBeDeleted
             });
           }
         }
@@ -413,18 +628,66 @@ const UserListEstado: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <div className="flex-shrink-0 h-10 w-10">
-                              <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                                <Users className="h-5 w-5 text-blue-600" />
+                              <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                                user.userLevel === 'admin.municipio' ? 'bg-yellow-100' :
+                                user.userLevel === 'admin.unidade' ? 'bg-purple-100' :
+                                user.userLevel === 'admin.estado' ? 'bg-red-100' :
+                                user.userLevel === 'notificador' ? 'bg-green-100' :
+                                'bg-blue-100'
+                              }`}>
+                                {user.userLevel === 'admin.municipio' || user.userLevel === 'admin.unidade' || user.userLevel === 'admin.estado' ? (
+                                  <Shield className={`h-5 w-5 ${
+                                    user.userLevel === 'admin.municipio' ? 'text-yellow-600' :
+                                    user.userLevel === 'admin.unidade' ? 'text-purple-600' :
+                                    'text-red-600'
+                                  }`} />
+                                ) : (
+                                  <Users className={`h-5 w-5 ${
+                                    user.userLevel === 'notificador' ? 'text-green-600' : 'text-blue-600'
+                                  }`} />
+                                )}
                               </div>
                             </div>
                             <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">
+                              <div className="text-sm font-medium text-gray-900 flex items-center">
                                 {user.firstName && user.lastName 
                                   ? `${user.firstName} ${user.lastName}`
                                   : user.username
                                 }
+                                {user.userLevel === 'admin.municipio' && (
+                                  <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                    Admin Município
+                                  </span>
+                                )}
+                                {user.userLevel === 'admin.unidade' && (
+                                  <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                    Admin Unidade
+                                  </span>
+                                )}
+                                {user.userLevel === 'admin.estado' && (
+                                  <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                    Admin Estado
+                                  </span>
+                                )}
+                                {user.userLevel === 'notificador' && (
+                                  <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    Notificador
+                                  </span>
+                                )}
+                                {isNotificadorUnidade(user) && user.userLevel !== 'notificador' && (
+                                  <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    Notificador (legacy)
+                                  </span>
+                                )}
                               </div>
-                              <div className="text-sm text-gray-500">@{user.username}</div>
+                              <div className="text-sm text-gray-500">
+                                @{user.username}
+                                {!user.canBeDeleted && (
+                                  <span className="ml-2 text-xs text-red-500 font-medium">
+                                    (não pode ser excluído)
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -462,17 +725,19 @@ const UserListEstado: React.FC = () => {
                                     <Edit className="h-4 w-4 mr-2" />
                                     Editar
                                   </button>
-                                  <button
-                                    onClick={() => confirmDeleteUser(user.id, 
-                                      user.firstName && user.lastName 
-                                        ? `${user.firstName} ${user.lastName}`
-                                        : user.username
-                                    )}
-                                    className="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100 w-full"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Deletar
-                                  </button>
+                                  {user.canBeDeleted && (
+                                    <button
+                                      onClick={() => confirmDeleteUser(user.id, 
+                                        user.firstName && user.lastName 
+                                          ? `${user.firstName} ${user.lastName}`
+                                          : user.username
+                                      )}
+                                      className="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100 w-full"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Deletar
+                                    </button>
+                                  )}
                                   <div className="border-t border-gray-100"></div>
                                   <button
                                     onClick={() => handleUserAction(user.id, user.enabled ? 'disable' : 'enable')}

@@ -41,11 +41,54 @@ interface User {
 
 interface UserWithAccess extends User {
   acessos?: UsuarioAcesso[];
+  roles?: string[];
 }
 
 interface UserFilters {
   search: string;
   enabled?: boolean;
+}
+
+// Função para obter o nível hierárquico a partir dos roles do Keycloak
+function getUserLevelFromRoles(roles: string[]): 'admin' | 'admin.estado' | 'admin.municipio' | 'admin.unidade' | 'notificador' | 'user' {
+  // Prioridade hierárquica dos roles (do maior para o menor)
+  const roleHierarchy = [
+    'admin',
+    'admin.estado', 
+    'admin.municipio',
+    'admin.unidade',
+    'notificador'
+  ];
+  
+  for (const role of roleHierarchy) {
+    if (roles.includes(role)) {
+      return role as any;
+    }
+  }
+  
+  return 'user';
+}
+
+// Função para determinar se usuário pode ser deletado baseado no tipo de admin
+function canUserBeDeleted(targetUser: UserWithAccess, adminType: string): boolean {
+  if (!targetUser.roles) return false;
+  
+  const targetLevel = getUserLevelFromRoles(targetUser.roles);
+  
+  // Admin master pode deletar qualquer um
+  if (adminType === 'admin') return true;
+  
+  // Admin.unidade só pode deletar notificadores e usuários comuns
+  if (adminType === 'admin.unidade') {
+    return ['notificador', 'user'].includes(targetLevel);
+  }
+  
+  return false;
+}
+
+// Função para identificar se é notificador de unidade baseado nos roles
+function isNotificadorUnidade(user: UserWithAccess): boolean {
+  return user.roles?.includes('notificador') || false;
 }
 
 const UserListUnidade: React.FC = () => {
@@ -159,6 +202,9 @@ const UserListUnidade: React.FC = () => {
             });
             
             if (hasUnidadeAccess) {
+              // Buscar roles do usuário
+              const userRoles = await usuarioGestaoService.getUserRoles(userData.id);
+              
               usersWithAccess.push({
                 id: userData.id || `user-${usersWithAccess.length}`,
                 username: userData.username || `user-${usersWithAccess.length}`,
@@ -168,7 +214,8 @@ const UserListUnidade: React.FC = () => {
                 enabled: userData.enabled !== false,
                 emailVerified: true,
                 createdTimestamp: userData.createdTimestamp || Date.now(),
-                acessos: userAcessos
+                acessos: userAcessos,
+                roles: userRoles
               });
             }
           }
@@ -379,6 +426,9 @@ const UserListUnidade: React.FC = () => {
                       Email
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Tipo
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -389,7 +439,7 @@ const UserListUnidade: React.FC = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {loading ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
+                      <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
                         <div className="flex justify-center">
                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                         </div>
@@ -398,7 +448,7 @@ const UserListUnidade: React.FC = () => {
                     </tr>
                   ) : paginatedUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
+                      <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
                         <Users className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                         <p className="text-lg font-medium">Nenhum usuário encontrado</p>
                         <p className="text-sm">Tente ajustar os filtros ou criar um novo usuário.</p>
@@ -427,6 +477,45 @@ const UserListUnidade: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">{user.email || 'N/A'}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {(() => {
+                            if (!user.roles) {
+                              return <span className="text-sm text-gray-400">Carregando...</span>;
+                            }
+                            
+                            const userLevel = getUserLevelFromRoles(user.roles);
+                            const isNotificador = isNotificadorUnidade(user);
+                            const canBeDeleted = canUserBeDeleted(user, user?.roles?.includes('admin') ? 'admin' : 'admin.unidade');
+                            
+                            const getBadgeConfig = (level: string) => {
+                              switch (level) {
+                                case 'admin':
+                                  return { color: 'bg-purple-100 text-purple-800', text: 'Admin Master' };
+                                case 'admin.estado':
+                                  return { color: 'bg-blue-100 text-blue-800', text: 'Admin Estado' };
+                                case 'admin.municipio':
+                                  return { color: 'bg-green-100 text-green-800', text: 'Admin Município' };
+                                case 'admin.unidade':
+                                  return { color: 'bg-yellow-100 text-yellow-800', text: 'Admin Unidade' };
+                                case 'notificador':
+                                  return { color: 'bg-orange-100 text-orange-800', text: 'Notificador' };
+                                default:
+                                  return { color: 'bg-gray-100 text-gray-800', text: 'Usuário' };
+                              }
+                            };
+                            
+                            const badgeConfig = getBadgeConfig(userLevel);
+                            
+                            return (
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeConfig.color}`}>
+                                {badgeConfig.text}
+                                {isNotificador && userLevel !== 'notificador' && (
+                                  <span className="ml-1 text-orange-600">•</span>
+                                )}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${

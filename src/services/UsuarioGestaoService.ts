@@ -120,6 +120,45 @@ class UsuarioGestaoService {
   }
 
   /**
+   * Buscar roles de um usuário específico no Keycloak
+   */
+  async getUserRoles(userId: string): Promise<string[]> {
+    try {
+      console.log(`🎭 Buscando roles do usuário: ${userId}`);
+      const response = await this.keycloakApi.get(`/admin/users/${userId}/roles`);
+      console.log('🔑 Response completo de roles:', {
+        status: response.status,
+        data: response.data,
+        dataType: typeof response.data,
+        isArray: Array.isArray(response.data)
+      });
+      
+      if (!Array.isArray(response.data)) {
+        console.warn('⚠️ Response.data não é array:', response.data);
+        return [];
+      }
+      
+      // Extrair apenas os nomes das roles e filtrar roles do sistema
+      const allRoleNames = response.data.map((role: any) => {
+        console.log('🔍 Processando role:', role);
+        return role.name;
+      });
+      
+      // Filtrar roles do sistema que não são relevantes
+      const systemRoles = ['default-roles-saudepara', 'offline_access', 'uma_authorization'];
+      const roleNames = allRoleNames.filter((roleName: string) => !systemRoles.includes(roleName));
+      
+      console.log('✅ Roles extraídas (filtradas):', roleNames);
+      console.log('🗑️ Roles do sistema removidas:', allRoleNames.filter((role: string) => systemRoles.includes(role)));
+      return roleNames;
+    } catch (error: any) {
+      console.error('Erro ao buscar roles do usuário:', error);
+      // Se não conseguir buscar roles, retornar array vazio em vez de falhar
+      return [];
+    }
+  }
+
+  /**
    * Criar novo usuário no Keycloak
    */
   async createUsuario(userData: CreateUsuarioRequest): Promise<string | null> {
