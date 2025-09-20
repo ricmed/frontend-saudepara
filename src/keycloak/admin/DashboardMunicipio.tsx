@@ -14,100 +14,81 @@ import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { usuarioGestaoService } from '@/services/UsuarioGestaoService';
 
 interface AdminStats {
-  totalUsers: number;
+  total: number;
   timestamp: string;
-}
-
-interface RecentActivity {
-  id: string;
-  type: 'userCreated' | 'userDisabled';
-  at: string;
-  who?: string;
-  details?: string;
 }
 
 const DashboardMunicipio: React.FC = () => {
   const { user } = useAuth();
   const { selectedLanguage } = useLanguage();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [stats, setStats] = useState<AdminStats | null>(null);
-  const [activity, setActivity] = useState<RecentActivity[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<AdminStats>({
+    total: 0,
+    timestamp: new Date().toISOString()
+  });
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Hook para permissões do usuário atual
   const userPermissions = useUserPermissions();
 
-  // Função para interpolação de strings de tradução
-  const interpolate = (s?: string, vars: Record<string, string> = {}) =>
-    (s || '').replace(/\{\{?(\w+)\}?\}/g, (_, k) => vars[k] ?? '');
-
-  // Função para formatação de tempo relativo
-  const formatRelative = (date: Date, locale = 'pt-BR') => {
-    const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
-    const diff = (Date.now() - date.getTime()) / 1000;
-    const abs = Math.abs(diff);
-    if (abs < 60) return rtf.format(-Math.round(diff), 'second');
-    if (abs < 3600) return rtf.format(-Math.round(diff / 60), 'minute');
-    if (abs < 86400) return rtf.format(-Math.round(diff / 3600), 'hour');
-    return rtf.format(-Math.round(diff / 86400), 'day');
-  };
-
-  useEffect(() => {
-    loadStats();
-    loadActivity();
-    
-    // Auto refresh a cada 30 segundos
-    const interval = setInterval(() => {
-      loadStats();
-      loadActivity();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadStats = async () => {
+  // Função otimizada para buscar contagens por município
+  const loadUserCounts = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Para admin.municipio, vamos buscar apenas os usuários do município vinculado
-      const usuarios = await usuarioGestaoService.getUsuarios();
+      if (userPermissions.municipioId) {
+        console.log(`📊 Carregando contagens para município ${userPermissions.municipioId}...`);
+        
+        // Usar novo método otimizado do service
+        const contagens = await usuarioGestaoService.getContagensUsuariosPorMunicipio(userPermissions.municipioId);
+        
+        setStats({
+          total: contagens.total,
+          timestamp: new Date().toISOString()
+        });
+        
+        console.log('✅ Contagens carregadas:', contagens);
+      } else {
+        // Fallback: usuário sem municipioId
+        setStats({
+          total: 0,
+          timestamp: new Date().toISOString()
+        });
+        console.warn('⚠️ Usuário não possui municipioId definido');
+      }
       
-      // Filtrar usuários pelo município do admin atual
-      const usuariosMunicipio = usuarios.filter(() => {
-        // Lógica para filtrar usuários do município específico
-        // Isso deve ser implementado baseado na estrutura de dados do seu sistema
-        return true; // Por enquanto, retorna todos
-      });
-
+    } catch (err: any) {
+      console.error('Erro ao carregar contagens de usuários:', err);
+      setError('Não foi possível carregar as contagens de usuários');
+      
+      // Em caso de erro, manter os valores zerados
       setStats({
-        totalUsers: usuariosMunicipio.length,
+        total: 0,
         timestamp: new Date().toISOString()
       });
-    } catch (e: any) {
-      console.error('Erro ao carregar stats:', e);
-      setError('Não foi possível carregar as estatísticas.');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadActivity = async () => {
-    try {
-      // Simular atividade recente para admin.municipio
-      setActivity([
-        {
-          id: '1',
-          type: 'userCreated',
-          at: new Date().toISOString(),
-          who: 'Sistema',
-          details: 'Novo usuário notificador criado'
-        }
-      ]);
-    } catch (e) {
-      console.warn('Sem atividade ou endpoint indisponível');
-    }
-  };
+  // Função para interpolação de strings de tradução
+  const interpolate = (s?: string, vars: Record<string, string> = {}) =>
+    (s || '').replace(/\{\{?(\w+)\}?\}/g, (_, k) => vars[k] ?? '');
+
+  // Carregar contagens na inicialização
+  useEffect(() => {
+    loadUserCounts();
+  }, [userPermissions.municipioId]); // Recarregar quando municipioId mudar
+
+  // Auto refresh a cada 2 minutos (menos frequente para evitar sobrecarga)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadUserCounts();
+    }, 120000); // 2 minutos
+    return () => clearInterval(interval);
+  }, [userPermissions.municipioId]);
 
   // Ações limitadas para admin.municipio
   const quickActions = [
@@ -159,8 +140,7 @@ const DashboardMunicipio: React.FC = () => {
               </div>
               <button
                 onClick={() => {
-                  loadStats();
-                  loadActivity();
+                  loadUserCounts();
                 }}
                 className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors whitespace-nowrap"
                 disabled={loading}
@@ -178,8 +158,9 @@ const DashboardMunicipio: React.FC = () => {
             )}
           </div>
 
-          {/* Card de estatística - apenas total de usuários */}
+          {/* Cards de estatísticas simples */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
+            {/* Total de usuários */}
             <div className="bg-white rounded-lg shadow p-4 sm:p-6 min-w-0">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -190,12 +171,13 @@ const DashboardMunicipio: React.FC = () => {
                     Total de Usuários do Município
                   </p>
                   <p className="text-xl sm:text-2xl font-semibold text-gray-900 truncate">
-                    {loading ? '...' : stats?.totalUsers || 0}
+                    {loading ? '...' : stats.total}
                   </p>
                 </div>
               </div>
             </div>
 
+            {/* Última atualização */}
             <div className="bg-white rounded-lg shadow p-4 sm:p-6 min-w-0">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -206,7 +188,7 @@ const DashboardMunicipio: React.FC = () => {
                     Última Atualização
                   </p>
                   <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">
-                    {loading ? '...' : stats?.timestamp ? 
+                    {loading ? '...' : stats.timestamp ? 
                       new Date(stats.timestamp).toLocaleString(selectedLanguage) : 
                       'Nunca'
                     }
@@ -245,36 +227,6 @@ const DashboardMunicipio: React.FC = () => {
                   </p>
                 </a>
               ))}
-            </div>
-          </div>
-
-          {/* Seção de atividades recentes */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="p-4 sm:p-6">
-              <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4 truncate">
-                Atividade Recente
-              </h2>
-              <div className="space-y-3 sm:space-y-4">
-                {activity.length === 0 && (
-                  <div className="p-3 sm:p-4 bg-gray-50 rounded-lg text-xs sm:text-sm text-gray-500">
-                    Sem atividades recentes.
-                  </div>
-                )}
-                {activity.map(a => (
-                  <div key={a.id} className="flex items-center p-3 sm:p-4 bg-gray-50 rounded-lg min-w-0">
-                    <Users className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 mr-2 sm:mr-3 flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">
-                        {a.type === 'userCreated' ? 'Usuário criado com sucesso' : 'Usuário desabilitado'}
-                        {a.who && <span className="text-gray-600"> - {a.who}</span>}
-                      </p>
-                      <p className="text-xs text-gray-500 truncate">
-                        {formatRelative(new Date(a.at), selectedLanguage || 'pt-BR')}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         </div>

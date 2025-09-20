@@ -986,6 +986,177 @@ class UsuarioGestaoService {
       throw new Error(this.getErrorMessage(error, 'Erro ao buscar eventos'));
     }
   }
+
+  // ========== MÉTODOS DE CONTAGENS POR ROLE (OTIMIZADOS) ==========
+
+  /**
+   * 🚀 Obter contagens de usuários por role no escopo do estado
+   * Retorna contagens para admin.estado, admin.municipio, admin.unidade e notificadores
+   * de todos os municípios e estabelecimentos do estado especificado
+   */
+  async getContagensUsuariosPorEstado(estadoId: number): Promise<{
+    adminEstado: number;
+    adminMunicipio: number;
+    adminUnidade: number;
+    notificadores: number;
+    total: number;
+  }> {
+    try {
+      console.log(`📊 Buscando contagens de usuários para estado ${estadoId}...`);
+      
+      const response = await this.backendApi.get(`/usuario-acesso/contagens/estado/${estadoId}`);
+      
+      const contagens = response.data?.data || response.data || {};
+      
+      console.log('✅ Contagens por estado recebidas:', contagens);
+      
+      return {
+        adminEstado: contagens.adminEstado || contagens.admin_estado || 0,
+        adminMunicipio: contagens.adminMunicipio || contagens.admin_municipio || 0,
+        adminUnidade: contagens.adminUnidade || contagens.admin_unidade || 0,
+        notificadores: contagens.notificadores || 0,
+        total: contagens.total || 0 // 🚀 CORRIGIDO: Usar o total correto do backend
+      };
+    } catch (error: any) {
+      console.error('Erro ao buscar contagens por estado:', error);
+      // Fallback: retornar zeros se o endpoint não existir ainda
+      if (error.response?.status === 404) {
+        console.warn('⚠️ Endpoint de contagens por estado não implementado ainda');
+        return {
+          adminEstado: 0,
+          adminMunicipio: 0,
+          adminUnidade: 0,
+          notificadores: 0,
+          total: 0
+        };
+      }
+      throw new Error(this.getErrorMessage(error, 'Erro ao carregar contagens de usuários por estado'));
+    }
+  }
+
+  /**
+   * 🚀 Obter contagens de usuários por role no escopo do município
+   * Retorna contagens para admin.municipio, admin.unidade e notificadores
+   * do município especificado
+   */
+  async getContagensUsuariosPorMunicipio(municipioId: number): Promise<{
+    adminMunicipio: number;
+    adminUnidade: number;
+    notificadores: number;
+    total: number;
+  }> {
+    try {
+      console.log(`📊 Buscando contagens de usuários para município ${municipioId}...`);
+      
+      const response = await this.backendApi.get(`/usuario-acesso/contagens/municipio/${municipioId}`);
+      
+      const contagens = response.data?.data || response.data || {};
+      
+      console.log('✅ Contagens por município recebidas:', contagens);
+      
+      return {
+        adminMunicipio: contagens.adminMunicipio || contagens.admin_municipio || 0,
+        adminUnidade: contagens.adminUnidade || contagens.admin_unidade || 0,
+        notificadores: contagens.notificadores || 0,
+        total: contagens.total || 0 // 🚀 CORRIGIDO: Usar o total correto do backend em vez de somar
+      };
+    } catch (error: any) {
+      console.error('Erro ao buscar contagens por município:', error);
+      // Fallback: retornar zeros se o endpoint não existir ainda
+      if (error.response?.status === 404) {
+        console.warn('⚠️ Endpoint de contagens por município não implementado ainda');
+        return {
+          adminMunicipio: 0,
+          adminUnidade: 0,
+          notificadores: 0,
+          total: 0
+        };
+      }
+      throw new Error(this.getErrorMessage(error, 'Erro ao carregar contagens de usuários por município'));
+    }
+  }
+
+  /**
+   * 🚀 Obter contagens de usuários por role no escopo do estabelecimento
+   * Retorna contagens para admin.unidade e notificadores do estabelecimento especificado
+   */
+  async getContagensUsuariosPorEstabelecimento(estabelecimentoId: number): Promise<{
+    adminUnidade: number;
+    notificadores: number;
+    total: number;
+  }> {
+    try {
+      console.log(`📊 Buscando contagens de usuários para estabelecimento ${estabelecimentoId}...`);
+      
+      const response = await this.backendApi.get(`/usuario-acesso/contagens/estabelecimento/${estabelecimentoId}`);
+      
+      const contagens = response.data?.data || response.data || {};
+      
+      console.log('✅ Contagens por estabelecimento recebidas:', contagens);
+      
+      return {
+        adminUnidade: contagens.adminUnidade || contagens.admin_unidade || 0,
+        notificadores: contagens.notificadores || 0,
+        total: contagens.total || 0 // 🚀 CORRIGIDO: Usar o total correto do backend
+      };
+    } catch (error: any) {
+      console.error('Erro ao buscar contagens por estabelecimento:', error);
+      // Fallback: retornar zeros se o endpoint não existir ainda
+      if (error.response?.status === 404) {
+        console.warn('⚠️ Endpoint de contagens por estabelecimento não implementado ainda');
+        return {
+          adminUnidade: 0,
+          notificadores: 0,
+          total: 0
+        };
+      }
+      throw new Error(this.getErrorMessage(error, 'Erro ao carregar contagens de usuários por estabelecimento'));
+    }
+  }
+
+  /**
+   * 🚀 Obter contagens gerais de usuários (para admin supremo)
+   * Retorna contagens totais de todos os usuários por role
+   */
+  async getContagensUsuariosGerais(): Promise<{
+    adminEstado: number;
+    adminMunicipio: number;
+    adminUnidade: number;
+    notificadores: number;
+    total: number;
+  }> {
+    try {
+      console.log('📊 Buscando contagens gerais de usuários...');
+      
+      const response = await this.backendApi.get('/usuario-acesso/contagens/gerais');
+      
+      const contagens = response.data?.data || response.data || {};
+      
+      console.log('✅ Contagens gerais recebidas:', contagens);
+      
+      return {
+        adminEstado: contagens.adminEstado || contagens.admin_estado || 0,
+        adminMunicipio: contagens.adminMunicipio || contagens.admin_municipio || 0,
+        adminUnidade: contagens.adminUnidade || contagens.admin_unidade || 0,
+        notificadores: contagens.notificadores || 0,
+        total: contagens.total || 0 // 🚀 CORRIGIDO: Usar o total correto do backend
+      };
+    } catch (error: any) {
+      console.error('Erro ao buscar contagens gerais:', error);
+      // Fallback: retornar zeros se o endpoint não existir ainda
+      if (error.response?.status === 404) {
+        console.warn('⚠️ Endpoint de contagens gerais não implementado ainda');
+        return {
+          adminEstado: 0,
+          adminMunicipio: 0,
+          adminUnidade: 0,
+          notificadores: 0,
+          total: 0
+        };
+      }
+      throw new Error(this.getErrorMessage(error, 'Erro ao carregar contagens gerais de usuários'));
+    }
+  }
 }
 
 export const usuarioGestaoService = new UsuarioGestaoService();

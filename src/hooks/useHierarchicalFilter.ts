@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/keycloak/AuthProvider';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { usuarioGestaoService, UsuarioAcesso } from '@/services/UsuarioGestaoService';
@@ -29,6 +29,21 @@ export interface HierarchicalFilterResult {
 /**
  * Hook para filtrar usuários hierarquicamente baseado no nível de acesso do admin
  */
+// Cache global para roles e acessos
+const rolesCache = new Map<string, string[]>();
+const acessosCache = new Map<string, UsuarioAcesso[]>();
+const cacheTimestamp = new Map<string, number>();
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutos - cache mais longo
+
+// Circuit breaker para prevenir rate limiting
+let circuitBreakerOpen = false;
+let circuitBreakerTimeout: NodeJS.Timeout | null = null;
+const CIRCUIT_BREAKER_DURATION = 2 * 60 * 1000; // 2 minutos
+
+// Contador de requisições falhas consecutivas
+let consecutiveFailures = 0;
+const MAX_CONSECUTIVE_FAILURES = 3;
+
 export const useHierarchicalFilter = (): HierarchicalFilterResult => {
   const { user } = useAuth();
   const userPermissions = useUserPermissions();
@@ -51,6 +66,119 @@ export const useHierarchicalFilter = (): HierarchicalFilterResult => {
   }, [user?.roles]);
 
   const shouldFilter = adminLevel !== 'admin' && adminLevel !== null;
+
+  // Função para verificar se cache é válido
+  const isCacheValid = (userId: string): boolean => {
+    const timestamp = cacheTimestamp.get(userId);
+    return timestamp ? (Date.now() - timestamp) < CACHE_DURATION : false;
+  };
+
+  // Função para abrir circuit breaker em caso de muitas falhas
+  const openCircuitBreaker = () => {
+    console.warn('🚨 Circuit breaker ATIVADO - muitas falhas de rate limiting');
+    circuitBreakerOpen = true;
+    consecutiveFailures = 0;
+    
+    if (circuitBreakerTimeout) clearTimeout(circuitBreakerTimeout);
+    circuitBreakerTimeout = setTimeout(() => {
+      console.log('🔄 Circuit breaker DESATIVADO - tentando novamente');
+      circuitBreakerOpen = false;
+    }, CIRCUIT_BREAKER_DURATION);
+  };
+
+  // Função para verificar se pode fazer requisições
+  const canMakeRequests = (): boolean => {
+    if (circuitBreakerOpen) {
+      console.log('⏸️ Circuit breaker ativo - pulando requisições');
+      return false;
+    }
+    return true;
+  };
+
+  // Função para lidar com falhas de rate limiting
+  const handleRateLimit = (error: any) => {
+    if (error.message?.includes('rate') || error.message?.includes('muitas') || error.status === 429) {
+      consecutiveFailures++;
+      console.warn(`⚠️ Rate limit detectado (${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES})`);
+      
+      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+        openCircuitBreaker();
+      }
+      return true;
+    }
+    return false;
+  };
+
+  // Função para reset de falhas quando sucesso
+  const resetFailures = () => {
+    consecutiveFailures = 0;
+  };
+
+  // Função para limpar cache
+  const clearCache = () => {
+    rolesCache.clear();
+    acessosCache.clear();
+    cacheTimestamp.clear();
+    console.log('🧹 Cache limpo');
+  };
+
+  // Função para buscar roles com cache e circuit breaker
+  const getUserRolesWithCache = async (userId: string): Promise<string[]> => {
+    // Verificar cache primeiro
+    if (isCacheValid(userId) && rolesCache.has(userId)) {
+      return rolesCache.get(userId)!;
+    }
+
+    // Circuit breaker - retornar array vazio se ativo
+    if (!canMakeRequests()) {
+      console.log(`⏸️ Circuit breaker ativo - retornando roles vazios para ${userId}`);
+      return [];
+    }
+
+    try {
+      const roles = await usuarioGestaoService.getUserRoles(userId);
+      rolesCache.set(userId, roles);
+      cacheTimestamp.set(userId, Date.now());
+      resetFailures(); // Reset em caso de sucesso
+      return roles;
+    } catch (error: any) {
+      if (handleRateLimit(error)) {
+        console.warn(`🚨 Rate limit - retornando roles vazios para ${userId}`);
+        return []; // Fallback seguro
+      }
+      console.warn(`Erro ao buscar roles para usuário ${userId}:`, error);
+      return [];
+    }
+  };
+
+  // Função para buscar acessos com cache e circuit breaker
+  const getUserAcessosWithCache = async (userId: string): Promise<UsuarioAcesso[]> => {
+    // Verificar cache primeiro
+    if (isCacheValid(userId) && acessosCache.has(userId)) {
+      return acessosCache.get(userId)!;
+    }
+
+    // Circuit breaker - retornar array vazio se ativo
+    if (!canMakeRequests()) {
+      console.log(`⏸️ Circuit breaker ativo - retornando acessos vazios para ${userId}`);
+      return [];
+    }
+
+    try {
+      const acessos = await usuarioGestaoService.getUsuarioAcessos(userId);
+      acessosCache.set(userId, acessos);
+      cacheTimestamp.set(userId, Date.now());
+      resetFailures(); // Reset em caso de sucesso
+      return acessos;
+    } catch (error: any) {
+      if (handleRateLimit(error)) {
+        console.warn(`🚨 Rate limit - retornando acessos vazios para ${userId}`);
+        return []; // Fallback seguro
+      }
+      console.warn(`Erro ao buscar acessos para usuário ${userId}:`, error);
+      return [];
+    }
+  };
 
   // Carregar todos os usuários do Keycloak
   const loadAllUsers = async () => {
@@ -111,17 +239,23 @@ export const useHierarchicalFilter = (): HierarchicalFilterResult => {
         );
         
       case 'admin.municipio':
-        // Admin de município vê usuários do mesmo município
+        // Admin de município vê:
+        // 1. Usuários com acesso no município
+        // 2. Usuários com acesso nas unidades do município
         return user.acessos.some(acesso => 
-          acesso.nivel_acesso === 'municipio' && 
-          acesso.tipo_municipio_id === adminPermissions.municipioId
+          (acesso.nivel_acesso === 'municipio' && acesso.tipo_municipio_id === adminPermissions.municipioId) ||
+          (acesso.nivel_acesso === 'unidade' && acesso.tipo_municipio_id === adminPermissions.municipioId)
         );
         
       case 'admin.estado':
-        // Admin de estado vê usuários do mesmo estado
+        // Admin de estado vê:
+        // 1. Usuários com acesso no estado
+        // 2. Usuários com acesso nos municípios do estado  
+        // 3. Usuários com acesso nas unidades dos municípios do estado
         return user.acessos.some(acesso => 
-          acesso.nivel_acesso === 'estado' && 
-          acesso.tipo_estado_id === adminPermissions.estadoId
+          (acesso.nivel_acesso === 'estado' && acesso.tipo_estado_id === adminPermissions.estadoId) ||
+          (acesso.nivel_acesso === 'municipio' && acesso.tipo_estado_id === adminPermissions.estadoId) ||
+          (acesso.nivel_acesso === 'unidade' && acesso.tipo_estado_id === adminPermissions.estadoId)
         );
         
       default:
@@ -149,25 +283,62 @@ export const useHierarchicalFilter = (): HierarchicalFilterResult => {
     try {
       const filtered: UserWithAccess[] = [];
       
-      for (const user of allUsers) {
-        try {
-          // Buscar acessos e roles do usuário
-          const [userAcessos, userRoles] = await Promise.all([
-            usuarioGestaoService.getUsuarioAcessos(user.id),
-            usuarioGestaoService.getUserRoles(user.id)
-          ]);
-          
-          // Atualizar usuário com seus acessos e roles
-          const userWithAccess = { ...user, acessos: userAcessos, roles: userRoles };
-          
-          // Aplicar filtro baseado no nível do admin
-          if (shouldIncludeUser(userWithAccess, adminLevel, userPermissions)) {
-            filtered.push(userWithAccess);
+      // Batch processing adaptativo: mais conservador se circuit breaker foi ativado
+      const BATCH_SIZE = circuitBreakerOpen ? 1 : 3; // Muito conservador se há problemas
+      const BATCH_DELAY = circuitBreakerOpen ? 1000 : 200; // Delay maior se há problemas
+      
+      console.log(`📦 Processando em lotes de ${BATCH_SIZE} usuários com delay de ${BATCH_DELAY}ms`);
+      
+      for (let i = 0; i < allUsers.length; i += BATCH_SIZE) {
+        const batch = allUsers.slice(i, i + BATCH_SIZE);
+        
+        // Se circuit breaker está ativo, pular processamento e usar dados básicos
+        if (circuitBreakerOpen) {
+          console.log(`⏸️ Circuit breaker ativo - usando dados básicos para usuários ${i}-${i + batch.length}`);
+          // Incluir todos os usuários sem filtro específico quando há rate limiting
+          filtered.push(...batch.map(user => ({ ...user, acessos: [], roles: [] })));
+          continue;
+        }
+        
+        // Processar lote atual
+        const batchPromises = batch.map(async (user) => {
+          try {
+            // Usar cache para buscar acessos e roles
+            const [userAcessos, userRoles] = await Promise.all([
+              getUserAcessosWithCache(user.id),
+              getUserRolesWithCache(user.id)
+            ]);
+            
+            // Atualizar usuário com seus acessos e roles
+            const userWithAccess = { ...user, acessos: userAcessos, roles: userRoles };
+            
+            // Aplicar filtro baseado no nível do admin
+            if (shouldIncludeUser(userWithAccess, adminLevel, userPermissions)) {
+              return userWithAccess;
+            }
+            
+            return null;
+          } catch (error: any) {
+            if (handleRateLimit(error)) {
+              // Em caso de rate limit, retornar usuário básico
+              return { ...user, acessos: [], roles: [] };
+            }
+            console.warn(`Erro ao buscar dados para usuário ${user.username}:`, error);
+            return null;
           }
-          
-        } catch (error) {
-          console.warn(`Erro ao buscar acessos para usuário ${user.username}:`, error);
-          // Em caso de erro, não incluir usuário
+        });
+        
+        // Aguardar conclusão do lote
+        const batchResults = await Promise.all(batchPromises);
+        
+        // Adicionar resultados válidos
+        batchResults.forEach(result => {
+          if (result) filtered.push(result);
+        });
+        
+        // Delay entre lotes para evitar rate limiting
+        if (i + BATCH_SIZE < allUsers.length) {
+          await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
         }
       }
 
@@ -195,25 +366,50 @@ export const useHierarchicalFilter = (): HierarchicalFilterResult => {
     }
   }, [allUsers, adminLevel, userPermissions.loading, userPermissions.estabelecimentoId]);
 
-  // Para admin master, buscar roles de todos os usuários
+  // Para admin master, buscar roles de todos os usuários com cache e batch processing
   useEffect(() => {
     if (!loading && !shouldFilter) {
       const loadRolesForAllUsers = async () => {
         try {
           setFilterLoading(true);
           
-          // Buscar roles de todos os usuários em paralelo
-          const rolesPromises = allUsers.map(async (user) => {
-            try {
-              const userRoles = await usuarioGestaoService.getUserRoles(user.id);
-              return { ...user, roles: userRoles };
-            } catch (error) {
-              console.warn(`Erro ao buscar roles para usuário ${user.username}:`, error);
-              return { ...user, roles: [] };
-            }
-          });
+          // Se circuit breaker está ativo, pular busca de roles
+          if (circuitBreakerOpen) {
+            console.log('⏸️ Circuit breaker ativo - admin master usando dados básicos');
+            setFilteredUsers(allUsers.map(user => ({ ...user, roles: [] })));
+            return;
+          }
           
-          const usersWithRoles = await Promise.all(rolesPromises);
+          // Batch processing conservativo para admin master
+          const BATCH_SIZE = circuitBreakerOpen ? 1 : 5; // Muito conservador se há problemas
+          const BATCH_DELAY = circuitBreakerOpen ? 1000 : 100; // Delay maior se há problemas
+          const usersWithRoles: UserWithAccess[] = [];
+          
+          for (let i = 0; i < allUsers.length; i += BATCH_SIZE) {
+            const batch = allUsers.slice(i, i + BATCH_SIZE);
+            
+            const rolesPromises = batch.map(async (user) => {
+              try {
+                const userRoles = await getUserRolesWithCache(user.id);
+                return { ...user, roles: userRoles };
+              } catch (error: any) {
+                if (handleRateLimit(error)) {
+                  console.warn(`🚨 Rate limit - retornando usuário sem roles: ${user.username}`);
+                  return { ...user, roles: [] };
+                }
+                console.warn(`Erro ao buscar roles para usuário ${user.username}:`, error);
+                return { ...user, roles: [] };
+              }
+            });
+            
+            const batchResults = await Promise.all(rolesPromises);
+            usersWithRoles.push(...batchResults);
+            
+            // Delay entre lotes
+            if (i + BATCH_SIZE < allUsers.length) {
+              await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
+            }
+          }
           
           console.log(`📊 Admin master: ${usersWithRoles.length} usuários com roles carregados`);
           setFilteredUsers(usersWithRoles);
@@ -230,6 +426,19 @@ export const useHierarchicalFilter = (): HierarchicalFilterResult => {
     }
   }, [allUsers, loading, shouldFilter]);
 
+  // Função refresh que limpa cache com debounce para evitar múltiplas chamadas
+  const refreshUsers = useCallback(async () => {
+    // Debounce simples - evitar chamadas múltiplas em 2 segundos
+    if (loading || filterLoading) {
+      console.log('⏳ Refresh já em andamento, ignorando nova chamada');
+      return;
+    }
+    
+    console.log('🔄 Refreshing users com cache clear...');
+    clearCache();
+    await loadAllUsers();
+  }, [loading, filterLoading]);
+
   return {
     filteredUsers,
     loading: loading || filterLoading,
@@ -237,6 +446,6 @@ export const useHierarchicalFilter = (): HierarchicalFilterResult => {
     totalUsers: allUsers.length,
     shouldFilter,
     adminLevel,
-    refreshUsers: loadAllUsers
+    refreshUsers
   };
 };

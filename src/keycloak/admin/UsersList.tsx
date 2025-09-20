@@ -52,30 +52,6 @@ function getUserLevelFromRoles(roles: string[]): 'admin' | 'admin.estado' | 'adm
 }
 
 // Função para determinar se usuário pode ser deletado baseado no tipo de admin
-function canUserBeDeleted(targetUser: UserWithAccess, adminType: string): boolean {
-  if (!targetUser.roles) return false;
-  
-  const targetLevel = getUserLevelFromRoles(targetUser.roles);
-  
-  // Admin master pode deletar qualquer um
-  if (adminType === 'admin') return true;
-  
-  // Regras hierárquicas para outros admins
-  if (adminType === 'admin.estado') {
-    return ['admin.municipio', 'admin.unidade', 'notificador', 'user'].includes(targetLevel);
-  }
-  
-  if (adminType === 'admin.municipio') {
-    return ['admin.unidade', 'notificador', 'user'].includes(targetLevel);
-  }
-  
-  if (adminType === 'admin.unidade') {
-    return ['notificador', 'user'].includes(targetLevel);
-  }
-  
-  return false;
-}
-
 // Função para identificar se é notificador baseado nos roles
 function isNotificadorUnidade(user: UserWithAccess): boolean {
   return user.roles?.includes('notificador') || false;
@@ -455,7 +431,6 @@ const UsersList: React.FC = () => {
                             
                             const userLevel = getUserLevelFromRoles(user.roles);
                             const isNotificador = isNotificadorUnidade(user);
-                            const canBeDeleted = canUserBeDeleted(user, adminLevel || 'admin');
                             
                             const getBadgeConfig = (level: string) => {
                               switch (level) {
