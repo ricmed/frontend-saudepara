@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useAuth } from '@/keycloak/AuthProvider';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { AdminHeader } from './components/AdminHeader';
 import Footer from '@/features/desktop/components/Footer';
@@ -34,13 +33,15 @@ interface UserFormData {
   password?: string;
   confirmPassword?: string;
   temporaryPassword: boolean;
+  // Campos específicos para controle de acesso do admin município
+  nivelAcesso: 'unidade' | 'municipio';
+  estabelecimentoId?: number;
 }
 
 const UserFormMunicipio: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { selectedLanguage } = useLanguage();
-  const { user } = useAuth();
   const userPermissions = useUserPermissions();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -49,6 +50,10 @@ const UserFormMunicipio: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // Estados para carregar estabelecimentos do município
+  const [estabelecimentos, setEstabelecimentos] = useState<Array<{id: number; nome: string; cnes?: string}>>([]);
+  const [loadingEstabelecimentos, setLoadingEstabelecimentos] = useState(false);
 
   const isEditMode = !!id;
   const [formData, setFormData] = useState<UserFormData>({
@@ -60,18 +65,74 @@ const UserFormMunicipio: React.FC = () => {
     emailVerified: false,
     password: '',
     confirmPassword: '',
-    temporaryPassword: true
+    temporaryPassword: true,
+    nivelAcesso: 'municipio', // Padrão para município (pré-selecionado)
+    estabelecimentoId: undefined
   });
 
   // Obter informações do município do admin logado usando userPermissions
   const adminMunicipioId = userPermissions.municipioId;
-  const adminMunicipioNome = 'Município do Administrador'; // TODO: buscar nome real do município
+  const [adminMunicipioNome, setAdminMunicipioNome] = useState<string>('Carregando...');
 
   useEffect(() => {
     if (isEditMode && id) {
       loadUser(id);
     }
-  }, [id, isEditMode]);
+    
+    // Carregar estabelecimentos do município quando o componente inicializar
+    if (adminMunicipioId) {
+      loadEstabelecimentosMunicipio();
+    }
+  }, [id, isEditMode, adminMunicipioId]);
+
+  const loadEstabelecimentosMunicipio = async () => {
+    if (!adminMunicipioId) return;
+    
+    try {
+      setLoadingEstabelecimentos(true);
+      console.log('🏥 Carregando estabelecimentos do município:', adminMunicipioId);
+      
+      // Usar o mesmo endpoint que o UserForm geral para filtrar por município
+      const response = await fetch(`/api/estabelecimentos/municipio/${adminMunicipioId}`, { 
+        credentials: 'include' 
+      });
+      
+      if (response.ok) {
+        const estabelecimentosDoMunicipio = await response.json();
+        const estabelecimentosFormatados = estabelecimentosDoMunicipio.map((est: any) => ({
+          id: est.idestabelecimento,
+          nome: est.nome,
+          cnes: est.cnes || undefined
+        }));
+        setEstabelecimentos(estabelecimentosFormatados);
+        console.log('✅ Estabelecimentos do município carregados:', estabelecimentosFormatados.length);
+      } else {
+        console.warn('⚠️ Nenhum estabelecimento encontrado para o município');
+        setEstabelecimentos([]);
+      }
+      
+      // Tentar buscar o nome do município
+      try {
+        const municipios = await usuarioGestaoService.getMunicipios();
+        const municipio = municipios.find(m => m.id === adminMunicipioId);
+        if (municipio) {
+          setAdminMunicipioNome(municipio.descricao);
+        } else {
+          setAdminMunicipioNome(`Município ${adminMunicipioId}`);
+        }
+      } catch (error) {
+        console.warn('⚠️ Não foi possível carregar o nome do município');
+        setAdminMunicipioNome(`Município ${adminMunicipioId}`);
+      }
+      
+    } catch (error) {
+      console.error('❌ Erro ao carregar dados:', error);
+      setAdminMunicipioNome(`Município ${adminMunicipioId}`);
+      setEstabelecimentos([]);
+    } finally {
+      setLoadingEstabelecimentos(false);
+    }
+  };
 
   const loadUser = async (userId: string) => {
     try {
@@ -92,6 +153,42 @@ const UserFormMunicipio: React.FC = () => {
       const userData = await response.json();
       console.log('📝 Dados do usuário carregados:', userData);
 
+      // Buscar acessos do usuário para determinar o nível correto
+      console.log('🔍 Buscando acessos do usuário...');
+      const userAcessos = await usuarioGestaoService.getUsuarioAcessos(userId);
+      console.log('🔐 Acessos encontrados:', userAcessos);
+
+      // Determinar nível de acesso e estabelecimento
+      let nivelAcesso: 'unidade' | 'municipio' = 'municipio';
+      let estabelecimentoId: number | undefined = undefined;
+
+      if (userAcessos && userAcessos.length > 0) {
+        // Procurar primeiro por acesso de unidade (qualquer unidade do município do admin)
+        const acessoUnidade = userAcessos.find(acesso => 
+          acesso.nivel_acesso === 'unidade' && 
+          acesso.estabelecimento_id
+        );
+        
+        if (acessoUnidade) {
+          nivelAcesso = 'unidade';
+          estabelecimentoId = acessoUnidade.estabelecimento_id;
+          console.log('✅ Usuário tem acesso de unidade:', {
+            estabelecimentoId,
+            nomeEstabelecimento: acessoUnidade.estabelecimento?.nome
+          });
+        } else {
+          // Verificar se tem acesso de município
+          const acessoMunicipio = userAcessos.find(acesso => 
+            acesso.nivel_acesso === 'municipio'
+          );
+          
+          if (acessoMunicipio) {
+            nivelAcesso = 'municipio';
+            console.log('✅ Usuário tem acesso de município');
+          }
+        }
+      }
+
       setFormData({
         username: userData.username || '',
         firstName: userData.firstName || '',
@@ -101,7 +198,9 @@ const UserFormMunicipio: React.FC = () => {
         emailVerified: userData.emailVerified !== false,
         password: '',
         confirmPassword: '',
-        temporaryPassword: true
+        temporaryPassword: true,
+        nivelAcesso: nivelAcesso,
+        estabelecimentoId: estabelecimentoId
       });
 
     } catch (error) {
@@ -155,6 +254,15 @@ const UserFormMunicipio: React.FC = () => {
       if (formData.password !== formData.confirmPassword) {
         newErrors.confirmPassword = 'Confirmação de senha não confere';
       }
+    }
+
+    // Validar nível de acesso e estabelecimento
+    if (!formData.nivelAcesso) {
+      newErrors.nivelAcesso = 'Nível de acesso é obrigatório';
+    }
+
+    if (formData.nivelAcesso === 'unidade' && !formData.estabelecimentoId) {
+      newErrors.estabelecimentoId = 'Estabelecimento é obrigatório para acesso de unidade';
     }
 
     setErrors(newErrors);
@@ -219,6 +327,56 @@ const UserFormMunicipio: React.FC = () => {
         }
 
         console.log('✅ Usuário atualizado com sucesso');
+        
+        // 3. Atualizar acessos do usuário
+        console.log('🔄 Atualizando acessos do usuário...');
+        
+        // Verificar se adminMunicipioId está definido
+        if (!adminMunicipioId) {
+          throw new Error('ID do município do administrador não encontrado');
+        }
+        
+        // Buscar acessos atuais
+        const acessosAtuais = await usuarioGestaoService.getUsuarioAcessos(id);
+        console.log('📋 Acessos atuais encontrados:', acessosAtuais);
+        
+        // Usar método de hard delete para garantir limpeza completa
+        console.log('🗑️ Fazendo limpeza completa de TODOS os acessos (hard delete)...');
+        try {
+          await usuarioGestaoService.hardDeleteTodosAcessosUsuario(id);
+          console.log('✅ Limpeza completa realizada com sucesso');
+        } catch (deleteError: any) {
+          console.error('❌ Erro na limpeza completa dos acessos:', deleteError);
+          throw new Error(`Erro na limpeza dos acessos: ${deleteError.message || deleteError}`);
+        }
+        
+        // Aguardar um momento para garantir que as remoções foram processadas
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Criar novo acesso baseado na seleção atual
+        console.log('➕ Criando novo acesso...');
+        if (formData.nivelAcesso === 'municipio') {
+          console.log('🏛️ Criando acesso de município');
+          await usuarioGestaoService.createAcessoMunicipio(id, adminMunicipioId);
+          console.log('✅ Acesso de município criado');
+        } else if (formData.nivelAcesso === 'unidade' && formData.estabelecimentoId) {
+          console.log('🏥 Criando acesso de unidade');
+          await usuarioGestaoService.createAcessoUnidade(
+            id, 
+            formData.estabelecimentoId,
+            6, // Permissão padrão de notificador
+            adminMunicipioId
+          );
+          console.log('✅ Acesso de unidade criado');
+        }
+        
+        console.log('✅ Acessos atualizados com sucesso');
+
+        // Verificar acessos finais para confirmação
+        console.log('🔍 Verificando acessos finais...');
+        const acessosFinais = await usuarioGestaoService.getUsuarioAcessos(id);
+        console.log('📊 Acessos finais do usuário:', acessosFinais);
+
         setNotification({
           message: 'Usuário atualizado com sucesso!',
           type: 'success'
@@ -246,19 +404,39 @@ const UserFormMunicipio: React.FC = () => {
           throw new Error('Falha ao criar usuário - ID não retornado');
         }
 
-        // 2. Criar acesso para o município
-        console.log('🔗 Criando acesso ao município...');
+        // 2. Criar acesso baseado no nível selecionado
+        console.log('🔗 Criando acesso baseado no nível:', formData.nivelAcesso);
         
         // Verificar se adminMunicipioId está definido
         if (!adminMunicipioId) {
           throw new Error('ID do município do administrador não encontrado');
         }
         
-        await usuarioGestaoService.createAcessoMunicipio(novoUsuarioId, adminMunicipioId);
+        if (formData.nivelAcesso === 'municipio') {
+          // Criar acesso de município - município pré-selecionado
+          console.log('🏛️ Criando acesso ao município:', adminMunicipioId);
+          await usuarioGestaoService.createAcessoMunicipio(novoUsuarioId, adminMunicipioId);
+        } else if (formData.nivelAcesso === 'unidade' && formData.estabelecimentoId) {
+          // Criar acesso de unidade - apenas estabelecimentos do município
+          console.log('🏥 Criando acesso à unidade:', formData.estabelecimentoId);
+          await usuarioGestaoService.createAcessoUnidade(
+            novoUsuarioId, 
+            formData.estabelecimentoId,
+            6, // Permissão padrão de notificador
+            adminMunicipioId // Município do admin
+          );
+        } else {
+          throw new Error('Configuração de acesso inválida');
+        }
 
         console.log('✅ Usuário e acesso criados com sucesso');
+        
+        const tipoAcesso = formData.nivelAcesso === 'municipio' 
+          ? `acesso ao município ${adminMunicipioNome}` 
+          : `acesso à unidade selecionada`;
+          
         setNotification({
-          message: 'Usuário criado com sucesso! Role "notificador" atribuída automaticamente.',
+          message: `Usuário criado com sucesso com ${tipoAcesso}!`,
           type: 'success'
         });
       }
@@ -596,6 +774,105 @@ const UserFormMunicipio: React.FC = () => {
                 <label htmlFor="temporaryPassword" className="ml-2 block text-sm text-gray-700">
                   Senha temporária (usuário deve alterar no primeiro login)
                 </label>
+              </div>
+            </div>
+
+            {/* Seção de Controle de Acesso */}
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <div className="flex items-center mb-4">
+                <MapPin className="h-5 w-5 text-gray-600 mr-2" />
+                <h2 className="text-lg font-semibold text-gray-900">Controle de Acesso</h2>
+              </div>
+
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <strong>Município:</strong> {adminMunicipioNome} (ID: {adminMunicipioId})
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  O usuário criado terá acesso limitado a este município.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Nível de Acesso */}
+                <div>
+                  <label htmlFor="nivelAcesso" className="block text-sm font-medium text-gray-700 mb-2">
+                    Nível de Acesso *
+                  </label>
+                  <select
+                    id="nivelAcesso"
+                    value={formData.nivelAcesso}
+                    onChange={(e) => {
+                      const novoNivel = e.target.value as 'unidade' | 'municipio';
+                      handleInputChange('nivelAcesso', novoNivel);
+                      // Limpar estabelecimento se mudou de unidade para município
+                      if (novoNivel === 'municipio') {
+                        handleInputChange('estabelecimentoId', undefined);
+                      }
+                    }}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.nivelAcesso ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    required
+                  >
+                    <option value="municipio">Nível Município - {adminMunicipioNome}</option>
+                    <option value="unidade">Nível Unidade - Escolher Estabelecimento</option>
+                  </select>
+                  {errors.nivelAcesso && (
+                    <p className="mt-1 text-sm text-red-600">{errors.nivelAcesso}</p>
+                  )}
+                  <p className="mt-1 text-xs text-gray-500">
+                    {formData.nivelAcesso === 'municipio' 
+                      ? 'Acesso a todo o município (pré-selecionado)'
+                      : 'Acesso limitado a um estabelecimento específico'
+                    }
+                  </p>
+                </div>
+
+                {/* Estabelecimento - Mostrar apenas se nível for 'unidade' */}
+                {formData.nivelAcesso === 'unidade' && (
+                  <div>
+                    <label htmlFor="estabelecimentoId" className="block text-sm font-medium text-gray-700 mb-2">
+                      Estabelecimento *
+                    </label>
+                    {loadingEstabelecimentos ? (
+                      <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500">
+                        Carregando estabelecimentos...
+                      </div>
+                    ) : (
+                      <select
+                        id="estabelecimentoId"
+                        value={formData.estabelecimentoId || ''}
+                        onChange={(e) => {
+                          const value = e.target.value ? parseInt(e.target.value) : undefined;
+                          handleInputChange('estabelecimentoId', value);
+                        }}
+                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          errors.estabelecimentoId ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                        required
+                      >
+                        <option value="">Selecionar Estabelecimento</option>
+                        {estabelecimentos.map(est => (
+                          <option key={est.id} value={est.id}>
+                            {est.nome} {est.cnes && `(CNES: ${est.cnes})`}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {errors.estabelecimentoId && (
+                      <p className="mt-1 text-sm text-red-600">{errors.estabelecimentoId}</p>
+                    )}
+                    {estabelecimentos.length === 0 && !loadingEstabelecimentos && (
+                      <p className="mt-1 text-sm text-orange-600">
+                        Nenhum estabelecimento encontrado para este município
+                      </p>
+                    )}
+                    <p className="mt-1 text-xs text-gray-500">
+                      Apenas estabelecimentos do município {adminMunicipioNome}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 

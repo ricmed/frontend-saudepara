@@ -501,6 +501,34 @@ class UsuarioGestaoService {
     }
   }
 
+  /**
+   * Excluir todos os acessos de um usuário
+   */
+  async excluirTodosAcessosUsuario(userId: string): Promise<void> {
+    try {
+      console.log('🗑️ Removendo todos os acessos do usuário:', userId);
+      const response = await this.backendApi.delete(`/usuario-acesso/user/${userId}`);
+      console.log('✅ Todos os acessos removidos com sucesso:', response.data);
+    } catch (error: any) {
+      console.error('❌ Erro ao excluir todos os acessos do usuário:', error);
+      throw new Error(this.getErrorMessage(error, 'Erro ao excluir todos os acessos do usuário'));
+    }
+  }
+
+  /**
+   * Limpeza completa de todos os acessos de um usuário (hard delete)
+   */
+  async hardDeleteTodosAcessosUsuario(userId: string): Promise<void> {
+    try {
+      console.log('🗑️ HARD DELETE: Fazendo limpeza completa dos acessos do usuário:', userId);
+      const response = await this.backendApi.delete(`/usuario-acesso/user/${userId}/hard-delete`);
+      console.log('✅ Limpeza completa realizada com sucesso:', response.data);
+    } catch (error: any) {
+      console.error('❌ Erro na limpeza completa dos acessos:', error);
+      throw new Error(this.getErrorMessage(error, 'Erro na limpeza completa dos acessos do usuário'));
+    }
+  }
+
   // ================================
   // MÉTODOS AUXILIARES
   // ================================
