@@ -38,6 +38,140 @@ interface UserFormData {
   estabelecimentoId?: number;
 }
 
+// Componente ComboBox para seleção de estabelecimentos com pesquisa integrada
+interface EstabelecimentoComboBoxProps {
+  estabelecimentos: Array<{id: number; nome: string; cnes?: string}>;
+  value?: number;
+  onChange: (value: number | undefined) => void;
+  error?: string;
+  placeholder?: string;
+}
+
+const EstabelecimentoComboBox: React.FC<EstabelecimentoComboBoxProps> = ({
+  estabelecimentos,
+  value,
+  onChange,
+  error,
+  placeholder = "Digite para pesquisar..."
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [displayText, setDisplayText] = useState('');
+
+  // Encontrar o estabelecimento selecionado
+  const selectedEstabelecimento = estabelecimentos.find(est => est.id === value);
+
+  // Filtrar estabelecimentos baseado na pesquisa
+  const filteredEstabelecimentos = estabelecimentos.filter(est => {
+    if (!searchTerm) return true;
+    const termo = searchTerm.toLowerCase();
+    const nome = est.nome?.toLowerCase() || '';
+    const cnes = est.cnes?.toLowerCase() || '';
+    return nome.includes(termo) || cnes.includes(termo);
+  });
+
+  // Atualizar texto exibido quando valor muda
+  useEffect(() => {
+    if (selectedEstabelecimento) {
+      setDisplayText(`${selectedEstabelecimento.nome}${selectedEstabelecimento.cnes ? ` (CNES: ${selectedEstabelecimento.cnes})` : ''}`);
+      setSearchTerm('');
+    } else {
+      setDisplayText('');
+      setSearchTerm('');
+    }
+  }, [selectedEstabelecimento]);
+
+  const handleSelect = (estabelecimento: {id: number; nome: string; cnes?: string}) => {
+    onChange(estabelecimento.id);
+    setIsOpen(false);
+    setSearchTerm('');
+  };
+
+  const handleClear = () => {
+    onChange(undefined);
+    setIsOpen(false);
+    setSearchTerm('');
+  };
+
+  return (
+    <div className="relative">
+      <div className={`relative w-full border rounded-md focus-within:ring-2 focus-within:ring-blue-500 ${
+        error ? 'border-red-500' : 'border-gray-300'
+      }`}>
+        <input
+          type="text"
+          value={isOpen ? searchTerm : displayText}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            if (!isOpen) setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
+          onClick={() => setIsOpen(true)}
+          placeholder={placeholder}
+          className="w-full px-3 py-2 outline-none rounded-md"
+        />
+        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
+          {value && (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              ×
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            ▼
+          </button>
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+          {filteredEstabelecimentos.length > 0 ? (
+            <>
+              <div className="px-3 py-2 text-xs text-gray-500 bg-gray-50 border-b">
+                {filteredEstabelecimentos.length} de {estabelecimentos.length} estabelecimentos
+              </div>
+              {filteredEstabelecimentos.map((est) => (
+                <button
+                  key={est.id}
+                  type="button"
+                  onClick={() => handleSelect(est)}
+                  className={`w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-100 ${
+                    value === est.id ? 'bg-blue-100 text-blue-800' : 'text-gray-900'
+                  }`}
+                >
+                  <div className="font-medium">{est.nome}</div>
+                  {est.cnes && (
+                    <div className="text-sm text-gray-500">CNES: {est.cnes}</div>
+                  )}
+                </button>
+              ))}
+            </>
+          ) : (
+            <div className="px-3 py-4 text-center text-gray-500">
+              {searchTerm ? `Nenhum resultado para "${searchTerm}"` : 'Nenhum estabelecimento encontrado'}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Overlay para fechar quando clicar fora */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+    </div>
+  );
+};
+
 const UserFormMunicipio: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -133,6 +267,8 @@ const UserFormMunicipio: React.FC = () => {
       setLoadingEstabelecimentos(false);
     }
   };
+
+
 
   const loadUser = async (userId: string) => {
     try {
@@ -835,30 +971,19 @@ const UserFormMunicipio: React.FC = () => {
                     <label htmlFor="estabelecimentoId" className="block text-sm font-medium text-gray-700 mb-2">
                       Estabelecimento *
                     </label>
+                    
                     {loadingEstabelecimentos ? (
                       <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500">
                         Carregando estabelecimentos...
                       </div>
                     ) : (
-                      <select
-                        id="estabelecimentoId"
-                        value={formData.estabelecimentoId || ''}
-                        onChange={(e) => {
-                          const value = e.target.value ? parseInt(e.target.value) : undefined;
-                          handleInputChange('estabelecimentoId', value);
-                        }}
-                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                          errors.estabelecimentoId ? 'border-red-500' : 'border-gray-300'
-                        }`}
-                        required
-                      >
-                        <option value="">Selecionar Estabelecimento</option>
-                        {estabelecimentos.map(est => (
-                          <option key={est.id} value={est.id}>
-                            {est.nome} {est.cnes && `(CNES: ${est.cnes})`}
-                          </option>
-                        ))}
-                      </select>
+                      <EstabelecimentoComboBox
+                        estabelecimentos={estabelecimentos}
+                        value={formData.estabelecimentoId}
+                        onChange={(value) => handleInputChange('estabelecimentoId', value)}
+                        error={errors.estabelecimentoId}
+                        placeholder="🔍 Digite para pesquisar ou clique para ver todos..."
+                      />
                     )}
                     {errors.estabelecimentoId && (
                       <p className="mt-1 text-sm text-red-600">{errors.estabelecimentoId}</p>
