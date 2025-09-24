@@ -58,6 +58,13 @@ const PersonOriginSection: React.FC<FormSectionProps> = ({
                       ...prev,
                       bairro: value,
                       tipo_bairro_idtipo_bairro: value,
+                      // ✅ AUTO-PREENCHIMENTO: Quando seleciona bairro de Belém, preencher automaticamente
+                      paisProcedencia: "105", // Brasil
+                      uf: "1", // Pará
+                      municipio: "1", // Belém
+                      // Limpar campos não aplicáveis
+                      localHospedagem: "",
+                      contatoLocal: "",
                     }));
                   }}
                   placeholder="Selecione o bairro"

@@ -97,9 +97,12 @@ export const formatFromBackend = async (
   // Converter valores de residente_belem para o formato do formulário
   const residenteBelem =
     backendData.residente_belem === "S"
-      ? "1"
+      ? "1"  // Sim - Belém
       : backendData.residente_belem === "N"
-      ? "2"       : "3";
+      ? "2"  // Não - Outro município brasileiro  
+      : backendData.residente_belem === "E"
+      ? "3"  // Estrangeiro
+      : "1"; // Default para Belém se valor indefinido
 
   // Buscar sintomas com método melhorado e aguardar resultado
   const sinaisESintomas = await extractSintomasStrings(backendData);
@@ -200,14 +203,17 @@ export const formatFromBackend = async (
     publicoAtendido: backendData.tipo_publico_idtipo_publico?.toString() || "",
     ddi: ddi,
 
-    // Seção 2: Procedência do indivíduo
+    // Seção 2: Procedência do indivíduo - ✅ CORRIGIDO para modo offline
     residenteBelem,
     bairro: backendData.tipo_bairro_idtipo_bairro?.toString() || "",
     municipio: backendData.tipo_municipio_idtipo_municipio?.toString() || "",
     uf: backendData.tipo_estado_idtipo_estado?.toString() || "",
     paisProcedencia: backendData.tipo_pais_idtipo_pais?.toString() || "",
-    localHospedagem: backendData.local_hospedagem || "",
-    contatoLocal: backendData.contato_local_hospedagem || "",
+    // ✅ CORREÇÃO CRÍTICA: Garantir que campos de hospedagem sejam sempre strings
+    localHospedagem: (backendData.local_hospedagem !== null && backendData.local_hospedagem !== undefined) 
+      ? String(backendData.local_hospedagem) : "",
+    contatoLocal: (backendData.contato_local_hospedagem !== null && backendData.contato_local_hospedagem !== undefined) 
+      ? String(backendData.contato_local_hospedagem) : "",
 
     // Seção 3: Identificação do indivíduo
     paciente: backendData.paciente?.nome || "",
@@ -273,14 +279,24 @@ export const formatFromBackend = async (
     updated_by_userid: backendData.updated_by_userid || undefined,
   };
   
-  console.log("FormData processado:", {
+  // ✅ LOG DETALHADO PARA DEBUG DO MODO OFFLINE
+  console.log("🔄 [ADAPTER] FormData processado do backend:", {
+    // Campos de localização
+    residenteBelem: formData.residenteBelem,
+    uf: formData.uf,
+    municipio: formData.municipio, 
+    bairro: formData.bairro,
+    paisProcedencia: formData.paisProcedencia,
+    localHospedagem: formData.localHospedagem,
+    contatoLocal: formData.contatoLocal,
+    // Outros campos críticos
     contatoTelefonico: formData.contatoTelefonico,
     contatoNotificador: formData.contatoNotificador,
-    sinaisESintomas: formData.sinaisESintomas,
-    hipoteseDiagnostica: formData.hipoteseDiagnostica,
+    sinaisESintomas: formData.sinaisESintomas.length,
+    hipoteseDiagnostica: formData.hipoteseDiagnostica.length,
     localEncaminhamento: formData.localEncaminhamento,
     tipoEncerramento: formData.tipoEncerramento,
-    arquivos: formData.arquivos.length // 🆕 LOG DOS ARQUIVOS
+    arquivos: formData.arquivos.length
   });
 
   return formData;
@@ -395,11 +411,13 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
 
   const trimmedData = trimFields(frontendData);
 
-  // Converter valores específicos
+  // ✅ MELHORADO: Converter valores específicos com mapeamento correto
   const residenteBelem =
     trimmedData.residenteBelem === "1"
-      ? "S"
-      : "N"; // Tanto "2" (não residente BR) quanto "3" (estrangeiro) mapeiam para "N"
+      ? "S"  // Sim - Belém
+      : trimmedData.residenteBelem === "2"
+      ? "N"  // Não - Outro município brasileiro
+      : "E"; // Estrangeiro
 
   const pacienteId = trimmedData.pacienteId ? Number(trimmedData.pacienteId) : null;
 
@@ -492,16 +510,11 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
     // *** ADICIONAR IDADE EM MESES PARA O BACKEND ***
     ...(idadeParaBackend !== null && { idade_paciente_meses: idadeParaBackend }),
 
-    // Campos opcionais
-    ...(trimmedData.bairro && { 
-      tipo_bairro_idtipo_bairro: parseInt(trimmedData.bairro) || null 
-    }),
-    ...(trimmedData.uf && {
-      tipo_estado_idtipo_estado: parseInt(trimmedData.uf) || null,
-    }),
-    ...(trimmedData.municipio && {
-      tipo_municipio_idtipo_municipio: parseInt(trimmedData.municipio) || null,
-    }),
+    // ✅ CORREÇÃO CRÍTICA: Campos de localização - sempre incluir (mesmo que null)
+    tipo_bairro_idtipo_bairro: trimmedData.bairro ? parseInt(trimmedData.bairro) || null : null,
+    tipo_estado_idtipo_estado: trimmedData.uf ? parseInt(trimmedData.uf) || null : null,
+    tipo_municipio_idtipo_municipio: trimmedData.municipio ? parseInt(trimmedData.municipio) || null : null,
+    // ✅ CORREÇÃO CRÍTICA: Campos de hospedagem - sempre incluir como string
     local_hospedagem: trimmedData.localHospedagem || "", 
     contato_local_hospedagem: trimmedData.contatoLocal || "",
     ...(trimmedData.dataInicioSintomas && {
@@ -559,7 +572,23 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
       : {})
   };
 
-  console.log("Enviando payload para o backend:", JSON.stringify(payload, null, 2));
+  // ✅ LOG DETALHADO PARA DEBUG DO MODO OFFLINE
+  console.log("🚀 [ADAPTER] Enviando payload para o backend:", {
+    // Campos de localização
+    residente_belem: payload.residente_belem,
+    tipo_estado_idtipo_estado: payload.tipo_estado_idtipo_estado,
+    tipo_municipio_idtipo_municipio: payload.tipo_municipio_idtipo_municipio,
+    tipo_bairro_idtipo_bairro: payload.tipo_bairro_idtipo_bairro,
+    tipo_pais_idtipo_pais: payload.tipo_pais_idtipo_pais,
+    local_hospedagem: payload.local_hospedagem,
+    contato_local_hospedagem: payload.contato_local_hospedagem,
+    // Outros campos críticos  
+    paciente_idpaciente: payload.paciente_idpaciente,
+    timezone_name: payload.timezone_name,
+    isUpdate: isUpdate
+  });
+  
+  console.log("🔍 [ADAPTER] Payload completo:", JSON.stringify(payload, null, 2));
 
   return payload;
 };

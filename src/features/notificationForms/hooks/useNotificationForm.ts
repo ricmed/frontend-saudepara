@@ -1670,37 +1670,65 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     }
   }, [formData.tipoAtendimento]);
 
-  // Efeito para limpar campos quando muda opção de residente
+  // ✅ MELHORADO: Efeito para auto-preenchimento inteligente quando muda opção de residente
   useEffect(() => {
     // Somente executar se já tiver um valor selecionado (evita limpar na inicialização)
     if (formData.residenteBelem && Object.keys(formData).length > 1) {
       // Criar uma cópia do formData para fazer as alterações
       const updatedData = { ...formData };
 
-      // Se selecionar "SIM" (residente em Belém), limpar campos de não-residentes
+      // Se selecionar "SIM" (residente em Belém)
       if (formData.residenteBelem === "1") {
-        updatedData.uf = "";
-        updatedData.municipio = "";
+        // Auto-preencher dados obrigatórios
         updatedData.paisProcedencia = "105"; // Brasil
+        updatedData.uf = "1"; // Pará
+        updatedData.municipio = "1"; // Belém
+        
+        // Limpar campos não aplicáveis
         updatedData.localHospedagem = "";
         updatedData.contatoLocal = "";
+        
+        console.log('✅ Auto-preenchimento: Residente de Belém - País, UF e Município definidos automaticamente');
       }
-      // Se selecionar "NÃO" (outro município/estado), limpar bairro e dados estrangeiros
+      // Se selecionar "NÃO" (outro município/estado brasileiro)
       else if (formData.residenteBelem === "2") {
-        updatedData.bairro = "";
+        // Auto-preencher país como Brasil
         updatedData.paisProcedencia = "105"; // Brasil
-        updatedData.localHospedagem = "";
-        updatedData.contatoLocal = "";
+        
+        // Limpar campos específicos de Belém e estrangeiros
+        updatedData.bairro = "";
+        
+        // Se estava com Belém selecionado, limpar para permitir nova seleção
+        if (updatedData.municipio === "1") {
+          updatedData.uf = "";
+          updatedData.municipio = "";
+        }
+        
+        console.log('✅ Auto-preenchimento: Outro município brasileiro - País definido como Brasil');
       }
-      // Se selecionar "ESTRANGEIRO", limpar dados de localização nacional
+      // Se selecionar "ESTRANGEIRO"
       else if (formData.residenteBelem === "3") {
+        // Limpar todos os dados de localização nacional
         updatedData.bairro = "";
         updatedData.uf = "";
         updatedData.municipio = "";
+        
+        // Se estava com Brasil selecionado, limpar para permitir seleção de outro país
+        if (updatedData.paisProcedencia === "105") {
+          updatedData.paisProcedencia = "";
+        }
+        
+        console.log('✅ Auto-preenchimento: Estrangeiro - Dados nacionais limpos');
       }
 
-      // Atualizar o estado
-      setFormData(updatedData);
+      // Atualizar o estado apenas se houve mudanças
+      const hasChanges = Object.keys(updatedData).some(key => 
+        updatedData[key as keyof typeof updatedData] !== formData[key as keyof typeof formData]
+      );
+      
+      if (hasChanges) {
+        setFormData(updatedData);
+      }
     }
   }, [formData.residenteBelem]);
 
