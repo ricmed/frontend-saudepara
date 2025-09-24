@@ -604,9 +604,18 @@ const UserForm: React.FC = () => {
         permissoes: formData.permissoes
       });
 
-      // Primeiro, remover todos os acessos existentes do usuário
-      console.log('🗑️ Removendo acessos existentes...');
-      await usuarioGestaoService.deleteUserAccess(userId);
+      // Primeiro, fazer limpeza completa de todos os acessos (hard delete)
+      console.log('🗑️ Fazendo limpeza completa de TODOS os acessos (hard delete)...');
+      try {
+        await usuarioGestaoService.hardDeleteTodosAcessosUsuario(userId);
+        console.log('✅ Limpeza completa realizada com sucesso');
+      } catch (deleteError: any) {
+        console.error('❌ Erro na limpeza completa dos acessos:', deleteError);
+        throw new Error(`Erro na limpeza dos acessos: ${deleteError.message || deleteError}`);
+      }
+      
+      // Aguardar um momento para garantir que as remoções foram processadas
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Depois, criar novo acesso baseado no formulário
       if (formData.nivelAcesso === 'unidade' && formData.estabelecimentoId) {

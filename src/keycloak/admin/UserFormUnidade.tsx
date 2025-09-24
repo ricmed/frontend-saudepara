@@ -226,6 +226,18 @@ const UserFormUnidade: React.FC = () => {
           });
         }
 
+        // 🔥 HARD DELETE: Limpar todos os acessos existentes antes de criar novos
+        console.log('🗑️ Removendo todos os acessos existentes do usuário (hard delete)...');
+        await usuarioGestaoService.hardDeleteTodosAcessosUsuario(id);
+        
+        // 🆕 Recriar o acesso específico para esta unidade
+        console.log('🔗 Recriando acesso à unidade...');
+        if (!adminEstabelecimentoId) {
+          throw new Error('ID do estabelecimento não disponível para o admin logado');
+        }
+        
+        await usuarioGestaoService.createAcessoUnidade(id, adminEstabelecimentoId);
+
         console.log('✅ Usuário atualizado com sucesso');
         setNotification({
           message: 'Usuário atualizado com sucesso!',

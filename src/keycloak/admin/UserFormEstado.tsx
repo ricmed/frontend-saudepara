@@ -24,6 +24,144 @@ import {
   CreateUsuarioRequest
 } from '@/services/UsuarioGestaoService';
 
+// Componente para seleção de estabelecimentos com pesquisa integrada
+interface EstabelecimentoComboBoxProps {
+  estabelecimentos: Array<{id: number; nome: string; cnes?: string; municipio?: string}>;
+  value?: number;
+  onChange: (value: number | undefined) => void;
+  error?: string;
+  placeholder?: string;
+}
+
+const EstabelecimentoComboBox: React.FC<EstabelecimentoComboBoxProps> = ({
+  estabelecimentos,
+  value,
+  onChange,
+  error,
+  placeholder = "Digite para pesquisar..."
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [displayText, setDisplayText] = useState('');
+
+  // Encontrar o estabelecimento selecionado
+  const selectedEstabelecimento = estabelecimentos.find(est => est.id === value);
+
+  // Filtrar estabelecimentos baseado na pesquisa
+  const filteredEstabelecimentos = estabelecimentos.filter(est => {
+    if (!searchTerm) return true;
+    const termo = searchTerm.toLowerCase();
+    const nome = est.nome?.toLowerCase() || '';
+    const cnes = est.cnes?.toLowerCase() || '';
+    const municipio = est.municipio?.toLowerCase() || '';
+    return nome.includes(termo) || cnes.includes(termo) || municipio.includes(termo);
+  });
+
+  // Atualizar texto exibido quando valor muda
+  useEffect(() => {
+    if (selectedEstabelecimento) {
+      setDisplayText(`${selectedEstabelecimento.nome}${selectedEstabelecimento.cnes ? ` (CNES: ${selectedEstabelecimento.cnes})` : ''}`);
+      setSearchTerm('');
+    } else {
+      setDisplayText('');
+      setSearchTerm('');
+    }
+  }, [selectedEstabelecimento]);
+
+  const handleSelect = (estabelecimento: {id: number; nome: string; cnes?: string; municipio?: string}) => {
+    onChange(estabelecimento.id);
+    setIsOpen(false);
+    setSearchTerm('');
+  };
+
+  const handleClear = () => {
+    onChange(undefined);
+    setIsOpen(false);
+    setSearchTerm('');
+  };
+
+  return (
+    <div className="relative">
+      <div className={`relative w-full border rounded-md focus-within:ring-2 focus-within:ring-blue-500 ${
+        error ? 'border-red-500' : 'border-gray-300'
+      }`}>
+        <input
+          type="text"
+          value={isOpen ? searchTerm : displayText}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            if (!isOpen) setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
+          onClick={() => setIsOpen(true)}
+          placeholder={placeholder}
+          className="w-full px-3 py-2 outline-none rounded-md"
+        />
+        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
+          {value && (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              ×
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            ▼
+          </button>
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+          {filteredEstabelecimentos.length > 0 ? (
+            <>
+              <div className="px-3 py-2 text-xs text-gray-500 bg-gray-50 border-b">
+                {filteredEstabelecimentos.length} de {estabelecimentos.length} estabelecimentos
+              </div>
+              {filteredEstabelecimentos.map((est) => (
+                <button
+                  key={est.id}
+                  type="button"
+                  onClick={() => handleSelect(est)}
+                  className={`w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-100 ${
+                    value === est.id ? 'bg-blue-100 text-blue-800' : 'text-gray-900'
+                  }`}
+                >
+                  <div className="font-medium">{est.nome}</div>
+                  {est.cnes && (
+                    <div className="text-sm text-gray-500">CNES: {est.cnes}</div>
+                  )}
+                  {est.municipio && (
+                    <div className="text-sm text-gray-500">Município: {est.municipio}</div>
+                  )}
+                </button>
+              ))}
+            </>
+          ) : (
+            <div className="px-3 py-4 text-center text-gray-500">
+              {searchTerm ? `Nenhum resultado para "${searchTerm}"` : 'Nenhum estabelecimento encontrado'}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Overlay para fechar quando clicar fora */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+    </div>
+  );
+};
+
 interface UserFormData {
   username: string;
   firstName: string;
@@ -34,6 +172,10 @@ interface UserFormData {
   password?: string;
   confirmPassword?: string;
   temporaryPassword: boolean;
+  // Campos para seleção de nível de acesso
+  nivelAcesso: 'unidade' | 'municipio' | 'estado';
+  estabelecimentoId?: number;
+  municipioId?: number;
 }
 
 const UserFormEstado: React.FC = () => {
@@ -49,6 +191,12 @@ const UserFormEstado: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  
+  // Estados para dados de dropdowns
+  const [estabelecimentos, setEstabelecimentos] = useState<Array<{id: number; nome: string; cnes?: string; municipio?: string}>>([]);
+  const [municipios, setMunicipios] = useState<Array<{id: number; nome: string}>>([]);
+  const [loadingEstabelecimentos, setLoadingEstabelecimentos] = useState(false);
+  const [loadingMunicipios, setLoadingMunicipios] = useState(false);
 
   const isEditMode = !!id;
   const [formData, setFormData] = useState<UserFormData>({
@@ -60,7 +208,10 @@ const UserFormEstado: React.FC = () => {
     emailVerified: false,
     password: '',
     confirmPassword: '',
-    temporaryPassword: true
+    temporaryPassword: true,
+    nivelAcesso: 'estado', // Padrão para estado (pré-selecionado)
+    estabelecimentoId: undefined,
+    municipioId: undefined
   });
 
   // Obter informações do estado do admin logado usando userPermissions
@@ -71,7 +222,13 @@ const UserFormEstado: React.FC = () => {
     if (isEditMode && id) {
       loadUser(id);
     }
-  }, [id, isEditMode]);
+    
+    // Carregar estabelecimentos e municípios do estado quando o componente inicializar
+    if (adminEstadoId) {
+      loadEstabelecimentosEstado();
+      loadMunicipiosEstado();
+    }
+  }, [id, isEditMode, adminEstadoId]);
 
   const loadUser = async (userId: string) => {
     try {
@@ -92,6 +249,58 @@ const UserFormEstado: React.FC = () => {
       const userData = await response.json();
       console.log('📝 Dados do usuário carregados:', userData);
 
+      // Buscar acessos do usuário para determinar o nível correto
+      console.log('🔍 Buscando acessos do usuário...');
+      const userAcessos = await usuarioGestaoService.getUsuarioAcessos(userId);
+      console.log('🔐 Acessos encontrados:', userAcessos);
+
+      // Determinar nível de acesso e IDs
+      let nivelAcesso: 'unidade' | 'municipio' | 'estado' = 'estado';
+      let estabelecimentoId: number | undefined = undefined;
+      let municipioId: number | undefined = undefined;
+
+      if (userAcessos && userAcessos.length > 0) {
+        // Procurar primeiro por acesso de unidade
+        const acessoUnidade = userAcessos.find(acesso => 
+          acesso.nivel_acesso === 'unidade' && 
+          acesso.estabelecimento_id
+        );
+        
+        if (acessoUnidade) {
+          nivelAcesso = 'unidade';
+          estabelecimentoId = acessoUnidade.estabelecimento_id;
+          console.log('✅ Usuário tem acesso de unidade:', {
+            estabelecimentoId,
+            nomeEstabelecimento: acessoUnidade.estabelecimento?.nome
+          });
+        } else {
+          // Verificar se tem acesso de município
+          const acessoMunicipio = userAcessos.find(acesso => 
+            acesso.nivel_acesso === 'municipio' && 
+            acesso.tipo_municipio_id
+          );
+          
+          if (acessoMunicipio) {
+            nivelAcesso = 'municipio';
+            municipioId = acessoMunicipio.tipo_municipio_id;
+            console.log('✅ Usuário tem acesso de município:', {
+              municipioId,
+              nomeMunicipio: acessoMunicipio.tipo_municipio?.descricao
+            });
+          } else {
+            // Verificar se tem acesso de estado
+            const acessoEstado = userAcessos.find(acesso => 
+              acesso.nivel_acesso === 'estado'
+            );
+            
+            if (acessoEstado) {
+              nivelAcesso = 'estado';
+              console.log('✅ Usuário tem acesso de estado');
+            }
+          }
+        }
+      }
+
       setFormData({
         username: userData.username || '',
         firstName: userData.firstName || '',
@@ -101,7 +310,10 @@ const UserFormEstado: React.FC = () => {
         emailVerified: userData.emailVerified !== false,
         password: '',
         confirmPassword: '',
-        temporaryPassword: true
+        temporaryPassword: true,
+        nivelAcesso: nivelAcesso,
+        estabelecimentoId: estabelecimentoId,
+        municipioId: municipioId
       });
 
     } catch (error) {
@@ -112,6 +324,72 @@ const UserFormEstado: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadEstabelecimentosEstado = async () => {
+    if (!adminEstadoId) return;
+    
+    try {
+      setLoadingEstabelecimentos(true);
+      console.log('🏥 Carregando estabelecimentos do estado:', adminEstadoId);
+      
+      // Usar endpoint que busca todos os estabelecimentos do estado
+      const response = await fetch(`/api/estabelecimentos/estado/${adminEstadoId}`, { 
+        credentials: 'include' 
+      });
+      
+      if (response.ok) {
+        const estabelecimentosDoEstado = await response.json();
+        const estabelecimentosFormatados = estabelecimentosDoEstado.map((est: any) => ({
+          id: est.idestabelecimento,
+          nome: est.nome,
+          cnes: est.cnes || undefined,
+          municipio: est.municipio?.nome || 'Município não informado'
+        }));
+        setEstabelecimentos(estabelecimentosFormatados);
+        console.log('✅ Estabelecimentos do estado carregados:', estabelecimentosFormatados.length);
+      } else {
+        console.warn('⚠️ Nenhum estabelecimento encontrado para o estado');
+        setEstabelecimentos([]);
+      }
+    } catch (error) {
+      console.error('💥 Erro ao carregar estabelecimentos:', error);
+      setEstabelecimentos([]);
+    } finally {
+      setLoadingEstabelecimentos(false);
+    }
+  };
+
+  const loadMunicipiosEstado = async () => {
+    if (!adminEstadoId) return;
+    
+    try {
+      setLoadingMunicipios(true);
+      console.log('🏘️ Carregando municípios do estado:', adminEstadoId);
+      
+      // Usar endpoint que busca municípios por estado
+      const response = await fetch(`/api/municipios/estado/${adminEstadoId}`, { 
+        credentials: 'include' 
+      });
+      
+      if (response.ok) {
+        const municipiosDoEstado = await response.json();
+        const municipiosFormatados = municipiosDoEstado.map((mun: any) => ({
+          id: mun.idtipo_municipio,
+          nome: mun.descricao
+        }));
+        setMunicipios(municipiosFormatados);
+        console.log('✅ Municípios do estado carregados:', municipiosFormatados.length);
+      } else {
+        console.warn('⚠️ Nenhum município encontrado para o estado');
+        setMunicipios([]);
+      }
+    } catch (error) {
+      console.error('💥 Erro ao carregar municípios:', error);
+      setMunicipios([]);
+    } finally {
+      setLoadingMunicipios(false);
     }
   };
 
@@ -155,6 +433,19 @@ const UserFormEstado: React.FC = () => {
       if (formData.password !== formData.confirmPassword) {
         newErrors.confirmPassword = 'Confirmação de senha não confere';
       }
+    }
+
+    // Validar nível de acesso
+    if (!formData.nivelAcesso) {
+      newErrors.nivelAcesso = 'Nível de acesso é obrigatório';
+    }
+
+    if (formData.nivelAcesso === 'unidade' && !formData.estabelecimentoId) {
+      newErrors.estabelecimentoId = 'Estabelecimento é obrigatório para nível de acesso Unidade';
+    }
+
+    if (formData.nivelAcesso === 'municipio' && !formData.municipioId) {
+      newErrors.municipioId = 'Município é obrigatório para nível de acesso Município';
     }
 
     setErrors(newErrors);
@@ -218,6 +509,24 @@ const UserFormEstado: React.FC = () => {
           });
         }
 
+        // 🔥 HARD DELETE: Limpar todos os acessos existentes antes de criar novos
+        console.log('🗑️ Removendo todos os acessos existentes do usuário (hard delete)...');
+        await usuarioGestaoService.hardDeleteTodosAcessosUsuario(id);
+        
+        // 🆕 Recriar o acesso baseado no nível selecionado
+        console.log('🔗 Recriando acesso baseado no nível:', formData.nivelAcesso);
+
+        if (formData.nivelAcesso === 'estado') {
+          if (!adminEstadoId) {
+            throw new Error('ID do estado do administrador não encontrado');
+          }
+          await usuarioGestaoService.createAcessoEstado(id, adminEstadoId);
+        } else if (formData.nivelAcesso === 'municipio' && formData.municipioId) {
+          await usuarioGestaoService.createAcessoMunicipio(id, formData.municipioId);
+        } else if (formData.nivelAcesso === 'unidade' && formData.estabelecimentoId) {
+          await usuarioGestaoService.createAcessoUnidade(id, formData.estabelecimentoId);
+        }
+
         console.log('✅ Usuário atualizado com sucesso');
         setNotification({
           message: 'Usuário atualizado com sucesso!',
@@ -246,15 +555,20 @@ const UserFormEstado: React.FC = () => {
           throw new Error('Falha ao criar usuário - ID não retornado');
         }
 
-        // 2. Criar acesso para o estado
-        console.log('🔗 Criando acesso ao estado...');
-        
-        // Verificar se adminEstadoId está definido
-        if (!adminEstadoId) {
-          throw new Error('ID do estado do administrador não encontrado');
+        // 2. Criar acesso baseado no nível selecionado
+        console.log('🔗 Criando acesso baseado no nível:', formData.nivelAcesso);
+
+        if (formData.nivelAcesso === 'estado') {
+          // Verificar se adminEstadoId está definido
+          if (!adminEstadoId) {
+            throw new Error('ID do estado do administrador não encontrado');
+          }
+          await usuarioGestaoService.createAcessoEstado(novoUsuarioId, adminEstadoId);
+        } else if (formData.nivelAcesso === 'municipio' && formData.municipioId) {
+          await usuarioGestaoService.createAcessoMunicipio(novoUsuarioId, formData.municipioId);
+        } else if (formData.nivelAcesso === 'unidade' && formData.estabelecimentoId) {
+          await usuarioGestaoService.createAcessoUnidade(novoUsuarioId, formData.estabelecimentoId);
         }
-        
-        await usuarioGestaoService.createAcessoEstado(novoUsuarioId, adminEstadoId);
 
         console.log('✅ Usuário e acesso criados com sucesso');
         setNotification({
@@ -596,6 +910,143 @@ const UserFormEstado: React.FC = () => {
                 <label htmlFor="temporaryPassword" className="ml-2 block text-sm text-gray-700">
                   Senha temporária (usuário deve alterar no primeiro login)
                 </label>
+              </div>
+            </div>
+
+            {/* Seção de Controle de Acesso */}
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <div className="flex items-center mb-4">
+                <MapPin className="h-5 w-5 text-gray-600 mr-2" />
+                <h2 className="text-lg font-semibold text-gray-900">Controle de Acesso</h2>
+              </div>
+
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <strong>Estado:</strong> {adminEstadoNome} (ID: {adminEstadoId})
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  O usuário criado terá acesso baseado no nível selecionado abaixo.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Nível de Acesso */}
+                <div>
+                  <label htmlFor="nivelAcesso" className="block text-sm font-medium text-gray-700 mb-2">
+                    Nível de Acesso *
+                  </label>
+                  <select
+                    id="nivelAcesso"
+                    value={formData.nivelAcesso}
+                    onChange={(e) => {
+                      const novoNivel = e.target.value as 'unidade' | 'municipio' | 'estado';
+                      handleInputChange('nivelAcesso', novoNivel);
+                      // Limpar campos quando muda o nível
+                      if (novoNivel !== 'unidade') {
+                        handleInputChange('estabelecimentoId', undefined);
+                      }
+                      if (novoNivel !== 'municipio') {
+                        handleInputChange('municipioId', undefined);
+                      }
+                    }}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.nivelAcesso ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    required
+                  >
+                    <option value="estado">Nível Estado - {adminEstadoNome}</option>
+                    <option value="municipio">Nível Município - Escolher Município</option>
+                    <option value="unidade">Nível Unidade - Escolher Estabelecimento</option>
+                  </select>
+                  {errors.nivelAcesso && (
+                    <p className="mt-1 text-sm text-red-600">{errors.nivelAcesso}</p>
+                  )}
+                  <p className="mt-1 text-xs text-gray-500">
+                    {formData.nivelAcesso === 'estado' 
+                      ? 'Acesso a todo o estado (pré-selecionado)'
+                      : formData.nivelAcesso === 'municipio'
+                      ? 'Acesso limitado a um município específico'
+                      : 'Acesso limitado a um estabelecimento específico'
+                    }
+                  </p>
+                </div>
+
+                {/* Município - Mostrar apenas se nível for 'municipio' */}
+                {formData.nivelAcesso === 'municipio' && (
+                  <div>
+                    <label htmlFor="municipioId" className="block text-sm font-medium text-gray-700 mb-2">
+                      Município *
+                    </label>
+                    
+                    {loadingMunicipios ? (
+                      <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500">
+                        Carregando municípios...
+                      </div>
+                    ) : (
+                      <select
+                        id="municipioId"
+                        value={formData.municipioId || ''}
+                        onChange={(e) => handleInputChange('municipioId', Number(e.target.value) || undefined)}
+                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          errors.municipioId ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                        required
+                      >
+                        <option value="">Selecione um município...</option>
+                        {municipios.map(municipio => (
+                          <option key={municipio.id} value={municipio.id}>
+                            {municipio.nome}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {errors.municipioId && (
+                      <p className="mt-1 text-sm text-red-600">{errors.municipioId}</p>
+                    )}
+                    {municipios.length === 0 && !loadingMunicipios && (
+                      <p className="mt-1 text-sm text-orange-600">
+                        Nenhum município encontrado para este estado
+                      </p>
+                    )}
+                    <p className="mt-1 text-xs text-gray-500">
+                      Apenas municípios do estado {adminEstadoNome}
+                    </p>
+                  </div>
+                )}
+
+                {/* Estabelecimento - Mostrar apenas se nível for 'unidade' */}
+                {formData.nivelAcesso === 'unidade' && (
+                  <div>
+                    <label htmlFor="estabelecimentoId" className="block text-sm font-medium text-gray-700 mb-2">
+                      Estabelecimento *
+                    </label>
+                    
+                    {loadingEstabelecimentos ? (
+                      <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500">
+                        Carregando estabelecimentos...
+                      </div>
+                    ) : (
+                      <EstabelecimentoComboBox
+                        estabelecimentos={estabelecimentos}
+                        value={formData.estabelecimentoId}
+                        onChange={(value) => handleInputChange('estabelecimentoId', value)}
+                        error={errors.estabelecimentoId}
+                        placeholder="🔍 Digite para pesquisar ou clique para ver todos..."
+                      />
+                    )}
+                    {errors.estabelecimentoId && (
+                      <p className="mt-1 text-sm text-red-600">{errors.estabelecimentoId}</p>
+                    )}
+                    {estabelecimentos.length === 0 && !loadingEstabelecimentos && (
+                      <p className="mt-1 text-sm text-orange-600">
+                        Nenhum estabelecimento encontrado para este estado
+                      </p>
+                    )}
+                    <p className="mt-1 text-xs text-gray-500">
+                      Todos os estabelecimentos do estado {adminEstadoNome}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
