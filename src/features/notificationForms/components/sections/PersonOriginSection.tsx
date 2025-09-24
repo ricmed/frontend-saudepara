@@ -60,8 +60,8 @@ const PersonOriginSection: React.FC<FormSectionProps> = ({
                       tipo_bairro_idtipo_bairro: value,
                       // ✅ AUTO-PREENCHIMENTO: Quando seleciona bairro de Belém, preencher automaticamente
                       paisProcedencia: "105", // Brasil
-                      uf: "1", // Pará
-                      municipio: "1", // Belém
+                      uf: "15", // Pará (ID correto)
+                      municipio: "170", // Belém (ID correto)
                       // Limpar campos não aplicáveis
                       localHospedagem: "",
                       contatoLocal: "",

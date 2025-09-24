@@ -6,10 +6,15 @@ import { toast } from 'react-toastify';
 
 class SyncService {
   private isOnline: boolean;
+  private isAuthenticated: boolean = false;
   private syncInterval: number | null = null;
   private isSyncing: boolean = false;
   private syncStartTime: number = 0;
   private syncLockTimeout: number = 5 * 60 * 1000; // 5 minutos timeout
+  private authCheckCooldown: number = 0;
+  private authCheckInterval: number = 30000; // 30 segundos
+  private consecutiveAuthFailures: number = 0; // ✅ Contar falhas consecutivas
+  private maxConsecutiveFailures: number = 3; // ✅ Máximo de falhas antes de parar
 
   constructor() {
     this.isOnline = navigator.onLine;
@@ -21,16 +26,166 @@ class SyncService {
       this.isOnline = true;
       // ✅ DELAY para evitar múltiplas sincronizações simultâneas
       setTimeout(() => {
-        this.syncData();
+        this.checkAuthenticationStatus();
       }, 2000);
-      
-      toast.success('Conexão de internet restaurada! Sincronizando dados...');
     });
 
     window.addEventListener('offline', () => {
       this.isOnline = false;
+      this.isAuthenticated = false;
       toast.info('Você está offline. Os dados serão salvos localmente.');
     });
+  }
+
+  // ✅ NOVO: Verificar se realmente pode fazer chamadas API
+  private async checkAuthenticationStatus(): Promise<boolean> {
+    if (!this.isOnline) {
+      this.isAuthenticated = false;
+      return false;
+    }
+
+    // ✅ Se houve muitas falhas consecutivas, aumentar o intervalo drasticamente
+    if (this.consecutiveAuthFailures >= this.maxConsecutiveFailures) {
+      const extendedInterval = this.authCheckInterval * 10; // 5 minutos em vez de 30 segundos
+      const now = Date.now();
+      if (now - this.authCheckCooldown < extendedInterval) {
+        console.log(`🔕 Muitas falhas de auth (${this.consecutiveAuthFailures}), aguardando ${extendedInterval/1000}s antes da próxima tentativa`);
+        return this.isAuthenticated;
+      }
+    }
+
+    // ✅ Cooldown normal para evitar muitas verificações
+    const now = Date.now();
+    if (now - this.authCheckCooldown < this.authCheckInterval) {
+      return this.isAuthenticated;
+    }
+
+    try {
+      // ✅ Usar AbortController para timeout rápido
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 segundos
+      
+      // ✅ Fazer uma chamada simples para verificar autenticação
+      const response = await fetch('/api/usuario-acesso/current', {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+        },
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+      this.isAuthenticated = response.ok;
+      this.authCheckCooldown = now;
+
+      if (this.isAuthenticated) {
+        // ✅ Reset contador de falhas em caso de sucesso
+        this.consecutiveAuthFailures = 0;
+        console.log('✅ Autenticação verificada - modo online ativo');
+        // ✅ Não mostrar toast repetidamente
+      } else {
+        // ✅ Incrementar contador de falhas
+        this.consecutiveAuthFailures++;
+        console.log(`❌ Não autenticado (401) - modo offline forçado (falha ${this.consecutiveAuthFailures}/${this.maxConsecutiveFailures})`);
+        // ✅ Não mostrar toast repetidamente  
+      }
+
+      return this.isAuthenticated;
+    } catch (error) {
+      // ✅ Incrementar contador de falhas também em caso de erro de rede
+      this.consecutiveAuthFailures++;
+      
+      // ✅ Distinguir entre erro de rede e erro de servidor
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log(`⏰ Timeout na verificação de auth - modo offline (falha ${this.consecutiveAuthFailures}/${this.maxConsecutiveFailures})`);
+      } else {
+        console.log(`🔒 Servidor indisponível - modo offline (falha ${this.consecutiveAuthFailures}/${this.maxConsecutiveFailures}):`, error instanceof Error ? error.message : String(error));
+      }
+      this.isAuthenticated = false;
+      this.authCheckCooldown = now;
+      return false;
+    }
+  }
+
+  // ✅ NOVO: Verificar se deve usar modo online com auth
+  private shouldUseOnlineMode(): boolean {
+    return this.isOnline && this.isAuthenticated;
+  }
+
+  // ✅ NOVO: Forçar modo offline (para usuários que querem trabalhar offline)
+  public forceOfflineMode(): void {
+    console.log('🔒 Modo offline forçado pelo usuário');
+    this.isAuthenticated = false;
+    toast.info('Modo offline ativado - dados serão salvos localmente');
+  }
+
+  // ✅ NOVO: Tentar reativar modo online  
+  public async tryOnlineMode(): Promise<boolean> {
+    if (!this.isOnline) {
+      toast.warning('Sem conexão de internet');
+      return false;
+    }
+
+    const authenticated = await this.checkAuthenticationStatus();
+    if (authenticated) {
+      toast.success('Modo online ativado - sincronizando dados...');
+      setTimeout(() => this.syncData(), 1000);
+    } else {
+      toast.error('Falha na autenticação - permanecendo offline');
+    }
+    
+    return authenticated;
+  }
+
+  // ✅ PÚBLICO: Para outros componentes verificarem se devem usar modo online
+  public async canUseOnlineMode(): Promise<boolean> {
+    // ✅ PRIMEIRO: Verificar conectividade básica
+    if (!this.isOnline) {
+      console.log('🔇 Sem conectividade - modo offline automático');
+      return false;
+    }
+    
+    // ✅ Se já foi verificado recentemente, retorna direto
+    const now = Date.now();
+    if (now - this.authCheckCooldown < this.authCheckInterval) {
+      return this.shouldUseOnlineMode();
+    }
+    
+    // ✅ Só verificar autenticação se há conectividade
+    await this.checkAuthenticationStatus();
+    return this.shouldUseOnlineMode();
+  }
+
+  // ✅ PÚBLICO: Verificação simples de conectividade (sem auth)
+  public hasInternetConnection(): boolean {
+    return this.isOnline;
+  }
+
+  // ✅ NOVO: Verificação rápida se o servidor está disponível
+  public async isServerAvailable(): Promise<boolean> {
+    if (!this.isOnline) {
+      return false;
+    }
+
+    try {
+      // ✅ Verificação muito rápida (500ms timeout) usando endpoint conhecido
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 500);
+      
+      await fetch('/api/usuario-acesso/current', {
+        method: 'HEAD', // Só cabeçalho, mais rápido que GET
+        credentials: 'include',
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+      // ✅ Se chegou até aqui, servidor respondeu (200, 401, etc)
+      return true;
+    } catch (error) {
+      // Se der qualquer erro (timeout, rede, etc), consideramos servidor indisponível
+      return false;
+    }
   }
 
   // ✅ CORRIGIDO: Intervalo maior e verificação de lock
@@ -39,18 +194,23 @@ class SyncService {
       clearInterval(this.syncInterval);
     }
 
-    this.syncInterval = window.setInterval(() => {
+    this.syncInterval = window.setInterval(async () => {
       if (this.isOnline && !this.isSyncing) {
-        // ✅ Verificar se não há sync travado há muito tempo
-        const now = Date.now();
-        if (this.syncStartTime > 0 && (now - this.syncStartTime) > this.syncLockTimeout) {
-          console.warn('⚠️ Sync parece travado, resetando lock...');
-          this.isSyncing = false;
-          this.syncStartTime = 0;
-        }
+        // ✅ Verificar autenticação antes de sincronizar
+        await this.checkAuthenticationStatus();
         
-        if (!this.isSyncing) {
-          this.syncData();
+        if (this.shouldUseOnlineMode()) {
+          // ✅ Verificar se não há sync travado há muito tempo
+          const now = Date.now();
+          if (this.syncStartTime > 0 && (now - this.syncStartTime) > this.syncLockTimeout) {
+            console.warn('⚠️ Sync parece travado, resetando lock...');
+            this.isSyncing = false;
+            this.syncStartTime = 0;
+          }
+          
+          if (!this.isSyncing) {
+            this.syncData();
+          }
         }
       }
     }, intervalMs);
@@ -65,8 +225,11 @@ class SyncService {
 
   // ✅ CORRIGIDO: Sincronização com proteção contra duplicação
   async syncData() {
-    if (!this.isOnline) {
-      console.log('📱 Sem conexão para sincronizar');
+    // ✅ Verificar auth antes de sincronizar
+    await this.checkAuthenticationStatus();
+    
+    if (!this.shouldUseOnlineMode()) {
+      console.log('📱 Sem conexão autenticada para sincronizar');
       return;
     }
 
@@ -542,7 +705,8 @@ class SyncService {
       console.warn('⚠️ Erro ao verificar cache:', cacheError);
     }
 
-    if (!this.isOnline) {
+    await this.checkAuthenticationStatus();
+    if (!this.shouldUseOnlineMode()) {
       return false;
     }
 
@@ -564,13 +728,15 @@ class SyncService {
 
   // ✅ CORRIGIDO: Salvar paciente com ID único
   async savePaciente(pacienteData: any): Promise<any> {
-    if (this.isOnline) {
+    await this.checkAuthenticationStatus();
+    if (this.shouldUseOnlineMode()) {
       try {
         const result = await PacienteService.create(pacienteData);
         toast.success('✅ Paciente salvo!');
         return result;
       } catch (error) {
         console.warn('Falha online, salvando offline:', error);
+        this.isAuthenticated = false;
       }
     }
 
@@ -595,31 +761,67 @@ class SyncService {
     return pacienteComId;
   }
 
-  // ✅ SALVAR NOTIFICAÇÃO
-  async saveNotificacao(formData: any): Promise<void> {
-    if (this.isOnline) {
+  // ✅ SALVAR NOTIFICAÇÃO (NOVA OU EXISTENTE)
+  async saveNotificacao(formData: any, isEdit: boolean = false): Promise<void> {
+    // Verificar se é uma edição e existe um ID válido
+    const notificacaoId = formData.id || formData.idnotificacao;
+    
+    // ✅ Verificar autenticação antes de tentar online
+    await this.checkAuthenticationStatus();
+    
+    if (this.shouldUseOnlineMode() && !isEdit) {
+      // Para novas notificações, tentar salvar online primeiro
       try {
         await salvarNotificacaoCompleta(formData, false);
         toast.success('✅ Notificação salva!');
         return;
       } catch (error) {
         console.warn('Falha online, salvando offline:', error);
+        // ✅ Se falhar, marcar como não autenticado para próximas tentativas
+        this.isAuthenticated = false;
+      }
+    } else if (this.shouldUseOnlineMode() && isEdit && notificacaoId) {
+      // Para edições online, tentar atualizar
+      try {
+        await salvarNotificacaoCompleta(formData, true, notificacaoId);
+        toast.success('✅ Notificação atualizada!');
+        return;
+      } catch (error) {
+        console.warn('Falha online ao editar, salvando offline:', error);
+        // ✅ Se falhar, marcar como não autenticado para próximas tentativas
+        this.isAuthenticated = false;
       }
     }
 
+    // Salvar offline (seja nova ou edição)
     const formDataParaSalvar = { ...formData };
     
+    // ✅ CORREÇÃO: Garantir campos de ID consistentes
     if (formDataParaSalvar.pacienteId && !formDataParaSalvar.paciente_idpaciente) {
       formDataParaSalvar.paciente_idpaciente = formDataParaSalvar.pacienteId;
     } else if (formDataParaSalvar.paciente_idpaciente && !formDataParaSalvar.pacienteId) {
       formDataParaSalvar.pacienteId = formDataParaSalvar.paciente_idpaciente;
     }
 
-    await indexedDBService.saveNotificacao(formDataParaSalvar, false);
+    // ✅ LOG DETALHADO PARA DEBUG
+    console.log(`💾 [SYNC SERVICE] Salvando ${isEdit ? 'edição' : 'nova notificação'} offline:`, {
+      id: notificacaoId || 'novo',
+      isEdit,
+      // Campos críticos para verificação
+      localHospedagem: formDataParaSalvar.localHospedagem,
+      contatoLocal: formDataParaSalvar.contatoLocal,
+      uf: formDataParaSalvar.uf,
+      municipio: formDataParaSalvar.municipio,
+      bairro: formDataParaSalvar.bairro,
+      paisProcedencia: formDataParaSalvar.paisProcedencia,
+      residenteBelem: formDataParaSalvar.residenteBelem,
+    });
+
+    await indexedDBService.saveNotificacao(formDataParaSalvar, isEdit, notificacaoId);
     
-    const message = this.isOnline 
+    const message = this.shouldUseOnlineMode() 
       ? '📡 Erro na conexão - Salvo offline!'
-      : '📱 Salvo offline! Sincronizará quando voltar online.';
+      : `📱 ${isEdit ? 'Edição salva' : 'Salvo'} offline! Sincronizará quando voltar online.`;
     
     toast.success(message);
   }
@@ -627,7 +829,8 @@ class SyncService {
   // *** OUTROS MÉTODOS (sem alteração) ***
   
   async searchPacientes(query: string): Promise<any[]> {
-    if (this.isOnline) {
+    await this.checkAuthenticationStatus();
+    if (this.shouldUseOnlineMode()) {
       try {
         const result = await PacienteService.search(query);
         return result.data || [];
@@ -649,13 +852,15 @@ class SyncService {
       }
     }
     
-    if (this.isOnline) {
+    await this.checkAuthenticationStatus();
+    if (this.shouldUseOnlineMode()) {
       try {
         data = await fetchFn();
         await indexedDBService.saveOpcoes(tipo, data);
         return data;
       } catch (error) {
         console.error(`Erro ao buscar opções de ${tipo}:`, error);
+        this.isAuthenticated = false;
         
         const cachedData = await indexedDBService.getOpcoes(tipo);
         if (cachedData) {
@@ -676,7 +881,7 @@ class SyncService {
   }
 
   isNetworkAvailable() {
-    return this.isOnline;
+    return this.shouldUseOnlineMode();
   }
 
   isSyncInProgress() {
@@ -688,8 +893,9 @@ class SyncService {
   }
 
   async forceSyncData() {
-    if (!this.isOnline) {
-      toast.warning('Você está offline. Não é possível sincronizar agora.');
+    await this.checkAuthenticationStatus();
+    if (!this.shouldUseOnlineMode()) {
+      toast.warning('Você está offline ou não autenticado. Não é possível sincronizar agora.');
       return false;
     }
     
@@ -736,7 +942,8 @@ class SyncService {
       console.warn('⚠️ Erro ao verificar cache de estabelecimentos:', cacheError);
     }
 
-    if (!this.isOnline) {
+    await this.checkAuthenticationStatus();
+    if (!this.shouldUseOnlineMode()) {
       return false;
     }
 
@@ -757,13 +964,15 @@ class SyncService {
 
   // ✅ NOVO: Salvar estabelecimento com fallback offline
   async saveEstabelecimento(estabelecimentoData: any): Promise<any> {
-    if (this.isOnline) {
+    await this.checkAuthenticationStatus();
+    if (this.shouldUseOnlineMode()) {
       try {
         const result = await EstabelecimentoFormService.create(estabelecimentoData);
         toast.success('✅ Estabelecimento salvo!');
         return result;
       } catch (error) {
         console.warn('Falha online, salvando offline:', error);
+        this.isAuthenticated = false;
       }
     }
 
@@ -780,7 +989,7 @@ class SyncService {
     
     await indexedDBService.saveEstabelecimento(estabelecimentoComId);
     
-    const message = this.isOnline 
+    const message = this.shouldUseOnlineMode() 
       ? '📡 Erro na conexão - Estabelecimento salvo offline!'
       : '📱 Estabelecimento salvo offline! Sincronizará quando voltar online.';
     
@@ -789,13 +998,15 @@ class SyncService {
   }
   // ✅ NOVO: Buscar estabelecimentos com fallback offline
   async searchEstabelecimentos(query: string): Promise<any[]> {
-    if (this.isOnline) {
+    await this.checkAuthenticationStatus();
+    if (this.shouldUseOnlineMode()) {
       try {
         // Para busca de estabelecimentos, usamos cache local primeiro
         // já que não temos um método de busca específico no EstabelecimentoFormService
         console.log('Buscando estabelecimentos online não implementado, usando cache local');
       } catch (error) {
         console.warn('Falha na busca online de estabelecimentos, usando cache:', error);
+        this.isAuthenticated = false;
       }
     }
 

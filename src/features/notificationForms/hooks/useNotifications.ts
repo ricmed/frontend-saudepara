@@ -45,8 +45,8 @@ export const useNotifications = () => {
       console.log('🔄 Carregando eventos ativos do IndexedDB...');
       let eventosAtivos = await indexedDBService.getOpcoes('eventos') || [];
       
-      // Se não há eventos no cache local, tentar buscar da API
-      if (eventosAtivos.length === 0 && isOnline) {
+      // Se não há eventos no cache local, tentar buscar da API apenas se online/autenticado
+      if (eventosAtivos.length === 0 && await syncService.canUseOnlineMode()) {
         console.log('📡 Cache de eventos vazio, buscando da API...');
         try {
           const eventosResponse = await TiposEventoService.getAllAtivos();
@@ -237,6 +237,12 @@ export const useNotifications = () => {
         let hasMore = true;
         const MODERATE_PAGE_SIZE = 100; // Reduzido de 500 para 100
 
+        // ✅ VERIFICAR: Só buscar da API se estiver online e autenticado
+        if (!await syncService.canUseOnlineMode()) {
+          console.log('⚠️ Sistema offline ou não autenticado, usando apenas cache local');
+          return allNotificacoes; // Retorna array vazio se não há cache
+        }
+
         console.log('🌐 Buscando notificações da API...');
         
         while (hasMore && page <= 5) { // Limitar a 5 páginas (500 registros) por vez
@@ -387,9 +393,13 @@ export const useNotifications = () => {
                     limit: itemsPerPage
                   }
                 };
-              } else {
-                // Se não há cache, buscar apenas os dados necessários da API
+              } else if (await syncService.canUseOnlineMode()) {
+                // Se não há cache, buscar apenas os dados necessários da API (só se online/autenticado)
                 response = await NotificacaoService.getAll(currentPage, itemsPerPage);
+              } else {
+                // Sistema offline/não autenticado e sem cache
+                console.log('⚠️ Sistema offline/não autenticado e sem cache para busca');
+                response = { data: [], meta: { total: 0, totalPages: 0, page: 1, limit: itemsPerPage } };
               }
             } catch (error) {
               // Fallback para cache se API falhar
@@ -473,7 +483,13 @@ export const useNotifications = () => {
             console.log("🌐 Buscando todas notificações online");
             
             try {
-              response = await NotificacaoService.getAll(currentPage, itemsPerPage);
+              // ✅ VERIFICAR: Só buscar da API se estiver online e autenticado
+              if (await syncService.canUseOnlineMode()) {
+                response = await NotificacaoService.getAll(currentPage, itemsPerPage);
+              } else {
+                console.log('⚠️ Sistema offline/não autenticado, não é possível buscar da API');
+                response = { data: [], meta: { total: 0, totalPages: 0, page: 1, limit: itemsPerPage } };
+              }
               
               // ✅ OTIMIZADO: Cache inteligente apenas quando necessário
               if (response && response.data && currentPage === 1) {
@@ -484,10 +500,13 @@ export const useNotifications = () => {
                 if (existingCache.length < 100) {
                   setTimeout(async () => {
                     try {
-                      const moreData = await NotificacaoService.getAll(1, 200); // Reduzido de 1000 para 200
-                      if (moreData && moreData.data) {
-                        await indexedDBService.saveOpcoes('notificacoes-cache', moreData.data);
-                        console.log('✅ Cache atualizado em background');
+                      // ✅ VERIFICAR: Só buscar dados adicionais se ainda estiver online/autenticado
+                      if (await syncService.canUseOnlineMode()) {
+                        const moreData = await NotificacaoService.getAll(1, 200); // Reduzido de 1000 para 200
+                        if (moreData && moreData.data) {
+                          await indexedDBService.saveOpcoes('notificacoes-cache', moreData.data);
+                          console.log('✅ Cache atualizado em background');
+                        }
                       }
                     } catch (err) {
                       console.warn('⚠️ Erro ao atualizar cache em background:', err);
@@ -606,37 +625,45 @@ export const useNotifications = () => {
 
     if (window.confirm("Deseja realmente excluir esta notificação?")) {
       try {
-        await NotificacaoService.delete(id);
+        // ✅ VERIFICAR: Só excluir se estiver online e autenticado
+        if (await syncService.canUseOnlineMode()) {          
+          await NotificacaoService.delete(id);
 
-        // Recarregar os dados após a exclusão
-        const response = await NotificacaoService.getAll(
-          currentPage,
-          itemsPerPage
-        );
+          // Recarregar os dados após a exclusão
+          const response = await NotificacaoService.getAll(
+            currentPage,
+            itemsPerPage
+          );
 
-        if (response && response.data) {
-          setNotificacoes(response.data);
-          setPaginationMeta({
-            total: response.meta.total,
-            pages: response.meta.totalPages,
-            currentPage: response.meta.page,
-            perPage: response.meta.limit,
-          });
+          if (response && response.data) {
+            setNotificacoes(response.data);
+            setPaginationMeta({
+              total: response.meta.total,
+              pages: response.meta.totalPages,
+              currentPage: response.meta.page,
+              perPage: response.meta.limit,
+            });
 
-          // Se estamos usando ordenação local, atualizar allNotificacoes também
-          if (isUsingLocalSort) {
-            setAllNotificacoes(prev => prev.filter(n => n.id !== id));
-          }
-
-          // Atualizar cache
-          try {
-            const allData = await NotificacaoService.getAll(1, 1000);
-            if (allData && allData.data) {
-              await indexedDBService.saveOpcoes('notificacoes-cache', allData.data);
+            // Se estamos usando ordenação local, atualizar allNotificacoes também
+            if (isUsingLocalSort) {
+              setAllNotificacoes(prev => prev.filter(n => n.id !== id));
             }
-          } catch (cacheError) {
-            console.warn('Erro ao atualizar cache após exclusão:', cacheError);
+
+            // Atualizar cache apenas se online/autenticado
+            if (await syncService.canUseOnlineMode()) {
+              try {
+                const allData = await NotificacaoService.getAll(1, 1000);
+                if (allData && allData.data) {
+                  await indexedDBService.saveOpcoes('notificacoes-cache', allData.data);
+                }
+              } catch (cacheError) {
+                console.warn('Erro ao atualizar cache após exclusão:', cacheError);
+              }
+            }
           }
+        } else {
+          toast.error('Sistema offline ou não autenticado. Não é possível excluir.');
+          return;
         }
 
         toast.success("Notificação excluída com sucesso");

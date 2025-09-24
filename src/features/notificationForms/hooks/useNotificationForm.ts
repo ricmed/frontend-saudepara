@@ -226,6 +226,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [optionsLoaded, setOptionsLoaded] = useState<boolean>(false);
   
   // Estado para busca de pacientes
   const [pacienteSuggestions, setPacienteSuggestions] = useState<Paciente[]>([]);
@@ -855,13 +856,41 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
   // ✅ FUNÇÃO MODIFICADA PARA CARREGAR TODAS AS OPÇÕES (ONLINE/OFFLINE)
   // ✅ FUNÇÃO OTIMIZADA: Carregar dados essenciais primeiro, resto em background
-  const loadEssentialOptions = async () => {
+  const loadEssentialOptions = useCallback(async () => {
     setIsLoading(true);
     
     try {
-      // ✅ VERIFICAR SE ESTÁ OFFLINE E HAS CACHE
-      if (!navigator.onLine) {
-        console.log('📱 Modo offline detectado, tentando usar dados em cache...');
+      // ✅ PRIMEIRO: Verificar conectividade básica
+      if (!syncService.hasInternetConnection()) {
+        console.log('📱 Sem internet - modo offline direto, carregando dados do cache...');
+        
+        const cachedData = await loadOptionsFromCache();
+        if (cachedData.hasData) {
+          console.log('✅ Dados carregados do cache offline');
+          return;
+        } else {
+          throw new Error('Nenhum dado encontrado offline. Conecte-se à internet e baixe os dados primeiro.');
+        }
+      }
+
+      // ✅ SEGUNDO: Verificar se servidor está disponível (evita 401 desnecessários)
+      const serverAvailable = await syncService.isServerAvailable();
+      if (!serverAvailable) {
+        console.log('🔒 Servidor indisponível - modo offline direto, carregando dados do cache...');
+        
+        const cachedData = await loadOptionsFromCache();
+        if (cachedData.hasData) {
+          console.log('✅ Dados carregados do cache offline');
+          return;
+        } else {
+          throw new Error('Servidor indisponível e nenhum dado em cache. Verifique a conexão e tente novamente.');
+        }
+      }
+
+      // ✅ TERCEIRO: Se servidor disponível, verificar autenticação (pode gerar 401 se não logado)
+      const canUseOnline = await syncService.canUseOnlineMode();
+      if (!canUseOnline) {
+        console.log('📱 Modo offline ativo, tentando usar dados em cache...');
         
         const cachedData = await loadOptionsFromCache();
         if (cachedData.hasData) {
@@ -992,11 +1021,18 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         console.error('❌ Erro no fallback do cache:', cacheError);
       }
     }
-  };
+  }, []);
 
   // ✅ FUNÇÃO: Carregar dados restantes em background
   const loadRemainingOptions = async () => {
     try {
+      // ✅ VERIFICAR: Só carregar dados adicionais se estiver online/autenticado
+      const canUseOnline = await syncService.canUseOnlineMode();
+      if (!canUseOnline) {
+        console.log('⚠️ Sistema offline/não autenticado, pulando carregamento de dados restantes');
+        return;
+      }
+
       console.log('🔄 Carregando dados restantes em background...');
       
       const [
@@ -1106,10 +1142,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     }
   };
 
-  // ✅ FUNÇÃO ORIGINAL (renomeada para compatibilidade)
-  const loadAllOptions = async () => {
+  // ✅ FUNÇÃO ORIGINAL (renomeada para compatibilidade) 
+  const loadAllOptions = useCallback(async () => {
     return loadEssentialOptions();
-  };
+  }, [loadEssentialOptions]);
 
   // ✅ FUNÇÃO MODIFICADA PARA CARREGAR MUNICÍPIOS (ONLINE/OFFLINE)
   const loadMunicipiosByEstado = useCallback(async (estadoId: string) => {
@@ -1134,8 +1170,9 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
       let municipios = [];
 
-      // ✅ TENTAR CACHE OFFLINE PRIMEIRO
-      if (!navigator.onLine) {
+      // ✅ TENTAR CACHE OFFLINE PRIMEIRO  
+      const canUseOnline = await syncService.canUseOnlineMode();
+      if (!canUseOnline) {
         console.log('📱 Modo offline: buscando municípios em cache...');
         
         try {
@@ -1205,6 +1242,14 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     try {
       console.log("[HOOK] Carregando notificação ID:", notificacaoId);
       
+      // ✅ VERIFICAR: Só carregar da API se estiver online/autenticado
+      if (!(await syncService.canUseOnlineMode())) {
+        console.log('⚠️ Sistema offline/não autenticado - não é possível carregar notificação para edição');
+        toast.error('Sistema offline. Não é possível carregar notificação para edição.');
+        navigate("/private/comunicacao-de-caso");
+        return;
+      }
+      
       // 1. O NotificacaoService.getById já usa o adapter e retorna os dados formatados.
       const dadosFormatados = await NotificacaoService.getById(Number(notificacaoId));
       
@@ -1215,14 +1260,16 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         // 2. Armazena o CPF original para validações futuras.
         setOriginalCpf(dadosFormatados.cpf || "");
 
-        // 3. Define diretamente os dados no formulário.
+        // 3. CORREÇÃO: Carrega municípios ANTES de definir os dados no formulário
+        // para evitar problema visual de cidade não carregando em edição
+        if (dadosFormatados.uf) {
+          console.log(`[HOOK] Carregando municípios para UF ${dadosFormatados.uf} antes de definir formData`);
+          await loadMunicipiosByEstado(dadosFormatados.uf);
+        }
+        
+        // 4. Define os dados no formulário APÓS carregar municípios
         // A lógica de arquivos já foi tratada no adapter.
         setFormData(dadosFormatados);
-        
-        // 4. Carrega municípios se um estado estiver definido.
-        if (dadosFormatados.uf) {
-          loadMunicipiosByEstado(dadosFormatados.uf);
-        }
         
         console.log("[HOOK] FormData atualizado com dados da notificação");
       }
@@ -1370,7 +1417,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           error?.code === 'ERR_INTERNET_DISCONNECTED' ||
           error?.message?.includes('Network Error') ||
           error?.message?.includes('Failed to fetch') ||
-          !navigator.onLine
+          !(await syncService.canUseOnlineMode())
         );
 
         if (isNetworkError) {
@@ -1466,7 +1513,8 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         console.log("Dados do paciente para atualização:", pacienteData);
 
         // Para edição, usar PacienteService diretamente se online
-        if (navigator.onLine && isEditMode) {
+        const canUseOnline = await syncService.canUseOnlineMode();
+        if (canUseOnline && isEditMode) {
           await PacienteService.update(formData.pacienteId, pacienteData);
         } else {
           // Offline ou criação, usar sistema offline
@@ -1510,19 +1558,12 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         arquivosParaExcluir: arquivosParaExcluir
       });
 
-      // Agora, `salvarNotificacaoCompleta` recebe os dados com os IDs corretos
+      // ✅ NOVO: Usar sistema offline para todas as operações (criação e edição)
       if (isEditMode && id) {
-        // Para edição, verificar se está online
-        if (!systemIsOnline) {
-          setApiError("Não é possível editar notificações offline. Conecte-se à internet.");
-          setIsSaving(false);
-          return;
-        }
-
-        // Para atualização, usar método original
-        console.log("Atualizando notificação ID:", id);
-        await salvarNotificacaoCompleta(dataForBackend, true, Number(id));
-        console.log("Notificação atualizada com sucesso");
+        // Para edições, usar sistema offline que tenta online primeiro
+        console.log("Editando notificação ID:", id, "via sistema offline");
+        await saveNotificationOfflineSafe(dataForBackend, true, id); // isEdit = true, notificacaoId = id
+        console.log("Notificação editada com sucesso");
         setIsSuccess(true);
         toast.success("Notificação atualizada com sucesso");
         
@@ -1531,7 +1572,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       } else {
         // Para criação, usar sistema offline
         console.log("Criando nova notificação via sistema offline");
-        await saveNotificationOfflineSafe(dataForBackend);
+        await saveNotificationOfflineSafe(dataForBackend, false); // isEdit = false
         console.log("Notificação salva (online ou offline conforme disponibilidade)");
         setIsSuccess(true);
         
@@ -1604,15 +1645,39 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
   // Efeitos
 
-  // Efeito para carregar dados iniciais
+  // Efeito para carregar dados iniciais 
   useEffect(() => {
-    loadAllOptions();
+    let isMounted = true;
+    
+    const loadInitialData = async () => {
+      if (!optionsLoaded && isMounted) {
+        setIsLoading(true);
+        try {
+          await loadAllOptions();
+          if (isMounted) {
+            setOptionsLoaded(true);
+          }
+        } catch (error) {
+          console.error('Erro ao carregar dados iniciais:', error);
+        } finally {
+          if (isMounted) {
+            setIsLoading(false);
+          }
+        }
+      }
 
-    // Carregar dados da notificação se estiver em modo de edição
-    if (isEditMode && id) {
-      loadNotificacao(id);
-    }
-  }, [isEditMode, id, loadNotificacao]);  
+      // Carregar dados da notificação se estiver em modo de edição
+      if (isEditMode && id && isMounted) {
+        loadNotificacao(id);
+      }
+    };
+
+    loadInitialData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isEditMode, id]);  
 
   // 🆕 Hook para limpar window.fileStorage quando componente desmonta
   useEffect(() => {
@@ -1633,10 +1698,19 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
   // Efeito para atualizar municípios quando o estado muda
   useEffect(() => {
+    console.log(`🔍 DEBUG useEffect UF changed: formData.uf = "${formData.uf}"`);
     if (formData.uf) {
+      // ✅ VERIFICAR: Se o último estado carregado é o mesmo, não recarregar
+      if (latestUfRef.current === formData.uf && municipioOptions.length > 0) {
+        console.log(`🔍 Municípios já carregados para UF ${formData.uf}: ${municipioOptions.length} itens (mesmo estado)`);
+        return;
+      }
+      
+      console.log(`🔍 Chamando loadMunicipiosByEstado com UF: "${formData.uf}"`);
       loadMunicipiosByEstado(formData.uf);
     } else {
       // Limpar municípios quando nenhum estado estiver selecionado
+      console.log('🔍 UF vazia, limpando municípios');
       setMunicipioOptions([]);
     }
   }, [formData.uf, loadMunicipiosByEstado]);
@@ -1681,14 +1755,15 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       if (formData.residenteBelem === "1") {
         // Auto-preencher dados obrigatórios
         updatedData.paisProcedencia = "105"; // Brasil
-        updatedData.uf = "1"; // Pará
-        updatedData.municipio = "1"; // Belém
+        updatedData.uf = "15"; // Pará (ID correto: 15)
+        updatedData.municipio = "170"; // Belém (ID correto: 170)
         
         // Limpar campos não aplicáveis
         updatedData.localHospedagem = "";
         updatedData.contatoLocal = "";
         
         console.log('✅ Auto-preenchimento: Residente de Belém - País, UF e Município definidos automaticamente');
+        console.log(`🔍 DEBUG: updatedData.uf = "${updatedData.uf}", updatedData.municipio = "${updatedData.municipio}"`);
       }
       // Se selecionar "NÃO" (outro município/estado brasileiro)
       else if (formData.residenteBelem === "2") {
@@ -1699,7 +1774,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         updatedData.bairro = "";
         
         // Se estava com Belém selecionado, limpar para permitir nova seleção
-        if (updatedData.municipio === "1") {
+        if (updatedData.municipio === "170") {  // ID correto de Belém
           updatedData.uf = "";
           updatedData.municipio = "";
         }
@@ -2061,6 +2136,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     }
     
     // Lógica para outros campos
+    console.log(`🔧 handleChange: alterando ${name} = "${newValue}"`);
+    if (name === 'uf') {
+      console.log(`🚨 UF SENDO ALTERADA POR handleChange: valor atual: "${formData.uf}" → novo: "${newValue}"`);
+    }
     setFormData((prev) => ({ ...prev, [name]: newValue }));
   };
 

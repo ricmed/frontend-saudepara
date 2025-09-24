@@ -10,6 +10,7 @@ interface NotificacaoDatabase extends DBSchema {
       formData: FormData;
       syncStatus: 'pending' | 'synced';
       timestamp: number;
+      isEdit?: boolean; // ✅ Propriedade para distinguir edição
     };
     indexes: { 'by-sync-status': string };
   };
@@ -224,31 +225,51 @@ export class IndexedDBService {
     await this.init();
     
     try {
+      // ✅ CORREÇÃO: Criar uma cópia profunda dos dados para evitar perda de propriedades
+      const formDataCopy = JSON.parse(JSON.stringify(formData));
+      
       let notificacao;
       
       if (isEdit && id) {
         notificacao = {
           id,
-          formData,
+          formData: formDataCopy,
           syncStatus: 'pending' as const,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          isEdit: true
         };
       } else {
         const tempId = await this.generateTemporaryId();
         notificacao = {
           id: tempId,
-          formData, 
+          formData: formDataCopy, 
           syncStatus: 'pending' as const,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          isEdit: false
         };
       }
 
+      // ✅ LOG DETALHADO PARA DEBUG DO MODO OFFLINE
+      console.log(`💾 [INDEXEDDB] Salvando notificação offline:`, {
+        id: notificacao.id,
+        isEdit: isEdit,
+        // Campos críticos para verificação
+        localHospedagem: formDataCopy.localHospedagem,
+        contatoLocal: formDataCopy.contatoLocal,
+        uf: formDataCopy.uf,
+        municipio: formDataCopy.municipio,
+        bairro: formDataCopy.bairro,
+        paisProcedencia: formDataCopy.paisProcedencia,
+        residenteBelem: formDataCopy.residenteBelem,
+        totalCampos: Object.keys(formDataCopy).length
+      });
+
       await this.db!.put('notificacoes', notificacao);
-      console.log(`💾 Notificação salva offline: ID ${notificacao.id}`);
+      console.log(`✅ [INDEXEDDB] Notificação salva offline com sucesso: ID ${notificacao.id}`);
       return notificacao.id;
       
     } catch (error) {
-      console.error('❌ Erro ao salvar notificação:', error);
+      console.error('❌ [INDEXEDDB] Erro ao salvar notificação:', error);
       throw error;
     }
   }

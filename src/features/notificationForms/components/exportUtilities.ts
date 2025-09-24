@@ -257,8 +257,11 @@ const prepareDataForExport = (
   const getResidenteBelemLabel = (value: string): string => {
     const map: Record<string, string> = {
       "1": "SIM",
-      "2": "NÃO",
+      "2": "NÃO", 
       "3": "ESTRANGEIRO",
+      "S": "SIM",          // ✅ ADICIONADO: valores do backend
+      "N": "NÃO",          // ✅ ADICIONADO: valores do backend
+      "E": "ESTRANGEIRO",  // ✅ ADICIONADO: valor do backend para estrangeiro
     };
     return map[value] || value;
   };
@@ -1438,6 +1441,7 @@ const formatNotificacaoForExport = (
       N: "NÃO",
       "2": "NÃO",
       "3": "ESTRANGEIRO",
+      E: "ESTRANGEIRO",  // ✅ ADICIONADO: valor do backend para estrangeiro
     };
     return map[original.residente_belem] || original.residente_belem || "";
   };

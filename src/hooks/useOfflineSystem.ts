@@ -362,9 +362,14 @@ export function useOfflineSystem() {  const [state, setState] = useState<Offline
   }, [state]);
 
   // ✅ CORRIGIDO: Funções para salvar dados
-  const saveNotificationOfflineSafe = useCallback(async (data: any) => {
+  const saveNotificationOfflineSafe = useCallback(async (data: any, isEdit: boolean = false, notificacaoId?: string) => {
     try {
-      await syncService.saveNotificacao(data);
+      // Se é edição e tem ID, garantir que está no formData
+      if (isEdit && notificacaoId) {
+        data.id = notificacaoId;
+        data.idnotificacao = notificacaoId;
+      }
+      await syncService.saveNotificacao(data, isEdit);
       await updatePendingData(); // Atualizar contador
     } catch (error) {
       console.error('Erro ao salvar notificação:', error);

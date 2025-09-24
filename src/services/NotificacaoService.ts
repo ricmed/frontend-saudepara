@@ -2,6 +2,7 @@
 import axios from 'axios';
 import type { FormData } from '@/features/notificationForms/types/index2';
 import { formatFromBackend, formatToBackend, formatListResponse } from '@/utils/notificacaoAdapter';
+import indexedDBService from '@/services/indexedDB';
 
 // ... todas as interfaces existentes permanecem iguais ...
 export interface CboOption extends BaseOption {
@@ -408,6 +409,15 @@ export const NotificacaoService = {
   // Obter notificação por ID
   async getById(id: number): Promise<FormData> {
     try {
+      // ✅ NOVO: Tentar buscar do IndexedDB primeiro (notificações offline)
+      // Isso é especialmente importante para notificações criadas/editadas offline
+      const offlineData = await indexedDBService.getNotificacao(id);
+      if (offlineData) {
+        console.log(`📱 [OFFLINE MODE] Carregando notificação ${id} do cache local`);
+        return offlineData;
+      }
+
+      // Se não encontrou offline, buscar da API (se online)
       const response = await api.get(`/${id}`);
       const formData = await formatFromBackend(response.data);
       

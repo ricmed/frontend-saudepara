@@ -1,6 +1,7 @@
 import { useAuth } from '@/keycloak/AuthProvider';
 import { useState, useEffect } from 'react';
 import { usuarioGestaoService } from '../services/UsuarioGestaoService';
+import syncService from '@/services/syncService';
 
 export interface UserPermissions {
   // Níveis de acesso
@@ -32,6 +33,14 @@ export const useUserPermissions = (): UserPermissions => {
   useEffect(() => {
     const loadUserAccess = async () => {
       if (!user?.id) {
+        setLoading(false);
+        return;
+      }
+
+      // ✅ Verificar se pode usar modo online antes de fazer chamada API
+      const canUseOnline = await syncService.canUseOnlineMode();
+      if (!canUseOnline) {
+        console.log('🔒 Modo offline - não carregando permissões de usuário');
         setLoading(false);
         return;
       }
