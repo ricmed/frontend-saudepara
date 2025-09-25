@@ -6,6 +6,7 @@ import SectionHeader from '../shared/SectionHeader';
 import FormField from '../shared/FormField';
 import CustomDateInput from '@/features/notificationForms/components/CustomDateInput';
 import UnidadeNotificadoraField from '@/features/notificationForms/components/UnidadeNotificadoraField';
+import LocalEncaminhamentoSelect from '@/features/notificationForms/components/LocalEncaminhamentoSelect';
 
 interface CaseClosureSectionProps extends FormSectionProps {
   encerramentoOptions: any[];
@@ -96,28 +97,19 @@ const CaseClosureSection: React.FC<CaseClosureSectionProps> = ({
               </div>
             )}
 
-            {/* Local de Encaminhamento para Óbito */}
+            {/* Local de Encaminhamento para Óbito - Dropdown com dados do banco */}
             {isTipoEncerramentoFunc("óbito") && (
               <div>
-                <label className="block mb-2 font-medium text-gray-700">
-                  Local de Encaminhamento
-                </label>
-                <select
-                  name="localEncaminhamento"
-                  className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                <LocalEncaminhamentoSelect
                   value={formData.localEncaminhamento}
                   onChange={handleChange}
-                >
-                  <option value="">-- Selecione (Opcional) --</option>
-                  <option value="12205">SVO DVS SESPA</option>
-                  <option value="23116">
-                    Centro de Perícias Científicas Renato Chaves (IML)
-                  </option>
-                </select>
-                <p className="mt-1 text-xs text-gray-500">
-                  Campo opcional. Selecione um dos campos acima, se for
-                  necessário encaminhamento para estes locais.
-                </p>
+                  hasError={!!errors.localEncaminhamento}
+                />
+                {errors.localEncaminhamento && (
+                  <p className="mt-1 text-sm text-red-500">
+                    {errors.localEncaminhamento}
+                  </p>
+                )}
               </div>
             )}
           </div>
