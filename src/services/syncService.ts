@@ -497,6 +497,14 @@ class SyncService {
             }
           }
           
+          // ✅ DEBUG ESPECÍFICO: Log dos campos de trauma antes da sincronização
+          console.log(`🩹 [DEBUG TRAUMA] Sincronizando notificação ID ${id}:`, {
+            tipoTrauma: formDataAtualizada.tipoTrauma,
+            observacaoTrauma: formDataAtualizada.observacaoTrauma,
+            observacaoSintomas: formDataAtualizada.observacaoSintomas,
+            observacaoHipotese: formDataAtualizada.observacaoHipotese
+          });
+
           // ✅ SINCRONIZAR NOTIFICAÇÃO
           const isEdit = !!(formDataAtualizada as any).id && (formDataAtualizada as any).id > 0;
           const editId = isEdit ? Number((formDataAtualizada as any).id) : undefined;

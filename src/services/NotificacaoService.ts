@@ -409,16 +409,27 @@ export const NotificacaoService = {
   // Obter notificação por ID
   async getById(id: number): Promise<FormData> {
     try {
-      // ✅ NOVO: Tentar buscar do IndexedDB primeiro (notificações offline)
+      // ✅ REABILITADO: Tentar buscar do IndexedDB primeiro (notificações offline)
       // Isso é especialmente importante para notificações criadas/editadas offline
       const offlineData = await indexedDBService.getNotificacao(id);
       if (offlineData) {
         console.log(`📱 [OFFLINE MODE] Carregando notificação ${id} do cache local`);
+        
+        // ✅ DEBUG ESPECÍFICO: Log dos campos de trauma do IndexedDB
+        console.log('🩹 [DEBUG TRAUMA] Dados do IndexedDB:', {
+          tipoTrauma: offlineData.tipoTrauma,
+          observacaoTrauma: offlineData.observacaoTrauma,
+          observacaoSintomas: offlineData.observacaoSintomas,
+          observacaoHipotese: offlineData.observacaoHipotese
+        });
+        
         return offlineData;
       }
 
       // Se não encontrou offline, buscar da API (se online)
+      console.log(`🌐 [ONLINE MODE] Buscando notificação ${id} da API`);
       const response = await api.get(`/${id}`);
+      
       const formData = await formatFromBackend(response.data);
       
       if (!formData) {

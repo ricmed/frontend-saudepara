@@ -247,7 +247,21 @@ export const formatFromBackend = async (
     tipoTrauma: backendData.notificacao_has_tipo_trauma && Array.isArray(backendData.notificacao_has_tipo_trauma)
       ? backendData.notificacao_has_tipo_trauma.map((trauma: any) => trauma.tipo_trauma_idtipo_trauma.toString())
       : (backendData.tipo_trauma_idtipo_trauma ? [backendData.tipo_trauma_idtipo_trauma.toString()] : []),
-    observacaoTrauma: backendData.observacao_trauma || "",
+    // 🔧 NOVA CORREÇÃO: Extrair observacaoTrauma do primeiro trauma na tabela de relacionamento
+    observacaoTrauma: (() => {
+      const observacao = backendData.notificacao_has_tipo_trauma && Array.isArray(backendData.notificacao_has_tipo_trauma) && backendData.notificacao_has_tipo_trauma.length > 0
+        ? backendData.notificacao_has_tipo_trauma[0].observacao_trauma || ""
+        : "";
+      
+      console.log('🩹 [DEBUG TRAUMA] Extraindo observacaoTrauma do backend:', {
+        hasTraumas: !!backendData.notificacao_has_tipo_trauma,
+        traumasArray: backendData.notificacao_has_tipo_trauma,
+        observacaoExtraida: observacao,
+        novaEstrutura: 'Recuperando da tabela de relacionamento'
+      });
+      
+      return observacao;
+    })(),
     relacionadoSurto: "", // REMOVIDO: campo relacionadoSurto não é mais usado
     observacaoIncidente: backendData.observavao_incidente || "",
 
@@ -279,6 +293,24 @@ export const formatFromBackend = async (
     updated_by_userid: backendData.updated_by_userid || undefined,
   };
   
+  // ✅ DEBUG ESPECÍFICO: Log dos campos de observação vindos do backend
+  console.log('🩹 [DEBUG TRAUMA] Dados do backend recebidos:', {
+    observacao_trauma_backend: backendData.observacao_trauma,
+    observacao_sintomas_backend: backendData.observacao_sintomas,
+    observacao_hiposete_backend: backendData.observacao_hiposete,
+    observavao_incidente_backend: backendData.observavao_incidente,
+    traumas_backend: backendData.notificacao_has_tipo_trauma
+  });
+
+  // ✅ DEBUG ESPECÍFICO: Log dos campos após conversão para FormData
+  console.log('🩹 [DEBUG TRAUMA] Campos após conversão para FormData:', {
+    observacaoTrauma_frontend: formData.observacaoTrauma,
+    observacaoSintomas_frontend: formData.observacaoSintomas,
+    observacaoHipotese_frontend: formData.observacaoHipotese,
+    observacaoIncidente_frontend: formData.observacaoIncidente,
+    tipoTrauma_frontend: formData.tipoTrauma
+  });
+
   // ✅ LOG DETALHADO PARA DEBUG DO MODO OFFLINE
   console.log("🔄 [ADAPTER] FormData processado do backend:", {
     // Campos de localização
@@ -476,6 +508,16 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
 
   console.log('🌍 Timezone detectado para envio:', timezoneInfo);
 
+  // ✅ DEBUG ESPECÍFICO: Log do campo observacaoTrauma antes da formatação
+  console.log('🩹 [DEBUG TRAUMA] observacaoTrauma no frontend:', {
+    value: trimmedData.observacaoTrauma,
+    type: typeof trimmedData.observacaoTrauma,
+    length: trimmedData.observacaoTrauma?.length,
+    tipoTrauma: trimmedData.tipoTrauma,
+    tipoTraumaLength: trimmedData.tipoTrauma?.length,
+    novaEstrutura: 'Enviando dentro do array traumas com observacao_trauma'
+  });
+
   // Construir payload para o backend com datas ajustadas para UTC
   const payload: NotificacaoGenerica = {
     tipo_evento_idtipo_evento: parseInt(trimmedData.evento) || null,
@@ -499,7 +541,6 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
     observavao_incidente: trimmedData.observacaoIncidente || "",
     observacao_sintomas: trimmedData.observacaoSintomas || "",
     observacao_hiposete: trimmedData.observacaoHipotese || "",
-    observacao_trauma: trimmedData.observacaoTrauma || "",
 
     ddi: trimmedData.ddi || "55", // Adicionar o campo ddi
 
@@ -524,26 +565,21 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
         timezoneInfo.timezone_offset_minutos
       ),
     }),
-    ...(trimmedData.observacaoSintomas && {
-      observacao_sintomas: trimmedData.observacaoSintomas || "",
-    }),
+    // ✅ CORREÇÃO: observacao_sintomas já está definida no início do payload, removendo duplicação
     tipo_hipotese_diag_idtipo_hipotese_diag: 
       trimmedData.hipoteseDiagnostica.length > 0
         ? parseInt(trimmedData.hipoteseDiagnostica[0]) || null
         : null,
-    ...(trimmedData.observacaoHipotese && {
-      observacao_hiposete: trimmedData.observacaoHipotese || "",
-    }),
-    // 🔧 CORREÇÃO: Enviar traumas como array para suporte a múltiplos traumas
+    // ✅ CORREÇÃO: observacao_hiposete já está definida no início do payload, removendo duplicação
+    // 🔧 CORREÇÃO: Enviar traumas como array com observacao_trauma para suporte a múltiplos traumas
     ...(trimmedData.tipoTrauma.length > 0 && {
-      traumas: trimmedData.tipoTrauma.map(trauma => parseInt(trauma))
+      traumas: trimmedData.tipoTrauma.map(trauma => ({
+        tipo_trauma_id: parseInt(trauma),
+        observacao_trauma: trimmedData.observacaoTrauma || null
+      }))
     }),
-    ...(trimmedData.observacaoTrauma && {
-      observacao_trauma: trimmedData.observacaoTrauma || "",
-    }),
-    ...(trimmedData.observacaoIncidente && {
-      observavao_incidente: trimmedData.observacaoIncidente || "",
-    }),
+    // ✅ CORREÇÃO: observacao_trauma já está definida no início do payload, removendo duplicação
+    // ✅ CORREÇÃO: observavao_incidente já está definida no início do payload, removendo duplicação
     ...(trimmedData.dataAtendimento && {
       data_atendimento: processarDataParaUTC(
         trimmedData.dataAtendimento,
@@ -586,6 +622,15 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
     paciente_idpaciente: payload.paciente_idpaciente,
     timezone_name: payload.timezone_name,
     isUpdate: isUpdate
+  });
+
+  // ✅ DEBUG ESPECÍFICO: Log dos campos de observação no payload final
+  console.log('🩹 [DEBUG TRAUMA] Campos de observação no payload final:', {
+    observacao_trauma: payload.observacao_trauma,
+    observacao_sintomas: payload.observacao_sintomas,
+    observacao_hiposete: payload.observacao_hiposete,
+    observavao_incidente: payload.observavao_incidente,
+    traumas: payload.traumas
   });
   
   console.log("🔍 [ADAPTER] Payload completo:", JSON.stringify(payload, null, 2));

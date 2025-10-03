@@ -264,6 +264,15 @@ export class IndexedDBService {
         totalCampos: Object.keys(formDataCopy).length
       });
 
+      // ✅ DEBUG ESPECÍFICO: Log dos campos de trauma no IndexedDB
+      console.log('🩹 [DEBUG TRAUMA] Campos de trauma salvos no IndexedDB:', {
+        tipoTrauma: formDataCopy.tipoTrauma,
+        observacaoTrauma: formDataCopy.observacaoTrauma,
+        observacaoSintomas: formDataCopy.observacaoSintomas,
+        observacaoHipotese: formDataCopy.observacaoHipotese,
+        observacaoIncidente: formDataCopy.observacaoIncidente
+      });
+
       await this.db!.put('notificacoes', notificacao);
       console.log(`✅ [INDEXEDDB] Notificação salva offline com sucesso: ID ${notificacao.id}`);
       return notificacao.id;
@@ -523,6 +532,17 @@ export class IndexedDBService {
   async getPendingNotificacoes(): Promise<Array<{ id: number; formData: FormData }>> {
     await this.init();
     const pending = await this.db!.getAllFromIndex('notificacoes', 'by-sync-status', 'pending');
+    
+    // ✅ DEBUG ESPECÍFICO: Log dos campos de trauma nas notificações pendentes
+    pending.forEach(item => {
+      console.log(`🩹 [DEBUG TRAUMA] Notificação pendente ID ${item.id}:`, {
+        tipoTrauma: item.formData.tipoTrauma,
+        observacaoTrauma: item.formData.observacaoTrauma,
+        observacaoSintomas: item.formData.observacaoSintomas,
+        observacaoHipotese: item.formData.observacaoHipotese
+      });
+    });
+    
     return pending.map(item => ({ id: item.id as number, formData: item.formData }));
   }
 

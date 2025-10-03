@@ -17,7 +17,10 @@ import { debounce } from 'lodash';
 import axios from 'axios';
 import syncService from '@/services/syncService';
 import indexedDBService from '@/services/indexedDB';
+
 import { useOfflineSystem } from '@/hooks/useOfflineSystem';
+
+import type { Notificacao } from '../types';
 
 // Certificar que window.fileStorage existe
 if (!(window as any).fileStorage) {
@@ -176,7 +179,7 @@ const initialFormData: FormData = {
   tipoEncerramento: "",
   localEncaminhamento: "",
 
-  // 🆕 NOVA SEÇÃO: Arquivos Anexos
+  // 🆕 SEÇÃO: Arquivos Anexos - TEMPORARIAMENTE OCULTO (mas mantido para evitar erros)
   arquivos: [],
 
   // 🆕 Timezone automático (detectado no carregamento)
@@ -319,7 +322,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
     // ✅ NOVO: Lógica para rastrear exclusões de arquivos existentes
     setFormData(prevFormData => {
-      const idsAtuais = new Set(prevFormData.arquivos.map(a => a.id));
+      const idsAtuais = new Set((prevFormData.arquivos || []).map(a => a.id));
       const idsNovos = new Set(arquivosRecebidos.map(a => a.id));
 
       // Verificar quais arquivos existentes foram removidos
@@ -407,7 +410,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     }
     
     // ✅ Usar a nova função centralizada para atualizar
-    const arquivosAtualizados = [...formData.arquivos, ...arquivosValidos];
+    const arquivosAtualizados = [...(formData.arquivos || []), ...arquivosValidos];
     handleArquivosChange(arquivosAtualizados);
     
     console.log('✅ ===== FIM ADICIONAR ARQUIVOS =====\n');
@@ -416,7 +419,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
   // 2. Debug antes de salvar a notificação (versão melhorada)
   const debugAntesDoSalvamento = (data: FormData) => {
     console.log('\n🔍 ===== DEBUG ANTES DO SALVAMENTO =====');
-    console.log('📁 Total de arquivos no formulário:', data.arquivos.length);
+    console.log('📁 Total de arquivos no formulário:', (data.arquivos?.length || 0));
     console.log('💾 Storage disponível:', (window as any).fileStorage?.size || 0);
     
     // Listar tudo que está no storage
@@ -429,32 +432,37 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       console.log('   ❌ Storage não existe!');
     }
     
-    data.arquivos.forEach((arquivo, index) => {
-      console.log(`\n📄 Arquivo ${index + 1} no FormData (Estado):`);
-      console.log('   • ID:', arquivo.id);
-      console.log('   • Nome:', arquivo.nome);
-      console.log('   • Tamanho:', arquivo.tamanho);
-      console.log('   • Tipo:', arquivo.tipo);
-      console.log('   • isExisting:', arquivo.isExisting);
-      console.log('   • status:', arquivo.status);
-      
-      // Verificar no storage
-      if (!arquivo.isExisting && arquivo.id) {
-        const fileNoStorage = (window as any).fileStorage?.get(arquivo.id);
-        console.log('   • Verificando no Storage... Encontrado?', fileNoStorage instanceof File ? '✅ SIM' : '❌ NÃO');
-        if (fileNoStorage instanceof File) {
-          console.log(`   • File no storage: ${fileNoStorage.name} (${fileNoStorage.size} bytes)`);
+    // ✅ VERIFICAÇÃO DE SEGURANÇA: Só processar se arquivos existir
+    if (data.arquivos && Array.isArray(data.arquivos)) {
+      data.arquivos.forEach((arquivo, index) => {
+        console.log(`\n📄 Arquivo ${index + 1} no FormData (Estado):`);
+        console.log('   • ID:', arquivo.id);
+        console.log('   • Nome:', arquivo.nome);
+        console.log('   • Tamanho:', arquivo.tamanho);
+        console.log('   • Tipo:', arquivo.tipo);
+        console.log('   • isExisting:', arquivo.isExisting);
+        console.log('   • status:', arquivo.status);
+        
+        // Verificar no storage
+        if (!arquivo.isExisting && arquivo.id) {
+          const fileNoStorage = (window as any).fileStorage?.get(arquivo.id);
+          console.log('   • Verificando no Storage... Encontrado?', fileNoStorage instanceof File ? '✅ SIM' : '❌ NÃO');
+          if (fileNoStorage instanceof File) {
+            console.log(`   • File no storage: ${fileNoStorage.name} (${fileNoStorage.size} bytes)`);
+          }
         }
-      }
-    });
+      });
+    } else {
+      console.log('📄 Nenhum arquivo no formulário (seção de anexos oculta)');
+    }
     
-    const arquivosNovos = data.arquivos.filter(a => !a.isExisting);
-    const arquivosExistentes = data.arquivos.filter(a => a.isExisting);
+    const arquivosNovos = (data.arquivos || []).filter(a => !a.isExisting);
+    const arquivosExistentes = (data.arquivos || []).filter(a => a.isExisting);
     
     console.log('\n📊 RESUMO:');
     console.log('   🆕 Arquivos novos para upload:', arquivosNovos.length);
     console.log('   ✅ Arquivos existentes:', arquivosExistentes.length);
-    console.log('   📄 Total:', data.arquivos.length);
+    console.log('   📄 Total:', (data.arquivos?.length || 0));
     
     if (arquivosNovos.length === 0) {
       console.log('\n⚠️ ATENÇÃO: Nenhum arquivo novo será enviado!');
@@ -481,7 +489,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     console.log('\n🔍 ===== DEBUG STORAGE =====');
     console.log('Storage existe:', !!(window as any).fileStorage);
     console.log('Storage tamanho:', (window as any).fileStorage?.size || 0);
-    console.log('Arquivos no formData:', formData.arquivos.length);
+    console.log('Arquivos no formData:', (formData.arquivos?.length || 0));
     console.log('Arquivos para excluir:', arquivosParaExcluir);
     
     if ((window as any).fileStorage) {
@@ -492,7 +500,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     }
     
     console.log('Arquivos no estado:');
-    formData.arquivos.forEach((arquivo, index) => {
+    (formData.arquivos || []).forEach((arquivo, index) => {
       console.log(`  ${index + 1}. ${arquivo.id}: ${arquivo.nome} (existente: ${arquivo.isExisting})`);
     });
     console.log('✅ ===== FIM DEBUG =====\n');
@@ -500,10 +508,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
   // 5. Função corrigida para remover arquivo usando a função centralizada
   const handleRemoveFile = useCallback((id: string) => {
-    const arquivosAtualizados = formData.arquivos.filter(arquivo => arquivo.id !== id);
+    const arquivosAtualizados = (formData.arquivos || []).filter(arquivo => arquivo.id !== id);
     handleArquivosChange(arquivosAtualizados);
     toast.success('Arquivo removido.');
-  }, [formData.arquivos, handleArquivosChange]);
+  }, [formData.arquivos, handleArquivosChange]); // Funciona: arquivos existe como []
 
   // 6. FUNÇÃO CORRIGIDA PARA PROCESSAR ARQUIVOS (VERSÃO WINDOW.FILESTORAGE)
   const processarArquivosNotificacao = async (
@@ -1242,34 +1250,33 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     try {
       console.log("[HOOK] Carregando notificação ID:", notificacaoId);
       
-      // ✅ VERIFICAR: Só carregar da API se estiver online/autenticado
-      if (!(await syncService.canUseOnlineMode())) {
-        console.log('⚠️ Sistema offline/não autenticado - não é possível carregar notificação para edição');
-        toast.error('Sistema offline. Não é possível carregar notificação para edição.');
-        navigate("/private/comunicacao-de-caso");
-        return;
-      }
-      
-      // 1. O NotificacaoService.getById já usa o adapter e retorna os dados formatados.
       const dadosFormatados = await NotificacaoService.getById(Number(notificacaoId));
       
       if (dadosFormatados) {
         console.log("[HOOK] Dados formatados recebidos do serviço:", dadosFormatados);
-        console.log("[HOOK] Arquivos carregados:", dadosFormatados.arquivos?.length || 0);
+        console.log("[HOOK] Arquivos carregados:", (dadosFormatados as any)?.arquivos?.length || 0);
+        
+        // ✅ DEBUG ESPECÍFICO: Log dos campos de trauma carregados
+        console.log('🩹 [DEBUG TRAUMA] Dados carregados no loadNotificacao:', {
+          tipoTrauma: (dadosFormatados as any)?.tipoTrauma,
+          observacaoTrauma: (dadosFormatados as any)?.observacaoTrauma,
+          observacaoSintomas: (dadosFormatados as any)?.observacaoSintomas,
+          observacaoHipotese: (dadosFormatados as any)?.observacaoHipotese
+        });
         
         // 2. Armazena o CPF original para validações futuras.
-        setOriginalCpf(dadosFormatados.cpf || "");
+        setOriginalCpf((dadosFormatados as any)?.cpf || "");
 
         // 3. CORREÇÃO: Carrega municípios ANTES de definir os dados no formulário
         // para evitar problema visual de cidade não carregando em edição
-        if (dadosFormatados.uf) {
-          console.log(`[HOOK] Carregando municípios para UF ${dadosFormatados.uf} antes de definir formData`);
-          await loadMunicipiosByEstado(dadosFormatados.uf);
+        if ((dadosFormatados as any)?.uf) {
+          console.log(`[HOOK] Carregando municípios para UF ${(dadosFormatados as any).uf} antes de definir formData`);
+          await loadMunicipiosByEstado((dadosFormatados as any).uf);
         }
         
         // 4. Define os dados no formulário APÓS carregar municípios
         // A lógica de arquivos já foi tratada no adapter.
-        setFormData(dadosFormatados);
+        setFormData(dadosFormatados as any);
         
         console.log("[HOOK] FormData atualizado com dados da notificação");
       }
@@ -1335,13 +1342,13 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
     console.log("Validação passou. Procedendo com criação/atualização do paciente...");
 
-    // ✅ VALIDAR ARQUIVOS
-    const arquivosError = validateArquivos(formData.arquivos);
+    // ✅ VALIDAR ARQUIVOS (funcional, mas seção UI oculta - sempre será array vazio)
+    const arquivosError = validateArquivos(formData.arquivos || []);
     if (arquivosError) {
       setErrors(prev => ({ ...prev, arquivos: arquivosError }));
       toast.error("Erro nos arquivos anexados. Verifique e tente novamente.");
-      // Expandir seção de anexos se houver erro
-      setExpandedSections(prev => ({ ...prev, anexos: true }));
+      // Expandir seção de anexos se houver erro - SEÇÃO OCULTA NA UI
+      // setExpandedSections(prev => ({ ...prev, anexos: true }));
       return;
     }
 
@@ -1540,10 +1547,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       debugAntesDoSalvamento(formData);
       
       // ✅ CORREÇÃO CRÍTICA: Isolar o array 'arquivos' da conversão para maiúsculas
-      const { arquivos, ...restOfData } = formData;
+      const { arquivos = [], ...restOfData } = formData; // Default para array vazio se undefined
       const dataForBackend = {
         ...toUpperCaseAllStrings(restOfData), // Converte apenas os outros dados
-        arquivos: arquivos, // Mantém o array de arquivos original, com IDs em minúsculas
+        arquivos: arquivos, // Funcional, mas seção UI oculta
         // ✅ NOVO: Envia a lista de IDs para exclusão
         arquivos_para_excluir: arquivosParaExcluir,
         // 🆕 GARANTIR que timezone seja sempre enviado
@@ -1553,9 +1560,17 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
       console.log("✅ Dados preparados para backend (arquivos preservados):", {
         totalCampos: Object.keys(dataForBackend).length,
-        arquivosCount: arquivos.length,
-        arquivosIDs: arquivos.map(a => a.id),
+        arquivosCount: arquivos?.length || 0, // Proteção extra
+        arquivosIDs: (arquivos || []).map(a => a.id), // Proteção extra  
         arquivosParaExcluir: arquivosParaExcluir
+      });
+
+      // ✅ DEBUG ESPECÍFICO: Log do campo observacaoTrauma antes do envio
+      console.log('🩹 [DEBUG TRAUMA] observacaoTrauma no handleSubmit:', {
+        original: formData.observacaoTrauma,
+        processado: dataForBackend.observacaoTrauma,
+        tipoTrauma: formData.tipoTrauma,
+        tipoTraumaProcessado: dataForBackend.tipoTrauma
       });
 
       // ✅ NOVO: Usar sistema offline para todas as operações (criação e edição)
