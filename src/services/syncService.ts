@@ -516,22 +516,38 @@ class SyncService {
         } catch (error: any) {
           console.error(`❌ Erro ao sincronizar notificação ${id}:`, error);
           
-          // ✅ TRATAMENTO ESPECIAL PARA ERROS 500 E NOTIFICAÇÕES ÓRFÃS
+          // ✅ NOVO TRATAMENTO: Marcar como erro em vez de remover
           const isServerError = error?.response?.status === 500;
           const isOrphanedNotification = id < 0;
           const isInvalidData = error?.message?.includes('validation') || error?.message?.includes('required');
+          const isNetworkError = !error?.response || error?.code === 'NETWORK_ERROR';
           
-          if (isServerError || isOrphanedNotification || isInvalidData) {
-            console.log(`🗑️ Removendo notificação problemática ID ${id} - Motivo: ${
-              isServerError ? 'Erro 500 do servidor' : 
-              isOrphanedNotification ? 'ID negativo (órfã)' : 
-              'Dados inválidos'
-            }`);
-            
-            // Marcar como sincronizada para remover da lista de pendentes
+          if (isOrphanedNotification) {
+            // Apenas notificações órfãs devem ser removidas permanentemente
+            console.log(`🗑️ Removendo notificação órfã ID ${id} - ID negativo inválido`);
             await indexedDBService.markNotificacaoAsSynced(id);
-            toast.info(`Notificação problemática (ID: ${id}) foi removida da fila de sincronização`);
+            toast.info(`Notificação órfã (ID: ${id}) foi removida da fila de sincronização`);
           } else {
+            // ✅ TODOS OS OUTROS ERROS: Marcar como erro para retry posterior
+            const errorMessage = isServerError ? 'Erro interno do servidor' :
+                                isInvalidData ? 'Dados inválidos na notificação' :
+                                isNetworkError ? 'Erro de conexão' :
+                                error?.message || 'Erro desconhecido';
+            
+            const errorDetails = {
+              status: error?.response?.status,
+              message: error?.message,
+              timestamp: Date.now(),
+              notificationId: id
+            };
+            
+            await indexedDBService.markNotificacaoAsError(id, errorMessage, errorDetails);
+            
+            toast.error(`Erro ao sincronizar notificação ${id}: ${errorMessage}`, {
+              autoClose: false, // Não fechar automaticamente para dar tempo do usuário ler
+              toastId: `sync-error-${id}` // Evitar duplicatas
+            });
+            
             errorCount++;
           }
         }
@@ -914,6 +930,56 @@ class SyncService {
     
     await this.syncData();
     return true;
+  }
+
+  // ✅ NOVO: Tentar sincronizar novamente uma notificação com erro
+  async retryNotificationSync(id: number): Promise<boolean> {
+    try {
+      console.log(`🔄 Tentando sincronizar novamente a notificação ID: ${id}`);
+      
+      // Resetar status para pending
+      await indexedDBService.retryNotificacao(id);
+      
+      // Obter dados da notificação
+      const notificacao = await indexedDBService.getNotificacao(id);
+      if (!notificacao) {
+        throw new Error(`Notificação ${id} não encontrada`);
+      }
+
+      // Verificar autenticação
+      await this.checkAuthenticationStatus();
+      if (!this.shouldUseOnlineMode()) {
+        throw new Error('Sem conexão autenticada');
+      }
+
+      // Tentar sincronizar
+      const isEdit = !!(notificacao as any).id && (notificacao as any).id > 0;
+      const editId = isEdit ? Number((notificacao as any).id) : undefined;
+      
+      await salvarNotificacaoCompleta(notificacao as any, isEdit, editId);
+      await indexedDBService.markNotificacaoAsSynced(id);
+      
+      toast.success(`✅ Notificação ${id} sincronizada com sucesso!`);
+      return true;
+      
+    } catch (error: any) {
+      console.error(`❌ Erro ao tentar sincronizar novamente notificação ${id}:`, error);
+      
+      // Marcar como erro novamente
+      const errorMessage = error?.response?.status === 500 ? 'Erro interno do servidor' :
+                          error?.message?.includes('validation') ? 'Dados inválidos' :
+                          error?.message || 'Erro desconhecido';
+      
+      await indexedDBService.markNotificacaoAsError(id, errorMessage, error);
+      
+      toast.error(`Falha ao sincronizar notificação ${id}: ${errorMessage}`);
+      return false;
+    }
+  }
+
+  // ✅ NOVO: Obter notificações com erro
+  async getErrorNotifications(): Promise<Array<{ id: number, formData: any, errorInfo: any }>> {
+    return await indexedDBService.getErrorNotificacoes();
   }
 
   // ✅ NOVO: Método para forçar limpeza de notificação específica

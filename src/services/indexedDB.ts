@@ -8,9 +8,15 @@ interface NotificacaoDatabase extends DBSchema {
     value: {
       id: number;
       formData: FormData;
-      syncStatus: 'pending' | 'synced';
+      syncStatus: 'pending' | 'synced' | 'error';
       timestamp: number;
       isEdit?: boolean; // ✅ Propriedade para distinguir edição
+      errorInfo?: { // ✅ NOVO: Informações do erro
+        message: string;
+        timestamp: number;
+        retryCount?: number;
+        lastError?: string;
+      };
     };
     indexes: { 'by-sync-status': string };
   };
@@ -390,11 +396,12 @@ export class IndexedDBService {
     }
   }
   // ✅ CORRIGIDO: Contar apenas pacientes criados localmente
-  async getPendingCount(): Promise<{ notificacoes: number; pacientes: number; estabelecimentos: number }> {
+  async getPendingCount(): Promise<{ notificacoes: number; pacientes: number; estabelecimentos: number; errors: number }> {
     await this.init();
     
     try {
       const pendingNotificacoes = await this.getPendingNotificacoes();
+      const errorNotificacoes = await this.getErrorNotificacoes();
       
       // ✅ IMPORTANTE: Apenas pacientes com source = 'local_creation'
       let unsyncedPacientes: any[] = [];
@@ -433,17 +440,18 @@ export class IndexedDBService {
         );
       }
       
-      console.log(`📊 Pendentes: ${pendingNotificacoes.length} notificações, ${unsyncedPacientes.length} pacientes locais, ${unsyncedEstabelecimentos.length} estabelecimentos`);
+      console.log(`📊 Pendentes: ${pendingNotificacoes.length} notificações, ${errorNotificacoes.length} com erro, ${unsyncedPacientes.length} pacientes locais, ${unsyncedEstabelecimentos.length} estabelecimentos`);
       
       return {
         notificacoes: pendingNotificacoes.length,
         pacientes: unsyncedPacientes.length,
-        estabelecimentos: unsyncedEstabelecimentos.length
+        estabelecimentos: unsyncedEstabelecimentos.length,
+        errors: errorNotificacoes.length
       };
       
     } catch (error) {
       console.error('Erro ao obter contadores:', error);
-      return { notificacoes: 0, pacientes: 0, estabelecimentos: 0 };
+      return { notificacoes: 0, pacientes: 0, estabelecimentos: 0, errors: 0 };
     }
   }
 
@@ -546,13 +554,81 @@ export class IndexedDBService {
     return pending.map(item => ({ id: item.id as number, formData: item.formData }));
   }
 
+  // ✅ NOVO: Obter notificações pendentes incluindo as com erro (para retry)
+  async getAllPendingNotificacoes(): Promise<Array<{ id: number, formData: FormData, status: 'pending' | 'error', errorInfo?: any }>> {
+    await this.init();
+    const pending = await this.db!.getAllFromIndex('notificacoes', 'by-sync-status', 'pending');
+    const errors = await this.db!.getAllFromIndex('notificacoes', 'by-sync-status', 'error');
+    
+    const allPending = [
+      ...pending.map(item => ({ 
+        id: item.id as number, 
+        formData: item.formData, 
+        status: 'pending' as const 
+      })),
+      ...errors.map(item => ({ 
+        id: item.id as number, 
+        formData: item.formData, 
+        status: 'error' as const,
+        errorInfo: item.errorInfo
+      }))
+    ];
+    
+    return allPending.sort((a, b) => a.id - b.id);
+  }
+
   async markNotificacaoAsSynced(id: number): Promise<void> {
     await this.init();
     const notificacao = await this.db!.get('notificacoes', id);
     if (notificacao) {
       notificacao.syncStatus = 'synced';
+      // Limpar informações de erro se houver
+      delete notificacao.errorInfo;
       await this.db!.put('notificacoes', notificacao);
     }
+  }
+
+  // ✅ NOVO: Marcar notificação como erro
+  async markNotificacaoAsError(id: number, errorMessage: string, errorDetails?: any): Promise<void> {
+    await this.init();
+    const notificacao = await this.db!.get('notificacoes', id);
+    if (notificacao) {
+      const currentRetryCount = notificacao.errorInfo?.retryCount || 0;
+      
+      notificacao.syncStatus = 'error';
+      notificacao.errorInfo = {
+        message: errorMessage,
+        timestamp: Date.now(),
+        retryCount: currentRetryCount + 1,
+        lastError: errorDetails ? JSON.stringify(errorDetails) : undefined
+      };
+      
+      await this.db!.put('notificacoes', notificacao);
+      console.log(`❌ Notificação ${id} marcada como erro: ${errorMessage} (tentativa ${currentRetryCount + 1})`);
+    }
+  }
+
+  // ✅ NOVO: Resetar status de erro para permitir nova tentativa
+  async retryNotificacao(id: number): Promise<void> {
+    await this.init();
+    const notificacao = await this.db!.get('notificacoes', id);
+    if (notificacao && notificacao.syncStatus === 'error') {
+      notificacao.syncStatus = 'pending';
+      // Manter errorInfo para histórico, mas limpar o status
+      await this.db!.put('notificacoes', notificacao);
+      console.log(`🔄 Notificação ${id} marcada para nova tentativa de sincronização`);
+    }
+  }
+
+  // ✅ NOVO: Obter notificações com erro
+  async getErrorNotificacoes(): Promise<Array<{ id: number, formData: FormData, errorInfo: any }>> {
+    await this.init();
+    const errorNotificacoes = await this.db!.getAllFromIndex('notificacoes', 'by-sync-status', 'error');
+    return errorNotificacoes.map(item => ({ 
+      id: item.id as number, 
+      formData: item.formData,
+      errorInfo: item.errorInfo
+    }));
   }
   async markPacienteAsSynced(idpaciente: number, serverId?: number): Promise<void> {
     await this.init();

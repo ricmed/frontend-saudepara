@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Wifi, WifiOff, RefreshCw, FileText, Users } from 'lucide-react';
+import { Wifi, WifiOff, RefreshCw, FileText, Users, AlertTriangle } from 'lucide-react';
 import syncService from '@/services/syncService';
+import NotificationErrorsModal from './NotificationErrorsModal';
 
 interface ConnectionStatusProps {
   showForceSync?: boolean;
@@ -13,7 +14,8 @@ const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
 }) => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [pendingCount, setPendingCount] = useState({ notificacoes: 0, pacientes: 0 });
+  const [pendingCount, setPendingCount] = useState({ notificacoes: 0, pacientes: 0, errors: 0 });
+  const [showErrorModal, setShowErrorModal] = useState(false);
   
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -57,7 +59,13 @@ const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
     }
   };
 
-  const totalPending = pendingCount.notificacoes + pendingCount.pacientes;
+  const handleErrorsChanged = async () => {
+    // Atualizar contador quando erros forem resolvidos
+    const count = await syncService.getPendingCount();
+    setPendingCount(count);
+  };
+
+  const totalPending = pendingCount.notificacoes + pendingCount.pacientes + pendingCount.errors;
 
   // *** MELHORAR A EXIBIÇÃO ***
   const getStatusInfo = () => {
@@ -76,9 +84,10 @@ const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
     }
     
     if (totalPending > 0) {
+      const errorText = pendingCount.errors > 0 ? ` (${pendingCount.errors} com erro)` : '';
       return {
-        color: 'bg-orange-50 text-orange-700 border-orange-200',
-        text: `${totalPending} registro(s) aguardando sincronização`
+        color: pendingCount.errors > 0 ? 'bg-red-50 text-red-700 border-red-200' : 'bg-orange-50 text-orange-700 border-orange-200',
+        text: `${totalPending} registro(s) aguardando sincronização${errorText}`
       };
     }
     
@@ -95,6 +104,7 @@ const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
     return null;
   }
     return (
+    <>
     <div className={`flex items-center justify-between rounded-lg px-3 py-2 mb-4 border ${className} ${statusInfo.color}`}>
       <div className="flex items-center gap-2">
         {isOnline ? (
@@ -124,6 +134,16 @@ const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
                 {pendingCount.notificacoes} ficha(s)
               </span>
             )}
+            {pendingCount.errors > 0 && (
+              <button
+                onClick={() => setShowErrorModal(true)}
+                className="flex items-center gap-1 bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200 transition-colors"
+                title="Clique para ver detalhes dos erros"
+              >
+                <AlertTriangle className="h-3 w-3" />
+                {pendingCount.errors} erro(s)
+              </button>
+            )}
           </div>
         )}
 
@@ -139,6 +159,14 @@ const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
         )}
       </div>
     </div>
+    
+    {/* Modal de erros */}
+    <NotificationErrorsModal
+      isOpen={showErrorModal}
+      onClose={() => setShowErrorModal(false)}
+      onErrorsChanged={handleErrorsChanged}
+    />
+  </>
   );
 };
 
