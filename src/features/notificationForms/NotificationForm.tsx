@@ -27,7 +27,7 @@ import PersonIdentificationSection from "./components/sections/PersonIdentificat
 import AttendanceInfoSection from "./components/sections/AttendanceInfoSection";
 import NotifierInfoSection from "./components/sections/NotifierInfoSection";
 import CaseClosureSection from "./components/sections/CaseClosureSection";
-import AttachmentsSection from "./components/sections/AttachmentsSection";
+// import AttachmentsSection from "./components/sections/AttachmentsSection"; // TEMPORARIAMENTE COMENTADO
 
 // Import do novo componente de resumo de erros
 import ErrorSummary, { scrollToField } from "./components/ErrorSummary";
@@ -67,10 +67,10 @@ const NotificationForm: React.FC = () => {
     handleValidationError, // Add this new function
     originalCpf,
     
-    // 🆕 ADICIONAR FUNÇÕES PARA ARQUIVOS:
-    handleArquivosChange,
-    handleRemoveFile, // Adicionar função de remoção
-    validateArquivos,
+    // 🆕 ADICIONAR FUNÇÕES PARA ARQUIVOS: - TEMPORARIAMENTE COMENTADO
+    // handleArquivosChange,
+    // handleRemoveFile, // Adicionar função de remoção
+    // validateArquivos,
     
     // ✅ ADICIONAR checkCpfOfflineSafe para validação de CPF
     checkCpfOfflineSafe,
@@ -430,7 +430,8 @@ const NotificationForm: React.FC = () => {
             handleValidationError={handleValidationError}
           />
 
-          {/* 🆕 NOVA SEÇÃO 7: Arquivos Anexos */}
+          {/* 🆕 NOVA SEÇÃO 7: Arquivos Anexos - TEMPORARIAMENTE OCULTA */}
+          {/* 
           <AttachmentsSection
             formData={formData}
             errors={errors}
@@ -440,6 +441,7 @@ const NotificationForm: React.FC = () => {
             onArquivosChange={handleArquivosChange}
             onRemoveFile={handleRemoveFile}
           />
+          */}
 
           {/* Botões de ação na parte inferior do formulário (centralizados) */}
           <div className="mt-8 flex justify-center space-x-4">
