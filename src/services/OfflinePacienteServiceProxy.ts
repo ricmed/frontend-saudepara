@@ -275,13 +275,14 @@ export const OfflinePacienteService = {
       throw new Error('A data de nascimento é obrigatória');
     }
     
-    if (!data.tipo_genero_idtipo_genero) {
-      throw new Error('O tipo de gênero é obrigatório');
-    }
+    // ✅ CORRIGIDO: Remover validação obrigatória para gênero e raça
+    // if (!data.tipo_genero_idtipo_genero) {
+    //   throw new Error('O tipo de gênero é obrigatório');
+    // }
     
-    if (!data.tipo_raca_idtipo_raca) {
-      throw new Error('O tipo de raça é obrigatório');
-    }
+    // if (!data.tipo_raca_idtipo_raca) {
+    //   throw new Error('O tipo de raça é obrigatório');
+    // }
     
     // Formatação da data se necessário
     const formattedData = {

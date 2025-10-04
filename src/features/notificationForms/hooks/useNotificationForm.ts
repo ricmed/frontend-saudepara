@@ -1389,9 +1389,9 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           contato: formData.contatoTelefonico || "",
           ddi: formData.ddi || "55",
           gestante: formData.gestante || null, // ✅ ADICIONADO: Incluir campo gestante
-          tipo_genero_idtipo_genero: formData.identidadeGenero ? parseInt(formData.identidadeGenero) : 2,
-          tipo_raca_idtipo_raca: formData.raca ? parseInt(formData.raca) : 1,
-          escolaridade_idescolaridade: formData.escolaridade ? parseInt(formData.escolaridade) : 11,
+          tipo_genero_idtipo_genero: formData.identidadeGenero ? parseInt(formData.identidadeGenero) : null,
+          tipo_raca_idtipo_raca: formData.raca ? parseInt(formData.raca) : null,
+          escolaridade_idescolaridade: formData.escolaridade ? parseInt(formData.escolaridade) : null,
           cbo_idcbo: formData.profissao ? parseInt(formData.profissao) : null
         };
         

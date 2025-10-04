@@ -441,6 +441,16 @@ if (formData.cpf.length !== 11) {
 }
  }
 
+ // ✅ NOVA VALIDAÇÃO: Identidade de Gênero obrigatório
+ if (!formData.identidadeGenero || formData.identidadeGenero === "") {
+newErrors.identidadeGenero = "A Identidade de Gênero é obrigatória";
+ }
+
+ // ✅ NOVA VALIDAÇÃO: Raça obrigatório  
+ if (!formData.raca || formData.raca === "") {
+newErrors.raca = "A Raça/Cor é obrigatória";
+ }
+
  // ========================================
  // SEÇÃO 4: INFORMAÇÕES DO ATENDIMENTO
  // ========================================
