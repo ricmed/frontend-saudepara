@@ -6,6 +6,8 @@ services:
     ports:
       - "1001:80"
     environment:
+      - NGINX_PROXY_BACKEND=yes
+      - NGINX_PROXY_URL=https://app-api.saude.pa.gov.br
       - API_AUTH_URL=http://172.32.1.98:4000
       - DEBUG=true
     

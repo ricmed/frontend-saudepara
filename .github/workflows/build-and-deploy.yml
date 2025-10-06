@@ -87,9 +87,9 @@ jobs:
         build-args: |
           NODE_ENV=production
           VITE_GOOGLE_MAPS_API_KEY=${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
-          VITE_API_SERVER="https://app-api.saude.pa.gov.br"
-          VITE_API_PORT="443"
-          VITE_API_BASE_URL=""
+          VITE_API_SERVER=
+          VITE_API_PORT=
+          VITE_API_BASE_URL=/api
 
   deploy-staging:
     needs: build-and-push
