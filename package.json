@@ -7,7 +7,16 @@
     "dev": "vite --host",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "docker:build": "docker build -f Dockerfile.github -t spa-local:latest .",
+    "docker:run": "docker run -d --name spa-test -p 8080:80 spa-local:latest",
+    "docker:stop": "docker stop spa-test && docker rm spa-test",
+    "docker:logs": "docker logs spa-test",
+    "docker:compose": "docker-compose up -d",
+    "docker:compose:down": "docker-compose down",
+    "docker:clean": "docker system prune -f && docker volume prune -f",
+    "test:proxy": "bash scripts/test-proxy.sh",
+    "deploy:local": "bash scripts/local-build.sh"
   },
   "dependencies": {
     "@google-cloud/text-to-speech": "^5.6.0",

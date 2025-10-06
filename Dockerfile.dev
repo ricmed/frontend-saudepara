@@ -1,0 +1,19 @@
+# Dockerfile para desenvolvimento com hot reload
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copia arquivos de configuração
+COPY package.json package-lock.json ./
+
+# Instala dependências
+RUN npm ci
+
+# Copia código fonte
+COPY . .
+
+# Expõe porta do Vite dev server
+EXPOSE 3000
+
+# Comando para desenvolvimento
+CMD ["npm", "run", "dev"]
