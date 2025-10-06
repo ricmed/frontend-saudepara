@@ -1,4 +1,5 @@
 import axios, { AxiosError } from 'axios';
+import { getApiUrl } from '../config/api';
 import { 
   Estabelecimento, 
   PaginationMeta, 

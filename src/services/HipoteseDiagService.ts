@@ -1,4 +1,5 @@
 import axios, { AxiosError } from 'axios';
+import { getApiUrl } from '../config/api';
 
 const API_URL = getApiUrl('/tipo-hipotese-diag');
 
