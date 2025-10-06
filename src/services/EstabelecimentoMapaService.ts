@@ -1,8 +1,6 @@
 import axios, { AxiosError } from 'axios';
 
-const server = import.meta.env.VITE_API_SERVER;
-const port = import.meta.env.VITE_API_PORT;
-const API_URL = `${server}:${port}/api/estabelecimentos`;
+const API_URL = getApiUrl('/estabelecimentos');
 
 console.log('🔧 EstabelecimentoMapaService - Configuração API:', {
   server,
