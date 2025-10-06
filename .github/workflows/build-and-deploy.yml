@@ -90,7 +90,6 @@ jobs:
           VITE_API_SERVER=""
           VITE_API_PORT=""
           VITE_API_BASE_URL="/api"
-          VITE_API_PORT=${{ secrets.VITE_API_PORT }}
 
   deploy-staging:
     needs: build-and-push
