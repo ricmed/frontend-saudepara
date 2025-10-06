@@ -87,7 +87,9 @@ jobs:
         build-args: |
           NODE_ENV=production
           VITE_GOOGLE_MAPS_API_KEY=${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
-          VITE_API_SERVER=${{ secrets.VITE_API_SERVER }}
+          VITE_API_SERVER=""
+          VITE_API_PORT=""
+          VITE_API_BASE_URL="/api"
           VITE_API_PORT=${{ secrets.VITE_API_PORT }}
 
   deploy-staging:
