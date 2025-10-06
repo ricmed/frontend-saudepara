@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { debounce } from 'lodash';
 import axios from 'axios';
+import { getApiUrl } from '@/config/api';
 import syncService from '@/services/syncService';
 import indexedDBService from '@/services/indexedDB';
 
@@ -588,9 +589,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       }
       
       // Upload
-      const server = import.meta.env.VITE_API_SERVER;
-      const port = import.meta.env.VITE_API_PORT;
-      const url = `${server}:${port}/api/notificacao/${notificacaoId}/arquivos`;
+      const url = getApiUrl(`/notificacao/${notificacaoId}/arquivos`);
       
       console.log(`📤 Enviando para: ${url}`);
       
