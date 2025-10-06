@@ -9,16 +9,7 @@ services:
       # Configurações do nginx proxy
       - NGINX_PROXY_BACKEND=yes
       - NGINX_PROXY_URL=https://app-api.saude.pa.gov.br
-      - NGINX_PROXY_PATH=/api
-      - NGINX_SERVER_NAME=localhost
-      - NGINX_CLIENT_MAX_BODY_SIZE=100M
-      - NGINX_PROXY_READ_TIMEOUT=300s
-      - NGINX_PROXY_CONNECT_TIMEOUT=300s
-      
-      # Build-time environment variables (se necessário rebuildar)
-      - VITE_API_SERVER=app-api.saude.pa.gov.br
-      - VITE_API_PORT=443
-      - VITE_GOOGLE_MAPS_API_KEY=${VITE_GOOGLE_MAPS_API_KEY:-}
+      - DEBUG=true
     
     networks:
       - frontend-network

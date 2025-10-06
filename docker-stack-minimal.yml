@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  app:
+    image: ghcr.io/nivspa/frontend-saudepara:latest
+    ports:
+      - "1001:80"
+    environment:
+      - API_AUTH_URL=http://172.32.1.98:4000
+      - DEBUG=true
+    
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
+networks:
+  default:
+    driver: overlay
