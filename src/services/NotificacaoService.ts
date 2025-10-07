@@ -96,26 +96,26 @@ export interface PaginatedResponse<T> {
 }
 
 // URL base para o backend
-const API_BASE_URL = getApiUrl(''); // Base da API sem endpoint específico
+const API_BASE_URL = getApiUrl('/notificacao');
 
-// Endpoints relativos para buscar tipos - usando o padrão de nomenclatura do backend
+// Endpoints corretos para buscar tipos - usando o padrão de nomenclatura do backend
 const TIPO_ENDPOINTS = {
-  EVENTO: '/tipo-evento',
-  PUBLICO: '/tipo-publico',
-  PAIS: '/tipo-pais',
-  ESTADO: '/tipo-estado',
-  MUNICIPIO: '/tipo-municipio',
-  BAIRRO: '/tipo-bairro',
-  GENERO: '/tipo-genero',
-  RACA: '/tipo-raca',
-  ESCOLARIDADE: '/tipo-escolaridade',
-  CBO: '/tipo-cbo',
-  ATENDIMENTO: '/tipo-atendimento',
-  SINTOMA: '/tipo-sintoma',
-  HIPOTESE_DIAG: '/tipo-hipotese-diag',
-  TRAUMA: '/tipo-trauma',
-  ESTABELECIMENTO: '/estabelecimentos', // Nota o uso do plural, conforme o backend
-  ENCERRAMENTO: '/tipo-encerramento',
+  EVENTO: getApiUrl('/tipo-evento'),
+  PUBLICO: getApiUrl('/tipo-publico'),
+  PAIS: getApiUrl('/tipo-pais'),
+  ESTADO: getApiUrl('/tipo-estado'),
+  MUNICIPIO: getApiUrl('/tipo-municipio'),
+  BAIRRO: getApiUrl('/tipo-bairro'),
+  GENERO: getApiUrl('/tipo-genero'),
+  RACA: getApiUrl('/tipo-raca'),
+  ESCOLARIDADE: getApiUrl('/tipo-escolaridade'),
+  CBO: getApiUrl('/tipo-cbo'),
+  ATENDIMENTO: getApiUrl('/tipo-atendimento'),
+  SINTOMA: getApiUrl('/tipo-sintoma'),
+  HIPOTESE_DIAG: getApiUrl('/tipo-hipotese-diag'),
+  TRAUMA: getApiUrl('/tipo-trauma'),
+  ESTABELECIMENTO: getApiUrl('/estabelecimentos'), // Nota o uso do plural, conforme o backend
+  ENCERRAMENTO: getApiUrl('/tipo-encerramento'),
 };
 
 // Instância do axios
@@ -181,7 +181,7 @@ export const NotificacaoService = {
     try {
       // Adicionar parâmetro de limite para obter mais itens
       const paginatedEndpoint = `${endpoint}?limit=${limit}`;
-      const response = await api.get(paginatedEndpoint);
+      const response = await axios.get(paginatedEndpoint);
       
       // Tratamento para diferentes formatos de resposta
       if (Array.isArray(response.data)) {
@@ -231,7 +231,7 @@ export const NotificacaoService = {
   async getEventoOptions(): Promise<EventoOption[]> {
     try {
       // 🔄 MODIFICADO: Usar endpoint de eventos ativos apenas
-      const response = await api.get<EventoOption[]>(`${TIPO_ENDPOINTS.EVENTO}/ativos`);
+      const response = await axios.get<EventoOption[]>(`${TIPO_ENDPOINTS.EVENTO}/ativos`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar eventos ativos:', error);
@@ -257,7 +257,7 @@ export const NotificacaoService = {
     if (!estadoId) {
       try {
         const endpoint = `${TIPO_ENDPOINTS.MUNICIPIO}?limit=10000`;
-        const response = await api.get(endpoint);
+        const response = await axios.get(endpoint);
         
         let municipios = [];
         if (Array.isArray(response.data)) {
@@ -298,8 +298,8 @@ export const NotificacaoService = {
       
       console.log(`Buscando municípios para o estado ID: ${idEstado} (${typeof idEstado})`);
       
-      // Usar api diretamente em vez do método genérico fetchOptions para ter mais controle
-      const response = await api.get(endpoint, { signal });
+      // Usar axios diretamente em vez do método genérico fetchOptions para ter mais controle
+      const response = await axios.get(endpoint, { signal });
       
       // Validar a resposta e garantir que estamos retornando apenas dados válidos
       let municipios = [];
@@ -364,7 +364,7 @@ export const NotificacaoService = {
 
   async getCboOptions(): Promise<BaseOption[]> {
     try {
-      const response = await api.get('/tipo-cbo?limit=20000');
+      const response = await axios.get(getApiUrl('/tipo-cbo?limit=20000'));
       
       // Verificar diferentes formatos de resposta
       const data = response.data?.data || response.data || [];
