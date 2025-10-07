@@ -1,11 +1,9 @@
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 import { getApiUrl } from '../config/api';
 
 const API_URL = getApiUrl('/estabelecimentos');
 
 console.log('🔧 EstabelecimentoMapaService - Configuração API:', {
-  server,
-  port,
   API_URL
 });
 
@@ -63,18 +61,7 @@ export interface Local {
   ativo: boolean;
 }
 
-interface APIError {
-  status: string;
-  message: string;
-}
 
-const handleApiError = (error: AxiosError<APIError>) => {
-  console.error('API Error:', error);
-  throw new Error(
-    error.response?.data?.message || 
-    'Ocorreu um erro ao carregar estabelecimentos. Tente novamente mais tarde.'
-  );
-};
 
 // Função para converter EstabelecimentoMapa para Local (compatibilidade com o mapa)
 const mapToLocal = (estabelecimento: EstabelecimentoMapa): Local => {
@@ -123,9 +110,7 @@ const mapToLocal = (estabelecimento: EstabelecimentoMapa): Local => {
     cnes: estabelecimento.cnes || '',
     cnpj: '',
     codigo_unidade: '',
-    ativo: true, // Já vem filtrado como ativo da API
-    // Manter também o ID original do estabelecimento para referência
-    idestabelecimento: estabelecimento.idestabelecimento
+    ativo: true // Já vem filtrado como ativo da API
   };
 };
 
