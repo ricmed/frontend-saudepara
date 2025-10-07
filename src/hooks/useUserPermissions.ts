@@ -13,6 +13,7 @@ export interface UserPermissions {
   // Roles específicos
   isQualificador: boolean;
   isNotificador: boolean;
+  isDashboard: boolean; // ✅ NOVO: Role apenas para visualizar Dashboard
   
   // Dados do usuário
   estabelecimentoId?: number;
@@ -68,6 +69,7 @@ export const useUserPermissions = (): UserPermissions => {
       isAdmin: false,
       isQualificador: false,
       isNotificador: false,
+      isDashboard: false,
       loading: false,
     };
   }
@@ -77,6 +79,7 @@ export const useUserPermissions = (): UserPermissions => {
   const isAdmin = roles.includes('admin') || roles.includes('administrator');
   const isQualificador = roles.includes('qualificador');
   const isNotificador = roles.includes('notificador');
+  const isDashboard = roles.includes('dashboard'); // ✅ NOVO: Verificar role dashboard
 
   // Verificar nível de acesso baseado nos dados de usuario_acesso
   // Primeiro tenta usar os dados do backend, depois fallback para os dados do Keycloak
@@ -103,6 +106,7 @@ export const useUserPermissions = (): UserPermissions => {
     isAdmin,
     isQualificador,
     isNotificador,
+    isDashboard,
     estabelecimentoId: userAccess?.estabelecimentoId,
     municipioId: userAccess?.municipioId,
     estadoId: userAccess?.estadoId,

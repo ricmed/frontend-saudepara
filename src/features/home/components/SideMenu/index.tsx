@@ -206,8 +206,8 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       onClick: () => navigate("/private/comunicacao-de-caso"),
     }] : []),
     
-    // Menu Dashboard - apenas para notificadores
-    ...(permissions.isNotificador ? [{
+    // Menu Dashboard - para notificadores OU usuários com role dashboard
+    ...(permissions.isNotificador || permissions.isDashboard ? [{
       icon: <ChartSpline />,
       label: t("menu.dashboard"),
       onClick: () => navigate("/dashboard-page"),

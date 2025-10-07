@@ -261,9 +261,9 @@ function App() {
           <Route path="/mapa-leaflet" element={<MapaLeaflet />} />
           <Route path="/campanhas" element={<HealthCampaignsPage />} />
           
-          {/* Rotas do Dashboard - Protegidas para Notificador */}
-          <Route path="/dashboard" element={<ProtectedRoute requiredRoles={['notificador']} requiredGroups={['/grupo_notificador']}><NotificationDashboard /></ProtectedRoute>} />
-          <Route path="/dashboard-page" element={<ProtectedRoute requiredRoles={['notificador']} requiredGroups={['/grupo_notificador']}><DashboardPage /></ProtectedRoute>} />
+          {/* Rotas do Dashboard - Protegidas para Notificador OU Dashboard */}
+          <Route path="/dashboard" element={<ProtectedRoute requiredRoles={['notificador', 'dashboard']}><NotificationDashboard /></ProtectedRoute>} />
+          <Route path="/dashboard-page" element={<ProtectedRoute requiredRoles={['notificador', 'dashboard']}><DashboardPage /></ProtectedRoute>} />
           
           {/* Rotas de Campanhas */}
           <Route path="/setembro-verde" element={<SetembroVerde />} />
