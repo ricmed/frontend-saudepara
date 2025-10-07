@@ -9,7 +9,6 @@ interface NotificacaoGenerica {
 import { type FormData, ArquivoFormulario, detectUserTimezone, formatDateWithTimezone } from '@/features/notificationForms/types/index2';
 import { formatLocalDateForBackend } from './timezoneHelper';
 import axios from "axios";
-import { getApiUrl } from '@/config/api';
 // import indexedDBService from '@/services/indexedDB'; // COMENTADO - SERÁ USADO NO FUTURO
 // import syncService from '@/services/syncService';     // COMENTADO - SERÁ USADO NO FUTURO
 import { toast } from 'react-toastify';
@@ -119,12 +118,15 @@ export const formatFromBackend = async (
   // ✅ CORREÇÃO: Mapear diretamente os arquivos que vêm com a notificação.
   let arquivos: ArquivoFormulario[] = [];
   if (backendData.arquivos && Array.isArray(backendData.arquivos)) {
+    const server = import.meta.env.VITE_API_SERVER;
+    const port = import.meta.env.VITE_API_PORT;
+
     arquivos = backendData.arquivos.map((arquivo: any) => ({
       id: arquivo.id.toString(),
       nome: arquivo.nome_original || arquivo.nome || 'Arquivo sem nome',
       tamanho: arquivo.tamanho || 0,
       tipo: arquivo.tipo_mime || arquivo.tipo || 'application/octet-stream',
-      url: `arquivos/${arquivo.id}/download`,
+      url: `${server}:${port}/api/arquivos/${arquivo.id}/download`,
       isExisting: true, // Marcar como já existente no servidor
       status: 'uploaded' as const, // Definir o status como 'uploaded'
     }));
@@ -642,8 +644,11 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
  * @param sintomasIds Array de IDs dos sintomas
  */
 export const salvarSintomasViaApi = async (notificacaoId: number, sintomasIds: number[]): Promise<void> => {
+  const server = import.meta.env.VITE_API_SERVER;
+  const port = import.meta.env.VITE_API_PORT;
+  
   try {
-    await axios.post(getApiUrl(`/notificacao/${notificacaoId}/sintomas`), {
+    await axios.post(`${server}:${port}/api/notificacao/${notificacaoId}/sintomas`, {
       sintomas: sintomasIds
     });
     
@@ -712,7 +717,9 @@ export const processarArquivosNotificacao = async (
   console.log(`\n📦 FormData final pronto com ${arquivosAnexadosContador} arquivo(s). Enviando para o backend...`);
 
   try {
-    const url = getApiUrl(`/notificacao/${notificacaoId}/arquivos`);
+    const server = import.meta.env.VITE_API_SERVER;
+    const port = import.meta.env.VITE_API_PORT;
+    const url = `${server}:${port}/api/notificacao/${notificacaoId}/arquivos`;
 
     await axios.post(url, formDataApi, {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -752,6 +759,9 @@ export const salvarNotificacaoCompleta = async (
   console.log("DADOS DO FORM ANTES DE ENVIAR:", formData);
   console.log("Dados antes de salvar - Tipo residente:", formData.residenteBelem, "País:", formData.paisProcedencia);
   
+  const server = import.meta.env.VITE_API_SERVER;
+  const port = import.meta.env.VITE_API_PORT;
+  
   // Verificar campos obrigatórios
   if (!formData.evento) console.warn("Campo obrigatório ausente: evento");
   if (!formData.publicoAtendido) console.warn("Campo obrigatório ausente: publicoAtendido");
@@ -781,7 +791,7 @@ export const salvarNotificacaoCompleta = async (
       }
       
       // ✅ NOVO: Usar axios diretamente para manter compatibilidade
-      response = await axios.put(getApiUrl(`/notificacao/${notificacaoId}`), payloadBackend);
+      response = await axios.put(`${server}:${port}/api/notificacao/${notificacaoId}`, payloadBackend);
       savedNotificacaoId = notificacaoId;
     } else {
       // Criar nova notificação
@@ -810,7 +820,7 @@ export const salvarNotificacaoCompleta = async (
       
       try {
         // ✅ NOVO: Usar axios diretamente para manter compatibilidade
-        response = await axios.post(getApiUrl(`/notificacao`), payloadBackend);
+        response = await axios.post(`${server}:${port}/api/notificacao`, payloadBackend);
         savedNotificacaoId = response.data.idnotificacao;
         console.log(`Notificação criada com ID: ${savedNotificacaoId}`);
       } catch (postError: any) {
@@ -864,7 +874,7 @@ export const salvarNotificacaoCompleta = async (
         // Nota: Pode ser otimizado para operação em batch no futuro
         for (const arquivoId of formData.arquivos_para_excluir) {
           try {
-            await axios.delete(getApiUrl(`/arquivos/${arquivoId}`));
+            await axios.delete(`${server}:${port}/api/arquivos/${arquivoId}`);
             console.log(`[ADAPTER] ✅ Arquivo ID ${arquivoId} excluído com sucesso.`);
           } catch (deleteError) {
             console.error(`[ADAPTER] ❌ Erro ao excluir arquivo ID ${arquivoId}:`, deleteError);
@@ -948,7 +958,10 @@ export const salvarNotificacaoCompleta = async (
  */
 export const buscarNotificacao = async (id: number): Promise<FormData | null> => {
   try {
-    const response = await axios.get(getApiUrl(`/notificacao/${id}`));
+    const server = import.meta.env.VITE_API_SERVER;
+    const port = import.meta.env.VITE_API_PORT;
+    
+    const response = await axios.get(`${server}:${port}/api/notificacao/${id}`);
     return await formatFromBackend(response.data);
   } catch (error) {
     console.error('Erro ao buscar notificação:', error);
@@ -961,8 +974,11 @@ export const buscarNotificacao = async (id: number): Promise<FormData | null> =>
  * Função auxiliar para buscar sintomas via API quando necessário
  */
 async function fetchSintomasForNotificacao(notificacaoId: number): Promise<any[]> {
+  const server = import.meta.env.VITE_API_SERVER;
+  const port = import.meta.env.VITE_API_PORT;
+  
   try {
-    const response = await axios.get(getApiUrl(`/notificacao/${notificacaoId}/sintomas`));
+    const response = await axios.get(`${server}:${port}/api/notificacao/${notificacaoId}/sintomas`);
     
     if (response.data?.data) {
       return response.data.data;
@@ -1192,8 +1208,11 @@ export const formatToBackendHipoteses = (hipotesesIds: string[]) => {
  * @param hipotesesIds Array de IDs das hipóteses
  */
 export const salvarHipotesesViaApi = async (notificacaoId: number, hipotesesIds: number[]): Promise<void> => {
+  const server = import.meta.env.VITE_API_SERVER;
+  const port = import.meta.env.VITE_API_PORT;
+  
   try {
-    await axios.post(getApiUrl(`/notificacao/${notificacaoId}/hipoteses`), {
+    await axios.post(`${server}:${port}/api/notificacao/${notificacaoId}/hipoteses`, {
       hipoteses: hipotesesIds
     });
     
@@ -1208,9 +1227,12 @@ export const salvarHipotesesViaApi = async (notificacaoId: number, hipotesesIds:
  * Função auxiliar para buscar hipóteses via API quando necessário
  */
 async function fetchHipotesesForNotificacao(notificacaoId: number): Promise<any[]> {
+  const server = import.meta.env.VITE_API_SERVER;
+  const port = import.meta.env.VITE_API_PORT;
+  
   try {
     // ROTA CORRETA que você criou
-    const response = await axios.get(getApiUrl(`/notificacao/${notificacaoId}/hipoteses-diagnosticas`));
+    const response = await axios.get(`${server}:${port}/api/notificacao/${notificacaoId}/hipoteses-diagnosticas`);
     
     console.log("📡 Response da API de hipóteses:", response.data);
     

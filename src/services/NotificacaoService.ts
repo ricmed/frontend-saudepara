@@ -3,7 +3,6 @@ import axios from 'axios';
 import type { FormData } from '@/features/notificationForms/types/index2';
 import { formatFromBackend, formatToBackend, formatListResponse } from '@/utils/notificacaoAdapter';
 import indexedDBService from '@/services/indexedDB';
-import { getApiUrl } from '@/config/api';
 
 // ... todas as interfaces existentes permanecem iguais ...
 export interface CboOption extends BaseOption {
@@ -95,27 +94,29 @@ export interface PaginatedResponse<T> {
   };
 }
 
+const server = import.meta.env.VITE_API_SERVER;
+const port = import.meta.env.VITE_API_PORT;
 // URL base para o backend
-const API_BASE_URL = getApiUrl('/notificacao');
+const API_BASE_URL = `${server}:${port}/api/notificacao`;
 
 // Endpoints corretos para buscar tipos - usando o padrão de nomenclatura do backend
 const TIPO_ENDPOINTS = {
-  EVENTO: getApiUrl('/tipo-evento'),
-  PUBLICO: getApiUrl('/tipo-publico'),
-  PAIS: getApiUrl('/tipo-pais'),
-  ESTADO: getApiUrl('/tipo-estado'),
-  MUNICIPIO: getApiUrl('/tipo-municipio'),
-  BAIRRO: getApiUrl('/tipo-bairro'),
-  GENERO: getApiUrl('/tipo-genero'),
-  RACA: getApiUrl('/tipo-raca'),
-  ESCOLARIDADE: getApiUrl('/tipo-escolaridade'),
-  CBO: getApiUrl('/tipo-cbo'),
-  ATENDIMENTO: getApiUrl('/tipo-atendimento'),
-  SINTOMA: getApiUrl('/tipo-sintoma'),
-  HIPOTESE_DIAG: getApiUrl('/tipo-hipotese-diag'),
-  TRAUMA: getApiUrl('/tipo-trauma'),
-  ESTABELECIMENTO: getApiUrl('/estabelecimentos'), // Nota o uso do plural, conforme o backend
-  ENCERRAMENTO: getApiUrl('/tipo-encerramento'),
+  EVENTO: `${server}:${port}/api/tipo-evento`,
+  PUBLICO: `${server}:${port}/api/tipo-publico`,
+  PAIS: `${server}:${port}/api/tipo-pais`,
+  ESTADO: `${server}:${port}/api/tipo-estado`,
+  MUNICIPIO: `${server}:${port}/api/tipo-municipio`,
+  BAIRRO: `${server}:${port}/api/tipo-bairro`,
+  GENERO: `${server}:${port}/api/tipo-genero`,
+  RACA: `${server}:${port}/api/tipo-raca`,
+  ESCOLARIDADE: `${server}:${port}/api/tipo-escolaridade`,
+  CBO: `${server}:${port}/api/tipo-cbo`,
+  ATENDIMENTO: `${server}:${port}/api/tipo-atendimento`,
+  SINTOMA: `${server}:${port}/api/tipo-sintoma`,
+  HIPOTESE_DIAG: `${server}:${port}/api/tipo-hipotese-diag`,
+  TRAUMA: `${server}:${port}/api/tipo-trauma`,
+  ESTABELECIMENTO: `${server}:${port}/api/estabelecimentos`, // Nota o uso do plural, conforme o backend
+  ENCERRAMENTO: `${server}:${port}/api/tipo-encerramento`,
 };
 
 // Instância do axios
@@ -364,7 +365,7 @@ export const NotificacaoService = {
 
   async getCboOptions(): Promise<BaseOption[]> {
     try {
-      const response = await axios.get(getApiUrl('/tipo-cbo?limit=20000'));
+      const response = await axios.get(`${server}:${port}/api/tipo-cbo?limit=20000`);
       
       // Verificar diferentes formatos de resposta
       const data = response.data?.data || response.data || [];
@@ -541,7 +542,7 @@ export const NotificacaoService = {
 
       // Fazer upload
       const response = await axios.post(
-        getApiUrl(`/notificacao/${notificacaoId}/arquivos`),
+        `${server}:${port}/api/notificacao/${notificacaoId}/arquivos`,
         formData,
         {
           headers: {
@@ -582,7 +583,7 @@ export const NotificacaoService = {
   async getArquivos(notificacaoId: number): Promise<any[]> {
     try {
       const response = await axios.get(
-        getApiUrl(`/notificacao/${notificacaoId}/arquivos`)
+        `${server}:${port}/api/notificacao/${notificacaoId}/arquivos`
       );
       
       return response.data || [];
@@ -602,7 +603,7 @@ export const NotificacaoService = {
    */
   async deleteArquivo(arquivoId: number): Promise<void> {
     try {
-      await axios.delete(getApiUrl(`/arquivos/${arquivoId}`));
+      await axios.delete(`${server}:${port}/api/arquivos/${arquivoId}`);
     } catch (error: any) {
       console.error('Erro ao deletar arquivo:', error);
       
@@ -620,7 +621,7 @@ export const NotificacaoService = {
   async getArquivosStats(notificacaoId: number): Promise<any> {
     try {
       const response = await axios.get(
-        getApiUrl(`/notificacao/${notificacaoId}/arquivos/stats`)
+        `${server}:${port}/api/notificacao/${notificacaoId}/arquivos/stats`
       );
       
       return response.data;
@@ -645,7 +646,7 @@ export const NotificacaoService = {
    * Função utilitária para download de arquivo
    */
   getDownloadUrl(arquivoId: number): string {
-    return getApiUrl(`/arquivos/${arquivoId}/download`);
+    return `${server}:${port}/api/arquivos/${arquivoId}/download`;
   }
 };
 
