@@ -1,6 +1,8 @@
 import axios, { AxiosError } from 'axios';
 
-const API_URL = getApiUrl('/tipo-estado');
+const server = import.meta.env.VITE_API_SERVER;
+const port = import.meta.env.VITE_API_PORT;
+const API_URL = `${server}:${port}/api/tipo-estado`;
 
 interface Estado {
   idtipo_estado: number;

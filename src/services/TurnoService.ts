@@ -1,7 +1,8 @@
 import axios, { AxiosError } from 'axios';
-import { getApiUrl } from '../config/api';
 
-const API_URL = getApiUrl('/tipo-turno');
+const server = import.meta.env.VITE_API_SERVER;
+const port = import.meta.env.VITE_API_PORT;
+const API_URL = `${server}:${port}/api/tipo-turno`;
 
 interface Turno {
   id_turno: number;

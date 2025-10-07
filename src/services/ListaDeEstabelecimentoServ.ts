@@ -14,7 +14,9 @@ import {
 // ✅ ADICIONAR IMPORT PARA OFFLINE
 import syncService from '@/services/syncService';
 
-const API_URL = getApiUrl('/estabelecimentos');
+const server = import.meta.env.VITE_API_SERVER;
+const port = import.meta.env.VITE_API_PORT;
+const API_URL = `${server}:${port}/api/estabelecimentos`;
 
 
 interface PaginatedResponse {
