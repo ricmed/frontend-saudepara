@@ -31,6 +31,12 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
   // Dados padrão de campanhas
   const defaultCampanhas: CampanhaItem[] = [
     {
+      imagem: "./images/campaigns/Setembro Amarelo.jpg",
+      titulo: "Campanha Setembro Amarelo 2025",
+      descricao: "Conscientização sobre prevenção do suicídio e valorização da saúde mental",
+      link: "/setembro-amarelo"
+    },
+    {
       imagem: "./images/campaigns/Setembro Verde.jpg",
       titulo: "Campanha Setembro Verde 2025",
       descricao: "Conscientização sobre a doação de órgãos e tecidos",
@@ -70,6 +76,9 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
     switch(campanha.link) {
       case '/setembro-verde':
         translationKey = 'greenSeptember';
+        break;
+      case '/setembro-amarelo':
+        translationKey = 'yellowSeptember';
         break;
       case '/agosto-dourado':
         translationKey = 'goldenAugust';

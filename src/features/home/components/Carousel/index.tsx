@@ -19,6 +19,13 @@ export const Carousel: React.FC<CarouselProps> = ({ materials: propMaterials }) 
   // Dados padrão de campanhas
   const defaultMaterials: Material[] = [
     {
+      id: "setembro-amarelo",
+      title: "Campanha Setembro Amarelo 2025",
+      desc: "Conscientização sobre prevenção do suicídio e valorização da saúde mental",
+      image: "./images/campaigns/Setembro Amarelo.jpg",
+      link: "/setembro-amarelo",
+    },
+    {
       id: "setembro-verde",
       title: "Campanha Setembro Verde 2025",
       desc: "Conscientização sobre a doação de órgãos e tecidos",
@@ -70,6 +77,9 @@ export const Carousel: React.FC<CarouselProps> = ({ materials: propMaterials }) 
       case 'setembro-verde':
         translationKey = 'greenSeptember';
         break;
+      case 'setembro-amarelo':
+        translationKey = 'yellowSeptember';
+        break;
       case 'agosto-dourado':
         translationKey = 'goldenAugust';
         break;
@@ -81,6 +91,7 @@ export const Carousel: React.FC<CarouselProps> = ({ materials: propMaterials }) 
         break;
       case 'janeiro-roxo':
         translationKey = 'purpleJanuary';
+        break;
         break;
       default:
         return material;

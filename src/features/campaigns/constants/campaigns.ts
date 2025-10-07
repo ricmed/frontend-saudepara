@@ -1,7 +1,16 @@
 import { Campaign } from '../types/campaign.types';
 
 export const HEALTH_CAMPAIGNS: Campaign[] = [
-  // Setembro Verde como primeira campanha
+  // Setembro Amarelo como primeira campanha
+  {
+    id: "7",
+    titleKey: "campaigns.list.yellowSeptember",
+    descriptionKey: "campaigns.list.yellowSeptemberDesc",
+    imageUrl: "/images/campaigns/Setembro Amarelo.jpg",
+    link: "/setembro-amarelo",
+    status: 'active'
+  },
+  // Setembro Verde
   {
     id: "3",
     titleKey: "campaigns.list.greenSeptember",

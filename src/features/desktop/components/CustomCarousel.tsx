@@ -32,6 +32,13 @@ export const CustomCarousel: React.FC<CustomCarouselProps> = ({ materials: propM
   // Materiais padrão
   const defaultMaterials: CarouselMaterial[] = [
     {
+      id: "setembro-amarelo",
+      title: "Campanha Setembro Amarelo 2025",
+      desc: "Conscientização sobre prevenção do suicídio e valorização da saúde mental",
+      image: "./images/campaigns/Setembro Amarelo.jpg",
+      link: "/setembro-amarelo",
+    },
+    {
       id: "setembro-verde",
       title: "Campanha Setembro Verde 2025",
       desc: "Conscientização sobre a doação de órgãos e tecidos",

@@ -16,12 +16,12 @@ export const JaneiroRoxoPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-blue-600 text-white shadow-lg">
+      <header className="bg-purple-600 text-white shadow-lg">
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-center gap-4">
             <button
               onClick={handleGoBack}
-              className="p-2 hover:bg-blue-700 rounded-full transition-colors"
+              className="p-2 hover:bg-purple-700 rounded-full transition-colors"
               aria-label={t('campaigns.backButton')}
             >
               <ArrowLeft className="h-6 w-6" />
@@ -40,7 +40,7 @@ export const JaneiroRoxoPage: React.FC = () => {
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* Imagem */}
-              <div className="flex items-center justify-center bg-blue-100 rounded-lg p-4">
+              <div className="flex items-center justify-center bg-purple-100 rounded-lg p-4">
                 <img
                   src="./images/campaigns/Janeiro Roxo.jpg"
                   alt={t('campaigns.purpleJanuary.title')}
@@ -50,7 +50,7 @@ export const JaneiroRoxoPage: React.FC = () => {
               
               {/* Conteúdo */}
               <div className="flex flex-col justify-center">
-                <h2 className="text-2xl font-bold mb-4 text-blue-600">
+                <h2 className="text-2xl font-bold mb-4 text-purple-600">
                   {t('campaigns.purpleJanuary.title')}
                 </h2>
                 <div className="space-y-4">
@@ -69,7 +69,7 @@ export const JaneiroRoxoPage: React.FC = () => {
 
             <div className="mt-8 flex justify-center">
               <button 
-                className="px-8 py-3 bg-blue-600 text-white rounded-lg flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors"
+                className="px-8 py-3 bg-purple-600 text-white rounded-lg flex items-center justify-center gap-2 hover:bg-purple-700 transition-colors"
                 onClick={() => window.open('https://drive.google.com/file/d/15DU5IRnMHhC358fFkNm1BU5kVN7dhMPC/view?usp=drive_link')}
               >
                 <Download className="w-5 h-5" />
@@ -92,7 +92,7 @@ export const JaneiroRoxoPage: React.FC = () => {
                 <a 
                   key={item} 
                   href={`/${item}`} 
-                  className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
+                  className="text-sm text-gray-600 hover:text-purple-600 transition-colors"
                 >
                   {t(`campaigns.footer.${item}`)}
                 </a>

@@ -70,7 +70,7 @@ export const GreenSeptemberPage: React.FC = () => {
             <div className="mt-8 flex justify-center">
               <button 
                 className="px-8 py-3 bg-green-600 text-white rounded-lg flex items-center justify-center gap-2 hover:bg-green-700 transition-colors"
-                onClick={() => window.open('https://drive.google.com/drive/folders/1BRWcA_JYfs01tMXB4UNj1i2o-sbGODIa')}
+                onClick={() => window.open('https://drive.google.com/file/d/1S5dCAIVSh0Y_hlw68dGZi6FWBzxLURnQ/view')}
               >
                 <Download className="w-5 h-5" />
                 <span>{t('campaigns.greenSeptember.downloadButton')}</span>

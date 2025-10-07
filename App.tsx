@@ -17,6 +17,7 @@ import NotificationDashboard from "@/features/dashboard/NotificationDashboard";
 // Features - Campanhas
 import DezembroVermelho from "@/features/campaigns/pages/details/RedDecemberPage";
 import SetembroVerde from "@/features/campaigns/pages/details/GreenSeptemberPage";
+import SetembroAmarelo from "@/features/campaigns/pages/details/YellowSeptemberPage";
 import NovembroAzul from "@/features/campaigns/pages/details/BlueNovemberPage";
 import JaneiroRoxoPage from "@/features/campaigns/pages/details/JaneiroRoxoPage";
 import GoldenAugustPage from "@/features/campaigns/pages/details/GoldenAugustPage";
@@ -266,6 +267,7 @@ function App() {
           
           {/* Rotas de Campanhas */}
           <Route path="/setembro-verde" element={<SetembroVerde />} />
+          <Route path="/setembro-amarelo" element={<SetembroAmarelo />} />
           <Route path="/agosto-dourado" element={<GoldenAugustPage />} />
           <Route path="/janeiro-roxo" element={<JaneiroRoxoPage />} />
           <Route path="/campanha-dezembro-vermelho" element={<DezembroVermelho />} />
