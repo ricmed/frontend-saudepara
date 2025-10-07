@@ -18,13 +18,15 @@ echo "  API_AUTH_URL: $API_AUTH_URL"
 generate_api_proxy_config() {
     if [ "$NGINX_PROXY_BACKEND" = "yes" ]; then
         cat << 'EOF'
-    # Configuração de proxy para /api/
-    location /api/ {
+    # Regra específica para capturar o padrão :/api/
+    location ~ :/api/ {
+        # Extrai apenas a parte api/algo da URL
+        rewrite ^.*:/api/(.*) /api/$1 break;
         proxy_pass NGINX_PROXY_URL_PLACEHOLDER;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
-        proxy_set_header Host app-api.saude.pa.gov.br;
+        proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -32,10 +34,22 @@ generate_api_proxy_config() {
         proxy_connect_timeout 30s;
         proxy_send_timeout 30s;
         proxy_read_timeout 30s;
-        # Configurações SSL para proxy HTTPS
-        proxy_ssl_verify off;
-        proxy_ssl_server_name on;
-        proxy_ssl_protocols TLSv1.2 TLSv1.3;
+    }
+
+    # Configuração padrão para /api/
+    location /api/ {
+        proxy_pass NGINX_PROXY_URL_PLACEHOLDER/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 30s;
+        proxy_read_timeout 30s;
     }
 EOF
     else
