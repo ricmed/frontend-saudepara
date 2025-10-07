@@ -31,6 +31,12 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
   // Dados padrão de campanhas
   const defaultCampanhas: CampanhaItem[] = [
     {
+      imagem: "./images/campaigns/Agosto Dourado – Aleitamento Materno.jpg",
+      titulo: "Campanha Agosto Dourado 2025",
+      descricao: "Campanha de incentivo ao Aleitamento Materno",
+      link: "/agosto-dourado"
+    },
+    {
       imagem: "./images/campaigns/Janeiro Roxo.jpg",
       titulo: "Campanha Janeiro Roxo 2025",
       descricao: "Campanha de conscientização sobre a Hanseníase",
@@ -49,12 +55,6 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
       link: "/campanha-novembro-azul"
     },
     {
-      imagem: "./images/campaigns/Setembro Verde.png",
-      titulo: "Setembro Verde",
-      descricao: "Mês de conscientização sobre a doação de órgãos",
-      link: "/setembro-verde"
-    },
-    {
       imagem: "./images/campaigns/Malária Zero.png",
       titulo: "Malária Zero",
       descricao: "Iniciativa para erradicação da malária na região amazônica",
@@ -69,6 +69,10 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
     
     // Match campaign URL path to translation key
     switch(campanha.link) {
+      case '/agosto-dourado':
+        translationKey = 'goldenAugust';
+        campaignKey = 'agosto-dourado';
+        break;
       case '/campanha-dezembro-vermelho':
         translationKey = 'redDecember';
         campaignKey = 'dezembro-vermelho';
@@ -76,10 +80,6 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
       case '/campanha-novembro-azul':
         translationKey = 'blueNovember';
         campaignKey = 'novembro-azul';
-        break;
-      case '/setembro-verde':
-        translationKey = 'greenSeptember';
-        campaignKey = 'setembro-verde';
         break;
       case '/malaria-zero':
         translationKey = 'malaria';

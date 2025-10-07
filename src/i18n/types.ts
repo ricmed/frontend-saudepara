@@ -227,5 +227,9 @@ export const campaignStructure = {
   "janeiro-roxo": {
     translationKey: "purpleJanuary",
     route: "/janeiro-roxo"
+  },
+  "agosto-dourado": {
+    translationKey: "goldenAugust",
+    route: "/agosto-dourado"
   }
 } as const;
