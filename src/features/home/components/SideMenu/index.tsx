@@ -285,7 +285,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       >
         <div className="p-4 flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-6 flex-shrink-0">
             <img
               src="/images/logos/lateral completo.png"
               alt="Logo Saúde Pará"
@@ -294,10 +294,12 @@ export const SideMenu: React.FC<SideMenuProps> = ({
           </div>
           
           {/* User Profile Header */}
-          <UserProfileHeader selectedLanguage={selectedLanguage} />
+          <div className="flex-shrink-0">
+            <UserProfileHeader selectedLanguage={selectedLanguage} />
+          </div>
           
           {/* Itens do Menu */}
-          <div className="flex-grow">
+          <div className="flex-grow overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-blue-700 scrollbar-track-blue-800">
             {menuItems.map((item, i) => (
               <div
                 key={i}
@@ -364,7 +366,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
           </div>
 
           {/* Seletor de Idiomas */}
-          <div className="mt-auto border-t border-blue-800 pt-4">
+          <div className="mt-4 border-t border-blue-800 pt-4 flex-shrink-0">
             <LanguageSelector
               selectedLanguage={selectedLanguage}
               onLanguageChange={setSelectedLanguage}
