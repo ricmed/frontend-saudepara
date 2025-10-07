@@ -1,7 +1,16 @@
 import { Campaign } from '../types/campaign.types';
 
 export const HEALTH_CAMPAIGNS: Campaign[] = [
-  // Agosto Dourado como primeira campanha
+  // Setembro Verde como primeira campanha
+  {
+    id: "3",
+    titleKey: "campaigns.list.greenSeptember",
+    descriptionKey: "campaigns.list.greenSeptemberDesc",
+    imageUrl: "/images/campaigns/Setembro Verde.jpg",
+    link: "/setembro-verde",
+    status: 'active'
+  },
+  // Agosto Dourado
   {
     id: "6",
     titleKey: "campaigns.list.goldenAugust",
@@ -33,14 +42,6 @@ export const HEALTH_CAMPAIGNS: Campaign[] = [
     descriptionKey: "campaigns.list.blueNovemberDesc",
     imageUrl: "/images/campaigns/Novembro Azul.png",
     link: "/campanha-novembro-azul",
-    status: 'active'
-  },
-  {
-    id: "4",
-    titleKey: "campaigns.list.malaria",
-    descriptionKey: "campaigns.list.malariaDesc",
-    imageUrl: "/images/campaigns/Malária Zero.png",
-    link: "/malaria-zero",
     status: 'active'
   }
 ];

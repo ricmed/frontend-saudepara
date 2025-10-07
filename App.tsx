@@ -16,7 +16,7 @@ import LogoutConfirmation from "@/keycloak/pages/LogoutConfirmation";
 import NotificationDashboard from "@/features/dashboard/NotificationDashboard";
 // Features - Campanhas
 import DezembroVermelho from "@/features/campaigns/pages/details/RedDecemberPage";
-import MalariaZero from "@/features/campaigns/pages/details/MalariaZeroPage";
+import SetembroVerde from "@/features/campaigns/pages/details/GreenSeptemberPage";
 import NovembroAzul from "@/features/campaigns/pages/details/BlueNovemberPage";
 import JaneiroRoxoPage from "@/features/campaigns/pages/details/JaneiroRoxoPage";
 import GoldenAugustPage from "@/features/campaigns/pages/details/GoldenAugustPage";
@@ -265,10 +265,10 @@ function App() {
           <Route path="/dashboard-page" element={<ProtectedRoute requiredRoles={['notificador']} requiredGroups={['/grupo_notificador']}><DashboardPage /></ProtectedRoute>} />
           
           {/* Rotas de Campanhas */}
+          <Route path="/setembro-verde" element={<SetembroVerde />} />
           <Route path="/agosto-dourado" element={<GoldenAugustPage />} />
           <Route path="/janeiro-roxo" element={<JaneiroRoxoPage />} />
           <Route path="/campanha-dezembro-vermelho" element={<DezembroVermelho />} />
-          <Route path="/malaria-zero" element={<MalariaZero />} />
           <Route path="/campanha-novembro-azul" element={<NovembroAzul />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/access-denied" element={<AccessDenied />} />

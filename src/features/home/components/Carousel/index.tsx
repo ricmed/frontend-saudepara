@@ -19,6 +19,13 @@ export const Carousel: React.FC<CarouselProps> = ({ materials: propMaterials }) 
   // Dados padrão de campanhas
   const defaultMaterials: Material[] = [
     {
+      id: "setembro-verde",
+      title: "Campanha Setembro Verde 2025",
+      desc: "Conscientização sobre a doação de órgãos e tecidos",
+      image: "./images/campaigns/Setembro Verde.jpg",
+      link: "/setembro-verde",
+    },
+    {
       id: "agosto-dourado",
       title: "Campanha Agosto Dourado 2025",
       desc: "Campanha de incentivo ao Aleitamento Materno",
@@ -45,13 +52,6 @@ export const Carousel: React.FC<CarouselProps> = ({ materials: propMaterials }) 
       desc: "Conscientização sobre a saúde do homem e prevenção ao câncer de próstata",
       image: "./images/campaigns/Novembro Azul.png",
       link: "/campanha-novembro-azul",
-    },
-    {
-      id: "malaria-zero",
-      title: "Malária Zero",
-      desc: "Iniciativa para erradicação da malária na região amazônica",
-      image: "./images/campaigns/Malária Zero.png",
-      link: "/malaria-zero",
     }
   ];
 
@@ -67,6 +67,9 @@ export const Carousel: React.FC<CarouselProps> = ({ materials: propMaterials }) 
     
     // Mapear ID da campanha para chave de tradução
     switch(material.id) {
+      case 'setembro-verde':
+        translationKey = 'greenSeptember';
+        break;
       case 'agosto-dourado':
         translationKey = 'goldenAugust';
         break;
@@ -75,9 +78,6 @@ export const Carousel: React.FC<CarouselProps> = ({ materials: propMaterials }) 
         break;
       case 'novembro-azul':
         translationKey = 'blueNovember';
-        break;
-      case 'malaria-zero':
-        translationKey = 'malaria';
         break;
       case 'janeiro-roxo':
         translationKey = 'purpleJanuary';

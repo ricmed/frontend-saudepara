@@ -32,6 +32,13 @@ export const CustomCarousel: React.FC<CustomCarouselProps> = ({ materials: propM
   // Materiais padrão
   const defaultMaterials: CarouselMaterial[] = [
     {
+      id: "setembro-verde",
+      title: "Campanha Setembro Verde 2025",
+      desc: "Conscientização sobre a doação de órgãos e tecidos",
+      image: "./images/campaigns/Setembro Verde.jpg",
+      link: "/setembro-verde",
+    },
+    {
       id: "agosto-dourado",
       title: "Campanha Agosto Dourado 2025",
       desc: "Campanha de incentivo ao Aleitamento Materno",
@@ -58,13 +65,6 @@ export const CustomCarousel: React.FC<CustomCarouselProps> = ({ materials: propM
       desc: "Conscientização sobre a saúde do homem e prevenção ao câncer de próstata",
       image: "./images/campaigns/Novembro Azul.png",
       link: "/campanha-novembro-azul",
-    },
-    {
-      id: "malaria-zero",
-      title: "Malária Zero",
-      desc: "Iniciativa para erradicação da malária na região amazônica",
-      image: "./images/campaigns/Malária Zero.png",
-      link: "/malaria-zero",
     },
   ];
 

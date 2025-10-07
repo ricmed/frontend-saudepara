@@ -31,6 +31,12 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
   // Dados padrão de campanhas
   const defaultCampanhas: CampanhaItem[] = [
     {
+      imagem: "./images/campaigns/Setembro Verde.jpg",
+      titulo: "Campanha Setembro Verde 2025",
+      descricao: "Conscientização sobre a doação de órgãos e tecidos",
+      link: "/setembro-verde"
+    },
+    {
       imagem: "./images/campaigns/Agosto Dourado – Aleitamento Materno.jpg",
       titulo: "Campanha Agosto Dourado 2025",
       descricao: "Campanha de incentivo ao Aleitamento Materno",
@@ -53,41 +59,29 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
       titulo: "Novembro Azul",
       descricao: "Conscientização sobre a saúde do homem e prevenção ao câncer de próstata",
       link: "/campanha-novembro-azul"
-    },
-    {
-      imagem: "./images/campaigns/Malária Zero.png",
-      titulo: "Malária Zero",
-      descricao: "Iniciativa para erradicação da malária na região amazônica",
-      link: "/malaria-zero"
     }
   ];
 
   // Map default campaigns to translated content
-  const translatedCampanhas = defaultCampanhas.map((campanha, index) => {
+  const translatedCampanhas = defaultCampanhas.map((campanha) => {
     let translationKey = '';
-    let campaignKey = '';
     
     // Match campaign URL path to translation key
     switch(campanha.link) {
+      case '/setembro-verde':
+        translationKey = 'greenSeptember';
+        break;
       case '/agosto-dourado':
         translationKey = 'goldenAugust';
-        campaignKey = 'agosto-dourado';
         break;
       case '/campanha-dezembro-vermelho':
         translationKey = 'redDecember';
-        campaignKey = 'dezembro-vermelho';
         break;
       case '/campanha-novembro-azul':
         translationKey = 'blueNovember';
-        campaignKey = 'novembro-azul';
-        break;
-      case '/malaria-zero':
-        translationKey = 'malaria';
-        campaignKey = 'malaria-zero';
         break;
       case '/janeiro-roxo':
         translationKey = 'purpleJanuary';
-        campaignKey = 'janeiro-roxo';
         break;
       default:
         return campanha;

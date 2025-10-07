@@ -220,10 +220,6 @@ export const campaignStructure = {
     translationKey: "greenSeptember",
     route: "/setembro-verde"
   },
-  "malaria-zero": {
-    translationKey: "malaria",
-    route: "/malaria-zero"
-  },
   "janeiro-roxo": {
     translationKey: "purpleJanuary",
     route: "/janeiro-roxo"
