@@ -723,8 +723,31 @@ const UserForm: React.FC = () => {
         });
 
         if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Erro ao criar usuário');
+          const errorData = await response.json();
+          console.error('❌ Erro ao criar usuário:', errorData);
+          
+          // Mensagem de erro amigável
+          let errorMessage = 'Erro ao criar usuário';
+          
+          // Se há detalhes de validação, mostrar o primeiro erro
+          if (errorData.details && Array.isArray(errorData.details) && errorData.details.length > 0) {
+            errorMessage = errorData.details[0].message;
+            
+            // Destacar o campo com erro
+            const errorField = errorData.details[0].field;
+            if (errorField) {
+              setErrors(prev => ({
+                ...prev,
+                [errorField]: errorData.details[0].message
+              }));
+            }
+          } else if (errorData.error) {
+            errorMessage = errorData.error;
+          } else if (errorData.details) {
+            errorMessage = errorData.details;
+          }
+          
+          throw new Error(errorMessage);
         }
 
         // Se usuário foi criado com sucesso, buscar o ID real do usuário
@@ -856,8 +879,22 @@ const UserForm: React.FC = () => {
       }, 2000);
 
     } catch (error: any) {
-      console.error('Erro ao salvar usuário:', error);
-      showNotification(error.message || t('admin.userForm.saveError'), 'error');
+      console.error('❌ Erro ao salvar usuário:', error);
+      
+      // Extrair mensagem de erro mais específica
+      let errorMessage = 'Erro ao salvar usuário';
+      
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
+      // Exibir notificação com a mensagem de erro
+      showNotification(errorMessage, 'error');
+      
+      // Scroll para o topo para ver o erro
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setSaving(false);
     }

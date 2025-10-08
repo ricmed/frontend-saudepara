@@ -443,7 +443,30 @@ const UserFormMunicipio: React.FC = () => {
         });
 
         if (!response.ok) {
-          throw new Error(`Erro HTTP: ${response.status}`);
+          const errorData = await response.json();
+          console.error('❌ Erro ao atualizar usuário:', errorData);
+          
+          // Mensagem de erro amigável
+          let errorMessage = 'Erro ao atualizar usuário';
+          
+          if (errorData.details && Array.isArray(errorData.details) && errorData.details.length > 0) {
+            errorMessage = errorData.details[0].message;
+            
+            // Destacar o campo com erro
+            const errorField = errorData.details[0].field;
+            if (errorField) {
+              setErrors(prev => ({
+                ...prev,
+                [errorField]: errorData.details[0].message
+              }));
+            }
+          } else if (errorData.error) {
+            errorMessage = errorData.error;
+          } else if (errorData.details) {
+            errorMessage = errorData.details;
+          }
+          
+          throw new Error(errorMessage);
         }
 
         // Se senha foi informada, atualizar também
@@ -585,10 +608,27 @@ const UserFormMunicipio: React.FC = () => {
     } catch (error: any) {
       console.error('💥 Erro ao salvar usuário:', error);
       
-      let errorMessage = 'Erro desconhecido ao salvar usuário';
+      // Extrair mensagem de erro mais específica
+      let errorMessage = 'Erro ao salvar usuário';
       
       if (error.response?.data?.error) {
         errorMessage = error.response.data.error;
+      } else if (error.response?.data?.details) {
+        // Se há detalhes de validação, mostrar o primeiro erro
+        if (Array.isArray(error.response.data.details) && error.response.data.details.length > 0) {
+          errorMessage = error.response.data.details[0].message;
+          
+          // Destacar o campo com erro
+          const errorField = error.response.data.details[0].field;
+          if (errorField) {
+            setErrors(prev => ({
+              ...prev,
+              [errorField]: error.response.data.details[0].message
+            }));
+          }
+        } else {
+          errorMessage = error.response.data.details;
+        }
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -597,6 +637,9 @@ const UserFormMunicipio: React.FC = () => {
         message: errorMessage,
         type: 'error'
       });
+      
+      // Scroll para o topo para ver o erro
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setSaving(false);
     }

@@ -127,11 +127,11 @@ export const validationUtils = {
   },
 
   /**
-   * Validar username
+   * Validar username - Mais permissivo
    */
   isValidUsername: (username: string): boolean => {
-    // Username deve ter 3-30 caracteres, apenas letras, números, underscore e hífen
-    const usernameRegex = /^[a-zA-Z0-9_-]{3,30}$/;
+    // Username deve ter 3-50 caracteres, permite letras, números, pontos, hífens e underscores
+    const usernameRegex = /^[a-zA-Z0-9._-]{3,50}$/;
     return usernameRegex.test(username);
   },
 
