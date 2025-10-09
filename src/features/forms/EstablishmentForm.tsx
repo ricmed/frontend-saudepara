@@ -116,6 +116,7 @@ const EstabelecimentoForm: React.FC = () => {
   const [originalEstabelecimento, setOriginalEstabelecimento] =
     useState<EstabelecimentoData | null>(null);
   const [addressFieldsModified, setAddressFieldsModified] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // 🔒 Proteção contra submits duplicados
 
   const validateField = (name: string, value: string) => {
     let errorMsg = "";
@@ -413,11 +414,28 @@ const EstabelecimentoForm: React.FC = () => {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    
+    // 🔒 PROTEÇÃO: Prevenir múltiplos submits
+    if (isSubmitting || loading) {
+      console.warn('⚠️ Submit bloqueado - já existe uma operação em andamento');
+      return;
+    }
+    
+    setIsSubmitting(true); // Bloquear novos submits
     setError(null);
+    
     try {
       await validateForm();
+      
+      // 🔍 VALIDAÇÃO DE DUPLICATAS - apenas para novos estabelecimentos
       if (!id) {
+        console.log('🔍 Verificando duplicatas...');
+        
+        // ⚠️ IMPORTANTE: Desabilitar check duplicate por enquanto pois o endpoint não existe
+        // TODO: Implementar endpoint /api/estabelecimentos/check-duplicate no backend
+        /*
         const validationPromises = [];
+        
         if (estabelecimento.codigo_unidade) {
           validationPromises.push(
             EstabelecimentoFormService.checkDuplicate(
@@ -435,24 +453,43 @@ const EstabelecimentoForm: React.FC = () => {
           );
         }
         if (estabelecimento.cnpj) {
+          // 🎭 Remover máscara do CNPJ antes de verificar duplicata
+          const cnpjSemMascara = estabelecimento.cnpj.replace(/\D/g, '');
           validationPromises.push(
             EstabelecimentoFormService.checkDuplicate(
               "cnpj",
-              estabelecimento.cnpj
+              cnpjSemMascara
             )
           );
         }
-        const results = await Promise.all(validationPromises);
-        const duplicates = results.filter((r) => r.isDuplicate);
-        if (duplicates.length > 0)
-          throw new Error(`${duplicates[0].field} já cadastrado no sistema`);
+        
+        if (validationPromises.length > 0) {
+          const results = await Promise.all(validationPromises);
+          const duplicates = results.filter((r) => r.isDuplicate);
+          
+          if (duplicates.length > 0) {
+            const fieldNames: Record<string, string> = {
+              codigo_unidade: 'Código da Unidade',
+              cnes: 'CNES',
+              cnpj: 'CNPJ'
+            };
+            const fieldName = fieldNames[duplicates[0].field] || duplicates[0].field;
+            throw new Error(`❌ ${fieldName} já cadastrado no sistema. Por favor, verifique os dados.`);
+          }
+        }
+        */
+        console.log('✅ Verificação de duplicatas desabilitada temporariamente');
       }
+      
       setLoading(true);
       const dataToSubmit = prepareDataForSubmission();
+      
       if (id) {
+        console.log('📝 Atualizando estabelecimento...');
         await EstabelecimentoFormService.update(Number(id), dataToSubmit);
         alert("Estabelecimento atualizado com sucesso!");
       } else {
+        console.log('➕ Criando novo estabelecimento...');
         await EstabelecimentoFormService.create(dataToSubmit);
         alert("Estabelecimento criado com sucesso!");
       }
@@ -461,9 +498,10 @@ const EstabelecimentoForm: React.FC = () => {
       const errorMessage =
         err instanceof Error ? err.message : "Erro ao salvar estabelecimento";
       setError(errorMessage);
-      console.error("Erro ao salvar:", err);
+      console.error("❌ Erro ao salvar:", err);
     } finally {
       setLoading(false);
+      setIsSubmitting(false); // Liberar para novos submits
     }
   };
 
@@ -650,11 +688,11 @@ const EstabelecimentoForm: React.FC = () => {
               <button
                 type="submit"
                 form="estabelecimento-form"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
-                disabled={loading}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={loading || isSubmitting}
               >
                 <Save className="h-4 w-4" />
-                <span>Salvar</span>
+                <span>{isSubmitting ? 'Salvando...' : 'Salvar'}</span>
               </button>
               <button
                 type="button"
@@ -703,6 +741,26 @@ const EstabelecimentoForm: React.FC = () => {
               </div>
             </div>
           )}
+          
+          {/* 🔄 FEEDBACK VISUAL DE SALVAMENTO */}
+          {isSubmitting && (
+            <div className="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="animate-spin h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-blue-700 font-medium">
+                    Salvando estabelecimento... Por favor, aguarde.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <form
             id="estabelecimento-form"
             onSubmit={handleSubmit}
@@ -739,12 +797,11 @@ const EstabelecimentoForm: React.FC = () => {
             <div className="flex justify-center gap-4 mt-8 pb-8">
               <button
                 type="submit"
-                form="estabelecimento-form"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
-                disabled={loading}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={loading || isSubmitting}
               >
                 <Save className="h-4 w-4" />
-                <span>Salvar</span>
+                <span>{isSubmitting ? 'Salvando...' : 'Salvar'}</span>
               </button>
               <button
                 type="button"

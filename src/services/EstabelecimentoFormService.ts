@@ -29,6 +29,9 @@ const ENDPOINTS = {
   TIPO_QUALIFICACAO: `${API_BASE_URL}/api/tipo-qualificacao`
 };
 
+// 🔒 PROTEÇÃO CONTRA REQUISIÇÕES DUPLICADAS
+let isCreatingEstablishment = false;
+
 const api = axios.create({
   baseURL: ENDPOINTS.ESTABELECIMENTOS,
   timeout: 5000,
@@ -294,27 +297,44 @@ export const EstabelecimentoFormService = {  // Obter tipos de estabelecimento
   },
   // Criar estabelecimento
   async create(data: EstabelecimentoData): Promise<any> {
+    // 🔒 PROTEÇÃO: Bloquear requisições duplicadas
+    if (isCreatingEstablishment) {
+      console.warn('⚠️ Criação já em andamento, bloqueando requisição duplicada');
+      throw new Error('Já existe uma criação de estabelecimento em andamento. Por favor, aguarde.');
+    }
+    
     if (!data.nome) {
       throw new Error('O nome do estabelecimento é obrigatório');
     }
 
-    // ✅ TENTAR ONLINE PRIMEIRO
-    if (navigator.onLine) {
-      try {
-        const payload = formatToBackend(data, false);
-        console.log('Payload create:', payload);
-        
-        const response = await api.post("/", payload);
-        console.log('✅ Estabelecimento criado online');
-        return response.data;
-      } catch (error) {
-        console.warn('Falha ao criar estabelecimento online, salvando offline:', error);
+    try {
+      isCreatingEstablishment = true; // Bloquear novas requisições
+      
+      // ✅ TENTAR ONLINE PRIMEIRO
+      if (navigator.onLine) {
+        try {
+          const payload = formatToBackend(data, false);
+          console.log('📤 Enviando payload create:', payload);
+          
+          const response = await api.post("/", payload);
+          console.log('✅ Estabelecimento criado online com sucesso');
+          return response.data;
+        } catch (error) {
+          console.warn('⚠️ Falha ao criar estabelecimento online, salvando offline:', error);
+          // Se falhar online, tentar offline
+        }
       }
-    }
 
-    // ✅ FALLBACK OFFLINE
-    console.log('📱 Salvando estabelecimento offline...');
-    return await syncService.saveEstabelecimento(data);
+      // ✅ FALLBACK OFFLINE
+      console.log('📱 Salvando estabelecimento offline...');
+      return await syncService.saveEstabelecimento(data);
+      
+    } finally {
+      // Liberar o bloqueio após conclusão ou erro
+      setTimeout(() => {
+        isCreatingEstablishment = false;
+      }, 500); // Pequeno delay para evitar cliques muito rápidos
+    }
   },
 
   // Atualizar estabelecimento

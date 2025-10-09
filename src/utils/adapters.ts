@@ -3,6 +3,18 @@ interface EstabelecimentoGenerico {
   [key: string]: any; // Permite acessar qualquer propriedade
 }
 
+// 🎭 FUNÇÃO AUXILIAR: Formata CNPJ para o padrão com máscara
+const formatCNPJMask = (cnpj: string): string => {
+  // Remove tudo que não é dígito
+  const numbers = cnpj.replace(/\D/g, '');
+  
+  // Se não tiver 14 dígitos, retorna como está
+  if (numbers.length !== 14) return cnpj;
+  
+  // Aplica a máscara: XX.XXX.XXX/XXXX-XX
+  return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8, 12)}-${numbers.slice(12, 14)}`;
+};
+
 /**
  * Formata dados do backend para o formato esperado pelo frontend
  * @param backendData Dados recebidos da API
@@ -12,6 +24,11 @@ export const formatFromBackend = (backendData: EstabelecimentoGenerico): Estabel
   
   // Criar objeto base copiando todas as propriedades originais
   const formattedData: EstabelecimentoGenerico = { ...backendData };
+  
+  // 🎭 APLICAR MÁSCARA NO CNPJ vindo do backend
+  if (formattedData.cnpj && typeof formattedData.cnpj === 'string') {
+    formattedData.cnpj = formatCNPJMask(formattedData.cnpj);
+  }
   
   // Adicionar aliases para o frontend, garantindo que sejam números ou null
 if ('tipo_estabelecimento_idtipo_estabelecimento' in backendData) {
@@ -110,7 +127,12 @@ export const formatToBackend = (frontendData: EstabelecimentoGenerico, isUpdate:
   if ('codigo_unidade' in trimmedData) payload.codigo_unidade = trimmedData.codigo_unidade || '';
   if ('nome' in trimmedData) payload.nome = trimmedData.nome || '';
   if ('cnes' in trimmedData) payload.cnes = trimmedData.cnes || '';
-  if ('cnpj' in trimmedData) payload.cnpj = trimmedData.cnpj || '';
+  
+  // 🎭 REMOVER MÁSCARA DO CNPJ antes de enviar ao backend
+  if ('cnpj' in trimmedData) {
+    payload.cnpj = trimmedData.cnpj ? trimmedData.cnpj.replace(/\D/g, '') : '';
+  }
+  
   if ('cidade' in trimmedData) payload.cidade = trimmedData.cidade || '';
   if ('logradouro' in trimmedData) payload.logradouro = trimmedData.logradouro || '';
   if ('bairro' in trimmedData) payload.bairro = trimmedData.bairro || '';

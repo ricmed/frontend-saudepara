@@ -4,6 +4,25 @@ import FormField from "./FormField";
 import SectionTitle from "./SectionTitle";
 import { FIELD_LENGTHS } from "@/features/forms/utils/validations";
 
+// 🎭 FUNÇÃO DE MÁSCARA PARA CNPJ
+const formatCNPJ = (value: string): string => {
+  // Remove tudo que não é dígito
+  const numbers = value.replace(/\D/g, '');
+  
+  // Aplica a máscara: XX.XXX.XXX/XXXX-XX
+  if (numbers.length <= 2) {
+    return numbers;
+  } else if (numbers.length <= 5) {
+    return `${numbers.slice(0, 2)}.${numbers.slice(2)}`;
+  } else if (numbers.length <= 8) {
+    return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5)}`;
+  } else if (numbers.length <= 12) {
+    return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8)}`;
+  } else {
+    return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8, 12)}-${numbers.slice(12, 14)}`;
+  }
+};
+
 interface EstabelecimentoData {
   id?: number;
   codigo_unidade: string;
@@ -37,6 +56,26 @@ const PrimaryData: React.FC<DadosPrincipaisProps> = ({
   handleInputChange,
   fieldErrors,
 }) => {
+  // 🎭 Handler especial para CNPJ com máscara
+  const handleCNPJChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    // Verifica se é um input (tem propriedade value)
+    if ('value' in e.target) {
+      const formatted = formatCNPJ(e.target.value);
+      
+      // Criar evento sintético com o valor formatado
+      const syntheticEvent = {
+        ...e,
+        target: {
+          ...e.target,
+          value: formatted,
+          name: 'cnpj'
+        }
+      } as React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>;
+      
+      handleInputChange(syntheticEvent);
+    }
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm p-6 transition-shadow hover:shadow-md">
       <SectionTitle
@@ -75,10 +114,10 @@ const PrimaryData: React.FC<DadosPrincipaisProps> = ({
         <FormField
           label="CNPJ"
           name="cnpj"
-          maxLength={FIELD_LENGTHS.CNPJ}
-          placeholder="Ex.: 00.000.000/0000-00"
+          maxLength={18} // Tamanho com máscara: XX.XXX.XXX/XXXX-XX
+          placeholder="00.000.000/0000-00"
           value={estabelecimento.cnpj}
-          onChange={handleInputChange}
+          onChange={handleCNPJChange}
           error={fieldErrors.cnpj}
         />
       </div>
