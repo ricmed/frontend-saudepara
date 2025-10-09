@@ -176,11 +176,42 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
       if (!navigator.onLine) {
         console.log('📱 Modo offline: buscando estabelecimentos em cache...');
         
-        const cachedEstabelecimentos = await indexedDBService.getOpcoes('estabelecimentos');
+        // ✅ PRIMEIRO: Tentar buscar da chave 'estabelecimentos-permitidos' (filtrados no download)
+        let cachedEstabelecimentos = await indexedDBService.getOpcoes('estabelecimentos-permitidos');
+        
+        if (!cachedEstabelecimentos || cachedEstabelecimentos.length === 0) {
+          console.warn('⚠️ Cache "estabelecimentos-permitidos" vazio, tentando cache geral...');
+          // Fallback para cache geral (menos seguro, mas melhor que nada)
+          cachedEstabelecimentos = await indexedDBService.getOpcoes('estabelecimentos');
+        }
         
         if (cachedEstabelecimentos && cachedEstabelecimentos.length > 0) {
+          console.log(`📦 Cache offline carregado: ${cachedEstabelecimentos.length} estabelecimentos`);
+          
+          // ✅ IMPORTANTE: Se temos lista de permitidos (allowedOptions ou allowedEstablishmentIds),
+          // filtrar APENAS pelos estabelecimentos permitidos no cache
+          let estabelecimentosParaFiltrar = cachedEstabelecimentos;
+          
+          if (restrictToAllowed) {
+            if (allowedOptions && allowedOptions.length > 0) {
+              const allowedIds = allowedOptions.map(o => o.idestabelecimento);
+              estabelecimentosParaFiltrar = cachedEstabelecimentos.filter((est: any) => 
+                allowedIds.includes(est.idestabelecimento)
+              );
+              console.log(`🔒 Filtro hierárquico offline (allowedOptions): ${estabelecimentosParaFiltrar.length} de ${cachedEstabelecimentos.length} estabelecimentos permitidos`);
+            } else if (allowedEstablishmentIds && allowedEstablishmentIds.length > 0) {
+              estabelecimentosParaFiltrar = cachedEstabelecimentos.filter((est: any) => 
+                allowedEstablishmentIds.includes(est.idestabelecimento)
+              );
+              console.log(`🔒 Filtro por IDs offline: ${estabelecimentosParaFiltrar.length} de ${cachedEstabelecimentos.length} estabelecimentos permitidos`);
+            } else {
+              // Se restrictToAllowed está ativado mas não tem lista, significa que o cache já está filtrado
+              console.log(`✅ Cache já filtrado hierarquicamente: ${estabelecimentosParaFiltrar.length} estabelecimentos`);
+            }
+          }
+          
           // ✅ FILTRAR LOCALMENTE PELOS PARÂMETROS DE BUSCA
-          estabelecimentosAtivos = cachedEstabelecimentos.filter((est: any) => {
+          estabelecimentosAtivos = estabelecimentosParaFiltrar.filter((est: any) => {
             let matches = true;
             
             // Filtrar por busca de texto
@@ -208,66 +239,103 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
           throw new Error('Nenhum estabelecimento encontrado offline. Baixe os dados primeiro.');
         }
       } else {
-        // ✅ MODO ONLINE: usar API normal com fallback
+        // ✅ MODO ONLINE: PRIORIZAR CACHE FILTRADO para respeitar hierarquia
         try {
-          // Preparar parâmetros para a API
-          const params: any = {
-            limit: 11000, // Buscar todas as unidades disponíveis
-            orderBy: 'nome',
-            orderDir: 'asc',
-            ativo: 'S'
-          };
+          // 🔑 PRIMEIRO: Tentar buscar do cache 'estabelecimentos-permitidos' (filtrados hierarquicamente)
+          console.log('🌐 Modo online: verificando cache filtrado primeiro...');
+          let cachedEstabelecimentos = await indexedDBService.getOpcoes('estabelecimentos-permitidos');
           
-          // Se houver um termo de busca, adicionar aos parâmetros
-          if (searchTerm) {
-            params.search = searchTerm;
-            params.searchField = 'nome';
-          }
-          
-          console.log('Buscando estabelecimentos com params:', params);
-          
-          // URL da API usando variáveis de ambiente
-          const apiUrl = `${API_BASE_URL}/estabelecimentos`;
-          console.log('🌐 URL da API para busca de estabelecimentos:', apiUrl);
-          
-          // Fazer a requisição à API com a URL correta
-          const response = await axios.get(apiUrl, { 
-            params,
-            headers: {
-              'Accept': 'application/json'
-            }
-          });
-          
-          console.log('Resposta da API de estabelecimentos:', response);
-          
-          // A resposta do backend tem formato { data: [...], pagination: {...} }
-          if (response && response.data && response.data.data) {
-            // Adicional filtro no cliente para garantir apenas estabelecimentos ativos
-            estabelecimentosAtivos = response.data.data.filter((est: any) => 
-              est.ativo === 'S'
-            );
-          } else if (response && response.data && Array.isArray(response.data)) {
-            // Caso a API retorne diretamente um array (sem o wrapper data)
-            estabelecimentosAtivos = response.data.filter((est: any) => 
-              est.ativo === 'S'
-            );
-          } else {
-            console.warn('Formato de resposta inesperado:', response);
-            estabelecimentosAtivos = [];
-          }
-          
-          // ✅ SALVAR NO CACHE (só dados básicos, não busca específica)
-          if (searchTerm.length <= 5) {
-            const existingEstabelecimentos = await indexedDBService.getOpcoes('estabelecimentos') || [];
-            const mergedEstabelecimentos = [...existingEstabelecimentos];
+          if (cachedEstabelecimentos && cachedEstabelecimentos.length > 0) {
+            console.log(`✅ Cache filtrado encontrado: ${cachedEstabelecimentos.length} estabelecimentos permitidos`);
             
-            estabelecimentosAtivos.forEach((newEst: any) => {
-              if (!mergedEstabelecimentos.find((existing: any) => existing.idestabelecimento === newEst.idestabelecimento)) {
-                mergedEstabelecimentos.push(newEst);
+            // ✅ FILTRAR LOCALMENTE pelos parâmetros de busca
+            estabelecimentosAtivos = cachedEstabelecimentos.filter((est: any) => {
+              let matches = true;
+              
+              // Filtrar por busca de texto
+              if (searchTerm) {
+                const searchLower = searchTerm.toLowerCase();
+                const nome = (est.nome || '').toLowerCase();
+                matches = matches && nome.includes(searchLower);
+              }
+              
+              // Filtrar por ativo
+              matches = matches && est.ativo === 'S';
+              
+              return matches;
+            });
+            
+            // ✅ ORDENAR LOCALMENTE
+            estabelecimentosAtivos.sort((a: any, b: any) => {
+              const aVal = (a.nome || '').toLowerCase();
+              const bVal = (b.nome || '').toLowerCase();
+              return aVal.localeCompare(bVal);
+            });
+            
+            console.log(`✅ Estabelecimentos do cache filtrados pela busca: ${estabelecimentosAtivos.length} registros`);
+          } else {
+            // 🔄 FALLBACK: Se cache não existe, usar API (comportamento anterior)
+            console.warn('⚠️ Cache filtrado não encontrado, usando API direta (sem filtro hierárquico)');
+            
+            // Preparar parâmetros para a API
+            const params: any = {
+              limit: 11000,
+              orderBy: 'nome',
+              orderDir: 'asc',
+              ativo: 'S'
+            };
+            
+            // Se houver um termo de busca, adicionar aos parâmetros
+            if (searchTerm) {
+              params.search = searchTerm;
+              params.searchField = 'nome';
+            }
+            
+            console.log('Buscando estabelecimentos com params:', params);
+            
+            // URL da API usando variáveis de ambiente
+            const apiUrl = `${API_BASE_URL}/estabelecimentos`;
+            console.log('🌐 URL da API para busca de estabelecimentos:', apiUrl);
+          
+            // Fazer a requisição à API com a URL correta
+            const response = await axios.get(apiUrl, { 
+              params,
+              headers: {
+                'Accept': 'application/json'
               }
             });
             
-            await indexedDBService.saveOpcoes('estabelecimentos', mergedEstabelecimentos);
+            console.log('Resposta da API de estabelecimentos:', response);
+            
+            // A resposta do backend tem formato { data: [...], pagination: {...} }
+            if (response && response.data && response.data.data) {
+              // Adicional filtro no cliente para garantir apenas estabelecimentos ativos
+              estabelecimentosAtivos = response.data.data.filter((est: any) => 
+                est.ativo === 'S'
+              );
+            } else if (response && response.data && Array.isArray(response.data)) {
+              // Caso a API retorne diretamente um array (sem o wrapper data)
+              estabelecimentosAtivos = response.data.filter((est: any) => 
+                est.ativo === 'S'
+              );
+            } else {
+              console.warn('Formato de resposta inesperado:', response);
+              estabelecimentosAtivos = [];
+            }
+            
+            // ✅ SALVAR NO CACHE (só dados básicos, não busca específica)
+            if (searchTerm.length <= 5) {
+              const existingEstabelecimentos = await indexedDBService.getOpcoes('estabelecimentos') || [];
+              const mergedEstabelecimentos = [...existingEstabelecimentos];
+              
+              estabelecimentosAtivos.forEach((newEst: any) => {
+                if (!mergedEstabelecimentos.find((existing: any) => existing.idestabelecimento === newEst.idestabelecimento)) {
+                  mergedEstabelecimentos.push(newEst);
+                }
+              });
+              
+              await indexedDBService.saveOpcoes('estabelecimentos', mergedEstabelecimentos);
+            }
           }
           
         } catch (apiError: any) {
@@ -536,6 +604,83 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
       return () => clearTimeout(timer);
     }
   }, [searchQuery, isDropdownOpen]);
+
+  // 🎯 AUTO-SELEÇÃO: Para usuários de nível "unidade" com apenas 1 estabelecimento permitido
+  useEffect(() => {
+    const autoSelectSingleEstablishment = async () => {
+      console.log('🔍 useEffect auto-seleção executado:', {
+        value,
+        selectedEstabelecimento: selectedEstabelecimento?.nome,
+        allowedOptionsLength: allowedOptions?.length,
+        allowedIdsLength: allowedEstablishmentIds?.length,
+      });
+
+      // Só executar se campo ainda não tem valor
+      if (value || selectedEstabelecimento) {
+        console.log('⏭️ Campo já tem valor, pulando auto-seleção');
+        return;
+      }
+
+      let singleEstablishment: Estabelecimento | null = null;
+
+      // Cenário 1: allowedOptions com exatamente 1 item (modo online com permissões)
+      if (allowedOptions && allowedOptions.length === 1) {
+        singleEstablishment = allowedOptions[0];
+        console.log('🎯 Auto-seleção (online): 1 estabelecimento em allowedOptions:', singleEstablishment.nome);
+      }
+      // Cenário 2: allowedEstablishmentIds com exatamente 1 ID - buscar do cache
+      else if (allowedEstablishmentIds && allowedEstablishmentIds.length === 1) {
+        const singleId = allowedEstablishmentIds[0];
+        console.log('🎯 Auto-seleção (online): buscando estabelecimento ID', singleId, 'do cache...');
+        
+        // Tentar buscar do cache filtrado primeiro
+        try {
+          const cachedEstabelecimentos = await indexedDBService.getOpcoes('estabelecimentos-permitidos');
+          if (cachedEstabelecimentos && cachedEstabelecimentos.length > 0) {
+            singleEstablishment = cachedEstabelecimentos.find((est: any) => 
+              est.idestabelecimento === singleId
+            ) || null;
+            
+            if (singleEstablishment) {
+              console.log('✅ Estabelecimento encontrado no cache filtrado:', singleEstablishment.nome);
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ Erro ao buscar do cache para auto-seleção:', error);
+        }
+      }
+      // Cenário 3: MODO OFFLINE - props vazias, buscar direto do cache 'estabelecimentos-permitidos'
+      else if ((!allowedOptions || allowedOptions.length === 0) && (!allowedEstablishmentIds || allowedEstablishmentIds.length === 0)) {
+        console.log('🎯 Auto-seleção (offline): verificando cache estabelecimentos-permitidos...');
+        try {
+          const cachedEstabelecimentos = await indexedDBService.getOpcoes('estabelecimentos-permitidos');
+          
+          if (cachedEstabelecimentos && cachedEstabelecimentos.length === 1) {
+            singleEstablishment = cachedEstabelecimentos[0] as Estabelecimento;
+            console.log('✅ Cache offline tem exatamente 1 estabelecimento:', singleEstablishment.nome);
+          } else if (cachedEstabelecimentos && cachedEstabelecimentos.length > 1) {
+            console.log(`⚠️ Cache offline tem ${cachedEstabelecimentos.length} estabelecimentos - não auto-selecionar`);
+          } else {
+            console.log('⚠️ Cache offline vazio ou não encontrado');
+          }
+        } catch (error) {
+          console.warn('⚠️ Erro ao buscar cache offline para auto-seleção:', error);
+        }
+      } else {
+        console.log('⏭️ Nenhum cenário de auto-seleção aplicável');
+      }
+
+      // Se encontramos um único estabelecimento, selecionar automaticamente
+      if (singleEstablishment) {
+        console.log('✅ AUTO-SELECIONANDO estabelecimento único:', singleEstablishment.nome);
+        setDisplayValue(singleEstablishment.nome);
+        setSelectedEstabelecimento(singleEstablishment);
+        onChange(singleEstablishment.idestabelecimento.toString());
+      }
+    };
+
+    autoSelectSingleEstablishment();
+  }, [allowedOptions, allowedEstablishmentIds, value, selectedEstabelecimento, onChange]); // Executar quando props mudarem
 
   const handleFocus = () => {
     // Store current scroll position

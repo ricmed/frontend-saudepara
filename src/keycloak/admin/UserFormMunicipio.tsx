@@ -550,7 +550,8 @@ const UserFormMunicipio: React.FC = () => {
           firstName: formData.firstName,
           lastName: formData.lastName,
           email: formData.email,
-          password: formData.password!
+          password: formData.password!,
+          enabled: true // Usuário habilitado por padrão
         };
 
         console.log('📤 Dados para criação:', createRequest);

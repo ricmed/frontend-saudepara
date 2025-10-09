@@ -2,6 +2,7 @@ import { PacienteService } from '@/services/PacienteService';
 import { EstabelecimentoFormService } from '@/services/EstabelecimentoFormService';
 import indexedDBService from '@/services/indexedDB';
 import { toast } from 'react-toastify';
+import axios from 'axios';
 
 export interface DataSource {
   key: string;
@@ -222,11 +223,83 @@ class OfflineDataManager {
     },
     { 
       key: 'estabelecimentos', 
-      name: 'Estabelecimentos', 
-      fetchFn: createDirectApiFetch('estabelecimentos', 11000), // Aumentado para 11000
+      name: 'Estabelecimentos (Filtrados por Acesso)', 
+      fetchFn: async () => {
+        console.log('📥 Baixando estabelecimentos com filtro hierárquico...');
+        
+        try {
+          // ✅ USAR O ENDPOINT ESPECÍFICO QUE JÁ APLICA O FILTRO HIERÁRQUICO
+          // O endpoint /api/usuario-acesso/current/estabelecimentos retorna apenas
+          // os estabelecimentos que o usuário autenticado tem permissão de acessar
+          const server = import.meta.env.VITE_API_SERVER;
+          const port = import.meta.env.VITE_API_PORT;
+          const url = `${server}:${port}/api/usuario-acesso/current/estabelecimentos`;
+          
+          console.log('🌐 Buscando estabelecimentos com autenticação:', url);
+          
+          // ✅ USAR AXIOS COM CONFIGURAÇÃO COMPLETA (igual aos outros serviços)
+          const response = await axios.get(url, {
+            withCredentials: true, // Enviar cookies de autenticação
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            },
+            timeout: 30000 // 30 segundos de timeout
+          });
+          
+          // A resposta do backend tem formato { status: 'success', data: [...], pagination: {...} }
+          const estabelecimentos = response?.data?.data || response?.data || [];
+          
+          console.log(`✅ Estabelecimentos filtrados pelo backend: ${estabelecimentos.length}`);
+          console.log(`🔑 O backend já aplicou o filtro hierárquico baseado no nível de acesso do usuário`);
+          
+          // Log de exemplo para verificar o filtro
+          if (estabelecimentos.length > 0) {
+            console.log(`📊 Amostra dos estabelecimentos permitidos:`, {
+              total: estabelecimentos.length,
+              primeiro: {
+                id: estabelecimentos[0].idestabelecimento,
+                nome: estabelecimentos[0].nome,
+                municipio: estabelecimentos[0].tipo_municipio?.descricao || estabelecimentos[0].cidade
+              },
+              ultimo: estabelecimentos.length > 1 ? {
+                id: estabelecimentos[estabelecimentos.length - 1].idestabelecimento,
+                nome: estabelecimentos[estabelecimentos.length - 1].nome,
+                municipio: estabelecimentos[estabelecimentos.length - 1].tipo_municipio?.descricao || estabelecimentos[estabelecimentos.length - 1].cidade
+              } : null
+            });
+          }
+          
+          // ⚠️ IMPORTANTE: Salvar em chave SEPARADA para não misturar com cache antigo
+          // Esta chave será usada no modo offline
+          await indexedDBService.saveOpcoes('estabelecimentos-permitidos', estabelecimentos);
+          console.log(`💾 Estabelecimentos salvos na chave 'estabelecimentos-permitidos' para uso offline`);
+          
+          return estabelecimentos;
+          
+        } catch (error: any) {
+          console.error('❌ Erro ao buscar estabelecimentos com filtro hierárquico:', error);
+          
+          // Log detalhado do erro
+          if (error.response) {
+            console.error('Erro da API:', {
+              status: error.response.status,
+              statusText: error.response.statusText,
+              data: error.response.data
+            });
+          } else if (error.request) {
+            console.error('Erro de rede - nenhuma resposta recebida');
+          } else {
+            console.error('Erro:', error.message);
+          }
+          
+          throw error;
+        }
+      },
       priority: 3, 
       estimatedSize: 11000,
-      category: 'administrative'    },    // ✅ CORRIGIDO: DADOS DE PACIENTES PARA VERIFICAÇÃO (não sincronizar)
+      category: 'administrative'
+    },    // ✅ CORRIGIDO: DADOS DE PACIENTES PARA VERIFICAÇÃO (não sincronizar)
     { 
       key: 'pacientes-verificacao', 
       name: 'Lista de Pacientes (Verificação CPF)', 
@@ -443,6 +516,15 @@ class OfflineDataManager {
   }
 
   async downloadAllData(onProgress?: (progress: number, current: string, completed: number, total: number) => void) {
+    // ✅ LIMPAR CACHE DE ESTABELECIMENTOS ANTES DE BAIXAR (para evitar mistura de dados antigos)
+    console.log('🧹 Limpando cache de estabelecimentos antigo antes do download...');
+    try {
+      await indexedDBService.saveOpcoes('estabelecimentos', []);
+      console.log('✅ Cache de estabelecimentos limpo');
+    } catch (error) {
+      console.warn('⚠️ Erro ao limpar cache de estabelecimentos:', error);
+    }
+    
     toast.info('🔄 Baixando todos os dados offline...');
     const result = await this.downloadDataWithPriority(
       (prog, curr, comp, tot) => onProgress?.(prog, curr, comp, tot)

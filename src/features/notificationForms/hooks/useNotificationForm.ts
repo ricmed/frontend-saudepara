@@ -674,7 +674,12 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         indexedDBService.getOpcoes('hipoteses'),
         indexedDBService.getOpcoes('traumas'),
         indexedDBService.getOpcoes('encerramentos'),
-        indexedDBService.getOpcoes('estabelecimentos'),
+        // ✅ BUSCAR ESTABELECIMENTOS FILTRADOS HIERARQUICAMENTE (salvos no download)
+        indexedDBService.getOpcoes('estabelecimentos-permitidos').then(permitidos => 
+          permitidos && permitidos.length > 0 
+            ? permitidos 
+            : indexedDBService.getOpcoes('estabelecimentos') // Fallback para cache antigo
+        ),
       ]);
 
       // Verificar se temos dados essenciais
@@ -850,7 +855,9 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
       if (estabelecimentos) {
         setEstabelecimentoOptions(convertOptionsToUpperCase(estabelecimentos));
-        console.log(`✅ Estabelecimentos carregados do cache: ${estabelecimentos.length}`);
+        console.log(`✅ Estabelecimentos carregados do cache: ${estabelecimentos.length} (chave: estabelecimentos-permitidos)`);
+      } else {
+        console.warn('⚠️ Nenhum estabelecimento encontrado no cache');
       }
 
       console.log('✅ Todos os dados foram carregados do cache offline');

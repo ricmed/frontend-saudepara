@@ -50,6 +50,7 @@ export interface CreateUsuarioRequest {
   firstName?: string;
   lastName?: string;
   password: string;
+  enabled?: boolean; // Definir se o usuário estará habilitado ao ser criado
 }
 
 export interface CreateUsuarioAcessoRequest {
