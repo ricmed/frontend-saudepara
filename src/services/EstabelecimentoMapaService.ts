@@ -1,4 +1,5 @@
 import axios, { AxiosError } from 'axios';
+import { Local } from '../features/maps/leaflet/types';
 
 const server = import.meta.env.VITE_API_SERVER;
 const port = import.meta.env.VITE_API_PORT;
@@ -45,24 +46,6 @@ export interface EstabelecimentoMapa {
       descricao: string;
     };
   }>;
-}
-
-// Interface para o tipo Local usado no mapa
-export interface Local {
-  id: string;
-  nome: string;
-  lat: number;
-  lng: number;
-  endereco?: string;
-  habilitacoes: string[];
-  qualificacoes: string[];
-  natureza: string;
-  turno: string;
-  cnes?: string;
-  cnpj?: string;
-  codigo_unidade?: string;
-  ativo: boolean;
-  tipoEstabelecimento?: string;
 }
 
 interface APIError {
@@ -127,6 +110,7 @@ const mapToLocal = (estabelecimento: EstabelecimentoMapa): Local => {
     codigo_unidade: '',
     ativo: true, // Já vem filtrado como ativo da API
     tipoEstabelecimento: estabelecimento.tipo_estabelecimento?.descricao || 'Não informado',
+    idestabelecimento: estabelecimento.idestabelecimento, // Necessário para dashboard
   };
 };
 

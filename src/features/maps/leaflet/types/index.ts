@@ -19,6 +19,8 @@ export interface Local {
   codigo_unidade?: string;
   ativo: boolean;
   tipoEstabelecimento?: string;
+  // ID original do estabelecimento para referência cruzada (necessário para dashboard)
+  idestabelecimento?: number;
 }
 
 export interface TempoViagem {

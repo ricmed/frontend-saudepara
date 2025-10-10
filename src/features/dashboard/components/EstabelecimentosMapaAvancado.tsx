@@ -43,6 +43,11 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
   notificacoes = [],
   exportOptions = {} // 🆕 Receber exportOptions
 }) => {
+  console.log('🏁 EstabelecimentosMapaAvancado renderizado:', {
+    notificacoesRecebidas: notificacoes.length,
+    temExportOptions: !!exportOptions
+  });
+
   const [estabelecimentos, setEstabelecimentos] = useState<EstabelecimentoInfo[]>([]);
   const [selectedEstabelecimento, setSelectedEstabelecimento] = useState<EstabelecimentoInfo | null>(null);
   const [showLayers, setShowLayers] = useState(true);
@@ -60,9 +65,16 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
 
   // Carregar estabelecimentos apenas uma vez
   useEffect(() => {
+    console.log('🔍 Verificando carga de estabelecimentos:', {
+      allPlacesLength: allPlaces.length,
+      isLoading
+    });
+    
     if (allPlaces.length === 0 && !isLoading) {
       console.log('🔄 Carregando estabelecimentos para o mapa...');
       carregarEstabelecimentos();
+    } else {
+      console.log('✅ Estabelecimentos já carregados ou em carregamento');
     }
   }, []); // Dependências vazias - carrega apenas uma vez
 
@@ -74,8 +86,12 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
 
   // Memoizar o mapa de estabelecimentos para evitar recriações
   const allPlacesMap = useMemo(() => {
-    if (!allPlaces || allPlaces.length === 0) return new Map();
+    if (!allPlaces || allPlaces.length === 0) {
+      console.log('⚠️ allPlaces vazio ou não disponível');
+      return new Map();
+    }
     
+    console.log(`📊 Criando mapa de ${allPlaces.length} estabelecimentos...`);
     const placesMap = new Map<string, typeof allPlaces[0]>();
     
     allPlaces.forEach(lugar => {
@@ -83,10 +99,13 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
       if (lugar.cnes && lugar.cnes !== String(lugar.id)) {
         placesMap.set(lugar.cnes, lugar);
       }
-      if ((lugar as any).idestabelecimento) {
-        placesMap.set(String((lugar as any).idestabelecimento), lugar);
+      if (lugar.idestabelecimento) {
+        placesMap.set(String(lugar.idestabelecimento), lugar);
       }
     });
+    
+    console.log(`✅ Mapa criado com ${placesMap.size} entradas`);
+    console.log(`📋 Primeiras 3 chaves do mapa:`, Array.from(placesMap.keys()).slice(0, 3));
     
     return placesMap;
   }, [allPlaces]);
@@ -100,15 +119,36 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
 
   // Processar estabelecimentos de forma memoizada
   const estabelecimentosProcessados = useMemo(() => {
+    console.log('🔄 Processando estabelecimentos...', {
+      allPlacesMapSize: allPlacesMap.size,
+      notificacoesLength: notificacoes.length
+    });
+    
     if (allPlacesMap.size === 0 || notificacoes.length === 0) {
+      console.log('⚠️ Retornando array vazio:', {
+        temEstabelecimentos: allPlacesMap.size > 0,
+        temNotificacoes: notificacoes.length > 0
+      });
       return [];
     }
 
     const estabelecimentosMap = new Map<string, EstabelecimentoInfo>();
+    let notificacoesProcessadas = 0;
+    let notificacoesComEstabelecimento = 0;
     
-    notificacoes.forEach((notificacao) => {
+    notificacoes.forEach((notificacao, index) => {
       const estabelecimentoId = notificacao?.original?.estabelecimento_idestabelecimento ||
                                notificacao?.estabelecimentoId;
+      
+      notificacoesProcessadas++;
+      
+      if (index < 3) {
+        console.log(`📋 Notificação ${index}:`, {
+          estabelecimentoIdCalculado: estabelecimentoId,
+          originalEstabelecimentoId: notificacao?.original?.estabelecimento_idestabelecimento,
+          estabelecimentoIdDireto: notificacao?.estabelecimentoId
+        });
+      }
       
       // 🚨 Verificar se é notificação compulsória (hipótese diagnóstica alarmante)
       let isCompulsoria = false;
@@ -140,7 +180,16 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
         const idStr = String(estabelecimentoId);
         const lugarInfo = allPlacesMap.get(idStr);
         
+        if (index < 3) {
+          console.log(`🔍 Buscando estabelecimento ${idStr}:`, {
+            encontrado: !!lugarInfo,
+            nome: lugarInfo?.nome
+          });
+        }
+        
         if (lugarInfo) {
+          notificacoesComEstabelecimento++;
+          
           if (estabelecimentosMap.has(idStr)) {
             const est = estabelecimentosMap.get(idStr)!;
             est.notificacoes += 1;
@@ -188,14 +237,31 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
       }
     });
 
-    return Array.from(estabelecimentosMap.values());
-  }, [allPlacesMap, notificacoes]);
+    console.log(`📊 Resumo do processamento:`, {
+      notificacoesProcessadas,
+      notificacoesComEstabelecimento,
+      estabelecimentosUnicos: estabelecimentosMap.size
+    });
+
+    const resultado = Array.from(estabelecimentosMap.values());
+    console.log(`✅ Retornando ${resultado.length} estabelecimentos processados`);
+    
+    return resultado;
+  }, [allPlacesMap, notificacoes, exportOptions]);
 
   // Atualizar estado apenas quando dados processados mudarem
   useEffect(() => {
+    console.log('🔄 Verificando atualização de estado:', {
+      estabelecimentosAtuais: estabelecimentos.length,
+      estabelecimentosProcessados: estabelecimentosProcessados.length,
+      saoIguais: JSON.stringify(estabelecimentos) === JSON.stringify(estabelecimentosProcessados)
+    });
+    
     if (JSON.stringify(estabelecimentos) !== JSON.stringify(estabelecimentosProcessados)) {
+      console.log(`✅ Atualizando estado: ${estabelecimentosProcessados.length} estabelecimentos`);
       setEstabelecimentos(estabelecimentosProcessados);
-      console.log(`✅ Estabelecimentos atualizados: ${estabelecimentosProcessados.length}`);
+    } else {
+      console.log('⏭️ Nenhuma atualização necessária - dados idênticos');
     }
   }, [estabelecimentosProcessados, estabelecimentos]);
 
