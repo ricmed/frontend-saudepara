@@ -1531,16 +1531,16 @@ const GeographicLocationPanel: React.FC<GeographicLocationPanelProps> = ({
   exportMenu
 }) => {
   return (
-    <div className="space-y-6" data-dashboard="geographic-location">
-      {/* Cabeçalho do painel */}
+    <div className="space-y-4" data-dashboard="geographic-location">
+      {/* Cabeçalho do painel - Compacto */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <div className="p-2 bg-blue-100 rounded-lg">
-            <MapPin className="h-6 w-6 text-blue-600" />
+            <MapPin className="h-5 w-5 text-blue-600" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">Localização Geográfica</h2>
-            <p className="text-sm text-gray-600">Distribuição dos casos por localização de residência</p>
+            <h2 className="text-lg font-bold text-gray-800">Localização Geográfica</h2>
+            <p className="text-xs text-gray-600">Distribuição por localização de residência</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -1562,58 +1562,57 @@ const GeographicLocationPanel: React.FC<GeographicLocationPanelProps> = ({
         </div>
       </div>
 
-      {/* Grade responsiva dos gráficos */}
-      <div className="space-y-6">
+      {/* Grade responsiva dos gráficos - Layout em 2 colunas */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Países - Gráfico Híbrido (Barras + Tabela) */}
-        <CountriesChartWithTable
-          data={paisData}
-          title="Países de Residência"
-          icon={<Globe className="h-5 w-5 text-blue-600" />}
-          onItemClick={onFilterClick}
-          filterCategory="pais"
-          activeFilter={activeFilters?.pais}
-        />
+        <div className="lg:col-span-1">
+          <CountriesChartWithTable
+            data={paisData}
+            title="Países de Residência"
+            icon={<Globe className="h-5 w-5 text-blue-600" />}
+            onItemClick={onFilterClick}
+            filterCategory="pais"
+            activeFilter={activeFilters?.pais}
+          />
+        </div>
 
-        {/* Grade para Estados, Municípios e Bairros */}
-        <div className="grid grid-cols-1 gap-6">
-          {/* Componente Híbrido - Estados/UF com Gráfico + Tabela */}
-          <div className="col-span-1">
-            <StatesChartWithTable
-              data={estadoData}
-              title="Estados/UF de Residência"
-              icon={<Building className="h-5 w-5 text-blue-600" />}
-              onItemClick={onFilterClick}
-              filterCategory="estado"
-              activeFilter={activeFilters?.estado}
-            />
-          </div>
+        {/* Componente Híbrido - Estados/UF com Gráfico + Tabela */}
+        <div className="lg:col-span-1">
+          <StatesChartWithTable
+            data={estadoData}
+            title="Estados/UF de Residência"
+            icon={<Building className="h-5 w-5 text-blue-600" />}
+            onItemClick={onFilterClick}
+            filterCategory="estado"
+            activeFilter={activeFilters?.estado}
+          />
+        </div>
 
-          {/* Componente Híbrido - Municípios com Gráfico + Tabela */}
-          <div className="col-span-1">
-            <MunicipalitiesChartWithTable
-              data={municipioData}
-              title="Municípios de Residência"
-              icon={<Building className="h-5 w-5 text-green-600" />}
-              onItemClick={onFilterClick}
-              filterCategory="municipio"
-              activeFilter={activeFilters?.municipio}
-              stateFilter={activeFilters?.estado} // Passa o filtro de estado ativo
-            />
-          </div>
+        {/* Componente Híbrido - Municípios com Gráfico + Tabela */}
+        <div className="lg:col-span-1">
+          <MunicipalitiesChartWithTable
+            data={municipioData}
+            title="Municípios de Residência"
+            icon={<Building className="h-5 w-5 text-green-600" />}
+            onItemClick={onFilterClick}
+            filterCategory="municipio"
+            activeFilter={activeFilters?.municipio}
+            stateFilter={activeFilters?.estado} // Passa o filtro de estado ativo
+          />
+        </div>
 
-          {/* Componente Híbrido - Bairros com Gráfico + Tabela */}
-          <div className="col-span-1">
-            <NeighborhoodsChartWithTable
-              data={bairroData}
-              title="Bairros de Residência"
-              icon={<Home className="h-5 w-5 text-purple-600" />}
-              onItemClick={onFilterClick}
-              filterCategory="bairro"
-              activeFilter={activeFilters?.bairro}
-              municipalityFilter={activeFilters?.municipio} // Passa o filtro de município ativo
-              stateFilter={activeFilters?.estado} // Passa o filtro de estado ativo
-            />
-          </div>
+        {/* Componente Híbrido - Bairros com Gráfico + Tabela */}
+        <div className="lg:col-span-1">
+          <NeighborhoodsChartWithTable
+            data={bairroData}
+            title="Bairros de Residência"
+            icon={<Home className="h-5 w-5 text-purple-600" />}
+            onItemClick={onFilterClick}
+            filterCategory="bairro"
+            activeFilter={activeFilters?.bairro}
+            municipalityFilter={activeFilters?.municipio} // Passa o filtro de município ativo
+            stateFilter={activeFilters?.estado} // Passa o filtro de estado ativo
+          />
         </div>
       </div>
 

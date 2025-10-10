@@ -1117,76 +1117,74 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   // Usar a função para obter quais gráficos devem ser visíveis
   const visibleCharts = getVisibleCharts();
 
-  // 🆕 FUNÇÃO PARA CALCULAR O LAYOUT DO GRID DINAMICAMENTE
+  // FUNÇÃO PARA LAYOUT DO GRID - 8 colunas fixas (4 gráficos por linha em telas grandes)
   const getGridLayout = useCallback(() => {
-    // SEMPRE manter o layout de 5 colunas para que os gráficos possam se expandir
-    // O que muda são os spans individuais, não o grid total
-    return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 mt-2";
-  }, [visibleCharts]);
+    return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3 sm:gap-4 mt-2";
+  }, []);
 
-  // 🆕 FUNÇÃO PARA CALCULAR SPANS DOS GRÁFICOS DINAMICAMENTE  
+  // FUNÇÃO PARA CALCULAR SPANS DOS GRÁFICOS - Grid de 8 colunas (Sintomas 2, Trauma 2, Hipóteses 4)
   const getChartSpans = useCallback(() => {
     const { trauma, sintomas, hipoteses } = visibleCharts;
     
-    // CASO 1: Todos os 3 gráficos visíveis (layout padrão)
+    // CASO 1: Todos os 3 gráficos visíveis - Sintomas (2) + Trauma (2) + Hipóteses (4) = 8 cols
     if (trauma && sintomas && hipoteses) {
       return {
-        sintomas: "md:col-span-2 lg:col-span-3", // 3/5 colunas
-        trauma: "md:col-span-2 lg:col-span-2",   // 2/5 colunas  
-        hipoteses: "md:col-span-2 lg:col-span-5" // 5/5 colunas (próxima linha)
+        sintomas: "md:col-span-2 lg:col-span-2 xl:col-span-2",   // 2/8 colunas
+        trauma: "md:col-span-2 lg:col-span-2 xl:col-span-2",     // 2/8 colunas  
+        hipoteses: "md:col-span-2 lg:col-span-4 xl:col-span-4"   // 4/8 colunas (mais espaço para nomes longos)
       };
     }
     
     // CASO 2: CLÍNICO - só sintomas + hipóteses (sem trauma)
     if (!trauma && sintomas && hipoteses) {
       return {
-        sintomas: "md:col-span-2 lg:col-span-5",  // ocupa TODO o espaço da primeira linha (3+2=5)
-        trauma: "md:col-span-2 lg:col-span-2",    // não usado
-        hipoteses: "md:col-span-2 lg:col-span-5"  // mantém linha inteira
+        sintomas: "md:col-span-2 lg:col-span-4 xl:col-span-4",  // 4/8 colunas
+        trauma: "md:col-span-2 lg:col-span-2 xl:col-span-2",    // não usado
+        hipoteses: "md:col-span-2 lg:col-span-4 xl:col-span-4"  // 4/8 colunas
       };
     }
     
     // CASO 3: TRAUMA/MÚLTIPLAS - só trauma (sem sintomas e hipóteses)  
     if (trauma && !sintomas && !hipoteses) {
       return {
-        sintomas: "md:col-span-2 lg:col-span-3",  // não usado
-        trauma: "md:col-span-2 lg:col-span-5",    // ocupa linha inteira (2+3=5)
-        hipoteses: "md:col-span-2 lg:col-span-5"  // não usado
+        sintomas: "md:col-span-2 lg:col-span-2 xl:col-span-2",  // não usado
+        trauma: "md:col-span-2 lg:col-span-4 xl:col-span-8",    // linha inteira 8/8
+        hipoteses: "md:col-span-2 lg:col-span-2 xl:col-span-2"  // não usado
       };
     }
     
     // CASO 4: Outros casos de 2 gráficos
     if ((trauma && sintomas && !hipoteses) || (trauma && !sintomas && hipoteses)) {
       return {
-        sintomas: "md:col-span-2 lg:col-span-3",  // expande se visível
-        trauma: "md:col-span-2 lg:col-span-2",    // mantém tamanho se visível
-        hipoteses: "md:col-span-2 lg:col-span-5"  // linha inteira se visível
+        sintomas: "md:col-span-2 lg:col-span-4 xl:col-span-4",  // 4/8 colunas
+        trauma: "md:col-span-2 lg:col-span-2 xl:col-span-2",    // 2/8 colunas
+        hipoteses: "md:col-span-2 lg:col-span-4 xl:col-span-4"  // 4/8 colunas
       };
     }
     
     // CASO 5: Apenas sintomas
     if (!trauma && sintomas && !hipoteses) {
       return {
-        sintomas: "md:col-span-2 lg:col-span-5",  // linha inteira
-        trauma: "md:col-span-2 lg:col-span-2",
-        hipoteses: "md:col-span-2 lg:col-span-5"
+        sintomas: "md:col-span-2 lg:col-span-4 xl:col-span-8",  // linha inteira 8/8
+        trauma: "md:col-span-2 lg:col-span-2 xl:col-span-2",
+        hipoteses: "md:col-span-2 lg:col-span-2 xl:col-span-2"
       };
     }
     
     // CASO 6: Apenas hipóteses  
     if (!trauma && !sintomas && hipoteses) {
       return {
-        sintomas: "md:col-span-2 lg:col-span-3",
-        trauma: "md:col-span-2 lg:col-span-2",
-        hipoteses: "md:col-span-2 lg:col-span-5"  // já ocupa linha inteira
+        sintomas: "md:col-span-2 lg:col-span-2 xl:col-span-2",
+        trauma: "md:col-span-2 lg:col-span-2 xl:col-span-2",
+        hipoteses: "md:col-span-2 lg:col-span-4 xl:col-span-8"  // linha inteira 8/8
       };
     }
     
     // Padrão (fallback)
     return {
-      sintomas: "md:col-span-2 lg:col-span-3",
-      trauma: "md:col-span-2 lg:col-span-2", 
-      hipoteses: "md:col-span-2 lg:col-span-5"
+      sintomas: "md:col-span-2 lg:col-span-2 xl:col-span-2",
+      trauma: "md:col-span-2 lg:col-span-2 xl:col-span-2", 
+      hipoteses: "md:col-span-2 lg:col-span-4 xl:col-span-4"
     };
   }, [visibleCharts]);
 
@@ -1828,12 +1826,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         COLORS.blue,
         'normal'
       );
-      if (racaPorNotificacao.length > 0) {
-        setFilteredRaca(racaPorNotificacao);
-        // Se for a primeira vez, armazenar como original também
-        if (originalRaca.length === 0) {
-          setOriginalRaca(racaPorNotificacao);
-        }
+      // Sempre atualizar, mesmo se estiver vazio
+      setFilteredRaca(racaPorNotificacao);
+      if (racaPorNotificacao.length > 0 && originalRaca.length === 0) {
+        setOriginalRaca(racaPorNotificacao);
       }
 
       const escolaridadePorNotificacao = processarCategoria(
@@ -1845,11 +1841,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         COLORS.blue,
         'normal'
       );
-      if (escolaridadePorNotificacao.length > 0) {
-        setFilteredEscolaridade(escolaridadePorNotificacao);
-        if (originalEscolaridade.length === 0) {
-          setOriginalEscolaridade(escolaridadePorNotificacao);
-        }
+      // Sempre atualizar, mesmo se estiver vazio
+      setFilteredEscolaridade(escolaridadePorNotificacao);
+      if (escolaridadePorNotificacao.length > 0 && originalEscolaridade.length === 0) {
+        setOriginalEscolaridade(escolaridadePorNotificacao);
       }
 
       const unidadesPorNotificacao = processarCategoria(
@@ -1861,11 +1856,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         COLORS.blue,
         'normal'
       );
-      if (unidadesPorNotificacao.length > 0) {
-        setFilteredUnidades(unidadesPorNotificacao);
-        if (originalUnidades.length === 0) {
-          setOriginalUnidades(unidadesPorNotificacao);
-        }
+      // Sempre atualizar, mesmo se estiver vazio
+      setFilteredUnidades(unidadesPorNotificacao);
+      if (unidadesPorNotificacao.length > 0 && originalUnidades.length === 0) {
+        setOriginalUnidades(unidadesPorNotificacao);
       }
 
       // Gênero como gráfico de pizza - usar paleta pie
@@ -1878,11 +1872,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         COLORS.pie,
         'pie'
       );
-      if (generoPorNotificacao.length > 0) {
-        setFilteredGenero(generoPorNotificacao);
-        if (originalGenero.length === 0) {
-          setOriginalGenero(generoPorNotificacao);
-        }
+      // Sempre atualizar, mesmo se estiver vazio
+      setFilteredGenero(generoPorNotificacao);
+      if (generoPorNotificacao.length > 0 && originalGenero.length === 0) {
+        setOriginalGenero(generoPorNotificacao);
       }
 
       const sintomasPorNotificacao = processarCategoriaMuitosParaMuitos(
@@ -1895,11 +1888,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         COLORS.blue,
         'normal'
       );
-      if (sintomasPorNotificacao.length > 0) {
-        setFilteredSintomas(sintomasPorNotificacao);
-        if (originalSintomas.length === 0) {
-          setOriginalSintomas(sintomasPorNotificacao);
-        }
+      // Sempre atualizar, mesmo se estiver vazio
+      setFilteredSintomas(sintomasPorNotificacao);
+      if (sintomasPorNotificacao.length > 0 && originalSintomas.length === 0) {
+        setOriginalSintomas(sintomasPorNotificacao);
       }
 
       const atendimentoPorNotificacao = processarCategoria(
@@ -1911,11 +1903,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         COLORS.blue,
         'normal'
       );
-      if (atendimentoPorNotificacao.length > 0) {
-        setFilteredTipoAtendimento(atendimentoPorNotificacao);
-        if (originalTipoAtendimento.length === 0) {
-          setOriginalTipoAtendimento(atendimentoPorNotificacao);
-        }
+      // Sempre atualizar, mesmo se estiver vazio
+      setFilteredTipoAtendimento(atendimentoPorNotificacao);
+      if (atendimentoPorNotificacao.length > 0 && originalTipoAtendimento.length === 0) {
+        setOriginalTipoAtendimento(atendimentoPorNotificacao);
       }
 
       // Público como gráfico de rosca - usar paleta pie
@@ -1928,11 +1919,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         COLORS.pie,
         'pie'
       );
-      if (publicoPorNotificacao.length > 0) {
-        setFilteredPublico(publicoPorNotificacao);
-        if (originalPublico.length === 0) {
-          setOriginalPublico(publicoPorNotificacao);
-        }
+      // Sempre atualizar, mesmo se estiver vazio
+      setFilteredPublico(publicoPorNotificacao);
+      if (publicoPorNotificacao.length > 0 && originalPublico.length === 0) {
+        setOriginalPublico(publicoPorNotificacao);
       }
 
       const hipotesePorNotificacao = processarCategoria(
@@ -1958,6 +1948,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         if (originalHipoteses.length === 0) {
           setOriginalHipoteses(sortedHipoteses);
         }
+      } else {
+        // Se não houver hipóteses, limpar o array
+        setFilteredHipoteses([]);
       }
       
       // Verificar se há notificações com trauma - agora usando o relacionamento many-to-many
@@ -1979,11 +1972,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         COLORS.trauma,
         'normal'
       );
-      if (traumaPorNotificacao.length > 0) {
-        setFilteredTrauma(traumaPorNotificacao);
-        if (originalTrauma.length === 0) {
-          setOriginalTrauma(traumaPorNotificacao);
-        }
+      // Sempre atualizar, mesmo se estiver vazio
+      setFilteredTrauma(traumaPorNotificacao);
+      if (traumaPorNotificacao.length > 0 && originalTrauma.length === 0) {
+        setOriginalTrauma(traumaPorNotificacao);
       }
       
       // 🆕 PROCESSAMENTO DOS DADOS DE LOCALIZAÇÃO GEOGRÁFICA
@@ -2000,12 +1992,11 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         "idtipo_pais",
         "descricao"
       );
-      if (paisPorNotificacao.length > 0) {
-        console.log("🏳️ Países com dados:", paisPorNotificacao.map(p => `${p.name} (${p.value})`));
-        setFilteredPais(paisPorNotificacao);
-        if (originalPais.length === 0) {
-          setOriginalPais(paisPorNotificacao);
-        }
+      // Sempre atualizar, mesmo se estiver vazio
+      console.log("🏳️ Países com dados:", paisPorNotificacao.map(p => `${p.name} (${p.value})`));
+      setFilteredPais(paisPorNotificacao);
+      if (paisPorNotificacao.length > 0 && originalPais.length === 0) {
+        setOriginalPais(paisPorNotificacao);
       }
 
       // Estado/UF de residência com cores características dos estados brasileiros
@@ -2016,11 +2007,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         "idtipo_estado", 
         "descricao"
       );
-      if (estadoPorNotificacao.length > 0) {
-        setFilteredEstado(estadoPorNotificacao);
-        if (originalEstado.length === 0) {
-          setOriginalEstado(estadoPorNotificacao);
-        }
+      // Sempre atualizar, mesmo se estiver vazio
+      setFilteredEstado(estadoPorNotificacao);
+      if (estadoPorNotificacao.length > 0 && originalEstado.length === 0) {
+        setOriginalEstado(estadoPorNotificacao);
       }
 
       // Municípios de residência
@@ -2033,12 +2023,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         COLORS.blue,
         'normal'
       );
-      
-      if (municipioPorNotificacao.length > 0) {
-        setFilteredMunicipio(municipioPorNotificacao);
-        if (originalMunicipio.length === 0) {
-          setOriginalMunicipio(municipioPorNotificacao);
-        }
+      // Sempre atualizar, mesmo se estiver vazio
+      setFilteredMunicipio(municipioPorNotificacao);
+      if (municipioPorNotificacao.length > 0 && originalMunicipio.length === 0) {
+        setOriginalMunicipio(municipioPorNotificacao);
       }
 
       // Bairros de residência (específicos de Belém)
@@ -2051,11 +2039,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         COLORS.blue,
         'normal'
       );
-      if (bairroPorNotificacao.length > 0) {
-        setFilteredBairro(bairroPorNotificacao);
-        if (originalBairro.length === 0) {
-          setOriginalBairro(bairroPorNotificacao);
-        }
+      // Sempre atualizar, mesmo se estiver vazio
+      setFilteredBairro(bairroPorNotificacao);
+      if (bairroPorNotificacao.length > 0 && originalBairro.length === 0) {
+        setOriginalBairro(bairroPorNotificacao);
       }
       
       return true;
@@ -2680,11 +2667,31 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     }));
   }, []);
 
+  // FUNÇÃO: Obter classes de container
+  const getContainerClasses = useCallback(() => {
+    return 'min-h-screen bg-gray-100 text-gray-800 pb-6';
+  }, []);
+
+  // FUNÇÃO: Obter classes do header
+  const getHeaderClasses = useCallback(() => {
+    return 'bg-gradient-to-r from-blue-700 to-blue-900 p-3 sm:p-4 shadow-md sticky top-0 z-10';
+  }, []);
+
+  // FUNÇÃO: Verificar se deve esconder controles
+  const shouldHideControls = useCallback(() => {
+    return false;
+  }, []);
+
+  // FUNÇÃO: Obter max-width do container - Otimizado para 4 gráficos por linha (largura total)
+  const getMaxWidth = useCallback(() => {
+    return 'max-w-[1920px]'; // Largura total para aproveitar toda a tela
+  }, []);
+
   return (
-    <div data-dashboard="main" className="min-h-screen bg-gray-100 text-gray-800 pb-6">
+    <div data-dashboard="main" className={getContainerClasses()}>
       {/* Cabeçalho */}
-      <header className="bg-gradient-to-r from-blue-700 to-blue-900 p-3 sm:p-4 shadow-md sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
+      <header className={getHeaderClasses()}>
+        <div className={`mx-auto flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 ${getMaxWidth()}`}>
           <div className="flex items-center gap-2 sm:gap-3 text-white">
             <button
               className="p-1.5 sm:p-2 hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
@@ -2708,7 +2715,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                   Próxima em: {autoRefreshCountdown}s
                 </span>
               )}
-              {hasActiveFilters && (
+              {hasActiveFilters && !shouldHideControls() && (
                 <span className="ml-2 bg-blue-200 text-blue-800 px-2 py-1 rounded text-xs">
                   {Object.values(activeFilters).filter(f => f !== null).length} filtro(s)
                 </span>
@@ -2777,7 +2784,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       </header>
 
       {/* Seção de Filtros */}
-      <div className="max-w-7xl mx-auto mt-4 px-4">
+      <div className={`${getMaxWidth()} mx-auto mt-4 px-4`}>
         <div className="bg-white p-4 rounded-lg shadow-sm">
           <div className="flex flex-wrap gap-4 items-center mb-4">
             <div className="flex items-center gap-2 text-blue-800">
@@ -2977,50 +2984,46 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       {/* Conteúdo principal baseado na aba selecionada */}
       {activeTab === "graficos" && (
         <main
-          className={`max-w-7xl mx-auto p-2 sm:p-4 ${getGridLayout()}`}
+          className={`${getMaxWidth()} mx-auto p-2 sm:p-4 ${getGridLayout()}`}
         >
-          {/* 🆕 CARD PRINCIPAL: Seletor de Data de Notificação */}
-          <div className="bg-gradient-to-r from-indigo-500 to-blue-600 p-4 sm:p-6 rounded-lg shadow-lg text-white sm:col-span-2 lg:col-span-3 xl:col-span-5">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          {/* LINHA 1: Seletor de Data + Total de Notificações (Grid 8 colunas: 4+4) */}
+          
+          {/* Seletor de Data - 4 colunas */}
+          <div className="bg-gradient-to-r from-indigo-500 to-blue-600 p-4 rounded-lg shadow-lg text-white sm:col-span-2 lg:col-span-4 xl:col-span-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               {/* Informações da Data Selecionada */}
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-white bg-opacity-20 rounded-full">
-                  <Calendar className="h-8 w-8" />
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white bg-opacity-20 rounded-full">
+                  <Calendar className="h-6 w-6" />
                 </div>
                 <div>
-                  <h2 className="text-xl sm:text-2xl font-bold mb-1">
+                  <h2 className="text-lg font-bold mb-1">
                     {selectedDataNotificacao 
                       ? new Date(selectedDataNotificacao + 'T00:00:00').toLocaleDateString('pt-BR', {
                           weekday: 'long',
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
+                          day: 'numeric',
+                          month: 'long'
                         })
                       : 'Todas as Datas'
                     }
                   </h2>
-                  <p className="text-indigo-100 text-sm">
+                  <p className="text-indigo-100 text-xs">
                     {selectedDataNotificacao 
-                      ? `${totalNotificacoesDia.toLocaleString()} notificação(ções) criadas neste dia`
-                      : `${totalNotifications.toLocaleString()} notificação(ções) no total`
+                      ? `${totalNotificacoesDia.toLocaleString()} casos neste dia`
+                      : `Visualizando todos os registros`
                     }
                   </p>
-                  {selectedDataNotificacao && selectedDataNotificacao === obterDataAtual() && (
-                    <span className="inline-block mt-1 px-2 py-1 bg-green-400 bg-opacity-30 text-green-100 text-xs font-medium rounded-full">
-                      🕐 Hoje
-                    </span>
-                  )}
                 </div>
               </div>
               
               {/* Seletor de Data */}
-              <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+              <div className="flex gap-2 items-center">
                 <select
                   value={selectedDataNotificacao || 'todos'}
                   onChange={(e) => handleDataNotificacaoChange(e.target.value)}
-                  className="px-4 py-2 text-sm text-gray-800 border border-white border-opacity-30 rounded-lg focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 bg-white bg-opacity-90 min-w-[200px]"
+                  className="px-3 py-2 text-xs text-gray-800 border border-white border-opacity-30 rounded-lg focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 bg-white bg-opacity-90 min-w-[180px]"
                 >
-                  <option value="todos">📊 Todas as Datas ({totalNotifications.toLocaleString()})</option>
+                  <option value="todos">📊 Todas as Datas</option>
                   {datasNotificacaoDisponiveis.map((data) => {
                     const totalDia = contarNotificacoesPorData(originalNotificacoes.current, data);
                     const dataFormatada = new Date(data + 'T00:00:00').toLocaleDateString('pt-BR');
@@ -3029,7 +3032,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                     return (
                       <option key={data} value={data}>
                         {isToday ? '🕐' : '📅'} {dataFormatada} ({totalDia.toLocaleString()})
-                        {isToday ? ' - Hoje' : ''}
                       </option>
                     );
                   })}
@@ -3038,20 +3040,67 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 {selectedDataNotificacao && (
                   <button
                     onClick={() => handleDataNotificacaoChange('todos')}
-                    className="px-3 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 text-white text-sm rounded-lg transition-all duration-200 flex items-center gap-2"
+                    className="px-2 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 text-white text-sm rounded-lg transition-all duration-200"
                     title="Mostrar todas as datas"
                   >
                     <X className="h-4 w-4" />
-                    <span className="hidden sm:inline">Limpar</span>
                   </button>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Cards de Resumo - com indicador de filtros ativos */}
+          {/* Total de Notificações - 4 colunas */}
+          <div
+            className={`bg-gradient-to-br from-blue-500 to-blue-700 p-4 rounded-lg shadow-lg flex items-center gap-3 cursor-pointer hover:shadow-xl transition-all text-white sm:col-span-2 lg:col-span-4 xl:col-span-4 ${!hasActiveFilters && selectedCategory === null ? 'ring-4 ring-blue-300' : ''}`}
+            onClick={() => { 
+              clearAllFilters();
+            }}
+          >
+            <div className="p-3 bg-white bg-opacity-20 rounded-full flex-shrink-0">
+              <FileText className="h-8 w-8" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-xs text-blue-100 uppercase tracking-wide">Total de Notificações</h3>
+              <p className="text-4xl font-bold">
+                {totalNotifications.toLocaleString()}
+              </p>
+            </div>
+          </div>
+
+          {/* LINHA 2: Resumo por Tipo - 8 colunas (linha completa) */}
+          <div className="bg-white p-3 rounded-lg shadow-sm sm:col-span-2 lg:col-span-4 xl:col-span-8">
+            <div className="flex items-center gap-2 mb-3">
+              <Layers className="h-4 w-4 text-blue-600" />
+              <h3 className="text-sm font-semibold text-gray-700">Resumo por Tipo de Atendimento</h3>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              <div className="flex flex-col items-center gap-2 p-3 bg-green-50 rounded-lg cursor-pointer hover:bg-green-100 transition-colors" onClick={() => handleCardClick("clinico")}>
+                <Activity className="h-6 w-6 text-green-600" />
+                <p className="text-xs text-gray-600 font-medium">Clínico</p>
+                <p className="text-2xl font-bold text-green-700">{statCounts.clinico.toLocaleString()}</p>
+              </div>
+              <div className="flex flex-col items-center gap-2 p-3 bg-red-50 rounded-lg cursor-pointer hover:bg-red-100 transition-colors" onClick={() => handleCardClick("trauma")}>
+                <AlertCircle className="h-6 w-6 text-red-600" />
+                <p className="text-xs text-gray-600 font-medium">Trauma</p>
+                <p className="text-2xl font-bold text-red-700">{statCounts.trauma.toLocaleString()}</p>
+              </div>
+              <div className="flex flex-col items-center gap-2 p-3 bg-purple-50 rounded-lg cursor-pointer hover:bg-purple-100 transition-colors" onClick={() => handleCardClick("multiplas")}>
+                <AlertTriangle className="h-6 w-6 text-purple-600" />
+                <p className="text-xs text-gray-600 font-medium">Múltiplas</p>
+                <p className="text-2xl font-bold text-purple-700">{statCounts.multiplas.toLocaleString()}</p>
+              </div>
+              <div className="flex flex-col items-center gap-2 p-3 bg-orange-50 rounded-lg cursor-pointer hover:bg-orange-100 transition-colors" onClick={() => handleCardClick("qbrn")}>
+                <Bomb className="h-6 w-6 text-orange-600" />
+                <p className="text-xs text-gray-600 font-medium">QBRN</p>
+                <p className="text-2xl font-bold text-orange-700">{statCounts.qbrn.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Indicador de Filtros Ativos - 8 colunas (linha completa) */}
           {hasActiveFilters && (
-            <div className="bg-blue-50 p-3 rounded-lg shadow-sm sm:col-span-2 lg:col-span-3 xl:col-span-5 border-l-4 border-blue-500">
+            <div className="bg-blue-50 p-3 rounded-lg shadow-sm border-l-4 border-blue-500 sm:col-span-2 lg:col-span-4 xl:col-span-8">
               <div className="flex items-center gap-2 mb-2">
                 <Layers className="h-4 w-4 text-blue-600" />
                 <h3 className="text-sm font-semibold text-blue-800">
@@ -3066,136 +3115,60 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             </div>
           )}
 
-          {/* Cards de Resumo */}
-          <div
-            className={`bg-white p-3 sm:p-4 rounded-lg shadow-sm flex items-center gap-3 sm:gap-4 cursor-pointer hover:shadow-md transition-shadow sm:col-span-1 xl:col-span-1 ${!hasActiveFilters && selectedCategory === null ? 'ring-2 ring-blue-400' : ''}`}
-            onClick={() => { 
-              clearAllFilters();
-            }}
-          >
-            <div className="p-2 sm:p-3 bg-blue-100 text-blue-800 rounded-full flex-shrink-0">
-              <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="text-xs sm:text-sm text-gray-500 truncate">Total de Notificações</h3>
-              <p className="text-xl sm:text-2xl font-bold text-blue-800">
-                {totalNotifications.toLocaleString()}
-              </p>
-            </div>
-          </div>
-
-          <div
-            className={`bg-white p-3 sm:p-4 rounded-lg shadow-sm flex items-center gap-3 sm:gap-4 cursor-pointer hover:shadow-md transition-shadow sm:col-span-1 xl:col-span-1 ${activeFilters.tipoAtendimento?.toLowerCase().includes('clínico') || activeFilters.tipoAtendimento?.toLowerCase().includes('clinico') ? 'ring-2 ring-green-400' : ''}`}
-            onClick={() => handleCardClick("clinico")}
-          >
-            <div className="p-2 sm:p-3 bg-green-100 text-green-800 rounded-full flex-shrink-0">
-              <Activity className="h-5 w-5 sm:h-6 sm:w-6" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="text-xs sm:text-sm text-gray-500 truncate">Casos Clínicos</h3>
-              <p className="text-xl sm:text-2xl font-bold text-green-800">
-                {statCounts.clinico.toLocaleString()}
-              </p>
-            </div>
-          </div>
-
-          <div
-            className={`bg-white p-3 sm:p-4 rounded-lg shadow-sm flex items-center gap-3 sm:gap-4 cursor-pointer hover:shadow-md transition-shadow sm:col-span-1 xl:col-span-1 ${activeFilters.tipoAtendimento?.toLowerCase().includes('trauma') ? 'ring-2 ring-red-400' : ''}`}
-            onClick={() => handleCardClick("trauma")}
-          >
-            <div className="p-2 sm:p-3 bg-red-100 text-red-800 rounded-full flex-shrink-0">
-              <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="text-xs sm:text-sm text-gray-500 truncate">Casos de Trauma</h3>
-              <p className="text-xl sm:text-2xl font-bold text-red-800">
-                {statCounts.trauma.toLocaleString()}
-              </p>
-            </div>
-          </div>
-
-          {/* NOVO CARD: Múltiplas Vítimas */}
-          <div
-            className={`bg-white p-3 sm:p-4 rounded-lg shadow-sm flex items-center gap-3 sm:gap-4 cursor-pointer hover:shadow-md transition-shadow sm:col-span-1 xl:col-span-1 ${activeFilters.tipoAtendimento?.toLowerCase().includes('múltiplas') || activeFilters.tipoAtendimento?.toLowerCase().includes('multiplas') ? 'ring-2 ring-purple-400' : ''}`}
-            onClick={() => handleCardClick("multiplas")}
-          >
-            <div className="p-2 sm:p-3 bg-purple-100 text-purple-800 rounded-full flex-shrink-0">
-              <AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="text-xs sm:text-sm text-gray-500 truncate">Múltiplas Vítimas</h3>
-              <p className="text-xl sm:text-2xl font-bold text-purple-800">
-                {statCounts.multiplas.toLocaleString()}
-              </p>
-            </div>
-          </div>
-
-          {/* NOVO CARD: Incidente QBRN */}
-          <div
-            className={`bg-white p-3 sm:p-4 rounded-lg shadow-sm flex items-center gap-3 sm:gap-4 cursor-pointer hover:shadow-md transition-shadow sm:col-span-1 xl:col-span-1 ${activeFilters.tipoAtendimento?.toLowerCase().includes('qbrn') || activeFilters.tipoAtendimento?.toLowerCase().includes('incidente q') ? 'ring-2 ring-orange-400' : ''}`}
-            onClick={() => handleCardClick("qbrn")}
-          >
-            <div className="p-2 sm:p-3 bg-orange-100 text-orange-800 rounded-full flex-shrink-0">
-              <Bomb className="h-5 w-5 sm:h-6 sm:w-6" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="text-xs sm:text-sm text-gray-500 truncate">Incidente QBRN</h3>
-              <p className="text-xl sm:text-2xl font-bold text-orange-800">
-                {statCounts.qbrn.toLocaleString()}
-              </p>
-            </div>
-          </div>
-
           {/* =============================================== */}
-          {/* LINHA 1: Distribuição por Público e Tipo de Atendimento */}
+          {/* LINHA 3: Distribuição por Público, Tipo de Atendimento, Sexo e Raça/Cor (Grid 8 cols: 2+2+2+2) */}
           {/* =============================================== */}
           
-          {/* Gráfico de Público Atendido */}
-          <DistribuicaoPublicoAtendidoChart
-            data={filteredPublico}
-            onChartClick={(itemName) => handleChartClick('publico', itemName)}
-            activeFilter={activeFilters.publico}
-            chartId="chart-publico"
-            title="Distribuição por Público Atendido"
-          />
+          {/* Gráfico de Público Atendido - 2 colunas */}
+          <div className="sm:col-span-2 lg:col-span-2 xl:col-span-2">
+            <DistribuicaoPublicoAtendidoChart
+              data={filteredPublico}
+              onChartClick={(itemName) => handleChartClick('publico', itemName)}
+              activeFilter={activeFilters.publico}
+              chartId="chart-publico"
+              title="Distribuição por Público Atendido"
+            />
+          </div>
 
-          {/* Gráfico de Tipo de Atendimento */}
-          <DistribuicaoTipoAtendimentoChart
-            data={filteredTipoAtendimento}
-            onChartClick={(itemName) => handleChartClick('tipoAtendimento', itemName)}
-            activeFilter={activeFilters.tipoAtendimento}
-            chartId="chart-tipo-atendimento"
-            title="Distribuição por Tipo de Atendimento"
-          />
+          {/* Gráfico de Tipo de Atendimento - 2 colunas */}
+          <div className="sm:col-span-2 lg:col-span-2 xl:col-span-2">
+            <DistribuicaoTipoAtendimentoChart
+              data={filteredTipoAtendimento}
+              onChartClick={(itemName) => handleChartClick('tipoAtendimento', itemName)}
+              activeFilter={activeFilters.tipoAtendimento}
+              chartId="chart-tipo-atendimento"
+              title="Distribuição por Tipo de Atendimento"
+            />
+          </div>
+
+          {/* Gráfico de Identidade de Gênero - 2 colunas */}
+          <div className="sm:col-span-2 lg:col-span-2 xl:col-span-2">
+            <DistribuicaoSexoChart
+              data={filteredGenero}
+              onChartClick={(itemName) => handleChartClick('genero', itemName)}
+              activeFilter={activeFilters.genero}
+              chartId="chart-genero"
+              title="Distribuição por Identidade de Gênero"
+            />
+          </div>
+
+          {/* Gráfico de Raça/Cor - 2 colunas */}
+          <div className="sm:col-span-2 lg:col-span-2 xl:col-span-2">
+            <DistribuicaoRacaCorChart
+              data={filteredRaca}
+              onChartClick={(itemName) => handleChartClick('raca', itemName)}
+              activeFilter={activeFilters.raca}
+              chartId="chart-raca"
+              title="Distribuição por Raça e Cor"
+            />
+          </div>
 
           {/* =============================================== */}
-          {/* LINHA 2: Distribuição por Sexo e Raça/Cor */}
+          {/* LINHA 4: Localização Geográfica - Painel com 4 gráficos internos (Grid 8 cols: 8 largura total) */}
           {/* =============================================== */}
           
-          {/* Gráfico de Identidade de Gênero */}
-          <DistribuicaoSexoChart
-            data={filteredGenero}
-            onChartClick={(itemName) => handleChartClick('genero', itemName)}
-            activeFilter={activeFilters.genero}
-            chartId="chart-genero"
-            title="Distribuição por Sexo"
-          />
-
-          {/* Gráfico de Raça */}
-          <DistribuicaoRacaCorChart
-            data={filteredRaca}
-            onChartClick={(itemName) => handleChartClick('raca', itemName)}
-            activeFilter={activeFilters.raca}
-            chartId="chart-raca"
-            title="Distribuição por Raça e Cor"
-          />
-
-          {/* =============================================== */}
-          {/* LINHA 3: Localização Geográfica */}
-          {/* =============================================== */}
-          
-          {/* 🆕 PAINEL DE LOCALIZAÇÃO GEOGRÁFICA */}
-          <div className="sm:col-span-2 lg:col-span-3 xl:col-span-5">
+          {/* Painel de Localização Geográfica - 8 colunas (largura total) */}
+          <div className="sm:col-span-2 lg:col-span-3 xl:col-span-8">
             <GeographicLocationPanel
               paisData={filteredPais}
               estadoData={filteredEstado}
@@ -3207,11 +3180,11 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           </div>
 
           {/* =============================================== */}
-          {/* LINHA 4: Estabelecimentos */}
+          {/* LINHA 5: Estabelecimentos e Pirâmide Etária (Grid 8 cols: 4+4) */}
           {/* =============================================== */}
           
-          {/* Estabelecimentos por Número de Casos */}
-          <div className="sm:col-span-2 lg:col-span-3 xl:col-span-5">
+          {/* Estabelecimentos por Número de Casos - 4 colunas */}
+          <div className="sm:col-span-2 lg:col-span-3 xl:col-span-4">
             <EstabelecimentosCasosChart 
               toggleFilter={toggleFilter}
               activeFilters={activeFilters}
@@ -3219,11 +3192,20 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             />
           </div>
 
+          {/* Pirâmide Etária por Sexo - 4 colunas */}
+          <div className="sm:col-span-2 lg:col-span-2 xl:col-span-4">
+            <PiramideEtariaChart 
+              toggleFilter={toggleFilter}
+              activeFilters={activeFilters}
+              filteredData={getFilteredData()}
+            />
+          </div>
+
           {/* =============================================== */}
-          {/* LINHA 5: Sinais e Sintomas e Traumas */}
+          {/* LINHA 6: Sinais/Sintomas, Trauma e Hipóteses (Grid 8 cols: 2+2+4 conforme getChartSpans) */}
           {/* =============================================== */}
           
-          {/* Principais Sintomas */}
+          {/* Principais Sintomas - 2 colunas */}
           {visibleCharts.sintomas && (
             <PrincipaisSintomasChart
               data={filteredSintomas}
@@ -3237,7 +3219,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             />
           )}
 
-          {/* Tipos de Trauma */}
+          {/* Tipos de Trauma - 2 colunas */}
           {visibleCharts.trauma && (
             <TiposTraumaChart
               data={filteredTrauma}
@@ -3250,11 +3232,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             />
           )}
 
-          {/* =============================================== */}
-          {/* LINHA 6: Hipóteses Diagnósticas */}
-          {/* =============================================== */}
-          
-          {/* Hipóteses Diagnósticas */}
+          {/* Hipóteses Diagnósticas - 4 colunas (maior para mostrar nomes completos) */}
           {visibleCharts.hipoteses && (
             <HipotesesDiagnosticasChart
               data={filteredHipoteses}
@@ -3270,26 +3248,23 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           )}
 
           {/* =============================================== */}
-          {/* LINHA 7: Pirâmide Etária e Desfecho */}
+          {/* LINHA 7: Desfecho dos Casos (Grid 8 cols: 1 offset + 6 gráfico + 1 offset = centralizado) */}
           {/* =============================================== */}
           
-          {/* Pirâmide Etária por Sexo */}
-          <div className="sm:col-span-2 lg:col-span-3 xl:col-span-3">
-            <PiramideEtariaChart 
-              toggleFilter={toggleFilter}
-              activeFilters={activeFilters}
-              filteredData={getFilteredData()}
-            />
-          </div>
-
-          {/* Desfecho dos Casos */}
-          <div className="sm:col-span-2 lg:col-span-2 xl:col-span-2">
+          {/* Espaçamento vazio - 1 coluna */}
+          <div className="sm:col-span-2 lg:col-span-2 xl:col-span-1"></div>
+          
+          {/* Desfecho dos Casos - 6 colunas (divididas internamente) */}
+          <div className="sm:col-span-2 lg:col-span-4 xl:col-span-6">
             <DesfechoCasosChart 
               toggleFilter={toggleFilter}
               activeFilters={activeFilters}
               filteredData={getFilteredData()}
             />
           </div>
+          
+          {/* Espaçamento vazio - 1 coluna */}
+          <div className="sm:col-span-2 lg:col-span-2 xl:col-span-1"></div>
         </main>
       )}
 
@@ -3325,19 +3300,18 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           </div>
           
           <EstabelecimentosMapaAvancado 
-            key={`mapa-${lastUpdate}-${notificacoes.length}`}
-            notificacoes={notificacoes}
+            key={`mapa-${lastUpdate}-${originalNotificacoes.current.length}`}
+            notificacoes={originalNotificacoes.current}
             exportOptions={exportOptions} 
           />
         </main>
       )}
 
-      {/* Aba de IA - Temporariamente desabilitada, será usada no futuro */}
+      {/* Aba de IA - Temporariamente desabilitada, será usada no futuro
       {false && (
         <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-gray-800 mb-2 flex items-center gap-3">
-              <Brain className="h-8 w-8 text-purple-600" />
               Análise Inteligente com IA
             </h2>
             <p className="text-gray-600">
@@ -3345,53 +3319,11 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             </p>
           </div>
 
-          <AIGlobalConfig className="mb-6" />
-
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            
-            {/* Insights Automáticos */}
-            /*<div className="xl:col-span-2">
-              <AIInsights 
-                dashboardData={getAIDashboardData()} 
-                className="w-full"
-              />
-            </div>
-
-            {/* Chat com IA */}
-            /*<div className="xl:col-span-1">
-              <AIChat 
-                dashboardData={getAIDashboardData()} 
-                className="w-full"
-              />
-            </div>
-
-            {/* Alertas Inteligentes */}
-            /*<div className="xl:col-span-1">
-              <AIAlerts 
-                dashboardData={getAIDashboardData()} 
-                className="w-full"
-              />
-            </div>
-
-          </div>
-
-          {/* Informações sobre IA e Privacidade */}
-          /*<div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Brain className="h-5 w-5 text-purple-600" />
-              <h3 className="font-semibold text-purple-800">Sistema de IA Flexível</h3>
-            </div>
-            <p className="text-purple-700 text-sm">
-              O sistema suporta tanto IA local (Ollama) quanto APIs externas (OpenRouter, OpenAI, Anthropic, etc). 
-              Use a configuração acima para escolher entre privacidade total com modelos locais ou acesso aos modelos mais avançados via API.
-              <br />
-              <span className="text-purple-600 font-medium">
-                💡 Dica: Modelos locais garantem privacidade total, enquanto APIs externas oferecem capacidades mais avançadas.
-              </span>
-            </p>
+            Insights Automáticos, Chat com IA e Alertas Inteligentes aqui
           </div>
         </main>
-      )} */
+      )} */}
 
       {/* Sistema de Alertas - Sempre visível */}
       <AlertasPanel 

@@ -218,128 +218,131 @@ const DesfechoCasosChart: React.FC<DesfechoCasosChartProps> = ({
         )}
       </div>
 
-      {/* Gráfico */}
-      <div id="desfecho-casos" className="h-96">
-        {data.length > 0 ? (
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={data}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={renderLabel}
-                outerRadius={120}
-                dataKey="valor"
-                onClick={(data) => {
-                  console.log('🖱️ Clicou na fatia:', data);
-                  if (toggleFilter && data.descricao) {
-                    toggleFilter('desfecho', data.descricao);
+      {/* Layout Lado a Lado: Gráfico + Detalhamento */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Gráfico */}
+        <div id="desfecho-casos" className="h-96">
+          {data.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={data}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={renderLabel}
+                  outerRadius={120}
+                  dataKey="valor"
+                  onClick={(data) => {
+                    console.log('🖱️ Clicou na fatia:', data);
+                    if (toggleFilter && data.descricao) {
+                      toggleFilter('desfecho', data.descricao);
+                    }
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
+                  {data.map((entry, index) => {
+                    const originalColor = getColorByDesfecho(entry.descricao, index);
+                    const finalColor = getCellColor(entry.descricao, originalColor);
+                    
+                    return (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={finalColor}
+                        stroke={isDesfechoFiltered(entry.descricao) ? '#374151' : 'transparent'}
+                        strokeWidth={isDesfechoFiltered(entry.descricao) ? 3 : 0}
+                        style={{ 
+                          cursor: 'pointer',
+                          filter: isDesfechoFiltered(entry.descricao) ? 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3))' : 'none'
+                        }}
+                      />
+                    );
+                  })}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+                <Legend 
+                  verticalAlign="bottom" 
+                  height={36}
+                  formatter={(_, entry: any) =>
+                    `${entry.payload.descricao} (${entry.payload.valor})`
                   }
-                }}
-                style={{ cursor: 'pointer' }}
-              >
-                {data.map((entry, index) => {
-                  const originalColor = getColorByDesfecho(entry.descricao, index);
-                  const finalColor = getCellColor(entry.descricao, originalColor);
-                  
-                  return (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={finalColor}
-                      stroke={isDesfechoFiltered(entry.descricao) ? '#374151' : 'transparent'}
-                      strokeWidth={isDesfechoFiltered(entry.descricao) ? 3 : 0}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-gray-500">Nenhum dado disponível para o período selecionado</div>
+            </div>
+          )}
+        </div>
+
+        {/* Lista detalhada */}
+        {data.length > 0 && (
+          <div className="flex flex-col">
+            <h4 className="text-lg font-semibold text-gray-900 mb-3">Detalhamento</h4>
+            <div className="space-y-2 overflow-y-auto max-h-96">
+              {data.map((item, index) => (
+                <div 
+                  key={index} 
+                  className={`flex items-center justify-between p-3 rounded cursor-pointer transition-all hover:shadow-md ${
+                    isDesfechoFiltered(item.descricao) 
+                      ? 'bg-blue-100 border-2 border-blue-300 shadow-lg' 
+                      : activeFilters?.desfecho 
+                        ? 'bg-gray-50 opacity-60' 
+                        : 'bg-gray-50 hover:bg-gray-100'
+                  }`}
+                  onClick={() => {
+                    if (toggleFilter) {
+                      toggleFilter('desfecho', item.descricao);
+                    }
+                  }}
+                  title={`🎯 Clique para filtrar por: ${item.descricao}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="w-4 h-4 rounded"
                       style={{ 
-                        cursor: 'pointer',
-                        filter: isDesfechoFiltered(entry.descricao) ? 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3))' : 'none'
+                        backgroundColor: getCellColor(item.descricao, getColorByDesfecho(item.descricao, index)),
+                        border: isDesfechoFiltered(item.descricao) ? '2px solid #374151' : 'none'
                       }}
                     />
-                  );
-                })}
-              </Pie>
-              <Tooltip content={<CustomTooltip />} />
-              <Legend 
-                verticalAlign="bottom" 
-                height={36}
-                formatter={(_, entry: any) =>
-                  `${entry.payload.descricao} (${entry.payload.valor})`
-                }
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-gray-500">Nenhum dado disponível para o período selecionado</div>
+                    <span className={`font-medium ${
+                      isDesfechoFiltered(item.descricao) ? 'text-blue-900 font-semibold' : 'text-gray-700'
+                    }`}>
+                      {item.descricao}
+                      {isDesfechoFiltered(item.descricao) && <span className="ml-2 text-blue-600">✓</span>}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <div className={`font-bold ${
+                      isDesfechoFiltered(item.descricao) ? 'text-blue-900' : 'text-gray-900'
+                    }`}>
+                      {item.valor}
+                    </div>
+                    <div className={`text-sm ${
+                      isDesfechoFiltered(item.descricao) ? 'text-blue-700' : 'text-gray-600'
+                    }`}>
+                      {item.percentual}%
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              {/* Botão para limpar filtro */}
+              {activeFilters?.desfecho && (
+                <div className="mt-4 text-center">
+                  <button
+                    onClick={() => toggleFilter && toggleFilter('desfecho', activeFilters.desfecho)}
+                    className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
+                  >
+                    🧹 Limpar Filtro de Desfecho
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
-
-      {/* Lista detalhada */}
-      {data.length > 0 && (
-        <div className="mt-6">
-          <h4 className="text-lg font-semibold text-gray-900 mb-3">Detalhamento</h4>
-          <div className="space-y-2">
-            {data.map((item, index) => (
-              <div 
-                key={index} 
-                className={`flex items-center justify-between p-3 rounded cursor-pointer transition-all hover:shadow-md ${
-                  isDesfechoFiltered(item.descricao) 
-                    ? 'bg-blue-100 border-2 border-blue-300 shadow-lg' 
-                    : activeFilters?.desfecho 
-                      ? 'bg-gray-50 opacity-60' 
-                      : 'bg-gray-50 hover:bg-gray-100'
-                }`}
-                onClick={() => {
-                  if (toggleFilter) {
-                    toggleFilter('desfecho', item.descricao);
-                  }
-                }}
-                title={`🎯 Clique para filtrar por: ${item.descricao}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div 
-                    className="w-4 h-4 rounded"
-                    style={{ 
-                      backgroundColor: getCellColor(item.descricao, getColorByDesfecho(item.descricao, index)),
-                      border: isDesfechoFiltered(item.descricao) ? '2px solid #374151' : 'none'
-                    }}
-                  />
-                  <span className={`font-medium ${
-                    isDesfechoFiltered(item.descricao) ? 'text-blue-900 font-semibold' : 'text-gray-700'
-                  }`}>
-                    {item.descricao}
-                    {isDesfechoFiltered(item.descricao) && <span className="ml-2 text-blue-600">✓</span>}
-                  </span>
-                </div>
-                <div className="text-right">
-                  <div className={`font-bold ${
-                    isDesfechoFiltered(item.descricao) ? 'text-blue-900' : 'text-gray-900'
-                  }`}>
-                    {item.valor}
-                  </div>
-                  <div className={`text-sm ${
-                    isDesfechoFiltered(item.descricao) ? 'text-blue-700' : 'text-gray-600'
-                  }`}>
-                    {item.percentual}%
-                  </div>
-                </div>
-              </div>
-            ))}
-            
-            {/* Botão para limpar filtro */}
-            {activeFilters?.desfecho && (
-              <div className="mt-4 text-center">
-                <button
-                  onClick={() => toggleFilter && toggleFilter('desfecho', activeFilters.desfecho)}
-                  className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
-                >
-                  🧹 Limpar Filtro de Desfecho
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

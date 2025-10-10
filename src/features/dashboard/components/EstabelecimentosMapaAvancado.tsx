@@ -66,20 +66,11 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
     }
   }, []); // Dependências vazias - carrega apenas uma vez
 
-  // ⏰ AUTO-REFRESH: Recarregar dados a cada 30 segundos
+  // ⏰ AUTO-REFRESH: Reprocessar quando notificações mudarem (alinhado com dashboard)
   useEffect(() => {
-    console.log('⏰ Configurando auto-refresh do mapa (30s)...');
-    
-    const intervalId = setInterval(() => {
-      console.log('🔄 Auto-refresh do mapa ativado');
-      carregarEstabelecimentos();
-    }, 30000); // 30 segundos
-
-    return () => {
-      console.log('⏹️ Limpando auto-refresh do mapa');
-      clearInterval(intervalId);
-    };
-  }, [carregarEstabelecimentos]);
+    console.log('🔄 Notificações atualizadas no mapa:', notificacoes.length);
+    // Força reprocessamento dos estabelecimentos quando notificações mudarem
+  }, [notificacoes]); // Depende das notificações para reagir às atualizações do dashboard
 
   // Memoizar o mapa de estabelecimentos para evitar recriações
   const allPlacesMap = useMemo(() => {

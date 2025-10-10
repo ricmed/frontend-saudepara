@@ -1,12 +1,9 @@
-// src/pages/DashboardPageCirio.tsx - Dashboard do Círio de Nazaré com Modo TV
+// src/pages/DashboardPageCirio.tsx - Dashboard do Círio de Nazaré otimizado
 import React, { useState, useEffect } from 'react';
 import EnhancedNotificationDashboard from '@/features/dashboard/NotificationDashboardCirio';
-import TVSlideshowDashboard from '@/components/common/TVSlideshowDashboard';
 import NotificacaoService from '@/services/NotificacaoService';
-import { Monitor, Grid } from 'lucide-react';
 
 const DashboardPageCirio: React.FC = () => {
-  const [modoTV, setModoTV] = useState(false);
   const [notificacoes, setNotificacoes] = useState<any[]>([]);
   const [exportOptions, setExportOptions] = useState<any>({});
   const [loading, setLoading] = useState(true);
@@ -186,60 +183,12 @@ const DashboardPageCirio: React.FC = () => {
 
   // Renderizar o dashboard com os dados carregados
   return (
-    <>
-      {/* Toggle para Modo TV - Fixo no Topo */}
-      <div className="fixed top-4 right-4 z-50 flex gap-2">
-        <button
-          onClick={() => setModoTV(false)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg transition-all ${
-            !modoTV 
-              ? 'bg-blue-600 text-white' 
-              : 'bg-white text-gray-700 hover:bg-gray-100'
-          }`}
-          title="Modo Normal"
-        >
-          <Grid className="h-5 w-5" />
-          <span className="hidden sm:inline">Normal</span>
-        </button>
-        <button
-          onClick={() => setModoTV(true)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg transition-all ${
-            modoTV 
-              ? 'bg-red-600 text-white animate-pulse' 
-              : 'bg-white text-gray-700 hover:bg-gray-100'
-          }`}
-          title="Modo TV - Slideshow Automático"
-        >
-          <Monitor className="h-5 w-5" />
-          <span className="hidden sm:inline">Modo TV</span>
-        </button>
-      </div>
-
-      {/* Renderização Condicional */}
-      {modoTV ? (
-        <TVSlideshowDashboard
-          slides={[
-            // Slide único: Dashboard Completo com rolagem automática
-            <div key="slide-1" className="w-full min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
-              <div className="max-w-[1920px] mx-auto">
-                <EnhancedNotificationDashboard 
-                  notificacoes={notificacoes}
-                  exportOptions={exportOptions}
-                />
-              </div>
-            </div>,
-          ]}
-          autoPlayInterval={25}
-          enableAutoScroll={true}
-          scrollSpeed={80}
-        />
-      ) : (
-        <EnhancedNotificationDashboard 
-          notificacoes={notificacoes}
-          exportOptions={exportOptions}
-        />
-      )}
-    </>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      <EnhancedNotificationDashboard 
+        notificacoes={notificacoes}
+        exportOptions={exportOptions}
+      />
+    </div>
   );
 };
 

@@ -84,7 +84,7 @@ const PrincipaisSintomasChart: React.FC<PrincipaisSintomasChartProps> = ({
             <BarChart
               data={limitedData}
               layout="vertical"
-              margin={{ top: 5, right: 80, left: 100, bottom: 5 }}
+              margin={{ top: 5, right: 20, left: 5, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis type="number" stroke="#666" />

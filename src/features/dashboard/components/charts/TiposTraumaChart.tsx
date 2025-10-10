@@ -79,7 +79,7 @@ const TiposTraumaChart: React.FC<TiposTraumaChartProps> = ({
             <BarChart
               data={data}
               layout="vertical"
-              margin={{ top: 5, right: 80, left: 80, bottom: 5 }}
+              margin={{ top: 5, right: 20, left: 5, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis type="number" stroke="#666" />
@@ -87,7 +87,7 @@ const TiposTraumaChart: React.FC<TiposTraumaChartProps> = ({
                 dataKey="name"
                 type="category"
                 stroke="#666"
-                width={80}
+                width={100}
                 tick={{ fontSize: 10 }}
               />
               <Tooltip
