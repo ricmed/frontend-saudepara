@@ -8,7 +8,8 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Cell
+  Cell,
+  LabelList,
 } from 'recharts';
 import { Building } from 'lucide-react';
 import NotificacaoService from '@/services/NotificacaoService';
@@ -231,7 +232,7 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data}
-              margin={{ top: 20, right: 40, left: 20, bottom: 120 }}
+              margin={{ top: 20, right: 80, left: 20, bottom: 120 }}
               layout="vertical"
               onClick={(data) => {
                 console.log('🖱️ Clicou na barra:', data);
@@ -273,6 +274,12 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
                     />
                   );
                 })}
+                <LabelList
+                  dataKey="totalCasos"
+                  position="right"
+                  formatter={(value: number) => value.toLocaleString()}
+                  style={{ fontSize: '14px', fontWeight: 'bold', fill: '#374151' }}
+                />
               </Bar>
             </BarChart>
           </ResponsiveContainer>

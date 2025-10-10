@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  LabelList,
 } from "recharts";
 import { AlertCircle } from "lucide-react";
 import ChartExportMenu from '../../../../components/common/ChartExportMenu';
@@ -78,7 +79,7 @@ const TiposTraumaChart: React.FC<TiposTraumaChartProps> = ({
             <BarChart
               data={data}
               layout="vertical"
-              margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
+              margin={{ top: 5, right: 80, left: 80, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis type="number" stroke="#666" />
@@ -116,6 +117,12 @@ const TiposTraumaChart: React.FC<TiposTraumaChartProps> = ({
                     strokeWidth={activeFilter === entry.name ? 2 : 0}
                   />
                 ))}
+                <LabelList
+                  dataKey="value"
+                  position="right"
+                  formatter={(value: number) => value.toLocaleString()}
+                  style={{ fontSize: '14px', fontWeight: 'bold', fill: '#374151' }}
+                />
               </Bar>
             </BarChart>
           </ResponsiveContainer>

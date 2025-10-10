@@ -16,6 +16,10 @@ import MapaDashboard from './MapaDashboard';
 import { useEstabelecimentos } from '../../maps/leaflet/hooks/useEstabelecimentos';
 import { MapProviderProvider } from '../../maps/leaflet/contexts/MapProviderContext';
 import { Local } from '../../maps/leaflet/types';
+// 🚨 Importar função para verificar hipóteses alarmantes (compulsórias)
+import { findRuleByHypothesis } from '../config/vigilancia.config';
+// 🆕 Importar modal de detalhes
+import EstabelecimentoDetailModal from './EstabelecimentoDetailModal';
 
 interface EstabelecimentoInfo {
   id: string;
@@ -27,14 +31,17 @@ interface EstabelecimentoInfo {
   tipo: string;
   endereco?: string;
   originalLocal: Local;
+  temNotificacaoCompulsoria?: boolean; // 🚨 Flag para notificação compulsória
 }
 
 interface EstabelecimentosMapaAvancadoProps {
   notificacoes: any[];
+  exportOptions?: any; // 🆕 Adicionar exportOptions para acessar hipóteses
 }
 
 const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> = memo(({ 
-  notificacoes = [] 
+  notificacoes = [],
+  exportOptions = {} // 🆕 Receber exportOptions
 }) => {
   const [estabelecimentos, setEstabelecimentos] = useState<EstabelecimentoInfo[]>([]);
   const [selectedEstabelecimento, setSelectedEstabelecimento] = useState<EstabelecimentoInfo | null>(null);
@@ -58,6 +65,21 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
       carregarEstabelecimentos();
     }
   }, []); // Dependências vazias - carrega apenas uma vez
+
+  // ⏰ AUTO-REFRESH: Recarregar dados a cada 30 segundos
+  useEffect(() => {
+    console.log('⏰ Configurando auto-refresh do mapa (30s)...');
+    
+    const intervalId = setInterval(() => {
+      console.log('🔄 Auto-refresh do mapa ativado');
+      carregarEstabelecimentos();
+    }, 30000); // 30 segundos
+
+    return () => {
+      console.log('⏹️ Limpando auto-refresh do mapa');
+      clearInterval(intervalId);
+    };
+  }, [carregarEstabelecimentos]);
 
   // Memoizar o mapa de estabelecimentos para evitar recriações
   const allPlacesMap = useMemo(() => {
@@ -97,6 +119,32 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
       const estabelecimentoId = notificacao?.original?.estabelecimento_idestabelecimento ||
                                notificacao?.estabelecimentoId;
       
+      // 🚨 Verificar se é notificação compulsória (hipótese diagnóstica alarmante)
+      let isCompulsoria = false;
+      
+      // Método 1: Verificar se já vem marcado como alarmante
+      if (notificacao?.isAlarmante === true || notificacao?.original?.isAlarmante === true) {
+        isCompulsoria = true;
+      }
+      
+      // Método 2: Verificar a hipótese diagnóstica usando GVS rules
+      if (!isCompulsoria && exportOptions?.hipoteseDiagOptions?.length > 0) {
+        const hipoteseId = notificacao?.original?.tipo_hipotese_diag_idtipo_hipotese_diag;
+        if (hipoteseId) {
+          const hipotese = exportOptions.hipoteseDiagOptions.find(
+            (h: any) => String(h.idtipo_hipotese_diag) === String(hipoteseId)
+          );
+          if (hipotese?.descricao) {
+            const match = findRuleByHypothesis(hipotese.descricao);
+            isCompulsoria = !!match && match.rule.priority === 'critical';
+            
+            if (isCompulsoria) {
+              console.log(`🚨 NOTIFICAÇÃO COMPULSÓRIA DETECTADA: ${hipotese.descricao} no estabelecimento ID ${estabelecimentoId}`);
+            }
+          }
+        }
+      }
+      
       if (estabelecimentoId) {
         const idStr = String(estabelecimentoId);
         const lugarInfo = allPlacesMap.get(idStr);
@@ -105,6 +153,10 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
           if (estabelecimentosMap.has(idStr)) {
             const est = estabelecimentosMap.get(idStr)!;
             est.notificacoes += 1;
+            // Marcar se tem pelo menos uma compulsória
+            if (isCompulsoria) {
+              est.temNotificacaoCompulsoria = true;
+            }
           } else {
             const estabelecimentoInfo: EstabelecimentoInfo = {
               id: idStr,
@@ -115,19 +167,29 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
               urgencia: 'baixa',
               tipo: lugarInfo.natureza || 'hospital',
               endereco: lugarInfo.endereco,
-              originalLocal: lugarInfo
+              originalLocal: lugarInfo,
+              temNotificacaoCompulsoria: isCompulsoria
             };
             estabelecimentosMap.set(idStr, estabelecimentoInfo);
           }
           
-          // Recalcular urgência
+          // 🎯 Recalcular urgência - THRESHOLDS AJUSTADOS PARA CÍRIO DE NAZARÉ
           const est = estabelecimentosMap.get(idStr)!;
-          if (est.notificacoes >= 10) {
+          
+          // 🚨 PRIORIDADE: Se tem notificação compulsória, É SEMPRE CRÍTICO
+          if (est.temNotificacaoCompulsoria) {
             est.urgencia = 'critica';
-          } else if (est.notificacoes >= 5) {
+            console.log(`🔴 Estabelecimento ${est.nome} marcado como CRÍTICO por notificação compulsória`);
+          } 
+          // Senão, avaliar por quantidade (thresholds maiores para o Círio)
+          else if (est.notificacoes >= 100) {
+            est.urgencia = 'critica';
+          } else if (est.notificacoes >= 50) {
             est.urgencia = 'alta';
-          } else if (est.notificacoes >= 2) {
+          } else if (est.notificacoes >= 30) {
             est.urgencia = 'media';
+          } else if (est.notificacoes >= 10) {
+            est.urgencia = 'baixa';
           } else {
             est.urgencia = 'baixa';
           }
@@ -156,7 +218,8 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
       notificacoes: est.notificacoes,
       urgencia: est.urgencia,
       tipo: est.tipo,
-      endereco: est.endereco
+      endereco: est.endereco,
+      temNotificacaoCompulsoria: est.temNotificacaoCompulsoria // 🚨 Passar flag de compulsória
     }));
   }, [estabelecimentos]);
 
@@ -181,10 +244,11 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
     }
   }, []);
 
-  // Handler de clique memoizado
+  // Handler de clique memoizado - 🆕 Abre o modal de detalhes
   const handleEstabelecimentoClick = useCallback((estabelecimentoMapa: any) => {
     const estInfo = estabelecimentos.find(e => e.id === estabelecimentoMapa.id);
     if (estInfo) {
+      console.log('🏥 Estabelecimento clicado:', estInfo.nome);
       setSelectedEstabelecimento(estInfo);
     }
   }, [estabelecimentos]);
@@ -367,6 +431,24 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
         </div>
       </div>
     </div>
+    
+    {/* 🆕 Modal de Detalhes do Estabelecimento */}
+    {selectedEstabelecimento && (
+      <EstabelecimentoDetailModal
+        estabelecimento={{
+          id: selectedEstabelecimento.id,
+          nome: selectedEstabelecimento.nome,
+          notificacoes: selectedEstabelecimento.notificacoes,
+          urgencia: selectedEstabelecimento.urgencia,
+          endereco: selectedEstabelecimento.endereco,
+          tipo: selectedEstabelecimento.tipo,
+          temNotificacaoCompulsoria: selectedEstabelecimento.temNotificacaoCompulsoria
+        }}
+        notificacoes={notificacoes}
+        exportOptions={exportOptions}
+        onClose={closeSelectedEstabelecimento}
+      />
+    )}
     </MapProviderProvider>
   );
 });

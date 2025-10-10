@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  LabelList,
 } from "recharts";
 import { Heart } from "lucide-react";
 import ChartExportMenu from '../../../../components/common/ChartExportMenu';
@@ -83,7 +84,7 @@ const PrincipaisSintomasChart: React.FC<PrincipaisSintomasChartProps> = ({
             <BarChart
               data={limitedData}
               layout="vertical"
-              margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
+              margin={{ top: 5, right: 80, left: 100, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis type="number" stroke="#666" />
@@ -121,6 +122,16 @@ const PrincipaisSintomasChart: React.FC<PrincipaisSintomasChartProps> = ({
                     strokeWidth={activeFilter === entry.name ? 2 : 0}
                   />
                 ))}
+                <LabelList 
+                  dataKey="value" 
+                  position="right" 
+                  style={{ 
+                    fontSize: '14px', 
+                    fontWeight: 'bold',
+                    fill: '#374151'
+                  }}
+                  formatter={(value: number) => value.toLocaleString()}
+                />
               </Bar>
             </BarChart>
           </ResponsiveContainer>

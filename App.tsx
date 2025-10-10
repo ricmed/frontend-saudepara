@@ -100,6 +100,7 @@ import NotificationForm from "@/features/notificationForms/NotificationForm";
 import ListaNotificacoes from "@/features/notificationForms/ListaNotificacoes";
 import HomePage from "@/features/home/HomePage";
 import DashboardPage from '@/features/dashboard/DashboardPage';
+import DashboardPageCirio from '@/features/dashboard/DashboardPageCirio'; // 🎉 Dashboard Círio de Nazaré com Modo TV
 import OfflineManagementPage from '@/features/offlinePage/pages/OfflineManagementPage';
 // Contact pages
 import FaleConoscoPage from '@/features/contact/FaleConoscoPage';
@@ -263,7 +264,10 @@ function App() {
           
           {/* Rotas do Dashboard - Protegidas para Notificador OU Dashboard */}
           <Route path="/dashboard" element={<ProtectedRoute requiredRoles={['notificador', 'dashboard']}><NotificationDashboard /></ProtectedRoute>} />
-          <Route path="/dashboard-page" element={<ProtectedRoute requiredRoles={['notificador', 'dashboard']}><DashboardPage /></ProtectedRoute>} />
+          {/* 🎉 CÍRIO DE NAZARÉ 2025: Dashboard com Modo TV para exibição em telões */}
+          <Route path="/dashboard-page" element={<ProtectedRoute requiredRoles={['notificador', 'dashboard']}><DashboardPageCirio /></ProtectedRoute>} />
+          {/* Dashboard padrão ainda disponível em rota alternativa */}
+          <Route path="/dashboard-normal" element={<ProtectedRoute requiredRoles={['notificador', 'dashboard']}><DashboardPage /></ProtectedRoute>} />
           
           {/* Rotas de Campanhas */}
           <Route path="/setembro-verde" element={<SetembroVerde />} />

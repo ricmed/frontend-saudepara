@@ -15,6 +15,7 @@ interface EstabelecimentoMapa {
   urgencia: 'baixa' | 'media' | 'alta' | 'critica';
   tipo: string;
   endereco?: string;
+  temNotificacaoCompulsoria?: boolean; // 🚨 Flag para notificação compulsória
 }
 
 interface MapaDashboardProps {
@@ -54,11 +55,52 @@ const MapaDashboard: React.FC<MapaDashboardProps> = memo(({
     const color = getUrgenciaColor(estabelecimento.urgencia);
     const textColor = estabelecimento.urgencia === 'media' ? '#000' : '#fff';
     const hasRadar = estabelecimento.urgencia === 'critica';
+    // 🚨 Compulsórias sempre têm radar pulsante extra intenso
+    const isCompulsoria = estabelecimento.temNotificacaoCompulsoria === true;
 
     return L.divIcon({
       html: `
+        <style>
+          @keyframes radar-pulse {
+            0% {
+              transform: scale(1);
+              opacity: 0.8;
+            }
+            50% {
+              transform: scale(1.4);
+              opacity: 0.3;
+            }
+            100% {
+              transform: scale(1);
+              opacity: 0.8;
+            }
+          }
+          
+          @keyframes compulsoria-blink {
+            0%, 100% {
+              background: #ef4444;
+              box-shadow: 0 0 20px #ef4444, 0 4px 12px rgba(0,0,0,0.3);
+            }
+            50% {
+              background: #dc2626;
+              box-shadow: 0 0 30px #dc2626, 0 0 40px #ef4444, 0 4px 12px rgba(0,0,0,0.3);
+            }
+          }
+          
+          .radar-pulse {
+            animation: radar-pulse 2s ease-out infinite;
+          }
+          
+          .compulsoria-pulse {
+            animation: radar-pulse 1s ease-out infinite !important;
+          }
+          
+          .compulsoria-marker {
+            animation: compulsoria-blink 1.5s ease-in-out infinite !important;
+          }
+        </style>
         <div class="marker-container">
-          <div class="marker-main" style="
+          <div class="marker-main ${isCompulsoria ? 'compulsoria-marker' : ''}" style="
             width: 32px;
             height: 32px;
             background: ${color};
@@ -77,8 +119,8 @@ const MapaDashboard: React.FC<MapaDashboardProps> = memo(({
           ">
             ${estabelecimento.notificacoes}
           </div>
-          ${hasRadar ? `
-            <div class="radar-pulse" style="
+          ${hasRadar || isCompulsoria ? `
+            <div class="radar-pulse ${isCompulsoria ? 'compulsoria-pulse' : ''}" style="
               position: absolute;
               top: -3px;
               left: -3px;
@@ -90,11 +132,37 @@ const MapaDashboard: React.FC<MapaDashboardProps> = memo(({
               pointer-events: none;
             "></div>
           ` : ''}
+          ${isCompulsoria ? `
+            <div class="radar-pulse compulsoria-pulse" style="
+              position: absolute;
+              top: -8px;
+              left: -8px;
+              width: 48px;
+              height: 48px;
+              border: 2px solid ${color};
+              border-radius: 50%;
+              opacity: 0.4;
+              pointer-events: none;
+              animation-delay: 0.3s;
+            "></div>
+            <div class="radar-pulse compulsoria-pulse" style="
+              position: absolute;
+              top: -13px;
+              left: -13px;
+              width: 58px;
+              height: 58px;
+              border: 2px solid ${color};
+              border-radius: 50%;
+              opacity: 0.2;
+              pointer-events: none;
+              animation-delay: 0.6s;
+            "></div>
+          ` : ''}
         </div>
       `,
       iconSize: [32, 32],
       iconAnchor: [16, 16],
-      className: `dashboard-marker urgencia-${estabelecimento.urgencia}`
+      className: `dashboard-marker urgencia-${estabelecimento.urgencia} ${isCompulsoria ? 'compulsoria' : ''}`
     });
   }, [getUrgenciaColor]);
 

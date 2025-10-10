@@ -10,6 +10,7 @@ import {
   PieChart,
   Pie,
   Cell,
+  LabelList,
 } from "recharts";
 import { User, MousePointer, BarChart2, PieChart as PieChartIcon } from "lucide-react";
 import ChartExportMenu from '../../../../components/common/ChartExportMenu';
@@ -40,11 +41,11 @@ const DistribuicaoSexoChart: React.FC<DistribuicaoSexoChartProps> = ({
   onChartClick,
   activeFilter = null,
   chartId = "chart-genero",
-  title = "Distribuição por Sexo",
+  title = "Distribuição por Identidade de Gênero",
   className = "bg-white p-4 rounded-lg shadow-sm md:col-span-2 lg:col-span-2",
   exportMenu // 🆕 Prop para menu de exportação personalizado
 }) => {
-  const [chartType, setChartType] = useState<'bar' | 'pie'>('pie');
+  const [chartType, setChartType] = useState<'bar' | 'pie'>('bar');
 
   const toggleChartType = useCallback(() => {
     setChartType(prev => prev === 'bar' ? 'pie' : 'bar');
@@ -133,11 +134,17 @@ const DistribuicaoSexoChart: React.FC<DistribuicaoSexoChartProps> = ({
             ) : (
               <BarChart
                 data={data}
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                layout="vertical"
+                margin={{ top: 5, right: 80, left: 100, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="name" stroke="#666" />
-                <YAxis stroke="#666" />
+                <XAxis type="number" stroke="#666" />
+                <YAxis 
+                  dataKey="name" 
+                  type="category" 
+                  stroke="#666"
+                  width={100}
+                />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "#fff",
@@ -150,7 +157,7 @@ const DistribuicaoSexoChart: React.FC<DistribuicaoSexoChartProps> = ({
                 />
                 <Bar
                   dataKey="value"
-                  radius={[4, 4, 0, 0]}
+                  radius={[0, 4, 4, 0]}
                   onClick={(data) => {
                     if (data && data.name) {
                       handleChartItemClick(data.name);
@@ -166,6 +173,12 @@ const DistribuicaoSexoChart: React.FC<DistribuicaoSexoChartProps> = ({
                       strokeWidth={activeFilter === entry.name ? 2 : 0}
                     />
                   ))}
+                  <LabelList
+                    dataKey="value"
+                    position="right"
+                    formatter={(value: number) => value.toLocaleString()}
+                    style={{ fontSize: '14px', fontWeight: 'bold', fill: '#374151' }}
+                  />
                 </Bar>
               </BarChart>
             )}

@@ -10,6 +10,7 @@ import {
   PieChart,
   Pie,
   Cell,
+  LabelList,
 } from "recharts";
 import { Award, MousePointer, BarChart2, PieChart as PieChartIcon } from "lucide-react";
 import ChartExportMenu from '../../../../components/common/ChartExportMenu';
@@ -94,7 +95,7 @@ const DistribuicaoRacaCorChart: React.FC<DistribuicaoRacaCorChartProps> = ({
             {chartType === 'bar' ? (
               <BarChart
                 data={data}
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                margin={{ top: 25, right: 30, left: 20, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="name" stroke="#666" />
@@ -127,6 +128,16 @@ const DistribuicaoRacaCorChart: React.FC<DistribuicaoRacaCorChartProps> = ({
                       strokeWidth={activeFilter === entry.name ? 2 : 0}
                     />
                   ))}
+                  <LabelList 
+                    dataKey="value" 
+                    position="top" 
+                    style={{ 
+                      fontSize: '14px', 
+                      fontWeight: 'bold',
+                      fill: '#374151'
+                    }}
+                    formatter={(value: number) => value.toLocaleString()}
+                  />
                 </Bar>
               </BarChart>
             ) : (

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Globe, Building, Home } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
 import ChartExportMenu from '../../../../components/common/ChartExportMenu';
 import DashboardExportMenu from '../../../../components/common/DashboardExportMenu';
 
@@ -356,7 +356,7 @@ const InteractiveBarChart: React.FC<{
 
       {displayData.length > 0 ? (
         <ResponsiveContainer width="100%" height={Math.max(200, displayData.length * 25)}>
-          <BarChart data={displayData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+          <BarChart data={displayData} margin={{ top: 25, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis 
               dataKey="name" 
@@ -373,7 +373,14 @@ const InteractiveBarChart: React.FC<{
               cursor="pointer"
               onClick={handleBarClick}
               radius={[2, 2, 0, 0]}
-            />
+            >
+              <LabelList
+                dataKey="value"
+                position="top"
+                formatter={(value: number) => value.toLocaleString()}
+                style={{ fontSize: '14px', fontWeight: 'bold', fill: '#374151' }}
+              />
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       ) : (
@@ -752,7 +759,7 @@ const MunicipalitiesChartWithTable: React.FC<{
           {top10Municipalities.length > 0 ? (
             <div id={`${filterCategory}-chart`}>
               <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={top10Municipalities} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
+                <BarChart data={top10Municipalities} margin={{ top: 40, right: 30, left: 20, bottom: 80 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis 
                     dataKey="name" 
@@ -798,6 +805,12 @@ const MunicipalitiesChartWithTable: React.FC<{
                     {top10Municipalities.map((_, index) => (
                       <CustomMunicipalityCell key={`cell-${index}`} index={index} />
                     ))}
+                    <LabelList
+                      dataKey="value"
+                      position="top"
+                      formatter={(value: number) => value.toLocaleString()}
+                      style={{ fontSize: '14px', fontWeight: 'bold', fill: '#374151' }}
+                    />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -972,7 +985,7 @@ const NeighborhoodsChartWithTable: React.FC<{
           {top10Neighborhoods.length > 0 ? (
             <div id={`${filterCategory}-chart`}>
               <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={top10Neighborhoods} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
+                <BarChart data={top10Neighborhoods} margin={{ top: 40, right: 30, left: 20, bottom: 80 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis 
                     dataKey="name" 
@@ -1020,6 +1033,12 @@ const NeighborhoodsChartWithTable: React.FC<{
                     {top10Neighborhoods.map((_, index) => (
                       <CustomNeighborhoodCell key={`cell-${index}`} index={index} />
                     ))}
+                    <LabelList
+                      dataKey="value"
+                      position="top"
+                      formatter={(value: number) => value.toLocaleString()}
+                      style={{ fontSize: '14px', fontWeight: 'bold', fill: '#374151' }}
+                    />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
