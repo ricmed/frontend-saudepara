@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { ArrowLeft, Building2, Save, Trash2, Eraser, X, Menu } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { EstabelecimentoFormService } from "@/services/EstabelecimentoFormService";
+import { usuarioGestaoService } from "@/services/UsuarioGestaoService";  // 🆕 Importar serviço
 import {
   FIELD_LENGTHS,
   validateLength,
@@ -39,6 +40,7 @@ interface EstabelecimentoData {
   cnes?: string;
   cnpj?: string;
   cidade?: string;
+  municipioId?: number | null; // 🆕 Campo para associação com município
   logradouro?: string;
   bairro?: string;
   numero?: string;
@@ -62,6 +64,7 @@ const initialEstabelecimentoState: EstabelecimentoData = {
   cnes: "",
   cnpj: "",
   cidade: "",
+  municipioId: null, // 🆕 Inicializar como null
   logradouro: "",
   bairro: "",
   numero: "",
@@ -99,6 +102,7 @@ const EstabelecimentoForm: React.FC = () => {
   >([]);
   const [tiposNatureza, setTiposNatureza] = useState<OptionItem[]>([]);
   const [tiposTurno, setTiposTurno] = useState<OptionItem[]>([]);
+  const [municipios, setMunicipios] = useState<Array<{ id: number; descricao: string }>>([]);  // 🆕 Estado para municípios
   const [habilitacoes, setHabilitacoes] = useState<OptionItem[]>([]);
   const [qualificacoesDisponiveis, setQualificacoesDisponiveis] = useState<
     OptionItem[]
@@ -187,6 +191,79 @@ const EstabelecimentoForm: React.FC = () => {
     const fetchInitialData = async () => {
       try {
         setLoading(true);
+        
+        // 🆕 Buscar contexto do usuário para filtrar municípios
+        let userAccess: any = null;
+        let municipiosData: any[] = [];
+        
+        try {
+          userAccess = await usuarioGestaoService.getUserAccess();
+          console.log('🔐 Acesso do usuário:', userAccess);
+          
+          // Carregar municípios baseado no nível de acesso
+          if (userAccess) {
+            if (userAccess.nivel === 'unidade' || userAccess.nivel === 'estabelecimento') {
+              // Usuário de unidade: buscar município do estabelecimento
+              if (userAccess.estabelecimentoId) {
+                const estabelecimento = await usuarioGestaoService.getEstabelecimentoComHierarquia(userAccess.estabelecimentoId);
+                if (estabelecimento?.tipo_municipio) {
+                  municipiosData = [{
+                    idtipo_municipio: estabelecimento.tipo_municipio.idtipo_municipio,
+                    id: estabelecimento.tipo_municipio.idtipo_municipio,
+                    descricao: estabelecimento.tipo_municipio.descricao
+                  }];
+                }
+              }
+            } else if (userAccess.nivel === 'municipio') {
+              // Usuário de município: buscar apenas o município dele
+              if (userAccess.municipioId) {
+                try {
+                  const municipio = await usuarioGestaoService.getMunicipioComEstado(userAccess.municipioId);
+                  municipiosData = [{
+                    idtipo_municipio: municipio.idtipo_municipio,
+                    id: municipio.idtipo_municipio,
+                    descricao: municipio.descricao
+                  }];
+                } catch (error) {
+                  console.warn('⚠️ Erro ao buscar município específico, tentando pelo endpoint geral');
+                  const response = await fetch(`/api/municipios/${userAccess.municipioId}`, { credentials: 'include' });
+                  if (response.ok) {
+                    const mun = await response.json();
+                    municipiosData = [{
+                      idtipo_municipio: mun.idtipo_municipio || mun.id,
+                      id: mun.idtipo_municipio || mun.id,
+                      descricao: mun.descricao
+                    }];
+                  }
+                }
+              }
+            } else if (userAccess.nivel === 'estado') {
+              // Usuário de estado: buscar todos os municípios do estado
+              if (userAccess.estadoId) {
+                try {
+                  municipiosData = await usuarioGestaoService.getMunicipiosPorEstado(userAccess.estadoId);
+                } catch (error) {
+                  console.warn('⚠️ Erro ao buscar municípios do estado, tentando endpoint geral');
+                  const response = await fetch(`/api/municipios/estado/${userAccess.estadoId}`, { credentials: 'include' });
+                  if (response.ok) {
+                    municipiosData = await response.json();
+                  }
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ Não foi possível determinar contexto do usuário, carregando todos os municípios');
+        }
+        
+        // Se não conseguiu carregar municípios pelo nível de acesso, tenta carregar todos
+        if (municipiosData.length === 0) {
+          const response = await fetch('/api/municipios', { credentials: 'include' });
+          if (response.ok) {
+            municipiosData = await response.json();
+          }
+        }
+        
         // Buscar dados brutos primeiro
         const [
           tiposEstData,
@@ -242,12 +319,35 @@ const EstabelecimentoForm: React.FC = () => {
           }))
           .sort((a, b) => a.descricao.localeCompare(b.descricao));
 
+        // 🆕 Processar municípios
+        const muns = Array.isArray(municipiosData) 
+          ? municipiosData
+              .map((item: any) => ({
+                id: Number(item.idtipo_municipio || item.id),
+                descricao: item.descricao,
+              }))
+              .sort((a, b) => a.descricao.localeCompare(b.descricao))
+          : [];
+
         setTiposEstabelecimento(tiposEst);
         setTiposNatureza(tiposNat);
         setTiposTurno(tiposTur);
+        setMunicipios(muns); // 🆕 Salvar municípios no estado
         setHabilitacoes(habs);
         setQualificacoesDisponiveis(quals);
         setCurrentHabilitacoes(habs);
+        
+        // 🆕 Log para debug
+        console.log('📊 Dados carregados:', {
+          tiposEstabelecimento: tiposEst.length,
+          tiposNatureza: tiposNat.length,
+          tiposTurno: tiposTur.length,
+          municipios: muns.length,
+          municipiosCarregados: muns,
+          habilitacoes: habs.length,
+          qualificacoes: quals.length,
+          acessoUsuario: userAccess
+        });
 
         if (estabelecimentoData) {
           const formatEstabelecimento = {
@@ -260,6 +360,10 @@ const EstabelecimentoForm: React.FC = () => {
               : null,
             tipoTurnoId: estabelecimentoData.tipoTurnoId
               ? Number(estabelecimentoData.tipoTurnoId)
+              : null,
+            // 🆕 Mapear municipioId do backend
+            municipioId: estabelecimentoData.tipo_municipio_idtipo_municipio 
+              ? Number(estabelecimentoData.tipo_municipio_idtipo_municipio)
               : null,
           };
           setEstabelecimento(formatEstabelecimento);
@@ -317,6 +421,8 @@ const EstabelecimentoForm: React.FC = () => {
   const validateForm = async () => {
     if (!estabelecimento.nome?.trim())
       throw new Error("O campo Nome é obrigatório");
+    if (!estabelecimento.municipioId)  // 🆕 Validar município
+      throw new Error("O campo Município é obrigatório");
     if (!estabelecimento.cidade?.trim())
       throw new Error("O campo Cidade é obrigatório");
     if (!estabelecimento.logradouro?.trim())
@@ -360,7 +466,16 @@ const EstabelecimentoForm: React.FC = () => {
     setError(null);
     const addressFields = ["cidade", "logradouro", "bairro", "numero"];
     if (addressFields.includes(name)) setAddressFieldsModified(true);
-    setEstabelecimento((prev) => ({ ...prev, [name]: value }));
+    
+    // 🆕 Converter municipioId para número
+    if (name === 'municipioId') {
+      setEstabelecimento((prev) => ({ 
+        ...prev, 
+        [name]: value ? Number(value) : null 
+      }));
+    } else {
+      setEstabelecimento((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const prepareDataForSubmission = () => {
@@ -384,19 +499,31 @@ const EstabelecimentoForm: React.FC = () => {
       .filter((id) => id != null);
 
     console.log("IDs das habilitações que serão enviados:", habilitacoesIds);
+    
+    // 🆕 Log de debug para município
+    console.log("📍 Debug município:", {
+      municipioIdOriginal: estabelecimento.municipioId,
+      municipioIdClean: cleanData.municipioId,
+      tipoMunicipioQueSeraEnviado: cleanData.municipioId
+    });
 
-    return {
+    const dataToSend = {
       ...cleanData,
       tipo_estabelecimento_idtipo_estabelecimento:
         cleanData.tipoEstabelecimentoId,
       tipo_natureza_idtipo_natureza: cleanData.tipoNaturezaId,
       tipo_turno_idtipo_turno: cleanData.tipoTurnoId,
+      tipo_municipio_idtipo_municipio: cleanData.municipioId, // 🆕 Incluir município
       habilitacoes: habilitacoesIds,
       qualificacoes: qualificacoesSelecionadas
         .map((q) => q.id || q.idtipo_qualificacao)
         .filter((id) => id != null),
       ativo: cleanData.ativo || "N",
     };
+    
+    console.log("📦 Dados que serão enviados:", dataToSend);
+    
+    return dataToSend;
   };
 
   const isFormModified = (): boolean => {
@@ -486,11 +613,11 @@ const EstabelecimentoForm: React.FC = () => {
       
       if (id) {
         console.log('📝 Atualizando estabelecimento...');
-        await EstabelecimentoFormService.update(Number(id), dataToSubmit);
+        await EstabelecimentoFormService.update(Number(id), dataToSubmit as any);
         alert("Estabelecimento atualizado com sucesso!");
       } else {
         console.log('➕ Criando novo estabelecimento...');
-        await EstabelecimentoFormService.create(dataToSubmit);
+        await EstabelecimentoFormService.create(dataToSubmit as any);
         alert("Estabelecimento criado com sucesso!");
       }
       navigate(-1);
@@ -776,6 +903,7 @@ const EstabelecimentoForm: React.FC = () => {
               handleInputChange={handleInputChange}
               fieldErrors={fieldErrors}
               updateAddressFromCoordinates={updateAddressFromCoordinates}
+              municipios={municipios}
             />
             <InformacoesComplementares
               estabelecimento={estabelecimento}

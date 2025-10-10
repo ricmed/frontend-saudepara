@@ -17,6 +17,7 @@ export interface EstabelecimentoData {
   cnes?: string;
   cnpj?: string;
   cidade?: string;
+  municipioId?: number | null; // 🆕 Campo de município
   logradouro?: string;
   bairro?: string;
   numero?: string;
@@ -28,6 +29,7 @@ export interface EstabelecimentoData {
   tipo_estabelecimento_idtipo_estabelecimento?: number; // Original do backend
   tipo_natureza_idtipo_natureza?: number; // Original do backend
   tipo_turno_idtipo_turno?: number; // Original do backend
+  tipo_municipio_idtipo_municipio?: number | null; // 🆕 Campo de município no formato backend
   ativo: string;
   habilitacoes?: number[];
   habilitacoes_selecionadas?: Array<{

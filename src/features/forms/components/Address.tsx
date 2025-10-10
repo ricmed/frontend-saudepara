@@ -12,6 +12,7 @@ interface EstabelecimentoData {
   cnes?: string;
   cnpj?: string;
   cidade?: string;
+  municipioId?: number | null;  // 🆕 Campo de município
   logradouro?: string;
   bairro?: string;
   numero?: string;
@@ -32,6 +33,7 @@ interface EnderecoProps {
   handleInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
   fieldErrors: FieldErrors;
   updateAddressFromCoordinates: (lat: number, lng: number) => void;
+  municipios?: Array<{ id: number; descricao: string }>;  // 🆕 Lista de municípios
 }
 
 const Address: React.FC<EnderecoProps> = ({
@@ -39,6 +41,7 @@ const Address: React.FC<EnderecoProps> = ({
   handleInputChange,
   fieldErrors,
   updateAddressFromCoordinates,
+  municipios = [],  // 🆕 Valor padrão
 }) => {
   return (
     <div className="bg-white rounded-xl shadow-sm p-6 transition-shadow hover:shadow-md">
@@ -48,6 +51,30 @@ const Address: React.FC<EnderecoProps> = ({
       />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="space-y-6">
+          {/* 🆕 Campo de Município */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Município <span className="text-red-500">*</span>
+            </label>
+            <select
+              name="municipioId"
+              value={estabelecimento.municipioId || ''}
+              onChange={handleInputChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            >
+              <option value="">Selecione um município</option>
+              {municipios.map((municipio) => (
+                <option key={municipio.id} value={municipio.id}>
+                  {municipio.descricao}
+                </option>
+              ))}
+            </select>
+            {fieldErrors.municipioId && (
+              <p className="mt-1 text-sm text-red-600">{fieldErrors.municipioId}</p>
+            )}
+          </div>
+          
           <FormField
             label="Cidade"
             name="cidade"

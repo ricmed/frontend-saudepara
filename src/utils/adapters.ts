@@ -48,6 +48,13 @@ if ('tipo_turno_idtipo_turno' in backendData) {
     ? Number(backendData.tipo_turno_idtipo_turno)
     : null;
 }
+
+// 🆕 Mapear ID de município
+if ('tipo_municipio_idtipo_municipio' in backendData) {
+  formattedData.municipioId = backendData.tipo_municipio_idtipo_municipio !== undefined && backendData.tipo_municipio_idtipo_municipio !== null
+    ? Number(backendData.tipo_municipio_idtipo_municipio)
+    : null;
+}
   
   // Processar habilitações (se disponíveis)
   if (backendData.estabelecimento_has_tipo_habilitacao && 
@@ -165,6 +172,23 @@ export const formatToBackend = (frontendData: EstabelecimentoGenerico, isUpdate:
     payload.tipo_turno_idtipo_turno = 
       trimmedData.tipoTurnoId ? Number(trimmedData.tipoTurnoId) : null;
   }
+  
+  // 🆕 Mapear ID de município
+  if ('tipo_municipio_idtipo_municipio' in trimmedData) {
+    payload.tipo_municipio_idtipo_municipio = 
+      Number(trimmedData.tipo_municipio_idtipo_municipio) || null;
+  } else if ('municipioId' in trimmedData) {
+    payload.tipo_municipio_idtipo_municipio = 
+      trimmedData.municipioId ? Number(trimmedData.municipioId) : null;
+  }
+  
+  console.log('🔍 Debug adaptador - município:', {
+    temTipoMunicipioOriginal: 'tipo_municipio_idtipo_municipio' in trimmedData,
+    valorTipoMunicipioOriginal: trimmedData.tipo_municipio_idtipo_municipio,
+    temMunicipioId: 'municipioId' in trimmedData,
+    valorMunicipioId: trimmedData.municipioId,
+    valorFinalPayload: payload.tipo_municipio_idtipo_municipio
+  });
   
   // Processar habilitações para a estrutura de relação correta
   if ('habilitacoes' in trimmedData && Array.isArray(trimmedData.habilitacoes)) {

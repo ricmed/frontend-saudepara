@@ -5,6 +5,7 @@ export interface Estabelecimento {
   cnpj?: string;
   cnes?: string;
   cidade: string;
+  tipo_municipio_idtipo_municipio?: number;  // 🆕 Campo de município
   logradouro: string;
   bairro: string;
   numero: string;
@@ -17,6 +18,16 @@ export interface Estabelecimento {
   tipo_estabelecimento_descricao?: string;
   tipo_natureza_descricao?: string;
   tipo_turno_descricao?: string;
+  
+  // Relação com município (incluindo estado)
+  tipo_municipio?: {
+    idtipo_municipio: number;
+    descricao: string;
+    tipo_estado?: {
+      idtipo_estado: number;
+      descricao: string;
+    };
+  };
   
   // Propriedades para compatibilidade com o frontend
   habilitacoes?: Array<{
