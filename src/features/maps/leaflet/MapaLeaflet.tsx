@@ -4,7 +4,7 @@ import { MapaContainer } from "./components/MapaContainer";
 import { BotoesControle } from "./components/BotoesControle";
 import { MapProviderOverlay } from "./components/MapProviderOverlay";
 import { useGeolocation } from "./hooks/useGeolocation";
-import { useEstabelecimentos } from "./hooks/useEstabelecimentos";
+import { useEstabelecimentos, useEstabelecimentosFiltrados } from "./hooks/useEstabelecimentos";
 import { useRouting } from "./hooks/useRouting";
 import { MapProviderProvider } from "./contexts/MapProviderContext";
 import { RoutingServiceOSRM } from "./services/routingServiceOSRM";
@@ -37,14 +37,29 @@ const MapaLeaflet: React.FC = () => {
     obterLocalizacao,
   } = useGeolocation();
 
+  // Filtros - Declarar ANTES de usar no hook
+  const [searchRadius, setSearchRadius] = useState(DEFAULT_RADIUS);
+  const [habilitacaoSelecionada, setHabilitacaoSelecionada] = useState("todas");
+  const [qualificacaoSelecionada, setQualificacaoSelecionada] = useState("todas");
+  const [naturezaSelecionada, setNaturezaSelecionada] = useState("todos");
+  const [tipoEstabelecimentoSelecionado, setTipoEstabelecimentoSelecionado] = useState("todos");
+
   // Hook de Estabelecimentos (agora consome API)
   const {
-    filteredPlaces,
+    allPlaces,
     tiposHabilitacoes,
     tiposQualificacoes,
+    tiposEstabelecimentos,
     isLoading,
     carregarEstabelecimentos,
   } = useEstabelecimentos();
+
+  // Aplicar filtros adicionais aos estabelecimentos
+  const filteredPlaces = useEstabelecimentosFiltrados(
+    allPlaces,
+    tipoEstabelecimentoSelecionado,
+    naturezaSelecionada
+  );
 
   // Hook de Roteamento
   const { routeState, clearRoute } = useRouting();
@@ -95,12 +110,6 @@ const MapaLeaflet: React.FC = () => {
 
   // Controla quantos resultados aparecem
   const [visibleCount, setVisibleCount] = useState(20);
-
-  // Filtros
-  const [searchRadius, setSearchRadius] = useState(DEFAULT_RADIUS);
-  const [habilitacaoSelecionada, setHabilitacaoSelecionada] = useState("todas");
-  const [qualificacaoSelecionada, setQualificacaoSelecionada] = useState("todas");
-  const [naturezaSelecionada, setNaturezaSelecionada] = useState("todos");
 
   // Estados para controle de carregamento e erros
   const [inicializando, setInicializando] = useState(true);
@@ -160,6 +169,22 @@ const MapaLeaflet: React.FC = () => {
     
     inicializar();
   }, []); // Dependências vazias - executar apenas uma vez
+
+  /**
+   * Pré-selecionar "Postos de Coleta do Círio de Nazaré" quando os tipos estiverem carregados
+   */
+  useEffect(() => {
+    if (tiposEstabelecimentos.length > 0 && tipoEstabelecimentoSelecionado === "todos") {
+      const postosCirco = tiposEstabelecimentos.find(
+        tipo => tipo.nome === "Postos de Coleta do Círio de Nazaré"
+      );
+      
+      if (postosCirco) {
+        console.log('🎯 Pré-selecionando "Postos de Coleta do Círio de Nazaré"');
+        setTipoEstabelecimentoSelecionado(postosCirco.nome);
+      }
+    }
+  }, [tiposEstabelecimentos.length]); // Executar quando os tipos forem carregados
 
   /**
    * Aplicar filtros locais quando filtros mudarem
@@ -483,15 +508,18 @@ const MapaLeaflet: React.FC = () => {
           menuAberto={painelEstabelecimentosAberto}
           tiposHabilitacoes={tiposHabilitacoes}
           tiposQualificacoes={tiposQualificacoes}
+          tiposEstabelecimentos={tiposEstabelecimentos}
           habilitacaoSelecionada={habilitacaoSelecionada}
           qualificacaoSelecionada={qualificacaoSelecionada}
           naturezaSelecionada={naturezaSelecionada}
+          tipoEstabelecimentoSelecionado={tipoEstabelecimentoSelecionado}
           searchRadius={searchRadius}
           filteredPlaces={filteredPlaces}
           visibleCount={visibleCount}
           onHabilitacaoChange={setHabilitacaoSelecionada}
           onQualificacaoChange={setQualificacaoSelecionada}
           onNaturezaChange={setNaturezaSelecionada}
+          onTipoEstabelecimentoChange={setTipoEstabelecimentoSelecionado}
           onRadiusChange={setSearchRadius}
           onLoadMore={() => setVisibleCount((prev) => prev + 20)}
           onSearch={onSearch}

@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Local, TipoHabilitacao, TipoQualificacao } from '../types';
+import { Local, TipoHabilitacao, TipoQualificacao, TipoEstabelecimento } from '../types';
 import { MIN_RADIUS, MAX_RADIUS } from '../utils/constants';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { QUALIFICACOES_PREDEFINIDAS } from '../../../../data/qualificacoesPredefinidas';
+// import { QUALIFICACOES_PREDEFINIDAS } from '../../../../data/qualificacoesPredefinidas'; // Temporariamente não usado
 import { NavigationMenu } from './NavigationMenu';
 
 // Importar estilos CSS customizados
@@ -14,9 +14,11 @@ interface PainelLateralProps {
 
   tiposHabilitacoes: TipoHabilitacao[];
   tiposQualificacoes: TipoQualificacao[];
+  tiposEstabelecimentos: TipoEstabelecimento[];
   habilitacaoSelecionada: string;
   qualificacaoSelecionada: string;
   naturezaSelecionada: string;
+  tipoEstabelecimentoSelecionado: string;
   searchRadius: number;
   filteredPlaces: Local[];
   visibleCount: number;
@@ -24,6 +26,7 @@ interface PainelLateralProps {
   onHabilitacaoChange: (habilitacao: string) => void;
   onQualificacaoChange: (qualificacao: string) => void;
   onNaturezaChange: (natureza: string) => void;
+  onTipoEstabelecimentoChange: (tipo: string) => void;
   onRadiusChange: (radius: number) => void;
   onLoadMore: () => void;
   onSearch: () => void;
@@ -32,19 +35,22 @@ interface PainelLateralProps {
 export const PainelLateral: React.FC<PainelLateralProps> = ({
   menuAberto,
   onClose,
-  tiposHabilitacoes,
-  habilitacaoSelecionada,
-  qualificacaoSelecionada,
+  tiposHabilitacoes, // Temporariamente não usado
+  tiposEstabelecimentos,
+  habilitacaoSelecionada, // Temporariamente não usado
+  qualificacaoSelecionada, // Temporariamente não usado
   naturezaSelecionada,
+  tipoEstabelecimentoSelecionado,
   searchRadius,
   filteredPlaces,
   visibleCount,
-  onHabilitacaoChange,
-  onQualificacaoChange,
+  onHabilitacaoChange, // Temporariamente não usado
+  onQualificacaoChange, // Temporariamente não usado
   onNaturezaChange,
+  onTipoEstabelecimentoChange,
   onRadiusChange,
   onLoadMore,
-  onSearch,
+  onSearch, // Temporariamente não usado
 }) => {
   const [searchText, setSearchText] = useState('');
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
@@ -59,11 +65,21 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
     setExpandedCards(newExpanded);
   };
 
+  // Temporariamente não usado - mantido para futura reativação
   const handleRadiusChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const kmValue = Number(e.target.value);
     const value = Math.max(MIN_RADIUS, Math.min(MAX_RADIUS, kmValue * 1000));
     onRadiusChange(value);
   };
+
+  // Suprimir aviso de variável não usada
+  void handleRadiusChange;
+  void tiposHabilitacoes;
+  void habilitacaoSelecionada;
+  void qualificacaoSelecionada;
+  void onHabilitacaoChange;
+  void onQualificacaoChange;
+  void onSearch;
 
   // Filtrar estabelecimentos baseado no texto de pesquisa
   const searchFilteredPlaces = useMemo(() => {
@@ -140,8 +156,26 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
           </div>
         </div>
 
-        {/* Seletor de habilitação */}
+        {/* Seletor de tipo de estabelecimento */}
         <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Tipo de Estabelecimento
+          </label>
+          <select
+            value={tipoEstabelecimentoSelecionado}
+            onChange={(e) => onTipoEstabelecimentoChange(e.target.value)}
+            className="w-full p-3 text-sm border border-gray-300 rounded-lg shadow-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            {tiposEstabelecimentos.map((tipo) => (
+              <option key={tipo.id} value={tipo.nome}>
+                {tipo.nome}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Seletor de habilitação - TEMPORARIAMENTE OCULTO */}
+        {/* <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Habilitação
           </label>
@@ -157,10 +191,10 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
               </option>
             ))}
           </select>
-        </div>
+        </div> */}
 
-        {/* Campo de pesquisa por qualificação */}
-        <div className="mb-4">
+        {/* Campo de pesquisa por qualificação - TEMPORARIAMENTE OCULTO */}
+        {/* <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Qualificação
           </label>
@@ -175,7 +209,7 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
               </option>
             ))}
           </select>
-        </div>
+        </div> */}
 
         {/* Seletor de natureza */}
         <div className="mb-4">
@@ -193,8 +227,8 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
           </select>
         </div>
 
-        {/* Raio de busca */}
-        <div className="mb-4">
+        {/* Raio de busca - TEMPORARIAMENTE OCULTO */}
+        {/* <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Raio de Busca (km)
           </label>
@@ -220,7 +254,7 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
           <p className="text-xs text-gray-500 mt-1">
             Digite um valor entre {MIN_RADIUS / 1000} e {MAX_RADIUS / 1000} km
           </p>
-        </div>
+        </div> */}
 
         {/* Lista de estabelecimentos */}
         <div className="border-t border-gray-200 pt-4 flex-1 overflow-hidden">

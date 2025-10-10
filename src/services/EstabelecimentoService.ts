@@ -42,6 +42,19 @@ const mapApiResponse = (data: any): TipoEstabelecimento => ({
 });
 
 export const EstabelecimentoService = {
+  // Busca todos os tipos de estabelecimento para usar em select/dropdown
+  getAllForSelect: async (): Promise<TipoEstabelecimento[]> => {
+    try {
+      console.log('🔍 Buscando tipos de estabelecimento para select...');
+      const response = await axios.get<TipoEstabelecimento[]>(`${API_URL}/select`);
+      console.log('✅ Tipos de estabelecimento recebidos:', response.data);
+      return response.data || [];
+    } catch (error) {
+      console.error('❌ Erro ao buscar tipos de estabelecimento:', error);
+      return handleApiError(error as AxiosError<APIError>);
+    }
+  },
+
   getAll: async (): Promise<TipoEstabelecimento[]> => {
     try {
       const response = await axios.get<PaginatedResponse>(API_URL);

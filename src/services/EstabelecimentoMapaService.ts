@@ -62,6 +62,7 @@ export interface Local {
   cnpj?: string;
   codigo_unidade?: string;
   ativo: boolean;
+  tipoEstabelecimento?: string;
 }
 
 interface APIError {
@@ -125,8 +126,7 @@ const mapToLocal = (estabelecimento: EstabelecimentoMapa): Local => {
     cnpj: '',
     codigo_unidade: '',
     ativo: true, // Já vem filtrado como ativo da API
-    // Manter também o ID original do estabelecimento para referência
-    idestabelecimento: estabelecimento.idestabelecimento
+    tipoEstabelecimento: estabelecimento.tipo_estabelecimento?.descricao || 'Não informado',
   };
 };
 
@@ -201,6 +201,22 @@ export const EstabelecimentoMapaService = {
     return [
       { id: "todas", nome: "Todas as Qualificações" },
       ...qualificacoesUnicas.map(qualificacao => ({ id: qualificacao, nome: qualificacao }))
+    ];
+  },
+
+  /**
+   * Extrai tipos de estabelecimentos únicos dos estabelecimentos carregados
+   */
+  getTiposEstabelecimentosUnicos: (estabelecimentos: Local[]): Array<{id: string, nome: string}> => {
+    // Coletar todos os tipos de estabelecimentos
+    const todosTipos = estabelecimentos
+      .map(e => e.tipoEstabelecimento)
+      .filter(tipo => tipo && tipo !== 'Não informado') as string[];
+    const tiposUnicos = Array.from(new Set(todosTipos));
+    
+    return [
+      { id: "todos", nome: "Todos os Tipos" },
+      ...tiposUnicos.map(tipo => ({ id: tipo, nome: tipo }))
     ];
   }
 };
