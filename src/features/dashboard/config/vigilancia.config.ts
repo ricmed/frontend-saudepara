@@ -57,17 +57,31 @@ export const detectarAlertas = (notificacoes: any[]): AlertaEpidemiologico[] => 
   const alertas: AlertaEpidemiologico[] = [];
   const agora = new Date();
 
-  // 1. 🚨 ALERTAS BASEADOS NAS REGRAS GVS (principais)
-  const hipotesesProcessadas = new Set<string>();
-  
-  notificacoes.forEach((notif) => {
-    const hipoteseNome = (
+  // � HELPER: Verificar se é trauma (excluir de análise de surto)
+  const isTrauma = (notif: any): boolean => {
+    const tipoAtendimento = notif.original?.tipo_atendimento?.descricao || 
+                           notif.tipo_atendimento?.descricao || '';
+    return /trauma|traumat|acidente/i.test(tipoAtendimento);
+  };
+
+  // 🔧 HELPER: Extrair nome da hipótese
+  const getHipoteseNome = (notif: any): string => {
+    return (
       notif.hipoteseDiagnostico ||
       notif.tipo_hipotese_diag?.descricao ||
       notif.original?.tipo_hipotese_diag?.descricao ||
       ''
     );
+  };
 
+  // 1. 🚨 ALERTAS BASEADOS NAS REGRAS GVS (principais) - POR HIPÓTESE
+  const hipotesesProcessadas = new Set<string>();
+  
+  notificacoes.forEach((notif) => {
+    // ❌ IGNORAR traumas para alertas de surto
+    if (isTrauma(notif)) return;
+
+    const hipoteseNome = getHipoteseNome(notif);
     const match = findRuleByHypothesis(hipoteseNome);
     if (!match) return;
 
@@ -123,110 +137,190 @@ export const detectarAlertas = (notificacoes: any[]): AlertaEpidemiologico[] => 
     });
   });
 
-  // 3. 📍 CONCENTRAÇÃO GEOGRÁFICA (possível surto) - MELHORADA
-  const porEstabelecimento: Record<string, { nome: string; qtd: number }> = notificacoes.reduce((acc, notif, index) => {
-    // Buscar estabelecimento em diferentes locais da estrutura
-    const possiveisEstabelecimentos = [
-      notif.original?.estabelecimento_notificacao_estabelecimento_idestabelecimentoToestabelecimento,
-      notif.estabelecimento_notificacao_estabelecimento_idestabelecimentoToestabelecimento,
-      notif.original?.estabelecimento_idestabelecimento,
-      notif.estabelecimento_idestabelecimento,
-      notif.original?.estabelecimento,
-      notif.estabelecimento
-    ];
-
-    let estabelecimentoEncontrado = null;
-    for (const est of possiveisEstabelecimentos) {
-      if (est && (est.nome || est.idestabelecimento)) {
-        estabelecimentoEncontrado = est;
-        break;
-      }
+  // 2. 🦠 ANÁLISE DE SURTO POR HIPÓTESE ESPECÍFICA (excluindo traumas)
+  // Agrupar notificações por hipótese diagnóstica
+  const notificacoesPorHipotese = new Map<string, any[]>();
+  
+  notificacoes.forEach((notif) => {
+    // ❌ IGNORAR traumas
+    if (isTrauma(notif)) return;
+    
+    const hipoteseNome = getHipoteseNome(notif);
+    if (!hipoteseNome) return;
+    
+    if (!notificacoesPorHipotese.has(hipoteseNome)) {
+      notificacoesPorHipotese.set(hipoteseNome, []);
     }
+    notificacoesPorHipotese.get(hipoteseNome)!.push(notif);
+  });
 
-    const id = estabelecimentoEncontrado?.idestabelecimento ?? `sem_id_${index}`;
-    const nome = estabelecimentoEncontrado?.nome ?? 'Estabelecimento não informado';
+  // Analisar cada hipótese separadamente
+  notificacoesPorHipotese.forEach((casos, hipotese) => {
+    const totalCasos = casos.length;
     
-    if (!acc[id]) acc[id] = { nome, qtd: 0 };
-    acc[id].qtd++;
-    return acc;
-  }, {} as Record<string, { nome: string; qtd: number }>);
-
-  Object.entries(porEstabelecimento).forEach(([id, estabelecimento]) => {
-    const { nome, qtd } = estabelecimento;
+    // 🔍 Verificar se a hipótese pode causar surto (doenças transmissíveis)
+    const match = findRuleByHypothesis(hipotese);
+    const podeCausarSurto = match && (match.rule.priority === 'critical' || match.rule.priority === 'high');
     
-    // ✅ CORREÇÃO: Não gerar alertas para estabelecimentos sem informação válida
-    const isEstabelecimentoValido = !id.startsWith('sem_id') && 
-                                   !/não informado|sem informação|desconhecido/i.test(nome) &&
-                                   nome.trim().length > 0;
+    // Thresholds específicos por tipo de doença
+    const thresholdSurto = match?.rule.priority === 'critical' ? 3 : 5; // Doenças críticas: 3+ casos; Outras: 5+ casos
     
-    if (qtd >= VigilanciaConfig.thresholds.clusterPorEstabelecimento && isEstabelecimentoValido) {
-      const bucket = Math.floor(agora.getTime() / 60000);
-      const alertaId = `concentracao-${id}-${bucket}`;
+    if (podeCausarSurto && totalCasos >= thresholdSurto) {
+      const bucket = Math.floor(agora.getTime() / (60*60*1000));
+      const alertaId = `surto-${normalize(hipotese).replace(/\s+/g, '_')}-${bucket}`;
       
       alertas.push({
         id: alertaId,
-        tipo: 'atencao',
-        titulo: '📍 CONCENTRAÇÃO DE CASOS - INVESTIGAÇÃO EPIDEMIOLÓGICA',
-        descricao: `${qtd} casos registrados em ${nome}. Concentração pode indicar surto localizado. Recomenda-se investigação epidemiológica.`,
+        tipo: 'critico',
+        titulo: `🦠 POSSÍVEL SURTO: ${hipotese.toUpperCase()}`,
+        descricao: `${totalCasos} casos de ${hipotese} detectados. Número de casos sugere possível surto epidemiológico. Requer investigação imediata e medidas de controle.`,
         timestamp: agora,
         lido: false,
-        dados: { 
-          estabelecimento: nome, 
-          quantidade: qtd,
+        dados: {
+          hipotese: hipotese,
+          totalCasos: totalCasos,
           criterioLegal: 'Guia de Vigilância em Saúde - Investigação de Surtos',
-          acaoRecomendada: 'Investigação epidemiológica de campo'
+          acaoRecomendada: `Investigação epidemiológica imediata. Identificar fonte e implementar medidas de controle.`,
+          acaoCampo: 'Visita aos casos, busca ativa, investigação de contactantes'
         }
       });
     }
   });
 
-  // 4. 📈 AUMENTO SÚBITO DE CASOS (análise temporal) - MELHORADA
-  const ultimas24h = notificacoes.filter(notif => {
-    const d = VigilanciaConfig.parseData(notif.original?.data_notificacao) ?? VigilanciaConfig.parseData(notif.created_at);
-    if (!d || isNaN(d.getTime())) return false;
-    return (agora.getTime() - d.getTime()) <= 24*60*60*1000;
-  });
-
-  if (ultimas24h.length >= VigilanciaConfig.thresholds.volume24h) {
-    const bucket = Math.floor(agora.getTime() / (60*60*1000)); // Agrupa por hora
+  // 3. 📍 CONCENTRAÇÃO GEOGRÁFICA POR HIPÓTESE (possível surto localizado)
+  notificacoesPorHipotese.forEach((casos, hipotese) => {
+    const match = findRuleByHypothesis(hipotese);
+    const podeCausarSurto = match && (match.rule.priority === 'critical' || match.rule.priority === 'high');
     
-    alertas.push({
-      id: `volume-24h-${bucket}`,
-      tipo: 'critico',
-      titulo: '📈 AUMENTO SÚBITO DE NOTIFICAÇÕES',
-      descricao: `${ultimas24h.length} notificações nas últimas 24 horas. Aumento pode indicar surto ou evento de saúde pública. Análise epidemiológica recomendada.`,
-      timestamp: agora,
-      lido: false,
-      dados: {
-        casosUltimas24h: ultimas24h.length,
-        criterioLegal: 'Guia de Vigilância em Saúde - Detecção de Surtos',
-        acaoRecomendada: 'Investigação epidemiológica imediata'
+    if (!podeCausarSurto) return; // Só analisar doenças que podem causar surto
+    
+    // Agrupar por estabelecimento
+    const porEstabelecimento: Record<string, { nome: string; qtd: number }> = {};
+    
+    casos.forEach((notif, index) => {
+      const possiveisEstabelecimentos = [
+        notif.original?.estabelecimento_notificacao_estabelecimento_idestabelecimentoToestabelecimento,
+        notif.estabelecimento_notificacao_estabelecimento_idestabelecimentoToestabelecimento,
+        notif.original?.estabelecimento_idestabelecimento,
+        notif.estabelecimento_idestabelecimento,
+        notif.original?.estabelecimento,
+        notif.estabelecimento
+      ];
+
+      let estabelecimentoEncontrado = null;
+      for (const est of possiveisEstabelecimentos) {
+        if (est && (est.nome || est.idestabelecimento)) {
+          estabelecimentoEncontrado = est;
+          break;
+        }
+      }
+
+      const id = estabelecimentoEncontrado?.idestabelecimento ?? `sem_id_${index}`;
+      const nome = estabelecimentoEncontrado?.nome ?? 'Estabelecimento não informado';
+      
+      if (!porEstabelecimento[id]) porEstabelecimento[id] = { nome, qtd: 0 };
+      porEstabelecimento[id].qtd++;
+    });
+    
+    // Alertar se concentração em estabelecimento específico
+    Object.entries(porEstabelecimento).forEach(([id, estabelecimento]) => {
+      const { nome, qtd } = estabelecimento;
+      const thresholdConcentracao = match?.rule.priority === 'critical' ? 2 : 3;
+      
+      const isEstabelecimentoValido = !id.startsWith('sem_id') && 
+                                     !/não informado|sem informação|desconhecido/i.test(nome) &&
+                                     nome.trim().length > 0;
+      
+      if (qtd >= thresholdConcentracao && isEstabelecimentoValido) {
+        const bucket = Math.floor(agora.getTime() / 60000);
+        const alertaId = `concentracao-${normalize(hipotese)}-${id}-${bucket}`;
+        
+        alertas.push({
+          id: alertaId,
+          tipo: 'urgente',
+          titulo: `📍 CONCENTRAÇÃO: ${hipotese.toUpperCase()}`,
+          descricao: `${qtd} casos de ${hipotese} em ${nome}. Concentração geográfica pode indicar surto localizado. Investigar fonte comum.`,
+          timestamp: agora,
+          lido: false,
+          dados: { 
+            hipotese: hipotese,
+            estabelecimento: nome, 
+            quantidade: qtd,
+            criterioLegal: 'Guia de Vigilância em Saúde - Investigação de Surtos',
+            acaoRecomendada: 'Investigação de fonte comum, busca ativa de casos'
+          }
+        });
       }
     });
-  }
-
-  // 5. 👶 CASOS PEDIÁTRICOS (grupo prioritário)
-  const casosPediatricos = notificacoes.filter(notif => {
-    const idade = notif.paciente?.idade || notif.original?.paciente?.idade;
-    return idade !== null && idade !== undefined && Number(idade) < 5;
   });
 
-  if (casosPediatricos.length >= VigilanciaConfig.thresholds.casosPediatricos) {
-    alertas.push({
-      id: `pediatrico-${Math.floor(agora.getTime() / (60*60*1000))}`,
-      tipo: 'urgente',
-      titulo: '👶 ATENÇÃO: CASOS PEDIÁTRICOS',
-      descricao: `${casosPediatricos.length} casos em menores de 5 anos identificados. Crianças são grupo prioritário para vigilância epidemiológica. Verificar cobertura vacinal e medidas de prevenção.`,
-      timestamp: agora,
-      lido: false,
-      dados: {
-        totalCasosPediatricos: casosPediatricos.length,
-        idades: casosPediatricos.map(c => c.paciente?.idade || c.original?.paciente?.idade).filter(Boolean),
-        criterioLegal: 'Guia de Vigilância em Saúde - Vigilância Pediátrica',
-        acaoRecomendada: 'Verificar situação vacinal e medidas de prevenção'
-      }
+  // 4. 📈 AUMENTO SÚBITO POR HIPÓTESE nas últimas 24h
+  notificacoesPorHipotese.forEach((casos, hipotese) => {
+    const match = findRuleByHypothesis(hipotese);
+    const podeCausarSurto = match && (match.rule.priority === 'critical' || match.rule.priority === 'high');
+    
+    if (!podeCausarSurto) return;
+    
+    const ultimas24h = casos.filter(notif => {
+      const d = VigilanciaConfig.parseData(notif.original?.data_notificacao) ?? VigilanciaConfig.parseData(notif.created_at);
+      if (!d || isNaN(d.getTime())) return false;
+      return (agora.getTime() - d.getTime()) <= 24*60*60*1000;
     });
-  }
+
+    const thresholdVolume24h = match.rule.priority === 'critical' ? 3 : 5;
+    
+    if (ultimas24h.length >= thresholdVolume24h) {
+      const bucket = Math.floor(agora.getTime() / (60*60*1000));
+      
+      alertas.push({
+        id: `volume-24h-${normalize(hipotese)}-${bucket}`,
+        tipo: 'critico',
+        titulo: `📈 AUMENTO SÚBITO: ${hipotese.toUpperCase()}`,
+        descricao: `${ultimas24h.length} casos de ${hipotese} nas últimas 24 horas. Aumento súbito pode indicar surto em evolução. Investigação imediata necessária.`,
+        timestamp: agora,
+        lido: false,
+        dados: {
+          hipotese: hipotese,
+          casosUltimas24h: ultimas24h.length,
+          criterioLegal: 'Guia de Vigilância em Saúde - Detecção de Surtos',
+          acaoRecomendada: 'Investigação epidemiológica imediata, identificar e controlar fonte'
+        }
+      });
+    }
+  });
+
+  // 5. 👶 CASOS PEDIÁTRICOS (grupo prioritário) - apenas para doenças transmissíveis
+  notificacoesPorHipotese.forEach((casos, hipotese) => {
+    const match = findRuleByHypothesis(hipotese);
+    const podeCausarSurto = match && (match.rule.priority === 'critical' || match.rule.priority === 'high');
+    
+    if (!podeCausarSurto) return;
+    
+    const casosPediatricos = casos.filter(notif => {
+      const idade = notif.paciente?.idade || notif.original?.paciente?.idade;
+      return idade !== null && idade !== undefined && Number(idade) < 60; // < 5 anos (60 meses)
+    });
+
+    if (casosPediatricos.length >= 2) { // 2+ casos pediátricos já é relevante
+      const bucket = Math.floor(agora.getTime() / (60*60*1000));
+      
+      alertas.push({
+        id: `pediatrico-${normalize(hipotese)}-${bucket}`,
+        tipo: 'urgente',
+        titulo: `👶 CASOS PEDIÁTRICOS: ${hipotese.toUpperCase()}`,
+        descricao: `${casosPediatricos.length} casos de ${hipotese} em menores de 5 anos. Crianças são grupo prioritário. Verificar cobertura vacinal e medidas de prevenção.`,
+        timestamp: agora,
+        lido: false,
+        dados: {
+          hipotese: hipotese,
+          totalCasosPediatricos: casosPediatricos.length,
+          idades: casosPediatricos.map(c => c.paciente?.idade || c.original?.paciente?.idade).filter(Boolean),
+          criterioLegal: 'Guia de Vigilância em Saúde - Vigilância Pediátrica',
+          acaoRecomendada: 'Verificar situação vacinal, avaliar medidas de prevenção e controle'
+        }
+      });
+    }
+  });
 
   return alertas;
 };
