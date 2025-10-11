@@ -489,9 +489,14 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
               {datasDisponiveis.map((data) => {
                 const dataFormatada = new Date(data + 'T00:00:00').toLocaleDateString('pt-BR');
                 const quantidade = notificacoes.filter(n => {
-                  const dataAtendimento = n?.original?.data_atendimento;
-                  if (!dataAtendimento) return false;
-                  return new Date(dataAtendimento).toISOString().split('T')[0] === data;
+                  // 📅 Usar data de criação da notificação (created_at)
+                  const dataCreated = n?.created_at || n?.original?.created_at;
+                  if (!dataCreated) return false;
+                  try {
+                    return new Date(dataCreated).toISOString().split('T')[0] === data;
+                  } catch (error) {
+                    return false;
+                  }
                 }).length;
                 const isToday = data === new Date().toISOString().split('T')[0];
                 
