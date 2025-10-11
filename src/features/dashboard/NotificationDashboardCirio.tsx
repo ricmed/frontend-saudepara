@@ -12,6 +12,10 @@ import {
   PieChart,
   Pie,
   Cell,
+  AreaChart,
+  Area,
+  LabelList,
+  Dot,
 } from "recharts";
 import { findRuleByHypothesis } from './config/vigilancia.config';
 import {
@@ -3299,13 +3303,22 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
               
               <div className="h-80">
                 {(() => {
-                  // Processar dados por dia
+                  // Processar dados por dia - MESMA LÓGICA DO DASHBOARD E MAPA
+                  const timezone = 'America/Belem';
                   const notificacoesPorDia = notificacoes.reduce((acc: any, notif: any) => {
                     const dataCreated = notif?.created_at || notif?.original?.created_at;
                     if (!dataCreated) return acc;
                     
                     try {
-                      const data = new Date(dataCreated).toISOString().split('T')[0];
+                      // Converter para o fuso horário local (IGUAL AO DASHBOARD/MAPA)
+                      const dataLocal = new Date(dataCreated);
+                      const data = dataLocal.toLocaleDateString('pt-BR', {
+                        timeZone: timezone,
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit'
+                      }).split('/').reverse().join('-'); // Converter para YYYY-MM-DD
+                      
                       if (!acc[data]) {
                         acc[data] = { total: 0 };
                       }
@@ -3328,7 +3341,13 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                   
                   return dadosGrafico.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={dadosGrafico} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                      <AreaChart data={dadosGrafico} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                        <defs>
+                          <linearGradient id="colorQuantidade" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.1}/>
+                          </linearGradient>
+                        </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                         <XAxis 
                           dataKey="data" 
@@ -3351,17 +3370,51 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                           formatter={(value: any, name: string) => {
                             if (name === 'quantidade') {
                               const item = dadosGrafico.find((d: any) => d.quantidade === value);
-                              return [`${value} notificações (${item?.percentual}% do total)`, 'Total'];
+                              return [`${value} notificações (${item?.percentual}% do total geral)`, 'Total'];
                             }
                             return [value, name];
                           }}
                         />
-                        <Bar 
+                        <Area 
+                          type="monotone"
                           dataKey="quantidade" 
-                          fill="#3B82F6"
-                          radius={[8, 8, 0, 0]}
-                        />
-                      </BarChart>
+                          stroke="#3B82F6"
+                          strokeWidth={2}
+                          fillOpacity={1}
+                          fill="url(#colorQuantidade)"
+                          dot={(props: any) => {
+                            if (props.payload.quantidade === 0) {
+                              return <circle cx={props.cx} cy={props.cy} r={0} fill="transparent" />;
+                            }
+                            return <circle cx={props.cx} cy={props.cy} r={4} fill="#3B82F6" strokeWidth={2} />;
+                          }}
+                          activeDot={(props: any) => {
+                            if (props.payload.quantidade === 0) {
+                              return <circle cx={props.cx} cy={props.cy} r={0} fill="transparent" />;
+                            }
+                            return <circle cx={props.cx} cy={props.cy} r={6} fill="#3B82F6" />;
+                          }}
+                        >
+                          <LabelList 
+                            dataKey="quantidade" 
+                            position="top" 
+                            style={{ fill: '#1e40af', fontWeight: 'bold', fontSize: 12 }}
+                            content={(props: any) => {
+                              if (props.value === 0) return null;
+                              return (
+                                <text 
+                                  x={props.x} 
+                                  y={props.y - 10} 
+                                  textAnchor="middle" 
+                                  style={{ fill: '#1e40af', fontWeight: 'bold', fontSize: 12 }}
+                                >
+                                  {props.value}
+                                </text>
+                              );
+                            }}
+                          />
+                        </Area>
+                      </AreaChart>
                     </ResponsiveContainer>
                   ) : (
                     <div className="h-full flex items-center justify-center text-gray-500">

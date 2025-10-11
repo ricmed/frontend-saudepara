@@ -9,6 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  LabelList,
 } from 'recharts';
 import { Clock, TrendingUp, AlertTriangle, BarChart3, Calendar } from 'lucide-react';
 import { useAtendimentosPorHora } from '../hooks/useAtendimentosPorHora';
@@ -214,10 +215,6 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
                 <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
                 <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1}/>
               </linearGradient>
-              <linearGradient id="colorPercentual" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
-              </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
             <XAxis 
@@ -230,23 +227,14 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
               height={60}
             />
             <YAxis 
-              yAxisId="left"
               stroke="#64748b" 
               fontSize={12}
               allowDecimals={false}
-            />
-            <YAxis 
-              yAxisId="right"
-              orientation="right"
-              stroke="#10b981" 
-              fontSize={12}
-              tickFormatter={(value) => `${value}%`}
             />
             <Tooltip content={<CustomTooltip />} />
             <Legend />
             
             <Area
-              yAxisId="left"
               type="monotone"
               dataKey="quantidade"
               stroke="#3b82f6"
@@ -254,18 +242,38 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
               fillOpacity={0.6}
               fill="url(#colorQuantidade)"
               name="Total de Atendimentos"
-            />
-            
-            <Area
-              yAxisId="right"
-              type="monotone"
-              dataKey="percentual"
-              stroke="#10b981"
-              strokeWidth={2}
-              fillOpacity={0.6}
-              fill="url(#colorPercentual)"
-              name="% do Total Geral"
-            />
+              dot={(props: any) => {
+                if (props.payload.quantidade === 0) {
+                  return <circle cx={props.cx} cy={props.cy} r={0} fill="transparent" />;
+                }
+                return <circle cx={props.cx} cy={props.cy} r={4} fill="#3b82f6" strokeWidth={2} />;
+              }}
+              activeDot={(props: any) => {
+                if (props.payload.quantidade === 0) {
+                  return <circle cx={props.cx} cy={props.cy} r={0} fill="transparent" />;
+                }
+                return <circle cx={props.cx} cy={props.cy} r={6} fill="#3b82f6" />;
+              }}
+            >
+              <LabelList 
+                dataKey="quantidade" 
+                position="top" 
+                style={{ fill: '#1e40af', fontWeight: 'bold', fontSize: 11 }}
+                content={(props: any) => {
+                  if (props.value === 0) return null;
+                  return (
+                    <text 
+                      x={props.x} 
+                      y={props.y - 10} 
+                      textAnchor="middle" 
+                      style={{ fill: '#1e40af', fontWeight: 'bold', fontSize: 11 }}
+                    >
+                      {props.value}
+                    </text>
+                  );
+                }}
+              />
+            </Area>
           </AreaChart>
         </ResponsiveContainer>
       </div>
