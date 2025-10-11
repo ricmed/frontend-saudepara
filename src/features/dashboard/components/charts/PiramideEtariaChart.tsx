@@ -35,16 +35,10 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Recarregar dados quando filteredData mudar
   useEffect(() => {
     loadData();
-  }, []);
-
-  // Recarregar dados quando filteredData mudar - com dependências corretas
-  useEffect(() => {
-    if (filteredData && Array.isArray(filteredData) && filteredData.length > 0) {
-      loadData();
-    }
-  }, [filteredData?.length]); // Usar apenas o length para evitar loop
+  }, [filteredData]); // Reagir a qualquer mudança em filteredData (incluindo quando fica vazio)
 
   // Função para calcular faixa etária - DEVE MANTER O MESMO FORMATO do NotificationDashboard
   const getFaixaEtaria = (idadeMeses: number): string => {
@@ -119,13 +113,15 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
       
       console.log('🔍 Carregando dados para pirâmide etária...');
       
-      // Usar dados filtrados se disponíveis, senão buscar todos
+      // ✅ SEMPRE usar dados filtrados quando disponíveis (mesmo se vazio)
+      // Se filteredData for undefined/null, buscar todos os dados
       let result;
-      if (filteredData && filteredData.length > 0) {
+      if (filteredData !== undefined && filteredData !== null) {
         console.log('📊 Usando dados filtrados:', filteredData.length, 'registros');
         result = { data: filteredData };
       } else {
         // Usar endpoint existente de notificações com dados do paciente
+        console.log('📊 Buscando todos os dados (sem filtro)...');
         result = await NotificacaoService.getAll(1, 1000); // Buscar muitos registros
         console.log('📊 Dados recebidos:', result);
       }
