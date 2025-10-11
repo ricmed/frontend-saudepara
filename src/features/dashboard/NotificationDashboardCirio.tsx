@@ -3300,7 +3300,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           </div>
           
           <EstabelecimentosMapaAvancado 
-            key={`mapa-${lastUpdate}-${originalNotificacoes.current.length}`}
             notificacoes={originalNotificacoes.current}
             exportOptions={exportOptions} 
           />

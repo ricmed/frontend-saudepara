@@ -8,7 +8,10 @@ import {
   Info,
   AlertTriangle,
   Activity,
-  Building
+  Building,
+  Calendar,
+  Filter,
+  X
 } from 'lucide-react';
 
 // Importar componentes do sistema de mapas existente
@@ -52,6 +55,10 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
   const [selectedEstabelecimento, setSelectedEstabelecimento] = useState<EstabelecimentoInfo | null>(null);
   const [showLayers, setShowLayers] = useState(true);
   
+  // 🆕 Estados para filtros
+  const [tipoEstabelecimentoSelecionado, setTipoEstabelecimentoSelecionado] = useState<string | null>(null);
+  const [dataSelecionada, setDataSelecionada] = useState<string | null>(null);
+  
   // Usar o hook do sistema de mapas existente
   const { allPlaces, isLoading, carregarEstabelecimentos } = useEstabelecimentos();
 
@@ -80,9 +87,16 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
 
   // ⏰ AUTO-REFRESH: Reprocessar quando notificações mudarem (alinhado com dashboard)
   useEffect(() => {
-    console.log('🔄 Notificações atualizadas no mapa:', notificacoes.length);
+    console.log('🔄 Notificações atualizadas no mapa:', {
+      totalNotificacoes: notificacoes.length,
+      filtrosAtivos: {
+        tipo: tipoEstabelecimentoSelecionado,
+        data: dataSelecionada
+      }
+    });
     // Força reprocessamento dos estabelecimentos quando notificações mudarem
-  }, [notificacoes]); // Depende das notificações para reagir às atualizações do dashboard
+    // Os filtros (tipoEstabelecimentoSelecionado e dataSelecionada) são MANTIDOS durante o refresh
+  }, [notificacoes, tipoEstabelecimentoSelecionado, dataSelecionada]); // Depende das notificações para reagir às atualizações do dashboard
 
   // Memoizar o mapa de estabelecimentos para evitar recriações
   const allPlacesMap = useMemo(() => {
@@ -117,11 +131,40 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
       .filter(Boolean);
   }, [notificacoes]);
 
+  // 🆕 Extrair tipos de estabelecimento disponíveis
+  const tiposEstabelecimento = useMemo(() => {
+    const tipos = new Set<string>();
+    allPlaces.forEach(lugar => {
+      if (lugar.tipoEstabelecimento) {
+        tipos.add(lugar.tipoEstabelecimento);
+      }
+    });
+    return Array.from(tipos).sort();
+  }, [allPlaces]);
+
+  // 🆕 Extrair datas disponíveis das notificações
+  const datasDisponiveis = useMemo(() => {
+    const datas = new Set<string>();
+    notificacoes.forEach(n => {
+      const dataAtendimento = n?.original?.data_atendimento;
+      if (dataAtendimento) {
+        // Extrair apenas a data (YYYY-MM-DD)
+        const dataFormatada = new Date(dataAtendimento).toISOString().split('T')[0];
+        datas.add(dataFormatada);
+      }
+    });
+    return Array.from(datas).sort().reverse(); // Mais recentes primeiro
+  }, [notificacoes]);
+
   // Processar estabelecimentos de forma memoizada
   const estabelecimentosProcessados = useMemo(() => {
     console.log('🔄 Processando estabelecimentos...', {
       allPlacesMapSize: allPlacesMap.size,
-      notificacoesLength: notificacoes.length
+      notificacoesLength: notificacoes.length,
+      filtros: {
+        tipoEstabelecimento: tipoEstabelecimentoSelecionado,
+        data: dataSelecionada
+      }
     });
     
     if (allPlacesMap.size === 0 || notificacoes.length === 0) {
@@ -132,11 +175,24 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
       return [];
     }
 
+    // 🆕 Filtrar notificações por data se necessário
+    let notificacoesFiltradas = notificacoes;
+    
+    if (dataSelecionada) {
+      notificacoesFiltradas = notificacoes.filter(n => {
+        const dataAtendimento = n?.original?.data_atendimento;
+        if (!dataAtendimento) return false;
+        const dataFormatada = new Date(dataAtendimento).toISOString().split('T')[0];
+        return dataFormatada === dataSelecionada;
+      });
+      console.log(`📅 Filtrado por data ${dataSelecionada}: ${notificacoesFiltradas.length} de ${notificacoes.length} notificações`);
+    }
+
     const estabelecimentosMap = new Map<string, EstabelecimentoInfo>();
     let notificacoesProcessadas = 0;
     let notificacoesComEstabelecimento = 0;
     
-    notificacoes.forEach((notificacao, index) => {
+    notificacoesFiltradas.forEach((notificacao, index) => {
       const estabelecimentoId = notificacao?.original?.estabelecimento_idestabelecimento ||
                                notificacao?.estabelecimentoId;
       
@@ -205,7 +261,7 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
               longitude: lugarInfo.lng,
               notificacoes: 1,
               urgencia: 'baixa',
-              tipo: lugarInfo.natureza || 'hospital',
+              tipo: lugarInfo.tipoEstabelecimento || lugarInfo.natureza || 'hospital',
               endereco: lugarInfo.endereco,
               originalLocal: lugarInfo,
               temNotificacaoCompulsoria: isCompulsoria
@@ -243,11 +299,31 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
       estabelecimentosUnicos: estabelecimentosMap.size
     });
 
-    const resultado = Array.from(estabelecimentosMap.values());
+    let resultado = Array.from(estabelecimentosMap.values());
+    
+    console.log(`🔍 Antes de filtrar por tipo:`, {
+      total: resultado.length,
+      tiposFiltro: tipoEstabelecimentoSelecionado,
+      tiposPresentes: [...new Set(resultado.map(e => e.tipo))].slice(0, 5)
+    });
+    
+    // 🆕 Filtrar por tipo de estabelecimento se necessário
+    if (tipoEstabelecimentoSelecionado) {
+      const antesDoFiltro = resultado.length;
+      resultado = resultado.filter(est => {
+        const match = est.tipo === tipoEstabelecimentoSelecionado;
+        if (!match && antesDoFiltro < 5) {
+          console.log(`❌ Tipo "${est.tipo}" não corresponde a "${tipoEstabelecimentoSelecionado}"`);
+        }
+        return match;
+      });
+      console.log(`🏥 Filtrado por tipo "${tipoEstabelecimentoSelecionado}": ${resultado.length} de ${antesDoFiltro} estabelecimentos`);
+    }
+    
     console.log(`✅ Retornando ${resultado.length} estabelecimentos processados`);
     
     return resultado;
-  }, [allPlacesMap, notificacoes, exportOptions]);
+  }, [allPlacesMap, notificacoes, exportOptions, tipoEstabelecimentoSelecionado, dataSelecionada]);
 
   // Atualizar estado apenas quando dados processados mudarem
   useEffect(() => {
@@ -341,6 +417,12 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
               <p className="text-sm text-gray-600">
                 {estabelecimentos.length} estabelecimentos com notificações • {allPlaces.length} total no sistema
               </p>
+              {(tipoEstabelecimentoSelecionado || dataSelecionada) && (
+                <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                  <Info className="h-3 w-3" />
+                  Filtros ativos mantidos durante atualização automática
+                </p>
+              )}
             </div>
           </div>
           
@@ -356,6 +438,107 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
             </button>
           </div>
         </div>
+
+        {/* 🆕 Filtros */}
+        <div className="mt-4 flex flex-wrap gap-3 items-center border-t pt-4">
+          <div className="flex items-center gap-2 text-gray-700">
+            <Filter className="h-4 w-4" />
+            <span className="font-medium text-sm">Filtros:</span>
+          </div>
+
+          {/* Filtro de Tipo de Estabelecimento */}
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs text-gray-600 mb-1">Tipo de Estabelecimento</label>
+            <select
+              value={tipoEstabelecimentoSelecionado || 'todos'}
+              onChange={(e) => setTipoEstabelecimentoSelecionado(e.target.value === 'todos' ? null : e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="todos">📊 Todos os Tipos ({allPlaces.length})</option>
+              {tiposEstabelecimento.map((tipo) => {
+                const quantidade = allPlaces.filter(p => p.tipoEstabelecimento === tipo).length;
+                return (
+                  <option key={tipo} value={tipo}>
+                    {tipo} ({quantidade})
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          {/* Filtro de Data */}
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs text-gray-600 mb-1">Data de Atendimento</label>
+            <select
+              value={dataSelecionada || 'todas'}
+              onChange={(e) => setDataSelecionada(e.target.value === 'todas' ? null : e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="todas">📅 Todas as Datas ({notificacoes.length})</option>
+              {datasDisponiveis.map((data) => {
+                const dataFormatada = new Date(data + 'T00:00:00').toLocaleDateString('pt-BR');
+                const quantidade = notificacoes.filter(n => {
+                  const dataAtendimento = n?.original?.data_atendimento;
+                  if (!dataAtendimento) return false;
+                  return new Date(dataAtendimento).toISOString().split('T')[0] === data;
+                }).length;
+                const isToday = data === new Date().toISOString().split('T')[0];
+                
+                return (
+                  <option key={data} value={data}>
+                    {isToday ? '🕐' : '📅'} {dataFormatada} ({quantidade})
+                    {isToday ? ' - Hoje' : ''}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          {/* Botão para limpar filtros */}
+          {(tipoEstabelecimentoSelecionado || dataSelecionada) && (
+            <button
+              onClick={() => {
+                setTipoEstabelecimentoSelecionado(null);
+                setDataSelecionada(null);
+              }}
+              className="flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors text-sm"
+              title="Limpar todos os filtros"
+            >
+              <X className="h-4 w-4" />
+              Limpar
+            </button>
+          )}
+        </div>
+
+        {/* Mostrar filtros ativos */}
+        {(tipoEstabelecimentoSelecionado || dataSelecionada) && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {tipoEstabelecimentoSelecionado && (
+              <div className="flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs">
+                <Building className="h-3 w-3" />
+                <span>Tipo: {tipoEstabelecimentoSelecionado}</span>
+                <button
+                  onClick={() => setTipoEstabelecimentoSelecionado(null)}
+                  className="hover:bg-blue-200 rounded-full p-0.5"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
+            {dataSelecionada && (
+              <div className="flex items-center gap-2 bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-xs">
+                <Calendar className="h-3 w-3" />
+                <span>Data: {new Date(dataSelecionada + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                <button
+                  onClick={() => setDataSelecionada(null)}
+                  className="hover:bg-purple-200 rounded-full p-0.5"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="relative">
