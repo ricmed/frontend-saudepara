@@ -98,6 +98,43 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
     // Os filtros (tipoEstabelecimentoSelecionado e dataSelecionada) são MANTIDOS durante o refresh
   }, [notificacoes, tipoEstabelecimentoSelecionado, dataSelecionada]); // Depende das notificações para reagir às atualizações do dashboard
 
+  // 🆕 FUNÇÃO AUXILIAR: Deduplica notificações mantendo a versão MAIS ANTIGA
+  const deduplicarNotificacoes = useCallback((notifs: any[]) => {
+    const mapaNotificacoes = new Map<string, any>();
+    
+    notifs.forEach((notif: any) => {
+      const notifId = notif?.idnotificacao_sinais_sintomas || notif?.original?.idnotificacao_sinais_sintomas;
+      
+      if (!notifId) {
+        const tempId = `temp-${Math.random()}`;
+        mapaNotificacoes.set(tempId, notif);
+        return;
+      }
+      
+      const idStr = String(notifId);
+      const dataAtual = notif?.created_at || notif?.original?.created_at;
+      
+      if (!mapaNotificacoes.has(idStr)) {
+        mapaNotificacoes.set(idStr, notif);
+      } else {
+        const notifExistente = mapaNotificacoes.get(idStr);
+        const dataExistente = notifExistente?.created_at || notifExistente?.original?.created_at;
+        
+        if (dataAtual && dataExistente) {
+          try {
+            if (new Date(dataAtual).getTime() < new Date(dataExistente).getTime()) {
+              mapaNotificacoes.set(idStr, notif);
+            }
+          } catch (error) {
+            // Ignorar erro
+          }
+        }
+      }
+    });
+    
+    return Array.from(mapaNotificacoes.values());
+  }, []);
+
   // Memoizar o mapa de estabelecimentos para evitar recriações
   const allPlacesMap = useMemo(() => {
     if (!allPlaces || allPlaces.length === 0) {
@@ -144,26 +181,7 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
 
   // 🆕 Extrair datas disponíveis das notificações (data de criação)
   const datasDisponiveis = useMemo(() => {
-    // 🆕 DEDUPLICAR NOTIFICAÇÕES POR ID antes de extrair datas
-    const notificacoesUnicas = notificacoes.reduce((acc: any[], notif: any) => {
-      const notifId = notif?.idnotificacao_sinais_sintomas || notif?.original?.idnotificacao_sinais_sintomas;
-      
-      if (!notifId) {
-        acc.push(notif);
-        return acc;
-      }
-      
-      const jaExiste = acc.some((n: any) => {
-        const existingId = n?.idnotificacao_sinais_sintomas || n?.original?.idnotificacao_sinais_sintomas;
-        return existingId && String(existingId) === String(notifId);
-      });
-      
-      if (!jaExiste) {
-        acc.push(notif);
-      }
-      
-      return acc;
-    }, []);
+    const notificacoesUnicas = deduplicarNotificacoes(notificacoes);
     
     const datas = new Set<string>();
     notificacoesUnicas.forEach(n => {
@@ -180,7 +198,7 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
       }
     });
     return Array.from(datas).sort().reverse(); // Mais recentes primeiro
-  }, [notificacoes]);
+  }, [notificacoes, deduplicarNotificacoes]);
 
   // Processar estabelecimentos de forma memoizada
   const estabelecimentosProcessados = useMemo(() => {
@@ -201,28 +219,8 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
       return [];
     }
 
-    // 🆕 DEDUPLICAR NOTIFICAÇÕES POR ID - Manter apenas a primeira ocorrência de cada ID
-    const notificacoesUnicas = notificacoes.reduce((acc: any[], notif: any) => {
-      const notifId = notif?.idnotificacao_sinais_sintomas || notif?.original?.idnotificacao_sinais_sintomas;
-      
-      if (!notifId) {
-        // Se não tem ID, incluir mesmo assim
-        acc.push(notif);
-        return acc;
-      }
-      
-      // Verificar se já existe uma notificação com este ID
-      const jaExiste = acc.some((n: any) => {
-        const existingId = n?.idnotificacao_sinais_sintomas || n?.original?.idnotificacao_sinais_sintomas;
-        return existingId && String(existingId) === String(notifId);
-      });
-      
-      if (!jaExiste) {
-        acc.push(notif);
-      }
-      
-      return acc;
-    }, []);
+    // 🆕 DEDUPLICAR NOTIFICAÇÕES POR ID - Manter a versão com data MAIS ANTIGA (entrada original no sistema)
+    const notificacoesUnicas = deduplicarNotificacoes(notificacoes);
     
     if (notificacoes.length !== notificacoesUnicas.length) {
       console.log(`🔄 Deduplicação: ${notificacoes.length} → ${notificacoesUnicas.length} notificações únicas (removidas ${notificacoes.length - notificacoesUnicas.length} duplicatas)`);
@@ -533,51 +531,18 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
               onChange={(e) => setDataSelecionada(e.target.value === 'todas' ? null : e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="todas">📅 Todas as Datas ({(() => {
-                // Deduplic para contar corretamente
-                const notificacoesUnicas = notificacoes.reduce((acc: any[], notif: any) => {
-                  const notifId = notif?.idnotificacao_sinais_sintomas || notif?.original?.idnotificacao_sinais_sintomas;
-                  if (!notifId) {
-                    acc.push(notif);
-                    return acc;
-                  }
-                  const jaExiste = acc.some((n: any) => {
-                    const existingId = n?.idnotificacao_sinais_sintomas || n?.original?.idnotificacao_sinais_sintomas;
-                    return existingId && String(existingId) === String(notifId);
-                  });
-                  if (!jaExiste) acc.push(notif);
-                  return acc;
-                }, []);
-                return notificacoesUnicas.length;
-              })()})</option>
+              <option value="todas">📅 Todas as Datas ({deduplicarNotificacoes(notificacoes).length})</option>
               {datasDisponiveis.map((data) => {
                 const dataFormatada = new Date(data + 'T00:00:00').toLocaleDateString('pt-BR');
-                const quantidade = (() => {
-                  // Deduplic para contar corretamente
-                  const notificacoesUnicas = notificacoes.reduce((acc: any[], notif: any) => {
-                    const notifId = notif?.idnotificacao_sinais_sintomas || notif?.original?.idnotificacao_sinais_sintomas;
-                    if (!notifId) {
-                      acc.push(notif);
-                      return acc;
-                    }
-                    const jaExiste = acc.some((n: any) => {
-                      const existingId = n?.idnotificacao_sinais_sintomas || n?.original?.idnotificacao_sinais_sintomas;
-                      return existingId && String(existingId) === String(notifId);
-                    });
-                    if (!jaExiste) acc.push(notif);
-                    return acc;
-                  }, []);
-                  
-                  return notificacoesUnicas.filter(n => {
-                    const dataCreated = n?.created_at || n?.original?.created_at;
-                    if (!dataCreated) return false;
-                    try {
-                      return new Date(dataCreated).toISOString().split('T')[0] === data;
-                    } catch (error) {
-                      return false;
-                    }
-                  }).length;
-                })();
+                const quantidade = deduplicarNotificacoes(notificacoes).filter(n => {
+                  const dataCreated = n?.created_at || n?.original?.created_at;
+                  if (!dataCreated) return false;
+                  try {
+                    return new Date(dataCreated).toISOString().split('T')[0] === data;
+                  } catch (error) {
+                    return false;
+                  }
+                }).length;
                 const isToday = data === new Date().toISOString().split('T')[0];
                 
                 return (
