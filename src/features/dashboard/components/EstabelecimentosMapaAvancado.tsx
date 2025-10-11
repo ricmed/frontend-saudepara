@@ -98,43 +98,6 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
     // Os filtros (tipoEstabelecimentoSelecionado e dataSelecionada) são MANTIDOS durante o refresh
   }, [notificacoes, tipoEstabelecimentoSelecionado, dataSelecionada]); // Depende das notificações para reagir às atualizações do dashboard
 
-  // 🆕 FUNÇÃO AUXILIAR: Deduplica notificações mantendo a versão MAIS ANTIGA
-  const deduplicarNotificacoes = useCallback((notifs: any[]) => {
-    const mapaNotificacoes = new Map<string, any>();
-    
-    notifs.forEach((notif: any) => {
-      const notifId = notif?.idnotificacao_sinais_sintomas || notif?.original?.idnotificacao_sinais_sintomas;
-      
-      if (!notifId) {
-        const tempId = `temp-${Math.random()}`;
-        mapaNotificacoes.set(tempId, notif);
-        return;
-      }
-      
-      const idStr = String(notifId);
-      const dataAtual = notif?.created_at || notif?.original?.created_at;
-      
-      if (!mapaNotificacoes.has(idStr)) {
-        mapaNotificacoes.set(idStr, notif);
-      } else {
-        const notifExistente = mapaNotificacoes.get(idStr);
-        const dataExistente = notifExistente?.created_at || notifExistente?.original?.created_at;
-        
-        if (dataAtual && dataExistente) {
-          try {
-            if (new Date(dataAtual).getTime() < new Date(dataExistente).getTime()) {
-              mapaNotificacoes.set(idStr, notif);
-            }
-          } catch (error) {
-            // Ignorar erro
-          }
-        }
-      }
-    });
-    
-    return Array.from(mapaNotificacoes.values());
-  }, []);
-
   // Memoizar o mapa de estabelecimentos para evitar recriações
   const allPlacesMap = useMemo(() => {
     if (!allPlaces || allPlaces.length === 0) {
@@ -181,10 +144,8 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
 
   // 🆕 Extrair datas disponíveis das notificações (data de criação)
   const datasDisponiveis = useMemo(() => {
-    const notificacoesUnicas = deduplicarNotificacoes(notificacoes);
-    
     const datas = new Set<string>();
-    notificacoesUnicas.forEach(n => {
+    notificacoes.forEach((n: any) => {
       // 📅 Usar data de criação da notificação (created_at), não data de atendimento
       const dataCreated = n?.created_at || n?.original?.created_at;
       if (dataCreated) {
@@ -198,7 +159,7 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
       }
     });
     return Array.from(datas).sort().reverse(); // Mais recentes primeiro
-  }, [notificacoes, deduplicarNotificacoes]);
+  }, [notificacoes]);
 
   // Processar estabelecimentos de forma memoizada
   const estabelecimentosProcessados = useMemo(() => {
@@ -219,18 +180,11 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
       return [];
     }
 
-    // 🆕 DEDUPLICAR NOTIFICAÇÕES POR ID - Manter a versão com data MAIS ANTIGA (entrada original no sistema)
-    const notificacoesUnicas = deduplicarNotificacoes(notificacoes);
-    
-    if (notificacoes.length !== notificacoesUnicas.length) {
-      console.log(`🔄 Deduplicação: ${notificacoes.length} → ${notificacoesUnicas.length} notificações únicas (removidas ${notificacoes.length - notificacoesUnicas.length} duplicatas)`);
-    }
-
     // 🆕 Filtrar notificações por data se necessário (data de criação)
-    let notificacoesFiltradas = notificacoesUnicas;
+    let notificacoesFiltradas = notificacoes;
     
     if (dataSelecionada) {
-      notificacoesFiltradas = notificacoes.filter(n => {
+      notificacoesFiltradas = notificacoes.filter((n: any) => {
         // 📅 Usar data de criação da notificação (created_at), não data de atendimento
         const dataCreated = n?.created_at || n?.original?.created_at;
         if (!dataCreated) return false;
@@ -531,10 +485,10 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
               onChange={(e) => setDataSelecionada(e.target.value === 'todas' ? null : e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="todas">📅 Todas as Datas ({deduplicarNotificacoes(notificacoes).length})</option>
+              <option value="todas">📅 Todas as Datas ({notificacoes.length})</option>
               {datasDisponiveis.map((data) => {
                 const dataFormatada = new Date(data + 'T00:00:00').toLocaleDateString('pt-BR');
-                const quantidade = deduplicarNotificacoes(notificacoes).filter(n => {
+                const quantidade = notificacoes.filter((n: any) => {
                   const dataCreated = n?.created_at || n?.original?.created_at;
                   if (!dataCreated) return false;
                   try {
