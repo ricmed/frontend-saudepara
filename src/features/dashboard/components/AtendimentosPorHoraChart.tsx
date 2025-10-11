@@ -76,6 +76,9 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
+      const totalGeral = estatisticas.totalAtendimentos;
+      const percentualDoTotal = totalGeral > 0 ? ((data.quantidade / totalGeral) * 100).toFixed(1) : '0';
+      
       return (
         <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
           <p className="font-medium text-gray-900">{`Horário: ${label}`}</p>
@@ -83,12 +86,9 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
             <span className="inline-block w-3 h-3 bg-blue-500 rounded-full mr-2"></span>
             {`Atendimentos: ${data.quantidade}`}
           </p>
-          <p className="text-red-600">
-            <span className="inline-block w-3 h-3 bg-red-500 rounded-full mr-2"></span>
-            {`Urgências: ${data.urgencia}`}
-          </p>
-          <p className="text-sm text-gray-500 mt-1">
-            {data.quantidade > 0 ? `${Math.round((data.urgencia / data.quantidade) * 100)}% urgentes` : '0% urgentes'}
+          <p className="text-green-600">
+            <span className="inline-block w-3 h-3 bg-green-500 rounded-full mr-2"></span>
+            {`Percentual: ${percentualDoTotal}% do total geral`}
           </p>
         </div>
       );
@@ -106,7 +106,7 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
           </div>
           <div>
             <h3 className="text-lg font-medium text-gray-900">
-              Fluxo de Atendimentos por Hora
+              Série Temporal por Horário de Notificação
             </h3>
             <p className="text-sm text-gray-600">
               {dataSelecionada 
@@ -174,13 +174,13 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
           </p>
         </div>
 
-        <div className="bg-orange-50 p-3 rounded-lg">
+        <div className="bg-purple-50 p-3 rounded-lg">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-orange-600" />
-            <span className="text-sm font-medium text-orange-900">Urgências</span>
+            <BarChart3 className="h-4 w-4 text-purple-600" />
+            <span className="text-sm font-medium text-purple-900">Média/Hora</span>
           </div>
-          <p className="text-lg font-bold text-orange-700 mt-1">
-            {estatisticas.percentualUrgencia}%
+          <p className="text-lg font-bold text-purple-700 mt-1">
+            {estatisticas.mediaHoraria}
           </p>
         </div>
 
@@ -188,11 +188,11 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-gray-600" />
             <span className="text-sm font-medium text-gray-900">
-              {dataSelecionada ? 'Média/h' : 'Dias Disp.'}
+              Dias Disponíveis
             </span>
           </div>
           <p className="text-lg font-bold text-gray-700 mt-1">
-            {dataSelecionada ? estatisticas.mediaHoraria : datasDisponiveis.length}
+            {datasDisponiveis.length}
           </p>
         </div>
       </div>
@@ -200,15 +200,23 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
       {/* Gráfico */}
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={atendimentosPorHora} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+          <AreaChart 
+            data={atendimentosPorHora.map((item: any) => ({
+              ...item,
+              percentual: estatisticas.totalAtendimentos > 0 
+                ? parseFloat(((item.quantidade / estatisticas.totalAtendimentos) * 100).toFixed(1))
+                : 0
+            }))} 
+            margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+          >
             <defs>
               <linearGradient id="colorQuantidade" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
                 <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1}/>
               </linearGradient>
-              <linearGradient id="colorUrgencia" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
-                <stop offset="95%" stopColor="#ef4444" stopOpacity={0.1}/>
+              <linearGradient id="colorPercentual" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
@@ -221,11 +229,24 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
               textAnchor="end"
               height={60}
             />
-            <YAxis stroke="#64748b" fontSize={12} />
+            <YAxis 
+              yAxisId="left"
+              stroke="#64748b" 
+              fontSize={12}
+              allowDecimals={false}
+            />
+            <YAxis 
+              yAxisId="right"
+              orientation="right"
+              stroke="#10b981" 
+              fontSize={12}
+              tickFormatter={(value) => `${value}%`}
+            />
             <Tooltip content={<CustomTooltip />} />
             <Legend />
             
             <Area
+              yAxisId="left"
               type="monotone"
               dataKey="quantidade"
               stroke="#3b82f6"
@@ -236,13 +257,14 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
             />
             
             <Area
+              yAxisId="right"
               type="monotone"
-              dataKey="urgencia"
-              stroke="#ef4444"
+              dataKey="percentual"
+              stroke="#10b981"
               strokeWidth={2}
               fillOpacity={0.6}
-              fill="url(#colorUrgencia)"
-              name="Atendimentos Urgentes"
+              fill="url(#colorPercentual)"
+              name="% do Total Geral"
             />
           </AreaChart>
         </ResponsiveContainer>
@@ -250,23 +272,23 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
 
       {/* Insights */}
       <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-        <h4 className="text-sm font-medium text-gray-700 mb-2">💡 Insights para Gestão</h4>
+        <h4 className="text-sm font-medium text-gray-700 mb-2">💡 Insights de Análise Temporal</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-600">
           <div>
             <strong>Horário de Pico:</strong> {estatisticas.horarioPico} 
             {estatisticas.horarioPico && (
-              <span className="text-blue-600"> (maior fluxo)</span>
+              <span className="text-blue-600"> (maior concentração)</span>
             )}
           </div>
           <div>
             <strong>Menor Fluxo:</strong> {estatisticas.horarioMenorFluxo}
             {estatisticas.horarioMenorFluxo && (
-              <span className="text-green-600"> (ideal para manutenção)</span>
+              <span className="text-green-600"> (menor atividade)</span>
             )}
           </div>
         </div>
         <p className="text-xs text-gray-500 mt-2">
-          📊 Use estes dados para otimizar escalas médicas e planejar recursos durante eventos de massa.
+          📊 Análise temporal baseada na data de criação das notificações no sistema.
         </p>
       </div>
     </div>

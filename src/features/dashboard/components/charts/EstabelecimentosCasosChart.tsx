@@ -244,7 +244,10 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
               }}
             >
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" />
+              <XAxis 
+                type="number" 
+                allowDecimals={false}
+              />
               <YAxis 
                 type="category"
                 dataKey="nome"

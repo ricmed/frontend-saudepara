@@ -119,7 +119,11 @@ const HipotesesDiagnosticasChart: React.FC<HipotesesDiagnosticasChartProps> = ({
               margin={{ top: 5, right: 80, left: 10, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis type="number" stroke="#666" />
+              <XAxis 
+                type="number" 
+                stroke="#666" 
+                allowDecimals={false}
+              />
               <YAxis
                 dataKey="name"
                 type="category"

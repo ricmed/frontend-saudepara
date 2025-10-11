@@ -3268,20 +3268,113 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         </main>
       )}
 
-      {/* Aba de Fluxo Hospitalar - Análise por Hora */}
+      {/* Aba de Análise Temporal - Séries Temporais */}
       {activeTab === "fluxo" && (
         <main className="max-w-7xl mx-auto px-4 py-6">
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              Análise de Fluxo Hospitalar
+              Análise Temporal
             </h2>
             <p className="text-gray-600">
-              Visualização dos atendimentos por hora para otimização dos recursos hospitalares
+              Visualização de séries temporais por dia e hora de notificação
             </p>
           </div>
           
+          {/* Gráfico 1: Série temporal por dia */}
+          <div className="mb-6">
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-blue-100 text-blue-700 rounded-lg">
+                  <Calendar className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">
+                    Série Temporal por Dia de Notificação
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Evolução diária do número de notificações
+                  </p>
+                </div>
+              </div>
+              
+              <div className="h-80">
+                {(() => {
+                  // Processar dados por dia
+                  const notificacoesPorDia = notificacoes.reduce((acc: any, notif: any) => {
+                    const dataCreated = notif?.created_at || notif?.original?.created_at;
+                    if (!dataCreated) return acc;
+                    
+                    try {
+                      const data = new Date(dataCreated).toISOString().split('T')[0];
+                      if (!acc[data]) {
+                        acc[data] = { total: 0 };
+                      }
+                      acc[data].total += 1;
+                    } catch (error) {
+                      console.warn('Erro ao processar data:', error);
+                    }
+                    
+                    return acc;
+                  }, {});
+                  
+                  const dadosGrafico = Object.entries(notificacoesPorDia)
+                    .map(([data, valores]: [string, any]) => ({
+                      data: new Date(data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+                      dataCompleta: data,
+                      quantidade: valores.total,
+                      percentual: ((valores.total / notificacoes.length) * 100).toFixed(1)
+                    }))
+                    .sort((a, b) => a.dataCompleta.localeCompare(b.dataCompleta));
+                  
+                  return dadosGrafico.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={dadosGrafico} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis 
+                          dataKey="data" 
+                          stroke="#666"
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                          tick={{ fontSize: 12 }}
+                        />
+                        <YAxis 
+                          stroke="#666"
+                          allowDecimals={false}
+                        />
+                        <Tooltip 
+                          contentStyle={{
+                            backgroundColor: "#fff",
+                            border: "1px solid #ddd",
+                            borderRadius: "8px"
+                          }}
+                          formatter={(value: any, name: string) => {
+                            if (name === 'quantidade') {
+                              const item = dadosGrafico.find((d: any) => d.quantidade === value);
+                              return [`${value} notificações (${item?.percentual}% do total)`, 'Total'];
+                            }
+                            return [value, name];
+                          }}
+                        />
+                        <Bar 
+                          dataKey="quantidade" 
+                          fill="#3B82F6"
+                          radius={[8, 8, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-gray-500">
+                      Não há dados disponíveis
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+          
+          {/* Gráfico 2: Série temporal por hora */}
           <AtendimentosPorHoraChart 
-            key={`atendimentos-${lastUpdate}-${notificacoes.length}`}
             notificacoes={notificacoes} 
           />
         </main>

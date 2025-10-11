@@ -34,9 +34,9 @@ export const DashboardTabs: React.FC<DashboardTabsProps> = ({
     },
     {
       id: 'fluxo' as DashboardTab,
-      label: 'Fluxo Hospitalar',
+      label: 'Análise Temporal',
       icon: TrendingUp,
-      description: 'Atendimentos por hora'
+      description: 'Séries temporais e horários'
     },
     {
       id: 'mapa' as DashboardTab,
