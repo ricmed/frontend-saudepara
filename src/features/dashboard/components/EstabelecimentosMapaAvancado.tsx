@@ -142,15 +142,20 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
     return Array.from(tipos).sort();
   }, [allPlaces]);
 
-  // 🆕 Extrair datas disponíveis das notificações
+  // 🆕 Extrair datas disponíveis das notificações (data de criação)
   const datasDisponiveis = useMemo(() => {
     const datas = new Set<string>();
     notificacoes.forEach(n => {
-      const dataAtendimento = n?.original?.data_atendimento;
-      if (dataAtendimento) {
-        // Extrair apenas a data (YYYY-MM-DD)
-        const dataFormatada = new Date(dataAtendimento).toISOString().split('T')[0];
-        datas.add(dataFormatada);
+      // 📅 Usar data de criação da notificação (created_at), não data de atendimento
+      const dataCreated = n?.created_at || n?.original?.created_at;
+      if (dataCreated) {
+        try {
+          // Extrair apenas a data (YYYY-MM-DD)
+          const dataFormatada = new Date(dataCreated).toISOString().split('T')[0];
+          datas.add(dataFormatada);
+        } catch (error) {
+          console.warn('Erro ao processar data de criação:', error);
+        }
       }
     });
     return Array.from(datas).sort().reverse(); // Mais recentes primeiro
@@ -175,15 +180,21 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
       return [];
     }
 
-    // 🆕 Filtrar notificações por data se necessário
+    // 🆕 Filtrar notificações por data se necessário (data de criação)
     let notificacoesFiltradas = notificacoes;
     
     if (dataSelecionada) {
       notificacoesFiltradas = notificacoes.filter(n => {
-        const dataAtendimento = n?.original?.data_atendimento;
-        if (!dataAtendimento) return false;
-        const dataFormatada = new Date(dataAtendimento).toISOString().split('T')[0];
-        return dataFormatada === dataSelecionada;
+        // 📅 Usar data de criação da notificação (created_at), não data de atendimento
+        const dataCreated = n?.created_at || n?.original?.created_at;
+        if (!dataCreated) return false;
+        try {
+          const dataFormatada = new Date(dataCreated).toISOString().split('T')[0];
+          return dataFormatada === dataSelecionada;
+        } catch (error) {
+          console.warn('Erro ao filtrar por data:', error);
+          return false;
+        }
       });
       console.log(`📅 Filtrado por data ${dataSelecionada}: ${notificacoesFiltradas.length} de ${notificacoes.length} notificações`);
     }
@@ -468,7 +479,7 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
 
           {/* Filtro de Data */}
           <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs text-gray-600 mb-1">Data de Atendimento</label>
+            <label className="block text-xs text-gray-600 mb-1">Data da Notificação</label>
             <select
               value={dataSelecionada || 'todas'}
               onChange={(e) => setDataSelecionada(e.target.value === 'todas' ? null : e.target.value)}
