@@ -3393,7 +3393,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           </div>
           
           <EstabelecimentosMapaAvancado 
-            notificacoes={filteredNotificacoes.current}
+            notificacoes={originalNotificacoes.current}
             exportOptions={exportOptions} 
           />
         </main>

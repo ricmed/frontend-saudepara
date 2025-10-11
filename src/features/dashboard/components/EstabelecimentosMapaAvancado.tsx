@@ -55,7 +55,7 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
   const [selectedEstabelecimento, setSelectedEstabelecimento] = useState<EstabelecimentoInfo | null>(null);
   const [showLayers, setShowLayers] = useState(true);
   
-  // 🆕 Estados para filtros
+  // 🆕 Estados para filtros (mapa tem seus próprios filtros independentes)
   const [tipoEstabelecimentoSelecionado, setTipoEstabelecimentoSelecionado] = useState<string | null>(null);
   const [dataSelecionada, setDataSelecionada] = useState<string | null>(null);
   
@@ -142,16 +142,25 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
     return Array.from(tipos).sort();
   }, [allPlaces]);
 
-  // 🆕 Extrair datas disponíveis das notificações (data de criação)
+  // 🆕 Extrair datas disponíveis das notificações (data de criação) - MESMA LÓGICA DO DASHBOARD
   const datasDisponiveis = useMemo(() => {
     const datas = new Set<string>();
+    const timezone = 'America/Belem'; // Fuso horário local
+    
     notificacoes.forEach((n: any) => {
       // 📅 Usar data de criação da notificação (created_at), não data de atendimento
       const dataCreated = n?.created_at || n?.original?.created_at;
       if (dataCreated) {
         try {
-          // Extrair apenas a data (YYYY-MM-DD)
-          const dataFormatada = new Date(dataCreated).toISOString().split('T')[0];
+          // Converter para o fuso horário local (IGUAL AO DASHBOARD)
+          const dataLocal = new Date(dataCreated);
+          const dataFormatada = dataLocal.toLocaleDateString('pt-BR', {
+            timeZone: timezone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+          }).split('/').reverse().join('-'); // Converter para YYYY-MM-DD
+          
           datas.add(dataFormatada);
         } catch (error) {
           console.warn('Erro ao processar data de criação:', error);
@@ -180,16 +189,26 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
       return [];
     }
 
-    // 🆕 Filtrar notificações por data se necessário (data de criação)
+    // 🆕 Filtrar notificações por data se necessário (filtro do mapa, MESMA LÓGICA DO DASHBOARD)
     let notificacoesFiltradas = notificacoes;
     
     if (dataSelecionada) {
+      const timezone = 'America/Belem'; // Fuso horário local
+      
       notificacoesFiltradas = notificacoes.filter((n: any) => {
         // 📅 Usar data de criação da notificação (created_at), não data de atendimento
         const dataCreated = n?.created_at || n?.original?.created_at;
         if (!dataCreated) return false;
         try {
-          const dataFormatada = new Date(dataCreated).toISOString().split('T')[0];
+          // Converter para o fuso horário local (IGUAL AO DASHBOARD)
+          const dataLocal = new Date(dataCreated);
+          const dataFormatada = dataLocal.toLocaleDateString('pt-BR', {
+            timeZone: timezone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+          }).split('/').reverse().join('-'); // Converter para YYYY-MM-DD
+          
           return dataFormatada === dataSelecionada;
         } catch (error) {
           console.warn('Erro ao filtrar por data:', error);
@@ -431,7 +450,7 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
               {(tipoEstabelecimentoSelecionado || dataSelecionada) && (
                 <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
                   <Info className="h-3 w-3" />
-                  Filtros ativos mantidos durante atualização automática
+                  Filtros do mapa ativos (independente do dashboard)
                 </p>
               )}
             </div>
@@ -477,9 +496,9 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
             </select>
           </div>
 
-          {/* Filtro de Data */}
+          {/* Filtro de Data - Independente do filtro do dashboard */}
           <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs text-gray-600 mb-1">Data da Notificação</label>
+            <label className="block text-xs text-gray-600 mb-1">Data da Notificação (Mapa)</label>
             <select
               value={dataSelecionada || 'todas'}
               onChange={(e) => setDataSelecionada(e.target.value === 'todas' ? null : e.target.value)}
@@ -488,16 +507,34 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
               <option value="todas">📅 Todas as Datas ({notificacoes.length})</option>
               {datasDisponiveis.map((data) => {
                 const dataFormatada = new Date(data + 'T00:00:00').toLocaleDateString('pt-BR');
+                const timezone = 'America/Belem';
+                
+                // Contar notificações usando MESMA LÓGICA DO DASHBOARD
                 const quantidade = notificacoes.filter((n: any) => {
                   const dataCreated = n?.created_at || n?.original?.created_at;
                   if (!dataCreated) return false;
                   try {
-                    return new Date(dataCreated).toISOString().split('T')[0] === data;
+                    const dataLocal = new Date(dataCreated);
+                    const dataFormatadaNotif = dataLocal.toLocaleDateString('pt-BR', {
+                      timeZone: timezone,
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit'
+                    }).split('/').reverse().join('-');
+                    return dataFormatadaNotif === data;
                   } catch (error) {
                     return false;
                   }
                 }).length;
-                const isToday = data === new Date().toISOString().split('T')[0];
+                
+                // Verificar se é hoje usando timezone local
+                const hoje = new Date().toLocaleDateString('pt-BR', {
+                  timeZone: timezone,
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit'
+                }).split('/').reverse().join('-');
+                const isToday = data === hoje;
                 
                 return (
                   <option key={data} value={data}>
