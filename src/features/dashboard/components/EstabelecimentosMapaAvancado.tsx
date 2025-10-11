@@ -329,8 +329,8 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
 
   return (
     <MapProviderProvider defaultProvider="openstreetmap">
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-      <div className="p-4 border-b border-gray-200">
+      <div className="bg-white shadow-sm overflow-hidden -mx-6">
+      <div className="px-6 py-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <MapPin className="h-6 w-6 text-blue-600" />
@@ -360,7 +360,7 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
 
       <div className="relative">
         {/* Área do Mapa Dashboard Customizado */}
-        <div className="h-96 relative" style={{ minHeight: '400px' }}>
+        <div className="relative" style={{ height: 'calc(100vh - 400px)', minHeight: '600px' }}>
           <MapaDashboard
             estabelecimentos={estabelecimentosParaMapa}
             center={{ lat: -1.4558, lng: -48.4902 }}

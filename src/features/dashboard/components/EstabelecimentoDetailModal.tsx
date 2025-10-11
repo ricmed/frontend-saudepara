@@ -136,6 +136,66 @@ const EstabelecimentoDetailModal: React.FC<EstabelecimentoDetailModalProps> = ({
     });
   }, [notificacoesEstabelecimento, exportOptions]);
 
+  // 🆕 Processar TODAS as notificações com suas cores
+  const todasNotificacoes = useMemo(() => {
+    return notificacoesEstabelecimento.map(notificacao => {
+      const hipoteseId = notificacao?.original?.tipo_hipotese_diag_idtipo_hipotese_diag;
+      let isAlarmante = false;
+      let hipoteseDescricao = 'Não informada';
+      let corDeFundo = 'bg-gray-50 border-gray-200'; // Padrão: cinza claro
+      let corTexto = 'text-gray-800';
+
+      if (hipoteseId && exportOptions?.hipoteseDiagOptions?.length > 0) {
+        const hipotese = exportOptions.hipoteseDiagOptions.find(
+          (h: any) => String(h.idtipo_hipotese_diag) === String(hipoteseId)
+        );
+
+        if (hipotese) {
+          hipoteseDescricao = hipotese.descricao;
+          isAlarmante = hipotese.alarmante === true || hipotese.isAlarmante === true;
+          
+          // 🎨 Definir cores baseadas no tipo (igual ao gráfico de hipóteses)
+          if (isAlarmante) {
+            // Vermelho para notificações compulsórias
+            corDeFundo = 'bg-red-50 border-red-300';
+            corTexto = 'text-red-900';
+          } else {
+            // Diferentes tons para outras hipóteses (padrão azul claro)
+            corDeFundo = 'bg-blue-50 border-blue-200';
+            corTexto = 'text-blue-900';
+          }
+        }
+      }
+
+      return {
+        id: String(notificacao?.original?.idnotificacao || notificacao?.id || Math.random()),
+        idNotificacao: notificacao?.original?.idnotificacao || notificacao?.id || '',
+        pacienteNome: notificacao?.original?.paciente?.nome || 'Não informado',
+        pacienteIdade: notificacao?.original?.paciente?.idade,
+        pacienteSexo: notificacao?.original?.paciente?.tipo_genero_idtipo_genero 
+          ? (exportOptions.generoOptions?.find((g: any) => 
+              String(g.idtipo_genero) === String(notificacao.original.paciente.tipo_genero_idtipo_genero)
+            )?.descricao || 'Não informado')
+          : 'Não informado',
+        dataAtendimento: notificacao?.original?.data_atendimento 
+          ? new Date(notificacao.original.data_atendimento).toLocaleDateString('pt-BR')
+          : 'Não informado',
+        tipoEvento: notificacao?.original?.tipo_evento?.descricao || 'Não informado',
+        tipoAtendimento: notificacao?.original?.tipo_atendimento?.descricao || 'Não informado',
+        hipoteseDescricao,
+        isAlarmante,
+        corDeFundo,
+        corTexto
+      };
+    }).sort((a, b) => {
+      // Primeiro: notificações compulsórias
+      if (a.isAlarmante && !b.isAlarmante) return -1;
+      if (!a.isAlarmante && b.isAlarmante) return 1;
+      // Depois: por data de atendimento (mais recente primeiro)
+      return b.dataAtendimento.localeCompare(a.dataAtendimento);
+    });
+  }, [notificacoesEstabelecimento, exportOptions]);
+
   const getUrgenciaColor = (urgencia: string) => {
     switch (urgencia) {
       case 'critica': return 'bg-red-500';
@@ -213,8 +273,9 @@ const EstabelecimentoDetailModal: React.FC<EstabelecimentoDetailModalProps> = ({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          {hipotesesDiagnosticas.length > 0 ? (
-            <div className="space-y-4">
+          {/* Seção de Hipóteses Diagnósticas */}
+          {hipotesesDiagnosticas.length > 0 && (
+            <div className="space-y-4 mb-8">
               <h3 className="text-lg font-semibold text-gray-700 flex items-center gap-2">
                 <Activity className="h-5 w-5" />
                 Hipóteses Diagnósticas ({hipotesesDiagnosticas.length})
@@ -306,12 +367,91 @@ const EstabelecimentoDetailModal: React.FC<EstabelecimentoDetailModalProps> = ({
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="text-center py-12 text-gray-500">
-              <Activity className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p>Nenhuma hipótese diagnóstica registrada para este estabelecimento.</p>
-            </div>
           )}
+
+          {/* 🆕 Seção de Todas as Notificações */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-700 flex items-center gap-2 border-t pt-6 mt-6">
+              <Users className="h-5 w-5" />
+              Todas as Notificações ({todasNotificacoes.length})
+            </h3>
+
+            {todasNotificacoes.length > 0 ? (
+              <div className="space-y-3">
+                {todasNotificacoes.map((notif) => (
+                  <div 
+                    key={notif.id}
+                    className={`border-2 rounded-lg p-4 hover:shadow-lg transition-all ${notif.corDeFundo}`}
+                  >
+                    {/* Badge de compulsória no topo */}
+                    {notif.isAlarmante && (
+                      <div className="mb-3 flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full">
+                          <AlertTriangle className="h-3 w-3" />
+                          NOTIFICAÇÃO COMPULSÓRIA
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div>
+                          <span className="text-gray-500 text-xs font-medium uppercase tracking-wide">Paciente</span>
+                          <p className="font-bold text-gray-900 mt-1">{notif.pacienteNome}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs font-medium uppercase tracking-wide">Idade / Sexo</span>
+                          <p className="font-semibold text-gray-800 mt-1">
+                            {formatarIdade(notif.pacienteIdade)} / {notif.pacienteSexo}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs font-medium uppercase tracking-wide">Data Atendimento</span>
+                          <p className="font-semibold text-gray-800 mt-1">{notif.dataAtendimento}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs font-medium uppercase tracking-wide">Tipo de Evento</span>
+                          <p className="font-semibold text-gray-800 mt-1">{notif.tipoEvento}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs font-medium uppercase tracking-wide">Tipo de Atendimento</span>
+                          <p className="font-semibold text-gray-800 mt-1">{notif.tipoAtendimento}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs font-medium uppercase tracking-wide">Hipótese Diagnóstica</span>
+                          <div className="flex items-center gap-2 mt-1">
+                            {notif.isAlarmante && (
+                              <AlertTriangle className="h-4 w-4 text-red-700 flex-shrink-0" />
+                            )}
+                            <p className={`font-semibold ${
+                              notif.isAlarmante ? 'text-red-800' : 'text-gray-800'
+                            }`}>
+                              {notif.hipoteseDescricao}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Botão para navegar à ficha */}
+                      <button
+                        onClick={() => navegarParaFicha(notif.idNotificacao)}
+                        className="flex items-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-all shadow-md hover:shadow-lg whitespace-nowrap"
+                        title="Abrir ficha completa do paciente"
+                      >
+                        <ExternalLink className="h-5 w-5" />
+                        <span className="hidden sm:inline">Ver Ficha</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-gray-500">
+                <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                <p>Nenhuma notificação registrada para este estabelecimento.</p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Footer */}
