@@ -39,16 +39,10 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Carregar dados sempre que filteredData mudar (incluindo na montagem inicial)
   useEffect(() => {
     loadData();
-  }, []);
-
-  // Recarregar dados quando filteredData mudar - com dependências corretas
-  useEffect(() => {
-    if (filteredData && Array.isArray(filteredData) && filteredData.length > 0) {
-      loadData();
-    }
-  }, [filteredData?.length]); // Usar apenas o length para evitar loop
+  }, [filteredData?.length]); // Reagir a mudanças nos dados filtrados
 
   const loadData = async () => {
     try {
