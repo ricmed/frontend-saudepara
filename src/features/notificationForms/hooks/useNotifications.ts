@@ -222,58 +222,75 @@ export const useNotifications = () => {
         return dadosFiltrados;
       }
 
-      // ✅ OTIMIZADO: Buscar dados de forma mais eficiente
+      // ✅ OTIMIZADO: Buscar dados frescos da API quando online
       let allNotificacoes: Notificacao[] = [];
       
-      // Primeiro tentar usar dados do cache se disponível
-      const cachedData = await indexedDBService.getOpcoes('notificacoes-cache') || [];
+      // ✅ CORRIGIDO: SEMPRE buscar da API primeiro quando online
+      let page = 1;
+      let hasMore = true;
+      const MODERATE_PAGE_SIZE = 100;
+
+      // ✅ VERIFICAR: Só buscar da API se estiver online e autenticado
+      const podeUsarAPI = await syncService.canUseOnlineMode();
       
-      if (cachedData.length > 0) {
-        console.log(`✅ Usando ${cachedData.length} notificações do cache`);
+      if (!podeUsarAPI) {
+        console.log('⚠️ Sistema offline ou não autenticado, buscando do cache...');
+        const cachedData = await indexedDBService.getOpcoes('notificacoes-cache') || [];
+        
+        if (cachedData.length === 0) {
+          setError('Nenhuma notificação disponível offline.');
+          return [];
+        }
+        
+        console.log(`✅ Usando ${cachedData.length} notificações do cache offline`);
         allNotificacoes = cachedData;
       } else {
-        // Se não há cache, buscar dados da API de forma otimizada
-        let page = 1;
-        let hasMore = true;
-        const MODERATE_PAGE_SIZE = 100; // Reduzido de 500 para 100
-
-        // ✅ VERIFICAR: Só buscar da API se estiver online e autenticado
-        if (!await syncService.canUseOnlineMode()) {
-          console.log('⚠️ Sistema offline ou não autenticado, usando apenas cache local');
-          return allNotificacoes; // Retorna array vazio se não há cache
-        }
-
-        console.log('🌐 Buscando TODAS as notificações da API...');
+        // ✅ ONLINE: Buscar dados FRESCOS da API
+        console.log('🌐 Buscando TODAS as notificações da API (dados atualizados)...');
         
-        while (hasMore) { // ✅ CORRIGIDO: Buscar TODAS as páginas disponíveis
-          console.log(`📄 Buscando página ${page}...`);
-          const response = await NotificacaoService.getAll(page, MODERATE_PAGE_SIZE);
+        try {
+          while (hasMore) {
+            console.log(`📄 Buscando página ${page}...`);
+            const response = await NotificacaoService.getAll(page, MODERATE_PAGE_SIZE);
 
-          if (response && response.data && response.data.length > 0) {
-            allNotificacoes = [...allNotificacoes, ...response.data];
-            console.log(`   ➜ ${response.data.length} notificações (Total: ${allNotificacoes.length}/${response.meta.total})`);
+            if (response && response.data && response.data.length > 0) {
+              allNotificacoes = [...allNotificacoes, ...response.data];
+              console.log(`   ➜ ${response.data.length} notificações (Total: ${allNotificacoes.length}/${response.meta.total})`);
 
-            if (
-              page >= response.meta.totalPages ||
-              response.data.length < MODERATE_PAGE_SIZE
-            ) {
-              hasMore = false;
-              console.log(`✅ Busca completa: ${allNotificacoes.length} notificações`);
+              if (
+                page >= response.meta.totalPages ||
+                response.data.length < MODERATE_PAGE_SIZE
+              ) {
+                hasMore = false;
+                console.log(`✅ Busca completa: ${allNotificacoes.length} notificações`);
+              } else {
+                page++;
+              }
             } else {
-              page++;
+              hasMore = false;
             }
-          } else {
-            hasMore = false;
           }
-        }
 
-        // ✅ SALVAR NO CACHE apenas se conseguiu buscar dados
-        if (allNotificacoes.length > 0) {
-          try {
-            await indexedDBService.saveOpcoes('notificacoes-cache', allNotificacoes);
-            console.log(`✅ ${allNotificacoes.length} notificações salvas no cache offline`);
-          } catch (cacheError) {
-            console.warn('⚠️ Erro ao salvar notificações no cache:', cacheError);
+          // ✅ SALVAR NO CACHE para uso offline futuro
+          if (allNotificacoes.length > 0) {
+            try {
+              await indexedDBService.saveOpcoes('notificacoes-cache', allNotificacoes);
+              console.log(`✅ ${allNotificacoes.length} notificações salvas no cache offline`);
+            } catch (cacheError) {
+              console.warn('⚠️ Erro ao salvar notificações no cache:', cacheError);
+            }
+          }
+        } catch (apiError) {
+          // ✅ FALLBACK: Se API falhar, tentar usar cache
+          console.error('❌ Erro ao buscar da API, tentando cache...', apiError);
+          const cachedData = await indexedDBService.getOpcoes('notificacoes-cache') || [];
+          
+          if (cachedData.length > 0) {
+            console.log(`⚠️ Usando ${cachedData.length} notificações do cache (fallback)`);
+            allNotificacoes = cachedData;
+            toast.warning('Usando dados em cache devido a erro de conexão');
+          } else {
+            throw apiError; // Re-lançar erro se não há cache
           }
         }
       }
