@@ -738,6 +738,7 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
         }}
         notificacoes={notificacoes}
         exportOptions={exportOptions}
+        dataSelecionada={dataSelecionada}
         onClose={closeSelectedEstabelecimento}
       />
     )}

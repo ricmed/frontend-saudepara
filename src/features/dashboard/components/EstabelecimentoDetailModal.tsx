@@ -6,6 +6,7 @@ import { X, AlertTriangle, Activity, Users, MapPin, Building, ExternalLink } fro
 interface Notificacao {
   id?: string;
   idnotificacao?: number;
+  created_at?: string;
   original?: any;
 }
 
@@ -21,6 +22,7 @@ interface EstabelecimentoDetailModalProps {
   };
   notificacoes: Notificacao[];
   exportOptions?: any;
+  dataSelecionada?: string | null; // 🆕 Data selecionada no filtro do mapa
   onClose: () => void;
 }
 
@@ -43,6 +45,7 @@ const EstabelecimentoDetailModal: React.FC<EstabelecimentoDetailModalProps> = ({
   estabelecimento,
   notificacoes,
   exportOptions = {},
+  dataSelecionada = null, // 🆕 Receber data selecionada do componente pai
   onClose
 }) => {
   const navigate = useNavigate();
@@ -73,11 +76,38 @@ const EstabelecimentoDetailModal: React.FC<EstabelecimentoDetailModalProps> = ({
 
   // Filtrar notificações deste estabelecimento
   const notificacoesEstabelecimento = useMemo(() => {
-    return notificacoes.filter(n => {
+    let notifs = notificacoes.filter(n => {
       const estabId = n?.original?.estabelecimento_idestabelecimento || n?.original?.estabelecimentoId;
       return String(estabId) === String(estabelecimento.id);
     });
-  }, [notificacoes, estabelecimento.id]);
+    
+    // 🆕 Aplicar filtro de data se houver uma data selecionada no componente pai
+    if (dataSelecionada) {
+      const timezone = 'America/Belem';
+      
+      notifs = notifs.filter(n => {
+        const dataCreated = n?.original?.created_at || n?.created_at;
+        if (!dataCreated) return false;
+        
+        try {
+          const dataLocal = new Date(dataCreated);
+          const dataFormatada = dataLocal.toLocaleDateString('pt-BR', {
+            timeZone: timezone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+          }).split('/').reverse().join('-');
+          
+          return dataFormatada === dataSelecionada;
+        } catch (error) {
+          console.warn('Erro ao filtrar por data:', error);
+          return false;
+        }
+      });
+    }
+    
+    return notifs;
+  }, [notificacoes, estabelecimento.id, dataSelecionada]);
 
   // Processar hipóteses diagnósticas
   const hipotesesDiagnosticas = useMemo(() => {
@@ -239,7 +269,7 @@ const EstabelecimentoDetailModal: React.FC<EstabelecimentoDetailModalProps> = ({
               )}
             </div>
             
-            <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+            <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-3">
               {estabelecimento.endereco && (
                 <div className="flex items-center gap-1">
                   <MapPin className="h-4 w-4" />
@@ -258,7 +288,12 @@ const EstabelecimentoDetailModal: React.FC<EstabelecimentoDetailModalProps> = ({
               </div>
               <div className="flex items-center gap-1">
                 <Users className="h-4 w-4" />
-                <span className="font-semibold">{estabelecimento.notificacoes}</span> notificações
+                <span className="font-semibold">{notificacoesEstabelecimento.length}</span> notificações
+                {dataSelecionada && (
+                  <span className="text-xs text-gray-500">
+                    (filtradas por {new Date(dataSelecionada + 'T00:00:00').toLocaleDateString('pt-BR')})
+                  </span>
+                )}
               </div>
             </div>
           </div>
