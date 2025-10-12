@@ -49,7 +49,7 @@ export interface Notificacao {
   
   export interface SearchParams {
     term: string;
-    field: "all" | "paciente" | "evento" | "atendimento" | "encerramento";
+    field: "all" | "paciente" | "evento" | "atendimento" | "encerramento" | "unidade_notificadora";
   }
   
   export interface ColumnDefinition {
@@ -84,6 +84,7 @@ export interface Notificacao {
     { value: "evento", label: "Evento" },
     { value: "atendimento", label: "Tipo Atendimento" },
     { value: "encerramento", label: "Tipo Encerramento" },
+    { value: "unidade_notificadora", label: "Unidade Notificadora" },
   ];
   
   export interface ExportOptions {

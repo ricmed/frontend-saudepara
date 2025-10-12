@@ -448,15 +448,26 @@ export const useNotifications = () => {
                   item.tipoEncerramento && item.tipoEncerramento.toLowerCase().includes(searchTerm)
                 );
               }
+              else if (debouncedSearchParams.field === "unidade_notificadora") {
+                // 🆕 Buscar por unidade notificadora
+                filteredData = dadosComEventosAtivos.filter(item => {
+                  const unidade = item.original?.estabelecimento_notificacao_estabelecimento_idestabelecimentoToestabelecimento?.nome;
+                  return unidade && unidade.toLowerCase().includes(searchTerm);
+                });
+              }
               else {
-                // Buscar em todos os campos
-                filteredData = dadosComEventosAtivos.filter(item => (
-                  (item.paciente && item.paciente.toLowerCase().includes(searchTerm)) ||
-                  (item.tipoEvento && item.tipoEvento.toLowerCase().includes(searchTerm)) ||
-                  (item.tipoAtendimento && item.tipoAtendimento.toLowerCase().includes(searchTerm)) ||
-                  (item.tipoEncerramento && item.tipoEncerramento.toLowerCase().includes(searchTerm)) ||
-                  (item.dataOcorrencia && item.dataOcorrencia.toLowerCase().includes(searchTerm))
-                ));
+                // Buscar em todos os campos (incluindo unidade notificadora)
+                filteredData = dadosComEventosAtivos.filter(item => {
+                  const unidade = item.original?.estabelecimento_notificacao_estabelecimento_idestabelecimentoToestabelecimento?.nome || "";
+                  return (
+                    (item.paciente && item.paciente.toLowerCase().includes(searchTerm)) ||
+                    (item.tipoEvento && item.tipoEvento.toLowerCase().includes(searchTerm)) ||
+                    (item.tipoAtendimento && item.tipoAtendimento.toLowerCase().includes(searchTerm)) ||
+                    (item.tipoEncerramento && item.tipoEncerramento.toLowerCase().includes(searchTerm)) ||
+                    (item.dataOcorrencia && item.dataOcorrencia.toLowerCase().includes(searchTerm)) ||
+                    (unidade && unidade.toLowerCase().includes(searchTerm))
+                  );
+                });
               }
               
               // Calcular paginação
