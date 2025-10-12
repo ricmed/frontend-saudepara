@@ -2918,8 +2918,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                   Limpar Filtros
                 </h4>
                 <p className="text-gray-700">
-                  Clique no card "Total de Notificações" ou no botão "Limpar Filtros" 
-                  para remover todos os filtros e ver o dataset completo.
+                  Use o botão "Limpar Filtros" para remover todos os filtros ativos 
+                  e ver o dataset completo.
                 </p>
               </div>
               
@@ -3068,10 +3068,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
           {/* Cards de Resumo */}
           <div
-            className={`bg-white p-3 sm:p-4 rounded-lg shadow-sm flex items-center gap-3 sm:gap-4 cursor-pointer hover:shadow-md transition-shadow sm:col-span-1 xl:col-span-1 ${!hasActiveFilters && selectedCategory === null ? 'ring-2 ring-blue-400' : ''}`}
-            onClick={() => { 
-              clearAllFilters();
-            }}
+            className="bg-white p-3 sm:p-4 rounded-lg shadow-sm flex items-center gap-3 sm:gap-4 sm:col-span-1 xl:col-span-1"
           >
             <div className="p-2 sm:p-3 bg-blue-100 text-blue-800 rounded-full flex-shrink-0">
               <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
