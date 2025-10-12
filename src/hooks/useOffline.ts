@@ -94,10 +94,9 @@ export function useOfflineSystem() {
   useEffect(() => {
     const handleOnline = () => {
       setState(prev => ({ ...prev, isOnline: true }));
-      // Auto-sync quando voltar online
-      setTimeout(() => {
-        syncService.forceSyncData();
-      }, 1000);
+      // ✅ REMOVIDO: Não disparar sincronização automática aqui
+      // O syncService já cuida disso de forma centralizada
+      console.log('🌐 useOffline detectou conexão online');
     };
 
     const handleOffline = () => {

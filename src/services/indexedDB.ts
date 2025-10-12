@@ -8,9 +8,10 @@ interface NotificacaoDatabase extends DBSchema {
     value: {
       id: number;
       formData: FormData;
-      syncStatus: 'pending' | 'synced' | 'error';
+      syncStatus: 'pending' | 'syncing' | 'synced' | 'error'; // ✅ NOVO: Adicionado status 'syncing'
       timestamp: number;
       isEdit?: boolean; // ✅ Propriedade para distinguir edição
+      syncStartedAt?: number; // ✅ NOVO: Timestamp de quando iniciou a sincronização
       errorInfo?: { // ✅ NOVO: Informações do erro
         message: string;
         timestamp: number;
@@ -582,9 +583,34 @@ export class IndexedDBService {
     const notificacao = await this.db!.get('notificacoes', id);
     if (notificacao) {
       notificacao.syncStatus = 'synced';
-      // Limpar informações de erro se houver
+      // Limpar informações de erro e sincronização
       delete notificacao.errorInfo;
+      delete notificacao.syncStartedAt;
       await this.db!.put('notificacoes', notificacao);
+    }
+  }
+
+  // ✅ NOVO: Marcar notificação como "em sincronização"
+  async markNotificacaoAsSyncing(id: number): Promise<void> {
+    await this.init();
+    const notificacao = await this.db!.get('notificacoes', id);
+    if (notificacao) {
+      notificacao.syncStatus = 'syncing';
+      notificacao.syncStartedAt = Date.now();
+      await this.db!.put('notificacoes', notificacao);
+      console.log(`🔄 Notificação ${id} marcada como 'syncing' - iniciando envio ao servidor`);
+    }
+  }
+
+  // ✅ NOVO: Reverter notificação de "syncing" para "pending" em caso de falha
+  async revertNotificacaoToPending(id: number): Promise<void> {
+    await this.init();
+    const notificacao = await this.db!.get('notificacoes', id);
+    if (notificacao && notificacao.syncStatus === 'syncing') {
+      notificacao.syncStatus = 'pending';
+      delete notificacao.syncStartedAt;
+      await this.db!.put('notificacoes', notificacao);
+      console.log(`⚠️ Notificação ${id} revertida de 'syncing' para 'pending'`);
     }
   }
 

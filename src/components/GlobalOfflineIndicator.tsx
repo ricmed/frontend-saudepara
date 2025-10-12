@@ -54,14 +54,12 @@ const GlobalOfflineIndicator: React.FC = () => {
           id: 'connection-restored',
           type: 'success',
           title: 'Conexão Restaurada',
-          message: 'Internet reconectada! Sincronizando dados...',
+          message: 'Internet reconectada! Dados serão sincronizados automaticamente.',
           timeout: 3000
         });
         
-        // Auto-sync quando voltar online
-        if (pendingData.total > 0) {
-          setTimeout(() => syncPendingData(), 1000);
-        }
+        // ✅ REMOVIDO: Não disparar sincronização aqui
+        // O syncService já cuida disso de forma centralizada
       } else {
         // Ficou offline
         if (needsEssentialData()) {

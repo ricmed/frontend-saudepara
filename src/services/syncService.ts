@@ -15,6 +15,10 @@ class SyncService {
   private authCheckInterval: number = 30000; // 30 segundos
   private consecutiveAuthFailures: number = 0; // ✅ Contar falhas consecutivas
   private maxConsecutiveFailures: number = 3; // ✅ Máximo de falhas antes de parar
+  
+  // ✅ NOVO: Lock atômico para prevenir race conditions
+  private syncLockPromise: Promise<void> | null = null;
+  private syncLockId: string | null = null;
 
   constructor() {
     this.isOnline = navigator.onLine;
@@ -24,9 +28,16 @@ class SyncService {
   private setupEventListeners() {
     window.addEventListener('online', () => {
       this.isOnline = true;
+      console.log('🌐 Conexão restaurada - SyncService detectou evento online');
       // ✅ DELAY para evitar múltiplas sincronizações simultâneas
-      setTimeout(() => {
-        this.checkAuthenticationStatus();
+      setTimeout(async () => {
+        await this.checkAuthenticationStatus();
+        
+        // ✅ NOVO: Disparar sincronização automática apenas se autenticado
+        if (this.shouldUseOnlineMode()) {
+          console.log('🔄 Iniciando sincronização automática após voltar online...');
+          await this.syncData();
+        }
       }, 2000);
     });
 
@@ -223,7 +234,57 @@ class SyncService {
     }
   }
 
-  // ✅ CORRIGIDO: Sincronização com proteção contra duplicação
+  // ✅ NOVO: Método para adquirir lock atômico
+  private async acquireSyncLock(): Promise<string | null> {
+    const lockId = `sync-${Date.now()}-${Math.random()}`;
+    
+    // Se já existe um lock ativo, esperar ele terminar
+    if (this.syncLockPromise) {
+      console.log('⏳ Aguardando sincronização em andamento terminar...');
+      try {
+        await this.syncLockPromise;
+      } catch (error) {
+        console.error('Erro na sincronização anterior:', error);
+      }
+    }
+    
+    // Verificar se ainda não há sincronização (double-check após await)
+    if (this.isSyncing) {
+      console.log('🔒 Sincronização já está em andamento (lock ativo)');
+      return null;
+    }
+    
+    // Verificar timeout de lock travado
+    const now = Date.now();
+    if (this.syncStartTime > 0 && (now - this.syncStartTime) > this.syncLockTimeout) {
+      console.warn('⚠️ Sync parece travado, resetando lock...');
+      this.releaseSyncLock();
+    }
+    
+    // Adquirir lock
+    this.isSyncing = true;
+    this.syncStartTime = Date.now();
+    this.syncLockId = lockId;
+    
+    console.log(`🔐 Lock de sincronização adquirido: ${lockId}`);
+    return lockId;
+  }
+  
+  // ✅ NOVO: Método para liberar lock
+  private releaseSyncLock(lockId?: string): void {
+    // Só liberar se o lockId corresponder (ou se não foi fornecido)
+    if (!lockId || this.syncLockId === lockId) {
+      this.isSyncing = false;
+      this.syncStartTime = 0;
+      this.syncLockId = null;
+      this.syncLockPromise = null;
+      console.log('🔓 Lock de sincronização liberado');
+    } else {
+      console.warn(`⚠️ Tentativa de liberar lock incorreto: ${lockId} vs ${this.syncLockId}`);
+    }
+  }
+
+  // ✅ CORRIGIDO: Sincronização com lock atômico
   async syncData() {
     // ✅ Verificar auth antes de sincronizar
     await this.checkAuthenticationStatus();
@@ -233,27 +294,29 @@ class SyncService {
       return;
     }
 
-    if (this.isSyncing) {
-      console.log('🔄 Sincronização já em andamento...');
+    // ✅ NOVO: Tentar adquirir lock atômico
+    const lockId = await this.acquireSyncLock();
+    if (!lockId) {
+      console.log('🔄 Sincronização já em andamento, pulando...');
       return;
     }
 
-    this.isSyncing = true;
-    this.syncStartTime = Date.now();
-    let syncedCount = 0;
-    let errorCount = 0;
+    // ✅ NOVO: Criar Promise para o lock
+    this.syncLockPromise = (async () => {
+      let syncedCount = 0;
+      let errorCount = 0;
 
-    try {
-      console.log('🚀 === INICIANDO SINCRONIZAÇÃO ===');
+      try {
+        console.log('🚀 === INICIANDO SINCRONIZAÇÃO ===');
 
-      // ===== 1. SINCRONIZAR APENAS PACIENTES CRIADOS LOCALMENTE =====
-      const unsyncedPacientes = await indexedDBService.getUnsyncedPacientes();
-      const pacienteIdMapping: Map<number, number> = new Map();
-      
-      // ✅ FILTRAR APENAS PACIENTES REALMENTE CRIADOS LOCALMENTE
-      const pacientesParaSincronizar = unsyncedPacientes.filter(p => {
-        const isLocalCreation = (
-          p.source === 'local_creation' || 
+        // ===== 1. SINCRONIZAR APENAS PACIENTES CRIADOS LOCALMENTE =====
+        const unsyncedPacientes = await indexedDBService.getUnsyncedPacientes();
+        const pacienteIdMapping: Map<number, number> = new Map();
+        
+        // ✅ FILTRAR APENAS PACIENTES REALMENTE CRIADOS LOCALMENTE
+        const pacientesParaSincronizar = unsyncedPacientes.filter(p => {
+          const isLocalCreation = (
+            p.source === 'local_creation' || 
           (!p.source && p.synced === 'false' && p.idpaciente < 0)
         );
         
@@ -505,18 +568,23 @@ class SyncService {
             observacaoHipotese: formDataAtualizada.observacaoHipotese
           });
 
+          // ✅ CRÍTICO: Marcar como 'syncing' ANTES de enviar ao servidor
+          await indexedDBService.markNotificacaoAsSyncing(id);
+
           // ✅ SINCRONIZAR NOTIFICAÇÃO
           const isEdit = !!(formDataAtualizada as any).id && (formDataAtualizada as any).id > 0;
           const editId = isEdit ? Number((formDataAtualizada as any).id) : undefined;
           
           await salvarNotificacaoCompleta(formDataAtualizada as any, isEdit, editId);
+          
+          // ✅ Marcar como sincronizada SOMENTE após sucesso
           await indexedDBService.markNotificacaoAsSynced(id);
           syncedCount++;
           
         } catch (error: any) {
           console.error(`❌ Erro ao sincronizar notificação ${id}:`, error);
           
-          // ✅ NOVO TRATAMENTO: Marcar como erro em vez de remover
+          // ✅ REVERTER de 'syncing' para 'pending' ou marcar como erro
           const isServerError = error?.response?.status === 500;
           const isOrphanedNotification = id < 0;
           const isInvalidData = error?.message?.includes('validation') || error?.message?.includes('required');
@@ -571,16 +639,19 @@ class SyncService {
       console.error('❌ Erro geral durante sincronização:', error);
       toast.error('Erro na sincronização. Tentaremos novamente.');
     } finally {
-      this.isSyncing = false;
-      this.syncStartTime = 0;
+      // ✅ NOVO: Liberar lock no finally
+      this.releaseSyncLock(lockId);
     }
+    })(); // Fechar a Promise do lock
+    
+    // Aguardar a Promise terminar
+    await this.syncLockPromise;
   }
 
   // ✅ MÉTODO PARA RESETAR SINCRONIZAÇÃO TRAVADA
   async resetSyncLock() {
     console.log('🔓 Resetando lock de sincronização...');
-    this.isSyncing = false;
-    this.syncStartTime = 0;
+    this.releaseSyncLock();
     toast.info('Lock de sincronização resetado');
   }
   // ✅ MÉTODO PARA DEBUG MELHORADO
