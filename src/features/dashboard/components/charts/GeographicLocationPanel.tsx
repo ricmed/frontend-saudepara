@@ -687,8 +687,11 @@ const MunicipalitiesChartWithTable: React.FC<{
   activeFilter?: string;
   stateFilter?: string; // Novo: para mostrar se há filtro de estado ativo
 }> = ({ data, title, icon, onItemClick, filterCategory, activeFilter, stateFilter }) => {
-  // Top 10 municípios para o gráfico
-  const top10Municipalities = data.slice(0, 10);
+  // Top 10 municípios para o gráfico (ordenados por valor decrescente, excluindo "Ignorado")
+  const top10Municipalities = [...data]
+    .filter(item => item.name.toLowerCase() !== 'ignorado')
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
   
   const handleBarClick = (item: any) => {
     if (onItemClick && item && item.name) {
@@ -905,8 +908,11 @@ const NeighborhoodsChartWithTable: React.FC<{
   municipalityFilter?: string; // Novo: para mostrar se há filtro de município ativo
   stateFilter?: string; // Novo: para mostrar se há filtro de estado ativo
 }> = ({ data, title, icon, onItemClick, filterCategory, activeFilter, municipalityFilter, stateFilter }) => {
-  // Top 10 bairros para o gráfico
-  const top10Neighborhoods = data.slice(0, 10);
+  // Top 10 bairros para o gráfico (ordenados por valor decrescente, excluindo "Ignorado")
+  const top10Neighborhoods = [...data]
+    .filter(item => item.name.toLowerCase() !== 'ignorado')
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
   
   const handleBarClick = (item: any) => {
     if (onItemClick && item && item.name) {
@@ -1139,8 +1145,11 @@ const StatesChartWithTable: React.FC<{
   filterCategory: string;
   activeFilter?: string;
 }> = ({ data, title, icon, onItemClick, filterCategory, activeFilter }) => {
-  // Top 10 estados para o gráfico
-  const top10States = data.slice(0, 10);
+  // Top 10 estados para o gráfico (ordenados por valor decrescente, excluindo "Ignorado")
+  const top10States = [...data]
+    .filter(item => item.name.toLowerCase() !== 'ignorado')
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
   
   const handleBarClick = (item: any) => {
     if (onItemClick && item && item.name) {
@@ -1313,8 +1322,11 @@ const CountriesChartWithTable: React.FC<{
   filterCategory: string;
   activeFilter?: string;
 }> = ({ data, title, icon, onItemClick, filterCategory, activeFilter }) => {
-  // Top 10 países para o gráfico
-  const top10Countries = data.slice(0, 10);
+  // Top 10 países para o gráfico (ordenados por valor decrescente, excluindo "Ignorado")
+  const top10Countries = [...data]
+    .filter(item => item.name.toLowerCase() !== 'ignorado')
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
   
   const handleItemClick = (countryName: string) => {
     if (onItemClick) {
