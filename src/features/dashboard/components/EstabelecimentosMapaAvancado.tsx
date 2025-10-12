@@ -37,6 +37,7 @@ interface EstabelecimentoInfo {
   endereco?: string;
   originalLocal: Local;
   temNotificacaoCompulsoria?: boolean; // 🚨 Flag para notificação compulsória
+  severidadeMaxima?: 'critical' | 'high' | 'medium' | null; // 🆕 Severidade máxima das hipóteses
 }
 
 interface EstabelecimentosMapaAvancadoProps {
@@ -240,6 +241,8 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
       
       // 🚨 Verificar se é notificação compulsória (hipótese diagnóstica alarmante)
       let isCompulsoria = false;
+      // 🆕 NOVO: Rastrear severidade da hipótese
+      let severidadeHipotese: 'critical' | 'high' | 'medium' | null = null;
       
       // Método 1: Verificar se já vem marcado como alarmante
       if (notificacao?.isAlarmante === true || notificacao?.original?.isAlarmante === true) {
@@ -255,10 +258,18 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
           );
           if (hipotese?.descricao) {
             const match = findRuleByHypothesis(hipotese.descricao);
-            isCompulsoria = !!match && match.rule.priority === 'critical';
-            
-            if (isCompulsoria) {
-              console.log(`🚨 NOTIFICAÇÃO COMPULSÓRIA DETECTADA: ${hipotese.descricao} no estabelecimento ID ${estabelecimentoId}`);
+            if (match) {
+              // 🆕 Armazenar a severidade para uso posterior
+              severidadeHipotese = match.rule.priority as 'critical' | 'high' | 'medium';
+              isCompulsoria = match.rule.priority === 'critical';
+              
+              if (isCompulsoria) {
+                console.log(`🚨 CRÍTICA: ${hipotese.descricao} no estabelecimento ID ${estabelecimentoId}`);
+              } else if (severidadeHipotese === 'high') {
+                console.log(`⚠️ ALTA: ${hipotese.descricao} no estabelecimento ID ${estabelecimentoId}`);
+              } else if (severidadeHipotese === 'medium') {
+                console.log(`📋 MÉDIA: ${hipotese.descricao} no estabelecimento ID ${estabelecimentoId}`);
+              }
             }
           }
         }
@@ -285,6 +296,16 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
             if (isCompulsoria) {
               est.temNotificacaoCompulsoria = true;
             }
+            // 🆕 Atualizar severidade máxima
+            if (severidadeHipotese) {
+              const severidadeOrdem = { critical: 3, high: 2, medium: 1 };
+              const severidadeAtualOrdem = est.severidadeMaxima ? severidadeOrdem[est.severidadeMaxima] : 0;
+              const novaSeveridadeOrdem = severidadeOrdem[severidadeHipotese];
+              
+              if (novaSeveridadeOrdem > severidadeAtualOrdem) {
+                est.severidadeMaxima = severidadeHipotese;
+              }
+            }
           } else {
             const estabelecimentoInfo: EstabelecimentoInfo = {
               id: idStr,
@@ -296,20 +317,31 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
               tipo: lugarInfo.tipoEstabelecimento || lugarInfo.natureza || 'hospital',
               endereco: lugarInfo.endereco,
               originalLocal: lugarInfo,
-              temNotificacaoCompulsoria: isCompulsoria
+              temNotificacaoCompulsoria: isCompulsoria,
+              severidadeMaxima: severidadeHipotese // 🆕 Inicializar com severidade da primeira notificação
             };
             estabelecimentosMap.set(idStr, estabelecimentoInfo);
           }
           
-          // 🎯 Recalcular urgência - THRESHOLDS AJUSTADOS PARA CÍRIO DE NAZARÉ
+          // 🎯 Recalcular urgência baseada em HIPÓTESE DIAGNÓSTICA e quantidade
           const est = estabelecimentosMap.get(idStr)!;
           
-          // 🚨 PRIORIDADE: Se tem notificação compulsória, É SEMPRE CRÍTICO
-          if (est.temNotificacaoCompulsoria) {
+          // 🚨 PRIORIDADE 1: Se tem notificação compulsória (critical), É SEMPRE CRÍTICO
+          if (est.temNotificacaoCompulsoria || est.severidadeMaxima === 'critical') {
             est.urgencia = 'critica';
-            console.log(`🔴 Estabelecimento ${est.nome} marcado como CRÍTICO por notificação compulsória`);
-          } 
-          // Senão, avaliar por quantidade (thresholds maiores para o Círio)
+            console.log(`🔴 Estabelecimento ${est.nome} marcado como CRÍTICO por notificação compulsória ou hipótese crítica`);
+          }
+          // 🆕 PRIORIDADE 2: Se tem hipótese de severidade HIGH, marcar como ALTA
+          else if (est.severidadeMaxima === 'high') {
+            est.urgencia = 'alta';
+            console.log(`🟠 Estabelecimento ${est.nome} marcado como ALTA por hipótese de alta prioridade`);
+          }
+          // 🆕 PRIORIDADE 3: Se tem hipótese de severidade MEDIUM, marcar como MÉDIA
+          else if (est.severidadeMaxima === 'medium') {
+            est.urgencia = 'media';
+            console.log(`🟡 Estabelecimento ${est.nome} marcado como MÉDIA por hipótese de média prioridade`);
+          }
+          // PRIORIDADE 4: Avaliar por quantidade (thresholds maiores para o Círio)
           else if (est.notificacoes >= 100) {
             est.urgencia = 'critica';
           } else if (est.notificacoes >= 50) {
