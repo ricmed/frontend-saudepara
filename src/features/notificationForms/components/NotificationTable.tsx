@@ -70,9 +70,33 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
           </div>
         );
       case "created_at":
-        return formatDate(notificacao.original?.created_at);
+        // 🆕 FORMATAR com data e hora
+        return notificacao.original?.created_at ? (
+          <div className="text-sm text-gray-700">
+            {new Date(notificacao.original.created_at).toLocaleString('pt-BR', {
+              timeZone: 'America/Belem',
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </div>
+        ) : "—";
       case "updated_at":
-        return formatDate(notificacao.original?.updated_at);
+        // 🆕 FORMATAR com data e hora
+        return notificacao.original?.updated_at ? (
+          <div className="text-sm text-gray-700">
+            {new Date(notificacao.original.updated_at).toLocaleString('pt-BR', {
+              timeZone: 'America/Belem',
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </div>
+        ) : "—";
       default:
         return String(notificacao[key] || "");
     }

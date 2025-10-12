@@ -146,8 +146,8 @@ export const useNotifications = () => {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [isUsingLocalSort, setIsUsingLocalSort] = useState(false);
 
-  // Ordenação
-  const [sortKey, setSortKey] = useState<keyof Notificacao>("data_ocorrencia");
+  // Ordenação - 🆕 ATUALIZADO: Ordenar por data de criação (mais recente primeiro)
+  const [sortKey, setSortKey] = useState<keyof Notificacao>("created_at");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   // Erro e loading

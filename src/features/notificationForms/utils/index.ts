@@ -64,40 +64,52 @@ export const adjustDatesForExport = (data: any[]): any[] => {
 
 /**
  * Função de comparação para ordenação de dados
+ * 🆕 ATUALIZADO: Suporte para timestamps ISO (created_at, updated_at)
  */
 export const compareValues = (valA: any, valB: any, sortOrder: "asc" | "desc"): number => {
-  // Para datas, converter para objetos Date
-  if (typeof valA === 'string' && valA.includes('/') && 
-      typeof valB === 'string' && valB.includes('/')) {
-    // Formato data brasileira DD/MM/YYYY
-    const partsA = valA.split('/');
-    const partsB = valB.split('/');
-    
-    if (partsA.length === 3 && partsB.length === 3) {
-      const dateA = new Date(+partsA[2], +partsA[1] - 1, +partsA[0]);
-      const dateB = new Date(+partsB[2], +partsB[1] - 1, +partsB[0]);
+  // 🆕 Para timestamps ISO (formato: 2025-10-12T14:30:25.000Z)
+  if (typeof valA === 'string' && typeof valB === 'string') {
+    // Detectar se é um timestamp ISO completo
+    if (valA.includes('T') && valA.includes('Z') && 
+        valB.includes('T') && valB.includes('Z')) {
+      const dateA = new Date(valA);
+      const dateB = new Date(valB);
       
       return sortOrder === "asc" 
         ? dateA.getTime() - dateB.getTime() 
         : dateB.getTime() - dateA.getTime();
     }
-  }
-  
-  // Para strings
-  if (typeof valA === "string" && typeof valB === "string") {
+    
+    // Para datas brasileiras DD/MM/YYYY
+    if (valA.includes('/') && valB.includes('/')) {
+      const partsA = valA.split('/');
+      const partsB = valB.split('/');
+      
+      if (partsA.length === 3 && partsB.length === 3) {
+        const dateA = new Date(+partsA[2], +partsA[1] - 1, +partsA[0]);
+        const dateB = new Date(+partsB[2], +partsB[1] - 1, +partsB[0]);
+        
+        return sortOrder === "asc" 
+          ? dateA.getTime() - dateB.getTime() 
+          : dateB.getTime() - dateA.getTime();
+      }
+    }
+    
+    // Para strings normais
     return sortOrder === "asc"
       ? valA.localeCompare(valB, "pt-BR")
       : valB.localeCompare(valA, "pt-BR");
-  } else {
-    // Para outros tipos
-    if (valA < valB) return sortOrder === "asc" ? -1 : 1;
-    if (valA > valB) return sortOrder === "asc" ? 1 : -1;
-    return 0;
   }
+  
+  // Para outros tipos (números, etc)
+  if (valA < valB) return sortOrder === "asc" ? -1 : 1;
+  if (valA > valB) return sortOrder === "asc" ? 1 : -1;
+  return 0;
 };
 
 /**
  * Extrai valor para comparação com base na chave de ordenação
+ * 🆕 ATUALIZADO: Suporte para created_at e updated_at com timestamp completo
  */
 export const getValueForSorting = (notificacao: Notificacao, sortKey: keyof Notificacao): any => {
   if (sortKey === "paciente") {
@@ -112,6 +124,16 @@ export const getValueForSorting = (notificacao: Notificacao, sortKey: keyof Noti
     return notificacao.tipoAtendimento || "";
   } else if (sortKey === "tipo_encerramento") {
     return notificacao.tipoEncerramento || "";
+  } else if (sortKey === "created_at") {
+    // 🆕 Retornar timestamp completo para ordenação precisa
+    return notificacao.original?.created_at || "";
+  } else if (sortKey === "updated_at") {
+    // 🆕 Retornar timestamp completo para ordenação precisa
+    return notificacao.original?.updated_at || "";
+  } else if (sortKey === "created_by_userid") {
+    return notificacao.original?.created_by_userid || "";
+  } else if (sortKey === "updated_by_userid") {
+    return notificacao.original?.updated_by_userid || "";
   } else {
     return notificacao[sortKey] || "";
   }
