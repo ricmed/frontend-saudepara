@@ -16,6 +16,7 @@ interface UseAtendimentosPorHoraProps {
 
 /**
  * Hook para processar atendimentos por hora considerando timezone local e filtro por data
+ * 🆕 ATUALIZADO: Usa data/hora de CRIAÇÃO da notificação (created_at) em vez de data_atendimento
  * Usado para análise de fluxo hospitalar e identificação de picos
  */
 export const useAtendimentosPorHora = ({ 
@@ -25,7 +26,7 @@ export const useAtendimentosPorHora = ({
 }: UseAtendimentosPorHoraProps) => {
   const [loading, setLoading] = useState(true);
 
-  // ✅ NOVO: Extrair datas únicas disponíveis das notificações
+  // ✅ ATUALIZADO: Extrair datas únicas disponíveis das notificações usando created_at
   const datasDisponiveis = useMemo(() => {
     console.log('🔍 [DATAS DEBUG] Calculando datas disponíveis:', {
       totalNotificacoes: notificacoes?.length || 0
@@ -36,15 +37,16 @@ export const useAtendimentosPorHora = ({
     const datas = new Set<string>();
 
     notificacoes.forEach((notificacao) => {
-      const dataAtendimento = notificacao.data_atendimento || notificacao.original?.data_atendimento;
+      // 🆕 MUDANÇA: Usar created_at em vez de data_atendimento
+      const dataCreated = notificacao.created_at || notificacao.original?.created_at;
       
-      if (dataAtendimento) {
+      if (dataCreated) {
         try {
-          const dataLocal = new Date(dataAtendimento);
+          const dataLocal = new Date(dataCreated);
           const dataFormatada = dataLocal.toISOString().split('T')[0]; // YYYY-MM-DD
           
           console.log('🔍 [DATAS DEBUG] Data processada para lista:', {
-            original: dataAtendimento,
+            original: dataCreated,
             formatada: dataFormatada,
             dataLocal: dataLocal.toString()
           });
@@ -89,15 +91,16 @@ export const useAtendimentosPorHora = ({
       let notificacoesFiltradas = 0;
 
       notificacoes.forEach((notificacao) => {
-        const dataAtendimento = notificacao.data_atendimento || notificacao.original?.data_atendimento;
+        // 🆕 MUDANÇA: Usar created_at em vez de data_atendimento
+        const dataCreated = notificacao.created_at || notificacao.original?.created_at;
         
-        if (dataAtendimento) {
+        if (dataCreated) {
           try {
-            const dataLocal = new Date(dataAtendimento);
+            const dataLocal = new Date(dataCreated);
             
             // Verificar se a data é válida
             if (isNaN(dataLocal.getTime())) {
-              console.warn('Data inválida encontrada:', dataAtendimento);
+              console.warn('Data inválida encontrada:', dataCreated);
               return;
             }
             
@@ -108,11 +111,11 @@ export const useAtendimentosPorHora = ({
             const dataNotificacao = `${ano}-${mes}-${dia}`;
 
             console.log('🔍 [FILTRO DEBUG] Processando notificação:', {
-              dataOriginal: dataAtendimento,
+              dataOriginal: dataCreated,
               dataLocal: dataLocal.toString(),
               dataNotificacao,
               dataFiltro,
-              tipoData: typeof dataAtendimento
+              tipoData: typeof dataCreated
             });
 
             // ✅ FILTRO POR DATA: Se uma data específica foi selecionada, filtrar apenas essa data
@@ -149,7 +152,7 @@ export const useAtendimentosPorHora = ({
               }
             }
           } catch (error) {
-            console.warn('Erro ao processar data de atendimento:', error);
+            console.warn('Erro ao processar data de criação da notificação:', error);
           }
         }
       });

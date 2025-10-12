@@ -104,6 +104,37 @@ export const formatarDataUniversal = (dateString?: string | null): string => {
   }
 };
 
+// 🆕 Função para formatar data E hora com timezone (usado para created_at e updated_at)
+export const formatarDataHoraUniversal = (dateString?: string | null): string => {
+  if (!dateString) return "";
+
+  console.log(`[formatarDataHoraUniversal] Data original: ${dateString}`);
+
+  try {
+    const date = new Date(dateString);
+    console.log(`[formatarDataHoraUniversal] Data após criação do objeto Date: ${date.toISOString()}`);
+
+    // Usar timezone America/Belem como no dashboard
+    const timezone_name = 'America/Belem';
+    
+    const result = date.toLocaleString("pt-BR", {
+      timeZone: timezone_name,
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+
+    console.log(`[formatarDataHoraUniversal] Resultado final formatado com timezone (${timezone_name}): ${result}`);
+    return result;
+  } catch (error) {
+    console.error("[formatarDataHoraUniversal] Erro ao formatar data e hora:", error);
+    return "Data inválida";
+  }
+};
+
 // Função para calcular idade a partir da data de nascimento
 // 🆕 Atualizada para mostrar em meses/anos conforme especificação
 const calculateAge = (dateString: string): string => {
@@ -824,8 +855,8 @@ const prepareDataForExport = (
     "Local de Encaminhamento": getLocalEncaminhamentoText(),
 
     // Seção 7: Campos de Auditoria
-    "Data de Criação": formatarDataUniversal(formData.created_at),
-    "Data de Atualização": formatarDataUniversal(formData.updated_at),
+    "Data e Hora de Criação": formatarDataHoraUniversal(formData.created_at),
+    "Data e Hora de Atualização": formatarDataHoraUniversal(formData.updated_at),
     "Criado por (ID)": formData.created_by_userid || "—",
     "Atualizado por (ID)": formData.updated_by_userid || "—",
   };
@@ -1080,8 +1111,8 @@ export const exportToPDF = (
       {
         title: "7. Campos de Auditoria",
         fields: [
-          "Data de Criação",
-          "Data de Atualização",
+          "Data e Hora de Criação",
+          "Data e Hora de Atualização",
         ],
       },
     ];
@@ -1548,8 +1579,8 @@ const formatNotificacaoForExport = (
     "Local de Encaminhamento": getLocalEncaminhamentoText(), // Usando a função aprimorada
 
     // Campos de Auditoria
-    "Data de Criação": formatarDataUniversal(original.created_at),
-    "Data de Atualização": formatarDataUniversal(original.updated_at),
+    "Data e Hora de Criação": formatarDataHoraUniversal(original.created_at),
+    "Data e Hora de Atualização": formatarDataHoraUniversal(original.updated_at),
     "Criado por (ID)": original.created_by_userid || "—",
     "Atualizado por (ID)": original.updated_by_userid || "—",
   };
@@ -1618,11 +1649,15 @@ export const exportListToExcel = (
       { wch: 15 }, // Data de Encerramento
       { wch: 20 }, // Tipo de Encerramento
       { wch: 30 }, // Local de Encaminhamento
+      { wch: 20 }, // Data e Hora de Criação
+      { wch: 20 }, // Data e Hora de Atualização
+      { wch: 15 }, // Criado por (ID)
+      { wch: 15 }, // Atualizado por (ID)
     ];
 
     worksheet["!cols"] = columnsWidth;
 
-    // Ajustar formato de datas
+    // Ajustar formato de datas (campos que são apenas data)
     const dateFields = [
       "Data de Nascimento",
       "Data de Início dos Sintomas",
@@ -1630,6 +1665,13 @@ export const exportListToExcel = (
       "Data do Atendimento",
       "Data de Encerramento",
     ];
+    
+    // Campos de data e hora (formato diferente)
+    const dateTimeFields = [
+      "Data e Hora de Criação",
+      "Data e Hora de Atualização",
+    ];
+    
     const header = Object.keys(formattedData[0] || {});
     for (let rowIdx = 1; rowIdx <= formattedData.length; rowIdx++) {
       for (let colIdx = 0; colIdx < header.length; colIdx++) {
@@ -1641,6 +1683,14 @@ export const exportListToExcel = (
             // Aplicar formato de data diretamente sem criar objetos Date
             cell.t = "s"; // Manter como string
             cell.z = "dd/mm/yyyy"; // Formato visual
+          }
+        } else if (dateTimeFields.includes(field)) {
+          const cellRef = XLSX.utils.encode_cell({ r: rowIdx, c: colIdx });
+          const cell = worksheet[cellRef];
+          if (cell && cell.v) {
+            // Aplicar formato de data e hora
+            cell.t = "s"; // Manter como string
+            cell.z = "dd/mm/yyyy hh:mm:ss"; // Formato visual data e hora
           }
         }
       }

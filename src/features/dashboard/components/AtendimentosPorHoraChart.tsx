@@ -11,7 +11,7 @@ import {
   Legend,
   LabelList,
 } from 'recharts';
-import { Clock, TrendingUp, AlertTriangle, BarChart3, Calendar } from 'lucide-react';
+import { Clock, TrendingUp, BarChart3, Calendar } from 'lucide-react';
 import { useAtendimentosPorHora } from '../hooks/useAtendimentosPorHora';
 
 interface AtendimentosPorHoraChartProps {
@@ -22,6 +22,7 @@ interface AtendimentosPorHoraChartProps {
 
 /**
  * Componente de gráfico para análise de atendimentos por hora com filtro por data
+ * 🆕 ATUALIZADO: Usa data/hora de CRIAÇÃO da notificação (created_at) em vez de data_atendimento
  * Usado para identificar picos de fluxo hospitalar em dias específicos
  */
 export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> = ({
@@ -107,7 +108,7 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
           </div>
           <div>
             <h3 className="text-lg font-medium text-gray-900">
-              Série Temporal por Horário de Notificação
+              Notificações por Horário de Atendimento
             </h3>
             <p className="text-sm text-gray-600">
               {dataSelecionada 
@@ -296,7 +297,7 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
           </div>
         </div>
         <p className="text-xs text-gray-500 mt-2">
-          📊 Análise temporal baseada na data de criação das notificações no sistema.
+          📊 Análise temporal dos atendimentos registrados no sistema por horário.
         </p>
       </div>
     </div>
