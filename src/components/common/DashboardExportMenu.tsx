@@ -155,12 +155,12 @@ const DashboardExportMenu: React.FC<DashboardExportMenuProps> = ({
         <>
           {/* Overlay para fechar menu */}
           <div 
-            className="fixed inset-0 z-10" 
+            className="fixed inset-0 z-[9998]" 
             onClick={() => setShowMenu(false)}
           />
           
           {/* Menu de opções */}
-          <div className="absolute right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-20 min-w-64">
+          <div className="absolute right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-[9999] min-w-64">
             <div className="px-4 py-3 border-b border-gray-100">
               <h3 className="font-semibold text-gray-800">Exportar Dashboard Completo</h3>
               <p className="text-xs text-gray-500 mt-1">

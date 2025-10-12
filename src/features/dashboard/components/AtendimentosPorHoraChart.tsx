@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { Clock, TrendingUp, BarChart3, Calendar } from 'lucide-react';
 import { useAtendimentosPorHora } from '../hooks/useAtendimentosPorHora';
+import ChartExportMenu from '../../../components/common/ChartExportMenu';
 
 interface AtendimentosPorHoraChartProps {
   notificacoes: any[];
@@ -119,7 +120,21 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
           </div>
         </div>
         
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          {/* Botão de Exportação */}
+          <ChartExportMenu
+            chartId="atendimentos-por-hora"
+            chartData={atendimentosPorHora.map(item => ({
+              name: item.hora,
+              value: item.quantidade
+            }))}
+            chartTitle={dataSelecionada 
+              ? `Notificações por Horário - ${formatarDataParaExibicao(dataSelecionada)}`
+              : 'Notificações por Horário - Consolidado'
+            }
+            buttonVariant="icon"
+          />
+          
           {/* ✅ NOVO: Seletor de Data */}
           <div className="flex flex-col items-end">
             <label className="text-sm text-gray-500 mb-1">Filtrar por data:</label>
@@ -200,7 +215,7 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
       </div>
 
       {/* Gráfico */}
-      <div className="h-80">
+      <div id="atendimentos-por-hora" className="h-80">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart 
             data={atendimentosPorHora.map((item: any) => ({

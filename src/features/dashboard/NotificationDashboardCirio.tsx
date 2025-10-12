@@ -79,7 +79,7 @@ import HipotesesDiagnosticasChart from './components/charts/HipotesesDiagnostica
 
 // 🆕 SISTEMA DE EXPORTAÇÃO DISPONÍVEL:
 // Para integrar exportação em um gráfico individual, importe:
-// import ChartExportMenu from '../../components/common/ChartExportMenu';
+import ChartExportMenu from '../../components/common/ChartExportMenu';
 // E adicione como prop ou elemento ao lado do gráfico
 
 // Funções de exportação para diferentes formatos
@@ -3602,33 +3602,88 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       {/* Aba de Análise Temporal - Séries Temporais */}
       {activeTab === "fluxo" && (
         <main className="max-w-7xl mx-auto px-4 py-6">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              Análise Temporal
-            </h2>
-            <p className="text-gray-600">
-              Visualização de séries temporais por dia e hora de notificação
-            </p>
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                Análise Temporal
+              </h2>
+              <p className="text-gray-600">
+                Visualização de séries temporais por dia e hora de notificação
+              </p>
+            </div>
+            <DashboardExportMenu
+              paisData={filteredPais}
+              estadoData={filteredEstado}
+              municipioData={filteredMunicipio}
+              bairroData={filteredBairro}
+              publicoData={filteredPublico}
+              tipoAtendimentoData={filteredTipoAtendimento}
+              generoData={filteredGenero}
+              racaData={filteredRaca}
+              sintomasData={filteredSintomas}
+              traumaData={filteredTrauma}
+              hipotesesData={filteredHipoteses}
+              totalRecords={filteredNotificacoes.current.length}
+              activeFilters={activeFilters}
+              buttonVariant="button"
+              className="text-xs sm:text-sm"
+            />
           </div>
           
           {/* Gráfico 1: Série temporal por dia */}
           <div className="mb-6">
             <div className="bg-white p-6 rounded-lg shadow-sm">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-blue-100 text-blue-700 rounded-lg">
-                  <Calendar className="h-5 w-5" />
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 text-blue-700 rounded-lg">
+                    <Calendar className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900">
+                      Série Temporal por Dia de Notificação
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Evolução diária do número de notificações
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900">
-                    Série Temporal por Dia de Notificação
-                  </h3>
-                  <p className="text-sm text-gray-600">
-                    Evolução diária do número de notificações
-                  </p>
-                </div>
+                <ChartExportMenu
+                  chartId="serie-temporal-dia"
+                  chartData={(() => {
+                    const timezone = 'America/Belem';
+                    const notificacoesPorDia = notificacoes.reduce((acc: any, notif: any) => {
+                      const dataCreated = notif?.created_at || notif?.original?.created_at;
+                      if (!dataCreated) return acc;
+                      try {
+                        const dataLocal = new Date(dataCreated);
+                        const data = dataLocal.toLocaleDateString('pt-BR', {
+                          timeZone: timezone,
+                          year: 'numeric',
+                          month: '2-digit',
+                          day: '2-digit'
+                        }).split('/').reverse().join('-');
+                        if (!acc[data]) {
+                          acc[data] = { total: 0 };
+                        }
+                        acc[data].total += 1;
+                      } catch (error) {
+                        console.warn('Erro ao processar data:', error);
+                      }
+                      return acc;
+                    }, {});
+                    return Object.entries(notificacoesPorDia)
+                      .map(([data, valores]: [string, any]) => ({
+                        name: new Date(data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+                        value: valores.total
+                      }))
+                      .sort((a, b) => a.name.localeCompare(b.name));
+                  })()}
+                  chartTitle="Série Temporal por Dia de Notificação"
+                  buttonVariant="icon"
+                />
               </div>
               
-              <div className="h-80">
+              <div id="serie-temporal-dia" className="h-80">
                 {(() => {
                   // Processar dados por dia - MESMA LÓGICA DO DASHBOARD E MAPA
                   const timezone = 'America/Belem';
@@ -3763,13 +3818,32 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       {/* Aba do Mapa - Distribuição Geográfica */}
       {activeTab === "mapa" && (
         <main className="max-w-7xl mx-auto px-4 py-6">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              Mapa de Estabelecimentos
-            </h2>
-            <p className="text-gray-600">
-              Distribuição geográfica dos estabelecimentos de saúde com indicadores de urgência
-            </p>
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                Mapa de Estabelecimentos
+              </h2>
+              <p className="text-gray-600">
+                Distribuição geográfica dos estabelecimentos de saúde com indicadores de urgência
+              </p>
+            </div>
+            <DashboardExportMenu
+              paisData={filteredPais}
+              estadoData={filteredEstado}
+              municipioData={filteredMunicipio}
+              bairroData={filteredBairro}
+              publicoData={filteredPublico}
+              tipoAtendimentoData={filteredTipoAtendimento}
+              generoData={filteredGenero}
+              racaData={filteredRaca}
+              sintomasData={filteredSintomas}
+              traumaData={filteredTrauma}
+              hipotesesData={filteredHipoteses}
+              totalRecords={filteredNotificacoes.current.length}
+              activeFilters={activeFilters}
+              buttonVariant="button"
+              className="text-xs sm:text-sm"
+            />
           </div>
           
           <EstabelecimentosMapaAvancado 

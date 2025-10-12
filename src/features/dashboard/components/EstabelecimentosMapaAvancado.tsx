@@ -23,6 +23,8 @@ import { Local } from '../../maps/leaflet/types';
 import { findRuleByHypothesis } from '../config/vigilancia.config';
 // 🆕 Importar modal de detalhes
 import EstabelecimentoDetailModal from './EstabelecimentoDetailModal';
+// 🆕 Importar menu de exportação
+import ChartExportMenu from '../../../components/common/ChartExportMenu';
 
 interface EstabelecimentoInfo {
   id: string;
@@ -457,6 +459,51 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
           </div>
           
           <div className="flex items-center gap-2">
+            <ChartExportMenu
+              chartId="mapa-estabelecimentos"
+              chartData={estabelecimentos
+                .sort((a, b) => b.notificacoes - a.notificacoes) // Ordenar por número de notificações
+                .map(est => ({
+                  name: `${est.nome} (${est.tipo})`,
+                  value: est.notificacoes,
+                  fill: (() => {
+                    switch (est.urgencia) {
+                      case 'critica': return '#EF4444';
+                      case 'alta': return '#F97316';
+                      case 'media': return '#EAB308';
+                      case 'baixa': return '#22C55E';
+                      default: return '#6B7280';
+                    }
+                  })(),
+                  isAlarmante: est.urgencia === 'critica' || est.urgencia === 'alta',
+                  original: {
+                    endereco: est.endereco,
+                    urgencia: est.urgencia,
+                    tipo: est.tipo,
+                    temNotificacaoCompulsoria: est.temNotificacaoCompulsoria
+                  }
+                }))}
+              chartTitle={(() => {
+                let titulo = 'Distribuição de Notificações por Estabelecimento';
+                const filtros: string[] = [];
+                
+                if (tipoEstabelecimentoSelecionado) {
+                  filtros.push(`Tipo: ${tipoEstabelecimentoSelecionado}`);
+                }
+                
+                if (dataSelecionada) {
+                  const dataFormatada = new Date(dataSelecionada + 'T00:00:00').toLocaleDateString('pt-BR');
+                  filtros.push(`Data: ${dataFormatada}`);
+                }
+                
+                if (filtros.length > 0) {
+                  titulo += ` - ${filtros.join(' | ')}`;
+                }
+                
+                return titulo;
+              })()}
+              buttonVariant="icon"
+            />
             <button
               onClick={toggleLayers}
               className={`p-2 rounded transition-colors ${
@@ -595,7 +642,7 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
 
       <div className="relative">
         {/* Área do Mapa Dashboard Customizado */}
-        <div className="relative" style={{ height: 'calc(100vh - 400px)', minHeight: '600px' }}>
+        <div id="mapa-estabelecimentos" className="relative" style={{ height: 'calc(100vh - 400px)', minHeight: '600px' }}>
           <MapaDashboard
             estabelecimentos={estabelecimentosParaMapa}
             center={{ lat: -1.4558, lng: -48.4902 }}

@@ -272,20 +272,27 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({ notificacoes = [] })
     // 🆕 CRIAR ALERTAS AGRUPADOS POR HIPÓTESE
     casosAgrupados.forEach((casos, hipotese) => {
       if (casos.length === 0) return;
+      
+      // 🔧 IGNORAR hipóteses vazias ou inválidas
+      if (!hipotese || hipotese === 'Não informado' || hipotese.trim() === '') return;
 
       // Verificar se há match nas regras GVS para determinar prioridade real
       const primeiroAlertaDetectado = detectarAlertas([casos[0]]).find(a => 
         a.dados?.doenca === hipotese || a.dados?.hipotese === hipotese
       );
 
-      let tipoAlerta: 'critico' | 'alerta' | 'info' = 'info';
+      // 🔧 NOVO: Mostrar TODAS as hipóteses, independente de estarem no GVS
+      let tipoAlerta: 'critico' | 'alerta' | 'info' = 'info'; // Padrão: info para hipóteses não catalogadas
+      
       if (primeiroAlertaDetectado) {
+        // Se estiver no GVS, usar a prioridade configurada
         tipoAlerta = primeiroAlertaDetectado.tipo === 'critico' ? 'critico' : 
-                     primeiroAlertaDetectado.tipo === 'urgente' ? 'alerta' : 'info';
+                     primeiroAlertaDetectado.tipo === 'urgente' ? 'alerta' : 
+                     primeiroAlertaDetectado.tipo === 'atencao' ? 'alerta' : 'info';
       }
 
-      // Só criar alerta se há casos e é uma hipótese relevante (crítica ou alta)
-      if ((tipoAlerta === 'critico' || tipoAlerta === 'alerta') && casos.length > 0) {
+      // 🔧 NOVO: Criar alerta para TODAS as hipóteses (não filtrar mais)
+      if (casos.length > 0) {
         const casosDetalhados = casos.map((caso, index) => ({
           id: caso.idnotificacao || `caso-${index}`,
           pacienteNome: caso.paciente?.nome || 
@@ -317,12 +324,12 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({ notificacoes = [] })
           timestamp: new Date(),
           hipotese: hipotese,
           requiresNotification: tipoAlerta === 'critico',
-          legalBasis: primeiroAlertaDetectado?.dados?.criterioLegal || 'Portaria GM/MS nº 264/2020',
+          legalBasis: primeiroAlertaDetectado?.dados?.criterioLegal || (tipoAlerta === 'info' ? 'Monitoramento geral' : 'Portaria GM/MS nº 264/2020'),
           totalCasos: casos.length,
           casos: casosDetalhados,
           // 🆕 ADICIONAR: Dados das recomendações
           recomendacoes: {
-            prazoNotificacao: primeiroAlertaDetectado?.dados?.prazoNotificacao,
+            prazoNotificacao: primeiroAlertaDetectado?.dados?.prazoNotificacao || (tipoAlerta === 'info' ? 'Monitoramento contínuo' : undefined),
             orgaoNotificar: primeiroAlertaDetectado?.dados?.orgaoNotificar,
             acaoRecomendada: primeiroAlertaDetectado?.dados?.acaoRecomendada,
             acaoCampo: primeiroAlertaDetectado?.dados?.acaoCampo
