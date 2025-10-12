@@ -359,6 +359,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   
   // Estado para controlar a exibição da ajuda
   const [showHelp, setShowHelp] = useState(false);
+  
+  // 🆕 Estado para controlar o modal de fichas
+  const [showFichasModal, setShowFichasModal] = useState(false);
 
   // Dados base do dashboard
   const [totalNotifications, setTotalNotifications] = useState(0);
@@ -2691,8 +2694,330 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     return 'max-w-[1920px]'; // Largura total para aproveitar toda a tela
   }, []);
 
+  // 🆕 Estado para pesquisa no modal
+  const [modalSearchTerm, setModalSearchTerm] = useState('');
+
+  // 🆕 COMPONENTE DO MODAL DE FICHAS
+  const FichasModal = useMemo(() => {
+    if (!showFichasModal) return null;
+
+    // Obter os dados filtrados atuais
+    const fichasFiltradas = filteredNotificacoes.current;
+    
+    // Filtrar fichas baseado no termo de pesquisa
+    const fichasPesquisadas = fichasFiltradas.filter((notificacao: any) => {
+      if (!modalSearchTerm) return true;
+      
+      const original = notificacao.original || notificacao;
+      const termo = modalSearchTerm.toLowerCase();
+      
+      // Pesquisar em múltiplos campos
+      const getDescById = (options: any[], id: any, idField: string, descField: string) => {
+        if (!options || !Array.isArray(options)) return 'N/A';
+        const item = options.find((opt: any) => String(opt[idField]) === String(id));
+        return item ? item[descField] : 'N/A';
+      };
+      
+      return (
+        original.idnotificacao?.toString().includes(termo) ||
+        original.paciente?.nome?.toLowerCase().includes(termo) ||
+        original.paciente?.cpf?.includes(termo) ||
+        getDescById(
+          exportOptions?.estabelecimentoOptions || [],
+          original.estabelecimento_idestabelecimento,
+          'idestabelecimento',
+          'nome'
+        )?.toLowerCase().includes(termo) ||
+        getDescById(
+          exportOptions?.hipoteseDiagOptions || [],
+          original.tipo_hipotese_diag_idtipo_hipotese_diag,
+          'idtipo_hipotese_diag',
+          'descricao'
+        )?.toLowerCase().includes(termo)
+      );
+    });
+    
+    // Função para formatar data
+    const formatDate = (dateString: string) => {
+      if (!dateString) return 'N/A';
+      try {
+        return new Date(dateString).toLocaleDateString('pt-BR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch {
+        return dateString;
+      }
+    };
+
+    // Função para obter descrição por ID
+    const getDescById = (options: any[], id: any, idField: string, descField: string) => {
+      if (!options || !Array.isArray(options)) return 'N/A';
+      const item = options.find((opt: any) => String(opt[idField]) === String(id));
+      return item ? item[descField] : 'N/A';
+    };
+
+    // 🆕 Função para formatar idade corretamente (considera meses e anos)
+    const formatIdade = (idade: number | null | undefined): string => {
+      if (!idade || isNaN(Number(idade))) return 'N/A';
+      
+      const idadeNum = Number(idade);
+      
+      // Se a idade for maior que 120, provavelmente está em meses - converter para anos
+      if (idadeNum > 120) {
+        const anos = Math.floor(idadeNum / 12);
+        return `${anos} ${anos === 1 ? 'ano' : 'anos'}`;
+      }
+      
+      // Se for menor que 12, é um bebê - mostrar em meses
+      if (idadeNum < 12) {
+        return `${idadeNum} ${idadeNum === 1 ? 'mês' : 'meses'}`;
+      }
+      
+      // Se for entre 12 e 24, converter para anos
+      if (idadeNum >= 12 && idadeNum <= 24) {
+        const anos = Math.floor(idadeNum / 12);
+        return `${anos} ${anos === 1 ? 'ano' : 'anos'}`;
+      }
+      
+      // Se for maior que 24, assumir que já é em anos
+      return `${idadeNum} ${idadeNum === 1 ? 'ano' : 'anos'}`;
+    };
+
+    // 🆕 Função para navegar para a ficha
+    const navegarParaFicha = (idNotificacao: number) => {
+      if (idNotificacao && !isNaN(Number(idNotificacao))) {
+        const url = `/private/comunicacao-de-caso/editar/${idNotificacao}`;
+        console.log('🚀 Navegando para:', url);
+        window.location.href = url;
+      } else {
+        console.error('❌ ID da notificação inválido:', idNotificacao);
+        alert('Erro: ID da notificação não encontrado ou inválido.');
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[80vh] overflow-hidden">
+          {/* Header do Modal */}
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <FileText className="h-6 w-6 text-blue-600" />
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">
+                    Fichas de Notificação
+                  </h2>
+                  <p className="text-sm text-gray-600">
+                    {fichasPesquisadas.length} de {fichasFiltradas.length} ficha(s)
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowFichasModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            {/* Campo de Pesquisa */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Pesquisar por nome, CPF, ID, estabelecimento ou hipótese..."
+                value={modalSearchTerm}
+                onChange={(e) => setModalSearchTerm(e.target.value)}
+                className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <FileSearch2 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              {modalSearchTerm && (
+                <button
+                  onClick={() => setModalSearchTerm('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Conteúdo - Lista de Fichas */}
+          <div className="p-6 overflow-y-auto max-h-[60vh]">
+            {fichasPesquisadas.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                <FileSearch2 className="h-16 w-16 mb-4 text-gray-300" />
+                <p className="text-lg font-medium">Nenhuma ficha encontrada</p>
+                <p className="text-sm">Tente ajustar os filtros</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {fichasPesquisadas.map((notificacao: any, index: number) => {
+                  const original = notificacao.original || notificacao;
+                  return (
+                    <div
+                      key={original.idnotificacao || index}
+                      className="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                    >
+                      {/* Cabeçalho da Ficha */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-blue-100 rounded-lg">
+                            <FileText className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-gray-900">
+                              Notificação #{original.idnotificacao}
+                            </h3>
+                            <p className="text-xs text-gray-500">
+                              {formatDate(original.data_notificacao)}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                          {getDescById(
+                            exportOptions?.atendimentoOptions || [],
+                            original.tipo_atendimento_idtipo_atendimento,
+                            'idtipo_atendimento',
+                            'descricao'
+                          )}
+                        </span>
+                      </div>
+
+                      {/* Grid de Informações */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                        {/* Paciente */}
+                        <div>
+                          <span className="text-gray-500 font-medium">Paciente:</span>
+                          <p className="text-gray-900">
+                            {original.paciente?.nome || 'Não informado'}
+                          </p>
+                        </div>
+
+                        {/* Idade */}
+                        <div>
+                          <span className="text-gray-500 font-medium">Idade:</span>
+                          <p className="text-gray-900">
+                            {formatIdade(original.paciente?.idade)}
+                          </p>
+                        </div>
+
+                        {/* Sexo */}
+                        <div>
+                          <span className="text-gray-500 font-medium">Sexo:</span>
+                          <p className="text-gray-900">
+                            {getDescById(
+                              exportOptions?.generoOptions || [],
+                              original.paciente?.tipo_genero_idtipo_genero,
+                              'idtipo_genero',
+                              'descricao'
+                            )}
+                          </p>
+                        </div>
+
+                        {/* Estabelecimento */}
+                        <div className="md:col-span-2">
+                          <span className="text-gray-500 font-medium">Estabelecimento:</span>
+                          <p className="text-gray-900">
+                            {getDescById(
+                              exportOptions?.estabelecimentoOptions || [],
+                              original.estabelecimento_idestabelecimento,
+                              'idestabelecimento',
+                              'nome'
+                            )}
+                          </p>
+                        </div>
+
+                        {/* Hipótese Diagnóstica */}
+                        <div>
+                          <span className="text-gray-500 font-medium">Hipótese:</span>
+                          <p className="text-gray-900">
+                            {getDescById(
+                              exportOptions?.hipoteseDiagOptions || [],
+                              original.tipo_hipotese_diag_idtipo_hipotese_diag,
+                              'idtipo_hipotese_diag',
+                              'descricao'
+                            )}
+                          </p>
+                        </div>
+
+                        {/* Público */}
+                        <div>
+                          <span className="text-gray-500 font-medium">Público:</span>
+                          <p className="text-gray-900">
+                            {getDescById(
+                              exportOptions?.publicoOptions || [],
+                              original.tipo_publico_idtipo_publico,
+                              'idtipo_publico',
+                              'descricao'
+                            )}
+                          </p>
+                        </div>
+
+                        {/* Raça/Cor */}
+                        <div>
+                          <span className="text-gray-500 font-medium">Raça/Cor:</span>
+                          <p className="text-gray-900">
+                            {getDescById(
+                              exportOptions?.racaOptions || [],
+                              original.paciente?.tipo_raca_idtipo_raca,
+                              'idtipo_raca',
+                              'descricao'
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Observações (se houver) */}
+                      {original.observacoes && (
+                        <div className="mt-3 pt-3 border-t border-gray-200">
+                          <span className="text-gray-500 font-medium text-sm">Observações:</span>
+                          <p className="text-gray-700 text-sm mt-1">{original.observacoes}</p>
+                        </div>
+                      )}
+
+                      {/* Botão Ver Ficha - Centralizado */}
+                      <div className="mt-3 pt-3 border-t border-gray-200 flex justify-center">
+                        <button
+                          onClick={() => navegarParaFicha(original.idnotificacao)}
+                          className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors flex items-center gap-1"
+                        >
+                          <Info className="h-3 w-3" />
+                          Ver paciente
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Footer do Modal */}
+          <div className="p-4 bg-gray-50 rounded-b-lg border-t border-gray-200 flex items-center justify-between">
+            <p className="text-sm text-gray-600">
+              Total: <strong>{fichasFiltradas.length}</strong> ficha(s)
+            </p>
+            <button
+              onClick={() => setShowFichasModal(false)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }, [showFichasModal, filteredNotificacoes, exportOptions, modalSearchTerm]);
+
   return (
     <div data-dashboard="main" className={getContainerClasses()}>
+      {/* Renderizar o Modal */}
+      {FichasModal}
+      
       {/* Cabeçalho */}
       <header className={getHeaderClasses()}>
         <div className={`mx-auto flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 ${getMaxWidth()}`}>
@@ -2929,8 +3254,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                   Limpar Filtros
                 </h4>
                 <p className="text-gray-700">
-                  Clique no card "Total de Notificações" ou no botão "Limpar Filtros" 
-                  para remover todos os filtros e ver o dataset completo.
+                  Use o botão "Limpar Filtros" para remover todos os filtros ativos 
+                  e ver o dataset completo.
                 </p>
               </div>
               
@@ -3056,10 +3381,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
           {/* Total de Notificações - 4 colunas */}
           <div
-            className={`bg-gradient-to-br from-blue-500 to-blue-700 p-4 rounded-lg shadow-lg flex items-center gap-3 cursor-pointer hover:shadow-xl transition-all text-white sm:col-span-2 lg:col-span-4 xl:col-span-4 ${!hasActiveFilters && selectedCategory === null ? 'ring-4 ring-blue-300' : ''}`}
-            onClick={() => { 
-              clearAllFilters();
-            }}
+            className="bg-gradient-to-br from-blue-500 to-blue-700 p-4 rounded-lg shadow-lg flex items-center gap-3 text-white sm:col-span-2 lg:col-span-4 xl:col-span-4 cursor-pointer hover:shadow-xl hover:from-blue-600 hover:to-blue-800 transition-all"
+            onClick={() => setShowFichasModal(true)}
+            title="Clique para ver as fichas relacionadas"
           >
             <div className="p-3 bg-white bg-opacity-20 rounded-full flex-shrink-0">
               <FileText className="h-8 w-8" />
@@ -3068,6 +3392,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
               <h3 className="text-xs text-blue-100 uppercase tracking-wide">Total de Notificações</h3>
               <p className="text-4xl font-bold">
                 {totalNotifications.toLocaleString()}
+              </p>
+              <p className="text-xs text-blue-200 mt-1">
+                👆 Clique para ver as fichas
               </p>
             </div>
           </div>
