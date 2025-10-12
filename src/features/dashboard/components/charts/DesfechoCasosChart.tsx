@@ -71,22 +71,27 @@ const DesfechoCasosChart: React.FC<DesfechoCasosChartProps> = ({
 
   // Carregar dados sempre que filteredData mudar (incluindo na montagem inicial)
   useEffect(() => {
-    loadData();
-  }, [filteredData?.length]); // Reagir a mudanças nos dados filtrados
+    // Se filteredData for undefined, ainda está carregando, então aguardar
+    if (filteredData !== undefined) {
+      loadData();
+    }
+  }, [filteredData]); // Reagir a mudanças nos dados filtrados
 
   const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Usar dados filtrados se disponíveis, senão buscar todos
+      // SEMPRE usar dados filtrados quando disponíveis (mesmo se for array vazio)
+      // Isso garante que respeitamos os filtros de data iniciais
       let result;
-      if (filteredData && filteredData.length > 0) {
+      if (filteredData !== undefined) {
         console.log('📊 DesfechoCasos - Usando dados filtrados:', filteredData.length, 'registros');
         result = { data: filteredData };
       } else {
-        // Usar endpoint existente de notificações para contar por tipo de encerramento
-        result = await NotificacaoService.getAll(1, 1000); // Buscar muitos registros
+        // Fallback: buscar todos apenas se filteredData for undefined
+        console.log('📊 DesfechoCasos - Buscando todos os dados da API');
+        result = await NotificacaoService.getAll(1, 1000);
       }
       
       // Contar por tipo de encerramento
