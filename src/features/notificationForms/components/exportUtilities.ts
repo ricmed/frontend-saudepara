@@ -1444,24 +1444,54 @@ const formatNotificacaoForExport = (
     return original.tipo_hipotese_diag_idtipo_hipotese_diag?.toString() || "";
   };
 
-  // Obter tipo de trauma aprimorado
+  // Obter tipo de trauma aprimorado - usando notificacao_has_tipo_trauma (N:N)
   const getTraumaText = (): string => {
-    if (!original.tipo_trauma_idtipo_trauma) return "";
+    console.log("[EXPORT DEBUG - Tipo Trauma] Original data:", {
+      notificacao_has_tipo_trauma: original.notificacao_has_tipo_trauma,
+      has_traumaOptions: !!options?.traumaOptions,
+      traumaOptions_length: options?.traumaOptions?.length || 0
+    });
 
-    // Tenta obter através do objeto relacionado
-    if (original.tipo_trauma && original.tipo_trauma.descricao) {
-      return original.tipo_trauma.descricao;
+    // Verificar se existe o array de traumas (relacionamento N:N)
+    const traumas = original.notificacao_has_tipo_trauma;
+    
+    if (!traumas || !Array.isArray(traumas) || traumas.length === 0) {
+      console.log("[EXPORT DEBUG - Tipo Trauma] Sem traumas associados, retornando vazio");
+      return "";
     }
 
-    if (options?.traumaOptions) {
-      return getLabelFromOptions(
-        original.tipo_trauma_idtipo_trauma?.toString(),
-        options.traumaOptions,
-        "idtipo_trauma"
-      );
-    }
+    // Extrair descrições dos traumas
+    const traumaDescricoes: string[] = [];
+    
+    traumas.forEach((traumaRel: any) => {
+      const traumaId = traumaRel.tipo_trauma_idtipo_trauma;
+      
+      // Tentar obter do objeto relacionado primeiro
+      if (traumaRel.tipo_trauma && traumaRel.tipo_trauma.descricao) {
+        traumaDescricoes.push(traumaRel.tipo_trauma.descricao);
+        return;
+      }
+      
+      // Senão, buscar nas opções
+      if (options?.traumaOptions && traumaId) {
+        const trauma = options.traumaOptions.find(
+          (t: any) => String(t.idtipo_trauma) === String(traumaId)
+        );
+        if (trauma && trauma.descricao) {
+          traumaDescricoes.push(trauma.descricao);
+          return;
+        }
+      }
+      
+      // Último recurso: usar o ID
+      if (traumaId) {
+        traumaDescricoes.push(traumaId.toString());
+      }
+    });
 
-    return original.tipo_trauma_idtipo_trauma?.toString() || "";
+    const result = traumaDescricoes.join(", ");
+    console.log("[EXPORT DEBUG - Tipo Trauma] Resultado final:", result);
+    return result;
   };
 
   // Função para obter valor de residente em Belém
@@ -1486,6 +1516,18 @@ const formatNotificacaoForExport = (
   const contatoPacienteProcessado = extractPhoneComponents(paciente.contato, { ddi: paciente.ddi });
   const contatoLocalProcessado = extractPhoneComponents(original.contato_local_hospedagem, original);
   const contatoNotificadorProcessado = extractPhoneComponents(original.contato_notificador, original);
+
+  // 🆕 DEBUG: Verificar observações no objeto original
+  console.log("[EXPORT DEBUG - Observações] Valores no original:", {
+    observacao_sintomas: original.observacao_sintomas,
+    observacao_hipotese: original.observacao_hipotese,
+    observacao_hiposete: original.observacao_hiposete,
+    observacao_trauma_direto: original.observacao_trauma,
+    observacao_trauma_array: original.notificacao_has_tipo_trauma?.[0]?.observacao_trauma,
+    notificacao_has_tipo_trauma: original.notificacao_has_tipo_trauma,
+    observacao_incidente: original.observacao_incidente,
+    observavao_incidente: original.observavao_incidente
+  });
 
   // Construir objeto com todos os dados formatados
   return {
@@ -1557,7 +1599,15 @@ const formatNotificacaoForExport = (
       original.observacao_hiposete || original.observacao_hipotese || "",
     "Tipo de Trauma": getTraumaText(),
     "Data da Ocorrência": formatarDataUniversal(original.data_ocorrencia),
-    "Observação do Trauma": original.observacao_trauma || "",
+    "Observação do Trauma": (() => {
+      // A observação do trauma está dentro do array notificacao_has_tipo_trauma
+      const traumas = original.notificacao_has_tipo_trauma;
+      if (traumas && Array.isArray(traumas) && traumas.length > 0) {
+        return traumas[0].observacao_trauma || "";
+      }
+      // Fallback para campos antigos
+      return original.observacao_trauma || "";
+    })(),
     "Relacionado a Surto": getSurtoText(),
     "Observação do Incidente":
       original.observavao_incidente || original.observacao_incidente || "",
