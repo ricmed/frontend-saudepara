@@ -243,19 +243,22 @@ export const useNotifications = () => {
           return allNotificacoes; // Retorna array vazio se não há cache
         }
 
-        console.log('🌐 Buscando notificações da API...');
+        console.log('🌐 Buscando TODAS as notificações da API...');
         
-        while (hasMore && page <= 5) { // Limitar a 5 páginas (500 registros) por vez
+        while (hasMore) { // ✅ CORRIGIDO: Buscar TODAS as páginas disponíveis
+          console.log(`📄 Buscando página ${page}...`);
           const response = await NotificacaoService.getAll(page, MODERATE_PAGE_SIZE);
 
           if (response && response.data && response.data.length > 0) {
             allNotificacoes = [...allNotificacoes, ...response.data];
+            console.log(`   ➜ ${response.data.length} notificações (Total: ${allNotificacoes.length}/${response.meta.total})`);
 
             if (
               page >= response.meta.totalPages ||
               response.data.length < MODERATE_PAGE_SIZE
             ) {
               hasMore = false;
+              console.log(`✅ Busca completa: ${allNotificacoes.length} notificações`);
             } else {
               page++;
             }
