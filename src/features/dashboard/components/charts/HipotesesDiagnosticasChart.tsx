@@ -50,7 +50,7 @@ const HipotesesDiagnosticasChart: React.FC<HipotesesDiagnosticasChartProps> = ({
   title = "Hipóteses Diagnósticas",
   className = "bg-white p-4 rounded-lg shadow-sm",
   exportMenu, // 🆕 Prop para menu de exportação personalizado
-  maxItems = 15,
+  maxItems = 10,  // Alterado de 15 para 10 para consistência com outros gráficos
   isVisible = true,
   COLORS = {
     alarmante: "#d32f2f",
@@ -65,8 +65,22 @@ const HipotesesDiagnosticasChart: React.FC<HipotesesDiagnosticasChartProps> = ({
     }
   }, [onChartClick]);
 
-  // Limitar os dados aos primeiros N itens
+  // Limitar os dados aos primeiros N itens para o gráfico
   const limitedData = data.slice(0, maxItems);
+  
+  // Calcular total para percentuais
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  
+  // Adicionar percentual a todos os dados
+  const dataWithPercentage = data.map(item => ({
+    ...item,
+    percentual: total > 0 ? Math.round((item.value / total) * 100) : 0
+  }));
+
+  // Função para verificar se uma hipótese está filtrada
+  const isHipoteseFiltered = (hipotese: string) => {
+    return activeFilter === hipotese;
+  };
 
   if (!isVisible) {
     return null;
@@ -79,6 +93,11 @@ const HipotesesDiagnosticasChart: React.FC<HipotesesDiagnosticasChartProps> = ({
           <BookOpen className="h-5 w-5 text-purple-700" />
           <h3 className="text-sm font-medium text-gray-700">
             {title}
+            {activeFilter && (
+              <span className="text-purple-600 font-medium ml-2">
+                • Filtrado: {activeFilter}
+              </span>
+            )}
           </h3>
         </div>
         <div className="flex gap-2">          {exportMenu || (
@@ -110,15 +129,17 @@ const HipotesesDiagnosticasChart: React.FC<HipotesesDiagnosticasChartProps> = ({
         </div>
       </div>
       
-      <div className="h-96" id={chartId}>
-        {limitedData.length > 0 ? (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={limitedData}
-              layout="vertical"
-              margin={{ top: 5, right: 100, left: 10, bottom: 5 }}
-              barCategoryGap="15%"
-            >
+      {/* Container completo para exportação - inclui gráfico + lista detalhada */}
+      <div id={chartId}>
+        <div className="h-96">
+          {limitedData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={limitedData}
+                layout="vertical"
+                margin={{ top: 5, right: 100, left: 10, bottom: 5 }}
+                barCategoryGap="15%"
+              >
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis 
                 type="number" 
@@ -174,16 +195,87 @@ const HipotesesDiagnosticasChart: React.FC<HipotesesDiagnosticasChartProps> = ({
             Não há dados disponíveis para exibir
           </div>
         )}
-      </div>
-      
-      <div className="mt-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
-        <p className="text-xs text-gray-600">
-          <span className="text-red-500 font-bold">⚠️ Atenção: </span>
-          As hipóteses em <span className="text-red-500 font-bold">vermelho</span> requerem notificação imediata e vigilância rigorosa mesmo com um único caso.
-          As hipóteses em <span className="text-orange-500 font-bold">laranja</span> requerem monitoramento cuidadoso.
-          Todas seguem a classificação de vigilância epidemiológica do Ministério da Saúde.
-        </p>
-      </div>
+        </div>
+
+        {/* Lista detalhada de todas as hipóteses diagnósticas */}
+        <div className="mt-6">
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">
+            Todas as Hipóteses Diagnósticas
+          </h4>
+          <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2">
+            {dataWithPercentage.map((item, index) => {
+              const isFiltered = isHipoteseFiltered(item.name);
+              // Usar a mesma cor que está no item do gráfico
+              const chartItem = limitedData.find(d => d.name === item.name);
+              const fillColor = chartItem?.fill || '#9CA3AF';
+              const isAlarmante = chartItem?.isAlarmante || false;
+              
+              // Determinar classes de borda baseadas na criticidade
+              let borderColorClass = 'border-gray-400';
+              let bgColorClass = 'bg-gray-100';
+              
+              if (isAlarmante) {
+                borderColorClass = 'border-red-500';
+                bgColorClass = 'bg-red-50';
+              } else if (fillColor.includes('#F59E0B') || fillColor.includes('#FB923C')) {
+                borderColorClass = 'border-orange-400';
+                bgColorClass = 'bg-orange-50';
+              } else if (fillColor.includes('#10B981')) {
+                borderColorClass = 'border-green-400';
+                bgColorClass = 'bg-green-50';
+              } else if (fillColor.includes('#8B5CF6') || fillColor.includes('#A78BFA')) {
+                borderColorClass = 'border-purple-400';
+                bgColorClass = 'bg-purple-50';
+              }
+              
+              return (
+                <div
+                  key={item.name}
+                  onClick={() => handleChartItemClick(item.name)}
+                  className={`p-3 rounded-lg border-l-4 transition-all cursor-pointer ${borderColorClass} ${bgColorClass} ${
+                    isFiltered 
+                      ? 'ring-2 ring-purple-500 shadow-md' 
+                      : 'hover:shadow-sm'
+                  }`}
+                  style={{ 
+                    opacity: activeFilter && !isFiltered ? 0.5 : 1
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 flex-1">
+                      <span className={`text-xs font-bold ${
+                        index < 3 ? 'text-purple-700' : 'text-gray-600'
+                      }`}>
+                        #{index + 1}
+                      </span>
+                      <span className="text-sm font-medium text-gray-800">
+                        {item.name}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-semibold text-gray-900">
+                        {item.value}
+                      </span>
+                      <span className="text-xs font-medium text-purple-600 bg-white px-2 py-1 rounded">
+                        {item.percentual}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        
+        <div className="mt-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
+          <p className="text-xs text-gray-600">
+            <span className="text-red-500 font-bold">⚠️ Atenção: </span>
+            As hipóteses em <span className="text-red-500 font-bold">vermelho</span> requerem notificação imediata e vigilância rigorosa mesmo com um único caso.
+            As hipóteses em <span className="text-orange-500 font-bold">laranja</span> requerem monitoramento cuidadoso.
+            Todas seguem a classificação de vigilância epidemiológica do Ministério da Saúde.
+          </p>
+        </div>
+      </div>{/* Fim do container de exportação */}
     </div>
   );
 };

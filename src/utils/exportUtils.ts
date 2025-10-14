@@ -115,7 +115,7 @@ export const exportChartAsPNG = async (chartId: string, title: string): Promise<
       return;
     }
 
-    // Salvar estado original de overflow
+    // Salvar estado original de overflow e altura do elemento principal
     const originalOverflow = element.style.overflow;
     const originalMaxHeight = element.style.maxHeight;
     const originalHeight = element.style.height;
@@ -125,14 +125,43 @@ export const exportChartAsPNG = async (chartId: string, title: string): Promise<
     element.style.maxHeight = 'none';
     element.style.height = 'auto';
     
-    // Encontrar elementos com overflow e ajustá-los temporariamente
-    const elementsWithOverflow = element.querySelectorAll('[style*="overflow"]');
-    const overflowStates: { element: HTMLElement; original: string }[] = [];
+    // Encontrar TODOS os elementos filhos com overflow (incluindo classes CSS)
+    const allElements = element.querySelectorAll('*');
+    const overflowStates: { 
+      element: HTMLElement; 
+      originalOverflow: string;
+      originalOverflowX: string;
+      originalOverflowY: string;
+      originalMaxHeight: string;
+      originalHeight: string;
+    }[] = [];
     
-    elementsWithOverflow.forEach((el) => {
+    allElements.forEach((el) => {
       const htmlEl = el as HTMLElement;
-      overflowStates.push({ element: htmlEl, original: htmlEl.style.overflow });
-      htmlEl.style.overflow = 'visible';
+      const computedStyle = window.getComputedStyle(htmlEl);
+      
+      // Verificar se elemento tem overflow ou max-height definidos
+      if (computedStyle.overflow !== 'visible' || 
+          computedStyle.overflowY !== 'visible' || 
+          computedStyle.overflowX !== 'visible' ||
+          computedStyle.maxHeight !== 'none') {
+        
+        overflowStates.push({ 
+          element: htmlEl, 
+          originalOverflow: htmlEl.style.overflow,
+          originalOverflowX: htmlEl.style.overflowX,
+          originalOverflowY: htmlEl.style.overflowY,
+          originalMaxHeight: htmlEl.style.maxHeight,
+          originalHeight: htmlEl.style.height
+        });
+        
+        // Forçar visibilidade total
+        htmlEl.style.overflow = 'visible';
+        htmlEl.style.overflowX = 'visible';
+        htmlEl.style.overflowY = 'visible';
+        htmlEl.style.maxHeight = 'none';
+        htmlEl.style.height = 'auto';
+      }
     });
 
     // Aguardar um frame para garantir que o layout seja recalculado
@@ -153,13 +182,18 @@ export const exportChartAsPNG = async (chartId: string, title: string): Promise<
       height: element.scrollHeight
     });
 
-    // Restaurar estado original
+    // Restaurar estado original do elemento principal
     element.style.overflow = originalOverflow;
     element.style.maxHeight = originalMaxHeight;
     element.style.height = originalHeight;
     
-    overflowStates.forEach(({ element, original }) => {
-      element.style.overflow = original;
+    // Restaurar estado original de todos os elementos filhos
+    overflowStates.forEach(({ element, originalOverflow, originalOverflowX, originalOverflowY, originalMaxHeight, originalHeight }) => {
+      element.style.overflow = originalOverflow;
+      element.style.overflowX = originalOverflowX;
+      element.style.overflowY = originalOverflowY;
+      element.style.maxHeight = originalMaxHeight;
+      element.style.height = originalHeight;
     });
 
     // Criar link para download
@@ -186,7 +220,7 @@ export const exportChartAsPDF = async (chartId: string, title: string): Promise<
       return;
     }
 
-    // Salvar estado original de overflow
+    // Salvar estado original de overflow e altura do elemento principal
     const originalOverflow = element.style.overflow;
     const originalMaxHeight = element.style.maxHeight;
     const originalHeight = element.style.height;
@@ -196,14 +230,43 @@ export const exportChartAsPDF = async (chartId: string, title: string): Promise<
     element.style.maxHeight = 'none';
     element.style.height = 'auto';
     
-    // Encontrar elementos com overflow e ajustá-los temporariamente
-    const elementsWithOverflow = element.querySelectorAll('[style*="overflow"]');
-    const overflowStates: { element: HTMLElement; original: string }[] = [];
+    // Encontrar TODOS os elementos filhos com overflow (incluindo classes CSS)
+    const allElements = element.querySelectorAll('*');
+    const overflowStates: { 
+      element: HTMLElement; 
+      originalOverflow: string;
+      originalOverflowX: string;
+      originalOverflowY: string;
+      originalMaxHeight: string;
+      originalHeight: string;
+    }[] = [];
     
-    elementsWithOverflow.forEach((el) => {
+    allElements.forEach((el) => {
       const htmlEl = el as HTMLElement;
-      overflowStates.push({ element: htmlEl, original: htmlEl.style.overflow });
-      htmlEl.style.overflow = 'visible';
+      const computedStyle = window.getComputedStyle(htmlEl);
+      
+      // Verificar se elemento tem overflow ou max-height definidos
+      if (computedStyle.overflow !== 'visible' || 
+          computedStyle.overflowY !== 'visible' || 
+          computedStyle.overflowX !== 'visible' ||
+          computedStyle.maxHeight !== 'none') {
+        
+        overflowStates.push({ 
+          element: htmlEl, 
+          originalOverflow: htmlEl.style.overflow,
+          originalOverflowX: htmlEl.style.overflowX,
+          originalOverflowY: htmlEl.style.overflowY,
+          originalMaxHeight: htmlEl.style.maxHeight,
+          originalHeight: htmlEl.style.height
+        });
+        
+        // Forçar visibilidade total
+        htmlEl.style.overflow = 'visible';
+        htmlEl.style.overflowX = 'visible';
+        htmlEl.style.overflowY = 'visible';
+        htmlEl.style.maxHeight = 'none';
+        htmlEl.style.height = 'auto';
+      }
     });
 
     // Aguardar um frame para garantir que o layout seja recalculado
@@ -224,13 +287,18 @@ export const exportChartAsPDF = async (chartId: string, title: string): Promise<
       height: element.scrollHeight
     });
 
-    // Restaurar estado original
+    // Restaurar estado original do elemento principal
     element.style.overflow = originalOverflow;
     element.style.maxHeight = originalMaxHeight;
     element.style.height = originalHeight;
     
-    overflowStates.forEach(({ element, original }) => {
-      element.style.overflow = original;
+    // Restaurar estado original de todos os elementos filhos
+    overflowStates.forEach(({ element, originalOverflow, originalOverflowX, originalOverflowY, originalMaxHeight, originalHeight }) => {
+      element.style.overflow = originalOverflow;
+      element.style.overflowX = originalOverflowX;
+      element.style.overflowY = originalOverflowY;
+      element.style.maxHeight = originalMaxHeight;
+      element.style.height = originalHeight;
     });
 
     // Criar PDF
@@ -300,7 +368,7 @@ export const exportChartAsWord = async (chartId: string, data: ChartDataItem[], 
       return;
     }
 
-    // Salvar estado original de overflow
+    // Salvar estado original de overflow e altura do elemento principal
     const originalOverflow = element.style.overflow;
     const originalMaxHeight = element.style.maxHeight;
     const originalHeight = element.style.height;
@@ -310,14 +378,43 @@ export const exportChartAsWord = async (chartId: string, data: ChartDataItem[], 
     element.style.maxHeight = 'none';
     element.style.height = 'auto';
     
-    // Encontrar elementos com overflow e ajustá-los temporariamente
-    const elementsWithOverflow = element.querySelectorAll('[style*="overflow"]');
-    const overflowStates: { element: HTMLElement; original: string }[] = [];
+    // Encontrar TODOS os elementos filhos com overflow (incluindo classes CSS)
+    const allElements = element.querySelectorAll('*');
+    const overflowStates: { 
+      element: HTMLElement; 
+      originalOverflow: string;
+      originalOverflowX: string;
+      originalOverflowY: string;
+      originalMaxHeight: string;
+      originalHeight: string;
+    }[] = [];
     
-    elementsWithOverflow.forEach((el) => {
+    allElements.forEach((el) => {
       const htmlEl = el as HTMLElement;
-      overflowStates.push({ element: htmlEl, original: htmlEl.style.overflow });
-      htmlEl.style.overflow = 'visible';
+      const computedStyle = window.getComputedStyle(htmlEl);
+      
+      // Verificar se elemento tem overflow ou max-height definidos
+      if (computedStyle.overflow !== 'visible' || 
+          computedStyle.overflowY !== 'visible' || 
+          computedStyle.overflowX !== 'visible' ||
+          computedStyle.maxHeight !== 'none') {
+        
+        overflowStates.push({ 
+          element: htmlEl, 
+          originalOverflow: htmlEl.style.overflow,
+          originalOverflowX: htmlEl.style.overflowX,
+          originalOverflowY: htmlEl.style.overflowY,
+          originalMaxHeight: htmlEl.style.maxHeight,
+          originalHeight: htmlEl.style.height
+        });
+        
+        // Forçar visibilidade total
+        htmlEl.style.overflow = 'visible';
+        htmlEl.style.overflowX = 'visible';
+        htmlEl.style.overflowY = 'visible';
+        htmlEl.style.maxHeight = 'none';
+        htmlEl.style.height = 'auto';
+      }
     });
 
     // Aguardar um frame para garantir que o layout seja recalculado
@@ -338,13 +435,18 @@ export const exportChartAsWord = async (chartId: string, data: ChartDataItem[], 
       height: element.scrollHeight
     });
 
-    // Restaurar estado original
+    // Restaurar estado original do elemento principal
     element.style.overflow = originalOverflow;
     element.style.maxHeight = originalMaxHeight;
     element.style.height = originalHeight;
     
-    overflowStates.forEach(({ element, original }) => {
-      element.style.overflow = original;
+    // Restaurar estado original de todos os elementos filhos
+    overflowStates.forEach(({ element, originalOverflow, originalOverflowX, originalOverflowY, originalMaxHeight, originalHeight }) => {
+      element.style.overflow = originalOverflow;
+      element.style.overflowX = originalOverflowX;
+      element.style.overflowY = originalOverflowY;
+      element.style.maxHeight = originalMaxHeight;
+      element.style.height = originalHeight;
     });
 
     const imgData = canvas.toDataURL('image/png');
