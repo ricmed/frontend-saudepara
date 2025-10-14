@@ -115,12 +115,51 @@ export const exportChartAsPNG = async (chartId: string, title: string): Promise<
       return;
     }
 
-    // Usar html2canvas para capturar o elemento
+    // Salvar estado original de overflow
+    const originalOverflow = element.style.overflow;
+    const originalMaxHeight = element.style.maxHeight;
+    const originalHeight = element.style.height;
+    
+    // Remover restrições de altura e overflow temporariamente
+    element.style.overflow = 'visible';
+    element.style.maxHeight = 'none';
+    element.style.height = 'auto';
+    
+    // Encontrar elementos com overflow e ajustá-los temporariamente
+    const elementsWithOverflow = element.querySelectorAll('[style*="overflow"]');
+    const overflowStates: { element: HTMLElement; original: string }[] = [];
+    
+    elementsWithOverflow.forEach((el) => {
+      const htmlEl = el as HTMLElement;
+      overflowStates.push({ element: htmlEl, original: htmlEl.style.overflow });
+      htmlEl.style.overflow = 'visible';
+    });
+
+    // Aguardar um frame para garantir que o layout seja recalculado
+    await new Promise(resolve => requestAnimationFrame(resolve));
+
+    // Usar html2canvas para capturar o elemento com configurações otimizadas
     const canvas = await html2canvas(element, {
       backgroundColor: '#ffffff',
       scale: 2, // Melhor qualidade
       useCORS: true,
-      allowTaint: true
+      allowTaint: true,
+      logging: false,
+      windowWidth: element.scrollWidth,
+      windowHeight: element.scrollHeight,
+      scrollX: 0,
+      scrollY: 0,
+      width: element.scrollWidth,
+      height: element.scrollHeight
+    });
+
+    // Restaurar estado original
+    element.style.overflow = originalOverflow;
+    element.style.maxHeight = originalMaxHeight;
+    element.style.height = originalHeight;
+    
+    overflowStates.forEach(({ element, original }) => {
+      element.style.overflow = original;
     });
 
     // Criar link para download
@@ -147,32 +186,99 @@ export const exportChartAsPDF = async (chartId: string, title: string): Promise<
       return;
     }
 
-    // Capturar elemento como imagem
+    // Salvar estado original de overflow
+    const originalOverflow = element.style.overflow;
+    const originalMaxHeight = element.style.maxHeight;
+    const originalHeight = element.style.height;
+    
+    // Remover restrições de altura e overflow temporariamente
+    element.style.overflow = 'visible';
+    element.style.maxHeight = 'none';
+    element.style.height = 'auto';
+    
+    // Encontrar elementos com overflow e ajustá-los temporariamente
+    const elementsWithOverflow = element.querySelectorAll('[style*="overflow"]');
+    const overflowStates: { element: HTMLElement; original: string }[] = [];
+    
+    elementsWithOverflow.forEach((el) => {
+      const htmlEl = el as HTMLElement;
+      overflowStates.push({ element: htmlEl, original: htmlEl.style.overflow });
+      htmlEl.style.overflow = 'visible';
+    });
+
+    // Aguardar um frame para garantir que o layout seja recalculado
+    await new Promise(resolve => requestAnimationFrame(resolve));
+
+    // Capturar elemento como imagem com configurações otimizadas
     const canvas = await html2canvas(element, {
       backgroundColor: '#ffffff',
       scale: 2,
       useCORS: true,
-      allowTaint: true
+      allowTaint: true,
+      logging: false,
+      windowWidth: element.scrollWidth,
+      windowHeight: element.scrollHeight,
+      scrollX: 0,
+      scrollY: 0,
+      width: element.scrollWidth,
+      height: element.scrollHeight
+    });
+
+    // Restaurar estado original
+    element.style.overflow = originalOverflow;
+    element.style.maxHeight = originalMaxHeight;
+    element.style.height = originalHeight;
+    
+    overflowStates.forEach(({ element, original }) => {
+      element.style.overflow = original;
     });
 
     // Criar PDF
     const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF();
+    const pdf = new jsPDF({
+      orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
     
     // Calcular dimensões mantendo proporção
-    const imgWidth = 190; // Largura máxima em mm
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = pdfWidth - 20; // Margem de 10mm de cada lado
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
     
     // Adicionar título
     pdf.setFontSize(16);
-    pdf.text(title, 20, 20);
+    pdf.text(title, pdfWidth / 2, 15, { align: 'center' });
     
-    // Adicionar imagem
-    pdf.addImage(imgData, 'PNG', 10, 30, imgWidth, imgHeight);
+    // Verificar se a imagem cabe em uma página
+    if (imgHeight <= pdfHeight - 40) {
+      // Adicionar imagem em uma página
+      pdf.addImage(imgData, 'PNG', 10, 25, imgWidth, imgHeight);
+    } else {
+      // Dividir em múltiplas páginas se necessário
+      let position = 25;
+      let remainingHeight = imgHeight;
+      const maxHeightPerPage = pdfHeight - 40;
+      
+      while (remainingHeight > 0) {
+        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+        remainingHeight -= maxHeightPerPage;
+        
+        if (remainingHeight > 0) {
+          pdf.addPage();
+          position = 10;
+        }
+      }
+    }
     
     // Adicionar rodapé com data
-    pdf.setFontSize(8);
-    pdf.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 20, pdf.internal.pageSize.height - 10);
+    const pageCount = pdf.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      pdf.setPage(i);
+      pdf.setFontSize(8);
+      pdf.text(`Gerado em: ${new Date().toLocaleString('pt-BR')} | Página ${i} de ${pageCount}`, pdfWidth / 2, pdfHeight - 10, { align: 'center' });
+    }
     
     // Salvar
     const filename = `${title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
@@ -194,12 +300,51 @@ export const exportChartAsWord = async (chartId: string, data: ChartDataItem[], 
       return;
     }
 
-    // Capturar gráfico como imagem
+    // Salvar estado original de overflow
+    const originalOverflow = element.style.overflow;
+    const originalMaxHeight = element.style.maxHeight;
+    const originalHeight = element.style.height;
+    
+    // Remover restrições de altura e overflow temporariamente
+    element.style.overflow = 'visible';
+    element.style.maxHeight = 'none';
+    element.style.height = 'auto';
+    
+    // Encontrar elementos com overflow e ajustá-los temporariamente
+    const elementsWithOverflow = element.querySelectorAll('[style*="overflow"]');
+    const overflowStates: { element: HTMLElement; original: string }[] = [];
+    
+    elementsWithOverflow.forEach((el) => {
+      const htmlEl = el as HTMLElement;
+      overflowStates.push({ element: htmlEl, original: htmlEl.style.overflow });
+      htmlEl.style.overflow = 'visible';
+    });
+
+    // Aguardar um frame para garantir que o layout seja recalculado
+    await new Promise(resolve => requestAnimationFrame(resolve));
+
+    // Capturar gráfico como imagem com configurações otimizadas
     const canvas = await html2canvas(element, {
       backgroundColor: '#ffffff',
       scale: 2,
       useCORS: true,
-      allowTaint: true
+      allowTaint: true,
+      logging: false,
+      windowWidth: element.scrollWidth,
+      windowHeight: element.scrollHeight,
+      scrollX: 0,
+      scrollY: 0,
+      width: element.scrollWidth,
+      height: element.scrollHeight
+    });
+
+    // Restaurar estado original
+    element.style.overflow = originalOverflow;
+    element.style.maxHeight = originalMaxHeight;
+    element.style.height = originalHeight;
+    
+    overflowStates.forEach(({ element, original }) => {
+      element.style.overflow = original;
     });
 
     const imgData = canvas.toDataURL('image/png');

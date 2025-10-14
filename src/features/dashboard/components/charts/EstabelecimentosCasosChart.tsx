@@ -203,7 +203,7 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
         
         {exportMenu || (
           <ChartExportMenu 
-            chartId="estabelecimentos-casos" 
+            chartId="estabelecimentos-casos-completo" 
             chartData={data.map(item => ({ name: item.nome, value: item.totalCasos }))} 
             chartTitle="Estabelecimentos por Número de Casos" 
             buttonVariant="icon"
@@ -211,8 +211,10 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
         )}
       </div>
 
-      {/* Gráfico */}
-      <div id="estabelecimentos-casos" className="h-[500px] relative estabelecimentos-chart">
+      {/* Container completo para exportação */}
+      <div id="estabelecimentos-casos-completo">
+        {/* Gráfico */}
+        <div className="h-[500px] relative estabelecimentos-chart">
         <style>{`
           .estabelecimentos-chart .recharts-bar-rectangle:hover {
             transform-origin: center !important;
@@ -331,6 +333,7 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
           </div>
         </div>
       )}
+      </div> {/* Fim do container completo para exportação */}
     </div>
   );
 };

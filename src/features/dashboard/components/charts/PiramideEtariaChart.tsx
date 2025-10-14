@@ -287,7 +287,7 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
         
         {exportMenu || (
           <ChartExportMenu 
-            chartId="piramide-etaria" 
+            chartId="piramide-etaria-completa" 
             chartData={data.map(item => ({ name: item.faixaEtaria, value: item.total }))} 
             chartTitle="Pirâmide Etária por Identidade de Gênero" 
             buttonVariant="icon"
@@ -296,7 +296,7 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
       </div>
 
       {/* Gráfico */}
-      <div id="piramide-etaria" className="min-h-96">
+      <div id="piramide-etaria-completa" className="min-h-96">
         {data.length > 0 ? (
           <div className="grid grid-cols-12 gap-4">
             {/* Pirâmide Principal (cols 1-9) */}
@@ -546,7 +546,6 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
             <div className="text-gray-500">Nenhum dado disponível para o período selecionado</div>
           </div>
         )}
-      </div>
 
       {/* Legenda ordenada: Cis → Trans → Travesti → NB → Ignorado → NSA */}
       {data.length > 0 && (
@@ -660,6 +659,7 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
           </div>
         </div>
       )}
+      </div> {/* Fim do div piramide-etaria-completa */}
     </div>
   );
 };

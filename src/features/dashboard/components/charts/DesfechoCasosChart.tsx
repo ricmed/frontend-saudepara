@@ -209,7 +209,7 @@ const DesfechoCasosChart: React.FC<DesfechoCasosChartProps> = ({
         
         {exportMenu || (
           <ChartExportMenu 
-            chartId="desfecho-casos" 
+            chartId="desfecho-casos-completo" 
             chartData={data.map(item => ({ name: item.descricao, value: item.valor }))} 
             chartTitle="Desfecho dos Casos" 
             buttonVariant="icon"
@@ -218,9 +218,9 @@ const DesfechoCasosChart: React.FC<DesfechoCasosChartProps> = ({
       </div>
 
       {/* Layout Lado a Lado: Gráfico + Detalhamento */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div id="desfecho-casos-completo" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Gráfico */}
-        <div id="desfecho-casos" className="h-96">
+        <div className="h-96">
           {data.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>

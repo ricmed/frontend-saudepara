@@ -78,14 +78,14 @@ const PrincipaisSintomasChart: React.FC<PrincipaisSintomasChartProps> = ({
           )}
       </div>
       
-      <div className="h-80" id={chartId}>
+      <div className="h-96" id={chartId}>
         {limitedData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={limitedData}
               layout="vertical"
-              margin={{ top: 5, right: 40, left: 5, bottom: 5 }}
-              barCategoryGap="10%"
+              margin={{ top: 10, right: 40, left: 10, bottom: 10 }}
+              barCategoryGap="20%"
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis 
@@ -97,9 +97,9 @@ const PrincipaisSintomasChart: React.FC<PrincipaisSintomasChartProps> = ({
                 dataKey="name"
                 type="category"
                 stroke="#666"
-                width={120}
+                width={150}
                 interval={0}
-                tick={{ fontSize: 11 }}
+                tick={{ fontSize: 10 }}
               />
               <Tooltip
                 contentStyle={{
