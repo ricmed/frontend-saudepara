@@ -116,7 +116,7 @@ const HipotesesDiagnosticasChart: React.FC<HipotesesDiagnosticasChartProps> = ({
             <BarChart
               data={limitedData}
               layout="vertical"
-              margin={{ top: 5, right: 80, left: 10, bottom: 5 }}
+              margin={{ top: 5, right: 100, left: 10, bottom: 5 }}
               barCategoryGap="15%"
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />

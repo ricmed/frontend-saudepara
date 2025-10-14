@@ -231,7 +231,7 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data}
-              margin={{ top: 20, right: 80, left: 20, bottom: 120 }}
+              margin={{ top: 20, right: 100, left: 20, bottom: 120 }}
               layout="vertical"
               barCategoryGap="10%"
               onClick={(data) => {

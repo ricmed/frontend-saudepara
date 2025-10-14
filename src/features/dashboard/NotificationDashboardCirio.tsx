@@ -3723,7 +3723,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                   
                   return dadosGrafico.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={dadosGrafico} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                      <AreaChart data={dadosGrafico} margin={{ top: 30, right: 30, left: 20, bottom: 50 }}>
                         <defs>
                           <linearGradient id="colorQuantidade" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>
@@ -3736,7 +3736,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                           stroke="#666"
                           angle={-45}
                           textAnchor="end"
-                          height={80}
+                          height={60}
                           interval={0}
                           tick={{ fontSize: 11 }}
                         />
