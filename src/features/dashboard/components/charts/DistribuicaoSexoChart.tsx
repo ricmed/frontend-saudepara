@@ -148,7 +148,8 @@ const DistribuicaoSexoChart: React.FC<DistribuicaoSexoChartProps> = ({
                   type="category" 
                   stroke="#666"
                   width={100}
-                  tick={{ fontSize: 10 }}
+                  interval={0}
+                  tick={{ fontSize: 11 }}
                 />
                 <Tooltip
                   contentStyle={{

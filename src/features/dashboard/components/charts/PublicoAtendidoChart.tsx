@@ -114,17 +114,18 @@ const PublicoAtendidoChart: React.FC<PublicoAtendidoChartProps> = ({
         {data.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
             {chartType === 'bar' ? (
-              <BarChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <BarChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 60 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis 
                   dataKey="name" 
                   stroke="#666"
-                  tick={{ fontSize: 12 }}
+                  interval={0}
+                  tick={{ fontSize: 11 }}
                   angle={-45}
                   textAnchor="end"
-                  height={60}
+                  height={80}
                 />
-                <YAxis stroke="#666" />
+                <YAxis stroke="#666" allowDecimals={false} />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "#fff",

@@ -117,6 +117,7 @@ const HipotesesDiagnosticasChart: React.FC<HipotesesDiagnosticasChartProps> = ({
               data={limitedData}
               layout="vertical"
               margin={{ top: 5, right: 80, left: 10, bottom: 5 }}
+              barCategoryGap="15%"
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis 
@@ -128,7 +129,8 @@ const HipotesesDiagnosticasChart: React.FC<HipotesesDiagnosticasChartProps> = ({
                 dataKey="name"
                 type="category"
                 stroke="#666"
-                width={200}
+                width={220}
+                interval={0}
                 tick={{ fontSize: 11 }}
               />
               <Tooltip

@@ -212,7 +212,7 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
       </div>
 
       {/* Gráfico */}
-      <div id="estabelecimentos-casos" className="h-96 relative estabelecimentos-chart">
+      <div id="estabelecimentos-casos" className="h-[500px] relative estabelecimentos-chart">
         <style>{`
           .estabelecimentos-chart .recharts-bar-rectangle:hover {
             transform-origin: center !important;
@@ -233,6 +233,7 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
               data={data}
               margin={{ top: 20, right: 80, left: 20, bottom: 120 }}
               layout="vertical"
+              barCategoryGap="10%"
               onClick={(data) => {
                 console.log('🖱️ Clicou na barra:', data);
                 if (data && data.activePayload && data.activePayload[0] && toggleFilter) {
@@ -250,8 +251,9 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
               <YAxis 
                 type="category"
                 dataKey="nome"
-                width={150}
-                tickFormatter={(value) => truncateName(value, 20)}
+                width={180}
+                interval={0}
+                tickFormatter={(value) => truncateName(value, 25)}
                 fontSize={11}
               />
               <Tooltip content={<CustomTooltip />} />

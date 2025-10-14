@@ -3737,7 +3737,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                           angle={-45}
                           textAnchor="end"
                           height={80}
-                          tick={{ fontSize: 12 }}
+                          interval={0}
+                          tick={{ fontSize: 11 }}
                         />
                         <YAxis 
                           stroke="#666"

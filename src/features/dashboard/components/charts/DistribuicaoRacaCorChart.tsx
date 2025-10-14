@@ -95,11 +95,19 @@ const DistribuicaoRacaCorChart: React.FC<DistribuicaoRacaCorChartProps> = ({
             {chartType === 'bar' ? (
               <BarChart
                 data={data}
-                margin={{ top: 25, right: 30, left: 20, bottom: 5 }}
+                margin={{ top: 25, right: 30, left: 20, bottom: 60 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="name" stroke="#666" />
-                <YAxis stroke="#666" />
+                <XAxis 
+                  dataKey="name" 
+                  stroke="#666" 
+                  interval={0}
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                  tick={{ fontSize: 11 }}
+                />
+                <YAxis stroke="#666" allowDecimals={false} />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "#fff",
