@@ -65,7 +65,7 @@ const ListaNotificacoes: React.FC = () => {
         selectedLanguage={selectedLanguage}
         onLanguageChange={(language) => setSelectedLanguage(language)}
       />      {/* Conteúdo principal */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="max-w-[98%] mx-auto px-2 py-8">
 
         <div className="overflow-x-auto">
           {/* Tabela de Notificações */}

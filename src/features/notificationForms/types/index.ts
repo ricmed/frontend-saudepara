@@ -15,6 +15,11 @@ export interface Notificacao {
       updated_at?: string;           // 🆕 Data de atualização
       created_by_userid?: string;    // 🆕 ID do usuário que criou
       updated_by_userid?: string;    // 🆕 ID do usuário que atualizou
+      // 🆕 Campos de rastreamento offline
+      offline_id?: string;           // ID offline formato: fp-{device}-{timestamp}-{random}
+      device_id?: string;            // ID do dispositivo (fingerprint)
+      created_offline?: boolean;     // Se foi criado offline
+      sincronizado?: boolean;        // Se já foi sincronizado
       paciente: {
         idpaciente: number;
         nome: string;
@@ -63,8 +68,8 @@ export interface Notificacao {
     { key: "paciente", label: "Paciente", sortable: true },
     { key: "tipo_evento", label: "Evento", sortable: true },
     { key: "data_atendimento", label: "Data Atendimento", sortable: true },
-    { key: "tipo_atendimento", label: "Tipo Atendimento", sortable: false },
-    { key: "tipo_encerramento", label: "Tipo Encerramento", sortable: false },
+    { key: "tipo_atendimento", label: "Tipo Atendimento", sortable: true }, // 🆕 Ordenável
+    { key: "tipo_encerramento", label: "Tipo Encerramento", sortable: true }, // 🆕 Ordenável
     {
       key: "unidade_notificadora",
       label: "Unidade Notificadora",
@@ -75,6 +80,7 @@ export interface Notificacao {
     { key: "updated_by_userid", label: "Atualizado por", sortable: true },
     { key: "created_at", label: "Data Criação", sortable: true },
     { key: "updated_at", label: "Data Atualização", sortable: true },
+    { key: "created_offline", label: "Origem", sortable: true }, // 🆕 Ordenar por offline/online
   ];
   
   // Campos de busca disponíveis para a dropdown

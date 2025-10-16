@@ -14,13 +14,14 @@ export const useTableControls = () => {
   const [isPdfOptionsOpen, setIsPdfOptionsOpen] = useState(false);
   const [selectedPdfType, setSelectedPdfType] = useState<PDFExportType>('both');
   
-  // Controle de colunas - 🆕 ATUALIZADO: Incluir created_at por padrão
+  // Controle de colunas - 🆕 ATUALIZADO: Incluir created_at e unidade_notificadora por padrão
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
     "paciente",
     "tipo_evento",
     "data_ocorrencia",
     "tipo_atendimento",
     "tipo_encerramento",
+    "unidade_notificadora", // 🆕 Unidade notificadora
     "created_at", // 🆕 Data de criação sempre visível
   ]);
 
