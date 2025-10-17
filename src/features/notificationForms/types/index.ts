@@ -73,7 +73,7 @@ export interface Notificacao {
     {
       key: "unidade_notificadora",
       label: "Unidade Notificadora",
-      sortable: false,
+      sortable: true, // 🆕 Ordenável
     },
     // 🆕 NOVAS COLUNAS: Auditoria de usuários
     { key: "created_by_userid", label: "Criado por", sortable: true },

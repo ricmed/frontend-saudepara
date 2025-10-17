@@ -20,8 +20,20 @@ class SyncService {
   private syncLockPromise: Promise<void> | null = null;
   private syncLockId: string | null = null;
 
+  // 🆕 MODO OFFLINE FORÇADO (tipo Spotify)
+  private isOfflineModeForced: boolean = false;
+  private readonly FORCE_OFFLINE_KEY = 'app_force_offline_mode';
+
   constructor() {
     this.isOnline = navigator.onLine;
+    // 🆕 Restaurar preferência de modo offline do localStorage
+    const savedOfflineMode = localStorage.getItem(this.FORCE_OFFLINE_KEY);
+    this.isOfflineModeForced = savedOfflineMode === 'true';
+    
+    if (this.isOfflineModeForced) {
+      console.log('📵 Modo offline forçado ATIVADO (restaurado do localStorage)');
+    }
+    
     this.setupEventListeners();
   }
 
@@ -129,18 +141,28 @@ class SyncService {
 
   // ✅ NOVO: Verificar se deve usar modo online com auth
   private shouldUseOnlineMode(): boolean {
+    // 🆕 Se modo offline forçado, SEMPRE retornar false
+    if (this.isOfflineModeForced) {
+      return false;
+    }
     return this.isOnline && this.isAuthenticated;
   }
 
   // ✅ NOVO: Forçar modo offline (para usuários que querem trabalhar offline)
   public forceOfflineMode(): void {
     console.log('🔒 Modo offline forçado pelo usuário');
+    this.isOfflineModeForced = true;
     this.isAuthenticated = false;
-    toast.info('Modo offline ativado - dados serão salvos localmente');
+    localStorage.setItem(this.FORCE_OFFLINE_KEY, 'true');
+    toast.info('📵 Modo offline ativado - dados serão salvos localmente');
   }
 
   // ✅ NOVO: Tentar reativar modo online  
   public async tryOnlineMode(): Promise<boolean> {
+    // 🆕 Desativar modo offline forçado
+    this.isOfflineModeForced = false;
+    localStorage.setItem(this.FORCE_OFFLINE_KEY, 'false');
+    
     if (!this.isOnline) {
       toast.warning('Sem conexão de internet');
       return false;
@@ -148,7 +170,7 @@ class SyncService {
 
     const authenticated = await this.checkAuthenticationStatus();
     if (authenticated) {
-      toast.success('Modo online ativado - sincronizando dados...');
+      toast.success('🌐 Modo online ativado - sincronizando dados...');
       setTimeout(() => this.syncData(), 1000);
     } else {
       toast.error('Falha na autenticação - permanecendo offline');
@@ -156,6 +178,84 @@ class SyncService {
     
     return authenticated;
   }
+
+  // 🆕 NOVOS MÉTODOS PÚBLICOS PARA CONTROLE DO MODO OFFLINE FORÇADO
+
+  /**
+   * Verifica se o modo offline está forçado pelo usuário
+   */
+  public isOfflineModeActive(): boolean {
+    return this.isOfflineModeForced;
+  }
+
+  /**
+   * Ativa o modo offline forçado
+   */
+  public enableOfflineMode(): void {
+    if (this.isOfflineModeForced) {
+      console.log('📵 Modo offline já está ativo');
+      return;
+    }
+    
+    this.isOfflineModeForced = true;
+    this.isAuthenticated = false;
+    localStorage.setItem(this.FORCE_OFFLINE_KEY, 'true');
+    
+    console.log('📵 Modo offline ATIVADO pelo usuário');
+    toast.success('📵 Modo offline ativado - você pode trabalhar sem internet', {
+      autoClose: 3000
+    });
+  }
+
+  /**
+   * Desativa o modo offline forçado e tenta reconectar
+   */
+  public async disableOfflineMode(): Promise<boolean> {
+    if (!this.isOfflineModeForced) {
+      console.log('🌐 Modo offline já está desativado');
+      return this.shouldUseOnlineMode();
+    }
+    
+    this.isOfflineModeForced = false;
+    localStorage.setItem(this.FORCE_OFFLINE_KEY, 'false');
+    
+    console.log('🌐 Modo offline DESATIVADO pelo usuário');
+    
+    // Tentar reconectar se houver internet
+    if (this.isOnline) {
+      const authenticated = await this.checkAuthenticationStatus();
+      if (authenticated) {
+        toast.success('🌐 Modo online ativado - sincronizando dados...', {
+          autoClose: 3000
+        });
+        setTimeout(() => this.syncData(), 1000);
+        return true;
+      } else {
+        toast.warning('⚠️ Modo online ativado, mas falha na autenticação', {
+          autoClose: 3000
+        });
+        return false;
+      }
+    } else {
+      toast.info('ℹ️ Modo online ativado, aguardando conexão de internet', {
+        autoClose: 3000
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Alterna entre modo offline e online
+   */
+  public async toggleOfflineMode(): Promise<boolean> {
+    if (this.isOfflineModeForced) {
+      return await this.disableOfflineMode();
+    } else {
+      this.enableOfflineMode();
+      return false; // Retorna false porque está offline agora
+    }
+  }
+
 
   // ✅ PÚBLICO: Para outros componentes verificarem se devem usar modo online
   public async canUseOnlineMode(): Promise<boolean> {
