@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { Local, TipoHabilitacao, TipoQualificacao, TipoEstabelecimento } from '../types';
 import { MIN_RADIUS, MAX_RADIUS } from '../utils/constants';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-// import { QUALIFICACOES_PREDEFINIDAS } from '../../../../data/qualificacoesPredefinidas'; // Temporariamente não usado
 import { NavigationMenu } from './NavigationMenu';
 
 // Importar estilos CSS customizados
@@ -36,16 +35,17 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
   menuAberto,
   onClose,
   tiposHabilitacoes, // Temporariamente não usado
+  tiposQualificacoes,
   tiposEstabelecimentos,
   habilitacaoSelecionada, // Temporariamente não usado
-  qualificacaoSelecionada, // Temporariamente não usado
+  qualificacaoSelecionada,
   naturezaSelecionada,
   tipoEstabelecimentoSelecionado,
   searchRadius,
   filteredPlaces,
   visibleCount,
   onHabilitacaoChange, // Temporariamente não usado
-  onQualificacaoChange, // Temporariamente não usado
+  onQualificacaoChange,
   onNaturezaChange,
   onTipoEstabelecimentoChange,
   onRadiusChange,
@@ -76,9 +76,7 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
   void handleRadiusChange;
   void tiposHabilitacoes;
   void habilitacaoSelecionada;
-  void qualificacaoSelecionada;
   void onHabilitacaoChange;
-  void onQualificacaoChange;
   void onSearch;
 
   // Filtrar estabelecimentos baseado no texto de pesquisa
@@ -193,23 +191,23 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
           </select>
         </div> */}
 
-        {/* Campo de pesquisa por qualificação - TEMPORARIAMENTE OCULTO */}
-        {/* <div className="mb-4">
+        {/* Seletor de qualificação COP 30 */}
+        <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Qualificação
+            Qualificação COP 30
           </label>
           <select
             value={qualificacaoSelecionada}
             onChange={(e) => onQualificacaoChange(e.target.value)}
             className="w-full p-3 text-sm border border-gray-300 rounded-lg shadow-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
-            {QUALIFICACOES_PREDEFINIDAS.map((qualificacao) => (
-              <option key={qualificacao.id} value={qualificacao.id === "todas" ? "todas" : qualificacao.nome}>
+            {tiposQualificacoes.map((qualificacao) => (
+              <option key={qualificacao.id} value={qualificacao.nome}>
                 {qualificacao.nome}
               </option>
             ))}
           </select>
-        </div> */}
+        </div>
 
         {/* Seletor de natureza */}
         <div className="mb-4">
