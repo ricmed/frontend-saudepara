@@ -55,9 +55,28 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
   const popupRef = useRef<L.Popup | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const [currentZoom, setCurrentZoom] = useState(6);
 
   // Hook para gerenciar provedor de mapa
   const { tileProvider } = useMapProvider();
+
+  // Função para abreviar nomes longos
+  const abreviarNome = (nome: string, maxLength: number = 25): string => {
+    if (nome.length <= maxLength) return nome;
+    
+    // Tentar abreviar por palavras
+    const palavras = nome.split(' ');
+    if (palavras.length > 3) {
+      // Pegar primeira palavra + iniciais das do meio + última
+      const primeira = palavras[0];
+      const ultima = palavras[palavras.length - 1];
+      const meio = palavras.slice(1, -1).map(p => p[0]).join('.');
+      return `${primeira} ${meio}. ${ultima}`;
+    }
+    
+    // Se ainda for longo, truncar com reticências
+    return nome.substring(0, maxLength) + '...';
+  };
 
   // Inicializar mapa uma única vez
   useEffect(() => {
@@ -110,7 +129,10 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
 
       // Event listeners otimizados para COP 30
       map.on('zoomend', () => {
-        if (isMapLoaded) onMapIdle();
+        if (isMapLoaded) {
+          setCurrentZoom(map.getZoom());
+          onMapIdle();
+        }
       });
       
       map.on('click', () => {
@@ -203,7 +225,7 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
     }
   }, [tileProvider.url, tileProvider.attribution, tileProvider.maxZoom, isMapReady]); // Dependências mais específicas
 
-  // Gerenciar marcador do usuário
+  // Gerenciar marcador do usuário e centralizar mapa na primeira vez
   useEffect(() => {
     if (!mapRef.current || !isMapReady) return;
 
@@ -218,44 +240,45 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
       if (userLocation) {
         const userIcon = L.divIcon({
           html: `
-            <div style="
-              width: 20px;
-              height: 20px;
-              background: #4285f4;
-              border: 3px solid white;
-              border-radius: 50%;
-              box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-              position: relative;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-            ">
-              <div style="
-                width: 8px;
-                height: 8px;
-                background: white;
-                border-radius: 50%;
-              "></div>
-            </div>
+            <svg width="30" height="42" viewBox="0 0 30 42" xmlns="http://www.w3.org/2000/svg">
+              <!-- Pin vermelho estilo Google Maps -->
+              <path d="M15 0C6.7 0 0 6.7 0 15c0 11.25 15 27 15 27s15-15.75 15-27C30 6.7 23.3 0 15 0z" 
+                    fill="#EA4335" 
+                    stroke="white" 
+                    stroke-width="2"/>
+              <!-- Círculo branco interno -->
+              <circle cx="15" cy="15" r="7" fill="white"/>
+              <!-- Ponto vermelho central -->
+              <circle cx="15" cy="15" r="4" fill="#EA4335"/>
+            </svg>
           `,
-          iconSize: [20, 20],
-          iconAnchor: [10, 10],
+          iconSize: [30, 42],
+          iconAnchor: [15, 42],
+          popupAnchor: [0, -42],
           className: 'user-location-marker'
         });
 
         userMarkerRef.current = L.marker([userLocation.lat, userLocation.lng], {
           icon: userIcon,
-          zIndexOffset: 1000
+          zIndexOffset: 10000  // Z-index muito alto para garantir que fique acima de tudo
         }).addTo(mapRef.current);
 
         userMarkerRef.current.bindTooltip('Você está aqui', {
           permanent: false,
           direction: 'top',
-          offset: [0, -25],
+          offset: [0, -45],
           className: 'user-location-tooltip'
         });
 
-        console.log('📍 Marcador do usuário adicionado:', userLocation);
+        // Centralizar o mapa na localização do usuário com zoom adequado (13 para ver os rótulos)
+        mapRef.current.setView([userLocation.lat, userLocation.lng], 13, {
+          animate: true,
+          duration: 1
+        });
+        
+        setCurrentZoom(13); // Atualizar o zoom atual
+
+        console.log('📍 Marcador do usuário adicionado e mapa centralizado:', userLocation);
       }
     } catch (error) {
       console.error('❌ Erro ao gerenciar marcador do usuário:', error);
@@ -361,11 +384,62 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
           riseOnHover: true
         }).addTo(mapRef.current!);
 
-        // Tooltip no hover
-        marker.bindTooltip(local.nome, {
+        // Rótulo permanente que aparece em zoom >= 13
+        const nomeAbreviado = abreviarNome(local.nome, 20);
+        const labelHtml = `
+          <div style="
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(4px);
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 9px;
+            font-weight: 500;
+            color: #1a1a1a;
+            white-space: nowrap;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.1);
+            border: 0.5px solid rgba(0,0,0,0.08);
+            letter-spacing: 0.2px;
+            line-height: 1.2;
+            z-index: 500;
+            position: relative;
+          ">${nomeAbreviado}</div>
+        `;
+        
+        marker.bindTooltip(labelHtml, {
+          permanent: currentZoom >= 13, // Mostrar permanente apenas em zoom alto
           direction: 'top',
-          offset: [0, -20],
-          opacity: 0.9
+          offset: [0, -30],
+          opacity: 1,
+          className: 'label-tooltip-modern'
+        });
+
+        // Tooltip completo no hover (sempre disponível)
+        marker.on('mouseover', () => {
+          // Elevar z-index do marcador para ficar acima de tudo (exceto pin do usuário)
+          marker.setZIndexOffset(9900);
+          
+          marker.unbindTooltip();
+          marker.bindTooltip(local.nome, {
+            permanent: false,
+            direction: 'top',
+            offset: [0, -20],
+            opacity: 0.9,
+            className: 'tooltip-hover-active'
+          }).openTooltip();
+        });
+
+        marker.on('mouseout', () => {
+          // Voltar z-index normal
+          marker.setZIndexOffset(0);
+          
+          marker.unbindTooltip();
+          marker.bindTooltip(labelHtml, {
+            permanent: currentZoom >= 13,
+            direction: 'top',
+            offset: [0, -30],
+            opacity: 1,
+            className: 'label-tooltip-modern'
+          });
         });
 
         // Click handler
@@ -381,7 +455,7 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
     } catch (error) {
       console.error('❌ Erro ao gerenciar marcadores dos estabelecimentos:', error);
     }
-  }, [filteredPlaces, visibleCount, qualificacaoSelecionada, isMapReady]); // Adiciona qualificacaoSelecionada
+  }, [filteredPlaces, visibleCount, qualificacaoSelecionada, currentZoom, isMapReady]); // Adiciona currentZoom
 
   // Gerenciar popup do marcador selecionado
   useEffect(() => {
