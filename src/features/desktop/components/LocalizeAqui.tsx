@@ -17,7 +17,7 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
     return (
       <div className="p-4 bg-white">
         <h2 className="text-xl font-bold text-center mb-6">{t('localize.title')}</h2>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
           <div
             className="flex flex-col items-center cursor-pointer group"
             onClick={() => navigateToMapa({ qualificacao: "Postos de atendimento - COP 30" })}
@@ -32,7 +32,7 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
 
           <div
             className="flex flex-col items-center cursor-pointer group"
-            onClick={() => navigateToMapa({ qualificacao: "Postos fixos de atendimento - Cúpula dos povos - COP 30" })}
+            onClick={() => navigateToMapa({ qualificacao: "Alojamentos - Cúpula dos Povos - COP 30" })}
           >
             <div className="w-16 h-16 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-2 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
               <Users className="h-6 w-6 text-white" />
@@ -92,18 +92,6 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
 
           <div
             className="flex flex-col items-center cursor-pointer group"
-            onClick={() => navigateToMapa({ qualificacao: "Alojamentos - COP 30" })}
-          >
-            <div className="w-16 h-16 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-2 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
-              <BedDouble className="h-6 w-6 text-white" />
-            </div>
-            <span className="text-xs text-center font-medium leading-tight">
-              {t('pointsOfInterest.accommodations')}
-            </span>
-          </div>
-
-          <div
-            className="flex flex-col items-center cursor-pointer group"
             onClick={() => navigateToMapa({ qualificacao: "Vacinação - COP 30" })}
           >
             <div className="w-16 h-16 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-2 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
@@ -122,7 +110,7 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
     <section className="py-12 bg-gray-50">
       <div className="container mx-auto px-6">
         <h2 className="text-2xl font-bold text-center text-gray-800 mb-8">{t('localize.title')}</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-6 max-w-7xl mx-auto">
           <div
             className="flex flex-col items-center cursor-pointer group"
             onClick={() => navigateToMapa({ qualificacao: "Postos de atendimento - COP 30" })}
@@ -137,7 +125,7 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
 
           <div
             className="flex flex-col items-center cursor-pointer group"
-            onClick={() => navigateToMapa({ qualificacao: "Postos fixos de atendimento - Cúpula dos povos - COP 30" })}
+            onClick={() => navigateToMapa({ qualificacao: "Alojamentos - Cúpula dos Povos - COP 30" })}
           >
             <div className="w-20 h-20 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-3 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
               <Users className="h-8 w-8 text-white" />
@@ -192,18 +180,6 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
             </div>
             <span className="text-sm font-medium text-center leading-tight">
               {t('pointsOfInterest.caps')}
-            </span>
-          </div>
-
-          <div
-            className="flex flex-col items-center cursor-pointer group"
-            onClick={() => navigateToMapa({ qualificacao: "Alojamentos - COP 30" })}
-          >
-            <div className="w-20 h-20 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-3 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
-              <BedDouble className="h-8 w-8 text-white" />
-            </div>
-            <span className="text-sm font-medium text-center leading-tight">
-              {t('pointsOfInterest.accommodations')}
             </span>
           </div>
 
