@@ -78,6 +78,8 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
   void habilitacaoSelecionada;
   void onHabilitacaoChange;
   void onSearch;
+  void naturezaSelecionada; // Temporariamente não usado
+  void onNaturezaChange; // Temporariamente não usado
 
   // Filtrar estabelecimentos baseado no texto de pesquisa
   const searchFilteredPlaces = useMemo(() => {
@@ -209,8 +211,8 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
           </select>
         </div>
 
-        {/* Seletor de natureza */}
-        <div className="mb-4">
+        {/* Seletor de natureza - TEMPORARIAMENTE OCULTO */}
+        {/* <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Natureza Jurídica
           </label>
@@ -223,7 +225,7 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
             <option value="PÚBLICO">Público</option>
             <option value="PRIVADO">Privado</option>
           </select>
-        </div>
+        </div> */}
 
         {/* Raio de busca - TEMPORARIAMENTE OCULTO */}
         {/* <div className="mb-4">
