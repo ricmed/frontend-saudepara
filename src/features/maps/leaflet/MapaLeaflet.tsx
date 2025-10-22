@@ -204,7 +204,11 @@ const MapaLeaflet: React.FC = () => {
   /**
    * Centralizar mapa no usuário quando localização estiver disponível
    * Apenas se a localização mudou significativamente
+   * 
+   * DESABILITADO: A centralização agora é feita diretamente no MapaContainer
+   * para evitar conflitos e garantir que o zoom permaneça estável
    */
+  /*
   useEffect(() => {
     if (!userLocation || !map || !mapReady) return;
 
@@ -267,6 +271,7 @@ const MapaLeaflet: React.FC = () => {
       }
     };
   }, [userLocation?.lat, userLocation?.lng, mapReady, filteredPlaces.length, map, calcularDistancia]);
+  */
 
   /**
    * Calcular estimativas de tempo (apenas para exibição)
