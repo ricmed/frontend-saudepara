@@ -109,7 +109,7 @@ const MapaLeaflet: React.FC = () => {
   // const [modoTransporteSelecionado, setModoTransporteSelecionado] = useState("DRIVING");
 
   // Controla quantos resultados aparecem
-  const [visibleCount, setVisibleCount] = useState(20);
+  const [visibleCount, setVisibleCount] = useState(100);
 
   // Estados para controle de carregamento e erros
   const [inicializando, setInicializando] = useState(true);
@@ -171,17 +171,22 @@ const MapaLeaflet: React.FC = () => {
   }, []); // Dependências vazias - executar apenas uma vez
 
   /**
-   * Pré-selecionar "Postos de Coleta do Círio de Nazaré" quando os tipos estiverem carregados
+   * Pré-selecionar "ESTABELECIMENTOS COP 30" quando os tipos estiverem carregados
    */
   useEffect(() => {
     if (tiposEstabelecimentos.length > 0 && tipoEstabelecimentoSelecionado === "todos") {
-      const postosCirco = tiposEstabelecimentos.find(
-        tipo => tipo.nome === "Postos de Coleta do Círio de Nazaré"
+      const cop30 = tiposEstabelecimentos.find(
+        tipo => tipo.nome.toUpperCase().includes("ESTABELECIMENTOS COP 30") || 
+                tipo.nome.toUpperCase().includes("COP 30") ||
+                tipo.nome.toUpperCase().includes("COP30")
       );
       
-      if (postosCirco) {
-        console.log('🎯 Pré-selecionando "Postos de Coleta do Círio de Nazaré"');
-        setTipoEstabelecimentoSelecionado(postosCirco.nome);
+      if (cop30) {
+        console.log('🎯 Pré-selecionando "ESTABELECIMENTOS COP 30"');
+        setTipoEstabelecimentoSelecionado(cop30.nome);
+      } else {
+        console.warn('⚠️ Tipo "ESTABELECIMENTOS COP 30" não encontrado. Tipos disponíveis:', 
+          tiposEstabelecimentos.map(t => t.nome));
       }
     }
   }, [tiposEstabelecimentos.length]); // Executar quando os tipos forem carregados
@@ -521,7 +526,7 @@ const MapaLeaflet: React.FC = () => {
           onNaturezaChange={setNaturezaSelecionada}
           onTipoEstabelecimentoChange={setTipoEstabelecimentoSelecionado}
           onRadiusChange={setSearchRadius}
-          onLoadMore={() => setVisibleCount((prev) => prev + 20)}
+          onLoadMore={() => setVisibleCount((prev) => prev + 100)}
           onSearch={onSearch}
           onClose={() => setPainelEstabelecimentosAberto(false)}
         />
