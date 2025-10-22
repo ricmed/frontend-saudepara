@@ -31,8 +31,8 @@ export const QUALIFICACOES_COP30: QualificacaoCOP30Config[] = [
   },
   {
     nome: "Usinas da Paz - COP 30",
-    letra: "UP",
-    cor: "#F38181",      // Rosa coral
+    letra: "PAZ",
+    cor: "#4169E1",      // Azul royal
     textColor: "#FFFFFF"
   },
   {
@@ -50,8 +50,8 @@ export const QUALIFICACOES_COP30: QualificacaoCOP30Config[] = [
   {
     nome: "Alojamentos - COP 30",
     letra: "ALO",
-    cor: "#A8D8EA",      // Azul claro
-    textColor: "#000000"
+    cor: "#8B4513",      // Marrom saddle brown
+    textColor: "#FFFFFF"
   },
   {
     nome: "Vacinação - COP 30",
