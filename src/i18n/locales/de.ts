@@ -1,0 +1,310 @@
+// German translations
+export const de = {
+  // Header
+  "search.placeholder": "Suchen",
+  "header.secretaryOf": "Staatssekretariat für",
+  "header.publicHealth": "Öffentliche Gesundheit",
+  
+  // Menu Grid
+  "menu.locations": "Standorte",
+  "menu.campaigns": "Gesundheitskampagnen",
+  "menu.materials": "Bildungsmaterialien",
+  "menu.fale_conosco": "Kontaktieren Sie uns",
+  "menu.emergencies": "Notfälle",
+  "menu.consultations": "Konsultationen",
+  "menu.exams": "Untersuchungen",
+  "menu.faq": "Häufig gestellte Fragen",
+
+  // Logout Confirmation
+  "logout.confirmation.title": "Möchten Sie sich abmelden?",
+  "logout.confirmation.confirm": "Ja, abmelden",
+  "logout.confirmation.cancel": "Abbrechen",
+  "logout.confirmation.message": "Sind Sie sicher, dass Sie sich abmelden möchten?",
+  
+  // Points Section
+  "section.locate": "Hier finden",
+  "localize.title": "Hier finden",
+  "localize.viewMap": "Auf Karte anzeigen",
+  "points.vaccination": "Impfstellen",
+  "points.vaccination.desc": "Impfstandorte",
+  "points.food": "Essbereiche",
+  "points.food.desc": "Speisestätten",
+  "points.parks": "Grünflächen",
+  "points.parks.desc": "Parks und Plätze",
+  "points.cultural": "Kulturzentren",
+  "points.cultural.desc": "Museen und Theater",
+  "points.health": "Gesundheitszentren",
+  "points.health.desc": "Medizinische Versorgung",
+  "points.hospitals": "Referenzkrankenhäuser",
+  "points.hospitals.desc": "Hauptkrankenhäuser",
+  "points.hospital": "Krankenhaus",
+  "points.hospital.desc": "Vollständige Krankenhausversorgung mit verschiedenen Fachbereichen",
+  "points.ubs": "Basisgesundheitseinheit",
+  "points.ubs.desc": "Primär- und Vorsorgedienste",
+  "points.emergency": "Notfall",
+  "points.emergency.desc": "24-Stunden-Notfallversorgung",
+  "points.laboratory": "Labor",
+  "points.laboratory.desc": "Labortests und Untersuchungen",
+  
+  // Navigation
+  "nav.home": "Startseite",
+  "nav.map": "Karte",
+  "nav.campaigns": "Kampagnen",
+  "nav.entrar": "Anmelden",
+  
+  // Side Menu
+  "menu.home": "Startseite",
+  "menu.qualify_establishments": "Einrichtungen qualifizieren",
+  "menu.notification": "Fallkommunikationsmodul",
+  "menu.notify_case": "Fall melden",
+  "menu.servicos": "Dienstleistungen",
+  "menu.dashboard": "Dashboard",
+  "menu.reportCase": "Fall melden",
+  "menu.reportCaseDesc": "Schnell einen neuen Fall registrieren",
+  "menu.offline_management": "Offline-Daten",
+  "menu.educational": "Bildungsmaterialien",
+  "menu.apps": "Hilfsanwendungen",
+  "menu.security": "Sicherheit",
+  "menu.version": "Version",
+  "menu.bug": "Fehler melden",
+  "menu.logout": "Abmelden",
+  "menu.login": "Anmelden",
+  "menu.manage_users": "Benutzer verwalten",
+  "menu.open": "Menü öffnen",
+  
+  // Language Selector
+  "language.select": "Sprache wählen",
+
+  // Departments
+  "department.title": "Benachrichtigungsmodul",
+  "department.health-surveillance": "Gesundheitsüberwachung",
+  "department.accidents": "Unfälle und Notfälle",
+  "department.chronic": "Chronische Krankheiten",
+  "department.mental-health": "Psychische Gesundheit",
+  "department.infectious": "Infektionskrankheiten",
+  "department.zoonoses": "Zoonosen",
+  "department.medications": "Medikamente",
+  "department.maternal": "Mütter- und Kindergesundheit",
+  "department.epidemiology": "Epidemiologie",
+
+  // Buttons and carousel
+  "campaigns.saibaMais": "Mehr erfahren",
+  "carousel.previousSlide": "Vorherige Folie",
+  "carousel.nextSlide": "Nächste Folie",
+  "carousel.goToSlide": "Zu Folie {number} gehen",
+
+  // Red December Campaign
+  "campaigns.redDecember.title": "Rote Dezember Kampagne",
+  "campaigns.redDecember.description1": "Der Rote Dezember ist eine nationale Aufklärungskampagne zur HIV/AIDS-Prävention und anderen sexuell übertragbaren Infektionen. Mit Fokus auf die Reduzierung von Vorurteilen und die Förderung der Früherkennung präsentiert die diesjährige Kampagne Bildungsstrategien und Präventionsmaßnahmen wie Kondomverteilung und Förderung regelmäßiger Tests.",
+  "campaigns.redDecember.description2": "Die Aktionen umfassen Gemeinschaftsworkshops, Informationskampagnen in Schulen und Gesundheitseinrichtungen sowie Partnerschaften mit lokalen NGOs, um den Zugang zu kostenloser und kontinuierlicher Behandlung für HIV-Diagnostizierte zu fördern.",
+  "campaigns.redDecember.description3": "Nehmen Sie an den Aktivitäten teil und helfen Sie, korrekte Informationen über Prävention und Pflege zu verbreiten. Der Kampf gegen Vorurteile beginnt mit Bewusstsein!",
+  "campaigns.redDecember.downloadButton": "Broschüre herunterladen - Roter Dezember",
+  
+  // Blue November Campaign
+  "campaigns.blueNovember.title": "Blauer November Kampagne 2024",
+  "campaigns.blueNovember.description1": "Die Blauer November Kampagne ist eine Initiative der Staatlichen Koordination für Männergesundheit, die darauf abzielt, Männer über die Bedeutung der Selbstfürsorge und Gesundheitsprävention zu informieren, mit besonderem Fokus auf sexuelle und reproduktive Gesundheit.",
+  "campaigns.blueNovember.description2": "Verschiedene Faktoren können die männliche sexuelle Gesundheit beeinflussen, einschließlich chronischer Krankheiten (wie Bluthochdruck, Diabetes und Nierenversagen), Bewegungsmangel, schlechte Ernährung, Angst, Depression und Alkohol- und Zigarettenkonsum. Daher ist es wichtig, gesunde Gewohnheiten für ein erfülltes Sexualleben zu pflegen.",
+  "campaigns.blueNovember.description3": "Die Kampagne betont auch die Bedeutung der Familienplanung und sicherer Sexpraktiken. Männer haben kostenlosen Zugang zu Kondomen in Gesundheitseinrichtungen und können sich über Verhütungsmethoden informieren, einschließlich Vasektomie, einem einfachen und wirksamen chirurgischen Eingriff.",
+  "campaigns.blueNovember.description4": "Kümmern Sie sich um Ihre Gesundheit! Besuchen Sie eine SUS-Einrichtung für Vorsorgeuntersuchungen, Beratung und Zugang zu Behandlungen bei Bedarf. Denken Sie daran: Gesundheitsfürsorge ist ein Zeichen der Liebe zum Leben!",
+  "campaigns.blueNovember.downloadButton1": "Broschüre 1 herunterladen - Blauer November",
+  "campaigns.blueNovember.downloadButton2": "Broschüre 2 herunterladen - Blauer November",
+  
+  // Green September Campaign
+  "campaigns.greenSeptember.title": "Grüner September Kampagne 2025",
+  "campaigns.greenSeptember.description1": "Die Grüner September Kampagne fördert das Bewusstsein für die Bedeutung der Organ- und Gewebespende. Ein einzelner Spender kann unzählige Leben retten, indem er Herz, Lunge, Leber, Bauchspeicheldrüse, Darm, Nieren, Hornhäute, Gefäße, Haut, Knochen, Sehnen und Bänder spendet.",
+  "campaigns.greenSeptember.description2": "Spenden können von Lebendspendern (die Nieren, Teile der Leber oder Lunge und Knochenmark spenden können) oder von Verstorbenen im Hirntodzustand stammen. In Pará werden Nieren-, Leber-, Knochenmark-, Hornhaut- und Muskel-Skelett-Gewebetransplantationen durchgeführt. Die Position auf der Warteliste wird durch technische Kompatibilitätskriterien und die Schwere des Empfängers definiert.",
+  "campaigns.greenSeptember.description3": "Sprechen Sie mit Ihrer Familie über dieses Thema und äußern Sie Ihren Wunsch, Spender zu werden. Die endgültige Entscheidung liegt immer bei der Familie, daher ist es wichtig, dass sie Ihre Wünsche kennen. Suchen Sie Informationen beim Staatlichen Transplantationszentrum und helfen Sie, Leben zu retten!",
+  "campaigns.greenSeptember.downloadButton": "Broschüre herunterladen - Grüner September",
+  
+  // Yellow September Campaign
+  "campaigns.yellowSeptember.title": "Gelber September Kampagne 2025",
+  "campaigns.yellowSeptember.description1": "Der Gelbe September ist eine Aufklärungskampagne zur Suizidprävention und Wertschätzung der psychischen Gesundheit. Die Kampagne fördert Aufnahme und einfühlsames Zuhören und ermutigt Menschen, Empathie zu zeigen und die Gefühle derer zu bestätigen, die unter psychischem Leid leiden.",
+  "campaigns.yellowSeptember.description2": "Es ist wichtig, auf Anzeichen psychischen Leidens zu achten, wie signifikante Verhaltensänderungen, soziale Isolation, Verlust des Interesses an angenehmen Aktivitäten, intensive Hoffnungslosigkeit und Pessimismus. Soziale Verbindungen aufrechtzuerhalten, gesunde Gewohnheiten zu entwickeln und den Missbrauch von Alkohol und Drogen zu vermeiden, sind wichtige Maßnahmen zur Förderung des Wohlbefindens und der psychischen Gesundheit.",
+  "campaigns.yellowSeptember.description3": "Wenn Sie Hilfe benötigen, suchen Sie sie! Fachkräfte für psychische Gesundheit sind geschult, angemessene Unterstützung und Behandlung anzubieten. Das Zentrum für Lebenswertschätzung (CVV) bietet kostenlose und vertrauliche emotionale Unterstützung unter der Telefonnummer 188. Rufen Sie 188 an für den besten Ausweg.",
+  "campaigns.yellowSeptember.downloadButton": "Broschüre herunterladen - Gelber September",
+  
+  // Malaria Zero Campaign
+  "campaigns.malariaZero.title": "Malaria Null",
+  "campaigns.malariaZero.description1": "Die Malaria Null Kampagne zielt darauf ab, Malaria in der Amazonasregion auszurotten. Verwenden Sie behandelte Moskitonetze, tragen Sie Insektenschutzmittel auf und suchen Sie ärztliche Hilfe, wenn Sie Symptome wie Fieber und Schüttelfrost verspüren.",
+  "campaigns.malariaZero.description2": "Prävention ist der beste Weg, um Sie und Ihre Familie vor dieser Krankheit zu schützen.",
+  
+  // Purple January Campaign
+  "campaigns.purpleJanuary.title": "Violetter Januar Kampagne 2025",
+  "campaigns.purpleJanuary.description1": "Die Violetter Januar Kampagne 2025 zielt darauf ab, das Bewusstsein für die Hansen-Krankheit (Lepra) zu schärfen, eine Infektionskrankheit, die hauptsächlich die Haut und die peripheren Nerven betrifft. In Pará versucht diese Initiative, das mit der Krankheit verbundene Stigma zu reduzieren und die Früherkennung zu fördern.",
+  "campaigns.purpleJanuary.description2": "Die Hansen-Krankheit ist heilbar, und je früher sie diagnostiziert und behandelt wird, desto geringer sind die Chancen für dauerhafte Folgen. Während des gesamten Januars führen Gesundheitseinrichtungen im ganzen Staat Informations-, Screening- und kostenlose Diagnoseaktionen durch.",
+  "campaigns.purpleJanuary.description3": "Nehmen Sie an Bildungsaktivitäten teil und helfen Sie, Fehlinformationen über die Hansen-Krankheit zu bekämpfen. Wissen ist der erste Schritt zu wirksamer Prävention und Behandlung.",
+  "campaigns.purpleJanuary.downloadButton": "Broschüre herunterladen - Violetter Januar",
+  
+  // Golden August Campaign
+  "campaigns.goldenAugust.title": "Goldener August Kampagne 2025 - Stillen",
+  "campaigns.goldenAugust.description1": "Mit dem Thema 'Im Strom des Lebens ist Muttermilch Wurzel, Fluss und Zukunft' symbolisiert der Goldene August den Monat des Bewusstseins für die Bedeutung des Stillens. Inspiriert vom Konzept der 'Goldenen Stunde', die den ersten Kontakt zwischen Mutter und Baby direkt nach der Geburt darstellt, betont die Kampagne die Bedeutung des ausschließlichen Stillens in den ersten sechs Lebensmonaten.",
+  "campaigns.goldenAugust.description2": "Muttermilch gilt als die vollständigste Nahrung für Babys und enthält alle notwendigen Nährstoffe für die beste Entwicklung des Kindes. Neben der Verringerung des Auftretens von Durchfall und Infektionen bietet sie zahlreiche Vorteile für die Gesundheit von Frauen, wie die Verringerung der Wahrscheinlichkeit, Brust- und Gebärmutterkrebs zu entwickeln.",
+  "campaigns.goldenAugust.description3": "Laut Weltgesundheitsorganisation (WHO) und Gesundheitsministerium wird geschätzt, dass Stillen in der Lage ist, den Tod von Kindern unter 5 Jahren weltweit um bis zu 13% durch vermeidbare Ursachen zu reduzieren. Keine andere einzelne Strategie erreicht die Wirkung, die das Stillen auf die Reduzierung der Kindersterblichkeit hat.",
+  
+  // Health Campaigns
+  "healthCampaigns.title": "Gesundheitskampagnen",
+  "healthCampaigns.backButton": "Zurück",
+  "healthCampaigns.listAriaLabel": "Liste der Gesundheitskampagnen",
+  "healthCampaigns.itemAriaLabel": "Kampagne",
+  "healthCampaigns.redDecember.cardTitle": "Rote Dezember Kampagne 2024",
+  "healthCampaigns.redDecember.cardDescription": "HIV/AIDS-Bewusstsein und Prävention in Pará",
+  "healthCampaigns.blueNovember.cardTitle": "Blauer November Kampagne 2024",
+  "healthCampaigns.blueNovember.cardDescription": "Männergesundheitsbewusstsein und Prostatakrebsprävention",
+  "healthCampaigns.greenSeptember.cardTitle": "Grüner September",
+  "healthCampaigns.greenSeptember.cardDescription": "Bewusstsein für Organspende in Pará",
+  "healthCampaigns.malariaZero.cardTitle": "Malaria Null",
+  "healthCampaigns.malariaZero.cardDescription": "Malaria-Präventionskampagne in der Amazonasregion",
+  "healthCampaigns.purpleJanuary.cardTitle": "Violetter Januar Kampagne 2025",
+  "healthCampaigns.purpleJanuary.cardDescription": "Hansen-Krankheits-Bewusstseinskampagne",
+  
+  // Campaigns List
+  "campaigns.list.redDecember": "Rote Dezember Kampagne 2024",
+  "campaigns.list.redDecemberDesc": "HIV/AIDS-Bewusstsein und Prävention in Pará",
+  "campaigns.list.blueNovember": "Blauer November Kampagne 2024",
+  "campaigns.list.blueNovemberDesc": "Männergesundheitsbewusstsein und Prostatakrebsprävention",
+  "campaigns.list.greenSeptember": "Grüner September Kampagne 2025",
+  "campaigns.list.greenSeptemberDesc": "Bewusstsein für Organ- und Gewebespende",
+  "campaigns.list.malaria": "Malaria Null",
+  "campaigns.list.malariaDesc": "Malaria-Präventionskampagne in der Amazonasregion",
+  "campaigns.list.purpleJanuary": "Violetter Januar Kampagne 2025",
+  "campaigns.list.purpleJanuaryDesc": "Hansen-Krankheits-Bewusstseinskampagne",
+  "campaigns.list.goldenAugust": "Goldener August Kampagne 2025",
+  "campaigns.list.goldenAugustDesc": "Stillförderungskampagne",
+  "campaigns.list.yellowSeptember": "Gelber September Kampagne 2025",
+  "campaigns.list.yellowSeptemberDesc": "Bewusstsein für Suizidprävention und Wertschätzung der psychischen Gesundheit",
+  
+  // Additional Health Campaigns
+  "healthCampaigns.viewCampaignButton": "Kampagne ansehen",
+  "healthCampaigns.addToFavorites": "Zu Favoriten hinzufügen",
+  "healthCampaigns.removeFromFavorites": "Aus Favoriten entfernen",
+  "healthCampaigns.searchPlaceholder": "Kampagnen suchen...",
+  "healthCampaigns.searchAriaLabel": "Suchfeld für Kampagnen",
+  "healthCampaigns.clearSearchButton": "Suche löschen",
+  "healthCampaigns.openMenuButton": "Menü öffnen",
+  "healthCampaigns.newCampaignButton": "Neue Kampagne",
+  "healthCampaigns.newButton": "Neu",
+  "healthCampaigns.closeErrorButton": "Fehlermeldung schließen",
+  "healthCampaigns.noResults": "Keine Ergebnisse gefunden",
+  "healthCampaigns.noCampaigns": "Keine Kampagnen verfügbar",
+  "healthCampaigns.errorLoading": "Fehler beim Laden von Kampagnen",
+  "healthCampaigns.tabs.campanhas": "Kampagnen",
+  "healthCampaigns.tabs.favoritos": "Favoriten",
+  "healthCampaigns.tabs.recentes": "Neueste",
+  "healthCampaigns.footerCopyright": "Staatssekretariat für öffentliche Gesundheit von Pará",
+  "healthCampaigns.footer.about": "Über",
+  "healthCampaigns.footer.contact": "Kontakt",
+  "healthCampaigns.footer.privacy": "Datenschutz",
+  "healthCampaigns.footer.terms": "Bedingungen",
+
+  // Auxiliary Apps
+  "apps.components": "Komponenten",
+  "apps.establishments": "Einrichtungen",
+  "apps.qualifications": "Qualifikationen",
+  "apps.enablings": "Befähigungen",
+  "apps.closure_types": "Abschlusstypen",
+  "apps.public_types": "Öffentliche Typen",
+  "apps.event_types": "Ereignistypen",
+  "apps.trauma_types": "Traumatypen",
+  "apps.care_types": "Pflegetypen",
+  "apps.diagnostic_hypothesis_types": "Diagnosehypothesentypen",
+  "apps.symptom_types": "Symptomtypen",
+  "apps.shift": "Schicht",
+  "apps.nature": "Rechtsform",
+  "apps.race": "Rasse/Farbe",
+  "apps.education": "Bildung",
+  "apps.cbo": "CBO",
+  "apps.countries": "Länder",
+  "apps.states": "Bundesstaaten",
+  "apps.cities": "Städte",
+  "apps.gender": "Geschlecht",
+  "apps.sexual_orientation": "Sexuelle Orientierung",
+
+  // Footer
+  "footer.contact": "Kontakt",
+  "footer.address": "Tv. Lomas Valentinas, 2190 - Marco, Belém - PA, 66093-677",
+  "footer.openingHours": "Öffnungszeiten",
+  "footer.weekdayHours": "Montag bis Freitag: 8 bis 17 Uhr",
+  "footer.sespaBrief": "SESPA arbeitet daran, die Gesundheit der Bevölkerung von Pará zu gewährleisten.",
+  "footer.ombudsman": "Ombudsstelle",
+  "footer.feedbackQuestion": "Haben Sie Vorschläge oder Beschwerden?",
+  "footer.contactOmbudsman": "Kontaktieren Sie unsere Ombudsstelle:",
+  "footer.portalTitle": "Gesundheitsportal Pará",
+  "footer.portalDescription": "Portal für Dienstleistungen und Informationen des Staatssekretariats für öffentliche Gesundheit von Pará.",
+  "footer.developedBy": "Entwickelt vom Informationszentrum für Gesundheitsüberwachung - NIVS",
+  "footer.copyright": "© {year} Staatssekretariat für öffentliche Gesundheit von Pará. Alle Rechte vorbehalten.",
+  "footer.rights": "Alle Rechte vorbehalten",
+  
+  // Contact Us, ASCOM, Ombudsman
+  "faleConosco.title": "Kontaktieren Sie uns",
+  "faleConosco.ascom": "Pressestelle",
+  "faleConosco.ouvitoria": "Ombudsstelle",
+  "faleConosco.access": "Zugriff",
+  "ascom.title": "Pressestelle - ASCOM",
+  "ascom.subTitle": "Kontakte der Pressestelle",
+  "ascom.description": "Dies ist der offizielle Kommunikationskanal zwischen dem Staatssekretariat für öffentliche Gesundheit von Pará und der Presse.",
+  "ascom.emailLabel": "E-Mail",
+  "ascom.phoneLabel": "Telefon",
+  "ouvitoria.title": "SUS-Ombudsstelle",
+  "ouvitoria.description": "Die SESPA-Ombudsstelle ist ein demokratischer Kommunikationskanal zwischen der SESPA-Verwaltung und SUS-Nutzern, der auf aktive Suche, Informationsverbreitung und Forschung abzielt, um das Management und die soziale Kontrolle des SUS zu unterstützen.",
+  "ouvitoria.inPersonLabel": "Persönlich",
+  "ouvitoria.address": "Travessa Lomas Valentinas, 2190, Bairro Marco - PLZ: 66093-687 - Belém / PA",
+  "ouvitoria.phoneLabel": "Telefone",
+  "ouvitoria.freeCallLabel": "Gesundheitshotline (Kostenlos)",
+  "ouvitoria.emailLabel": "E-Mail",
+  "ouvitoria.siteLabel": "Website",
+  "ouvitoria.formButton": "Online-Formular aufrufen",
+  
+  // Misc
+  "voltar": "Zurück",
+  "notifications": "Benachrichtigungen",
+  
+  // Login Page
+  "login.title": "Anmeldung",
+  "login.subtitle": "Geben Sie Ihre Anmeldedaten ein",
+  "login.username.placeholder": "Benutzername",
+  "login.password.placeholder": "Passwort",
+  "login.rememberMe": "Angemeldet bleiben",
+  "login.forgotPassword": "Passwort vergessen?",
+  "login.button": "Anmelden",
+  "login.verifying": "Authentifizierung wird überprüft...",
+  "login.error.invalid": "Ungültiger Benutzername oder Passwort",
+  
+  // Access Denied
+  "accessDenied.title": "Zugriff verweigert",
+  "accessDenied.message": "Sie haben keine Berechtigung, auf diese Seite zuzugreifen.",
+  "accessDenied.button": "Zurück zur Startseite",
+  
+  // Points of Interest - Home Page
+  "pointsOfInterest.servicePoints": "Servicestellen",
+  "pointsOfInterest.peoplesSummit": "Völkergipfel",
+  "pointsOfInterest.cop30Village": "COP 30 Dorf",
+  "pointsOfInterest.peacePlants": "Friedensanlagen",
+  "pointsOfInterest.upa": "UPA",
+  "pointsOfInterest.caps": "CAPS",
+  "pointsOfInterest.accommodations": "Unterkünfte",
+  "pointsOfInterest.vaccination": "Impfung",
+  
+  // Campaign Descriptions
+  "campaignDescriptions.yellowSeptember": "Bewusstsein für Suizidprävention und Wertschätzung der psychischen Gesundheit",
+  "campaignDescriptions.greenSeptember": "Bewusstsein für Organ- und Gewebespende",
+  "campaignDescriptions.goldenAugust": "Kampagne zur Förderung des Stillens",
+  "campaignDescriptions.purpleJanuary": "Kampagne zur Sensibilisierung für die Hansen-Krankheit",
+  "campaignDescriptions.redDecember": "Bewusstsein und Bekämpfung von HIV/AIDS in ganz Pará",
+  "campaignDescriptions.blueNovember": "Bewusstsein für Männergesundheit und Prostatakrebs-Prävention",
+  
+  // Campaign Titles
+  "campaignTitles.yellowSeptember": "Kampagne Gelber September 2025",
+  "campaignTitles.greenSeptember": "Kampagne Grüner September 2025",
+  "campaignTitles.goldenAugust": "Kampagne Goldener August 2025",
+  "campaignTitles.purpleJanuary": "Kampagne Violetter Januar 2025",
+  "campaignTitles.redDecember": "Kampagne Roter Dezember 2024",
+  "campaignTitles.blueNovember": "Kampagne Blauer November 2024",
+  
+  // Missing Keys
+  "banner.welcome": "Willkommen im Gesundheitsportal Pará",
+  "banner.subtitle": "Gesundheitsinformationen und Dienstleistungen zur Hand",
+  "banner.findService": "Finden Sie den Gesundheitsdienst, den Sie benötigen",
+  "fab.notifique": "Benachrichtigen",
+  "campaigns.title": "Gesundheitskampagnen",
+  "campaigns.description": "Erfahren Sie mehr über die wichtigsten öffentlichen Gesundheitskampagnen"
+};

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useLanguage, Language } from '@/contexts/LanguageContext';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { Language } from '@/i18n/types';
 import { SideMenu } from '@/features/home/components/SideMenu';
 import { Header } from '../features/desktop/components/Header';
 import Footer from '@/features/desktop/components/Footer';
+import { useTranslation } from '@/i18n/useTranslations';
 
 const MobileAccessDenied = ({ 
   onMenuToggle, 
@@ -14,6 +16,8 @@ const MobileAccessDenied = ({
   handleLogout: () => void,
   selectedLanguage: Language
 }) => {
+  const { t } = useTranslation(selectedLanguage);
+  
   return (
     <div className="bg-white min-h-screen flex flex-col">
       <Header 
@@ -29,11 +33,11 @@ const MobileAccessDenied = ({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-blue-900 mb-4">Acesso Negado</h1>
-          <p className="text-gray-600 mb-6">Você não tem permissão para acessar esta página.</p>
+          <h1 className="text-2xl font-bold text-blue-900 mb-4">{t('accessDenied.title')}</h1>
+          <p className="text-gray-600 mb-6">{t('accessDenied.message')}</p>
           <div className="flex flex-col gap-3">
             <Link to="/" className="bg-blue-900 text-white py-2 px-4 rounded hover:bg-blue-800 transition">
-              Voltar para a Página Inicial
+              {t('accessDenied.button')}
             </Link>
             <button 
               onClick={handleLogout} 
@@ -59,6 +63,8 @@ const DesktopAccessDenied = ({
   selectedLanguage: Language,
   handleLogout: () => void
 }) => {
+  const { t } = useTranslation(selectedLanguage);
+  
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <Header 
@@ -74,11 +80,11 @@ const DesktopAccessDenied = ({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0z" />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-blue-600 mb-4">Acesso Negado</h1>
-          <p className="text-gray-600 mb-8 text-lg">Você não tem permissão para acessar esta página.</p>
+          <h1 className="text-3xl font-bold text-blue-600 mb-4">{t('accessDenied.title')}</h1>
+          <p className="text-gray-600 mb-8 text-lg">{t('accessDenied.message')}</p>
           <div className="flex justify-center gap-4">
             <Link to="/" className="bg-blue-600 text-white py-2 px-6 rounded hover:bg-blue-800 transition">
-              Voltar para a Página Inicial
+              {t('accessDenied.button')}
             </Link>
             <button 
               onClick={handleLogout} 
@@ -95,13 +101,9 @@ const DesktopAccessDenied = ({
   );
 };
 
-interface AccessDeniedProps {
-  initialLanguage?: Language;
-}
-
-const AccessDenied: React.FC<AccessDeniedProps> = ({ initialLanguage = "pt-BR" as Language }) => {
+const AccessDenied: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { selectedLanguage, setSelectedLanguage } = useLanguage();
+  const { selectedLanguage } = useLanguage();
 
   const handleMenuToggle = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -130,8 +132,6 @@ const AccessDenied: React.FC<AccessDeniedProps> = ({ initialLanguage = "pt-BR" a
       <SideMenu 
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
-        selectedLanguage={selectedLanguage}
-        onLanguageChange={setSelectedLanguage}
       />
     </div>
   );

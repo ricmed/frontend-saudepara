@@ -1,5 +1,5 @@
 import React from 'react';
-import { Syringe, Utensils, Trees, Building, BriefcaseMedical, Hospital } from 'lucide-react';
+import { MapPin, Users, Tent, Home, Ambulance, Heart, BedDouble, Syringe } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslations';
 import { Language } from "@/i18n/types";
 import { useMapaNavigation } from '@/features/maps/hooks/useMapaNavigation';
@@ -13,67 +13,106 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
   const { navigateToMapa } = useMapaNavigation();
   const { t } = useTranslation(selectedLanguage);
 
-  const pontosDeInteresse = [
-    {
-      nome: "vaccination",
-      icone: <Syringe className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} text-white`} />,
-      tipo: "vacinacao",
-      descricao: "Postos de vacinação",
-    },
-    {
-      nome: "food",
-      icone: <Utensils className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} text-white`} />,
-      tipo: "alimentacao",
-      descricao: "Restaurantes",
-    },
-    {
-      nome: "parks",
-      icone: <Trees className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} text-white`} />,
-      tipo: "lazer",
-      descricao: "Parques e áreas",
-    },
-    {
-      nome: "cultural",
-      icone: <Building className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} text-white`} />,
-      tipo: "cultura",
-      descricao: "Museus e eventos",
-    },
-    {
-      nome: "health",
-      icone: <BriefcaseMedical className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} text-white`} />,
-      tipo: "saude",
-      descricao: "Postos de Saúde",
-    },
-    {
-      nome: "hospitals",
-      icone: <Hospital className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} text-white`} />,
-      tipo: "hospitais",
-      descricao: "Unidades de saúde",
-    },
-  ];
-
   if (isMobile) {
     return (
       <div className="p-4 bg-white">
         <h2 className="text-xl font-bold text-center mb-6">{t('localize.title')}</h2>
-        <div className="grid grid-cols-3 gap-4">
-          {pontosDeInteresse.map((ponto, index) => (
-            <div
-              key={index}
-              className="flex flex-col items-center cursor-pointer"
-              onClick={() => navigateToMapa({ tipo: ponto.tipo })}
-            >
-              <div className="w-14 h-14 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-2 hover:bg-[#4D6FFF] transition-colors">
-                {ponto.icone}
-              </div>
-              <span className="text-xs text-center font-medium">
-                {t(`points.${ponto.nome}`)}
-              </span>
-              <p className="text-xs text-center text-gray-500 mt-1">
-                {t(`points.${ponto.nome}.desc`)}
-              </p>
+        <div className="grid grid-cols-2 gap-4">
+          <div
+            className="flex flex-col items-center cursor-pointer group"
+            onClick={() => navigateToMapa({ qualificacao: "Postos de atendimento - COP 30" })}
+          >
+            <div className="w-16 h-16 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-2 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+              <MapPin className="h-6 w-6 text-white" />
             </div>
-          ))}
+            <span className="text-xs text-center font-medium leading-tight">
+              {t('pointsOfInterest.servicePoints')}
+            </span>
+          </div>
+
+          <div
+            className="flex flex-col items-center cursor-pointer group"
+            onClick={() => navigateToMapa({ qualificacao: "Postos fixos de atendimento - Cúpula dos povos - COP 30" })}
+          >
+            <div className="w-16 h-16 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-2 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+              <Users className="h-6 w-6 text-white" />
+            </div>
+            <span className="text-xs text-center font-medium leading-tight">
+              {t('pointsOfInterest.peoplesSummit')}
+            </span>
+          </div>
+
+          <div
+            className="flex flex-col items-center cursor-pointer group"
+            onClick={() => navigateToMapa({ qualificacao: "Posto fixo de atendimento - Aldeia COP 30" })}
+          >
+            <div className="w-16 h-16 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-2 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+              <Tent className="h-6 w-6 text-white" />
+            </div>
+            <span className="text-xs text-center font-medium leading-tight">
+              {t('pointsOfInterest.cop30Village')}
+            </span>
+          </div>
+
+          <div
+            className="flex flex-col items-center cursor-pointer group"
+            onClick={() => navigateToMapa({ qualificacao: "Usinas da Paz - COP 30" })}
+          >
+            <div className="w-16 h-16 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-2 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+              <Home className="h-6 w-6 text-white" />
+            </div>
+            <span className="text-xs text-center font-medium leading-tight">
+              {t('pointsOfInterest.peacePlants')}
+            </span>
+          </div>
+
+          <div
+            className="flex flex-col items-center cursor-pointer group"
+            onClick={() => navigateToMapa({ qualificacao: "Unidades de Pronto Atendimento - COP 30" })}
+          >
+            <div className="w-16 h-16 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-2 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+              <Ambulance className="h-6 w-6 text-white" />
+            </div>
+            <span className="text-xs text-center font-medium leading-tight">
+              {t('pointsOfInterest.upa')}
+            </span>
+          </div>
+
+          <div
+            className="flex flex-col items-center cursor-pointer group"
+            onClick={() => navigateToMapa({ qualificacao: "Centros de Atenção Psicossocial - COP 30" })}
+          >
+            <div className="w-16 h-16 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-2 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+              <Heart className="h-6 w-6 text-white" />
+            </div>
+            <span className="text-xs text-center font-medium leading-tight">
+              {t('pointsOfInterest.caps')}
+            </span>
+          </div>
+
+          <div
+            className="flex flex-col items-center cursor-pointer group"
+            onClick={() => navigateToMapa({ qualificacao: "Alojamentos - COP 30" })}
+          >
+            <div className="w-16 h-16 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-2 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+              <BedDouble className="h-6 w-6 text-white" />
+            </div>
+            <span className="text-xs text-center font-medium leading-tight">
+              {t('pointsOfInterest.accommodations')}
+            </span>
+          </div>
+
+          <div
+            className="flex flex-col items-center cursor-pointer group"
+            onClick={() => navigateToMapa({ qualificacao: "Vacinação - COP 30" })}
+          >
+            <div className="w-16 h-16 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-2 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+              <Syringe className="h-6 w-6 text-white" />
+            </div>
+            <span className="text-xs text-center font-medium leading-tight">
+              {t('pointsOfInterest.vaccination')}
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -83,24 +122,102 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
     <section className="py-12 bg-gray-50">
       <div className="container mx-auto px-6">
         <h2 className="text-2xl font-bold text-center text-gray-800 mb-8">{t('localize.title')}</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-          {pontosDeInteresse.map((ponto, index) => (
-            <div
-              key={index}
-              className="flex flex-col items-center cursor-pointer"
-              onClick={() => navigateToMapa({ tipo: ponto.tipo })}
-            >
-              <div className="w-20 h-20 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-3 hover:bg-[#4D6FFF] transition-colors">
-                {ponto.icone}
-              </div>
-              <span className="font-medium">
-                {t(`points.${ponto.nome}`)}
-              </span>
-              <p className="text-sm text-center text-gray-500 mt-1">
-                {t(`points.${ponto.nome}.desc`)}
-              </p>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-6">
+          <div
+            className="flex flex-col items-center cursor-pointer group"
+            onClick={() => navigateToMapa({ qualificacao: "Postos de atendimento - COP 30" })}
+          >
+            <div className="w-20 h-20 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-3 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+              <MapPin className="h-8 w-8 text-white" />
             </div>
-          ))}
+            <span className="text-sm font-medium text-center leading-tight">
+              {t('pointsOfInterest.servicePoints')}
+            </span>
+          </div>
+
+          <div
+            className="flex flex-col items-center cursor-pointer group"
+            onClick={() => navigateToMapa({ qualificacao: "Postos fixos de atendimento - Cúpula dos povos - COP 30" })}
+          >
+            <div className="w-20 h-20 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-3 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+              <Users className="h-8 w-8 text-white" />
+            </div>
+            <span className="text-sm font-medium text-center leading-tight">
+              {t('pointsOfInterest.peoplesSummit')}
+            </span>
+          </div>
+
+          <div
+            className="flex flex-col items-center cursor-pointer group"
+            onClick={() => navigateToMapa({ qualificacao: "Posto fixo de atendimento - Aldeia COP 30" })}
+          >
+            <div className="w-20 h-20 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-3 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+              <Tent className="h-8 w-8 text-white" />
+            </div>
+            <span className="text-sm font-medium text-center leading-tight">
+              {t('pointsOfInterest.cop30Village')}
+            </span>
+          </div>
+
+          <div
+            className="flex flex-col items-center cursor-pointer group"
+            onClick={() => navigateToMapa({ qualificacao: "Usinas da Paz - COP 30" })}
+          >
+            <div className="w-20 h-20 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-3 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+              <Home className="h-8 w-8 text-white" />
+            </div>
+            <span className="text-sm font-medium text-center leading-tight">
+              {t('pointsOfInterest.peacePlants')}
+            </span>
+          </div>
+
+          <div
+            className="flex flex-col items-center cursor-pointer group"
+            onClick={() => navigateToMapa({ qualificacao: "Unidades de Pronto Atendimento - COP 30" })}
+          >
+            <div className="w-20 h-20 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-3 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+              <Ambulance className="h-8 w-8 text-white" />
+            </div>
+            <span className="text-sm font-medium text-center leading-tight">
+              {t('pointsOfInterest.upa')}
+            </span>
+          </div>
+
+          <div
+            className="flex flex-col items-center cursor-pointer group"
+            onClick={() => navigateToMapa({ qualificacao: "Centros de Atenção Psicossocial - COP 30" })}
+          >
+            <div className="w-20 h-20 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-3 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+              <Heart className="h-8 w-8 text-white" />
+            </div>
+            <span className="text-sm font-medium text-center leading-tight">
+              {t('pointsOfInterest.caps')}
+            </span>
+          </div>
+
+          <div
+            className="flex flex-col items-center cursor-pointer group"
+            onClick={() => navigateToMapa({ qualificacao: "Alojamentos - COP 30" })}
+          >
+            <div className="w-20 h-20 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-3 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+              <BedDouble className="h-8 w-8 text-white" />
+            </div>
+            <span className="text-sm font-medium text-center leading-tight">
+              {t('pointsOfInterest.accommodations')}
+            </span>
+          </div>
+
+          <div
+            className="flex flex-col items-center cursor-pointer group"
+            onClick={() => navigateToMapa({ qualificacao: "Vacinação - COP 30" })}
+          >
+            <div className="w-20 h-20 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-3 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+              <Syringe className="h-8 w-8 text-white" />
+            </div>
+            <span className="text-sm font-medium text-center leading-tight">
+              {t('pointsOfInterest.vaccination')}
+            </span>
+          </div>
         </div>
       </div>
     </section>

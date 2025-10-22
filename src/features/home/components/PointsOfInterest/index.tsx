@@ -4,12 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTranslation } from '@/i18n/useTranslations';
 import { 
- Syringe, 
- Utensils, 
- Trees, 
- Building, 
- BriefcaseMedical, 
- Hospital 
+ MapPin,
+ Users,
+ Tent,
+ Home,
+ Ambulance,
+ Heart,
+ BedDouble,
+ Syringe
 } from 'lucide-react';
 
 export const PointsOfInterest: React.FC = () => {
@@ -17,63 +19,108 @@ export const PointsOfInterest: React.FC = () => {
  const { selectedLanguage } = useLanguage();
  const { t } = useTranslation(selectedLanguage);
 
- const pontosPrincipais = [
-   {
-     nome: "vaccination",
-     icone: <Syringe className="h-8 w-8 text-white" />,
-     link: "/mapa?tipo=vacinacao",
-   },
-   {
-     nome: "food",
-     icone: <Utensils className="h-8 w-8 text-white" />,
-     link: "/mapa?tipo=alimentacao",
-   },
-   {
-     nome: "parks",
-     icone: <Trees className="h-8 w-8 text-white" />,
-     link: "/mapa?tipo=lazer",
-   },
-   {
-     nome: "cultural",
-     icone: <Building className="h-8 w-8 text-white" />,
-     link: "/mapa?tipo=cultura",
-   },
-   {
-     nome: "health",
-     icone: <BriefcaseMedical className="h-8 w-8 text-white" />,
-     link: "/mapa?tipo=saude",
-   },
-   {
-     nome: "hospitals",
-     icone: <Hospital className="h-8 w-8 text-white" />,
-     link: "/mapa?tipo=hospitais",
-   },
- ] as const;
-
  return (
    <div className="px-4 mb-6">
      <h2 className="text-lg font-semibold mb-4 text-center">
        {t('section.locate')}
      </h2>
      
-     <div className="grid grid-cols-3 gap-4">
-       {pontosPrincipais.map((ponto, index) => (
-         <div
-           key={index}
-           className="flex flex-col items-center cursor-pointer"
-           onClick={() => navigate(ponto.link)}
-         >
-           <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center mb-2 hover:bg-blue-700 transition-colors">
-             {ponto.icone}
-           </div>
-           <span className="text-xs text-center font-medium">
-             {t(`points.${ponto.nome}`)}
-           </span>
-           <p className="text-xs text-center text-gray-500 mt-1">
-             {t(`points.${ponto.nome}.desc`)}
-           </p>
+     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-6">
+       <div
+         className="flex flex-col items-center cursor-pointer group"
+         onClick={() => navigate("/mapa?qualificacao=Postos de atendimento - COP 30")}
+       >
+         <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-blue-600 flex items-center justify-center mb-2 group-hover:bg-blue-700 group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+           <MapPin className="h-8 w-8 text-white" />
          </div>
-       ))}
+         <span className="text-xs md:text-sm text-center font-medium leading-tight">
+           {t('pointsOfInterest.servicePoints')}
+         </span>
+       </div>
+
+       <div
+         className="flex flex-col items-center cursor-pointer group"
+         onClick={() => navigate("/mapa?qualificacao=Cúpula dos povos - COP 30")}
+       >
+         <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-blue-600 flex items-center justify-center mb-2 group-hover:bg-blue-700 group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+           <Users className="h-8 w-8 text-white" />
+         </div>
+         <span className="text-xs md:text-sm text-center font-medium leading-tight">
+           {t('pointsOfInterest.peoplesSummit')}
+         </span>
+       </div>
+
+       <div
+         className="flex flex-col items-center cursor-pointer group"
+         onClick={() => navigate("/mapa?qualificacao=Posto fixo de atendimento - Aldeia COP 30")}
+       >
+         <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-blue-600 flex items-center justify-center mb-2 group-hover:bg-blue-700 group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+           <Tent className="h-8 w-8 text-white" />
+         </div>
+         <span className="text-xs md:text-sm text-center font-medium leading-tight">
+           {t('pointsOfInterest.cop30Village')}
+         </span>
+       </div>
+
+       <div
+         className="flex flex-col items-center cursor-pointer group"
+         onClick={() => navigate("/mapa?qualificacao=Usinas da Paz - COP 30")}
+       >
+         <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-blue-600 flex items-center justify-center mb-2 group-hover:bg-blue-700 group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+           <Home className="h-8 w-8 text-white" />
+         </div>
+         <span className="text-xs md:text-sm text-center font-medium leading-tight">
+           {t('pointsOfInterest.peacePlants')}
+         </span>
+       </div>
+
+       <div
+         className="flex flex-col items-center cursor-pointer group"
+         onClick={() => navigate("/mapa?qualificacao=Unidades de Pronto Atendimento - COP 30")}
+       >
+         <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-blue-600 flex items-center justify-center mb-2 group-hover:bg-blue-700 group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+           <Ambulance className="h-8 w-8 text-white" />
+         </div>
+         <span className="text-xs md:text-sm text-center font-medium leading-tight">
+           {t('pointsOfInterest.upa')}
+         </span>
+       </div>
+
+       <div
+         className="flex flex-col items-center cursor-pointer group"
+         onClick={() => navigate("/mapa?qualificacao=Centros de Atenção Psicossocial - COP 30")}
+       >
+         <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-blue-600 flex items-center justify-center mb-2 group-hover:bg-blue-700 group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+           <Heart className="h-8 w-8 text-white" />
+         </div>
+         <span className="text-xs md:text-sm text-center font-medium leading-tight">
+           {t('pointsOfInterest.caps')}
+         </span>
+       </div>
+
+       <div
+         className="flex flex-col items-center cursor-pointer group"
+         onClick={() => navigate("/mapa?qualificacao=Alojamentos - COP 30")}
+       >
+         <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-blue-600 flex items-center justify-center mb-2 group-hover:bg-blue-700 group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+           <BedDouble className="h-8 w-8 text-white" />
+         </div>
+         <span className="text-xs md:text-sm text-center font-medium leading-tight">
+           {t('pointsOfInterest.accommodations')}
+         </span>
+       </div>
+
+       <div
+         className="flex flex-col items-center cursor-pointer group"
+         onClick={() => navigate("/mapa?qualificacao=Vacinação - COP 30")}
+       >
+         <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-blue-600 flex items-center justify-center mb-2 group-hover:bg-blue-700 group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+           <Syringe className="h-8 w-8 text-white" />
+         </div>
+         <span className="text-xs md:text-sm text-center font-medium leading-tight">
+           {t('pointsOfInterest.vaccination')}
+         </span>
+       </div>
      </div>
    </div>
  );
