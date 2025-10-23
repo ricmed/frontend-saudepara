@@ -42,29 +42,5 @@ export const languages: LanguageOption[] = [
     name: "Русский",
     fullName: "Русский (Russian)",
     flag: "https://flagcdn.com/ru.svg",
-  },
-  {
-    code: "de",
-    name: "Deutsch",
-    fullName: "Deutsch (German)",
-    flag: "https://flagcdn.com/de.svg",
-  },
-  {
-    code: "ja",
-    name: "日本語",
-    fullName: "日本語 (Japanese)",
-    flag: "https://flagcdn.com/jp.svg",
-  },
-  {
-    code: "ko",
-    name: "한국어",
-    fullName: "한국어 (Korean)",
-    flag: "https://flagcdn.com/kr.svg",
-  },
-  {
-    code: "it",
-    name: "Italiano",
-    fullName: "Italiano (Italian)",
-    flag: "https://flagcdn.com/it.svg",
   }
 ];

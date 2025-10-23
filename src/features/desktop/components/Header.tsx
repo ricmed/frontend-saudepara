@@ -122,7 +122,7 @@ export const Header: React.FC<HeaderProps> = ({
               {t("nav.home")}
             </a>
             <a
-              href="/mapa"
+              href="/unidades"
               className="text-white font-medium hover:text-blue-100 transition-colors py-2 px-3 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
             >
               {t("menu.locations")}
@@ -181,7 +181,7 @@ export const Header: React.FC<HeaderProps> = ({
               {t("nav.home")}
             </a>
             <a
-              href="/mapa"
+              href="/unidades"
               className="text-white font-medium hover:text-blue-100 transition-colors py-2 px-3 rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
             >
               {t("menu.locations")}

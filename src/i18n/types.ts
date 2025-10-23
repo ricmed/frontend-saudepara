@@ -1,5 +1,5 @@
 // types.ts
-export type Language = "pt-BR" | "en" | "es" | "zh" | "fr" | "ar" | "ru" | "de" | "ja" | "ko" | "it";
+export type Language = "pt-BR" | "en" | "es" | "zh" | "fr" | "ar" | "ru";
 
 // Basic Translation Types
 export interface CampaignTranslation {
@@ -35,8 +35,6 @@ export type TranslationRecord = {
   'menu.faq': string;
   'menu.servicos': string;
   'menu.materials': string;
-  'menu.reportCase': string;
-  'menu.reportCaseDesc': string;
   
   // Localize Aqui
   'localize.title': string;
@@ -203,48 +201,6 @@ export type TranslationRecord = {
   // Other pages
   'campaigns.title': string;
   'campaigns.description': string;
-  
-  // Login Page
-  'login.title': string;
-  'login.subtitle': string;
-  'login.username.placeholder': string;
-  'login.password.placeholder': string;
-  'login.rememberMe': string;
-  'login.forgotPassword': string;
-  'login.button': string;
-  'login.verifying': string;
-  'login.error.invalid': string;
-  
-  // Access Denied
-  'accessDenied.title': string;
-  'accessDenied.message': string;
-  'accessDenied.button': string;
-  
-  // Points of Interest - Home Page
-  'pointsOfInterest.servicePoints': string;
-  'pointsOfInterest.peoplesSummit': string;
-  'pointsOfInterest.cop30Village': string;
-  'pointsOfInterest.peacePlants': string;
-  'pointsOfInterest.upa': string;
-  'pointsOfInterest.caps': string;
-  'pointsOfInterest.accommodations': string;
-  'pointsOfInterest.vaccination': string;
-  
-  // Campaign Descriptions
-  'campaignDescriptions.yellowSeptember': string;
-  'campaignDescriptions.greenSeptember': string;
-  'campaignDescriptions.goldenAugust': string;
-  'campaignDescriptions.purpleJanuary': string;
-  'campaignDescriptions.redDecember': string;
-  'campaignDescriptions.blueNovember': string;
-  
-  // Campaign Titles
-  'campaignTitles.yellowSeptember': string;
-  'campaignTitles.greenSeptember': string;
-  'campaignTitles.goldenAugust': string;
-  'campaignTitles.purpleJanuary': string;
-  'campaignTitles.redDecember': string;
-  'campaignTitles.blueNovember': string;
 }
 
 // Final Translation Type

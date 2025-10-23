@@ -84,9 +84,9 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
             <div className="mb-3">
               {notificationButton.icon}
             </div>
-            <span className="text-lg font-semibold mb-1">{t('menu.reportCase')}</span>
+            <span className="text-lg font-semibold mb-1">Comunicar Caso</span>
             <span className="text-xs text-blue-100 text-center">
-              {t('menu.reportCaseDesc')}
+              Registre um novo caso rapidamente
             </span>
           </div>
         </div>

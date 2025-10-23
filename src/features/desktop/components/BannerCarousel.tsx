@@ -28,42 +28,42 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
   const carouselRef = useRef<HTMLDivElement>(null);
   const { t } = useTranslation(selectedLanguage || 'pt-BR');
   
-  // Dados padrão de campanhas com traduções
+  // Dados padrão de campanhas
   const defaultCampanhas: CampanhaItem[] = [
     {
       imagem: "./images/campaigns/Setembro Amarelo.jpg",
-      titulo: t('campaignTitles.yellowSeptember'),
-      descricao: t('campaignDescriptions.yellowSeptember'),
+      titulo: "Campanha Setembro Amarelo 2025",
+      descricao: "Conscientização sobre prevenção do suicídio e valorização da saúde mental",
       link: "/setembro-amarelo"
     },
     {
       imagem: "./images/campaigns/Setembro Verde.jpg",
-      titulo: t('campaignTitles.greenSeptember'),
-      descricao: t('campaignDescriptions.greenSeptember'),
+      titulo: "Campanha Setembro Verde 2025",
+      descricao: "Conscientização sobre a doação de órgãos e tecidos",
       link: "/setembro-verde"
     },
     {
       imagem: "./images/campaigns/Agosto Dourado – Aleitamento Materno.jpg",
-      titulo: t('campaignTitles.goldenAugust'),
-      descricao: t('campaignDescriptions.goldenAugust'),
+      titulo: "Campanha Agosto Dourado 2025",
+      descricao: "Campanha de incentivo ao Aleitamento Materno",
       link: "/agosto-dourado"
     },
     {
       imagem: "./images/campaigns/Janeiro Roxo.jpg",
-      titulo: t('campaignTitles.purpleJanuary'),
-      descricao: t('campaignDescriptions.purpleJanuary'),
+      titulo: "Campanha Janeiro Roxo 2025",
+      descricao: "Campanha de conscientização sobre a Hanseníase",
       link: "/janeiro-roxo"
     },
     {
       imagem: "./images/campaigns/Dezembro Vermelho.png",
-      titulo: t('campaignTitles.redDecember'),
-      descricao: t('campaignDescriptions.redDecember'),
+      titulo: "Campanha Dezembro Vermelho 2024",
+      descricao: "Conscientização e combate ao HIV/AIDS em todo o Pará",
       link: "/campanha-dezembro-vermelho"
     },
     {
       imagem: "./images/campaigns/Novembro Azul.png",
-      titulo: t('campaignTitles.blueNovember'),
-      descricao: t('campaignDescriptions.blueNovember'),
+      titulo: "Novembro Azul",
+      descricao: "Conscientização sobre a saúde do homem e prevenção ao câncer de próstata",
       link: "/campanha-novembro-azul"
     }
   ];
