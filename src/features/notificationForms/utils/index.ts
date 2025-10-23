@@ -143,6 +143,11 @@ export const getValueForSorting = (notificacao: Notificacao, sortKey: keyof Noti
     return notificacao.tipoAtendimento || "";
   } else if (sortKey === "tipo_encerramento") {
     return notificacao.tipoEncerramento || "";
+  } else if (sortKey === "unidade_notificadora") {
+    // 🆕 Ordenar por nome do estabelecimento notificador
+    return notificacao.original
+      ?.estabelecimento_notificacao_estabelecimento_idestabelecimentoToestabelecimento
+      ?.nome || "";
   } else if (sortKey === "created_at") {
     // 🆕 USAR DATA REAL: Se foi criado offline, usar timestamp do offline_id
     const original = notificacao.original;
