@@ -6,13 +6,12 @@ import { LanguageSelector } from "@/components/LanguageSelector";
 import { useAuth } from '@/keycloak/AuthProvider';
 import useUserPermissions from '@/hooks/useUserPermissions';
 import UserProfileHeader from "@/keycloak/components/UserProfileHeader";
-import ChatSuporteModal from '@/features/chat/components/ChatSuporteModal';
-import { useChatSuporte } from '@/features/chat/hooks/useChatSuporte';
 import {
   FileText,
   ChartSpline,
   BookType,
   Award,
+  Lock,
   Network,
   AlertTriangle,
   LogOut,
@@ -52,9 +51,6 @@ export const SideMenu: React.FC<SideMenuProps> = ({
   const { user } = useAuth();
   const permissions = useUserPermissions();
   const [showAppsSubmenu, setShowAppsSubmenu] = useState(false);
-  
-  // ✅ NOVO: Chat de suporte
-  const { isOpen: isChatOpen, abrirChat, fecharChat, mensagensNaoLidas } = useChatSuporte();
 
   // Função para verificar se o usuário é admin (incluindo admins hierárquicos)
   const isAdmin = () => {
@@ -66,12 +62,6 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       role === 'admin.municipio' || 
       role === 'admin.estado'
     );
-  };
-
-  // Função para verificar se é APENAS admin master (não hierárquico)
-  const isAdminMaster = () => {
-    if (!user) return false;
-    return user.roles?.includes('admin');
   };
 
   // List of auxiliary apps - FILTRADOS POR NÍVEL DE PERMISSÃO
@@ -245,28 +235,21 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     }] : []),
     
     {
+      icon: <Lock />,
+      label: t("menu.security"),
+      onClick: () => {},
+    },
+    
+    {
       icon: <Network />,
       label: t("menu.version"),
-      onClick: () => {
-        navigate("/versao");
-        onClose();
-      },
+      onClick: () => {},
     },
     
     {
       icon: <AlertTriangle />,
       label: t("menu.bug"),
-      onClick: () => {
-        // ✅ APENAS Admin master vai para dashboard, todos os outros (incluindo admins hierárquicos) abrem o chat
-        if (isAdminMaster()) {
-          navigate("/admin/chat-suporte");
-          onClose();
-        } else {
-          abrirChat();
-          onClose(); // Fechar menu lateral
-        }
-      },
-      badge: mensagensNaoLidas > 0 ? mensagensNaoLidas : undefined, // ✅ Badge com contador
+      onClick: () => {},
     },
     
     // Menu de Gerenciar Usuários - apenas para admins logados
@@ -335,7 +318,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                 }}
               >
                 <div
-                  className="flex items-center gap-3 text-white py-3 px-2 hover:bg-blue-800 rounded-lg cursor-pointer relative"
+                  className="flex items-center gap-3 text-white py-3 px-2 hover:bg-blue-800 rounded-lg cursor-pointer"
                   onClick={() => {
                     if (item.submenu) {
                       navigate("/private/apps-auxiliares");
@@ -346,16 +329,8 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                   }}
                 >
                   <span className="text-white">{item.icon}</span>
-                  <span className="text-sm flex-1">{item.label}</span>
-                  
-                  {/* ✅ NOVO: Badge para notificações */}
-                  {(item as any).badge && (
-                    <span className="bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center">
-                      {(item as any).badge}
-                    </span>
-                  )}
-                  
-                  {item.submenu && <ChevronRight className="h-4 w-4 text-white" />}
+                  <span className="text-sm">{item.label}</span>
+                  <ChevronRight className="h-4 w-4 text-white ml-auto" />
                 </div>
 
                 {/* Apps Submenu */}
@@ -403,14 +378,6 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       {/* Overlay */}
       {isOpen && (
         <div className="fixed inset-0 bg-black/50 z-[1050]" onClick={onClose} />
-      )}
-      
-      {/* ✅ Modal de Chat de Suporte - Para todos EXCETO admin master */}
-      {user && !isAdminMaster() && (
-        <ChatSuporteModal 
-          isOpen={isChatOpen} 
-          onClose={fecharChat} 
-        />
       )}
     </>
   );
