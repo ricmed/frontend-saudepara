@@ -3,6 +3,7 @@ import { PainelLateral } from "./components/PainelLateral";
 import { MapaContainer } from "./components/MapaContainer";
 import { BotoesControle } from "./components/BotoesControle";
 import { MapProviderOverlay } from "./components/MapProviderOverlay";
+import { LegendaQualificacoes } from "./components/LegendaQualificacoes";
 import { useGeolocation } from "./hooks/useGeolocation";
 import { useEstabelecimentos, useEstabelecimentosFiltrados } from "./hooks/useEstabelecimentos";
 import { useRouting } from "./hooks/useRouting";
@@ -58,7 +59,8 @@ const MapaLeaflet: React.FC = () => {
   const filteredPlaces = useEstabelecimentosFiltrados(
     allPlaces,
     tipoEstabelecimentoSelecionado,
-    naturezaSelecionada
+    naturezaSelecionada,
+    qualificacaoSelecionada
   );
 
   // Hook de Roteamento
@@ -548,6 +550,11 @@ const MapaLeaflet: React.FC = () => {
 
             {/* Overlay para seleção de servidor de mapa */}
             <MapProviderOverlay />
+
+            {/* Legenda de qualificações - canto inferior esquerdo */}
+            <div className="absolute bottom-24 left-4 z-[400] hidden md:block">
+              <LegendaQualificacoes />
+            </div>
 
             {/* Botões de controle */}
             <BotoesControle
