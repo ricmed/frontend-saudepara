@@ -89,70 +89,11 @@ const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 dias
 export class IndexedDBService {
   private db: IDBPDatabase<NotificacaoDatabase> | null = null;
 
-  /**
-   * 🆕 Verifica e limpa versões antigas do IndexedDB
-   * Se detectar versão < 5, deleta o banco inteiro para garantir estrutura limpa
-   */
-  private async checkAndCleanOldVersions(): Promise<void> {
-    try {
-      // Tentar abrir o banco sem especificar versão para ver qual versão existe
-      const request = indexedDB.open(DB_NAME);
-      
-      return new Promise((resolve, reject) => {
-        request.onsuccess = (event) => {
-          const db = (event.target as IDBOpenDBRequest).result;
-          const currentVersion = db.version;
-          db.close();
-          
-          console.log(`📊 Versão atual do IndexedDB: ${currentVersion}`);
-          
-          // Se versão antiga detectada, deletar banco
-          if (currentVersion < DB_VERSION) {
-            console.warn(`⚠️ Versão antiga detectada (v${currentVersion}). Limpando banco para v${DB_VERSION}...`);
-            
-            const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
-            
-            deleteRequest.onsuccess = () => {
-              console.log('✅ Banco de dados antigo deletado com sucesso!');
-              console.log('🔄 Nova versão será criada na próxima inicialização...');
-              resolve();
-            };
-            
-            deleteRequest.onerror = (err) => {
-              console.error('❌ Erro ao deletar banco antigo:', err);
-              reject(err);
-            };
-            
-            deleteRequest.onblocked = () => {
-              console.warn('⚠️ Deleção bloqueada. Feche todas as abas e tente novamente.');
-              // Continua mesmo bloqueado - upgrade tentará migrar
-              resolve();
-            };
-          } else {
-            console.log('✅ Versão do banco está atualizada');
-            resolve();
-          }
-        };
-        
-        request.onerror = () => {
-          console.log('ℹ️ Banco não existe ainda, será criado na v5');
-          resolve(); // Não é erro, apenas não existe
-        };
-      });
-    } catch (error) {
-      console.error('❌ Erro ao verificar versão do banco:', error);
-      // Não bloqueia inicialização
-    }
-  }
-
   async init(): Promise<void> {
     if (this.db) return;
 
     try {
       console.log(`🔧 Inicializando IndexedDB: ${DB_NAME} v${DB_VERSION}`);
-      
-      // 🆕 VERIFICAR E LIMPAR VERSÕES ANTIGAS
-      await this.checkAndCleanOldVersions();
       
       this.db = await openDB<NotificacaoDatabase>(DB_NAME, DB_VERSION, {
         upgrade(db, oldVersion, newVersion) {
