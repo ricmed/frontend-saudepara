@@ -33,8 +33,17 @@ const OfflineModeToggle: React.FC = () => {
     setIsToggling(true);
     
     try {
-      const wasOnline = await syncService.toggleOfflineMode();
-      setIsOfflineForced(!wasOnline);
+      // Verificar estado ANTES de alternar
+      const wasOffline = syncService.isOfflineModeActive();
+      
+      // Alternar o modo (ele faz a inversão internamente)
+      await syncService.toggleOfflineMode();
+      
+      // Verificar estado DEPOIS de alternar (para garantir sincronização)
+      const nowOffline = syncService.isOfflineModeActive();
+      setIsOfflineForced(nowOffline);
+      
+      console.log(`🔄 Toggle: ${wasOffline ? 'OFFLINE' : 'ONLINE'} → ${nowOffline ? 'OFFLINE' : 'ONLINE'}`);
     } catch (error) {
       console.error('Erro ao alternar modo offline:', error);
     } finally {

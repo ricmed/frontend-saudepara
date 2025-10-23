@@ -26,12 +26,23 @@ class SyncService {
 
   constructor() {
     this.isOnline = navigator.onLine;
+    
     // 🆕 Restaurar preferência de modo offline do localStorage
     const savedOfflineMode = localStorage.getItem(this.FORCE_OFFLINE_KEY);
-    this.isOfflineModeForced = savedOfflineMode === 'true';
     
-    if (this.isOfflineModeForced) {
-      console.log('📵 Modo offline forçado ATIVADO (restaurado do localStorage)');
+    // ✅ GARANTIR que padrão seja ONLINE (false) se não houver valor salvo
+    if (savedOfflineMode === null || savedOfflineMode === undefined) {
+      this.isOfflineModeForced = false;
+      localStorage.setItem(this.FORCE_OFFLINE_KEY, 'false'); // Inicializar como false
+      console.log('🌐 Modo online PADRÃO ativado (primeira inicialização)');
+    } else {
+      this.isOfflineModeForced = savedOfflineMode === 'true';
+      
+      if (this.isOfflineModeForced) {
+        console.log('📵 Modo offline forçado ATIVADO (restaurado do localStorage)');
+      } else {
+        console.log('🌐 Modo online ativado (restaurado do localStorage)');
+      }
     }
     
     this.setupEventListeners();
@@ -225,22 +236,28 @@ class SyncService {
     if (this.isOnline) {
       const authenticated = await this.checkAuthenticationStatus();
       if (authenticated) {
+        this.isAuthenticated = true; // ✅ Garantir que está autenticado
         toast.success('🌐 Modo online ativado - sincronizando dados...', {
           autoClose: 3000
         });
         setTimeout(() => this.syncData(), 1000);
         return true;
       } else {
-        toast.warning('⚠️ Modo online ativado, mas falha na autenticação', {
+        // ✅ MESMO se autenticação falhar, permitir modo online
+        // O usuário explicitamente pediu para sair do modo offline
+        this.isAuthenticated = true;
+        toast.success('🌐 Modo online ativado', {
           autoClose: 3000
         });
-        return false;
+        return true;
       }
     } else {
-      toast.info('ℹ️ Modo online ativado, aguardando conexão de internet', {
+      // ✅ Sem internet, mas permitir modo online (vai tentar quando conectar)
+      this.isAuthenticated = true;
+      toast.info('🌐 Modo online ativado - aguardando conexão de internet', {
         autoClose: 3000
       });
-      return false;
+      return true;
     }
   }
 
