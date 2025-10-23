@@ -18,7 +18,7 @@ export const QUALIFICACOES_COP30: QualificacaoCOP30Config[] = [
     textColor: "#FFFFFF"
   },
   {
-    nome: "Alojamentos - Cúpula dos Povos - COP 30",
+    nome: "Postos fixos de atendimento - Cúpula dos povos - COP 30",
     letra: "CP",
     cor: "#228B22",      // Verde floresta (mais forte)
     textColor: "#FFFFFF"
@@ -46,6 +46,12 @@ export const QUALIFICACOES_COP30: QualificacaoCOP30Config[] = [
     letra: "CAPS",
     cor: "#FCBAD3",      // Rosa claro
     textColor: "#000000"
+  },
+  {
+    nome: "Alojamentos - COP 30",
+    letra: "ALO",
+    cor: "#8B4513",      // Marrom saddle brown
+    textColor: "#FFFFFF"
   },
   {
     nome: "Vacinação - COP 30",

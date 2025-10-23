@@ -25,7 +25,7 @@ export const PointsOfInterest: React.FC = () => {
        {t('section.locate')}
      </h2>
      
-     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4 md:gap-6 max-w-6xl mx-auto">
+     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-6">
        <div
          className="flex flex-col items-center cursor-pointer group"
          onClick={() => navigate("/mapa?qualificacao=Postos de atendimento - COP 30")}
@@ -40,7 +40,7 @@ export const PointsOfInterest: React.FC = () => {
 
        <div
          className="flex flex-col items-center cursor-pointer group"
-         onClick={() => navigate("/mapa?qualificacao=Alojamentos - Cúpula dos Povos - COP 30")}
+         onClick={() => navigate("/mapa?qualificacao=Cúpula dos povos - COP 30")}
        >
          <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-blue-600 flex items-center justify-center mb-2 group-hover:bg-blue-700 group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
            <Users className="h-8 w-8 text-white" />
@@ -95,6 +95,18 @@ export const PointsOfInterest: React.FC = () => {
          </div>
          <span className="text-xs md:text-sm text-center font-medium leading-tight">
            {t('pointsOfInterest.caps')}
+         </span>
+       </div>
+
+       <div
+         className="flex flex-col items-center cursor-pointer group"
+         onClick={() => navigate("/mapa?qualificacao=Alojamentos - COP 30")}
+       >
+         <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-blue-600 flex items-center justify-center mb-2 group-hover:bg-blue-700 group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+           <BedDouble className="h-8 w-8 text-white" />
+         </div>
+         <span className="text-xs md:text-sm text-center font-medium leading-tight">
+           {t('pointsOfInterest.accommodations')}
          </span>
        </div>
 
