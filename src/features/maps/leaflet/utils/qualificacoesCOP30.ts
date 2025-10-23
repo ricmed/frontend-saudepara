@@ -19,8 +19,8 @@ export const QUALIFICACOES_COP30: QualificacaoCOP30Config[] = [
   },
   {
     nome: "Postos fixos de atendimento - Cúpula dos povos - COP 30",
-    letra: "PF",
-    cor: "#4ECDC4",      // Turquesa
+    letra: "CP",
+    cor: "#228B22",      // Verde floresta (mais forte)
     textColor: "#FFFFFF"
   },
   {
