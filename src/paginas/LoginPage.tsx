@@ -6,6 +6,7 @@ import { Header } from '../features/desktop/components/Header';
 import Footer from '@/features/desktop/components/Footer';
 import { SideMenu } from '@/features/home/components/SideMenu';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTranslation } from '@/i18n/useTranslations';
 
 const LoginPage = () => {
   const [username, setUsername] = useState('');
@@ -14,8 +15,9 @@ const LoginPage = () => {
   const { user, login, loading, retryMessage } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { selectedLanguage, setSelectedLanguage } = useLanguage();
+  const { selectedLanguage } = useLanguage();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { t } = useTranslation(selectedLanguage);
 
   // Se já estiver logado, redireciona
   useEffect(() => {
@@ -33,7 +35,7 @@ const LoginPage = () => {
       await login(username, password);
       // O useEffect acima vai redirecionar quando user for atualizado
     } catch (err) {
-      setError('Usuário ou senha inválidos');
+      setError(t('login.error.invalid'));
     }
   };
 
@@ -47,7 +49,7 @@ const LoginPage = () => {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Verificando autenticação...</p>
+          <p className="mt-4 text-gray-600">{t('login.verifying')}</p>
         </div>
       </div>
     );
@@ -64,9 +66,9 @@ const LoginPage = () => {
       <main className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-lg mx-4 sm:mx-auto">
           <div className="text-center">
-            <h2 className="mt-6 text-3xl font-bold text-blue-600">Login</h2>
+            <h2 className="mt-6 text-3xl font-bold text-blue-600">{t('login.title')}</h2>
             <p className="mt-2 text-sm text-gray-600">
-              Entre com suas credenciais para acessar
+              {t('login.subtitle')}
             </p>
           </div>
           
@@ -92,7 +94,7 @@ const LoginPage = () => {
                   type="text"
                   required
                   className="appearance-none rounded-t-md relative block w-full px-10 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-600 focus:border-blue-600 focus:z-10"
-                  placeholder="Usuário"
+                  placeholder={t('login.username.placeholder')}
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                 />
@@ -105,7 +107,7 @@ const LoginPage = () => {
                   type="password"
                   required
                   className="appearance-none rounded-b-md relative block w-full px-10 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-600 focus:border-blue-600 focus:z-10"
-                  placeholder="Senha"
+                  placeholder={t('login.password.placeholder')}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
@@ -121,13 +123,13 @@ const LoginPage = () => {
                   className="h-4 w-4 text-blue-600 focus:ring-blue-600 border-gray-300 rounded"
                 />
                 <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
-                  Lembrar-me
+                  {t('login.rememberMe')}
                 </label>
               </div>
 
               <div className="text-sm">
                 <a href="#" className="font-medium text-blue-600 hover:text-blue-700">
-                  Esqueceu a senha?
+                  {t('login.forgotPassword')}
                 </a>
               </div>
             </div>
@@ -137,7 +139,7 @@ const LoginPage = () => {
                 type="submit"
                 className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 transition duration-150"
               >
-                Entrar
+                {t('login.button')}
               </button>
             </div>
           </form>

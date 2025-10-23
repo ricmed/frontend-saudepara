@@ -1,0 +1,310 @@
+// Japanese translations
+export const ja = {
+  // Header
+  "search.placeholder": "検索",
+  "header.secretaryOf": "州",
+  "header.publicHealth": "公衆衛生局",
+  
+  // Menu Grid
+  "menu.locations": "場所",
+  "menu.campaigns": "健康キャンペーン",
+  "menu.materials": "教育資料",
+  "menu.fale_conosco": "お問い合わせ",
+  "menu.emergencies": "緊急",
+  "menu.consultations": "相談",
+  "menu.exams": "検査",
+  "menu.faq": "よくある質問",
+
+  // Logout Confirmation
+  "logout.confirmation.title": "ログアウトしますか？",
+  "logout.confirmation.confirm": "はい、ログアウト",
+  "logout.confirmation.cancel": "キャンセル",
+  "logout.confirmation.message": "本当にログアウトしますか？",
+  
+  // Points Section
+  "section.locate": "ここで探す",
+  "localize.title": "ここで探す",
+  "localize.viewMap": "地図で表示",
+  "points.vaccination": "予防接種ポイント",
+  "points.vaccination.desc": "予防接種場所",
+  "points.food": "飲食エリア",
+  "points.food.desc": "食事場所",
+  "points.parks": "緑地",
+  "points.parks.desc": "公園と広場",
+  "points.cultural": "文化センター",
+  "points.cultural.desc": "博物館と劇場",
+  "points.health": "保健センター",
+  "points.health.desc": "医療ケア",
+  "points.hospitals": "基幹病院",
+  "points.hospitals.desc": "主要病院",
+  "points.hospital": "病院",
+  "points.hospital.desc": "さまざまな専門分野を備えた完全な病院ケア",
+  "points.ubs": "基礎保健ユニット",
+  "points.ubs.desc": "プライマリケアと予防サービス",
+  "points.emergency": "救急",
+  "points.emergency.desc": "24時間救急医療",
+  "points.laboratory": "検査室",
+  "points.laboratory.desc": "臨床検査",
+  
+  // Navigation
+  "nav.home": "ホーム",
+  "nav.map": "地図",
+  "nav.campaigns": "キャンペーン",
+  "nav.entrar": "ログイン",
+  
+  // Side Menu
+  "menu.home": "ホーム",
+  "menu.qualify_establishments": "施設認定",
+  "menu.notification": "症例通報モジュール",
+  "menu.notify_case": "症例を報告",
+  "menu.servicos": "サービス",
+  "menu.dashboard": "ダッシュボード",
+  "menu.reportCase": "症例を報告",
+  "menu.reportCaseDesc": "新しい症例を迅速に登録",
+  "menu.offline_management": "オフラインデータ",
+  "menu.educational": "教育資料",
+  "menu.apps": "補助アプリ",
+  "menu.security": "セキュリティ",
+  "menu.version": "バージョン",
+  "menu.bug": "バグ報告",
+  "menu.logout": "ログアウト",
+  "menu.login": "ログイン",
+  "menu.manage_users": "ユーザー管理",
+  "menu.open": "メニューを開く",
+  
+  // Language Selector
+  "language.select": "言語を選択",
+
+  // Departments
+  "department.title": "通知モジュール",
+  "department.health-surveillance": "衛生監視",
+  "department.accidents": "事故と緊急事態",
+  "department.chronic": "慢性疾患",
+  "department.mental-health": "メンタルヘルス",
+  "department.infectious": "感染症",
+  "department.zoonoses": "人獣共通感染症",
+  "department.medications": "医薬品",
+  "department.maternal": "母子保健",
+  "department.epidemiology": "疫学",
+
+  // Buttons and carousel
+  "campaigns.saibaMais": "詳細を見る",
+  "carousel.previousSlide": "前のスライド",
+  "carousel.nextSlide": "次のスライド",
+  "carousel.goToSlide": "スライド{number}へ移動",
+
+  // Red December Campaign
+  "campaigns.redDecember.title": "レッド・ディセンバー・キャンペーン",
+  "campaigns.redDecember.description1": "レッド・ディセンバーは、HIV/AIDSおよびその他の性感染症の予防に関する全国的な啓発キャンペーンです。偏見の軽減と早期診断の促進に焦点を当て、今年のキャンペーンでは、コンドーム配布や定期検査の奨励などの教育戦略と予防措置を提示します。",
+  "campaigns.redDecember.description2": "活動には、コミュニティワークショップ、学校や保健施設での情報キャンペーン、HIV診断者への無料かつ継続的な治療へのアクセスを促進するための地元NGOとのパートナーシップが含まれます。",
+  "campaigns.redDecember.description3": "活動に参加し、予防とケアに関する正しい情報を広めるのを手伝ってください。偏見との戦いは意識から始まります！",
+  "campaigns.redDecember.downloadButton": "パンフレットをダウンロード - レッド・ディセンバー",
+  
+  // Blue November Campaign
+  "campaigns.blueNovember.title": "ブルー・ノベンバー・キャンペーン2024",
+  "campaigns.blueNovember.description1": "ブルー・ノベンバー・キャンペーンは、男性の健康の自己管理と予防の重要性について男性に意識を高めることを目的とした、州男性健康調整センターの取り組みです。特に性と生殖の健康に注目しています。",
+  "campaigns.blueNovember.description2": "慢性疾患（高血圧、糖尿病、腎不全など）、運動不足、不健康な食事、不安、うつ病、アルコールとタバコの使用など、さまざまな要因が男性の性的健康に影響を与える可能性があります。したがって、充実した性生活のために健康的な習慣を維持することが重要です。",
+  "campaigns.blueNovember.description3": "キャンペーンでは、家族計画と安全な性行為の重要性も強調されています。男性は保健施設でコンドームに無料でアクセスでき、簡単で効果的な外科手術である精管切除術を含む避妊方法に関する情報を求めることができます。",
+  "campaigns.blueNovember.description4": "健康に気をつけましょう！予防検査を受け、指導を受け、必要に応じて治療を受けるためにSUSユニットを訪れてください。覚えておいてください：健康管理は生命への愛のしるしです！",
+  "campaigns.blueNovember.downloadButton1": "パンフレット1をダウンロード - ブルー・ノベンバー",
+  "campaigns.blueNovember.downloadButton2": "パンフレット2をダウンロード - ブルー・ノベンバー",
+  
+  // Green September Campaign
+  "campaigns.greenSeptember.title": "グリーン・セプテンバー・キャンペーン2025",
+  "campaigns.greenSeptember.description1": "グリーン・セプテンバー・キャンペーンは、臓器と組織の寄付の重要性についての意識を高めます。1人のドナーが、心臓、肺、肝臓、膵臓、腸、腎臓、角膜、血管、皮膚、骨、腱、靭帯を寄付することで、無数の命を救うことができます。",
+  "campaigns.greenSeptember.description2": "寄付は生体ドナー（腎臓、肝臓または肺の一部、骨髄を寄付できる）または脳死状態の故人ドナーから来ることができます。パラ州では、腎臓、肝臓、骨髄、角膜、筋骨格組織の移植が行われています。待機リストでの位置は、互換性の技術的基準と受容者の重症度によって定義されます。",
+  "campaigns.greenSeptember.description3": "このトピックについて家族と話し合い、ドナーになりたいという願いを表明してください。最終決定は常に家族によって行われるため、彼らがあなたの意志を知っていることが重要です。州移植センターから情報を求め、命を救うのを手伝ってください！",
+  "campaigns.greenSeptember.downloadButton": "パンフレットをダウンロード - グリーン・セプテンバー",
+  
+  // Yellow September Campaign
+  "campaigns.yellowSeptember.title": "イエロー・セプテンバー・キャンペーン2025",
+  "campaigns.yellowSeptember.description1": "イエロー・セプテンバーは、自殺予防とメンタルヘルスの価値に関する啓発キャンペーンです。キャンペーンは、受け入れと共感的傾聴を促進し、人々が共感を示し、精神的苦痛を経験している人の感情を検証することを奨励します。",
+  "campaigns.yellowSeptember.description2": "行動の大きな変化、社会的孤立、楽しい活動への興味の喪失、激しい絶望感と悲観主義など、精神的苦痛の兆候に注意を払うことが重要です。社会的つながりを維持し、健康的な習慣を開発し、アルコールや薬物の乱用を避けることは、幸福とメンタルヘルスを促進するための重要な措置です。",
+  "campaigns.yellowSeptember.description3": "助けが必要な場合は、それを求めてください！メンタルヘルスの専門家は、適切なサポートと治療を提供するための訓練を受けています。生命価値センター（CVV）は、電話188で無料で機密の感情的サポートを提供しています。最良の解決策を話すために188に電話してください。",
+  "campaigns.yellowSeptember.downloadButton": "パンフレットをダウンロード - イエロー・セプテンバー",
+  
+  // Malaria Zero Campaign
+  "campaigns.malariaZero.title": "マラリア・ゼロ",
+  "campaigns.malariaZero.description1": "マラリア・ゼロ・キャンペーンは、アマゾン地域でマラリアを根絶することを目指しています。処理された蚊帳を使用し、虫よけスプレーを塗布し、発熱や悪寒などの症状を感じたら医師の診察を受けてください。",
+  "campaigns.malariaZero.description2": "予防は、あなたとあなたの家族をこの病気から守るための最良の方法です。",
+  
+  // Purple January Campaign
+  "campaigns.purpleJanuary.title": "パープル・ジャニュアリー・キャンペーン2025",
+  "campaigns.purpleJanuary.description1": "パープル・ジャニュアリー・キャンペーン2025は、主に皮膚と末梢神経に影響を与える感染症であるハンセン病（らい病）についての意識を高めることを目的としています。パラ州では、このイニシアチブは病気に関連する偏見を減らし、早期診断を促進することを目指しています。",
+  "campaigns.purpleJanuary.description2": "ハンセン病は治癒可能であり、早期に診断され治療されるほど、永続的な後遺症の可能性は低くなります。1月中、州全体の保健ユニットは情報、スクリーニング、無料診断の活動を実施します。",
+  "campaigns.purpleJanuary.description3": "教育活動に参加し、ハンセン病に関する誤った情報と戦うのを手伝ってください。知識は効果的な予防と治療への最初のステップです。",
+  "campaigns.purpleJanuary.downloadButton": "パンフレットをダウンロード - パープル・ジャニュアリー",
+  
+  // Golden August Campaign
+  "campaigns.goldenAugust.title": "ゴールデン・オーガスト・キャンペーン2025 - 母乳育児",
+  "campaigns.goldenAugust.description1": "「生命の流れの中で、母乳は根、川、そして未来である」というテーマで、ゴールデン・オーガストは母乳育児の重要性についての意識の月を象徴しています。出生直後の母親と赤ちゃんの最初の接触を表す「ゴールデンアワー」の概念に触発され、キャンペーンは生後6ヶ月間の完全母乳育児の重要性を強調しています。",
+  "campaigns.goldenAugust.description2": "母乳は赤ちゃんにとって最も完全な食品と考えられており、子供の最良の発達に必要なすべての栄養素が含まれています。下痢や感染症の発生を減らすことに加えて、乳がんや子宮がんを発症する可能性を減らすなど、女性の健康に多くの利点をもたらします。",
+  "campaigns.goldenAugust.description3": "世界保健機関（WHO）と保健省によると、母乳育児は予防可能な原因による5歳未満の子供の死亡を世界中で最大13％減らすことができると推定されています。母乳育児が乳児死亡率の削減に与える影響を達成する他の単一の戦略はありません。",
+  
+  // Health Campaigns
+  "healthCampaigns.title": "健康キャンペーン",
+  "healthCampaigns.backButton": "戻る",
+  "healthCampaigns.listAriaLabel": "健康キャンペーンリスト",
+  "healthCampaigns.itemAriaLabel": "キャンペーン",
+  "healthCampaigns.redDecember.cardTitle": "レッド・ディセンバー・キャンペーン2024",
+  "healthCampaigns.redDecember.cardDescription": "パラ州におけるHIV/AIDS意識と予防",
+  "healthCampaigns.blueNovember.cardTitle": "ブルー・ノベンバー・キャンペーン2024",
+  "healthCampaigns.blueNovember.cardDescription": "男性の健康意識と前立腺がん予防",
+  "healthCampaigns.greenSeptember.cardTitle": "グリーン・セプテンバー",
+  "healthCampaigns.greenSeptember.cardDescription": "パラ州における臓器寄付意識",
+  "healthCampaigns.malariaZero.cardTitle": "マラリア・ゼロ",
+  "healthCampaigns.malariaZero.cardDescription": "アマゾン地域におけるマラリア予防キャンペーン",
+  "healthCampaigns.purpleJanuary.cardTitle": "パープル・ジャニュアリー・キャンペーン2025",
+  "healthCampaigns.purpleJanuary.cardDescription": "ハンセン病啓発キャンペーン",
+  
+  // Campaigns List
+  "campaigns.list.redDecember": "レッド・ディセンバー・キャンペーン2024",
+  "campaigns.list.redDecemberDesc": "パラ州におけるHIV/AIDS意識と予防",
+  "campaigns.list.blueNovember": "ブルー・ノベンバー・キャンペーン2024",
+  "campaigns.list.blueNovemberDesc": "男性の健康意識と前立腺がん予防",
+  "campaigns.list.greenSeptember": "グリーン・セプテンバー・キャンペーン2025",
+  "campaigns.list.greenSeptemberDesc": "臓器および組織寄付意識",
+  "campaigns.list.malaria": "マラリア・ゼロ",
+  "campaigns.list.malariaDesc": "アマゾン地域におけるマラリア予防キャンペーン",
+  "campaigns.list.purpleJanuary": "パープル・ジャニュアリー・キャンペーン2025",
+  "campaigns.list.purpleJanuaryDesc": "ハンセン病啓発キャンペーン",
+  "campaigns.list.goldenAugust": "ゴールデン・オーガスト・キャンペーン2025",
+  "campaigns.list.goldenAugustDesc": "母乳育児促進キャンペーン",
+  "campaigns.list.yellowSeptember": "イエロー・セプテンバー・キャンペーン2025",
+  "campaigns.list.yellowSeptemberDesc": "自殺予防とメンタルヘルスの価値に関する意識",
+  
+  // Additional Health Campaigns
+  "healthCampaigns.viewCampaignButton": "キャンペーンを見る",
+  "healthCampaigns.addToFavorites": "お気に入りに追加",
+  "healthCampaigns.removeFromFavorites": "お気に入りから削除",
+  "healthCampaigns.searchPlaceholder": "キャンペーンを検索...",
+  "healthCampaigns.searchAriaLabel": "キャンペーン検索フィールド",
+  "healthCampaigns.clearSearchButton": "検索をクリア",
+  "healthCampaigns.openMenuButton": "メニューを開く",
+  "healthCampaigns.newCampaignButton": "新しいキャンペーン",
+  "healthCampaigns.newButton": "新規",
+  "healthCampaigns.closeErrorButton": "エラーメッセージを閉じる",
+  "healthCampaigns.noResults": "結果が見つかりません",
+  "healthCampaigns.noCampaigns": "利用可能なキャンペーンはありません",
+  "healthCampaigns.errorLoading": "キャンペーンの読み込みエラー",
+  "healthCampaigns.tabs.campanhas": "キャンペーン",
+  "healthCampaigns.tabs.favoritos": "お気に入り",
+  "healthCampaigns.tabs.recentes": "最近",
+  "healthCampaigns.footerCopyright": "パラ州公衆衛生局",
+  "healthCampaigns.footer.about": "について",
+  "healthCampaigns.footer.contact": "連絡先",
+  "healthCampaigns.footer.privacy": "プライバシー",
+  "healthCampaigns.footer.terms": "利用規約",
+
+  // Auxiliary Apps
+  "apps.components": "コンポーネント",
+  "apps.establishments": "施設",
+  "apps.qualifications": "資格",
+  "apps.enablings": "有効化",
+  "apps.closure_types": "終了タイプ",
+  "apps.public_types": "公共タイプ",
+  "apps.event_types": "イベントタイプ",
+  "apps.trauma_types": "外傷タイプ",
+  "apps.care_types": "ケアタイプ",
+  "apps.diagnostic_hypothesis_types": "診断仮説タイプ",
+  "apps.symptom_types": "症状タイプ",
+  "apps.shift": "シフト",
+  "apps.nature": "法的性質",
+  "apps.race": "人種/肌の色",
+  "apps.education": "教育",
+  "apps.cbo": "CBO",
+  "apps.countries": "国",
+  "apps.states": "州",
+  "apps.cities": "市",
+  "apps.gender": "性別",
+  "apps.sexual_orientation": "性的指向",
+
+  // Footer
+  "footer.contact": "連絡先",
+  "footer.address": "Tv. Lomas Valentinas, 2190 - Marco, Belém - PA, 66093-677",
+  "footer.openingHours": "営業時間",
+  "footer.weekdayHours": "月曜日から金曜日：8時から17時",
+  "footer.sespaBrief": "SESPAはパラ州の人々の健康を保証するために働いています。",
+  "footer.ombudsman": "オンブズマン",
+  "footer.feedbackQuestion": "提案や苦情はありますか？",
+  "footer.contactOmbudsman": "オンブズマンにお問い合わせください：",
+  "footer.portalTitle": "パラ健康ポータル",
+  "footer.portalDescription": "パラ州公衆衛生局のサービスと情報のポータル。",
+  "footer.developedBy": "健康監視情報センター - NIVSによって開発されました",
+  "footer.copyright": "© {year} パラ州公衆衛生局。全著作権所有。",
+  "footer.rights": "全著作権所有",
+  
+  // Contact Us, ASCOM, Ombudsman
+  "faleConosco.title": "お問い合わせ",
+  "faleConosco.ascom": "広報室",
+  "faleConosco.ouvitoria": "オンブズマン",
+  "faleConosco.access": "アクセス",
+  "ascom.title": "広報室 - ASCOM",
+  "ascom.subTitle": "広報室の連絡先",
+  "ascom.description": "これは、パラ州公衆衛生局とマスコミの間の公式コミュニケーションチャネルです。",
+  "ascom.emailLabel": "メール",
+  "ascom.phoneLabel": "電話",
+  "ouvitoria.title": "SUSオンブズマン",
+  "ouvitoria.description": "SESPA オンブズマンは、SESPA管理とSUSユーザーの間の民主的なコミュニケーションチャネルであり、SUSの管理と社会的管理をサポートするための積極的な検索、情報の普及、研究の実施を目的としています。",
+  "ouvitoria.inPersonLabel": "対面",
+  "ouvitoria.address": "Travessa Lomas Valentinas, 2190, Bairro Marco - 郵便番号: 66093-687 - Belém / PA",
+  "ouvitoria.phoneLabel": "電話",
+  "ouvitoria.freeCallLabel": "健康ホットライン（無料）",
+  "ouvitoria.emailLabel": "メール",
+  "ouvitoria.siteLabel": "ウェブサイト",
+  "ouvitoria.formButton": "オンラインフォームにアクセス",
+  
+  // Misc
+  "voltar": "戻る",
+  "notifications": "通知",
+  
+  // Login Page
+  "login.title": "ログイン",
+  "login.subtitle": "アクセスするには認証情報を入力してください",
+  "login.username.placeholder": "ユーザー名",
+  "login.password.placeholder": "パスワード",
+  "login.rememberMe": "ログイン状態を保持",
+  "login.forgotPassword": "パスワードをお忘れですか？",
+  "login.button": "ログイン",
+  "login.verifying": "認証を確認しています...",
+  "login.error.invalid": "ユーザー名またはパスワードが無効です",
+  
+  // Access Denied
+  "accessDenied.title": "アクセス拒否",
+  "accessDenied.message": "このページにアクセスする権限がありません。",
+  "accessDenied.button": "ホームに戻る",
+  
+  // Points of Interest - Home Page
+  "pointsOfInterest.servicePoints": "サービスポイント",
+  "pointsOfInterest.peoplesSummit": "人民サミット",
+  "pointsOfInterest.cop30Village": "COP 30村",
+  "pointsOfInterest.peacePlants": "平和工場",
+  "pointsOfInterest.upa": "UPA",
+  "pointsOfInterest.caps": "CAPS",
+  "pointsOfInterest.accommodations": "宿泊施設",
+  "pointsOfInterest.vaccination": "予防接種",
+  
+  // Campaign Descriptions
+  "campaignDescriptions.yellowSeptember": "自殺予防とメンタルヘルスの価値についての認識",
+  "campaignDescriptions.greenSeptember": "臓器・組織提供についての認識",
+  "campaignDescriptions.goldenAugust": "母乳育児促進キャンペーン",
+  "campaignDescriptions.purpleJanuary": "ハンセン病に関する啓発キャンペーン",
+  "campaignDescriptions.redDecember": "パラ全域でのHIV/AIDSに対する認識と対策",
+  "campaignDescriptions.blueNovember": "男性の健康と前立腺がん予防についての認識",
+  
+  // Campaign Titles
+  "campaignTitles.yellowSeptember": "イエローセプテンバーキャンペーン2025",
+  "campaignTitles.greenSeptember": "グリーンセプテンバーキャンペーン2025",
+  "campaignTitles.goldenAugust": "ゴールデンオーガストキャンペーン2025",
+  "campaignTitles.purpleJanuary": "パープルジャニュアリーキャンペーン2025",
+  "campaignTitles.redDecember": "レッドディッセンバーキャンペーン2024",
+  "campaignTitles.blueNovember": "ブルーノーベンバーキャンペーン2024",
+  
+  // Missing Keys
+  "banner.welcome": "パラ健康ポータルへようこそ",
+  "banner.subtitle": "健康情報とサービスを手軽に",
+  "banner.findService": "必要な健康サービスを見つける",
+  "fab.notifique": "通知",
+  "campaigns.title": "健康キャンペーン",
+  "campaigns.description": "主要な公衆衛生キャンペーンについて学ぶ"
+};

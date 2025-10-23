@@ -13,7 +13,7 @@ import { RoutingServiceOSRM } from "./services/routingServiceOSRM";
 // Componentes do desktop
 import { SideMenu } from "@/features/home/components/SideMenu";
 import { Home, Map, Heart, User, FileText } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import {
   DEFAULT_CENTER,
@@ -29,6 +29,7 @@ import L from 'leaflet';
  */
 const MapaLeaflet: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   
   // Hook de Geolocalização
   const {
@@ -192,6 +193,17 @@ const MapaLeaflet: React.FC = () => {
       }
     }
   }, [tiposEstabelecimentos.length]); // Executar quando os tipos forem carregados
+
+  /**
+   * Aplicar qualificação da URL quando fornecida
+   */
+  useEffect(() => {
+    const qualificacaoURL = searchParams.get('qualificacao');
+    if (qualificacaoURL && tiposQualificacoes.length > 0) {
+      console.log('🔗 Aplicando qualificação da URL:', qualificacaoURL);
+      setQualificacaoSelecionada(qualificacaoURL);
+    }
+  }, [searchParams, tiposQualificacoes.length]);
 
   /**
    * Aplicar filtros locais quando filtros mudarem

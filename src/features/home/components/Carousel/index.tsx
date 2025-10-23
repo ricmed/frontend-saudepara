@@ -20,96 +20,50 @@ export const Carousel: React.FC<CarouselProps> = ({ materials: propMaterials }) 
   const defaultMaterials: Material[] = [
     {
       id: "setembro-amarelo",
-      title: "Campanha Setembro Amarelo 2025",
-      desc: "Conscientização sobre prevenção do suicídio e valorização da saúde mental",
+      title: t('campaignTitles.yellowSeptember'),
+      desc: t('campaignDescriptions.yellowSeptember'),
       image: "./images/campaigns/Setembro Amarelo.jpg",
       link: "/setembro-amarelo",
     },
     {
       id: "setembro-verde",
-      title: "Campanha Setembro Verde 2025",
-      desc: "Conscientização sobre a doação de órgãos e tecidos",
+      title: t('campaignTitles.greenSeptember'),
+      desc: t('campaignDescriptions.greenSeptember'),
       image: "./images/campaigns/Setembro Verde.jpg",
       link: "/setembro-verde",
     },
     {
       id: "agosto-dourado",
-      title: "Campanha Agosto Dourado 2025",
-      desc: "Campanha de incentivo ao Aleitamento Materno",
+      title: t('campaignTitles.goldenAugust'),
+      desc: t('campaignDescriptions.goldenAugust'),
       image: "./images/campaigns/Agosto Dourado – Aleitamento Materno.jpg",
       link: "/agosto-dourado",
     },
     {
       id: "janeiro-roxo",
-      title: "Campanha Janeiro Roxo 2025",
-      desc: "Campanha de conscientização sobre a Hanseníase",
+      title: t('campaignTitles.purpleJanuary'),
+      desc: t('campaignDescriptions.purpleJanuary'),
       image: "./images/campaigns/Janeiro Roxo.jpg",
       link: "/janeiro-roxo",
     },
     {
       id: "dezembro-vermelho",
-      title: "Campanha Dezembro Vermelho 2024",
-      desc: "Conscientização e combate ao HIV/AIDS em todo o Pará",
+      title: t('campaignTitles.redDecember'),
+      desc: t('campaignDescriptions.redDecember'),
       image: "./images/campaigns/Dezembro Vermelho.png",
       link: "/campanha-dezembro-vermelho",
     },
     {
       id: "novembro-azul",
-      title: "Campanha Novembro Azul 2024",
-      desc: "Conscientização sobre a saúde do homem e prevenção ao câncer de próstata",
+      title: t('campaignTitles.blueNovember'),
+      desc: t('campaignDescriptions.blueNovember'),
       image: "./images/campaigns/Novembro Azul.png",
       link: "/campanha-novembro-azul",
     }
   ];
 
-  // Mapear as campanhas para o idioma selecionado
-  const translatedMaterials = defaultMaterials.map(material => {
-    // Se forem fornecidos materiais como props, usá-los primeiro
-    if (propMaterials) {
-      const propMaterial = propMaterials.find(pm => pm.id === material.id);
-      if (propMaterial) return propMaterial;
-    }
-
-    let translationKey = '';
-    
-    // Mapear ID da campanha para chave de tradução
-    switch(material.id) {
-      case 'setembro-verde':
-        translationKey = 'greenSeptember';
-        break;
-      case 'setembro-amarelo':
-        translationKey = 'yellowSeptember';
-        break;
-      case 'agosto-dourado':
-        translationKey = 'goldenAugust';
-        break;
-      case 'dezembro-vermelho':
-        translationKey = 'redDecember';
-        break;
-      case 'novembro-azul':
-        translationKey = 'blueNovember';
-        break;
-      case 'janeiro-roxo':
-        translationKey = 'purpleJanuary';
-        break;
-        break;
-      default:
-        return material;
-    }
-    
-    // Se estiver usando um idioma diferente do português, aplicar traduções
-    if (selectedLanguage !== 'pt-BR') {
-      return {
-        ...material,
-        title: t(`campaigns.list.${translationKey}`),
-        desc: t(`campaigns.list.${translationKey}Desc`),
-      };
-    }
-    
-    return material;
-  });
-
-  const materials = translatedMaterials;
+  // Se forem fornecidos materiais como props, usá-los; senão, usar os padrões já traduzidos
+  const materials = propMaterials || defaultMaterials;
 
   const handleSwipe = () => {
     if (!touchStart || !touchEnd) return;

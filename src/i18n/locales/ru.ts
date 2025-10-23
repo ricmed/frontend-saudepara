@@ -1,0 +1,313 @@
+import { TranslationRecord } from '../types';
+
+export const ru: TranslationRecord = {
+  // Logout Confirmation
+  "logout.confirmation.title": "Вы хотите выйти?",
+  "logout.confirmation.confirm": "Да, выйти",
+  "logout.confirmation.cancel": "Отмена",
+  "logout.confirmation.message": "Вы уверены, что хотите выйти?",
+  
+  // General translations
+  "search.placeholder": "Поиск",
+  "header.secretaryOf": "Государственный департамент",
+  "header.publicHealth": "Общественное здравоохранение",
+  "menu.locations": "Места",
+  "menu.campaigns": "Медицинские кампании",
+  "menu.materials": "Образовательные материалы",
+  "menu.fale_conosco": "Связаться с нами",
+  "menu.emergencies": "Экстренные случаи",
+  "menu.consultations": "Консультации",
+  "menu.exams": "Обследования",
+  "menu.faq": "Часто задаваемые вопросы",
+  "section.locate": "Найти здесь",
+  "localize.title": "Найти здесь",
+  "localize.viewMap": "Посмотреть на карте",
+  
+  // Points of Interest
+  "points.vaccination": "Пункты вакцинации",
+  "points.vaccination.desc": "Места вакцинации",
+  "points.food": "Фуд-корты",
+  "points.food.desc": "Места для питания",
+  "points.parks": "Зеленые зоны",
+  "points.parks.desc": "Парки и площади",
+  "points.cultural": "Культурные центры",
+  "points.cultural.desc": "Музеи и театры",
+  "points.health": "Медицинские центры",
+  "points.health.desc": "Медицинская помощь",
+  "points.hospitals": "Референсные больницы",
+  "points.hospitals.desc": "Основные больницы",
+  "points.hospital": "Больница",
+  "points.hospital.desc": "Полная больничная помощь с различными специальностями",
+  "points.ubs": "Основное медицинское учреждение",
+  "points.ubs.desc": "Первичная и профилактическая помощь",
+  "points.emergency": "Скорая помощь",
+  "points.emergency.desc": "Круглосуточная экстренная помощь",
+  "points.laboratory": "Лаборатория",
+  "points.laboratory.desc": "Лабораторные анализы и обследования",
+  
+  // Navigation
+  "nav.home": "Главная",
+  "nav.map": "Карта",
+  "nav.campaigns": "Кампании",
+  "nav.entrar": "Войти",
+  
+  // Menu
+  "menu.home": "Главная",
+  "menu.qualify_establishments": "Квалификация учреждений",
+  "menu.notification": "Модуль связи по случаям",
+  "menu.notify_case": "Сообщить о случае",
+  "menu.servicos": "Услуги",
+  "menu.dashboard": "Панель управления",
+  "menu.reportCase": "Сообщить о случае",
+  "menu.reportCaseDesc": "Быстро зарегистрировать новый случай",
+  "menu.offline_management": "Автономные данные",
+  "menu.educational": "Образовательные материалы",
+  "menu.apps": "Вспомогательные приложения",
+  "menu.security": "Безопасность",
+  "menu.version": "Версия",
+  "menu.bug": "Сообщить об ошибке",
+  "menu.logout": "Выйти",
+  "menu.login": "Войти",
+  "menu.manage_users": "Управление пользователями",
+  "menu.open": "Открыть меню",
+  
+  // Language
+  "language.select": "Выберите язык",
+  
+  // Departments
+  "department.title": "Модуль уведомлений",
+  "department.health-surveillance": "Санитарный надзор",
+  "department.accidents": "Несчастные случаи и чрезвычайные ситуации",
+  "department.chronic": "Хронические заболевания",
+  "department.mental-health": "Психическое здоровье",
+  "department.infectious": "Инфекционные заболевания",
+  "department.zoonoses": "Зоонозы",
+  "department.medications": "Лекарства",
+  "department.maternal": "Материнское и детское здоровье",
+  "department.epidemiology": "Эпидемиология",
+  
+  // Campaigns General
+  "campaigns.saibaMais": "Узнать больше",
+  "carousel.previousSlide": "Предыдущий слайд",
+  "carousel.nextSlide": "Следующий слайд",
+  "carousel.goToSlide": "Перейти к слайду {number}",
+  
+  // Red December Campaign
+  "campaigns.redDecember.title": "Кампания Красный Декабрь",
+  "campaigns.redDecember.description1": "Красный Декабрь — это национальная кампания по информированию о профилактике ВИЧ/СПИДа и других ИППП. Кампания этого года фокусируется на снижении предрассудков и поощрении раннего диагностирования.",
+  "campaigns.redDecember.description2": "Мероприятия включают в себя общественные семинары, информационные кампании в школах и медицинских учреждениях, а также партнерство с местными НКО для продвижения доступа к бесплатному и постоянному лечению для людей с диагнозом ВИЧ.",
+  "campaigns.redDecember.description3": "Участвуйте в мероприятиях и помогайте распространять правильную информацию о профилактике и уходе. Борьба с предрассудками начинается с осведомленности!",
+  "campaigns.redDecember.downloadButton": "Скачать папку - Красный Декабрь",
+  
+  // Blue November Campaign
+  "campaigns.blueNovember.title": "Кампания Синий Ноябрь 2024",
+  "campaigns.blueNovember.description1": "Кампания Синий Ноябрь — это инициатива Государственной координации здоровья мужчин, которая направлена на повышение осведомленности среди мужчин о важности самопомощи и профилактики проблем со здоровьем, с особым вниманием к сексуальному и репродуктивному здоровью.",
+  "campaigns.blueNovember.description2": "Несколько факторов могут влиять на сексуальное здоровье мужчин, включая хронические заболевания (такие как гипертония, диабет и почечная недостаточность), сидячий образ жизни, плохое питание, тревожность, депрессию и употребление алкоголя и сигарет.",
+  "campaigns.blueNovember.description3": "Кампания также подчеркивает важность планирования семьи и безопасного секса. Мужчины имеют бесплатный доступ к презервативам в медицинских учреждениях и могут получить информацию о методах контрацепции, включая вазэктомию.",
+  "campaigns.blueNovember.description4": "Заботьтесь о своем здоровье! Посетите медицинское учреждение для профилактических обследований, получения рекомендаций и доступа к лечению при необходимости.",
+  "campaigns.blueNovember.downloadButton1": "Скачать папку 1 - Синий Ноябрь",
+  "campaigns.blueNovember.downloadButton2": "Скачать папку 2 - Синий Ноябрь",
+  
+  // Green September Campaign
+  "campaigns.greenSeptember.title": "Кампания Зеленый Сентябрь 2025",
+  "campaigns.greenSeptember.description1": "Кампания Зеленый Сентябрь продвигает осведомленность о важности донорства органов и тканей. Один донор может спасти бесчисленное количество жизней, пожертвовав сердце, легкие, печень, поджелудочную железу, кишечник, почки, роговицы, сосуды, кожу, кости, сухожилия и связки.",
+  "campaigns.greenSeptember.description2": "Донорство может происходить от живых доноров (которые могут пожертвовать почки, часть печени или легкого и костный мозг) или умерших доноров в состоянии смерти мозга. В Пара проводятся трансплантации почек, печени, костного мозга, роговиц и скелетно-мышечной ткани. Позиция в списке ожидания определяется техническими критериями совместимости и тяжести состояния получателя.",
+  "campaigns.greenSeptember.description3": "Поговорите с вашей семьей на эту тему и выразите свое желание стать донором. Окончательное решение всегда принимает семья, поэтому очень важно, чтобы они знали ваши пожелания. Обращайтесь за информацией в Государственный центр трансплантации и помогайте спасать жизни!",
+  "campaigns.greenSeptember.downloadButton": "Скачать папку - Зеленый Сентябрь",
+  
+  // Malaria Zero Campaign
+  "campaigns.malariaZero.title": "Малярия Ноль",
+  "campaigns.malariaZero.description1": "Кампания Малярия Ноль стремится искоренить малярию в регионе Амазонки. Используйте обработанные москитные сетки, применяйте репелленты и обращайтесь за медицинской помощью при появлении симптомов, таких как лихорадка и озноб.",
+  "campaigns.malariaZero.description2": "Профилактика — лучший способ защитить себя и свою семью от этой болезни.",
+  
+  // Purple January Campaign
+  "campaigns.purpleJanuary.title": "Фиолетовый Январь",
+  "campaigns.purpleJanuary.description1": "Кампания Фиолетовый Январь направлена на повышение осведомленности о болезни Хансена (лепре), инфекционном заболевании, которое в основном поражает кожу и периферические нервы. В Пара эта инициатива стремится уменьшить стигматизацию, связанную с болезнью, и поощрить раннюю диагностику.",
+  "campaigns.purpleJanuary.description2": "Болезнь Хансена излечима, и чем раньше она диагностирована и лечится, тем меньше шансов на постоянные последствия. В течение января медицинские учреждения по всему штату проводят информационные, скрининговые и бесплатные диагностические мероприятия.",
+  "campaigns.purpleJanuary.description3": "Участвуйте в образовательных мероприятиях и помогайте бороться с дезинформацией о болезни Хансена. Знание — первый шаг к эффективной профилактике и лечению.",
+  "campaigns.purpleJanuary.downloadButton": "Скачать папку - Фиолетовый Январь",
+  
+  // Golden August Campaign
+  "campaigns.goldenAugust.title": "Кампания Золотой Август 2025 - Грудное вскармливание",
+  "campaigns.goldenAugust.description1": "С темой 'В потоке жизни грудное молоко — корень, река и будущее', Золотой Август символизирует месяц повышения осведомленности о важности грудного вскармливания. Вдохновленная концепцией 'Золотого часа', которая представляет первый контакт между матерью и ребенком сразу после рождения, кампания подчеркивает важность исключительно грудного вскармливания в течение первых шести месяцев жизни.",
+  "campaigns.goldenAugust.description2": "Грудное молоко считается самой полноценной пищей для младенцев, содержащей все необходимые питательные вещества для лучшего развития ребенка. Помимо снижения частоты диареи и инфекций, оно обеспечивает многочисленные преимущества для здоровья женщин, такие как снижение вероятности развития рака молочной железы и матки.",
+  "campaigns.goldenAugust.description3": "По данным Всемирной организации здравоохранения (ВОЗ) и Министерства здравоохранения, грудное вскармливание способно снизить смертность детей в возрасте до 5 лет до 13% во всем мире от предотвратимых причин. Ни одна другая изолированная стратегия не достигает такого воздействия, которое грудное вскармливание оказывает на снижение младенческой смертности.",
+  
+  // Yellow September Campaign
+  "campaigns.yellowSeptember.title": "Кампания Желтый Сентябрь 2025",
+  "campaigns.yellowSeptember.description1": "Желтый Сентябрь — это кампания по повышению осведомленности о предотвращении самоубийств и ценности психического здоровья. Ее цель — показать важность предоставления поддержки и эмпатического слушания, а также содействовать диалогу и размышлениям на эту тему.",
+  "campaigns.yellowSeptember.description2": "Важно обращать внимание на признаки психологического страдания, такие как значительные изменения в поведении, социальная изоляция, потеря интереса к приятным занятиям и сильное чувство безнадежности и пессимизма. Профилактические меры включают укрепление социальных связей, развитие здоровых привычек и избегание злоупотребления алкоголем и наркотиками.",
+  "campaigns.yellowSeptember.description3": "Если вам нужна помощь, обращайтесь! Специалисты по психическому здоровью, такие как психологи и психиатры, обучены оказывать соответствующую поддержку. Центр ценности жизни (CVV) предлагает бесплатную и конфиденциальную эмоциональную поддержку по телефону 188, работающему круглосуточно.",
+  "campaigns.yellowSeptember.downloadButton": "Скачать папку - Желтый Сентябрь",
+  
+  // Health Campaigns
+  "healthCampaigns.title": "Медицинские кампании",
+  "healthCampaigns.backButton": "Назад",
+  "healthCampaigns.listAriaLabel": "Список медицинских кампаний",
+  "healthCampaigns.itemAriaLabel": "Кампания",
+  "healthCampaigns.redDecember.cardTitle": "Кампания Красный Декабрь 2024",
+  "healthCampaigns.redDecember.cardDescription": "Осведомленность и профилактика ВИЧ/СПИДа в Пара",
+  "healthCampaigns.blueNovember.cardTitle": "Кампания Синий Ноябрь 2024",
+  "healthCampaigns.blueNovember.cardDescription": "Осведомленность о мужском здоровье и профилактика рака простаты",
+  "healthCampaigns.greenSeptember.cardTitle": "Кампания Зеленый Сентябрь 2025",
+  "healthCampaigns.greenSeptember.cardDescription": "Осведомленность о донорстве органов и тканей",
+  "healthCampaigns.malariaZero.cardTitle": "Малярия Ноль",
+  "healthCampaigns.malariaZero.cardDescription": "Кампания по профилактике малярии в регионе Амазонки",
+  "healthCampaigns.purpleJanuary.cardTitle": "Кампания Фиолетовый Январь 2025",
+  "healthCampaigns.purpleJanuary.cardDescription": "Кампания по повышению осведомленности о болезни Хансена",
+  
+  // Campaign List
+  "campaigns.list.redDecember": "Кампания Красный Декабрь 2024",
+  "campaigns.list.redDecemberDesc": "Осведомленность и профилактика ВИЧ/СПИДа в Пара",
+  "campaigns.list.blueNovember": "Кампания Синий Ноябрь 2024",
+  "campaigns.list.blueNovemberDesc": "Осведомленность о мужском здоровье и профилактика рака простаты",
+  "campaigns.list.greenSeptember": "Кампания Зеленый Сентябрь 2025",
+  "campaigns.list.greenSeptemberDesc": "Осведомленность о донорстве органов и тканей",
+  "campaigns.list.malaria": "Малярия Ноль",
+  "campaigns.list.malariaDesc": "Кампания по профилактике малярии в регионе Амазонки",
+  "campaigns.list.purpleJanuary": "Кампания Фиолетовый Январь 2025",
+  "campaigns.list.purpleJanuaryDesc": "Кампания по повышению осведомленности о болезни Хансена",
+  "campaigns.list.goldenAugust": "Золотой Август 2025",
+  "campaigns.list.goldenAugustDesc": "Кампания по продвижению грудного вскармливания",
+  "campaigns.list.yellowSeptember": "Кампания Желтый Сентябрь 2025",
+  "campaigns.list.yellowSeptemberDesc": "Осведомленность о предотвращении самоубийств и ценности психического здоровья",
+  
+  // Health Campaigns UI
+  "healthCampaigns.viewCampaignButton": "Просмотреть кампанию",
+  "healthCampaigns.addToFavorites": "Добавить в избранное",
+  "healthCampaigns.removeFromFavorites": "Удалить из избранного",
+  "healthCampaigns.searchPlaceholder": "Поиск кампаний...",
+  "healthCampaigns.searchAriaLabel": "Поле поиска для кампаний",
+  "healthCampaigns.clearSearchButton": "Очистить поиск",
+  "healthCampaigns.openMenuButton": "Открыть меню",
+  "healthCampaigns.newCampaignButton": "Новая кампания",
+  "healthCampaigns.newButton": "Новая",
+  "healthCampaigns.closeErrorButton": "Закрыть сообщение об ошибке",
+  "healthCampaigns.noResults": "Результаты не найдены",
+  "healthCampaigns.noCampaigns": "Нет доступных кампаний",
+  "healthCampaigns.errorLoading": "Ошибка при загрузке кампаний",
+  "healthCampaigns.tabs.campanhas": "Кампании",
+  "healthCampaigns.tabs.favoritos": "Избранное",
+  "healthCampaigns.tabs.recentes": "Недавние",
+  "healthCampaigns.footerCopyright": "Государственный департамент общественного здравоохранения Пара",
+  "healthCampaigns.footer.about": "О нас",
+  "healthCampaigns.footer.contact": "Контакт",
+  "healthCampaigns.footer.privacy": "Конфиденциальность",
+  "healthCampaigns.footer.terms": "Условия",
+  
+  // Apps
+  "apps.components": "Компоненты",
+  "apps.establishments": "Учреждения",
+  "apps.qualifications": "Квалификации",
+  "apps.enablings": "Разрешения",
+  "apps.closure_types": "Типы закрытия",
+  "apps.public_types": "Типы публики",
+  "apps.event_types": "Типы событий",
+  "apps.trauma_types": "Типы травм",
+  "apps.care_types": "Типы ухода",
+  "apps.diagnostic_hypothesis_types": "Типы диагностических гипотез",
+  "apps.symptom_types": "Типы симптомов",
+  "apps.shift": "Смена",
+  "apps.nature": "Юридическая природа",
+  "apps.race": "Раса/цвет",
+  "apps.education": "Образование",
+  "apps.cbo": "CBO",
+  "apps.countries": "Страны",
+  "apps.states": "Штаты",
+  "apps.cities": "Города",
+  "apps.gender": "Пол",
+  "apps.sexual_orientation": "Сексуальная ориентация",
+  
+  // Footer
+  "footer.contact": "Контакт",
+  "footer.address": "Tv. Lomas Valentinas, 2190 - Marco, Belém - PA, 66093-677",
+  "footer.openingHours": "Часы работы",
+  "footer.weekdayHours": "Понедельник-пятница: с 8 до 17",
+  "footer.sespaBrief": "SESPA работает для обеспечения здоровья населения Пара.",
+  "footer.ombudsman": "Омбудсмен",
+  "footer.feedbackQuestion": "Есть предложения или жалобы?",
+  "footer.contactOmbudsman": "Свяжитесь с нашим омбудсменом:",
+  "footer.portalTitle": "Портал здоровья Пара",
+  "footer.portalDescription": "Портал услуг и информации Государственного департамента общественного здравоохранения Пара.",
+  "footer.developedBy": "Разработано Центром информации по надзору за здоровьем - NIVS",
+  "footer.copyright": "© {year} Государственный департамент общественного здравоохранения Пара. Все права защищены.",
+  "footer.rights": "Все права защищены",
+  
+  // Contact Information
+  "faleConosco.title": "Связаться с нами",
+  "faleConosco.ascom": "Пресс-служба",
+  "faleConosco.ouvitoria": "Омбудсмен",
+  "faleConosco.access": "Доступ",
+  
+  // ASCOM
+  "ascom.title": "Пресс-служба - ASCOM",
+  "ascom.subTitle": "Контакты пресс-службы",
+  "ascom.description": "Это официальный канал связи между Департаментом здравоохранения штата Пара и прессой.",
+  "ascom.emailLabel": "Электронная почта",
+  "ascom.phoneLabel": "Телефон",
+  
+  // Ombudsman
+  "ouvitoria.title": "Омбудсмен SUS",
+  "ouvitoria.description": "Омбудсмен SESPA — это демократический канал связи между руководством SESPA и пользователями SUS, предназначенный для активного поиска, распространения информации и проведения исследований для поддержки управления и социального контроля SUS.",
+  "ouvitoria.inPersonLabel": "Личный прием",
+  "ouvitoria.address": "Travessa Lomas Valentinas, 2190, Bairro Marco - Индекс: 66093-687 - Belém / PA",
+  "ouvitoria.phoneLabel": "Телефоны",
+  "ouvitoria.freeCallLabel": "Горячая линия здоровья (бесплатно)",
+  "ouvitoria.emailLabel": "Электронная почта",
+  "ouvitoria.siteLabel": "Веб-сайт",
+  "ouvitoria.formButton": "Перейти к онлайн-форме",
+  
+  // General
+  "voltar": "Назад",
+  "notifications": "Уведомления",
+  
+  // Login Page
+  "login.title": "Вход",
+  "login.subtitle": "Введите свои учетные данные для доступа",
+  "login.username.placeholder": "Имя пользователя",
+  "login.password.placeholder": "Пароль",
+  "login.rememberMe": "Запомнить меня",
+  "login.forgotPassword": "Забыли пароль?",
+  "login.button": "Войти",
+  "login.verifying": "Проверка аутентификации...",
+  "login.error.invalid": "Неверное имя пользователя или пароль",
+  
+  // Access Denied
+  "accessDenied.title": "Доступ запрещен",
+  "accessDenied.message": "У вас нет разрешения на доступ к этой странице.",
+  "accessDenied.button": "Вернуться на главную",
+  
+  // Points of Interest - Home Page
+  "pointsOfInterest.servicePoints": "Пункты обслуживания",
+  "pointsOfInterest.peoplesSummit": "Саммит народов",
+  "pointsOfInterest.cop30Village": "Деревня COP 30",
+  "pointsOfInterest.peacePlants": "Заводы мира",
+  "pointsOfInterest.upa": "UPA",
+  "pointsOfInterest.caps": "CAPS",
+  "pointsOfInterest.accommodations": "Размещение",
+  "pointsOfInterest.vaccination": "Вакцинация",
+  
+  // Campaign Descriptions
+  "campaignDescriptions.yellowSeptember": "Осведомленность о профилактике самоубийств и ценности психического здоровья",
+  "campaignDescriptions.greenSeptember": "Осведомленность о донорстве органов и тканей",
+  "campaignDescriptions.goldenAugust": "Кампания по поощрению грудного вскармливания",
+  "campaignDescriptions.purpleJanuary": "Кампания по повышению осведомленности о болезни Хансена",
+  "campaignDescriptions.redDecember": "Осведомленность и борьба с ВИЧ/СПИДом по всему штату Пара",
+  "campaignDescriptions.blueNovember": "Осведомленность о мужском здоровье и профилактике рака простаты",
+  
+  // Campaign Titles
+  "campaignTitles.yellowSeptember": "Кампания Желтый Сентябрь 2025",
+  "campaignTitles.greenSeptember": "Кампания Зеленый Сентябрь 2025",
+  "campaignTitles.goldenAugust": "Кампания Золотой Август 2025",
+  "campaignTitles.purpleJanuary": "Кампания Фиолетовый Январь 2025",
+  "campaignTitles.redDecember": "Кампания Красный Декабрь 2024",
+  "campaignTitles.blueNovember": "Кампания Голубой Ноябрь 2024",
+  
+  // Missing Keys
+  "banner.welcome": "Добро пожаловать на портал здравоохранения Пара",
+  "banner.subtitle": "Медицинская информация и услуги у вас под рукой",
+  "banner.findService": "Найдите нужную медицинскую услугу",
+  "fab.notifique": "Уведомить",
+  "campaigns.title": "Медицинские кампании",
+  "campaigns.description": "Узнайте об основных кампаниях общественного здравоохранения"
+};
