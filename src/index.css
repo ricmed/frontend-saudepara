@@ -93,20 +93,9 @@
 }
 
 .leaflet-tooltip-pane {
-  z-index: 500 !important;
+  z-index: 9000 !important;
 }
 
 .leaflet-marker-pane .user-location-marker {
   z-index: 10000 !important;
-}
-
-/* Garantir que o pin do usuário sempre fique acima dos tooltips */
-.leaflet-pane.leaflet-marker-pane > .user-location-marker {
-  z-index: 15000 !important;
-}
-
-/* Criar uma camada separada para o pin do usuário */
-.leaflet-container .user-location-marker {
-  position: relative !important;
-  z-index: 15000 !important;
 }

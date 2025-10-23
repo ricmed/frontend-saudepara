@@ -53,7 +53,6 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
   const markersRef = useRef<L.Marker[]>([]);
   const userMarkerRef = useRef<L.Marker | null>(null);
   const popupRef = useRef<L.Popup | null>(null);
-  const hasInitializedLocation = useRef(false);
   const [isMapReady, setIsMapReady] = useState(false);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [currentZoom, setCurrentZoom] = useState(6);
@@ -170,9 +169,6 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
   // Atualizar centro do mapa (com segurança)
   useEffect(() => {
     if (!mapRef.current || !isMapReady) return;
-    
-    // Se já centralizou na localização do usuário, não atualizar mais
-    if (hasInitializedLocation.current) return;
 
     try {
       const currentCenter = mapRef.current.getCenter();
@@ -264,7 +260,7 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
 
         userMarkerRef.current = L.marker([userLocation.lat, userLocation.lng], {
           icon: userIcon,
-          zIndexOffset: 15000  // Z-index altíssimo para garantir que fique acima dos tooltips
+          zIndexOffset: 10000  // Z-index muito alto para garantir que fique acima de tudo
         }).addTo(mapRef.current);
 
         userMarkerRef.current.bindTooltip('Você está aqui', {
@@ -274,19 +270,15 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
           className: 'user-location-tooltip'
         });
 
-        // Centralizar o mapa na localização do usuário apenas na primeira vez
-        if (!hasInitializedLocation.current) {
-          mapRef.current.setView([userLocation.lat, userLocation.lng], 15, {
-            animate: true,
-            duration: 1.5
-          });
-          
-          setCurrentZoom(15); // Zoom mais próximo para ver bem a área
-          hasInitializedLocation.current = true;
-          console.log('📍 Mapa centralizado na localização do usuário pela primeira vez');
-        }
+        // Centralizar o mapa na localização do usuário com zoom adequado (13 para ver os rótulos)
+        mapRef.current.setView([userLocation.lat, userLocation.lng], 13, {
+          animate: true,
+          duration: 1
+        });
+        
+        setCurrentZoom(13); // Atualizar o zoom atual
 
-        console.log('📍 Marcador do usuário adicionado:', userLocation);
+        console.log('📍 Marcador do usuário adicionado e mapa centralizado:', userLocation);
       }
     } catch (error) {
       console.error('❌ Erro ao gerenciar marcador do usuário:', error);
