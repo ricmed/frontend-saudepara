@@ -542,7 +542,6 @@ const MapaLeaflet: React.FC = () => {
               filteredPlaces={filteredPlaces}
               selectedMarker={selectedMarker}
               visibleCount={visibleCount}
-              qualificacaoSelecionada={qualificacaoSelecionada}
               onMapLoad={handleMapLoad}
               onMapIdle={() => {}}
               onMarkerClick={setSelectedMarker}

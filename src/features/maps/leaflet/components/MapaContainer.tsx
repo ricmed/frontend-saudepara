@@ -29,7 +29,6 @@ interface MapaContainerProps {
   filteredPlaces: Local[];
   selectedMarker: Local | null;
   visibleCount: number;
-  qualificacaoSelecionada?: string;
   onMapLoad: (map: L.Map) => void;
   onMapIdle: () => void;
   onMarkerClick: (local: Local) => void;
@@ -42,7 +41,6 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
   filteredPlaces,
   selectedMarker,
   visibleCount,
-  qualificacaoSelecionada,
   onMapLoad,
   onMapIdle,
   onMarkerClick,
@@ -300,19 +298,7 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
         });
 
         // Buscar configuração da qualificação COP 30
-        // Se uma qualificação específica está selecionada, usar ela
-        // Senão, usar a primeira qualificação COP 30 do estabelecimento
-        let qualConfig;
-        
-        if (qualificacaoSelecionada && 
-            qualificacaoSelecionada !== "todas" && 
-            qualificacaoSelecionada !== "Todas as Qualificações") {
-          // Buscar a configuração da qualificação selecionada
-          qualConfig = getPrimeiraQualificacaoCOP30([qualificacaoSelecionada]);
-        } else {
-          // Usar a primeira qualificação do estabelecimento
-          qualConfig = getPrimeiraQualificacaoCOP30(local.qualificacoes);
-        }
+        const qualConfig = getPrimeiraQualificacaoCOP30(local.qualificacoes);
         
         // Se encontrou qualificação COP 30, usar suas cores e letra
         // Senão, usar configuração padrão
@@ -322,9 +308,8 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
         
         // Debug para primeiro item
         if (index === 0) {
-          console.log(`🎨 Configuração do marcador - ${local.nome}:`, {
+          console.log(`� Configuração do marcador - ${local.nome}:`, {
             qualificacoes: local.qualificacoes,
-            qualificacaoSelecionada,
             qualConfig,
             cor: markerColor,
             letra: markerLetra
@@ -381,7 +366,7 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
     } catch (error) {
       console.error('❌ Erro ao gerenciar marcadores dos estabelecimentos:', error);
     }
-  }, [filteredPlaces, visibleCount, qualificacaoSelecionada, isMapReady]); // Adiciona qualificacaoSelecionada
+  }, [filteredPlaces, visibleCount, isMapReady]); // Sem onMarkerClick nas dependências
 
   // Gerenciar popup do marcador selecionado
   useEffect(() => {
