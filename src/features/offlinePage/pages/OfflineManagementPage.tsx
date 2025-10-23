@@ -254,20 +254,10 @@ const OfflineManagementPage: React.FC = () => {
     setIsTogglingOfflineMode(true);
     
     try {
-      // Verificar estado ANTES de alternar
-      const wasOffline = syncService.isOfflineModeActive();
+      const wasOnline = await syncService.toggleOfflineMode();
+      const newState = !wasOnline; // Se estava online, agora está offline
       
-      console.log(`🔄 Estado ANTES do toggle: ${wasOffline ? 'OFFLINE' : 'ONLINE'}`);
-      
-      // Alternar o modo (ele faz a inversão internamente)
-      await syncService.toggleOfflineMode();
-      
-      // Verificar estado DEPOIS de alternar (para garantir)
-      const nowOffline = syncService.isOfflineModeActive();
-      setIsOfflineModeForced(nowOffline);
-      
-      console.log(`🔄 Estado DEPOIS do toggle: ${nowOffline ? 'OFFLINE' : 'ONLINE'}`);
-      console.log(`✅ Modo offline alternado: ${wasOffline ? 'OFFLINE' : 'ONLINE'} → ${nowOffline ? 'OFFLINE' : 'ONLINE'}`);
+      setIsOfflineModeForced(newState);
       
       // Atualizar stats após mudança de modo
       await loadStats();
