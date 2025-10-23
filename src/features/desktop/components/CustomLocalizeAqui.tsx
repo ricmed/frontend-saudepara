@@ -21,7 +21,7 @@ export const CustomLocalizeAqui: React.FC<CustomLocalizeAquiProps> = ({ selected
         {t('section.locate')}
       </h2>
       
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4 max-w-6xl mx-auto">
         <div
           className="flex flex-col items-center cursor-pointer group"
           onClick={() => navigateToMapa({ qualificacao: "Postos de atendimento - COP 30" })}
@@ -36,7 +36,7 @@ export const CustomLocalizeAqui: React.FC<CustomLocalizeAquiProps> = ({ selected
 
         <div
           className="flex flex-col items-center cursor-pointer group"
-          onClick={() => navigateToMapa({ qualificacao: "Postos fixos de atendimento - Cúpula dos povos - COP 30" })}
+          onClick={() => navigateToMapa({ qualificacao: "Alojamentos - Cúpula dos Povos - COP 30" })}
         >
           <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-[#4A6CF7] flex items-center justify-center mb-2 group-hover:bg-[#5A7CFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
             <Users className="h-6 w-6 text-white" />
@@ -91,18 +91,6 @@ export const CustomLocalizeAqui: React.FC<CustomLocalizeAquiProps> = ({ selected
           </div>
           <span className="text-xs md:text-sm text-center font-medium leading-tight">
             {t('pointsOfInterest.caps')}
-          </span>
-        </div>
-
-        <div
-          className="flex flex-col items-center cursor-pointer group"
-          onClick={() => navigateToMapa({ qualificacao: "Alojamentos - COP 30" })}
-        >
-          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-[#4A6CF7] flex items-center justify-center mb-2 group-hover:bg-[#5A7CFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
-            <BedDouble className="h-6 w-6 text-white" />
-          </div>
-          <span className="text-xs md:text-sm text-center font-medium leading-tight">
-            {t('pointsOfInterest.accommodations')}
           </span>
         </div>
 
