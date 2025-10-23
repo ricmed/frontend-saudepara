@@ -260,7 +260,7 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
   }, [userLocation?.lat, userLocation?.lng, isMapReady]); // Dependências específicas
 
   // Gerenciar marcadores dos estabelecimentos
-  // OTIMIZAÇÃO: Carregar todos os estabelecimentos filtrados (sem limitação por bounds)
+  // OTIMIZAÇÃO 4: Lazy loading de marcadores baseado nos bounds do mapa
   useEffect(() => {
     if (!mapRef.current || !isMapReady) return;
 
@@ -273,20 +273,22 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
       });
       markersRef.current = [];
 
-      // ALTERAÇÃO: Carregar TODOS os estabelecimentos filtrados (não apenas os no bounds)
-      // Filtrar apenas estabelecimentos com coordenadas válidas
-      const validPlaces = filteredPlaces.filter(local => {
+      // OTIMIZAÇÃO: Carregar apenas estabelecimentos visíveis na tela
+      const mapBounds = mapRef.current.getBounds();
+      const visiblePlacesInBounds = filteredPlaces.filter(local => {
         // Verificar se o estabelecimento tem coordenadas válidas
         if (!local.lat || !local.lng || local.lat === 0 || local.lng === 0) {
           return false;
         }
-        return true;
+        
+        // Verificar se está dentro dos bounds visíveis do mapa
+        return mapBounds.contains([local.lat, local.lng]);
       });
 
-      // Limitar apenas pelo visibleCount para performance
-      const visiblePlaces = validPlaces.slice(0, visibleCount);
+      // Limitar também pelo visibleCount para performance
+      const visiblePlaces = visiblePlacesInBounds.slice(0, Math.min(visibleCount, 100)); // Máximo 100 marcadores simultâneos
       
-      console.log(`🔍 Debug: ${filteredPlaces.length} total, ${validPlaces.length} com coordenadas válidas, ${visiblePlaces.length} renderizados`);
+      console.log(`🔍 Debug: ${filteredPlaces.length} total, ${visiblePlacesInBounds.length} nos bounds, ${visiblePlaces.length} renderizados`);
       
       visiblePlaces.forEach((local, index) => {
         console.log(`🏥 Estabelecimento ${index}:`, {
