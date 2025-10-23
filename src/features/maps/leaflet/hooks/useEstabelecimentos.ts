@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect } from 'react';
 import { Local, TipoHabilitacao, TipoQualificacao, TipoEstabelecimento } from '../types';
 import { EstabelecimentoMapaService } from '@/services/EstabelecimentoMapaService';
 import { EstabelecimentoService } from '@/services/EstabelecimentoService';
-import { QUALIFICACOES_COP30 } from '../utils/qualificacoesCOP30';
 
 export const useEstabelecimentos = () => {
   const [allPlaces, setAllPlaces] = useState<Local[]>([]);
@@ -42,20 +41,8 @@ export const useEstabelecimentos = () => {
       const habilitacoes = EstabelecimentoMapaService.getHabilitacoesUnicas(estabelecimentos);
       const qualificacoes = EstabelecimentoMapaService.getQualificacoesUnicas(estabelecimentos);
       
-      // Filtrar apenas as qualificações COP 30
-      const qualificacoesCOP30Nomes = QUALIFICACOES_COP30.map(q => q.nome);
-      const qualificacoesFiltradas: TipoQualificacao[] = [
-        { id: "todas", nome: "Todas as Qualificações" },
-        ...qualificacoes
-          .filter(q => qualificacoesCOP30Nomes.some(cop30Nome => 
-            q.nome.includes(cop30Nome) || cop30Nome.includes(q.nome)
-          ))
-      ];
-      
-      console.log('🎯 Qualificações COP 30 filtradas:', qualificacoesFiltradas.length - 1);
-      
       setTiposHabilitacoes(habilitacoes);
-      setTiposQualificacoes(qualificacoesFiltradas);
+      setTiposQualificacoes(qualificacoes);
 
       // Buscar tipos de estabelecimentos da API dedicada
       console.log('🔄 Carregando tipos de estabelecimentos da API...');
@@ -126,14 +113,12 @@ export const useEstabelecimentos = () => {
 export const useEstabelecimentosFiltrados = (
   allPlaces: Local[],
   tipoEstabelecimentoSelecionado: string,
-  naturezaSelecionada: string,
-  qualificacaoSelecionada?: string
+  naturezaSelecionada: string
 ): Local[] => {
   console.log('🔍 Aplicando filtros:', {
     total: allPlaces.length,
     tipoSelecionado: tipoEstabelecimentoSelecionado,
-    naturezaSelecionada,
-    qualificacaoSelecionada
+    naturezaSelecionada
   });
 
   // Se não há estabelecimentos, retornar array vazio
@@ -155,21 +140,6 @@ export const useEstabelecimentosFiltrados = (
           tipoEstabelecimento: place.tipoEstabelecimento,
           tipoSelecionado: tipoEstabelecimentoSelecionado
         });
-        return false;
-      }
-    }
-
-    // Filtro por qualificação
-    if (qualificacaoSelecionada && 
-        qualificacaoSelecionada !== "todas" && 
-        qualificacaoSelecionada !== "Todas as Qualificações") {
-      const temQualificacao = place.qualificacoes.some(q => 
-        q === qualificacaoSelecionada || 
-        q.includes(qualificacaoSelecionada) ||
-        qualificacaoSelecionada.includes(q)
-      );
-      
-      if (!temQualificacao) {
         return false;
       }
     }

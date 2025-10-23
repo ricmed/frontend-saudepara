@@ -4,7 +4,6 @@ import 'leaflet/dist/leaflet.css';
 import { Local, LatLngLiteral } from '../types';
 import { TILE_OPTIONS } from '../config/tileProviders';
 import { useMapProvider } from '../contexts/MapProviderContext';
-import { getPrimeiraQualificacaoCOP30 } from '../utils/qualificacoesCOP30';
 
 // Fix para ícones do Leaflet no Webpack/Vite
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
@@ -294,33 +293,37 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
           nome: local.nome,
           lat: local.lat,
           lng: local.lng,
-          qualificacoes: local.qualificacoes
         });
 
-        // Buscar configuração da qualificação COP 30
-        const qualConfig = getPrimeiraQualificacaoCOP30(local.qualificacoes);
-        
-        // Se encontrou qualificação COP 30, usar suas cores e letra
-        // Senão, usar configuração padrão
-        const markerColor = qualConfig?.cor || '#999999';
-        const textColor = qualConfig?.textColor || '#FFFFFF';
-        const markerLetra = qualConfig?.letra || '?';
+        // Definir cor baseada na natureza
+        const naturezaLower = local.natureza?.toLowerCase() || '';
+        const isPublic = naturezaLower.includes('público') || 
+                         naturezaLower.includes('publico') ||
+                         naturezaLower.includes('pública') ||
+                         naturezaLower.includes('publica') ||
+                         naturezaLower.includes('municipal') ||
+                         naturezaLower.includes('estadual') ||
+                         naturezaLower.includes('federal') ||
+                         naturezaLower.includes('governo') ||
+                         naturezaLower.includes('sus');
         
         // Debug para primeiro item
         if (index === 0) {
-          console.log(`� Configuração do marcador - ${local.nome}:`, {
-            qualificacoes: local.qualificacoes,
-            qualConfig,
-            cor: markerColor,
-            letra: markerLetra
+          console.log(`🏛️ Detecção de natureza - ${local.nome}:`, {
+            natureza: local.natureza,
+            naturezaLower,
+            isPublic
           });
         }
+        
+        const markerColor = isPublic ? '#dc3545' : '#ffc107';
+        const textColor = isPublic ? 'white' : '#000';
         
         const markerIcon = L.divIcon({
           html: `
             <div style="
-              width: 30px;
-              height: 30px;
+              width: 24px;
+              height: 24px;
               background: ${markerColor};
               border: 2px solid white;
               border-radius: 50%;
@@ -328,17 +331,17 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
               display: flex;
               align-items: center;
               justify-content: center;
-              font-size: 8px;
+              font-size: 10px;
               font-weight: bold;
               color: ${textColor};
               cursor: pointer;
             ">
-              ${markerLetra}
+              ${isPublic ? 'P' : 'V'}
             </div>
           `,
-          iconSize: [30, 30],
-          iconAnchor: [15, 15],
-          className: `estabelecimento-marker qualificacao-cop30`
+          iconSize: [24, 24],
+          iconAnchor: [12, 12],
+          className: `estabelecimento-marker ${isPublic ? 'public' : 'private'}`
         });
 
         const marker = L.marker([local.lat, local.lng], {
@@ -423,8 +426,8 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
         </div>
       )}
       
-      {/* Legenda antiga público/privado - TEMPORARIAMENTE DESABILITADA (será reativada após COP30) */}
-      {/* {isMapReady && (
+      {/* Legenda - z-index baixo para não sobrepor painel lateral */}
+      {isMapReady && (
         <div className="absolute bottom-4 left-4 bg-white p-2 sm:p-3 rounded-lg shadow-lg z-[500] max-w-[180px] sm:max-w-xs">
           <h4 className="text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-gray-800">Legenda</h4>
           <div className="space-y-1 sm:space-y-2 text-xs">
@@ -448,7 +451,7 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
             </div>
           </div>
         </div>
-      )} */}
+      )}
 
       {/* Estilo CSS adicional */}
       <style>{`
@@ -496,14 +499,12 @@ const createPopupContent = (local: Local): HTMLElement => {
     cnes: local.cnes
   });
   
-  
-  // CÓDIGO DE DETECÇÃO PÚBLICO/PRIVADO - TEMPORARIAMENTE DESABILITADO (será reativado após COP30)
-  // const naturezaLower = local.natureza?.toLowerCase() || '';
-  // const isPublic = naturezaLower.includes('público') || 
-  //                  naturezaLower.includes('publico') ||
-  //                  naturezaLower.includes('municipal') ||
-  //                  naturezaLower.includes('estadual') ||
-  //                  naturezaLower.includes('federal');
+  const naturezaLower = local.natureza?.toLowerCase() || '';
+  const isPublic = naturezaLower.includes('público') || 
+                   naturezaLower.includes('publico') ||
+                   naturezaLower.includes('municipal') ||
+                   naturezaLower.includes('estadual') ||
+                   naturezaLower.includes('federal');
   
   // Limitar habilitações e qualificações mostradas no popup
   const maxItems = 3;
@@ -519,11 +520,15 @@ const createPopupContent = (local: Local): HTMLElement => {
       
       <div class="space-y-2">
         <div class="flex items-center gap-2 flex-wrap">
-          <span class="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+          <span class="px-2 py-1 rounded-full text-xs font-medium ${
+            isPublic 
+              ? 'bg-red-100 text-red-800' 
+              : 'bg-yellow-100 text-yellow-800'
+          }">
             ${local.natureza || 'Não informado'}
           </span>
           ${local.turno && local.turno !== 'Não informado' ? `
-            <span class="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+            <span class="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
               ${local.turno}
             </span>
           ` : ''}
