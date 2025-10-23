@@ -70,56 +70,19 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
           </div>
         );
       case "created_at":
-        // 🆕 MOSTRAR DATA REAL (offline_id timestamp ou created_at)
-        const original = notificacao.original;
-        if (!original?.created_at) return "—";
-        
-        let realDate: Date;
-        let badge: string = "";
-        let badgeColor: string = "";
-        
-        // Se foi criado offline, extrair timestamp do offline_id
-        if (original.created_offline && original.offline_id) {
-          const parts = original.offline_id.split('-');
-          if (parts.length >= 3) {
-            const timestamp = parseInt(parts[2], 10);
-            if (!isNaN(timestamp)) {
-              realDate = new Date(timestamp);
-              badge = "offline";
-              badgeColor = "bg-orange-100 text-orange-800";
-            } else {
-              realDate = new Date(original.created_at);
-              badge = "online";
-              badgeColor = "bg-green-100 text-green-800";
-            }
-          } else {
-            realDate = new Date(original.created_at);
-            badge = "online";
-            badgeColor = "bg-green-100 text-green-800";
-          }
-        } else {
-          realDate = new Date(original.created_at);
-          badge = "online";
-          badgeColor = "bg-green-100 text-green-800";
-        }
-        
-        return (
-          <div className="text-sm flex items-center gap-2">
-            <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${badgeColor}`}>
-              Criado {badge}
-            </span>
-            <span className="text-gray-700">
-              {realDate.toLocaleString('pt-BR', {
-                timeZone: 'America/Belem',
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </span>
+        // 🆕 FORMATAR com data e hora
+        return notificacao.original?.created_at ? (
+          <div className="text-sm text-gray-700">
+            {new Date(notificacao.original.created_at).toLocaleString('pt-BR', {
+              timeZone: 'America/Belem',
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
           </div>
-        );
+        ) : "—";
       case "updated_at":
         // 🆕 FORMATAR com data e hora
         return notificacao.original?.updated_at ? (
@@ -134,18 +97,6 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
             })}
           </div>
         ) : "—";
-      case "created_offline":
-        // 🆕 Mostrar apenas o badge de origem
-        const isOffline = notificacao.original?.created_offline;
-        return (
-          <div className="text-sm">
-            <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${
-              isOffline ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800'
-            }`}>
-              {isOffline ? '📱 Offline' : '🌐 Online'}
-            </span>
-          </div>
-        );
       default:
         return String(notificacao[key] || "");
     }

@@ -50,14 +50,6 @@ class SyncService {
 
   // ✅ NOVO: Verificar se realmente pode fazer chamadas API
   private async checkAuthenticationStatus(): Promise<boolean> {
-    // ✅ PRIORIDADE: Verificar conexão de rede PRIMEIRO
-    if (!navigator.onLine) {
-      console.log('🔒 Sem conexão de rede - modo offline');
-      this.isOnline = false;
-      this.isAuthenticated = false;
-      return false;
-    }
-
     if (!this.isOnline) {
       this.isAuthenticated = false;
       return false;
@@ -183,11 +175,6 @@ class SyncService {
 
   // ✅ NOVO: Verificação rápida se o servidor está disponível
   public async isServerAvailable(): Promise<boolean> {
-    // ✅ PRIMEIRO: Verificar conexão de rede
-    if (!navigator.onLine) {
-      return false;
-    }
-
     if (!this.isOnline) {
       return false;
     }
@@ -521,18 +508,11 @@ class SyncService {
       const pendingNotificacoes = await indexedDBService.getPendingNotificacoes();
       console.log(`🔄 Sincronizando ${pendingNotificacoes.length} notificações...`);
       
-      for (const { id, formData, offlineId, deviceId } of pendingNotificacoes) {
+      for (const { id, formData } of pendingNotificacoes) {
         try {
-          console.log(`📋 Sincronizando notificação offlineId: ${offlineId} (ID temp: ${id})`);
+          console.log(`📋 Sincronizando notificação ID: ${id}`);
           
           let formDataAtualizada = { ...formData } as any;
-          
-          // ✅ NOVO: Adicionar campos de rastreamento offline (snake_case para o backend)
-          formDataAtualizada.offline_id = offlineId;
-          formDataAtualizada.device_id = deviceId;
-          formDataAtualizada.created_offline = true;
-          formDataAtualizada.sincronizado = false; // Será setado como true pelo backend após salvar
-          
           const pacienteIdAtual = formDataAtualizada.pacienteId || formDataAtualizada.paciente_idpaciente;
           
           // ✅ ATUALIZAR REFERÊNCIA DE PACIENTE SE NECESSÁRIO
@@ -588,16 +568,8 @@ class SyncService {
             observacaoHipotese: formDataAtualizada.observacaoHipotese
           });
 
-          // ✅ LOG CAMPOS OFFLINE ANTES DE SINCRONIZAR
-          console.log('📱 [OFFLINE TRACKING] Enviando ao servidor:', {
-            offline_id: formDataAtualizada.offline_id,
-            device_id: formDataAtualizada.device_id,
-            created_offline: formDataAtualizada.created_offline,
-            sincronizado: formDataAtualizada.sincronizado
-          });
-
-          // ✅ CRÍTICO: Marcar como 'syncing' ANTES de enviar ao servidor (usar offlineId)
-          await indexedDBService.markNotificacaoAsSyncing(offlineId);
+          // ✅ CRÍTICO: Marcar como 'syncing' ANTES de enviar ao servidor
+          await indexedDBService.markNotificacaoAsSyncing(id);
 
           // ✅ SINCRONIZAR NOTIFICAÇÃO
           const isEdit = !!(formDataAtualizada as any).id && (formDataAtualizada as any).id > 0;
@@ -605,12 +577,12 @@ class SyncService {
           
           await salvarNotificacaoCompleta(formDataAtualizada as any, isEdit, editId);
           
-          // ✅ Marcar como sincronizada SOMENTE após sucesso (usar offlineId)
-          await indexedDBService.markNotificacaoAsSynced(offlineId);
+          // ✅ Marcar como sincronizada SOMENTE após sucesso
+          await indexedDBService.markNotificacaoAsSynced(id);
           syncedCount++;
           
         } catch (error: any) {
-          console.error(`❌ Erro ao sincronizar notificação offlineId ${offlineId}:`, error);
+          console.error(`❌ Erro ao sincronizar notificação ${id}:`, error);
           
           // ✅ REVERTER de 'syncing' para 'pending' ou marcar como erro
           const isServerError = error?.response?.status === 500;
@@ -620,9 +592,9 @@ class SyncService {
           
           if (isOrphanedNotification) {
             // Apenas notificações órfãs devem ser removidas permanentemente
-            console.log(`🗑️ Removendo notificação órfã offlineId ${offlineId} - ID negativo inválido`);
-            await indexedDBService.markNotificacaoAsSynced(offlineId);
-            toast.info(`Notificação órfã (offlineId: ${offlineId}) foi removida da fila de sincronização`);
+            console.log(`🗑️ Removendo notificação órfã ID ${id} - ID negativo inválido`);
+            await indexedDBService.markNotificacaoAsSynced(id);
+            toast.info(`Notificação órfã (ID: ${id}) foi removida da fila de sincronização`);
           } else {
             // ✅ TODOS OS OUTROS ERROS: Marcar como erro para retry posterior
             const errorMessage = isServerError ? 'Erro interno do servidor' :
@@ -634,13 +606,12 @@ class SyncService {
               status: error?.response?.status,
               message: error?.message,
               timestamp: Date.now(),
-              notificationId: id,
-              offlineId: offlineId
+              notificationId: id
             };
             
-            await indexedDBService.markNotificacaoAsError(offlineId, errorMessage, errorDetails);
+            await indexedDBService.markNotificacaoAsError(id, errorMessage, errorDetails);
             
-            toast.error(`Erro ao sincronizar notificação ${offlineId}: ${errorMessage}`, {
+            toast.error(`Erro ao sincronizar notificação ${id}: ${errorMessage}`, {
               autoClose: false, // Não fechar automaticamente para dar tempo do usuário ler
               toastId: `sync-error-${id}` // Evitar duplicatas
             });
@@ -774,8 +745,8 @@ class SyncService {
         }
         
         if (shouldClear) {
-          console.log(`🗑️ Removendo notificação órfã offlineId ${notif.offlineId}: ${reason}`);
-          await indexedDBService.markNotificacaoAsSynced(notif.offlineId); // ✅ Usar offlineId
+          console.log(`🗑️ Removendo notificação órfã ID ${notif.id}: ${reason}`);
+          await indexedDBService.markNotificacaoAsSynced(notif.id); // Marca como sincronizada para remover da lista
           clearedCount++;
         }
       }
@@ -1032,20 +1003,18 @@ class SyncService {
     return true;
   }
 
-  // ✅ ATUALIZADO: Tentar sincronizar novamente uma notificação com erro (usar offlineId)
-  async retryNotificationSync(offlineId: string): Promise<boolean> {
+  // ✅ NOVO: Tentar sincronizar novamente uma notificação com erro
+  async retryNotificationSync(id: number): Promise<boolean> {
     try {
-      console.log(`🔄 Tentando sincronizar novamente a notificação offlineId: ${offlineId}`);
+      console.log(`🔄 Tentando sincronizar novamente a notificação ID: ${id}`);
       
       // Resetar status para pending
-      await indexedDBService.retryNotificacao(offlineId);
+      await indexedDBService.retryNotificacao(id);
       
-      // Obter todas notificações e buscar pelo offlineId
-      const allNotificacoes = await indexedDBService.getAll('notificacoes');
-      const notificacao = allNotificacoes.find((n: any) => n.offlineId === offlineId);
-      
+      // Obter dados da notificação
+      const notificacao = await indexedDBService.getNotificacao(id);
       if (!notificacao) {
-        throw new Error(`Notificação ${offlineId} não encontrada`);
+        throw new Error(`Notificação ${id} não encontrada`);
       }
 
       // Verificar autenticação
@@ -1055,26 +1024,26 @@ class SyncService {
       }
 
       // Tentar sincronizar
-      const isEdit = !!(notificacao.formData as any).id && (notificacao.formData as any).id > 0;
-      const editId = isEdit ? Number((notificacao.formData as any).id) : undefined;
+      const isEdit = !!(notificacao as any).id && (notificacao as any).id > 0;
+      const editId = isEdit ? Number((notificacao as any).id) : undefined;
       
-      await salvarNotificacaoCompleta(notificacao.formData as any, isEdit, editId);
-      await indexedDBService.markNotificacaoAsSynced(offlineId);
+      await salvarNotificacaoCompleta(notificacao as any, isEdit, editId);
+      await indexedDBService.markNotificacaoAsSynced(id);
       
-      toast.success(`✅ Notificação ${offlineId} sincronizada com sucesso!`);
+      toast.success(`✅ Notificação ${id} sincronizada com sucesso!`);
       return true;
       
     } catch (error: any) {
-      console.error(`❌ Erro ao tentar sincronizar novamente notificação ${offlineId}:`, error);
+      console.error(`❌ Erro ao tentar sincronizar novamente notificação ${id}:`, error);
       
       // Marcar como erro novamente
       const errorMessage = error?.response?.status === 500 ? 'Erro interno do servidor' :
                           error?.message?.includes('validation') ? 'Dados inválidos' :
                           error?.message || 'Erro desconhecido';
       
-      await indexedDBService.markNotificacaoAsError(offlineId, errorMessage, error);
+      await indexedDBService.markNotificacaoAsError(id, errorMessage, error);
       
-      toast.error(`Falha ao sincronizar notificação ${offlineId}: ${errorMessage}`);
+      toast.error(`Falha ao sincronizar notificação ${id}: ${errorMessage}`);
       return false;
     }
   }
@@ -1084,22 +1053,22 @@ class SyncService {
     return await indexedDBService.getErrorNotificacoes();
   }
 
-  // ✅ ATUALIZADO: Método para forçar limpeza de notificação específica (usar offlineId)
-  async forceRemovePendingNotification(offlineId: string): Promise<boolean> {
+  // ✅ NOVO: Método para forçar limpeza de notificação específica
+  async forceRemovePendingNotification(id: number): Promise<boolean> {
     try {
-      console.log(`🗑️ Forçando remoção da notificação pendente offlineId: ${offlineId}`);
+      console.log(`🗑️ Forçando remoção da notificação pendente ID: ${id}`);
       
-      await indexedDBService.markNotificacaoAsSynced(offlineId);
+      await indexedDBService.markNotificacaoAsSynced(id);
       
       const newCount = await this.getPendingCount();
-      console.log(`✅ Notificação ${offlineId} removida. Pendentes restantes: ${newCount.notificacoes}`);
+      console.log(`✅ Notificação ${id} removida. Pendentes restantes: ${newCount.notificacoes}`);
       
-      toast.success(`Notificação problemática (offlineId: ${offlineId}) foi removida`);
+      toast.success(`Notificação problemática (ID: ${id}) foi removida`);
       return true;
       
     } catch (error) {
-      console.error(`❌ Erro ao remover notificação ${offlineId}:`, error);
-      toast.error(`Erro ao remover notificação ${offlineId}`);
+      console.error(`❌ Erro ao remover notificação ${id}:`, error);
+      toast.error(`Erro ao remover notificação ${id}`);
       return false;
     }
   }

@@ -1,36 +1,25 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { FormData } from '@/features/notificationForms/types/index2';
-import { deviceIdService } from './deviceIdService'; // ✅ NOVO: Import do serviço de Device ID
 
 // ✅ CORRIGIDO: Interface melhorada para distinguir dados
 interface NotificacaoDatabase extends DBSchema {
   notificacoes: {
-    key: string; // ✅ MUDANÇA: Agora usa offlineId como chave (string)
+    key: number;
     value: {
       id: number;
-      offlineId: string; // ✅ NOVO: ID único da notificação offline
-      deviceId: string; // ✅ NOVO: ID do dispositivo
       formData: FormData;
-      syncStatus: 'pending' | 'syncing' | 'synced' | 'error';
+      syncStatus: 'pending' | 'syncing' | 'synced' | 'error'; // ✅ NOVO: Adicionado status 'syncing'
       timestamp: number;
-      createdOffline: boolean; // ✅ NOVO: Flag se foi criada offline
-      sincronizado: boolean; // ✅ NOVO: Flag de controle de sincronização
-      syncedAt?: number; // ✅ NOVO: Timestamp da sincronização
-      isEdit?: boolean;
-      syncStartedAt?: number;
-      errorInfo?: {
+      isEdit?: boolean; // ✅ Propriedade para distinguir edição
+      syncStartedAt?: number; // ✅ NOVO: Timestamp de quando iniciou a sincronização
+      errorInfo?: { // ✅ NOVO: Informações do erro
         message: string;
         timestamp: number;
         retryCount?: number;
         lastError?: string;
       };
     };
-    indexes: { 
-      'by-sync-status': string;
-      'by-device-id': string; // ✅ NOVO
-      'by-offline-id': string; // ✅ NOVO
-      'by-sincronizado': string; // ✅ CORRIGIDO: string ao invés de boolean
-    };
+    indexes: { 'by-sync-status': string };
   };
   opcoes: {
     key: string;
@@ -82,7 +71,7 @@ interface NotificacaoDatabase extends DBSchema {
   };
 }
 
-const DB_VERSION = 5; // ✅ VERSÃO 5: Nova estrutura com offlineId, deviceId, sincronizado
+const DB_VERSION = 4; // ✅ INCREMENTAR versão para nova estrutura
 const DB_NAME = 'NotificacaoOfflineDB';
 const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 dias
 
@@ -103,29 +92,9 @@ export class IndexedDBService {
           if (!db.objectStoreNames.contains('notificacoes')) {
             console.log('🆕 Criando store: notificacoes');
             const notificacoesStore = db.createObjectStore('notificacoes', {
-              keyPath: 'offlineId' // ✅ NOVO: Usar offlineId como chave
+              keyPath: 'id'
             });
             notificacoesStore.createIndex('by-sync-status', 'syncStatus');
-            notificacoesStore.createIndex('by-device-id', 'deviceId'); // ✅ NOVO
-            notificacoesStore.createIndex('by-offline-id', 'offlineId'); // ✅ NOVO
-            notificacoesStore.createIndex('by-sincronizado', 'sincronizado'); // ✅ NOVO
-          } else if (oldVersion < 5) {
-            // ✅ Migração para versão 5: adicionar novos índices e migrar dados
-            console.log('🔄 Migrando notificações para v5 com offlineId...');
-            const tx = (db as any).transaction.objectStore('notificacoes');
-            
-            // Criar novos índices se não existirem
-            if (!tx.indexNames.contains('by-device-id')) {
-              tx.createIndex('by-device-id', 'deviceId');
-            }
-            if (!tx.indexNames.contains('by-offline-id')) {
-              tx.createIndex('by-offline-id', 'offlineId');
-            }
-            if (!tx.indexNames.contains('by-sincronizado')) {
-              tx.createIndex('by-sincronizado', 'sincronizado');
-            }
-            
-            console.log('✅ Índices v5 criados. ATENÇÃO: Dados antigos podem precisar migração manual.');
           }
 
           // Store para opções
@@ -266,35 +235,23 @@ export class IndexedDBService {
       // ✅ CORREÇÃO: Criar uma cópia profunda dos dados para evitar perda de propriedades
       const formDataCopy = JSON.parse(JSON.stringify(formData));
       
-      // ✅ NOVO: Gerar offlineId e deviceId
-      const offlineId = await deviceIdService.generateOfflineId();
-      const deviceId = await deviceIdService.getDeviceId();
-      
       let notificacao;
       
       if (isEdit && id) {
         notificacao = {
           id,
-          offlineId, // ✅ NOVO
-          deviceId, // ✅ NOVO
           formData: formDataCopy,
           syncStatus: 'pending' as const,
           timestamp: Date.now(),
-          createdOffline: true, // ✅ NOVO
-          sincronizado: false, // ✅ NOVO: Inicia como não sincronizado
           isEdit: true
         };
       } else {
         const tempId = await this.generateTemporaryId();
         notificacao = {
           id: tempId,
-          offlineId, // ✅ NOVO
-          deviceId, // ✅ NOVO
           formData: formDataCopy, 
           syncStatus: 'pending' as const,
           timestamp: Date.now(),
-          createdOffline: true, // ✅ NOVO
-          sincronizado: false, // ✅ NOVO: Inicia como não sincronizado
           isEdit: false
         };
       }
@@ -302,10 +259,7 @@ export class IndexedDBService {
       // ✅ LOG DETALHADO PARA DEBUG DO MODO OFFLINE
       console.log(`💾 [INDEXEDDB] Salvando notificação offline:`, {
         id: notificacao.id,
-        offlineId: notificacao.offlineId, // ✅ NOVO LOG
-        deviceId: notificacao.deviceId, // ✅ NOVO LOG
         isEdit: isEdit,
-        sincronizado: notificacao.sincronizado, // ✅ NOVO LOG
         // Campos críticos para verificação
         localHospedagem: formDataCopy.localHospedagem,
         contatoLocal: formDataCopy.contatoLocal,
@@ -576,38 +530,21 @@ export class IndexedDBService {
     }
   }
 
-  // ===== MÉTODOS EXISTENTES =====
+  // ===== MÉTODOS EXISTENTES (não mexer) =====
   
-  // ✅ OBSOLETO: Manter por compatibilidade, mas buscar por todas e filtrar
   async getNotificacao(id: number): Promise<FormData | null> {
     await this.init();
-    // Buscar todas notificações e encontrar pelo ID antigo
-    const allNotificacoes = await this.db!.getAll('notificacoes');
-    const notificacao = allNotificacoes.find(n => n.id === id);
-    return notificacao ? notificacao.formData : null;
-  }
-  
-  // ✅ NOVO: Buscar notificação por offlineId
-  async getNotificacaoByOfflineId(offlineId: string): Promise<FormData | null> {
-    await this.init();
-    const notificacao = await this.db!.get('notificacoes', offlineId);
+    const notificacao = await this.db!.get('notificacoes', id);
     return notificacao ? notificacao.formData : null;
   }
 
-  async getPendingNotificacoes(): Promise<Array<{ id: number; formData: FormData; offlineId: string; deviceId: string }>> {
+  async getPendingNotificacoes(): Promise<Array<{ id: number; formData: FormData }>> {
     await this.init();
-    
-    // ✅ NOVO: Buscar por sincronizado = false
-    const allNotificacoes = await this.db!.getAll('notificacoes');
-    const pending = allNotificacoes.filter(item => item.sincronizado === false);
-    
-    console.log(`📋 [INDEXEDDB] Notificações pendentes de sincronização: ${pending.length}`);
+    const pending = await this.db!.getAllFromIndex('notificacoes', 'by-sync-status', 'pending');
     
     // ✅ DEBUG ESPECÍFICO: Log dos campos de trauma nas notificações pendentes
     pending.forEach(item => {
-      console.log(`🩹 [DEBUG TRAUMA] Notificação pendente offlineId ${item.offlineId}:`, {
-        id: item.id,
-        deviceId: item.deviceId,
+      console.log(`🩹 [DEBUG TRAUMA] Notificação pendente ID ${item.id}:`, {
         tipoTrauma: item.formData.tipoTrauma,
         observacaoTrauma: item.formData.observacaoTrauma,
         observacaoSintomas: item.formData.observacaoSintomas,
@@ -615,12 +552,7 @@ export class IndexedDBService {
       });
     });
     
-    return pending.map(item => ({ 
-      id: item.id as number, 
-      formData: item.formData,
-      offlineId: item.offlineId,
-      deviceId: item.deviceId
-    }));
+    return pending.map(item => ({ id: item.id as number, formData: item.formData }));
   }
 
   // ✅ NOVO: Obter notificações pendentes incluindo as com erro (para retry)
@@ -646,57 +578,50 @@ export class IndexedDBService {
     return allPending.sort((a, b) => a.id - b.id);
   }
 
-  // ✅ ATUALIZADO: Aceita offlineId (string) ao invés de id (number)
-  async markNotificacaoAsSynced(offlineId: string): Promise<void> {
+  async markNotificacaoAsSynced(id: number): Promise<void> {
     await this.init();
-    const notificacao = await this.db!.get('notificacoes', offlineId);
+    const notificacao = await this.db!.get('notificacoes', id);
     if (notificacao) {
       notificacao.syncStatus = 'synced';
-      notificacao.sincronizado = true; // ✅ NOVO: Marcar como sincronizado
-      notificacao.syncedAt = Date.now(); // ✅ NOVO: Timestamp da sincronização
       // Limpar informações de erro e sincronização
       delete notificacao.errorInfo;
       delete notificacao.syncStartedAt;
       await this.db!.put('notificacoes', notificacao);
-      console.log(`✅ Notificação ${offlineId} marcada como sincronizada`);
     }
   }
 
-  // ✅ ATUALIZADO: Aceita offlineId (string) ao invés de id (number)
-  async markNotificacaoAsSyncing(offlineId: string): Promise<void> {
+  // ✅ NOVO: Marcar notificação como "em sincronização"
+  async markNotificacaoAsSyncing(id: number): Promise<void> {
     await this.init();
-    const notificacao = await this.db!.get('notificacoes', offlineId);
+    const notificacao = await this.db!.get('notificacoes', id);
     if (notificacao) {
       notificacao.syncStatus = 'syncing';
       notificacao.syncStartedAt = Date.now();
       await this.db!.put('notificacoes', notificacao);
-      console.log(`🔄 Notificação ${offlineId} marcada como 'syncing' - iniciando envio ao servidor`);
+      console.log(`🔄 Notificação ${id} marcada como 'syncing' - iniciando envio ao servidor`);
     }
   }
 
-  // ✅ ATUALIZADO: Reverter notificação de "syncing" para "pending" em caso de falha
-  async revertNotificacaoToPending(offlineId: string): Promise<void> {
+  // ✅ NOVO: Reverter notificação de "syncing" para "pending" em caso de falha
+  async revertNotificacaoToPending(id: number): Promise<void> {
     await this.init();
-    const notificacao = await this.db!.get('notificacoes', offlineId);
+    const notificacao = await this.db!.get('notificacoes', id);
     if (notificacao && notificacao.syncStatus === 'syncing') {
       notificacao.syncStatus = 'pending';
-      notificacao.sincronizado = false; // ✅ NOVO
       delete notificacao.syncStartedAt;
       await this.db!.put('notificacoes', notificacao);
-      console.log(`⚠️ Notificação ${offlineId} revertida de 'syncing' para 'pending'`);
+      console.log(`⚠️ Notificação ${id} revertida de 'syncing' para 'pending'`);
     }
   }
 
   // ✅ NOVO: Marcar notificação como erro
-  // ✅ ATUALIZADO: Aceita offlineId (string) ao invés de id (number)
-  async markNotificacaoAsError(offlineId: string, errorMessage: string, errorDetails?: any): Promise<void> {
+  async markNotificacaoAsError(id: number, errorMessage: string, errorDetails?: any): Promise<void> {
     await this.init();
-    const notificacao = await this.db!.get('notificacoes', offlineId);
+    const notificacao = await this.db!.get('notificacoes', id);
     if (notificacao) {
       const currentRetryCount = notificacao.errorInfo?.retryCount || 0;
       
       notificacao.syncStatus = 'error';
-      notificacao.sincronizado = false; // ✅ NOVO: Manter como não sincronizado
       notificacao.errorInfo = {
         message: errorMessage,
         timestamp: Date.now(),
@@ -705,20 +630,19 @@ export class IndexedDBService {
       };
       
       await this.db!.put('notificacoes', notificacao);
-      console.log(`❌ Notificação ${offlineId} marcada como erro: ${errorMessage} (tentativa ${currentRetryCount + 1})`);
+      console.log(`❌ Notificação ${id} marcada como erro: ${errorMessage} (tentativa ${currentRetryCount + 1})`);
     }
   }
 
-  // ✅ ATUALIZADO: Aceita offlineId (string) ao invés de id (number)
-  async retryNotificacao(offlineId: string): Promise<void> {
+  // ✅ NOVO: Resetar status de erro para permitir nova tentativa
+  async retryNotificacao(id: number): Promise<void> {
     await this.init();
-    const notificacao = await this.db!.get('notificacoes', offlineId);
+    const notificacao = await this.db!.get('notificacoes', id);
     if (notificacao && notificacao.syncStatus === 'error') {
       notificacao.syncStatus = 'pending';
-      notificacao.sincronizado = false; // ✅ Continua não sincronizado
       // Manter errorInfo para histórico, mas limpar o status
       await this.db!.put('notificacoes', notificacao);
-      console.log(`🔄 Notificação ${offlineId} marcada para nova tentativa de sincronização`);
+      console.log(`🔄 Notificação ${id} marcada para nova tentativa de sincronização`);
     }
   }
 
@@ -814,7 +738,7 @@ export class IndexedDBService {
     
     const tx = this.db!.transaction('notificacoes', 'readwrite');
     for (const n of oldSyncedNotificacoes) {
-      if (n.offlineId) await tx.store.delete(n.offlineId); // ✅ ATUALIZADO: Usar offlineId
+      if (n.id) await tx.store.delete(n.id);
     }
     await tx.done;
   }

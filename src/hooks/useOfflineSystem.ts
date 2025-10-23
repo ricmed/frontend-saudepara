@@ -3,6 +3,7 @@ import { toast } from 'react-toastify';
 import { offlineDataManager } from '@/services/offlineDataManager';
 import syncService from '@/services/syncService';
 import indexedDBService from '@/services/indexedDB';
+import PacienteService from '@/services/PacienteService';
 
 interface OfflineStats {
   isReady: boolean;

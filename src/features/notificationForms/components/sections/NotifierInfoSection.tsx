@@ -9,7 +9,6 @@ import UnidadeNotificadoraField from '@/features/notificationForms/components/Un
 import BrazilianPhoneInput from '@/features/notificationForms/components/BrazilianPhoneInput';
 import useUserPermissions from '@/hooks/useUserPermissions';
 import { usuarioGestaoService } from '@/services/UsuarioGestaoService';
-import indexedDBService from '@/services/indexedDB';
 
 const NotifierInfoSection: React.FC<FormSectionProps> = ({
   formData,
@@ -31,94 +30,31 @@ const NotifierInfoSection: React.FC<FormSectionProps> = ({
       try {
         setLoadingUnidades(true);
         console.log('🔍 Carregando unidades baseado no nível:', permissions.nivel);
-        console.log('📱 Status online:', navigator.onLine ? 'ONLINE' : 'OFFLINE');
         
         let unidades: Array<{id: number; nome: string}> = [];
         
         if (permissions.nivel === 'unidade' && permissions.estabelecimentoId) {
           // Para usuário de unidade: apenas sua unidade
-          
-          if (!navigator.onLine) {
-            // 📱 MODO OFFLINE: Buscar do cache
-            console.log('📱 Modo offline: buscando unidade do cache...');
-            const cachedEstabelecimentos = await indexedDBService.getOpcoes('estabelecimentos-permitidos') || 
-                                          await indexedDBService.getOpcoes('estabelecimentos');
-            
-            if (cachedEstabelecimentos && cachedEstabelecimentos.length > 0) {
-              const unidade = cachedEstabelecimentos.find((est: any) => 
-                est.idestabelecimento === permissions.estabelecimentoId
-              );
-              
-              if (unidade) {
-                unidades = [{
-                  id: unidade.idestabelecimento,
-                  nome: unidade.nome
-                }];
-                console.log('✅ Unidade encontrada no cache:', unidade.nome);
-              }
-            }
-          } else {
-            // 🌐 MODO ONLINE: Buscar da API
-            const response = await usuarioGestaoService.getEstabelecimentoComHierarquia(permissions.estabelecimentoId);
-            unidades = [{
-              id: response.idestabelecimento,
-              nome: response.nome
-            }];
-          }
+          const response = await usuarioGestaoService.getEstabelecimentoComHierarquia(permissions.estabelecimentoId);
+          unidades = [{
+            id: response.idestabelecimento,
+            nome: response.nome
+          }];
           
           // Pré-selecionar automaticamente a unidade do usuário
-          if (formData.unidadeNotificadora === '' && unidades.length > 0) {
-            console.log('🏥 Pré-selecionando unidade do usuário:', unidades[0].nome);
+          if (formData.unidadeNotificadora === '') {
+            console.log('🏥 Pré-selecionando unidade do usuário:', response.nome);
             setFormData(prev => ({
               ...prev,
-              unidadeNotificadora: unidades[0].id.toString()
+              unidadeNotificadora: response.idestabelecimento.toString()
             }));
           }
         } else if (permissions.nivel === 'municipio' && permissions.municipioId) {
           // Para usuário de município: todas as unidades do município
-          
-          if (!navigator.onLine) {
-            // 📱 MODO OFFLINE: Filtrar do cache
-            console.log('📱 Modo offline: filtrando estabelecimentos do município no cache...');
-            const cachedEstabelecimentos = await indexedDBService.getOpcoes('estabelecimentos-permitidos') || 
-                                          await indexedDBService.getOpcoes('estabelecimentos');
-            
-            if (cachedEstabelecimentos && cachedEstabelecimentos.length > 0) {
-              unidades = cachedEstabelecimentos
-                .filter((est: any) => est.tipo_municipio_idtipo_municipio === permissions.municipioId && est.ativo === 'S')
-                .map((est: any) => ({
-                  id: est.idestabelecimento,
-                  nome: est.nome
-                }));
-              console.log(`✅ ${unidades.length} estabelecimentos do município encontrados no cache`);
-            }
-          } else {
-            // 🌐 MODO ONLINE: Buscar da API
-            unidades = await usuarioGestaoService.getEstabelecimentosPorMunicipio(permissions.municipioId);
-          }
+          unidades = await usuarioGestaoService.getEstabelecimentosPorMunicipio(permissions.municipioId);
         } else if (permissions.nivel === 'estado' && permissions.estadoId) {
           // Para usuário de estado: todas as unidades do estado (Pará)
-          
-          if (!navigator.onLine) {
-            // 📱 MODO OFFLINE: Usar TODOS do cache (já filtrados hierarquicamente)
-            console.log('📱 Modo offline: usando cache de estabelecimentos permitidos...');
-            const cachedEstabelecimentos = await indexedDBService.getOpcoes('estabelecimentos-permitidos');
-            
-            if (cachedEstabelecimentos && cachedEstabelecimentos.length > 0) {
-              unidades = cachedEstabelecimentos
-                .filter((est: any) => est.ativo === 'S')
-                .map((est: any) => ({
-                  id: est.idestabelecimento,
-                  nome: est.nome
-                }));
-              console.log(`✅ ${unidades.length} estabelecimentos do estado encontrados no cache offline`);
-            } else {
-              console.warn('⚠️ Cache offline vazio! Execute o download de dados primeiro.');
-            }
-          } else {
-            // 🌐 MODO ONLINE: Buscar da API
-            unidades = await usuarioGestaoService.getEstabelecimentosPorEstado(permissions.estadoId);
-          }
+          unidades = await usuarioGestaoService.getEstabelecimentosPorEstado(permissions.estadoId);
         }
         
         setUnidadesPermitidas(unidades);
@@ -126,28 +62,6 @@ const NotifierInfoSection: React.FC<FormSectionProps> = ({
         
       } catch (error) {
         console.error('❌ Erro ao carregar unidades permitidas:', error);
-        
-        // ✅ FALLBACK: Se der erro (ex: offline), tentar carregar do cache
-        if (!navigator.onLine) {
-          console.log('🔄 Tentando fallback para cache offline...');
-          try {
-            const cachedEstabelecimentos = await indexedDBService.getOpcoes('estabelecimentos-permitidos') || 
-                                          await indexedDBService.getOpcoes('estabelecimentos');
-            
-            if (cachedEstabelecimentos && cachedEstabelecimentos.length > 0) {
-              const unidades = cachedEstabelecimentos
-                .filter((est: any) => est.ativo === 'S')
-                .map((est: any) => ({
-                  id: est.idestabelecimento,
-                  nome: est.nome
-                }));
-              setUnidadesPermitidas(unidades);
-              console.log(`✅ Fallback: ${unidades.length} unidades carregadas do cache`);
-            }
-          } catch (cacheError) {
-            console.error('❌ Erro ao carregar do cache:', cacheError);
-          }
-        }
       } finally {
         setLoadingUnidades(false);
       }
@@ -217,20 +131,16 @@ const NotifierInfoSection: React.FC<FormSectionProps> = ({
                         ? "Buscar unidades do seu município..."
                         : "Buscar unidades do Pará..."
                 }
-                /** 
-                 * 🔒 MODO ONLINE: Restringir por allowedOptions 
-                 * 📱 MODO OFFLINE: Cache já está filtrado hierarquicamente, não restringir
-                 * ⚠️ IMPORTANTE: Se lista vazia, passar undefined para buscar do cache
-                 */
-                restrictToAllowed={navigator.onLine && unidadesPermitidas.length > 0}
-                allowedOptions={navigator.onLine && unidadesPermitidas.length > 0 ? unidadesPermitidas.map(u => ({
+                /** 🔒 Chave para travar por ID - componente filtra tudo localmente */
+                restrictToAllowed={true}
+                allowedOptions={unidadesPermitidas.map(u => ({
                   idestabelecimento: u.id,
                   nome: u.nome,
                   // Se você tiver mais campos disponíveis, inclua aqui:
                   // cnes: u.cnes,
                   // cidade: u.cidade,
                   // bairro: u.bairro,
-                })) : undefined}
+                }))}
                 denyOutsideMessage={
                   permissions.nivel === 'unidade' 
                     ? "Você só pode selecionar sua própria unidade"

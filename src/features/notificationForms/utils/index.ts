@@ -64,39 +64,20 @@ export const adjustDatesForExport = (data: any[]): any[] => {
 
 /**
  * Função de comparação para ordenação de dados
- * 🆕 ATUALIZADO: Tratamento especial para valores vazios e timestamps ISO
+ * 🆕 ATUALIZADO: Suporte para timestamps ISO (created_at, updated_at)
  */
 export const compareValues = (valA: any, valB: any, sortOrder: "asc" | "desc"): number => {
-  // 🛡️ TRATAR VALORES VAZIOS/NULL/UNDEFINED primeiro
-  const isEmptyA = !valA || valA === "" || valA === null || valA === undefined;
-  const isEmptyB = !valB || valB === "" || valB === null || valB === undefined;
-  
-  // Se ambos vazios, são iguais
-  if (isEmptyA && isEmptyB) return 0;
-  
-  // Valores vazios sempre vão para o final
-  if (isEmptyA) return 1;  // A vai para o final
-  if (isEmptyB) return -1; // B vai para o final
-  
   // 🆕 Para timestamps ISO (formato: 2025-10-12T14:30:25.000Z)
   if (typeof valA === 'string' && typeof valB === 'string') {
     // Detectar se é um timestamp ISO completo
-    const isISOA = valA.includes('T') && (valA.includes('Z') || valA.includes('+') || valA.match(/-\d{2}:\d{2}$/));
-    const isISOB = valB.includes('T') && (valB.includes('Z') || valB.includes('+') || valB.match(/-\d{2}:\d{2}$/));
-    
-    if (isISOA && isISOB) {
-      try {
-        const dateA = new Date(valA);
-        const dateB = new Date(valB);
-        
-        // Verificar se as datas são válidas
-        if (!isNaN(dateA.getTime()) && !isNaN(dateB.getTime())) {
-          const diff = dateA.getTime() - dateB.getTime();
-          return sortOrder === "asc" ? diff : -diff;
-        }
-      } catch (error) {
-        console.warn('Erro ao comparar timestamps ISO:', error);
-      }
+    if (valA.includes('T') && valA.includes('Z') && 
+        valB.includes('T') && valB.includes('Z')) {
+      const dateA = new Date(valA);
+      const dateB = new Date(valB);
+      
+      return sortOrder === "asc" 
+        ? dateA.getTime() - dateB.getTime() 
+        : dateB.getTime() - dateA.getTime();
     }
     
     // Para datas brasileiras DD/MM/YYYY
@@ -128,7 +109,7 @@ export const compareValues = (valA: any, valB: any, sortOrder: "asc" | "desc"): 
 
 /**
  * Extrai valor para comparação com base na chave de ordenação
- * 🆕 ATUALIZADO: Suporte para created_at com timestamp REAL (offline_id ou created_at)
+ * 🆕 ATUALIZADO: Suporte para created_at e updated_at com timestamp completo
  */
 export const getValueForSorting = (notificacao: Notificacao, sortKey: keyof Notificacao): any => {
   if (sortKey === "paciente") {
@@ -144,21 +125,8 @@ export const getValueForSorting = (notificacao: Notificacao, sortKey: keyof Noti
   } else if (sortKey === "tipo_encerramento") {
     return notificacao.tipoEncerramento || "";
   } else if (sortKey === "created_at") {
-    // 🆕 USAR DATA REAL: Se foi criado offline, usar timestamp do offline_id
-    const original = notificacao.original;
-    if (original?.created_offline && original?.offline_id) {
-      // Extrair timestamp do offline_id (formato: fp-XXXX-TIMESTAMP-XXXX)
-      const parts = original.offline_id.split('-');
-      if (parts.length >= 3) {
-        const timestamp = parseInt(parts[2], 10);
-        if (!isNaN(timestamp)) {
-          // Retornar como ISO string para comparação consistente
-          return new Date(timestamp).toISOString();
-        }
-      }
-    }
-    // Se não tem offline_id ou não foi criado offline, usar created_at normal
-    return original?.created_at || "";
+    // 🆕 Retornar timestamp completo para ordenação precisa
+    return notificacao.original?.created_at || "";
   } else if (sortKey === "updated_at") {
     // 🆕 Retornar timestamp completo para ordenação precisa
     return notificacao.original?.updated_at || "";
@@ -166,9 +134,6 @@ export const getValueForSorting = (notificacao: Notificacao, sortKey: keyof Noti
     return notificacao.original?.created_by_userid || "";
   } else if (sortKey === "updated_by_userid") {
     return notificacao.original?.updated_by_userid || "";
-  } else if (sortKey === "created_offline") {
-    // 🆕 Ordenar por origem: offline (1) vem antes de online (0)
-    return notificacao.original?.created_offline ? "1-offline" : "0-online";
   } else {
     return notificacao[sortKey] || "";
   }
