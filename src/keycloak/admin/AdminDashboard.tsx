@@ -18,7 +18,8 @@ import {
   Bell,
   Eye,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  MessageCircle // ✅ NOVO: Ícone para Chat
 } from 'lucide-react';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useNotificacoesByUserAccess, useNotificacoesStats } from '@/hooks/useNotificacoesHierarquicas';
@@ -167,7 +168,15 @@ const AdminDashboard: React.FC = () => {
       icon: Shield,
       color: 'bg-purple-500',
       href: '/admin/master/roles'
-    }
+    },
+    // ✅ Chat de Suporte - APENAS para admin master (não admin hierárquico)
+    ...(user?.roles?.includes('admin') ? [{
+      title: 'Chat de Suporte',
+      description: 'Gerenciar conversas e reportes de bugs',
+      icon: MessageCircle,
+      color: 'bg-indigo-500',
+      href: '/admin/chat-suporte'
+    }] : [])
   ];
 
   return (

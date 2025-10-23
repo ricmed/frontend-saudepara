@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Outlet } from "react-router-dom";
 import AdminRoutes from "@/keycloak/admin/AdminRoutes";
+import ChatAdminDashboard from "@/features/chat/pages/ChatAdminDashboard";
 import { useEffect } from 'react';
 import indexedDBService from '@/services/indexedDB';
 import syncService from '@/services/syncService';
@@ -106,6 +107,8 @@ import OfflineManagementPage from '@/features/offlinePage/pages/OfflineManagemen
 import FaleConoscoPage from '@/features/contact/FaleConoscoPage';
 import AscomPage from '@/features/contact/AscomPage';
 import OuvidoriaPage from '@/features/contact/OuvidoriaPage';
+// Version page
+import VersionPage from '@/pages/VersionPage';
 // Componente de layout protegido
 const ProtectedLayout = () => {
   return (
@@ -282,6 +285,20 @@ function App() {
           <Route path="/fale-conosco" element={<FaleConoscoPage />} />
           <Route path="/fale-conosco/ascom" element={<AscomPage />} />
           <Route path="/fale-conosco/ouvidoria" element={<OuvidoriaPage />} />
+          
+          {/* Version Page */}
+          <Route path="/versao" element={<VersionPage />} />
+          
+          {/* ✅ NOVO: Rota para Admin do Chat de Suporte */}
+          <Route 
+            path="/admin/chat-suporte" 
+            element={
+              <ProtectedRoute>
+                <ChatAdminDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          
           <Route path="/admin/*" element={<AdminRoutes />}></Route>
         </Routes>
       </Router>
