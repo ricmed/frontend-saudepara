@@ -558,14 +558,8 @@ const MapaLeaflet: React.FC = () => {
             <MapProviderOverlay />
 
             {/* Legenda de qualificações - canto inferior esquerdo */}
-            {/* Versão mobile - compacta */}
-            <div className="absolute bottom-20 left-2 z-[400] md:hidden">
-              <LegendaQualificacoes mobile={true} />
-            </div>
-            
-            {/* Versão desktop - completa */}
-            <div className="hidden md:block absolute bottom-24 left-4 z-[400]">
-              <LegendaQualificacoes mobile={false} />
+            <div className="absolute bottom-24 left-4 z-[400] hidden md:block">
+              <LegendaQualificacoes />
             </div>
 
             {/* Botões de controle */}
