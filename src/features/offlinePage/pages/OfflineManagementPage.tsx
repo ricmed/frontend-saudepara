@@ -11,8 +11,6 @@ import {
   AlertTriangle, 
   Clock, 
   BarChart3,
-  Folder,
-  Settings,
   Info,
   Play,
   Pause,
@@ -49,6 +47,7 @@ const OfflineManagementPage: React.FC = () => {
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [currentDownload, setCurrentDownload] = useState('');
   const [pendingSync, setPendingSync] = useState({ notificacoes: 0, pacientes: 0 });
+  const [pendingNotifications, setPendingNotifications] = useState<any[]>([]); // ✅ NOVO: Lista detalhada de notificações pendentes
   const [activeTab, setActiveTab] = useState<'overview' | 'patients' | 'sources' | 'sync'>('overview');
   const [isSyncPaused, setIsSyncPaused] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
@@ -103,6 +102,10 @@ const OfflineManagementPage: React.FC = () => {
     try {
       const pending = await syncService.getPendingCount();
       setPendingSync(pending);
+      
+      // ✅ NOVO: Carregar lista detalhada de notificações pendentes
+      const pendingNotifs = await indexedDBService.getPendingNotificacoes();
+      setPendingNotifications(pendingNotifs);
     } catch (error) {
       console.error('Erro ao carregar dados pendentes:', error);
     }
@@ -294,7 +297,7 @@ const OfflineManagementPage: React.FC = () => {
   // ...existing code...
 
   // ✅ CORRIGIDO: Handlers para download de pacientes usando sistema correto
-  const handleDownloadPatients = async (strategy: 'full') => {
+  const handleDownloadPatients = async () => {
     if (!isOnline) {
       toast.error('❌ Sem conexão com a internet');
       return;
@@ -434,8 +437,6 @@ const OfflineManagementPage: React.FC = () => {
       <SideMenu
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
-        selectedLanguage="pt-BR"
-        onLanguageChange={() => {}}
       />
 
       {/* Navigation Tabs - atualizado */}
@@ -759,7 +760,7 @@ const OfflineManagementPage: React.FC = () => {
                     Todos os pacientes (verificação 100% precisa).
                   </p>
                   <button
-                    onClick={() => handleDownloadPatients('full')}
+                    onClick={() => handleDownloadPatients()}
                     disabled={patientsDownloading || !isOnline}
                     className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
@@ -980,7 +981,59 @@ const OfflineManagementPage: React.FC = () => {
                     {isOnline ? 'Sincronizar Agora' : 'Aguardando Conexão'}
                   </button>
                 </div>
-              )}              {(pendingSync.notificacoes + pendingSync.pacientes) === 0 && (
+              )}
+
+              {/* ✅ NOVO: Lista detalhada de notificações pendentes */}
+              {pendingNotifications.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                    📋 Notificações Pendentes de Sincronização
+                  </h3>
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {pendingNotifications.map((notif: any, index: number) => (
+                      <div key={notif.offlineId || index} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-sm font-medium text-gray-900">
+                                #{index + 1} - {notif.formData?.tipoEvento || 'Notificação'}
+                              </span>
+                              <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">
+                                Offline
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                              <div>
+                                <Clock className="inline h-3 w-3 mr-1" />
+                                <strong>Criado em:</strong>{' '}
+                                {new Date(notif.timestamp).toLocaleString('pt-BR', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </div>
+                              <div>
+                                <span className="inline-block w-20 truncate" title={notif.offlineId}>
+                                  📱 ID: {notif.offlineId?.substring(0, 15)}...
+                                </span>
+                              </div>
+                              {notif.formData?.paciente && (
+                                <div className="col-span-2">
+                                  <strong>Paciente:</strong> {notif.formData.paciente}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(pendingSync.notificacoes + pendingSync.pacientes) === 0 && (
                 <div className="mt-6 p-4 bg-green-50 rounded-xl border border-green-200">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-5 w-5 text-green-600" />

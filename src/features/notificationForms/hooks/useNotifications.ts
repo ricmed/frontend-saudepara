@@ -342,6 +342,19 @@ export const useNotifications = () => {
       try {
         setIsLoading(true);
 
+        // 🆕 ATIVAR ORDENAÇÃO LOCAL NA PRIMEIRA CARGA
+        // Se ainda não ativou ordenação local e não tem busca ativa, buscar todos os dados
+        if (!isUsingLocalSort && !debouncedSearchParams.term && allNotificacoes.length === 0) {
+          console.log('🔄 Primeira carga: buscando todos os dados para ordenação...');
+          const allData = await fetchAllData();
+          
+          if (allData && allData.length > 0) {
+            setAllNotificacoes(allData);
+            setIsUsingLocalSort(true);
+            console.log(`✅ ${allData.length} notificações carregadas - ordenação local ativada`);
+          }
+        }
+
         // Se estamos usando ordenação local e temos todos os dados
         if (isUsingLocalSort && allNotificacoes.length > 0) {
           // Aplicar ordenação
@@ -575,8 +588,15 @@ export const useNotifications = () => {
             return;
           }
 
+          // 🆕 ORDENAR dados antes de exibir (mesmo na primeira carga)
+          const sortedNotificacoes = [...notificacoesFiltradas].sort((a, b) => {
+            const valueA = getValueForSorting(a, sortKey);
+            const valueB = getValueForSorting(b, sortKey);
+            return compareValues(valueA, valueB, sortOrder);
+          });
+          
           // Atualizar os dados
-          setNotificacoes(notificacoesFiltradas);
+          setNotificacoes(sortedNotificacoes);
 
           // Verificação de segurança para meta
           if (response.meta) {

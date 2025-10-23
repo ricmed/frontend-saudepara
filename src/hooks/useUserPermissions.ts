@@ -1,7 +1,10 @@
 import { useAuth } from '@/keycloak/AuthProvider';
 import { useState, useEffect } from 'react';
 import { usuarioGestaoService } from '../services/UsuarioGestaoService';
-import syncService from '@/services/syncService';
+
+// ✅ Cache global em memória para evitar múltiplas chamadas API
+let cachedPermissions: any = null;
+let loadingPromise: Promise<any> | null = null;
 
 export interface UserPermissions {
   // Níveis de acesso
@@ -27,8 +30,8 @@ export interface UserPermissions {
 
 export const useUserPermissions = (): UserPermissions => {
   const { user } = useAuth();
-  const [accessData, setAccessData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [accessData, setAccessData] = useState<any>(cachedPermissions); // ✅ Inicializar com cache global
+  const [loading, setLoading] = useState(!cachedPermissions); // ✅ Não está loading se já tem cache
 
   // Carregar dados de acesso do usuário
   useEffect(() => {
@@ -38,24 +41,120 @@ export const useUserPermissions = (): UserPermissions => {
         return;
       }
 
-      // ✅ Verificar se pode usar modo online antes de fazer chamada API
-      const canUseOnline = await syncService.canUseOnlineMode();
-      if (!canUseOnline) {
-        console.log('🔒 Modo offline - não carregando permissões de usuário');
+      // ✅ Se já tem cache global em memória, usar imediatamente
+      if (cachedPermissions) {
+        console.log('⚡ Usando cache global em memória (sem chamada API)');
+        setAccessData(cachedPermissions);
         setLoading(false);
         return;
       }
 
-      try {
-        // Chamar sem parâmetro para usar o endpoint /current
-        const access = await usuarioGestaoService.getUserAccess();
-        console.log('🔑 Dados de acesso carregados:', access);
-        setAccessData(access);
-      } catch (error) {
-        console.warn('Não foi possível carregar dados de acesso:', error);
-      } finally {
-        setLoading(false);
+      // ✅ Se já existe uma requisição em andamento, esperar por ela
+      if (loadingPromise) {
+        console.log('⏳ Aguardando requisição em andamento...');
+        try {
+          const result = await loadingPromise;
+          setAccessData(result);
+          setLoading(false);
+          return;
+        } catch (error) {
+          console.error('Erro ao aguardar requisição:', error);
+        }
       }
+
+      // ✅ Verificar conexão de rede antes de fazer chamada API
+      console.log('🔍 useUserPermissions: navigator.onLine =', navigator.onLine);
+      
+      if (!navigator.onLine) {
+        console.log('🔒 Modo offline - carregando permissões do cache local');
+        
+        // ✅ FALLBACK: Tentar carregar do localStorage
+        try {
+          const cachedAccess = localStorage.getItem(`user_access_${user.id}`);
+          console.log('🔍 Cache encontrado:', cachedAccess ? 'SIM' : 'NÃO');
+          
+          if (cachedAccess) {
+            const parsedAccess = JSON.parse(cachedAccess);
+            console.log('✅ Permissões carregadas do cache local:', parsedAccess);
+            cachedPermissions = parsedAccess; // ✅ Salvar no cache global
+            setAccessData(parsedAccess);
+          } else {
+            console.warn('⚠️ Nenhuma permissão em cache - você precisa conectar online primeiro para baixar os dados');
+          }
+        } catch (error) {
+          console.error('Erro ao carregar permissões do cache:', error);
+        }
+        
+        setLoading(false);
+        return;
+      }
+
+      console.log('🌐 Modo ONLINE detectado - tentando buscar permissões da API...');
+
+      // ✅ SEMPRE tentar carregar do cache primeiro (mais rápido)
+      let hasCache = false;
+      try {
+        const cachedAccess = localStorage.getItem(`user_access_${user.id}`);
+        if (cachedAccess) {
+          const parsedAccess = JSON.parse(cachedAccess);
+          console.log('✅ Permissões carregadas do cache (será atualizado em background):', parsedAccess);
+          cachedPermissions = parsedAccess; // ✅ Salvar no cache global
+          setAccessData(parsedAccess);
+          hasCache = true;
+        }
+      } catch (cacheError) {
+        console.error('Erro ao carregar cache:', cacheError);
+      }
+
+      // ✅ Criar promise compartilhada para evitar múltiplas chamadas simultâneas
+      loadingPromise = (async () => {
+        try {
+          const access = await usuarioGestaoService.getUserAccess();
+          console.log('🔑 Dados de acesso atualizados da API:', access);
+          
+          // ✅ Atualizar cache global
+          cachedPermissions = access;
+          setAccessData(access);
+          
+          // ✅ SALVAR no localStorage para uso offline
+          if (access && user.id) {
+            localStorage.setItem(`user_access_${user.id}`, JSON.stringify(access));
+            console.log('💾 Permissões salvas no cache local');
+          }
+          
+          return access;
+        } catch (error: any) {
+          console.warn('⚠️ Erro ao buscar dados de acesso da API:', error?.response?.status || error?.message);
+          
+          // Se não tinha cache antes, tentar carregar agora
+          if (!hasCache) {
+            try {
+              const cachedAccess = localStorage.getItem(`user_access_${user.id}`);
+              if (cachedAccess) {
+                const parsedAccess = JSON.parse(cachedAccess);
+                console.log('✅ Usando permissões do cache após erro na API:', parsedAccess);
+                cachedPermissions = parsedAccess; // ✅ Salvar no cache global
+                setAccessData(parsedAccess);
+                return parsedAccess;
+              } else {
+                console.error('❌ Sem cache e sem conexão - não é possível carregar permissões');
+              }
+            } catch (cacheError) {
+              console.error('Erro ao carregar permissões do cache:', cacheError);
+            }
+          } else {
+            console.log('✅ Mantendo permissões do cache (erro ao atualizar da API)');
+          }
+          
+          return cachedPermissions;
+        } finally {
+          loadingPromise = null; // ✅ Limpar promise global
+          setLoading(false);
+        }
+      })();
+
+      // Aguardar conclusão
+      await loadingPromise;
     };
 
     loadUserAccess();
@@ -110,7 +209,8 @@ export const useUserPermissions = (): UserPermissions => {
     estabelecimentoId: userAccess?.estabelecimentoId,
     municipioId: userAccess?.municipioId,
     estadoId: userAccess?.estadoId,
-    nivel: userAccess?.nivel || 'estabelecimento',
+    // ✅ CORREÇÃO: Retornar o nível REAL do backend, não normalizado
+    nivel: userAccess?.nivel,
     loading,
   };
 };

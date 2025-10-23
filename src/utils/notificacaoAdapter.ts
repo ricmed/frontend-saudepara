@@ -558,6 +558,13 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
     // ✅ CORREÇÃO CRÍTICA: Campos de hospedagem - sempre incluir como string
     local_hospedagem: trimmedData.localHospedagem || "", 
     contato_local_hospedagem: trimmedData.contatoLocal || "",
+    
+    // ✅ NOVO: Campos de rastreamento offline (preservar se existirem)
+    ...((trimmedData as any).offline_id && { offline_id: (trimmedData as any).offline_id }),
+    ...((trimmedData as any).device_id && { device_id: (trimmedData as any).device_id }),
+    ...((trimmedData as any).created_offline !== undefined && { created_offline: (trimmedData as any).created_offline }),
+    ...((trimmedData as any).sincronizado !== undefined && { sincronizado: (trimmedData as any).sincronizado }),
+    
     ...(trimmedData.dataInicioSintomas && {
       data_inicio_sintomas: processarDataParaUTC(
         trimmedData.dataInicioSintomas,
