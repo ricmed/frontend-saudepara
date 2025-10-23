@@ -53,10 +53,6 @@ const OfflineManagementPage: React.FC = () => {
   const [showInfo, setShowInfo] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  // 🆕 MODO OFFLINE FORÇADO (tipo Spotify)
-  const [isOfflineModeForced, setIsOfflineModeForced] = useState(false);
-  const [isTogglingOfflineMode, setIsTogglingOfflineMode] = useState(false);
-
   // ✅ CORRIGIDO: Estados específicos para pacientes
   const [patientsStats, setPatientsStats] = useState<any>(null);
   const [downloadRecommendation, setDownloadRecommendation] = useState<any>(null);
@@ -76,12 +72,6 @@ const OfflineManagementPage: React.FC = () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
-
-  // 🆕 Carregar estado do modo offline forçado
-  useEffect(() => {
-    const isForced = syncService.isOfflineModeActive();
-    setIsOfflineModeForced(isForced);
   }, []);
 
   // Carregar estatísticas
@@ -248,29 +238,6 @@ const OfflineManagementPage: React.FC = () => {
       }
     }
   };
-
-  // 🆕 FUNÇÃO PARA ALTERNAR MODO OFFLINE FORÇADO (tipo Spotify)
-  const handleToggleOfflineMode = async () => {
-    setIsTogglingOfflineMode(true);
-    
-    try {
-      const wasOnline = await syncService.toggleOfflineMode();
-      const newState = !wasOnline; // Se estava online, agora está offline
-      
-      setIsOfflineModeForced(newState);
-      
-      // Atualizar stats após mudança de modo
-      await loadStats();
-      await loadPendingSync();
-      
-    } catch (error) {
-      console.error('Erro ao alternar modo offline:', error);
-      toast.error('Erro ao alternar modo offline');
-    } finally {
-      setIsTogglingOfflineMode(false);
-    }
-  };
-
 
   const handleSync = async () => {
     if (!isOnline) {
@@ -598,8 +565,8 @@ const OfflineManagementPage: React.FC = () => {
 
               <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className={`p-2 rounded-lg ${isOnline && !isOfflineModeForced ? 'bg-green-100' : 'bg-red-100'}`}>
-                    {isOnline && !isOfflineModeForced ? (
+                  <div className={`p-2 rounded-lg ${isOnline ? 'bg-green-100' : 'bg-red-100'}`}>
+                    {isOnline ? (
                       <Wifi className="h-6 w-6 text-green-600" />
                     ) : (
                       <WifiOff className="h-6 w-6 text-red-600" />
@@ -607,45 +574,12 @@ const OfflineManagementPage: React.FC = () => {
                   </div>
                   <span className="font-medium text-gray-700">Status</span>
                 </div>
-                <div className={`text-3xl font-bold mb-1 ${isOnline && !isOfflineModeForced ? 'text-green-600' : 'text-red-600'}`}>
-                  {isOfflineModeForced ? 'Offline' : isOnline ? 'Online' : 'Offline'}
+                <div className={`text-3xl font-bold mb-1 ${isOnline ? 'text-green-600' : 'text-red-600'}`}>
+                  {isOnline ? 'Online' : 'Offline'}
                 </div>
-                <div className="text-sm text-gray-600 mb-3">
-                  {isOfflineModeForced 
-                    ? '📵 Modo offline ativado (manual)' 
-                    : isOnline 
-                      ? 'Pronto para download' 
-                      : 'Sem conexão de internet'}
+                <div className="text-sm text-gray-600">
+                  {isOnline ? 'Pronto para download' : 'Usando dados em cache'}
                 </div>
-                
-                {/* 🆕 TOGGLE DE MODO OFFLINE FORÇADO (tipo Spotify) */}
-                <button
-                  onClick={handleToggleOfflineMode}
-                  disabled={isTogglingOfflineMode}
-                  className={`w-full px-4 py-2 rounded-lg font-medium transition-colors ${
-                    isOfflineModeForced
-                      ? 'bg-green-600 text-white hover:bg-green-700'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  title={isOfflineModeForced ? 'Clique para ativar modo online' : 'Clique para ativar modo offline'}
-                >
-                  {isTogglingOfflineMode ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                      Alterando...
-                    </span>
-                  ) : isOfflineModeForced ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <Wifi className="h-4 w-4" />
-                      Ativar Online
-                    </span>
-                  ) : (
-                    <span className="flex items-center justify-center gap-2">
-                      <WifiOff className="h-4 w-4" />
-                      Ativar Offline
-                    </span>
-                  )}
-                </button>
               </div>
             </div>
 

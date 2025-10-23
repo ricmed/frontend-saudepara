@@ -251,7 +251,7 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
 
       {/* Desktop: Table Layout */}
       <div className="hidden md:block overflow-x-auto">
-        <table className="w-full divide-y divide-gray-200">
+        <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-blue-600 text-white">
             <tr>
               {allColumns
@@ -260,7 +260,7 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
                   <th
                     key={col.key}
                     scope="col"
-                    className="px-2 md:px-3 lg:px-4 xl:px-6 py-3 text-left text-xs font-medium uppercase tracking-wider whitespace-nowrap"
+                    className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
                   >
                     <div className="flex items-center">
                       {col.label}
@@ -329,15 +329,15 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
                     .map((col) => (
                       <td
                         key={`${notificacao.id}-${col.key}`}
-                        className="px-2 md:px-3 lg:px-4 xl:px-6 py-3 md:py-4 text-xs md:text-sm"
+                        className="px-6 py-4 whitespace-nowrap"
                       >
                         {renderCellContent(notificacao, col.key)}
                       </td>
                     ))}
                   {/* Botões de ação */}
-                  <td className="px-2 md:px-3 lg:px-4 xl:px-6 py-3 md:py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div
-                      className="flex items-center justify-end space-x-1 md:space-x-2"
+                      className="flex items-center justify-end space-x-2"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button
@@ -347,22 +347,20 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
                             `/private/comunicacao-de-caso/editar/${notificacao.id}`
                           );
                         }}
-                        className="text-blue-600 hover:text-blue-900 flex items-center text-xs md:text-sm"
-                        title="Editar"
+                        className="text-blue-600 hover:text-blue-900 flex items-center"
                       >
-                        <Edit className="h-3 w-3 md:h-4 md:w-4 mr-0.5 md:mr-1" />
-                        <span className="hidden lg:inline">Editar</span>
+                        <Edit className="h-4 w-4 mr-1" />
+                        Editar
                       </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           onDelete(notificacao.id);
                         }}
-                        className="text-red-600 hover:text-red-900 flex items-center text-xs md:text-sm"
-                        title="Excluir"
+                        className="text-red-600 hover:text-red-900 flex items-center"
                       >
-                        <Trash2 className="h-3 w-3 md:h-4 md:w-4 mr-0.5 md:mr-1" />
-                        <span className="hidden lg:inline">Excluir</span>
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Excluir
                       </button>
                     </div>
                   </td>
