@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import EnhancedNotificationDashboard from '@/features/dashboard/NotificationDashboardCirio';
 import NotificacaoService from '@/services/NotificacaoService';
+import { TiposEventoService } from '@/services/EventoService';
+import indexedDBService from '@/services/indexedDB';
 
 const DashboardPageCirio: React.FC = () => {
   const [notificacoes, setNotificacoes] = useState<any[]>([]);
@@ -13,15 +15,91 @@ const DashboardPageCirio: React.FC = () => {
     const loadDashboardData = async () => {
       try {
         setLoading(true);
-        console.log("Iniciando carregamento de dados para o dashboard...");
+        console.log("📊 Iniciando carregamento de dados para o dashboard...");
 
-        // Buscar todas as notificações com um limite maior para o dashboard (ajuste conforme necessário)
-        const response = await NotificacaoService.getAll(1, 1000);
-        const notificacoesData = response.data || [];
+        // 🆕 PASSO 1: Buscar eventos ativos primeiro
+        console.log("🔍 Buscando eventos ativos...");
+        let eventosAtivos: any[] = [];
+        try {
+          // Tentar buscar da API primeiro
+          const todosEventos = await TiposEventoService.getAll();
+          eventosAtivos = todosEventos.filter((evento: any) => 
+            evento.ativo === 'S' || evento.ativo === '1' || evento.ativo === true
+          );
+          console.log(`✅ ${eventosAtivos.length} eventos ativos encontrados`);
+          
+          // Salvar no IndexedDB para cache
+          await indexedDBService.saveOpcoes('eventos', todosEventos);
+        } catch (apiError) {
+          console.warn('⚠️ Erro ao buscar eventos da API, usando cache...', apiError);
+          // Fallback: buscar do IndexedDB
+          const eventosCache = await indexedDBService.getOpcoes('eventos') || [];
+          eventosAtivos = eventosCache.filter((evento: any) => 
+            evento.ativo === 'S' || evento.ativo === '1' || evento.ativo === true
+          );
+        }
 
-        // Buscar todas as opções necessárias em paralelo
+        // Se não há eventos ativos, mostrar erro
+        if (eventosAtivos.length === 0) {
+          setError('Nenhum evento ativo encontrado. Ative pelo menos um evento para visualizar o dashboard.');
+          setLoading(false);
+          return;
+        }
+
+        const idsEventosAtivos = new Set(eventosAtivos.map((e: any) => e.idtipo_evento));
+        console.log(`📋 IDs dos eventos ativos: [${Array.from(idsEventosAtivos).join(', ')}]`);
+
+        // 🆕 PASSO 2: Buscar notificações e filtrar por eventos ativos
+        console.log("📥 Buscando notificações da API...");
+        let allNotificacoes: any[] = [];
+        let page = 1;
+        const pageSize = 100;
+        let hasMore = true;
+
+        // Buscar todas as notificações (paginado)
+        while (hasMore && allNotificacoes.length < 1000) {
+          const response = await NotificacaoService.getAll(page, pageSize);
+          if (response && response.data && response.data.length > 0) {
+            allNotificacoes = [...allNotificacoes, ...response.data];
+            console.log(`   📄 Página ${page}: ${response.data.length} notificações (Total: ${allNotificacoes.length})`);
+            
+            if (response.data.length < pageSize || allNotificacoes.length >= 1000) {
+              hasMore = false;
+            } else {
+              page++;
+            }
+          } else {
+            hasMore = false;
+          }
+        }
+
+        console.log(`✅ ${allNotificacoes.length} notificações baixadas da API`);
+
+        // 🆕 PASSO 3: Filtrar notificações por eventos ativos
+        console.log("🔍 Filtrando notificações por eventos ativos...");
+        const notificacoesFiltradas = allNotificacoes.filter((notificacao: any) => {
+          // Buscar idEvento em múltiplos caminhos
+          const idEvento = notificacao.original?.tipo_evento?.idtipo_evento || 
+                          notificacao.idtipo_evento || 
+                          notificacao.tipo_evento?.idtipo_evento;
+          
+          return idEvento && idsEventosAtivos.has(idEvento);
+        });
+
+        console.log(`✅ Filtro aplicado: ${allNotificacoes.length} → ${notificacoesFiltradas.length} notificações (apenas eventos ativos)`);
+
+        // Se nenhuma notificação passou no filtro, avisar
+        if (notificacoesFiltradas.length === 0) {
+          setError('Nenhuma notificação encontrada para os eventos ativos. Verifique se há notificações cadastradas.');
+          setLoading(false);
+          return;
+        }
+
+        const notificacoesData = notificacoesFiltradas;
+
+        // 🆕 PASSO 4: Buscar todas as opções necessárias em paralelo
+        console.log("📦 Carregando opções para o dashboard...");
         const [
-          eventoOptions,
           publicoOptions,
           paisOptions,
           estadoOptions,
@@ -38,7 +116,6 @@ const DashboardPageCirio: React.FC = () => {
           cboOptions,
           bairroOptions
         ] = await Promise.all([
-          NotificacaoService.getEventoOptions(),
           NotificacaoService.getPublicoOptions(),
           NotificacaoService.getPaisOptions(),
           NotificacaoService.getEstadoOptions(),
@@ -56,13 +133,13 @@ const DashboardPageCirio: React.FC = () => {
           NotificacaoService.getBairroOptions()
         ]);
 
-        // Montar objeto de opções para o dashboard
+        // 🆕 PASSO 5: Montar objeto de opções para o dashboard (com eventos ativos)
         const options = {
-          eventoOptions,
+          eventoOptions: eventosAtivos, // 🆕 USAR APENAS EVENTOS ATIVOS
           publicoOptions,
           paisOptions,
           estadoOptions,
-          municipioOptions, // 🆕 CORRIGIDO: Usar a variável carregada
+          municipioOptions,
           bairroOptions,
           generoOptions,
           racaOptions,
@@ -80,15 +157,15 @@ const DashboardPageCirio: React.FC = () => {
         setNotificacoes(notificacoesData);
         setExportOptions(options);
 
-        console.log(`Dashboard: Carregados ${notificacoesData.length} registros e ${Object.keys(options).length} categorias de opções`);
+        console.log(`✅ Dashboard carregado: ${notificacoesData.length} notificações e ${Object.keys(options).length} categorias de opções`);
         
         // Log detalhado para debug
-        console.log("Contagem de opções por categoria:", {
-          eventos: eventoOptions.length,
+        console.log("📊 Contagem de opções por categoria:", {
+          eventos: eventosAtivos.length, // 🆕 APENAS ATIVOS
           publicos: publicoOptions.length,
           paises: paisOptions.length,
           estados: estadoOptions.length,
-          municipios: municipioOptions.length, // 🆕 ADICIONADO: Log de municípios
+          municipios: municipioOptions.length,
           racas: racaOptions.length,
           escolaridades: escolaridadeOptions.length,
           generos: generoOptions.length,
@@ -103,8 +180,8 @@ const DashboardPageCirio: React.FC = () => {
         });
 
         // Se as opções estiverem vazias, log de aviso
-        if (!eventoOptions.length || !publicoOptions.length) {
-          console.warn("Algumas opções importantes estão vazias. Verifique as APIs.");
+        if (!eventosAtivos.length || !publicoOptions.length) {
+          console.warn("⚠️ Algumas opções importantes estão vazias. Verifique as APIs.");
         }
       } catch (error) {
         console.error("Erro ao carregar dados para o dashboard:", error);

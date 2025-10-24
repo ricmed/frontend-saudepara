@@ -437,6 +437,30 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     // Cor padrão se não encontrar correspondência
     return COLORS.blue[0];
   }, []);
+
+  // 🆕 FILTRAR NOTIFICAÇÕES PELO EVENTO SELECIONADO
+  // IMPORTANTE: Deve vir antes de funções que dependem dele (ex: handleDataNotificacaoChange)
+  const notificacoesFiltradasPorEvento = useMemo(() => {
+    // Se "Todos" está selecionado, retornar todas as notificações
+    if (selectedEvento === "Todos") {
+      console.log(`📊 Evento "Todos" selecionado - usando ${notificacoes.length} notificações`);
+      return notificacoes;
+    }
+
+    // Filtrar pelo evento selecionado
+    console.log(`🔍 Filtrando notificações pelo evento: "${selectedEvento}"`);
+    const filtradas = notificacoes.filter((notificacao: any) => {
+      // Buscar o nome do evento em múltiplos caminhos
+      const eventoNome = notificacao.tipoEvento || 
+                        notificacao.original?.tipo_evento?.descricao ||
+                        notificacao.eventoNome;
+      
+      return eventoNome === selectedEvento;
+    });
+
+    console.log(`✅ Filtro de evento aplicado: ${notificacoes.length} → ${filtradas.length} notificações`);
+    return filtradas;
+  }, [notificacoes, selectedEvento]);
   
   // Função para obter a descrição de um tipo de atendimento pelo ID
   const getAtendimentoDescById = useCallback((idAtendimento: string | number): string => {
@@ -1005,53 +1029,24 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       setSelectedDataNotificacao(null);
       setActiveFilters(prev => ({ ...prev, dataNotificacao: null }));
       
-      // Recalcular total para todos os dias considerando outros filtros
-      let dadosParaContar = originalNotificacoes.current;
-      if (activeFilters.evento && activeFilters.evento !== 'todos') {
-        dadosParaContar = dadosParaContar.filter(n => {
-          const eventoId = n?.original?.tipo_evento_idtipo_evento;
-          if (eventoId !== undefined && exportOptions?.eventoOptions?.length > 0) {
-            const evento = exportOptions.eventoOptions.find(
-              (e: any) => String(e.idtipo_evento) === String(eventoId) || String(e.idevento) === String(eventoId)
-            );
-            return evento?.descricao === activeFilters.evento;
-          }
-          return false;
-        });
-      }
-      setTotalNotificacoesDia(dadosParaContar.length);
+      // 🆕 CORREÇÃO: Usar notificações filtradas por evento
+      setTotalNotificacoesDia(notificacoesFiltradasPorEvento.length);
     } else {
-      // 🆕 VALIDAÇÃO: Verificar se há notificações para a data selecionada com o evento ativo
-      let dadosParaContar = originalNotificacoes.current;
-      
-      // Se há filtro de evento ativo, aplicar primeiro
-      if (activeFilters.evento && activeFilters.evento !== 'todos') {
-        dadosParaContar = dadosParaContar.filter(n => {
-          const eventoId = n?.original?.tipo_evento_idtipo_evento;
-          if (eventoId !== undefined && exportOptions?.eventoOptions?.length > 0) {
-            const evento = exportOptions.eventoOptions.find(
-              (e: any) => String(e.idtipo_evento) === String(eventoId) || String(e.idevento) === String(eventoId)
-            );
-            return evento?.descricao === activeFilters.evento;
-          }
-          return false;
-        });
-      }
+      // 🆕 CORREÇÃO: Usar notificações filtradas por evento como base
+      const dadosParaContar = notificacoesFiltradasPorEvento;
       
       // Contar notificações para a data específica
       const totalParaData = contarNotificacoesPorData(dadosParaContar, novaData);
       
-      // 🆕 Se não há notificações para a data com o evento selecionado, mostrar aviso
-      if (totalParaData === 0 && activeFilters.evento && activeFilters.evento !== 'todos') {
-        alert(`⚠️ O evento "${activeFilters.evento}" não possui notificações para a data ${novaData.split('-').reverse().join('/')}.`);
-        return; // Não atualizar nada, manter seleção atual
-      }
+      // 🆕 Se não há notificações para a data, apenas mostrar 0 (sem alert)
+      // O dashboard mostrará vazio, que é o comportamento correto
+      console.log(`📅 Data ${novaData}: ${totalParaData} notificações do evento selecionado`);
       
       setSelectedDataNotificacao(novaData);
       setActiveFilters(prev => ({ ...prev, dataNotificacao: novaData }));
       setTotalNotificacoesDia(totalParaData);
     }
-  }, [contarNotificacoesPorData, activeFilters, exportOptions]);
+  }, [contarNotificacoesPorData, notificacoesFiltradasPorEvento]);
 
   // 🆕 VERIFICAR SE HÁ FILTROS ATIVOS
   const hasActiveFilters = useMemo(() => {
@@ -1060,11 +1055,14 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
   // 🆕 FUNÇÃO PARA OBTER DADOS FILTRADOS
   const getFilteredData = useCallback(() => {
+    // 🆕 CORREÇÃO: Usar notificações filtradas por evento como base
+    const baseData = notificacoesFiltradasPorEvento;
+    
     if (!hasActiveFilters) {
-      return originalNotificacoes.current;
+      return baseData;
     }
-    return applyFilters(originalNotificacoes.current);
-  }, [hasActiveFilters, applyFilters]);
+    return applyFilters(baseData);
+  }, [hasActiveFilters, applyFilters, notificacoesFiltradasPorEvento]);
 
   // 🆕 FUNÇÃO PARA DETERMINAR QUAIS GRÁFICOS DEVEM SER VISÍVEIS BASEADO NO TIPO DE ATENDIMENTO
   const getVisibleCharts = useCallback(() => {
@@ -1814,7 +1812,27 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
   // Processamento dos dados para gráficos
   const processarDadosGraficos = useCallback((dadosFiltrados: any[]) => {
+    // 🆕 CORREÇÃO: Se dadosFiltrados está vazio, LIMPAR todos os gráficos
     if (!Array.isArray(dadosFiltrados) || !dadosFiltrados.length) {
+      console.log('📊 processarDadosGraficos - Array vazio, limpando todos os gráficos...');
+      
+      // Limpar TODOS os gráficos
+      setFilteredRaca([]);
+      setFilteredEscolaridade([]);
+      setFilteredUnidades([]);
+      setFilteredGenero([]);
+      setFilteredSintomas([]);
+      setFilteredTipoAtendimento([]);
+      setFilteredPublico([]);
+      setFilteredHipoteses([]);
+      setFilteredTrauma([]);
+      
+      // Limpar gráficos de localização geográfica
+      setFilteredPais([]);
+      setFilteredEstado([]);
+      setFilteredMunicipio([]);
+      setFilteredBairro([]);
+      
       return false;
     }
 
@@ -2066,7 +2084,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
   // Função para calcular estatísticas a partir das notificações
   const calcularEstatisticas = useCallback((dadosFiltrados: any[] = []) => {
-    const dados = dadosFiltrados.length > 0 ? dadosFiltrados : notificacoes;
+    // 🆕 CORREÇÃO: Se dadosFiltrados está vazio, use array vazio (não use notificacoes como fallback)
+    // Isso garante que quando filtro resulta em 0 notificações, o dashboard mostra 0 (correto)
+    const dados = dadosFiltrados;
     
     if (!Array.isArray(dados)) {
       console.error("dados não é um array:", dados);
@@ -2124,19 +2144,24 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       console.error("Erro ao calcular estatísticas:", error);
       return false;
     }
-  }, [notificacoes, processarDadosGraficos, getAtendimentoDescById]);
+  }, [processarDadosGraficos, getAtendimentoDescById]);
 
   // 🆕 FUNÇÃO MELHORADA PARA PROCESSAR DADOS COM FILTROS CRUZADOS
   // 🆕 FUNÇÃO PARA PROCESSAR DADOS COM FILTROS CRUZADOS
   const processarDadosComFiltros = useCallback(() => {
+    console.log('🔄 processarDadosComFiltros - Iniciando...');
+    console.log('   - notificacoesFiltradasPorEvento:', notificacoesFiltradasPorEvento.length);
+    console.log('   - activeFilters:', activeFilters);
+    
     const dadosFiltrados = getFilteredData();
+    console.log('   - dadosFiltrados resultado:', dadosFiltrados.length);
     
     // Atualizar dados filtrados de referência
     filteredNotificacoes.current = dadosFiltrados;
     
     // 🆕 ATUALIZAR DATAS DISPONÍVEIS BASEADAS NOS DADOS FILTRADOS
-    // Aplicar todos os filtros exceto data para obter as datas disponíveis
-    let dadosParaDatas = [...originalNotificacoes.current];
+    // 🆕 CORREÇÃO: Usar notificações filtradas por evento como base
+    let dadosParaDatas = [...notificacoesFiltradasPorEvento];
     
     // Aplicar todos os filtros ativos exceto o filtro de data usando a função applyFilters
     const filtrosSemData = { ...activeFilters };
@@ -2150,26 +2175,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           console.log('🎯 Aplicando filtro para datas:', { filterType, filterValue });
           switch (filterType) {
             case 'evento':
-              console.log('🎯 Filtrando evento para datas:', filterValue);
-              const dadosAntesEvento = dadosParaDatas.length;
-              dadosParaDatas = dadosParaDatas.filter(n => {
-                const eventoId = n?.original?.tipo_evento_idtipo_evento;
-                if (eventoId !== undefined && exportOptions?.eventoOptions?.length > 0) {
-                  const evento = exportOptions.eventoOptions.find(
-                    (e: any) => String(e.idtipo_evento) === String(eventoId) || String(e.idevento) === String(eventoId)
-                  );
-                  
-                  // Debug do filtro de evento
-                  const match = evento?.descricao === filterValue;
-                  if (match) {
-                    console.log('✅ Evento match para datas:', { eventoId, eventoNome: evento.descricao, filtroValue: filterValue });
-                  }
-                  
-                  return match;
-                }
-                return false;
-              });
-              console.log(`🎯 Filtro evento para datas: ${dadosAntesEvento} → ${dadosParaDatas.length}`);
+              // 🆕 CORREÇÃO: Não precisa mais filtrar por evento aqui
+              // dadosParaDatas já vem de notificacoesFiltradasPorEvento (já filtrado)
+              console.log('✅ Filtro de evento já aplicado (via notificacoesFiltradasPorEvento)');
               break;
             case 'categoria':
               const dadosFiltradosCategoria = filtrarNotificacoes(filterValue);
@@ -2182,7 +2190,13 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     }
     
     // Extrair datas das notificações filtradas (sem filtro de data)
-    const novasDatasDisponiveis = extrairDatasNotificacao(dadosParaDatas);
+    const todasDatasDisponiveis = extrairDatasNotificacao(dadosParaDatas);
+    
+    // 🆕 FILTRAR: Remover datas que têm 0 notificações do evento selecionado
+    const datasComNotificacoes = todasDatasDisponiveis.filter(data => {
+      const totalDia = contarNotificacoesPorData(dadosParaDatas, data);
+      return totalDia > 0; // Só incluir datas com pelo menos 1 notificação
+    });
     
     // Debug para verificar integração
     console.log('🔍 DEBUG Filtros:', {
@@ -2190,16 +2204,26 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       filtrosSemData: filtrosSemData,
       totalOriginais: originalNotificacoes.current.length,
       dadosAposFiltros: dadosParaDatas.length,
-      datasDisponiveis: novasDatasDisponiveis.length,
-      amostraDatas: novasDatasDisponiveis.slice(0, 3),
+      todasDatas: todasDatasDisponiveis.length,
+      datasComDados: datasComNotificacoes.length,
+      amostraDatas: datasComNotificacoes.slice(0, 3),
       eventoAtivo: activeFilters.evento
     });
     
-    setDatasNotificacaoDisponiveis(novasDatasDisponiveis);
+    setDatasNotificacaoDisponiveis(datasComNotificacoes);
     
     // Recalcular estatísticas e gráficos
-    calcularEstatisticas(dadosFiltrados);
-  }, [getFilteredData, calcularEstatisticas, activeFilters, exportOptions, extrairDatasNotificacao, filtrarNotificacoes]);
+    console.log('🔄 Chamando calcularEstatisticas com', dadosFiltrados.length, 'notificações');
+    
+    // 🆕 MELHORIA: Se dadosFiltrados está vazio E há filtro de data,
+    // mostrar dados do evento SEM filtro de data (total do evento)
+    if (dadosFiltrados.length === 0 && activeFilters.dataNotificacao) {
+      console.log('⚠️ Nenhuma notificação para a data selecionada - mostrando total do evento');
+      calcularEstatisticas(notificacoesFiltradasPorEvento);
+    } else {
+      calcularEstatisticas(dadosFiltrados);
+    }
+  }, [getFilteredData, calcularEstatisticas, activeFilters, exportOptions, extrairDatasNotificacao, filtrarNotificacoes, notificacoesFiltradasPorEvento, contarNotificacoesPorData]);
 
   // Função para buscar dados frescos do servidor
   const fetchFreshData = useCallback(async () => {
@@ -2273,8 +2297,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         const hasActiveFilter = Object.values(activeFilters).some(filter => filter !== null);
         
         if (hasActiveFilter) {
-          // Se temos filtros ativos, reaplicá-los usando o sistema de filtros cruzados
-          const dadosComFiltrosCruzados = applyFilters(originalNotificacoes.current);
+          // 🆕 CORREÇÃO: Aplicar filtros nas notificações já filtradas por evento
+          const dadosComFiltrosCruzados = applyFilters(notificacoesFiltradasPorEvento);
           filteredNotificacoes.current = dadosComFiltrosCruzados;
           calcularEstatisticas(dadosComFiltrosCruzados);
         } else if (selectedCategory) {
@@ -2283,9 +2307,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           filteredNotificacoes.current = dadosFiltrados;
           calcularEstatisticas(dadosFiltrados);
         } else {
-          // Sem filtro, processar todos os dados originais
-          filteredNotificacoes.current = originalNotificacoes.current;
-          calcularEstatisticas(originalNotificacoes.current);
+          // 🆕 CORREÇÃO: Sem filtros ativos, usar notificações filtradas por evento
+          filteredNotificacoes.current = notificacoesFiltradasPorEvento;
+          calcularEstatisticas(notificacoesFiltradasPorEvento);
         }
       } else {
         // Se não conseguirmos novos dados, verificar props
@@ -2319,7 +2343,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         const hasActiveFilter = Object.values(activeFilters).some(filter => filter !== null);
         
         if (hasActiveFilter) {
-          const dadosComFiltrosCruzados = applyFilters(originalNotificacoes.current);
+          // 🆕 CORREÇÃO: Aplicar filtros nas notificações já filtradas por evento
+          const dadosComFiltrosCruzados = applyFilters(notificacoesFiltradasPorEvento);
           filteredNotificacoes.current = dadosComFiltrosCruzados;
           calcularEstatisticas(dadosComFiltrosCruzados);
         } else if (selectedCategory) {
@@ -2327,8 +2352,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           filteredNotificacoes.current = dadosFiltrados;
           calcularEstatisticas(dadosFiltrados);
         } else {
-          filteredNotificacoes.current = originalNotificacoes.current;
-          calcularEstatisticas(originalNotificacoes.current);
+          // 🆕 CORREÇÃO: Sem filtros ativos, usar notificações filtradas por evento
+          filteredNotificacoes.current = notificacoesFiltradasPorEvento;
+          calcularEstatisticas(notificacoesFiltradasPorEvento);
         }
       }
 
@@ -2341,7 +2367,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       setLoading(false);
       setLastUpdate(new Date().toLocaleString());
     }
-  }, [loading, selectedCategory, selectedDataNotificacao, activeFilters, fetchFreshData, notificacoes, filtrarNotificacoes, calcularEstatisticas, onDataRefresh, extrairDatasNotificacao, contarNotificacoesPorData, applyFilters]);
+  }, [loading, selectedCategory, selectedDataNotificacao, activeFilters, fetchFreshData, notificacoes, filtrarNotificacoes, calcularEstatisticas, onDataRefresh, extrairDatasNotificacao, contarNotificacoesPorData, applyFilters, notificacoesFiltradasPorEvento]);
 
   // Efeito para gerenciar o auto refresh
   useEffect(() => {
@@ -2445,44 +2471,19 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             return novosFilters;
           });
           
-          // Calcular o total usando os dados filtrados (considerando outros filtros ativos)
-          // Se há filtro de evento ativo, usar apenas as notificações desse evento
-          let dadosParaContar = notificacoes;
-          if (activeFilters.evento && activeFilters.evento !== 'todos') {
-            dadosParaContar = notificacoes.filter(n => {
-              const eventoId = n?.original?.tipo_evento_idtipo_evento;
-              if (eventoId !== undefined && exportOptions?.eventoOptions?.length > 0) {
-                const evento = exportOptions.eventoOptions.find(
-                  (e: any) => String(e.idtipo_evento) === String(eventoId) || String(e.idevento) === String(eventoId)
-                );
-                return evento?.descricao === activeFilters.evento;
-              }
-              return false;
-            });
-          }
-          
-          const totalDia = contarNotificacoesPorData(dadosParaContar, dataAtual);
+          // 🆕 CORREÇÃO: Usar notificações filtradas por evento
+          const totalDia = contarNotificacoesPorData(notificacoesFiltradasPorEvento, dataAtual);
           setTotalNotificacoesDia(totalDia);
           console.log('📊 DEBUG: Total de notificações para', dataAtual, ':', totalDia);
+          
+          // 🆕 IMPORTANTE: NÃO deixar doInitialProcessing executar agora
+          // O useEffect de activeFilters (linha 2377) vai processar corretamente
+          return; // Interrompe aqui para evitar race condition
         }
       } else if (selectedDataNotificacao) {
         // Se já temos uma data selecionada, verificar sincronização com activeFilters
-        // CORRIGIR: Também considerar outros filtros ativos aqui
-        let dadosParaContar = notificacoes;
-        if (activeFilters.evento && activeFilters.evento !== 'todos') {
-          dadosParaContar = notificacoes.filter(n => {
-            const eventoId = n?.original?.tipo_evento_idtipo_evento;
-            if (eventoId !== undefined && exportOptions?.eventoOptions?.length > 0) {
-              const evento = exportOptions.eventoOptions.find(
-                (e: any) => String(e.idtipo_evento) === String(eventoId) || String(e.idevento) === String(eventoId)
-              );
-              return evento?.descricao === activeFilters.evento;
-            }
-            return false;
-          });
-        }
-        
-        const totalDiaAtualizado = contarNotificacoesPorData(dadosParaContar, selectedDataNotificacao);
+        // 🆕 CORREÇÃO: Usar notificações filtradas por evento
+        const totalDiaAtualizado = contarNotificacoesPorData(notificacoesFiltradasPorEvento, selectedDataNotificacao);
         setTotalNotificacoesDia(totalDiaAtualizado);
         
         // Garantir sincronização com activeFilters
@@ -2538,9 +2539,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         } else {
           console.log("Iniciando processamento de dados com", notificacoes.length, "notificações");
           
-          // Aplicar filtros se houver filtros ativos, caso contrário usar todos os dados
+          // 🆕 CORREÇÃO: Sempre partir de notificações filtradas por evento
           const hasActiveFilter = Object.values(activeFilters).some(f => f !== null);
-          const base = Array.isArray(notificacoes) ? notificacoes : [];
+          const base = Array.isArray(notificacoesFiltradasPorEvento) ? notificacoesFiltradasPorEvento : [];
           const dadosFiltrados = hasActiveFilter ? applyFilters(base) : base;
           
           filteredNotificacoes.current = dadosFiltrados;
@@ -2570,7 +2571,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     // Iniciar o processamento
     doInitialProcessing();
     
-  }, [notificacoes, calcularEstatisticas]);
+  }, [notificacoes, calcularEstatisticas, notificacoesFiltradasPorEvento, applyFilters, activeFilters, extrairDatasNotificacao, selectedDataNotificacao, obterDataAtual, contarNotificacoesPorData, exportOptions]);
 
   // Usar dados reais para eventos
   const eventoOptions = exportOptions?.eventoOptions?.length > 0 
@@ -3338,7 +3339,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                   </h2>
                   <p className="text-indigo-100 text-xs">
                     {selectedDataNotificacao 
-                      ? `${totalNotificacoesDia.toLocaleString()} casos neste dia`
+                      ? totalNotificacoesDia > 0 
+                        ? `${totalNotificacoesDia.toLocaleString()} casos neste dia`
+                        : `Sem casos neste dia - mostrando total do evento: ${notificacoesFiltradasPorEvento.length.toLocaleString()}`
                       : `Visualizando todos os registros`
                     }
                   </p>
@@ -3354,7 +3357,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 >
                   <option value="todos">📊 Todas as Datas</option>
                   {datasNotificacaoDisponiveis.map((data) => {
-                    const totalDia = contarNotificacoesPorData(originalNotificacoes.current, data);
+                    // 🆕 CORREÇÃO: Contar apenas notificações do evento selecionado
+                    const totalDia = contarNotificacoesPorData(notificacoesFiltradasPorEvento, data);
                     const dataFormatada = new Date(data + 'T00:00:00').toLocaleDateString('pt-BR');
                     const isToday = data === obterDataAtual();
                     
@@ -3651,7 +3655,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                   chartId="serie-temporal-dia"
                   chartData={(() => {
                     const timezone = 'America/Belem';
-                    const notificacoesPorDia = notificacoes.reduce((acc: any, notif: any) => {
+                    // 🆕 USAR NOTIFICAÇÕES FILTRADAS POR EVENTO
+                    const notificacoesPorDia = notificacoesFiltradasPorEvento.reduce((acc: any, notif: any) => {
                       const dataCreated = notif?.created_at || notif?.original?.created_at;
                       if (!dataCreated) return acc;
                       try {
@@ -3687,7 +3692,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 {(() => {
                   // Processar dados por dia - MESMA LÓGICA DO DASHBOARD E MAPA
                   const timezone = 'America/Belem';
-                  const notificacoesPorDia = notificacoes.reduce((acc: any, notif: any) => {
+                  // 🆕 USAR NOTIFICAÇÕES FILTRADAS POR EVENTO
+                  const notificacoesPorDia = notificacoesFiltradasPorEvento.reduce((acc: any, notif: any) => {
                     const dataCreated = notif?.created_at || notif?.original?.created_at;
                     if (!dataCreated) return acc;
                     
@@ -3717,7 +3723,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                       data: new Date(data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
                       dataCompleta: data,
                       quantidade: valores.total,
-                      percentual: ((valores.total / notificacoes.length) * 100).toFixed(1)
+                      percentual: ((valores.total / notificacoesFiltradasPorEvento.length) * 100).toFixed(1)
                     }))
                     .sort((a, b) => a.dataCompleta.localeCompare(b.dataCompleta));
                   
@@ -3810,8 +3816,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           </div>
           
           {/* Gráfico 2: Série temporal por hora */}
+          {/* 🆕 USAR NOTIFICAÇÕES FILTRADAS POR EVENTO */}
           <AtendimentosPorHoraChart 
-            notificacoes={notificacoes} 
+            notificacoes={notificacoesFiltradasPorEvento} 
           />
         </main>
       )}
@@ -3847,8 +3854,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             />
           </div>
           
+          {/* 🆕 USAR NOTIFICAÇÕES FILTRADAS POR EVENTO */}
           <EstabelecimentosMapaAvancado 
-            notificacoes={originalNotificacoes.current}
+            notificacoes={notificacoesFiltradasPorEvento}
             exportOptions={exportOptions} 
           />
         </main>
@@ -3873,9 +3881,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       )} */}
 
       {/* Sistema de Alertas - Sempre visível */}
+      {/* 🆕 USAR NOTIFICAÇÕES FILTRADAS POR EVENTO */}
       <AlertasPanel 
-        key={`alertas-${lastUpdate}-${notificacoes.length}`}
-        notificacoes={notificacoes} 
+        key={`alertas-${lastUpdate}-${notificacoesFiltradasPorEvento.length}`}
+        notificacoes={notificacoesFiltradasPorEvento} 
       />
 
       {/* Indicador de Carregamento */}

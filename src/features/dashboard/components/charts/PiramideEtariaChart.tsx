@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Users } from 'lucide-react';
-import { NotificacaoService } from '../../../../services/NotificacaoService';
 import ChartExportMenu from '../../../../components/common/ChartExportMenu';
 
 interface PiramideEtariaItem {
@@ -113,20 +112,16 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
       
       console.log('🔍 Carregando dados para pirâmide etária...');
       
-      // ✅ SEMPRE usar dados filtrados quando disponíveis (mesmo se vazio)
-      // Se filteredData for undefined/null, buscar todos os dados
-      let result;
-      if (filteredData !== undefined && filteredData !== null) {
-        console.log('📊 Usando dados filtrados:', filteredData.length, 'registros');
-        result = { data: filteredData };
-      } else {
-        // Usar endpoint existente de notificações com dados do paciente
-        console.log('📊 Buscando todos os dados (sem filtro)...');
-        result = await NotificacaoService.getAll(1, 1000); // Buscar muitos registros
-        console.log('📊 Dados recebidos:', result);
+      // 🆕 CORREÇÃO: SEMPRE usar dados filtrados (mesmo se vazio), nunca fazer fallback para API
+      // Isso garante que respeitamos TODOS os filtros (evento + data + outros)
+      if (filteredData === undefined) {
+        console.log('⏳ PiramideEtaria - Aguardando dados filtrados...');
+        setLoading(false);
+        return;
       }
       
-      console.log('📊 Total de notificações:', result.data?.length || 0);
+      console.log('📊 PiramideEtaria - Usando dados filtrados:', filteredData.length, 'registros');
+      const result = { data: filteredData };
       
       // Processar dados para gerar pirâmide etária
       const grupos: { [key: string]: { 

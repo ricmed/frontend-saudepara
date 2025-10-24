@@ -9,7 +9,6 @@ import {
   Legend
 } from 'recharts';
 import { CheckCircle } from 'lucide-react';
-import NotificacaoService from '@/services/NotificacaoService';
 import ChartExportMenu from '../../../../components/common/ChartExportMenu';
 
 interface DesfechoItem {
@@ -82,17 +81,16 @@ const DesfechoCasosChart: React.FC<DesfechoCasosChartProps> = ({
       setLoading(true);
       setError(null);
       
-      // SEMPRE usar dados filtrados quando disponíveis (mesmo se for array vazio)
-      // Isso garante que respeitamos os filtros de data iniciais
-      let result;
-      if (filteredData !== undefined) {
-        console.log('📊 DesfechoCasos - Usando dados filtrados:', filteredData.length, 'registros');
-        result = { data: filteredData };
-      } else {
-        // Fallback: buscar todos apenas se filteredData for undefined
-        console.log('📊 DesfechoCasos - Buscando todos os dados da API');
-        result = await NotificacaoService.getAll(1, 1000);
+      // 🆕 CORREÇÃO: SEMPRE usar dados filtrados (mesmo se vazio), nunca fazer fallback para API
+      // Isso garante que respeitamos TODOS os filtros (evento + data + outros)
+      if (filteredData === undefined) {
+        console.log('⏳ DesfechoCasos - Aguardando dados filtrados...');
+        setLoading(false);
+        return;
       }
+      
+      console.log('📊 DesfechoCasos - Usando dados filtrados:', filteredData.length, 'registros');
+      const result = { data: filteredData };
       
       // Contar por tipo de encerramento
       const contadores: { [key: string]: { descricao: string; count: number } } = {};
