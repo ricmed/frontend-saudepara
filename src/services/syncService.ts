@@ -770,6 +770,16 @@ class SyncService {
       // ===== 3. FEEDBACK =====
       if (syncedCount > 0) {
         toast.success(`${syncedCount} registro(s) sincronizado(s)!`);
+        
+        // ✅ NOVO: Disparar evento de cache atualizado
+        const cacheUpdatedEvent = new CustomEvent('cache-updated', {
+          detail: { 
+            syncedCount,
+            timestamp: Date.now()
+          }
+        });
+        window.dispatchEvent(cacheUpdatedEvent);
+        console.log('📤 Evento de cache atualizado disparado');
       }
       
       if (errorCount > 0) {

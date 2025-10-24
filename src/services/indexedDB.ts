@@ -907,7 +907,110 @@ export class IndexedDBService {
   async clearPacientesCache(): Promise<void> {
     await this.clear('pacientes_cache');
     console.log('🗑️ Cache de pacientes limpo');
-  }  // ✅ NOVO: Obter estatísticas do cache
+  }
+
+  // ✅ NOVO: Buscar todas as notificações para visualização (pendentes + sincronizadas)
+  async getAllNotificacoesForDisplay(): Promise<any[]> {
+    await this.init();
+    if (!this.db) return [];
+    
+    try {
+      console.log('📋 Buscando notificações para visualização (pendentes + cache)...');
+      
+      // 1. Buscar notificações sincronizadas (cache) - USAR MÉTODO QUE DESCRIPTOGRAFA
+      const cachedWrapper: any = await this.getOpcoes('notificacoes-cache');
+      let cached: any[] = [];
+      
+      // Verificar formato do cache
+      if (!cachedWrapper) {
+        // Cache vazio/não existe
+        console.log('   📭 Nenhuma notificação no cache');
+        cached = [];
+      } else if (typeof cachedWrapper === 'object' && !Array.isArray(cachedWrapper) && 'encrypted' in cachedWrapper) {
+        // Formato novo com wrapper { encrypted, data }
+        if (cachedWrapper.encrypted === true && typeof cachedWrapper.data === 'string') {
+          // Dados criptografados - usar offlineDataManager para descriptografar
+          console.log('   🔓 Cache criptografado detectado, descriptografando...');
+          const offlineDataManager = (await import('@/services/offlineDataManager')).offlineDataManager;
+          cached = await offlineDataManager.getNotificacoesFromCache();
+        } else if (cachedWrapper.encrypted === false && Array.isArray(cachedWrapper.data)) {
+          // Dados não criptografados
+          cached = cachedWrapper.data;
+        } else {
+          cached = [];
+        }
+      } else if (Array.isArray(cachedWrapper)) {
+        // Formato antigo (array direto)
+        cached = cachedWrapper;
+      }
+      
+      console.log(`   ✅ ${cached.length} notificações do cache`);
+      
+      // 2. Buscar notificações pendentes
+      const pending = await this.getPendingNotificacoes();
+      console.log(`   ⏳ ${pending.length} notificações pendentes`);
+      
+      // 3. Converter pendentes para formato display
+      const pendingFormatted = pending.map(p => ({
+        ...p.formData,
+        idnotificacao: p.id,
+        _isPending: true,
+        _offlineId: p.offlineId,
+        _deviceId: p.deviceId,
+        _syncStatus: 'pending',
+        _badge: '🟡 Aguardando sincronização',
+        // Garantir campos essenciais
+        created_at: p.formData.created_at || new Date(Date.now()).toISOString(),
+        updated_at: p.formData.updated_at || new Date(Date.now()).toISOString()
+      }));
+      
+      // 4. Mesclar (pendentes primeiro para aparecer no topo)
+      const all = [...pendingFormatted, ...cached];
+      
+      // 5. Remover duplicatas por offlineId (priorizar pendentes)
+      const uniqueMap = new Map();
+      all.forEach(n => {
+        // Usar offlineId como chave única, ou ID se não tiver offlineId
+        const key = n._offlineId || n.offline_id || n.idnotificacao || n.id;
+        
+        // Se já existe, verificar qual priorizar
+        if (uniqueMap.has(key)) {
+          const existing = uniqueMap.get(key);
+          // Priorizar pendentes sobre sincronizadas
+          if (n._isPending && !existing._isPending) {
+            uniqueMap.set(key, n);
+          }
+        } else {
+          uniqueMap.set(key, n);
+        }
+      });
+      
+      const result = Array.from(uniqueMap.values());
+      console.log(`   📊 Total: ${result.length} notificações únicas (${pending.length} pendentes + ${cached.length - (all.length - result.length)} sincronizadas)`);
+      
+      return result;
+    } catch (error) {
+      console.error('❌ Erro ao buscar notificações para display:', error);
+      // Fallback: tentar retornar apenas pendentes
+      try {
+        const pending = await this.getPendingNotificacoes();
+        console.warn(`⚠️ Fallback: retornando apenas ${pending.length} notificações pendentes`);
+        const pendingFormatted = pending.map(p => ({
+          ...p.formData,
+          idnotificacao: p.id,
+          _isPending: true,
+          _offlineId: p.offlineId,
+          _badge: '🟡 Aguardando sincronização'
+        }));
+        return pendingFormatted;
+      } catch (fallbackError) {
+        console.error('❌ Erro no fallback:', fallbackError);
+        return [];
+      }
+    }
+  }
+
+  // ✅ NOVO: Obter estatísticas do cache
   async getCacheStats(): Promise<{
     verificacao: number;
     locais: number;

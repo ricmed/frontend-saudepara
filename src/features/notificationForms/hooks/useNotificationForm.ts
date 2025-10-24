@@ -1591,6 +1591,17 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         
         // ✅ NOVO: Limpa a lista de exclusão após salvamento bem-sucedido
         setArquivosParaExcluir([]);
+        
+        // ✅ NOVO: Disparar evento para atualização automática da lista
+        const notificationSavedEvent = new CustomEvent('notification-saved', {
+          detail: { 
+            action: 'edit',
+            id: id,
+            timestamp: Date.now() 
+          }
+        });
+        window.dispatchEvent(notificationSavedEvent);
+        console.log('📤 Evento de notificação editada disparado');
       } else {
         // Para criação, usar sistema offline
         console.log("Criando nova notificação via sistema offline");
@@ -1602,6 +1613,18 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         
         // ✅ NOVO: Limpa a lista de exclusão após salvamento bem-sucedido
         setArquivosParaExcluir([]);
+        
+        // ✅ NOVO: Disparar evento para atualização automática da lista
+        const notificationSavedEvent = new CustomEvent('notification-saved', {
+          detail: { 
+            action: 'create',
+            offlineId: dataForBackend.offline_id,
+            timestamp: Date.now(),
+            isOffline: !systemIsOnline
+          }
+        });
+        window.dispatchEvent(notificationSavedEvent);
+        console.log('📤 Evento de nova notificação disparado');
       }
 
       // Redirecionar para página de listagem ou detalhes após um breve delay

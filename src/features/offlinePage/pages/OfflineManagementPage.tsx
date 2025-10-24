@@ -48,7 +48,13 @@ const OfflineManagementPage: React.FC = () => {
   const [currentDownload, setCurrentDownload] = useState('');
   const [pendingSync, setPendingSync] = useState({ notificacoes: 0, pacientes: 0 });
   const [pendingNotifications, setPendingNotifications] = useState<any[]>([]); // ✅ NOVO: Lista detalhada de notificações pendentes
-  const [activeTab, setActiveTab] = useState<'overview' | 'patients' | 'sources' | 'sync'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'patients' | 'sources' | 'notifications' | 'sync'>('overview');
+  
+  // ✅ NOVO: Estados para download de notificações
+  const [notificationsStats, setNotificationsStats] = useState<any>(null);
+  const [notificationsDownloading, setNotificationsDownloading] = useState(false);
+  const [notificationsProgress, setNotificationsProgress] = useState(0);
+  const [notificationsPhase, setNotificationsPhase] = useState('');
   const [isSyncPaused, setIsSyncPaused] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -89,11 +95,13 @@ const OfflineManagementPage: React.FC = () => {
     loadStats();
     loadPendingSync();
     loadPatientsStats();
+    loadNotificationsStats();
     
     const interval = setInterval(() => {
       loadStats();
       loadPendingSync();
       loadPatientsStats();
+      loadNotificationsStats();
     }, 10000);
     
     return () => clearInterval(interval);
@@ -168,6 +176,27 @@ const OfflineManagementPage: React.FC = () => {
         confidence: 'low',
         cacheStats: { verificacao: 0, locais: 0, pendentes: 0 },
         totalCached: 0
+      });
+    }
+  };
+
+  // ✅ NOVO: Carregar estatísticas de notificações
+  const loadNotificationsStats = async () => {
+    try {
+      const cached = await offlineDataManager.getNotificacoesFromCache();
+      const pending = await indexedDBService.getPendingNotificacoes();
+      
+      setNotificationsStats({
+        cached: cached.length,
+        pending: pending.length,
+        total: cached.length + pending.length
+      });
+    } catch (error) {
+      console.error('Erro ao carregar stats de notificações:', error);
+      setNotificationsStats({
+        cached: 0,
+        pending: 0,
+        total: 0
       });
     }
   };
@@ -409,6 +438,65 @@ const OfflineManagementPage: React.FC = () => {
     }
   };
 
+  // ✅ NOVO: Handlers para download de notificações
+  const handleDownloadNotifications = async (limit: number = 200) => {
+    if (!isOnline) {
+      toast.error('❌ Sem conexão com a internet');
+      return;
+    }
+
+    setNotificationsDownloading(true);
+    setNotificationsProgress(0);
+    setNotificationsPhase('Iniciando...');
+
+    try {
+      const result = await offlineDataManager.downloadNotificacoesForOfflineViewing({
+        limit,
+        encrypt: true,
+        onProgress: (progress, current) => {
+          setNotificationsProgress(progress);
+          setNotificationsPhase(current);
+        }
+      });
+
+      await loadNotificationsStats();
+
+      if (result.success) {
+        setNotificationsProgress(100);
+        setNotificationsPhase('Concluído!');
+        toast.success(
+          `✅ ${result.count} notificações baixadas${result.encrypted ? ' (criptografadas)' : ''}`,
+          { autoClose: 4000 }
+        );
+      } else {
+        throw new Error(result.error || 'Erro desconhecido');
+      }
+    } catch (error: any) {
+      console.error('Erro no download de notificações:', error);
+      toast.error(`❌ Erro: ${error.message || 'Erro desconhecido'}`);
+      setNotificationsPhase('Erro!');
+    } finally {
+      setNotificationsDownloading(false);
+      setTimeout(() => {
+        setNotificationsProgress(0);
+        setNotificationsPhase('');
+      }, 3000);
+    }
+  };
+
+  const handleClearNotificationsCache = async () => {
+    if (window.confirm('⚠️ Tem certeza que deseja limpar o cache de notificações? As notificações pendentes de sincronização serão preservadas.')) {
+      try {
+        await offlineDataManager.clearNotificacoesCache();
+        await loadNotificationsStats();
+        toast.success('✅ Cache de notificações limpo (pendentes preservadas)');
+      } catch (error) {
+        console.error('Erro ao limpar cache:', error);
+        toast.error('❌ Erro ao limpar cache');
+      }
+    }
+  };
+
   if (!stats) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -489,6 +577,7 @@ const OfflineManagementPage: React.FC = () => {
             {[
               { id: 'overview', label: 'Visão Geral', icon: BarChart3 },
               { id: 'patients', label: 'Base de Pacientes', icon: Users },
+              { id: 'notifications', label: 'Notificações', icon: Download },
               { id: 'sources', label: 'Todas as Fontes', icon: Database },
               { id: 'sync', label: 'Sincronização', icon: RefreshCw }
             ].map((tab) => {
@@ -864,6 +953,165 @@ const OfflineManagementPage: React.FC = () => {
                     Atualizar Status
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Notifications Tab */}
+        {activeTab === 'notifications' && (
+          <div className="space-y-6">
+            {/* Status das notificações */}
+            {notificationsStats && (
+              <div className="bg-white p-6 rounded-xl shadow-sm border">
+                <h2 className="text-lg font-semibold mb-4 text-gray-900 flex items-center gap-2">
+                  <Download className="h-5 w-5 text-blue-600" />
+                  Status de Notificações Offline
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Database className="h-5 w-5 text-blue-600" />
+                      <span className="font-medium text-blue-900">Cache de Visualização</span>
+                    </div>
+                    <div className="text-2xl font-bold text-blue-600 mb-1">
+                      {notificationsStats.cached.toLocaleString()}
+                    </div>
+                    <div className="text-sm text-blue-700">Notificações baixadas para visualização offline</div>
+                  </div>
+                  
+                  <div className="bg-orange-50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="h-5 w-5 text-orange-600" />
+                      <span className="font-medium text-orange-900">Pendentes</span>
+                    </div>
+                    <div className="text-2xl font-bold text-orange-600 mb-1">
+                      {notificationsStats.pending.toLocaleString()}
+                    </div>
+                    <div className="text-sm text-orange-700">Criadas offline (serão sincronizadas)</div>
+                  </div>
+                  
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle2 className="h-5 w-5 text-purple-600" />
+                      <span className="font-medium text-purple-900">Total Disponível</span>
+                    </div>
+                    <div className="text-2xl font-bold text-purple-600 mb-1">
+                      {notificationsStats.total.toLocaleString()}
+                    </div>
+                    <div className="text-sm text-purple-700">Visíveis no modo offline</div>
+                  </div>
+                </div>
+
+                {/* Informações sobre criptografia */}
+                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Shield className="h-5 w-5 text-green-600" />
+                    <span className="font-medium text-green-900">🔐 Proteção de Dados</span>
+                  </div>
+                  <div className="text-sm text-green-800 space-y-1">
+                    <p>• As notificações são <strong>criptografadas (AES-256)</strong> antes de serem salvas no dispositivo</p>
+                    <p>• Apenas você pode acessar seus dados offline</p>
+                    <p>• Os dados são descriptografados automaticamente quando necessário</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Progress bar específico para notificações */}
+            {notificationsDownloading && (
+              <div className="p-6 bg-blue-50 rounded-xl border border-blue-200">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="font-medium text-blue-900 flex items-center gap-2">
+                    <RefreshCw className="h-5 w-5 animate-spin" />
+                    {notificationsPhase}
+                  </span>
+                  <span className="text-blue-700 font-bold">{Math.round(notificationsProgress)}%</span>
+                </div>
+                <div className="w-full bg-blue-200 rounded-full h-3">
+                  <div 
+                    className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                    style={{ width: `${notificationsProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Opções de Download */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border">
+              <h3 className="text-lg font-semibold mb-4 text-gray-900">Opções de Download</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* Download 200 mais recentes */}
+                <div className="p-4 border-2 border-blue-200 rounded-lg hover:border-blue-300 transition-colors">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Download className="h-5 w-5 text-blue-600" />
+                    <span className="font-medium text-blue-900">Download Padrão</span>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Baixa as <strong>200 notificações mais recentes</strong> com criptografia AES-256.
+                  </p>
+                  <button
+                    onClick={() => handleDownloadNotifications(200)}
+                    disabled={notificationsDownloading || !isOnline}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Baixar 200 Notificações
+                  </button>
+                </div>
+
+                {/* Download todas as notificações */}
+                <div className="p-4 border-2 border-green-200 rounded-lg hover:border-green-300 transition-colors">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Database className="h-5 w-5 text-green-600" />
+                    <span className="font-medium text-green-900">Download Completo</span>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Baixa <strong>todas as notificações</strong> disponíveis (recomendado para uso prolongado offline).
+                  </p>
+                  <button
+                    onClick={() => handleDownloadNotifications(9999)}
+                    disabled={notificationsDownloading || !isOnline}
+                    className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Baixar Todas as Notificações
+                  </button>
+                </div>
+              </div>
+
+              {/* Ações adicionais */}
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <div className="flex flex-wrap gap-4">
+                  <button
+                    onClick={handleClearNotificationsCache}
+                    disabled={notificationsDownloading}
+                    className="px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                  >
+                    Limpar Cache
+                  </button>
+                  
+                  <button
+                    onClick={loadNotificationsStats}
+                    disabled={notificationsDownloading}
+                    className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Atualizar Status
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Informações importantes */}
+            <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+              <div className="flex items-center gap-2 mb-2">
+                <Info className="h-5 w-5 text-yellow-600" />
+                <span className="font-medium text-yellow-900">ℹ️ Informações Importantes</span>
+              </div>
+              <div className="text-sm text-yellow-800 space-y-1">
+                <p>• As notificações baixadas são <strong>apenas para visualização</strong> no modo offline</p>
+                <p>• Notificações <strong>criadas offline</strong> aparecem com o badge "🟡 Aguardando sincronização"</p>
+                <p>• O cache é atualizado automaticamente após sincronizações bem-sucedidas</p>
+                <p>• Recomendado baixar antes de períodos prolongados sem internet</p>
               </div>
             </div>
           </div>

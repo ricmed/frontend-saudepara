@@ -1,6 +1,7 @@
 import { PacienteService } from '@/services/PacienteService';
-import { EstabelecimentoFormService } from '@/services/EstabelecimentoFormService';
+import { NotificacaoService } from '@/services/NotificacaoService';
 import indexedDBService from '@/services/indexedDB';
+import encryptionService from '@/services/encryptionService'; // ✅ NOVO: Criptografia
 import { toast } from 'react-toastify';
 import axios from 'axios';
 
@@ -526,14 +527,45 @@ class OfflineDataManager {
     }
     
     toast.info('🔄 Baixando todos os dados offline...');
+    
+    // 1. Baixar todas as fontes de dados normais (95% do progresso)
     const result = await this.downloadDataWithPriority(
-      (prog, curr, comp, tot) => onProgress?.(prog, curr, comp, tot)
+      (prog, curr, comp, tot) => {
+        // Escalar progresso para 0-95%
+        const scaledProg = (prog * 0.95);
+        onProgress?.(scaledProg, curr, comp, tot);
+      }
     );
     
+    // 2. Baixar notificações (últimos 5% do progresso)
+    try {
+      console.log('📥 Baixando notificações para visualização offline...');
+      onProgress?.(95, 'Baixando notificações...', result.success, result.success + 1);
+      
+      const notifResult = await this.downloadNotificacoesForOfflineViewing({
+        limit: 200, // Baixar 200 mais recentes
+        encrypt: true,
+        onProgress: (subProg, subCurr) => {
+          // Mapear progresso de 95% a 100%
+          const scaledProg = 95 + (subProg * 0.05);
+          onProgress?.(scaledProg, `Notificações: ${subCurr}`, result.success + 1, result.success + 1);
+        }
+      });
+      
+      if (notifResult.success) {
+        console.log(`✅ ${notifResult.count} notificações incluídas no download completo`);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao baixar notificações no download completo:', error);
+      // Não falhar o download completo se notificações falharem
+    }
+    
+    onProgress?.(100, 'Concluído!', result.success + 1, result.success + 1);
+    
     if (result.errors === 0) {
-      toast.success(`🎉 Todos os dados baixados! ${result.totalRecords.toLocaleString()} registros offline.`);
+      toast.success(`🎉 Todos os dados baixados! ${result.totalRecords.toLocaleString()} registros offline + notificações.`);
     } else {
-      toast.warning(`⚠️ ${result.success} de ${result.success + result.errors} conjuntos baixados.`);
+      toast.warning(`⚠️ ${result.success} de ${result.success + result.errors} conjuntos baixados + notificações.`);
     }
     
     return result;
@@ -626,6 +658,220 @@ class OfflineDataManager {
       };
     }
   }
+
+  // ✅ NOVO: Download de notificações para visualização offline (COM CRIPTOGRAFIA)
+  async downloadNotificacoesForOfflineViewing(
+    options: {
+      limit?: number;           // Quantas notificações baixar (padrão: 200)
+      encrypt?: boolean;        // Se deve criptografar (padrão: true)
+      onProgress?: (progress: number, current: string) => void;
+    } = {}
+  ): Promise<{ success: boolean; count: number; encrypted: boolean; error?: string }> {
+    const { limit = 200, encrypt = true, onProgress } = options;
+    
+    try {
+      onProgress?.(10, 'Iniciando download de notificações...');
+      
+      console.log('📥 Baixando notificações para visualização offline...');
+      console.log(`   Limite: ${limit} notificações`);
+      console.log(`   Criptografia: ${encrypt ? 'ATIVADA' : 'DESATIVADA'}`);
+      
+      // 1. Buscar notificações da API (paginação para não travar)
+      onProgress?.(30, `Baixando ${limit} notificações mais recentes...`);
+      
+      let allNotificacoes: any[] = [];
+      let page = 1;
+      const pageSize = 100; // Baixar de 100 em 100
+      const maxPages = Math.ceil(limit / pageSize);
+      
+      for (let i = 0; i < maxPages; i++) {
+        const response = await NotificacaoService.getAll(page, pageSize);
+        
+        if (response && response.data && response.data.length > 0) {
+          allNotificacoes = [...allNotificacoes, ...response.data];
+          
+          const progressPct = 30 + (i / maxPages) * 40; // 30-70%
+          onProgress?.(progressPct, `${allNotificacoes.length}/${limit} notificações...`);
+          
+          // Se já temos o suficiente, parar
+          if (allNotificacoes.length >= limit) {
+            allNotificacoes = allNotificacoes.slice(0, limit);
+            break;
+          }
+          
+          page++;
+        } else {
+          break; // Não há mais dados
+        }
+      }
+      
+      console.log(`✅ ${allNotificacoes.length} notificações baixadas da API`);
+      
+      // 🆕 2. FILTRAR: Aplicar filtro de eventos ativos
+      onProgress?.(70, 'Aplicando filtro de eventos ativos...');
+      
+      // Buscar eventos ativos do IndexedDB ou API
+      let eventosAtivos: any[] = [];
+      try {
+        const eventosCache = await indexedDBService.getOpcoes('eventos');
+        if (eventosCache && eventosCache.length > 0) {
+          eventosAtivos = eventosCache.filter((evento: any) => 
+            evento.ativo === 'S' || evento.ativo === '1' || evento.ativo === true
+          );
+          console.log(`📊 ${eventosAtivos.length} eventos ativos encontrados no cache`);
+        } else {
+          // Se não há no cache, buscar da API
+          console.log('📡 Buscando eventos da API...');
+          const { TiposEventoService } = await import('./EventoService');
+          const todosEventos = await TiposEventoService.getAll();
+          eventosAtivos = todosEventos.filter((evento: any) => 
+            evento.ativo === 'S' || evento.ativo === '1' || evento.ativo === true
+          );
+          console.log(`📊 ${eventosAtivos.length} eventos ativos encontrados na API`);
+        }
+      } catch (error) {
+        console.warn('⚠️ Erro ao buscar eventos ativos:', error);
+      }
+      
+      // Se não há eventos ativos, não baixar notificações
+      if (eventosAtivos.length === 0) {
+        console.warn('⚠️ Nenhum evento ativo - cancelando download de notificações');
+        return {
+          success: false,
+          count: 0,
+          encrypted: false,
+          error: 'Nenhum evento ativo. Ative pelo menos um evento para baixar notificações.'
+        };
+      }
+      
+      // Criar Set com IDs dos eventos ativos para filtro rápido
+      const idsEventosAtivos = new Set(eventosAtivos.map((evento: any) => evento.idtipo_evento));
+      console.log(`🔍 Filtrando notificações por eventos ativos: [${Array.from(idsEventosAtivos).join(', ')}]`);
+      
+      // Filtrar notificações
+      const notificacoesFiltradas = allNotificacoes.filter((notificacao: any) => {
+        // Buscar idEvento em múltiplos caminhos
+        const idEvento = notificacao.original?.tipo_evento?.idtipo_evento || 
+                        notificacao.idtipo_evento || 
+                        notificacao.tipo_evento?.idtipo_evento;
+        
+        return idEvento && idsEventosAtivos.has(idEvento);
+      });
+      
+      console.log(`✅ Filtro aplicado: ${allNotificacoes.length} → ${notificacoesFiltradas.length} notificações (apenas eventos ativos)`);
+      
+      // Se o filtro removeu tudo, avisar
+      if (notificacoesFiltradas.length === 0) {
+        console.warn('⚠️ Nenhuma notificação passou pelo filtro de eventos ativos');
+        return {
+          success: false,
+          count: 0,
+          encrypted: false,
+          error: 'Nenhuma notificação encontrada para os eventos ativos.'
+        };
+      }
+      
+      // Usar as notificações filtradas daqui pra frente
+      allNotificacoes = notificacoesFiltradas;
+      
+      // 3. Criptografar se necessário
+      let dataToSave: any = allNotificacoes;
+      let isEncrypted = false;
+      
+      if (encrypt && allNotificacoes.length > 0) {
+        onProgress?.(80, 'Criptografando dados sensíveis...');
+        
+        console.log('🔐 Criptografando notificações...');
+        
+        // Criptografar todo o array e marcar como criptografado
+        const encryptedString = await encryptionService.encrypt(allNotificacoes);
+        
+        // Salvar como objeto com flag de criptografia
+        dataToSave = {
+          encrypted: true,
+          data: encryptedString
+        };
+        isEncrypted = true;
+        
+        console.log('✅ Dados criptografados com sucesso');
+      } else {
+        // Salvar normal sem criptografia
+        dataToSave = {
+          encrypted: false,
+          data: allNotificacoes
+        };
+      }
+      
+      // 4. Salvar no cache
+      onProgress?.(90, 'Salvando no cache local...');
+      
+      await indexedDBService.saveOpcoes('notificacoes-cache', dataToSave);
+      
+      console.log(`✅ ${allNotificacoes.length} notificações salvas no cache ${encrypt ? 'criptografado' : 'normal'}`);
+      
+      onProgress?.(100, 'Download concluído!');
+      
+      return {
+        success: true,
+        count: allNotificacoes.length,
+        encrypted: isEncrypted
+      };
+      
+    } catch (error) {
+      console.error('❌ Erro no download de notificações:', error);
+      return {
+        success: false,
+        count: 0,
+        encrypted: false,
+        error: error instanceof Error ? error.message : 'Erro desconhecido'
+      };
+    }
+  }
+
+  // ✅ NOVO: Obter notificações do cache (com descriptografia automática)
+  async getNotificacoesFromCache(): Promise<any[]> {
+    try {
+      const cachedWrapper: any = await indexedDBService.getOpcoes('notificacoes-cache');
+      
+      if (!cachedWrapper) {
+        console.log('📭 Nenhuma notificação no cache');
+        return [];
+      }
+      
+      // Verificar se é o formato novo (com wrapper)
+      if (typeof cachedWrapper === 'object' && !Array.isArray(cachedWrapper) && 'encrypted' in cachedWrapper) {
+        if (cachedWrapper.encrypted === true && typeof cachedWrapper.data === 'string') {
+          // Descriptografar
+          console.log('🔓 Descriptografando notificações...');
+          const decrypted = await encryptionService.decrypt(cachedWrapper.data);
+          console.log(`✅ ${decrypted.length} notificações descriptografadas`);
+          return decrypted;
+        } else if (cachedWrapper.encrypted === false) {
+          // Não criptografado (formato novo)
+          return Array.isArray(cachedWrapper.data) ? cachedWrapper.data : [];
+        }
+      }
+      
+      // Fallback: formato antigo (array direto)
+      return Array.isArray(cachedWrapper) ? cachedWrapper : [];
+      
+    } catch (error) {
+      console.error('❌ Erro ao obter notificações do cache:', error);
+      return [];
+    }
+  }
+
+  // ✅ NOVO: Limpar cache de notificações
+  async clearNotificacoesCache(): Promise<void> {
+    try {
+      const emptyCache: any = { encrypted: false, data: [] };
+      await indexedDBService.saveOpcoes('notificacoes-cache', emptyCache);
+      console.log('🗑️ Cache de notificações limpo');
+    } catch (error) {
+      console.error('Erro ao limpar cache de notificações:', error);
+    }
+  }
+
   // Limpar dados offline
   async clearOfflineData(): Promise<void> {
     for (const source of this.dataSources) {
