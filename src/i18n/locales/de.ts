@@ -70,6 +70,7 @@ export const de = {
   "menu.logout": "Abmelden",
   "menu.login": "Anmelden",
   "menu.manage_users": "Benutzer verwalten",
+  "menu.change_password": "Passwort ändern",
   "menu.open": "Menü öffnen",
   
   // Language Selector

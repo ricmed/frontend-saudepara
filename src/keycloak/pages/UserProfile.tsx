@@ -3,10 +3,12 @@ import { Header } from '../../features/desktop/components/Header';
 import Footer from '@/features/desktop/components/Footer';
 import { SideMenu } from '@/features/home/components/SideMenu';
 import { useState } from 'react';
-import { User as UserIcon, Mail, UserPlus } from 'lucide-react';
+import { User as UserIcon, Mail, UserPlus, Lock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const UserProfile = () => {
   const { user, logout, loading } = useAuth();
+  const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Helpers para lidar com diferentes possíveis nomes de campos
@@ -89,12 +91,21 @@ const UserProfile = () => {
               <span className="font-semibold">Grupos:</span> {user.groups.join(', ')}
             </div>
           )}
-          <button
-            onClick={logout}
-            className="mt-6 bg-blue-600 text-white py-2 px-8 rounded-lg hover:bg-blue-800 transition text-base font-medium w-full sm:w-auto"
-          >
-            Sair da Conta
-          </button>
+          <div className="flex flex-col sm:flex-row gap-3 mt-6 w-full">
+            <button
+              onClick={() => navigate('/alterar-senha')}
+              className="flex-1 bg-gray-600 text-white py-2 px-6 rounded-lg hover:bg-gray-700 transition text-base font-medium flex items-center justify-center gap-2"
+            >
+              <Lock size={18} />
+              Alterar Senha
+            </button>
+            <button
+              onClick={logout}
+              className="flex-1 bg-blue-600 text-white py-2 px-6 rounded-lg hover:bg-blue-800 transition text-base font-medium"
+            >
+              Sair da Conta
+            </button>
+          </div>
         </div>
       </main>
 

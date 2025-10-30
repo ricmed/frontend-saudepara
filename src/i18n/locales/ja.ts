@@ -70,6 +70,7 @@ export const ja = {
   "menu.logout": "ログアウト",
   "menu.login": "ログイン",
   "menu.manage_users": "ユーザー管理",
+  "menu.change_password": "パスワード変更",
   "menu.open": "メニューを開く",
   
   // Language Selector

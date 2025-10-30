@@ -69,6 +69,7 @@ export const it: TranslationRecord = {
   "menu.logout": "Esci",
   "menu.login": "Accedi",
   "menu.manage_users": "Gestisci Utenti",
+  "menu.change_password": "Cambia Password",
   "menu.open": "Apri Menu",
   
   // Language

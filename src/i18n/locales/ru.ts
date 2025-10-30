@@ -69,6 +69,7 @@ export const ru: TranslationRecord = {
   "menu.logout": "Выйти",
   "menu.login": "Войти",
   "menu.manage_users": "Управление пользователями",
+  "menu.change_password": "Изменить пароль",
   "menu.open": "Открыть меню",
   
   // Language
