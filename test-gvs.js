@@ -20,3 +20,4 @@ hipotesesTeste.forEach(hipotese => {
     console.log(`❌ ${hipotese} -> NÃO ENCONTRADO`);
   }
 });
+yeah its working
