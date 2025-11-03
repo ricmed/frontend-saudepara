@@ -39,6 +39,27 @@ const MapaDashboard: React.FC<MapaDashboardProps> = memo(({
   // Hook do provedor de mapas - usando contexto como no MapaContainer
   const { tileProvider } = useMapProvider(); // REMOVIDO currentProvider daqui
 
+  // 🆕 Função para abreviar nomes longos
+  const abreviarNome = useCallback((nome: string, maxLength: number = 25): string => {
+    if (nome.length <= maxLength) return nome;
+    
+    // Tentar abreviar por palavras
+    const palavras = nome.split(' ');
+    if (palavras.length > 1) {
+      // Pegar primeira e última palavra
+      const primeira = palavras[0];
+      const ultima = palavras[palavras.length - 1];
+      const abreviado = `${primeira} ... ${ultima}`;
+      
+      if (abreviado.length <= maxLength) {
+        return abreviado;
+      }
+    }
+    
+    // Se ainda for muito longo, cortar e adicionar reticências
+    return nome.substring(0, maxLength - 3) + '...';
+  }, []);
+
   // Função para obter cor baseada na urgência
   const getUrgenciaColor = useCallback((urgencia: EstabelecimentoMapa['urgencia']) => {
     switch (urgencia) {
@@ -385,12 +406,34 @@ const MapaDashboard: React.FC<MapaDashboardProps> = memo(({
         cleanupWaves.push(stopRadar);
       }
 
-      // Tooltip simples no hover
-      marker.bindTooltip(estabelecimento.nome, {
+      // 🆕 Label permanente com nome do estabelecimento (estilo moderno)
+      const nomeAbreviado = abreviarNome(estabelecimento.nome, 30);
+      const labelHtml = `
+        <div style="
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(4px);
+          padding: 4px 10px;
+          border-radius: 12px;
+          font-size: 11px;
+          font-weight: 600;
+          color: #1a1a1a;
+          white-space: nowrap;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.2), 0 1px 3px rgba(0,0,0,0.15);
+          border: 1px solid rgba(0,0,0,0.1);
+          letter-spacing: 0.3px;
+          line-height: 1.3;
+          z-index: 1000;
+          pointer-events: none;
+        ">${nomeAbreviado}</div>
+      `;
+      
+      // Tooltip permanente que sempre aparece
+      marker.bindTooltip(labelHtml, {
+        permanent: true, // 🎯 Sempre visível!
         direction: 'top',
-        offset: [0, -20],
-        opacity: 0.9,
-        sticky: true
+        offset: [0, -35],
+        opacity: 1,
+        className: 'label-tooltip-dashboard'
       });
 
       // Criar popup
@@ -448,7 +491,7 @@ const MapaDashboard: React.FC<MapaDashboardProps> = memo(({
 
     // ✅ Cleanup das ondas quando o componente desmontar ou marcadores mudarem
     return () => cleanupWaves.forEach(fn => fn());
-  }, [estabelecimentos, createCustomIcon, createPopupContent, handleEstabelecimentoClick, isMapReady, createRadarAnimation, getUrgenciaColor]);
+  }, [estabelecimentos, createCustomIcon, createPopupContent, handleEstabelecimentoClick, isMapReady, createRadarAnimation, getUrgenciaColor, abreviarNome]);
 
   return (
     <>
@@ -574,6 +617,19 @@ const MapaDashboard: React.FC<MapaDashboardProps> = memo(({
             line-height: 1.3;
             word-wrap: break-word;
             flex: 1;
+          }
+
+          /* 🆕 Estilos para labels permanentes dos estabelecimentos */
+          .label-tooltip-dashboard {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          
+          .label-tooltip-dashboard::before {
+            display: none !important;
           }
 
           .popup-body {
