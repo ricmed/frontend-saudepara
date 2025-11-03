@@ -2228,11 +2228,28 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   // Função para buscar dados frescos do servidor
   const fetchFreshData = useCallback(async () => {
     try {
-      // Usar o NotificacaoService para buscar dados atualizados
-      const response = await NotificacaoService.getAll(1, 1000);
-      const freshData = response.data || [];
+      // 🆕 PASSO 1: Buscar eventos ativos para filtrar
+      const eventosAtivos = exportOptions?.eventoOptions || [];
+      const idsEventosAtivos = new Set(eventosAtivos.map((e: any) => e.idtipo_evento));
       
-      console.log("Dados frescos recebidos:", freshData.length, "notificações");
+      console.log(`🔍 Buscando notificações... (${idsEventosAtivos.size} eventos ativos)`);
+      
+      // PASSO 2: Buscar notificações da API
+      const response = await NotificacaoService.getAll(1, 1000);
+      const allData = response.data || [];
+      
+      console.log(`📥 Dados frescos recebidos: ${allData.length} notificações`);
+      
+      // 🆕 PASSO 3: Filtrar apenas notificações de eventos ativos (igual ao DashboardPageCirio)
+      const freshData = allData.filter((notificacao: any) => {
+        const idEvento = notificacao.original?.tipo_evento?.idtipo_evento || 
+                        notificacao.idtipo_evento || 
+                        notificacao.tipo_evento?.idtipo_evento;
+        
+        return idEvento && idsEventosAtivos.has(idEvento);
+      });
+      
+      console.log(`✅ Filtro aplicado: ${allData.length} → ${freshData.length} notificações (apenas eventos ativos)`);
       
       // Verificar se temos dados novos
       if (freshData && Array.isArray(freshData) && freshData.length > 0) {
@@ -2255,7 +2272,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       
       return null;
     }
-  }, [notificacoes]);
+  }, [notificacoes, exportOptions]);
 
   // Função para atualizar os dados
   const refreshData = useCallback(async () => {
@@ -2368,6 +2385,11 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       setLastUpdate(new Date().toLocaleString());
     }
   }, [loading, selectedCategory, selectedDataNotificacao, activeFilters, fetchFreshData, notificacoes, filtrarNotificacoes, calcularEstatisticas, onDataRefresh, extrairDatasNotificacao, contarNotificacoesPorData, applyFilters, notificacoesFiltradasPorEvento]);
+
+  // 🔧 CORREÇÃO: Atribuir refreshData ao ref para que o auto-refresh funcione
+  useEffect(() => {
+    refreshDataRef.current = refreshData;
+  }, [refreshData]);
 
   // Efeito para gerenciar o auto refresh
   useEffect(() => {

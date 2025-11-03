@@ -11,8 +11,8 @@ const DashboardPageCirio: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadDashboardData = async () => {
+  // 🔧 Função para carregar dados do dashboard (reutilizável para refresh)
+  const loadDashboardData = React.useCallback(async () => {
       try {
         setLoading(true);
         console.log("📊 Iniciando carregamento de dados para o dashboard...");
@@ -189,10 +189,18 @@ const DashboardPageCirio: React.FC = () => {
       } finally {
         setLoading(false);
       }
-    };
+  }, []); // useCallback sem dependências para criar função estável
 
-    loadDashboardData();
+  // 🔧 Callback para quando o dashboard filho atualizar dados
+  const handleDataRefresh = React.useCallback((newData: any[]) => {
+    console.log(`🔄 DashboardPageCirio: Recebendo ${newData.length} notificações do componente filho`);
+    setNotificacoes(newData);
   }, []);
+
+  // 🔧 useEffect para carregar dados inicialmente
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
 
   // Componente para mostrar durante o carregamento
   if (loading) {
@@ -264,6 +272,7 @@ const DashboardPageCirio: React.FC = () => {
       <EnhancedNotificationDashboard 
         notificacoes={notificacoes}
         exportOptions={exportOptions}
+        onDataRefresh={handleDataRefresh}
       />
     </div>
   );

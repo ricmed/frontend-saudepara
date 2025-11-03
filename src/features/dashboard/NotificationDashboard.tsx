@@ -2349,6 +2349,11 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     }
   }, [loading, selectedCategory, selectedDataNotificacao, activeFilters, fetchFreshData, notificacoes, filtrarNotificacoes, calcularEstatisticas, onDataRefresh, extrairDatasNotificacao, contarNotificacoesPorData, applyFilters]);
 
+  // 🔧 CORREÇÃO: Atribuir refreshData ao ref para que o auto-refresh funcione
+  useEffect(() => {
+    refreshDataRef.current = refreshData;
+  }, [refreshData]);
+
   // Efeito para gerenciar o auto refresh
   useEffect(() => {
     // Limpar qualquer intervalo existente
