@@ -67,7 +67,6 @@ export const fr: TranslationRecord = {
   "menu.logout": "Déconnexion",
   "menu.login": "Se connecter",
   "menu.manage_users": "Gérer les Utilisateurs",
-  "menu.change_password": "Changer le Mot de Passe",
   
   "language.select": "Sélectionner la langue",
   "campaigns.saibaMais": "En savoir plus",

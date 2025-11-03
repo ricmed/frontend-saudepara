@@ -13,7 +13,6 @@ import HealthCampaignsPage from "@/features/campaigns/pages/HealthCampaignsPage"
 import ProtectedRoute from "@/keycloak/ProtectedRoute";
 import DesktopPage from "@/features/desktop/DesktopPage";
 import UserProfile from "@/keycloak/pages/UserProfile";
-import ChangePassword from "@/keycloak/pages/ChangePassword";
 import LogoutConfirmation from "@/keycloak/pages/LogoutConfirmation";
 import NotificationDashboard from "@/features/dashboard/NotificationDashboard";
 // Features - Campanhas
@@ -254,7 +253,6 @@ function App() {
             </Route>
           </Route>
           <Route path="/perfil" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
-          <Route path="/alterar-senha" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
           <Route path="/logout" element={<ProtectedRoute><LogoutConfirmation /></ProtectedRoute>} />
           {/* Rotas de Apps Auxiliares */}
           {/* Rotas Públicas */}

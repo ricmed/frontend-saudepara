@@ -35,7 +35,6 @@ import {
   UserCog,
   Home, // ✅ NOVO: Ícone para Home
   Database, // ✅ NOVO: Ícone para Gerenciamento Offline
-  Lock, // ✅ NOVO: Ícone para Alterar Senha
 } from "lucide-react";
 
 interface SideMenuProps {
@@ -275,16 +274,6 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       icon: <UserCog />,
       label: t("menu.manage_users"),
       onClick: () => navigate("/admin"),
-    }] : []),
-    
-    // Menu Alterar Senha - apenas para usuários logados
-    ...(user ? [{
-      icon: <Lock />,
-      label: t("menu.change_password"), // Adicionar tradução: "Alterar Senha"
-      onClick: () => {
-        navigate("/alterar-senha");
-        onClose();
-      },
     }] : []),
     
     // Menu de Logout - apenas para usuários logados

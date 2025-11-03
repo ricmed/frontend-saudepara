@@ -71,7 +71,6 @@ export const zh: TranslationRecord = {
   "menu.logout": "退出",
   "menu.login": "登录",
   "menu.manage_users": "管理用户",
-  "menu.change_password": "更改密码",
   
   // 语言选择器
   "language.select": "选择语言",

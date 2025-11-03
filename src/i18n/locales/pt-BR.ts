@@ -70,7 +70,6 @@ export const ptBR = {
   "menu.logout": "Sair",
   "menu.login": "Entrar",
   "menu.manage_users": "Gerenciar Usuários",
-  "menu.change_password": "Alterar Senha",
   "menu.open": "Abrir menu",
   
   // Seletor de Idiomas

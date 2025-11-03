@@ -88,7 +88,6 @@ export type TranslationRecord = {
   'menu.logout': string;
   'menu.login': string;
   'menu.manage_users': string;
-  'menu.change_password': string;
 
   // Auxiliary Apps
   'apps.components': string;

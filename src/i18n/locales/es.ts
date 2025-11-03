@@ -73,7 +73,6 @@ export const es: TranslationRecord = {
   "menu.logout": "Salir",
   "menu.login": "Iniciar Sesión",
   "menu.manage_users": "Gestionar Usuarios",
-  "menu.change_password": "Cambiar Contraseña",
   
   // Selector de Idiomas
   "language.select": "Seleccionar idioma",

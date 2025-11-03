@@ -69,7 +69,6 @@ export const ko: TranslationRecord = {
   "menu.logout": "로그아웃",
   "menu.login": "로그인",
   "menu.manage_users": "사용자 관리",
-  "menu.change_password": "비밀번호 변경",
   "menu.open": "메뉴 열기",
   
   // Language
