@@ -706,17 +706,18 @@ export class IndexedDBService {
   }
 
   // ✅ ATUALIZADO: Aceita offlineId (string) ao invés de id (number)
-  // ✅ CORRIGIDO: Remove notificação do store após sincronização para evitar duplicatas
   async markNotificacaoAsSynced(offlineId: string): Promise<void> {
     await this.init();
     const notificacao = await this.db!.get('notificacoes', offlineId);
     if (notificacao) {
-      // ✅ CORREÇÃO: REMOVER a notificação ao invés de apenas marcar como 'synced'
-      // Pois ela já estará disponível no cache após a próxima sincronização/download
-      await this.db!.delete('notificacoes', offlineId);
-      console.log(`✅ Notificação ${offlineId} REMOVIDA do store após sincronização (evitando duplicatas)`);
-    } else {
-      console.warn(`⚠️ Notificação ${offlineId} não encontrada para remoção`);
+      notificacao.syncStatus = 'synced';
+      notificacao.sincronizado = true; // ✅ NOVO: Marcar como sincronizado
+      notificacao.syncedAt = Date.now(); // ✅ NOVO: Timestamp da sincronização
+      // Limpar informações de erro e sincronização
+      delete notificacao.errorInfo;
+      delete notificacao.syncStartedAt;
+      await this.db!.put('notificacoes', notificacao);
+      console.log(`✅ Notificação ${offlineId} marcada como sincronizada`);
     }
   }
 
@@ -947,23 +948,10 @@ export class IndexedDBService {
       
       // 2. Buscar notificações pendentes
       const pending = await this.getPendingNotificacoes();
-      
-      // ✅ NOVO: Filtrar notificações que já foram sincronizadas (medida de segurança)
-      const pendingFiltered = pending.filter(p => {
-        // Verificar se tem flag _isPending ou syncStatus diferente de 'synced'
-        const formDataAny = p.formData as any;
-        const isSynced = formDataAny?.sincronizado === true || formDataAny?.synced === true;
-        return !isSynced;
-      });
-      
-      if (pendingFiltered.length < pending.length) {
-        console.warn(`   ⚠️ ${pending.length - pendingFiltered.length} notificações já sincronizadas foram filtradas`);
-      }
-      
-      console.log(`   ⏳ ${pendingFiltered.length} notificações pendentes`);
+      console.log(`   ⏳ ${pending.length} notificações pendentes`);
       
       // 3. Converter pendentes para formato display
-      const pendingFormatted = pendingFiltered.map(p => ({
+      const pendingFormatted = pending.map(p => ({
         ...p.formData,
         idnotificacao: p.id,
         _isPending: true,
@@ -980,64 +968,25 @@ export class IndexedDBService {
       const all = [...pendingFormatted, ...cached];
       
       // 5. Remover duplicatas por offlineId (priorizar pendentes)
-      // ✅ MELHORADO: Deduplicação mais robusta com múltiplas chaves
       const uniqueMap = new Map();
-      const offlineIdIndex = new Map(); // Índice adicional por offline_id
-      
       all.forEach(n => {
-        // ✅ CORREÇÃO: Criar múltiplas chaves possíveis para detectar duplicatas
-        const offlineId = n._offlineId || n.offline_id || null;
-        const numericId = n.idnotificacao || n.id || null;
+        // Usar offlineId como chave única, ou ID se não tiver offlineId
+        const key = n._offlineId || n.offline_id || n.idnotificacao || n.id;
         
-        // Criar chave primária (preferir offlineId se disponível)
-        const primaryKey = offlineId || `id_${numericId}`;
-        
-        // Verificar duplicatas por offlineId
-        let isDuplicate = false;
-        if (offlineId) {
-          if (offlineIdIndex.has(offlineId)) {
-            isDuplicate = true;
-            const existingKey = offlineIdIndex.get(offlineId);
-            const existing = uniqueMap.get(existingKey);
-            
-            // Priorizar pendentes sobre sincronizadas
-            if (n._isPending && !existing._isPending) {
-              uniqueMap.delete(existingKey);
-              isDuplicate = false; // Vai adicionar a versão pendente
-            }
-          } else {
-            offlineIdIndex.set(offlineId, primaryKey);
+        // Se já existe, verificar qual priorizar
+        if (uniqueMap.has(key)) {
+          const existing = uniqueMap.get(key);
+          // Priorizar pendentes sobre sincronizadas
+          if (n._isPending && !existing._isPending) {
+            uniqueMap.set(key, n);
           }
-        }
-        
-        // Verificar duplicatas por ID numérico (se não for temporário)
-        if (!isDuplicate && numericId && numericId > 0) {
-          for (const [existingKey, existingNotif] of uniqueMap.entries()) {
-            const existingNumericId = existingNotif.idnotificacao || existingNotif.id;
-            if (existingNumericId === numericId) {
-              // Se já existe com mesmo ID, priorizar pendentes
-              if (n._isPending && !existingNotif._isPending) {
-                uniqueMap.delete(existingKey);
-                if (existingNotif.offline_id || existingNotif._offlineId) {
-                  offlineIdIndex.delete(existingNotif.offline_id || existingNotif._offlineId);
-                }
-              } else {
-                isDuplicate = true;
-              }
-              break;
-            }
-          }
-        }
-        
-        // Adicionar se não for duplicata
-        if (!isDuplicate) {
-          uniqueMap.set(primaryKey, n);
+        } else {
+          uniqueMap.set(key, n);
         }
       });
       
       const result = Array.from(uniqueMap.values());
-      const duplicatesRemoved = all.length - result.length;
-      console.log(`   📊 Total: ${result.length} notificações únicas (${pendingFiltered.length} pendentes + ${cached.length} cache - ${duplicatesRemoved} duplicatas removidas)`);
+      console.log(`   📊 Total: ${result.length} notificações únicas (${pending.length} pendentes + ${cached.length - (all.length - result.length)} sincronizadas)`);
       
       return result;
     } catch (error) {
