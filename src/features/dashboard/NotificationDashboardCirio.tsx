@@ -1731,7 +1731,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       index++;
     }
   
-    return resultado;
+    return resultado.sort((a, b) => b.value - a.value); // Ordenar do maior para o menor
   }, [getAtendimentoColor, getHipotesisColor, isHipotesisAlarmante]);
 
   // Função para processar categorias muitos-para-muitos
