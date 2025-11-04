@@ -300,6 +300,35 @@ interface GeographicLocationPanelProps {
   exportMenu?: React.ReactNode;
 }
 
+// 🌍 FUNÇÃO PARA ABREVIAR NOMES DE PAÍSES (remover partes desnecessárias)
+const abbreviateCountryName = (fullName: string): string => {
+  // Remove partes comuns que deixam os nomes longos
+  return fullName
+    .replace(/, República Popular$/i, '')
+    .replace(/, República da$/i, '')
+    .replace(/, República do$/i, '')
+    .replace(/, Estado Plurinacional da$/i, '')
+    .replace(/, Rep\.Pop\.Democrática$/i, '')
+    .replace(/, Rep\. Unida da$/i, '')
+    .replace(/, Rep\.Pop\.Democr\.do$/i, '')
+    .replace(/, República Islâmica do$/i, '')
+    .replace(/, República Árabe da$/i, '')
+    .replace(/, Ilhas$/i, '')
+    .replace(/^Ilhas /i, '')
+    .replace(/, República de$/i, '')
+    .replace(/\(República da\)/i, '')
+    .replace(/\(Birmânia\)/i, '')
+    .replace(/\(Navidad\)/i, '')
+    .replace(/\(Ilhas Malvinas\)/i, '')
+    .replace(/\(Taiwan\)/i, '')
+    .replace(/\(Holanda\)/i, '')
+    .replace(/\(Jersey e Guernsey\)/i, '')
+    .replace(/\(possessão dos EUA\)/i, '')
+    .replace(/, Est\. da Cidade do$/i, '')
+    .replace(/, Ant\.Rep\.Iugoslava$/i, '')
+    .trim();
+};
+
 // Componente de tooltip personalizado
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -1251,6 +1280,12 @@ const StatesChartWithTable: React.FC<{
                     {top10States.map((entry, index) => (
                       <CustomStateCell key={`cell-${index}`} payload={entry} />
                     ))}
+                    <LabelList
+                      dataKey="value"
+                      position="top"
+                      formatter={(value: number) => value.toLocaleString()}
+                      style={{ fontSize: '14px', fontWeight: 'bold', fill: '#374151' }}
+                    />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -1345,12 +1380,12 @@ const CountriesChartWithTable: React.FC<{
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+      <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
           {icon}
-          <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
-          <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+          <h3 className="text-xl font-semibold text-gray-800">{title}</h3>
+          <span className="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full">
             {data.length} {data.length === 1 ? 'país' : 'países'}
           </span>
         </div>
@@ -1362,22 +1397,26 @@ const CountriesChartWithTable: React.FC<{
             buttonVariant="icon"
           />
           {activeFilter && (
-            <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded">
+            <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
               <span>Filtro ativo: </span>
-              <span className="font-medium">{activeFilter}</span>
+              <span className="font-semibold">{activeFilter}</span>
             </div>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Gráfico de Barras - Top 10 */}
-        <div className="lg:col-span-2">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">Top 10 Países</h4>
+        <div className="xl:col-span-2">
+          <div className="mb-4">
+            <h4 className="text-lg font-medium text-gray-700 mb-2">Top 10 Países</h4>
+            <p className="text-sm text-gray-500">Clique nas barras para filtrar por país</p>
+          </div>
+          
           {top10Countries.length > 0 ? (
             <div id={`${filterCategory}-chart`}>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={top10Countries} margin={{ top: 5, right: 30, left: 20, bottom: 60 }}>
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart data={top10Countries} margin={{ top: 30, right: 30, left: 20, bottom: 60 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis 
                     dataKey="name" 
@@ -1447,85 +1486,89 @@ const CountriesChartWithTable: React.FC<{
                     {top10Countries.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
+                    <LabelList
+                      dataKey="value"
+                      position="top"
+                      formatter={(value: number) => value.toLocaleString()}
+                      style={{ fontSize: '14px', fontWeight: 'bold', fill: '#374151' }}
+                    />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="flex items-center justify-center h-60 text-gray-500 bg-gray-50 rounded">
+            <div className="flex items-center justify-center h-64 text-gray-500">
               <div className="text-center">
-                <Globe className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-                <p className="text-sm">Nenhum país registrado</p>
+                <Globe className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                <p>Nenhum país registrado</p>
               </div>
             </div>
           )}
         </div>
 
-        {/* Tabela Interativa - Todos os países */}
-        <div className="lg:col-span-1">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">Todos os Países ({data.length})</h4>
-          {data.length > 0 ? (
-            <div className="border rounded-lg max-h-80 overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 sticky top-0">
-                  <tr>
-                    <th className="text-left p-2 font-medium text-gray-700">País</th>
-                    <th className="text-right p-2 font-medium text-gray-700">Casos</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.map((country, index) => (
-                    <tr 
-                      key={index}
-                      className={`cursor-pointer hover:bg-blue-50 transition-colors border-b border-gray-100 ${
-                        activeFilter === country.name ? 'bg-blue-100' : ''
-                      }`}
-                      onClick={() => handleTableRowClick(country.name)}
-                      title={`Clique para filtrar por ${country.name}`}
-                    >
-                      <td className="p-2">
-                        <div className="flex items-center gap-2">
-                          {getFlagUrl(country.name) ? (
-                            <div className="flex items-center justify-center w-5 h-4 rounded border border-gray-200 bg-white overflow-hidden flex-shrink-0">
-                              <img 
-                                src={getFlagUrl(country.name)!} 
-                                alt={`Bandeira ${country.name}`}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  // Se a imagem falhar, mostrar o quadradinho colorido
-                                  const target = e.target as HTMLImageElement;
-                                  const parent = target.parentElement;
-                                  if (parent) {
-                                    parent.innerHTML = `<div class="w-3 h-3 rounded-full" style="background-color: ${country.fill}"></div>`;
-                                  }
-                                }}
-                              />
-                            </div>
-                          ) : (
-                            <div 
-                              className="w-3 h-3 rounded-full flex-shrink-0" 
-                              style={{ backgroundColor: country.fill }}
-                            ></div>
-                          )}
-                          <span className="truncate">{country.name}</span>
-                        </div>
-                      </td>
-                      <td className="text-right p-2 font-medium text-gray-800">
+        {/* Tabela Completa - Todos os Países */}
+        <div className="xl:col-span-1">
+          <div className="mb-4">
+            <h4 className="text-lg font-medium text-gray-700 mb-2">Todos os Países</h4>
+            <p className="text-sm text-gray-500">Clique para filtrar por país</p>
+          </div>
+          
+          <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
+            <div className="space-y-2">
+              {data.map((country, index) => {
+                const isActive = activeFilter === country.name;
+                const abbreviatedName = abbreviateCountryName(country.name);
+                
+                return (
+                  <div
+                    key={index}
+                    className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all duration-200 ${
+                      isActive 
+                        ? 'bg-blue-100 border border-blue-300 shadow-sm' 
+                        : 'bg-white hover:bg-gray-100 border border-transparent hover:shadow-sm'
+                    }`}
+                    onClick={() => handleTableRowClick(country.name)}
+                    title={`${country.name} - Clique para filtrar`}
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        {getFlagUrl(country.name) ? (
+                          <div className="flex items-center justify-center w-6 h-4 rounded border border-gray-200 bg-white overflow-hidden flex-shrink-0">
+                            <img 
+                              src={getFlagUrl(country.name)!} 
+                              alt={`Bandeira ${abbreviatedName}`}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                const parent = target.parentElement;
+                                if (parent) {
+                                  parent.innerHTML = `<div class="w-3 h-3 rounded-full" style="background-color: ${country.fill}"></div>`;
+                                }
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div 
+                            className="w-3 h-3 rounded-full flex-shrink-0" 
+                            style={{ backgroundColor: country.fill }}
+                          ></div>
+                        )}
+                        <span className={`font-medium text-sm truncate ${isActive ? 'text-blue-800' : 'text-gray-700'}`}>
+                          {abbreviatedName}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={`text-sm font-semibold ${isActive ? 'text-blue-700' : 'text-gray-600'}`}>
                         {country.value}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </span>
+                      {isActive && <span className="text-blue-500 text-xs">●</span>}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          ) : (
-            <div className="flex items-center justify-center h-40 text-gray-500 bg-gray-50 rounded border">
-              <div className="text-center">
-                <Globe className="h-6 w-6 mx-auto mb-1 text-gray-300" />
-                <p className="text-xs">Sem dados</p>
-              </div>
-            </div>
-          )}
+          </div>
         </div>
       </div>
     </div>
