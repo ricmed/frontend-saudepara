@@ -17,6 +17,7 @@ import { debounce } from 'lodash';
 import axios from 'axios';
 import syncService from '@/services/syncService';
 import indexedDBService from '@/services/indexedDB';
+import { deviceIdService } from '@/services/deviceIdService';
 
 import { useOfflineSystem } from '@/hooks/useOfflineSystem';
 
@@ -223,6 +224,23 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
   // Este estado mantém uma lista de IDs numéricos de arquivos existentes que foram removidos
   // e precisam ser excluídos no backend quando o formulário for submetido
   const [arquivosParaExcluir, setArquivosParaExcluir] = useState<number[]>([]);
+  
+  // ✅ CORREÇÃO DUPLICATAS: Gerar offline_id uma única vez para novas notificações
+  useEffect(() => {
+    const generateOfflineId = async () => {
+      // Só gerar offline_id se for nova notificação (não edição) e ainda não tiver
+      if (!isEditMode && !(formData as any).offline_id) {
+        const offlineId = await deviceIdService.generateOfflineId();
+        console.log(`🆔 [FORM] Gerando offline_id único para nova notificação: ${offlineId}`);
+        setFormData(prev => ({
+          ...prev,
+          offline_id: offlineId
+        } as any));
+      }
+    };
+    
+    generateOfflineId();
+  }, [isEditMode]); // Executar apenas uma vez ao montar o componente
   
   // Estado para controle de carregamento e erros da API
   const [isLoading, setIsLoading] = useState<boolean>(true);

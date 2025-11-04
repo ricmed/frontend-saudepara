@@ -325,37 +325,84 @@ export class IndexedDBService {
       // ✅ CORREÇÃO: Criar uma cópia profunda dos dados para evitar perda de propriedades
       const formDataCopy = JSON.parse(JSON.stringify(formData));
       
-      // ✅ NOVO: Gerar offlineId e deviceId
-      const offlineId = await deviceIdService.generateOfflineId();
+      // ✅ NOVO: Gerar deviceId uma única vez
       const deviceId = await deviceIdService.getDeviceId();
+      
+      // ✅ CORREÇÃO DUPLICATAS: Verificar se já existe um offlineId no formData (para evitar criar duplicata)
+      let offlineId: string;
+      let existingNotificacao: any = null;
+      
+      // Se o formData já tem offlineId (retry ou múltiplas chamadas), REUSAR
+      if ((formDataCopy as any).offline_id || (formDataCopy as any).offlineId) {
+        offlineId = (formDataCopy as any).offline_id || (formDataCopy as any).offlineId;
+        
+        // Verificar se essa notificação já existe no banco
+        existingNotificacao = await this.db!.get('notificacoes', offlineId);
+        
+        if (existingNotificacao && !isEdit) {
+          console.warn(`⚠️ [DUPLICATA DETECTADA] Notificação com offlineId ${offlineId} já existe! Atualizando ao invés de criar nova.`);
+        }
+      } else {
+        // Gerar novo offlineId apenas se não existir
+        offlineId = await deviceIdService.generateOfflineId();
+        
+        // Salvar offlineId no formData para futuras referências
+        (formDataCopy as any).offline_id = offlineId;
+      }
       
       let notificacao;
       
       if (isEdit && id) {
-        notificacao = {
-          id,
-          offlineId, // ✅ NOVO
-          deviceId, // ✅ NOVO
-          formData: formDataCopy,
-          syncStatus: 'pending' as const,
-          timestamp: Date.now(),
-          createdOffline: true, // ✅ NOVO
-          sincronizado: false, // ✅ NOVO: Inicia como não sincronizado
-          isEdit: true
-        };
+        // ✅ EDIÇÃO: Buscar notificação existente pelo ID ou offlineId
+        if (existingNotificacao) {
+          // Atualizar notificação existente
+          notificacao = {
+            ...existingNotificacao,
+            formData: formDataCopy,
+            timestamp: Date.now(),
+            syncStatus: 'pending' as const,
+            sincronizado: false
+          };
+        } else {
+          // Criar nova entrada de edição
+          notificacao = {
+            id,
+            offlineId,
+            deviceId,
+            formData: formDataCopy,
+            syncStatus: 'pending' as const,
+            timestamp: Date.now(),
+            createdOffline: true,
+            sincronizado: false,
+            isEdit: true
+          };
+        }
       } else {
-        const tempId = await this.generateTemporaryId();
-        notificacao = {
-          id: tempId,
-          offlineId, // ✅ NOVO
-          deviceId, // ✅ NOVO
-          formData: formDataCopy, 
-          syncStatus: 'pending' as const,
-          timestamp: Date.now(),
-          createdOffline: true, // ✅ NOVO
-          sincronizado: false, // ✅ NOVO: Inicia como não sincronizado
-          isEdit: false
-        };
+        // ✅ CRIAÇÃO: Se já existe, ATUALIZAR ao invés de criar duplicata
+        if (existingNotificacao) {
+          console.log(`🔄 [ANTI-DUPLICATA] Atualizando notificação existente offlineId ${offlineId}`);
+          notificacao = {
+            ...existingNotificacao,
+            formData: formDataCopy,
+            timestamp: Date.now(),
+            syncStatus: 'pending' as const,
+            sincronizado: false
+          };
+        } else {
+          // Criar nova notificação
+          const tempId = await this.generateTemporaryId();
+          notificacao = {
+            id: tempId,
+            offlineId,
+            deviceId,
+            formData: formDataCopy, 
+            syncStatus: 'pending' as const,
+            timestamp: Date.now(),
+            createdOffline: true,
+            sincronizado: false,
+            isEdit: false
+          };
+        }
       }
 
       // ✅ LOG DETALHADO PARA DEBUG DO MODO OFFLINE
@@ -908,6 +955,81 @@ export class IndexedDBService {
     console.log('🗑️ Cache de pacientes limpo');
   }
 
+  // ✅ NOVO: Limpar notificações pendentes duplicadas (manter apenas a mais recente de cada grupo)
+  async cleanDuplicatePendingNotifications(): Promise<{ removed: number; kept: number }> {
+    await this.init();
+    
+    try {
+      console.log('🧹 Iniciando limpeza de notificações duplicadas...');
+      
+      // Buscar todas as notificações pendentes
+      const allNotificacoes = await this.db!.getAll('notificacoes');
+      const pending = allNotificacoes.filter(n => n.sincronizado === false);
+      
+      console.log(`📊 Total: ${allNotificacoes.length} notificações, ${pending.length} pendentes`);
+      
+      if (pending.length === 0) {
+        console.log('✅ Nenhuma notificação pendente para limpar');
+        return { removed: 0, kept: 0 };
+      }
+      
+      // Agrupar por deviceId + campos únicos (paciente, data)
+      const grupos = new Map<string, typeof pending>();
+      
+      pending.forEach(notif => {
+        // Criar chave única baseada em campos principais
+        const paciente = notif.formData.paciente || '';
+        const dataAtendimento = notif.formData.dataAtendimento || '';
+        const tipoAtendimento = notif.formData.tipoAtendimento || '';
+        
+        const chave = `${notif.deviceId}_${paciente}_${dataAtendimento}_${tipoAtendimento}`;
+        
+        if (!grupos.has(chave)) {
+          grupos.set(chave, []);
+        }
+        grupos.get(chave)!.push(notif);
+      });
+      
+      console.log(`📋 ${grupos.size} grupos de notificações encontrados`);
+      
+      let removed = 0;
+      let kept = 0;
+      
+      // Para cada grupo, manter apenas a PRIMEIRA CRIADA (mais antiga)
+      for (const [chave, grupo] of grupos.entries()) {
+        if (grupo.length > 1) {
+          console.log(`🔍 Grupo com ${grupo.length} duplicatas encontrado`);
+          
+          // ✅ CORREÇÃO: Ordenar por timestamp (mais ANTIGA primeiro)
+          grupo.sort((a, b) => a.timestamp - b.timestamp);
+          
+          // Manter a primeira (original), remover as outras (duplicatas posteriores)
+          const [original, ...duplicatas] = grupo;
+          
+          console.log(`   ✅ Mantendo ORIGINAL: ${original.offlineId} (timestamp: ${new Date(original.timestamp).toLocaleString()})`);
+          kept++;
+          
+          // Remover duplicatas posteriores
+          for (const duplicata of duplicatas) {
+            await this.db!.delete('notificacoes', duplicata.offlineId);
+            console.log(`   🗑️ Removendo duplicata posterior: ${duplicata.offlineId} (timestamp: ${new Date(duplicata.timestamp).toLocaleString()})`);
+            removed++;
+          }
+        } else {
+          kept++;
+        }
+      }
+      
+      console.log(`✅ Limpeza concluída: ${removed} duplicatas removidas, ${kept} mantidas`);
+      
+      return { removed, kept };
+      
+    } catch (error) {
+      console.error('❌ Erro ao limpar duplicatas:', error);
+      throw error;
+    }
+  }
+
   // ✅ NOVO: Buscar todas as notificações para visualização (pendentes + sincronizadas)
   async getAllNotificacoesForDisplay(): Promise<any[]> {
     await this.init();
@@ -1448,4 +1570,26 @@ export class IndexedDBService {
 }
 
 const indexedDBService = new IndexedDBService();
+
+// ✅ EXPOR FUNÇÃO GLOBAL para limpar duplicatas (útil para debugging e manutenção)
+if (typeof window !== 'undefined') {
+  (window as any).cleanDuplicateNotifications = async () => {
+    console.log('🧹 Iniciando limpeza de notificações duplicadas...');
+    try {
+      const result = await indexedDBService.cleanDuplicatePendingNotifications();
+      console.log(`✅ Limpeza concluída: ${result.removed} duplicatas removidas, ${result.kept} notificações mantidas`);
+      
+      // Disparar evento para atualizar lista
+      window.dispatchEvent(new CustomEvent('cache-updated'));
+      
+      return result;
+    } catch (error) {
+      console.error('❌ Erro ao limpar duplicatas:', error);
+      throw error;
+    }
+  };
+  
+  console.log('💡 Use window.cleanDuplicateNotifications() no console para limpar notificações duplicadas');
+}
+
 export default indexedDBService;

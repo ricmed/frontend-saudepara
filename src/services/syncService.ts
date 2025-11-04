@@ -1054,9 +1054,19 @@ class SyncService {
       formDataParaSalvar.pacienteId = formDataParaSalvar.paciente_idpaciente;
     }
 
+    // ✅ CORREÇÃO DUPLICATAS: Preservar offline_id se já existir (para evitar criar duplicata)
+    // Se o formData original tem offline_id, manter no formDataParaSalvar
+    if (formData.offline_id && !formDataParaSalvar.offline_id) {
+      formDataParaSalvar.offline_id = formData.offline_id;
+    }
+    if (formData.offlineId && !formDataParaSalvar.offlineId) {
+      formDataParaSalvar.offlineId = formData.offlineId;
+    }
+
     // ✅ LOG DETALHADO PARA DEBUG
     console.log(`💾 [SYNC SERVICE] Salvando ${isEdit ? 'edição' : 'nova notificação'} offline:`, {
       id: notificacaoId || 'novo',
+      offline_id: formDataParaSalvar.offline_id || formDataParaSalvar.offlineId || 'será gerado',
       isEdit,
       // Campos críticos para verificação
       localHospedagem: formDataParaSalvar.localHospedagem,
