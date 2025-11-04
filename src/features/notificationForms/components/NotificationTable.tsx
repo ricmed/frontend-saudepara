@@ -19,6 +19,45 @@ interface NotificationTableProps {
   searchTerm?: string;
 }
 
+// Função para obter a cor da borda e fundo baseada no tipo de atendimento
+const getTipoAtendimentoStyles = (notificacao: Notificacao): React.CSSProperties => {
+  // Buscar tipo de atendimento em múltiplos lugares
+  const tipoAtendimento = 
+    notificacao.tipoAtendimento || 
+    notificacao.original?.tipo_atendimento?.descricao ||
+    '';
+  
+  if (!tipoAtendimento || tipoAtendimento === 'N/A') {
+    return {};
+  }
+  
+  const tipo = tipoAtendimento.toLowerCase().trim();
+  
+  if (tipo.includes('clínico') || tipo.includes('clinico')) {
+    return { 
+      borderLeft: '4px solid rgb(34, 197, 94)', // green-500
+      backgroundColor: 'rgba(240, 253, 244, 0.5)' // green-50 with light opacity
+    };
+  } else if (tipo.includes('trauma')) {
+    return { 
+      borderLeft: '4px solid rgb(239, 68, 68)', // red-500
+      backgroundColor: 'rgba(254, 242, 242, 0.5)' // red-50 with light opacity
+    };
+  } else if (tipo.includes('múltiplas') || tipo.includes('multiplas') || tipo.includes('vítimas') || tipo.includes('vitimas')) {
+    return { 
+      borderLeft: '4px solid rgb(168, 85, 247)', // purple-500
+      backgroundColor: 'rgba(250, 245, 255, 0.5)' // purple-50 with light opacity
+    };
+  } else if (tipo.includes('qbrn')) {
+    return { 
+      borderLeft: '4px solid rgb(249, 115, 22)', // orange-500
+      backgroundColor: 'rgba(255, 247, 237, 0.5)' // orange-50 with light opacity
+    };
+  }
+  
+  return {};
+};
+
 const NotificationTable: React.FC<NotificationTableProps> = ({
   notificacoes,
   isLoading,
@@ -185,7 +224,8 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
             {notificacoes.map((notificacao) => (
               <div
                 key={notificacao.id}
-                className="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                className="p-4 transition-all duration-200 cursor-pointer hover:shadow-md"
+                style={getTipoAtendimentoStyles(notificacao)}
                 onClick={() =>
                   navigate(
                     `/private/comunicacao-de-caso/editar/${notificacao.id}`
@@ -317,7 +357,8 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
               notificacoes.map((notificacao) => (
                 <tr
                   key={notificacao.id}
-                  className="hover:bg-gray-50 transition-colors cursor-pointer"
+                  className="transition-all duration-200 cursor-pointer hover:shadow-lg"
+                  style={getTipoAtendimentoStyles(notificacao)}
                   onClick={() =>
                     navigate(
                       `/private/comunicacao-de-caso/editar/${notificacao.id}`

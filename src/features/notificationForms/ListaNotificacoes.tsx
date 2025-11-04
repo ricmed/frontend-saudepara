@@ -1,22 +1,37 @@
 // src/features/notificationForms/ListaNotificacoes.tsx
-import React, { useRef } from "react";
+import React, { useRef, useState, useMemo, useEffect } from "react";
 import { CSVLink } from "react-csv";
-import { Download, Table, FileText, Files } from "lucide-react";
 import SideMenu from "@/features/home/components/SideMenu";
 import TableHeader from "./components/TableHeader";
 import NotificationTable from "./components/NotificationTable";
 import Pagination from "./components/Pagination";
+import TipoAtendimentoFilter, { TipoAtendimentoType } from "./components/TipoAtendimentoFilter";
 import { useNotifications } from "./hooks/useNotifications";
 import { useTableControls } from "./hooks/useTableControls";
 import { allColumns, searchFields } from "./types";
-import type { SearchParams, PDFExportType, PDFExportOption } from "./types";
-import { formatDate } from "./utils";
+import type { SearchParams } from "./types";
+import { formatDate, compareValues, getValueForSorting } from "./utils";
 import { useLanguage } from "@/contexts/LanguageContext";
+import type { Notificacao } from "./types";
 
 const ListaNotificacoes: React.FC = () => {
   // Custom hooks para gerenciar estado e lógica
   const notifications = useNotifications();
   const tableControls = useTableControls();
+  
+  // Estado do filtro de tipo de atendimento
+  const [selectedTipoAtendimento, setSelectedTipoAtendimento] = useState<TipoAtendimentoType>(null);
+
+  // Resetar para página 1 quando o filtro mudar e forçar carregamento de todos os dados
+  useEffect(() => {
+    notifications.setCurrentPage(1);
+    
+    // Se há um filtro ativo e não temos todas as notificações, buscar todas
+    if (selectedTipoAtendimento && notifications.allNotificacoes.length === 0) {
+      notifications.fetchAllData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTipoAtendimento]);
   
   // Refs para CSVLink
   const csvLinkRef = useRef<any>(null);
@@ -25,10 +40,67 @@ const ListaNotificacoes: React.FC = () => {
   // Adicionar contexto de idioma
   const { selectedLanguage, setSelectedLanguage } = useLanguage();
 
-  // Função para lidar com exportação PDF
-  const handlePdfExport = (pdfType: PDFExportType) => {
-    notifications.handleExport('pdf', 'all', pdfType);
-  };
+  // Usar allNotificacoes quando disponível (modo de ordenação local) ou notificacoes (paginação do servidor)
+  const todasNotificacoes = notifications.allNotificacoes.length > 0 
+    ? notifications.allNotificacoes 
+    : notifications.notificacoes;
+
+  // Filtrar notificações por tipo de atendimento
+  const notificacoesFiltradas = useMemo(() => {
+    let filtradas = todasNotificacoes;
+    
+    // Aplicar filtro de tipo de atendimento
+    if (selectedTipoAtendimento) {
+      filtradas = filtradas.filter((notificacao) => {
+        const tipoAtendimento = notificacao.tipoAtendimento?.toLowerCase() || '';
+        
+        switch (selectedTipoAtendimento) {
+          case 'clinico':
+            return tipoAtendimento.includes('clínico') || tipoAtendimento.includes('clinico');
+          case 'trauma':
+            return tipoAtendimento.includes('trauma');
+          case 'multiplas':
+            return tipoAtendimento.includes('múltiplas') || tipoAtendimento.includes('multiplas') || 
+                   tipoAtendimento.includes('vítimas') || tipoAtendimento.includes('vitimas');
+          case 'qbrn':
+            return tipoAtendimento.includes('qbrn');
+          default:
+            return true;
+        }
+      });
+    }
+    
+    // Aplicar ordenação se estivermos usando dados locais
+    if (notifications.allNotificacoes.length > 0 && notifications.sortKey) {
+      filtradas = [...filtradas].sort((a, b) => {
+        const aValue = getValueForSorting(a, notifications.sortKey as keyof Notificacao);
+        const bValue = getValueForSorting(b, notifications.sortKey as keyof Notificacao);
+        return compareValues(aValue, bValue, notifications.sortOrder);
+      });
+    }
+    
+    return filtradas;
+  }, [todasNotificacoes, selectedTipoAtendimento, notifications.allNotificacoes.length, notifications.sortKey, notifications.sortOrder]);
+
+  // Aplicar paginação local nas notificações filtradas
+  const notificacoesPaginadas = useMemo(() => {
+    const startIndex = (notifications.currentPage - 1) * notifications.itemsPerPage;
+    const endIndex = startIndex + notifications.itemsPerPage;
+    return notificacoesFiltradas.slice(startIndex, endIndex);
+  }, [notificacoesFiltradas, notifications.currentPage, notifications.itemsPerPage]);
+
+  // Calcular metadados de paginação para dados filtrados
+  const paginationMetaFiltrada = useMemo(() => {
+    const total = notificacoesFiltradas.length;
+    const pages = Math.ceil(total / notifications.itemsPerPage);
+    
+    return {
+      total,
+      pages,
+      currentPage: notifications.currentPage,
+      perPage: notifications.itemsPerPage
+    };
+  }, [notificacoesFiltradas.length, notifications.itemsPerPage, notifications.currentPage]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -64,13 +136,20 @@ const ListaNotificacoes: React.FC = () => {
         onClose={() => tableControls.setIsMenuOpen(false)}
         selectedLanguage={selectedLanguage}
         onLanguageChange={(language) => setSelectedLanguage(language)}
-      />      {/* Conteúdo principal */}
+      />
+
+      {/* Conteúdo principal */}
       <main className="w-full max-w-[98%] mx-auto px-1 sm:px-2 lg:px-3 xl:px-4 py-4 md:py-6 lg:py-8">
+        {/* Filtro de Tipo de Atendimento */}
+        <TipoAtendimentoFilter
+          selectedTipo={selectedTipoAtendimento}
+          onTipoChange={setSelectedTipoAtendimento}
+        />
 
         <div className="overflow-x-auto overflow-y-visible">
           {/* Tabela de Notificações */}
           <NotificationTable 
-            notificacoes={notifications.notificacoes}
+            notificacoes={notificacoesPaginadas}
             isLoading={notifications.isLoading}
             error={notifications.error}
             onDismissError={() => notifications.setError(null)}
@@ -85,7 +164,7 @@ const ListaNotificacoes: React.FC = () => {
 
           {/* Paginação */}
           <Pagination 
-            paginationMeta={notifications.paginationMeta}
+            paginationMeta={paginationMetaFiltrada}
             currentPage={notifications.currentPage}
             itemsPerPage={notifications.itemsPerPage}
             onPageChange={notifications.handlePageChange}
