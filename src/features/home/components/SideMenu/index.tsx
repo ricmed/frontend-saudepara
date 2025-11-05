@@ -61,10 +61,10 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     if (!user) return false;
     // Verifica se o usuário tem qualquer tipo de role admin
     return user.roles?.some((role: string) => 
-      role === 'admin' || 
+      role === 'admin'/* || 
       role === 'admin.unidade' || 
       role === 'admin.municipio' || 
-      role === 'admin.estado'
+      role === 'admin.estado'   */
     );
   };
 
