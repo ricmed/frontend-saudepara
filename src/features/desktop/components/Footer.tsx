@@ -88,7 +88,7 @@ const Footer: React.FC<FooterProps> = ({ selectedLanguage }) => {
             </h3>
             <p>{t("footer.feedbackQuestion")}</p>
             <p className="mt-2">{t("footer.contactOmbudsman")}</p>
-            <p className="mt-2">📞 0800-280-9209</p>
+            <p className="mt-2">📞 0800-280-9889</p>
             <p className="mt-2">✉️ ouvidoria@saude.pa.gov.br</p>
           </div>
           <div>
