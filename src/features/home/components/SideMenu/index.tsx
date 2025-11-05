@@ -236,8 +236,8 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       onClick: () => {},
     },
     
-    // Menu de Apps Auxiliares - apenas para admins logados
-    ...(user && isAdmin() ? [{
+    // Menu de Apps Auxiliares - apenas para admin master
+    ...(user && isAdminMaster() ? [{
       icon: <Building2 />,
       label: t("menu.apps"),
       submenu: true,
