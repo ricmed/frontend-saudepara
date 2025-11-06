@@ -1031,6 +1031,17 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       
       // 🆕 CORREÇÃO: Usar notificações filtradas por evento
       setTotalNotificacoesDia(notificacoesFiltradasPorEvento.length);
+    } else if (novaData === 'ultima-data') {
+      // 🆕 SEMPRE ÚLTIMA DATA: Usar a data mais recente disponível
+      const dataMaisRecente = datasNotificacaoDisponiveis[0]; // Primeira do array = mais recente
+      if (dataMaisRecente) {
+        const totalParaData = contarNotificacoesPorData(notificacoesFiltradasPorEvento, dataMaisRecente);
+        console.log(`🆕 Sempre última data ativado: ${dataMaisRecente} (${totalParaData} notificações)`);
+        
+        setSelectedDataNotificacao('ultima-data');
+        setActiveFilters(prev => ({ ...prev, dataNotificacao: dataMaisRecente }));
+        setTotalNotificacoesDia(totalParaData);
+      }
     } else {
       // 🆕 CORREÇÃO: Usar notificações filtradas por evento como base
       const dadosParaContar = notificacoesFiltradasPorEvento;
@@ -1046,7 +1057,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       setActiveFilters(prev => ({ ...prev, dataNotificacao: novaData }));
       setTotalNotificacoesDia(totalParaData);
     }
-  }, [contarNotificacoesPorData, notificacoesFiltradasPorEvento]);
+  }, [contarNotificacoesPorData, notificacoesFiltradasPorEvento, datasNotificacaoDisponiveis]);
 
   // 🆕 VERIFICAR SE HÁ FILTROS ATIVOS
   const hasActiveFilters = useMemo(() => {
@@ -2503,19 +2514,41 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           return; // Interrompe aqui para evitar race condition
         }
       } else if (selectedDataNotificacao) {
-        // Se já temos uma data selecionada, verificar sincronização com activeFilters
-        // 🆕 CORREÇÃO: Usar notificações filtradas por evento
-        const totalDiaAtualizado = contarNotificacoesPorData(notificacoesFiltradasPorEvento, selectedDataNotificacao);
-        setTotalNotificacoesDia(totalDiaAtualizado);
-        
-        // Garantir sincronização com activeFilters
-        setActiveFilters(prev => {
-          if (prev.dataNotificacao !== selectedDataNotificacao) {
-            console.log('🔄 Sincronizando data selecionada com activeFilters:', selectedDataNotificacao);
-            return { ...prev, dataNotificacao: selectedDataNotificacao };
+        // 🆕 MODO "SEMPRE ÚLTIMA DATA": Atualizar automaticamente para a data mais recente
+        if (selectedDataNotificacao === 'ultima-data') {
+          const dataMaisRecente = datasDisponiveis[0]; // Primeira do array = mais recente
+          
+          if (dataMaisRecente) {
+            // Sempre usar a data mais recente quando estiver neste modo
+            const totalDiaNovo = contarNotificacoesPorData(notificacoesFiltradasPorEvento, dataMaisRecente);
+            
+            // Só atualizar activeFilters se a data mudou
+            setActiveFilters(prev => {
+              if (prev.dataNotificacao !== dataMaisRecente) {
+                console.log('🔄 Modo "Sempre última data": Atualizando para', dataMaisRecente);
+                return { ...prev, dataNotificacao: dataMaisRecente };
+              }
+              return prev;
+            });
+            
+            setTotalNotificacoesDia(totalDiaNovo);
           }
-          return prev;
-        });
+        } else {
+          // Data específica selecionada manualmente
+          // Se já temos uma data selecionada, verificar sincronização com activeFilters
+          // 🆕 CORREÇÃO: Usar notificações filtradas por evento
+          const totalDiaAtualizado = contarNotificacoesPorData(notificacoesFiltradasPorEvento, selectedDataNotificacao);
+          setTotalNotificacoesDia(totalDiaAtualizado);
+          
+          // Garantir sincronização com activeFilters
+          setActiveFilters(prev => {
+            if (prev.dataNotificacao !== selectedDataNotificacao) {
+              console.log('🔄 Sincronizando data selecionada com activeFilters:', selectedDataNotificacao);
+              return { ...prev, dataNotificacao: selectedDataNotificacao };
+            }
+            return prev;
+          });
+        }
       }
     }
     
@@ -3351,19 +3384,27 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 <div>
                   <h2 className="text-lg font-bold mb-1">
                     {selectedDataNotificacao 
-                      ? new Date(selectedDataNotificacao + 'T00:00:00').toLocaleDateString('pt-BR', {
-                          weekday: 'long',
-                          day: 'numeric',
-                          month: 'long'
-                        })
+                      ? selectedDataNotificacao === 'ultima-data'
+                        ? `${new Date(datasNotificacaoDisponiveis[0] + 'T00:00:00').toLocaleDateString('pt-BR', {
+                            weekday: 'long',
+                            day: 'numeric',
+                            month: 'long'
+                          })} 🔄`
+                        : new Date(selectedDataNotificacao + 'T00:00:00').toLocaleDateString('pt-BR', {
+                            weekday: 'long',
+                            day: 'numeric',
+                            month: 'long'
+                          })
                       : 'Todas as Datas'
                     }
                   </h2>
                   <p className="text-indigo-100 text-xs">
                     {selectedDataNotificacao 
-                      ? totalNotificacoesDia > 0 
-                        ? `${totalNotificacoesDia.toLocaleString()} casos neste dia`
-                        : `Sem casos neste dia - mostrando total do evento: ${notificacoesFiltradasPorEvento.length.toLocaleString()}`
+                      ? selectedDataNotificacao === 'ultima-data'
+                        ? `Sempre última data - ${totalNotificacoesDia.toLocaleString()} casos (atualiza automaticamente)`
+                        : totalNotificacoesDia > 0 
+                          ? `${totalNotificacoesDia.toLocaleString()} casos neste dia`
+                          : `Sem casos neste dia - mostrando total do evento: ${notificacoesFiltradasPorEvento.length.toLocaleString()}`
                       : `Visualizando todos os registros`
                     }
                   </p>
@@ -3378,6 +3419,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                   className="px-3 py-2 text-xs text-gray-800 border border-white border-opacity-30 rounded-lg focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 bg-white bg-opacity-90 min-w-[180px]"
                 >
                   <option value="todos">📊 Todas as Datas</option>
+                  {/* 🆕 OPÇÃO: Sempre última data */}
+                  {datasNotificacaoDisponiveis.length > 0 && (
+                    <option value="ultima-data">
+                      🔄 Sempre última data ({new Date(datasNotificacaoDisponiveis[0] + 'T00:00:00').toLocaleDateString('pt-BR')})
+                    </option>
+                  )}
                   {datasNotificacaoDisponiveis.map((data) => {
                     // 🆕 CORREÇÃO: Contar apenas notificações do evento selecionado
                     const totalDia = contarNotificacoesPorData(notificacoesFiltradasPorEvento, data);
@@ -3876,10 +3923,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             />
           </div>
           
-          {/* 🆕 USAR NOTIFICAÇÕES FILTRADAS POR EVENTO */}
+          {/* 🆕 USAR NOTIFICAÇÕES FILTRADAS POR EVENTO E DATA DO DASHBOARD */}
           <EstabelecimentosMapaAvancado 
             notificacoes={notificacoesFiltradasPorEvento}
-            exportOptions={exportOptions} 
+            exportOptions={exportOptions}
+            selectedDataNotificacao={selectedDataNotificacao}
+            datasNotificacaoDisponiveis={datasNotificacaoDisponiveis}
           />
         </main>
       )}

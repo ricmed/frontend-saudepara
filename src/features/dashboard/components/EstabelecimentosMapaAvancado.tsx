@@ -43,11 +43,15 @@ interface EstabelecimentoInfo {
 interface EstabelecimentosMapaAvancadoProps {
   notificacoes: any[];
   exportOptions?: any; // 🆕 Adicionar exportOptions para acessar hipóteses
+  selectedDataNotificacao?: string | null; // 🆕 Data selecionada no dashboard (pode ser 'ultima-data')
+  datasNotificacaoDisponiveis?: string[]; // 🆕 Datas disponíveis do dashboard
 }
 
 const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> = memo(({ 
   notificacoes = [],
-  exportOptions = {} // 🆕 Receber exportOptions
+  exportOptions = {}, // 🆕 Receber exportOptions
+  selectedDataNotificacao = null, // 🆕 Receber data selecionada do dashboard
+  datasNotificacaoDisponiveis = [] // 🆕 Receber datas disponíveis
 }) => {
   console.log('🏁 EstabelecimentosMapaAvancado renderizado:', {
     notificacoesRecebidas: notificacoes.length,
@@ -175,12 +179,23 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
 
   // Processar estabelecimentos de forma memoizada
   const estabelecimentosProcessados = useMemo(() => {
+    // 🆕 USAR DATA DO DASHBOARD SE FORNECIDA, SENÃO USA ESTADO INTERNO DO MAPA
+    let dataParaFiltrar = selectedDataNotificacao || dataSelecionada;
+    
+    // 🆕 SE ESTIVER NO MODO "SEMPRE ÚLTIMA DATA", USAR A DATA REAL
+    if (dataParaFiltrar === 'ultima-data' && datasNotificacaoDisponiveis.length > 0) {
+      dataParaFiltrar = datasNotificacaoDisponiveis[0]; // Primeira = mais recente
+      console.log('🔄 Mapa: Modo "sempre última data" ativo, usando:', dataParaFiltrar);
+    }
+    
     console.log('🔄 Processando estabelecimentos...', {
       allPlacesMapSize: allPlacesMap.size,
       notificacoesLength: notificacoes.length,
       filtros: {
         tipoEstabelecimento: tipoEstabelecimentoSelecionado,
-        data: dataSelecionada
+        data: dataParaFiltrar,
+        dataOriginalDashboard: selectedDataNotificacao,
+        dataInternaMap: dataSelecionada
       }
     });
     
@@ -195,7 +210,7 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
     // 🆕 Filtrar notificações por data se necessário (filtro do mapa, MESMA LÓGICA DO DASHBOARD)
     let notificacoesFiltradas = notificacoes;
     
-    if (dataSelecionada) {
+    if (dataParaFiltrar) {
       const timezone = 'America/Belem'; // Fuso horário local
       
       notificacoesFiltradas = notificacoes.filter((n: any) => {
@@ -212,13 +227,13 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
             day: '2-digit'
           }).split('/').reverse().join('-'); // Converter para YYYY-MM-DD
           
-          return dataFormatada === dataSelecionada;
+          return dataFormatada === dataParaFiltrar;
         } catch (error) {
           console.warn('Erro ao filtrar por data:', error);
           return false;
         }
       });
-      console.log(`📅 Filtrado por data ${dataSelecionada}: ${notificacoesFiltradas.length} de ${notificacoes.length} notificações`);
+      console.log(`📅 Filtrado por data ${dataParaFiltrar}: ${notificacoesFiltradas.length} de ${notificacoes.length} notificações`);
     }
 
     const estabelecimentosMap = new Map<string, EstabelecimentoInfo>();
@@ -387,7 +402,7 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
     console.log(`✅ Retornando ${resultado.length} estabelecimentos processados`);
     
     return resultado;
-  }, [allPlacesMap, notificacoes, exportOptions, tipoEstabelecimentoSelecionado, dataSelecionada]);
+  }, [allPlacesMap, notificacoes, exportOptions, tipoEstabelecimentoSelecionado, dataSelecionada, selectedDataNotificacao, datasNotificacaoDisponiveis]);
 
   // Atualizar estado apenas quando dados processados mudarem
   useEffect(() => {
@@ -404,6 +419,15 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
       console.log('⏭️ Nenhuma atualização necessária - dados idênticos');
     }
   }, [estabelecimentosProcessados, estabelecimentos]);
+
+  // 🆕 Atualizar automaticamente quando estiver no modo "última data" e a data mudar
+  useEffect(() => {
+    if (dataSelecionada === 'ultima-data' && datasDisponiveis.length > 0) {
+      const dataMaisRecente = datasDisponiveis[0];
+      console.log('🔄 Mapa (filtro interno): Modo "última data" ativo, data mais recente:', dataMaisRecente);
+      // O processamento já acontece automaticamente via useMemo, só precisamos garantir que o estado está correto
+    }
+  }, [dataSelecionada, datasDisponiveis]);
 
   // Converter para formato do mapa de forma memoizada
   const estabelecimentosParaMapa = useMemo(() => {
@@ -524,8 +548,13 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
                 }
                 
                 if (dataSelecionada) {
-                  const dataFormatada = new Date(dataSelecionada + 'T00:00:00').toLocaleDateString('pt-BR');
-                  filtros.push(`Data: ${dataFormatada}`);
+                  if (dataSelecionada === 'ultima-data' && datasDisponiveis.length > 0) {
+                    const dataFormatada = new Date(datasDisponiveis[0] + 'T00:00:00').toLocaleDateString('pt-BR');
+                    filtros.push(`Última data: ${dataFormatada} 🔄`);
+                  } else {
+                    const dataFormatada = new Date(dataSelecionada + 'T00:00:00').toLocaleDateString('pt-BR');
+                    filtros.push(`Data: ${dataFormatada}`);
+                  }
                 }
                 
                 if (filtros.length > 0) {
@@ -584,6 +613,12 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="todas">📅 Todas as Datas ({notificacoes.length})</option>
+              {/* 🆕 OPÇÃO: Sempre última data */}
+              {datasDisponiveis.length > 0 && (
+                <option value="ultima-data">
+                  🔄 Sempre última data ({new Date(datasDisponiveis[0] + 'T00:00:00').toLocaleDateString('pt-BR')})
+                </option>
+              )}
               {datasDisponiveis.map((data) => {
                 const dataFormatada = new Date(data + 'T00:00:00').toLocaleDateString('pt-BR');
                 const timezone = 'America/Belem';
@@ -659,7 +694,12 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
             {dataSelecionada && (
               <div className="flex items-center gap-2 bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-xs">
                 <Calendar className="h-3 w-3" />
-                <span>Data: {new Date(dataSelecionada + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                <span>
+                  {dataSelecionada === 'ultima-data' && datasDisponiveis.length > 0
+                    ? `Última data: ${new Date(datasDisponiveis[0] + 'T00:00:00').toLocaleDateString('pt-BR')} 🔄`
+                    : `Data: ${new Date(dataSelecionada + 'T00:00:00').toLocaleDateString('pt-BR')}`
+                  }
+                </span>
                 <button
                   onClick={() => setDataSelecionada(null)}
                   className="hover:bg-purple-200 rounded-full p-0.5"

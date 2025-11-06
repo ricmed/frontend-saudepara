@@ -1013,6 +1013,31 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         });
       }
       setTotalNotificacoesDia(dadosParaContar.length);
+    } else if (novaData === 'ultima-data') {
+      // 🆕 SEMPRE ÚLTIMA DATA: Usar a data mais recente disponível
+      const dataMaisRecente = datasNotificacaoDisponiveis[0]; // Primeira do array = mais recente
+      if (dataMaisRecente) {
+        let dadosParaContar = originalNotificacoes.current;
+        if (activeFilters.evento && activeFilters.evento !== 'todos') {
+          dadosParaContar = dadosParaContar.filter(n => {
+            const eventoId = n?.original?.tipo_evento_idtipo_evento;
+            if (eventoId !== undefined && exportOptions?.eventoOptions?.length > 0) {
+              const evento = exportOptions.eventoOptions.find(
+                (e: any) => String(e.idtipo_evento) === String(eventoId) || String(e.idevento) === String(eventoId)
+              );
+              return evento?.descricao === activeFilters.evento;
+            }
+            return false;
+          });
+        }
+        
+        const totalParaData = contarNotificacoesPorData(dadosParaContar, dataMaisRecente);
+        console.log(`🆕 Sempre última data ativado: ${dataMaisRecente} (${totalParaData} notificações)`);
+        
+        setSelectedDataNotificacao('ultima-data');
+        setActiveFilters(prev => ({ ...prev, dataNotificacao: dataMaisRecente }));
+        setTotalNotificacoesDia(totalParaData);
+      }
     } else {
       // 🆕 VALIDAÇÃO: Verificar se há notificações para a data selecionada com o evento ativo
       let dadosParaContar = originalNotificacoes.current;
@@ -2477,33 +2502,69 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           console.log('📊 DEBUG: Total de notificações para', dataAtual, ':', totalDia);
         }
       } else if (selectedDataNotificacao) {
-        // Se já temos uma data selecionada, verificar sincronização com activeFilters
-        // CORRIGIR: Também considerar outros filtros ativos aqui
-        let dadosParaContar = notificacoes;
-        if (activeFilters.evento && activeFilters.evento !== 'todos') {
-          dadosParaContar = notificacoes.filter(n => {
-            const eventoId = n?.original?.tipo_evento_idtipo_evento;
-            if (eventoId !== undefined && exportOptions?.eventoOptions?.length > 0) {
-              const evento = exportOptions.eventoOptions.find(
-                (e: any) => String(e.idtipo_evento) === String(eventoId) || String(e.idevento) === String(eventoId)
-              );
-              return evento?.descricao === activeFilters.evento;
+        // 🆕 MODO "SEMPRE ÚLTIMA DATA": Atualizar automaticamente para a data mais recente
+        if (selectedDataNotificacao === 'ultima-data') {
+          const dataMaisRecente = datasDisponiveis[0]; // Primeira do array = mais recente
+          
+          if (dataMaisRecente) {
+            // Sempre usar a data mais recente quando estiver neste modo
+            let dadosParaContar = notificacoes;
+            if (activeFilters.evento && activeFilters.evento !== 'todos') {
+              dadosParaContar = notificacoes.filter(n => {
+                const eventoId = n?.original?.tipo_evento_idtipo_evento;
+                if (eventoId !== undefined && exportOptions?.eventoOptions?.length > 0) {
+                  const evento = exportOptions.eventoOptions.find(
+                    (e: any) => String(e.idtipo_evento) === String(eventoId) || String(e.idevento) === String(eventoId)
+                  );
+                  return evento?.descricao === activeFilters.evento;
+                }
+                return false;
+              });
             }
-            return false;
+            
+            const totalDiaNovo = contarNotificacoesPorData(dadosParaContar, dataMaisRecente);
+            
+            // Só atualizar activeFilters se a data mudou
+            setActiveFilters(prev => {
+              if (prev.dataNotificacao !== dataMaisRecente) {
+                console.log('🔄 Modo "Sempre última data": Atualizando para', dataMaisRecente);
+                return { ...prev, dataNotificacao: dataMaisRecente };
+              }
+              return prev;
+            });
+            
+            setTotalNotificacoesDia(totalDiaNovo);
+          }
+        } else {
+          // Data específica selecionada manualmente
+          // Se já temos uma data selecionada, verificar sincronização com activeFilters
+          // CORRIGIR: Também considerar outros filtros ativos aqui
+          let dadosParaContar = notificacoes;
+          if (activeFilters.evento && activeFilters.evento !== 'todos') {
+            dadosParaContar = notificacoes.filter(n => {
+              const eventoId = n?.original?.tipo_evento_idtipo_evento;
+              if (eventoId !== undefined && exportOptions?.eventoOptions?.length > 0) {
+                const evento = exportOptions.eventoOptions.find(
+                  (e: any) => String(e.idtipo_evento) === String(eventoId) || String(e.idevento) === String(eventoId)
+                );
+                return evento?.descricao === activeFilters.evento;
+              }
+              return false;
+            });
+          }
+          
+          const totalDiaAtualizado = contarNotificacoesPorData(dadosParaContar, selectedDataNotificacao);
+          setTotalNotificacoesDia(totalDiaAtualizado);
+          
+          // Garantir sincronização com activeFilters
+          setActiveFilters(prev => {
+            if (prev.dataNotificacao !== selectedDataNotificacao) {
+              console.log('🔄 Sincronizando data selecionada com activeFilters:', selectedDataNotificacao);
+              return { ...prev, dataNotificacao: selectedDataNotificacao };
+            }
+            return prev;
           });
         }
-        
-        const totalDiaAtualizado = contarNotificacoesPorData(dadosParaContar, selectedDataNotificacao);
-        setTotalNotificacoesDia(totalDiaAtualizado);
-        
-        // Garantir sincronização com activeFilters
-        setActiveFilters(prev => {
-          if (prev.dataNotificacao !== selectedDataNotificacao) {
-            console.log('🔄 Sincronizando data selecionada com activeFilters:', selectedDataNotificacao);
-            return { ...prev, dataNotificacao: selectedDataNotificacao };
-          }
-          return prev;
-        });
       }
     }
     
@@ -2995,24 +3056,38 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 <div>
                   <h2 className="text-xl sm:text-2xl font-bold mb-1">
                     {selectedDataNotificacao 
-                      ? new Date(selectedDataNotificacao + 'T00:00:00').toLocaleDateString('pt-BR', {
-                          weekday: 'long',
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })
+                      ? selectedDataNotificacao === 'ultima-data'
+                        ? `${new Date(datasNotificacaoDisponiveis[0] + 'T00:00:00').toLocaleDateString('pt-BR', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })} 🔄`
+                        : new Date(selectedDataNotificacao + 'T00:00:00').toLocaleDateString('pt-BR', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })
                       : 'Todas as Datas'
                     }
                   </h2>
                   <p className="text-indigo-100 text-sm">
                     {selectedDataNotificacao 
-                      ? `${totalNotificacoesDia.toLocaleString()} notificação(ções) criadas neste dia`
+                      ? selectedDataNotificacao === 'ultima-data'
+                        ? `Sempre última data - ${totalNotificacoesDia.toLocaleString()} notificação(ções) (atualiza automaticamente)`
+                        : `${totalNotificacoesDia.toLocaleString()} notificação(ções) criadas neste dia`
                       : `${totalNotifications.toLocaleString()} notificação(ções) no total`
                     }
                   </p>
-                  {selectedDataNotificacao && selectedDataNotificacao === obterDataAtual() && (
+                  {selectedDataNotificacao && selectedDataNotificacao !== 'ultima-data' && selectedDataNotificacao === obterDataAtual() && (
                     <span className="inline-block mt-1 px-2 py-1 bg-green-400 bg-opacity-30 text-green-100 text-xs font-medium rounded-full">
                       🕐 Hoje
+                    </span>
+                  )}
+                  {selectedDataNotificacao === 'ultima-data' && (
+                    <span className="inline-block mt-1 px-2 py-1 bg-blue-400 bg-opacity-30 text-blue-100 text-xs font-medium rounded-full">
+                      🔄 Atualização automática
                     </span>
                   )}
                 </div>
@@ -3026,6 +3101,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                   className="px-4 py-2 text-sm text-gray-800 border border-white border-opacity-30 rounded-lg focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 bg-white bg-opacity-90 min-w-[200px]"
                 >
                   <option value="todos">📊 Todas as Datas ({totalNotifications.toLocaleString()})</option>
+                  {/* 🆕 OPÇÃO: Sempre última data */}
+                  {datasNotificacaoDisponiveis.length > 0 && (
+                    <option value="ultima-data">
+                      🔄 Sempre última data ({new Date(datasNotificacaoDisponiveis[0] + 'T00:00:00').toLocaleDateString('pt-BR')})
+                    </option>
+                  )}
                   {datasNotificacaoDisponiveis.map((data) => {
                     const totalDia = contarNotificacoesPorData(originalNotificacoes.current, data);
                     const dataFormatada = new Date(data + 'T00:00:00').toLocaleDateString('pt-BR');
@@ -3329,6 +3410,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           <EstabelecimentosMapaAvancado 
             notificacoes={notificacoes}
             exportOptions={exportOptions}
+            selectedDataNotificacao={selectedDataNotificacao}
+            datasNotificacaoDisponiveis={datasNotificacaoDisponiveis}
           />
         </main>
       )}

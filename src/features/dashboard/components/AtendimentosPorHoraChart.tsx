@@ -1,5 +1,5 @@
 // Componente para gráfico de atendimentos por hora com filtro por data
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AreaChart,
   Area,
@@ -33,17 +33,28 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
 }) => {
   // ✅ NOVO: Estado para controlar a data selecionada
   const [dataSelecionada, setDataSelecionada] = useState<string | null>(null);
+  const [dataFiltroReal, setDataFiltroReal] = useState<string | null>(null);
 
   console.log('🔍 [COMPONENT DEBUG] Estado inicial:', {
     dataSelecionada,
+    dataFiltroReal,
     totalNotificacoes: notificacoes?.length || 0
   });
 
   const { atendimentosPorHora, estatisticas, loading, datasDisponiveis } = useAtendimentosPorHora({
     notificacoes,
     timezone,
-    dataFiltro: dataSelecionada // ✅ NOVO: Passar a data selecionada para o hook
+    dataFiltro: dataFiltroReal
   });
+
+  // Atualizar o filtro real quando "ultima-data" for selecionado
+  useEffect(() => {
+    if (dataSelecionada === 'ultima-data' && datasDisponiveis.length > 0) {
+      setDataFiltroReal(datasDisponiveis[0]);
+    } else if (dataSelecionada !== 'ultima-data') {
+      setDataFiltroReal(dataSelecionada);
+    }
+  }, [dataSelecionada, datasDisponiveis]);
 
   console.log('🔍 [COMPONENT DEBUG] Dados do hook:', {
     datasDisponiveis: datasDisponiveis?.length || 0,
@@ -112,9 +123,11 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
               Notificações por Horário de Atendimento
             </h3>
             <p className="text-sm text-gray-600">
-              {dataSelecionada 
-                ? `Análise do dia ${formatarDataParaExibicao(dataSelecionada)}`
-                : 'Análise consolidada de todos os dias'
+              {dataSelecionada === 'ultima-data'
+                ? `🔄 Sempre última data: ${datasDisponiveis[0] ? formatarDataParaExibicao(datasDisponiveis[0]) : '—'}`
+                : dataSelecionada 
+                  ? `Análise do dia ${formatarDataParaExibicao(dataSelecionada)}`
+                  : 'Análise consolidada de todos os dias'
               }
             </p>
           </div>
@@ -128,9 +141,12 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
               name: item.hora,
               value: item.quantidade
             }))}
-            chartTitle={dataSelecionada 
-              ? `Notificações por Horário - ${formatarDataParaExibicao(dataSelecionada)}`
-              : 'Notificações por Horário - Consolidado'
+            chartTitle={
+              dataSelecionada === 'ultima-data'
+                ? `Notificações por Horário - Sempre última data (${datasDisponiveis[0] ? formatarDataParaExibicao(datasDisponiveis[0]) : '—'})`
+                : dataSelecionada 
+                  ? `Notificações por Horário - ${formatarDataParaExibicao(dataSelecionada)}`
+                  : 'Notificações por Horário - Consolidado'
             }
             buttonVariant="icon"
           />
@@ -152,6 +168,9 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
               className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="todas">📊 Todas as datas</option>
+              <option value="ultima-data">
+                🔄 Sempre última data {datasDisponiveis.length > 0 ? `(${formatarDataParaExibicao(datasDisponiveis[0])})` : ''}
+              </option>
               {datasDisponiveis.map((data) => (
                 <option key={data} value={data}>
                   📅 {formatarDataParaExibicao(data)}
@@ -173,7 +192,12 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
           <div className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4 text-blue-600" />
             <span className="text-sm font-medium text-blue-900">
-              {dataSelecionada ? 'Dia Selecionado' : 'Total Geral'}
+              {dataSelecionada === 'ultima-data' 
+                ? '🔄 Última Data' 
+                : dataSelecionada 
+                  ? 'Dia Selecionado' 
+                  : 'Total Geral'
+              }
             </span>
           </div>
           <p className="text-xl font-bold text-blue-700 mt-1">
