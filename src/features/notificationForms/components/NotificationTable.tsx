@@ -1,6 +1,5 @@
 // src/features/notificationForms/components/NotificationTable.tsx
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Edit, Trash2 } from 'lucide-react';
 import { Notificacao, ColumnDefinition } from '../types';
 import { formatDate } from '../utils';
@@ -71,8 +70,6 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
   onDelete,
   searchTerm = "",
 }) => {
-  const navigate = useNavigate();
-
   const renderCellContent = (notificacao: Notificacao, key: string) => {
     switch (key) {
       case "paciente":
@@ -224,13 +221,8 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
             {notificacoes.map((notificacao) => (
               <div
                 key={notificacao.id}
-                className="p-4 transition-all duration-200 cursor-pointer hover:shadow-md"
+                className="p-4 transition-all duration-200 hover:shadow-md"
                 style={getTipoAtendimentoStyles(notificacao)}
-                onClick={() =>
-                  navigate(
-                    `/private/comunicacao-de-caso/editar/${notificacao.id}`
-                  )
-                }
               >
                 <div className="flex justify-between items-start">
                   <div className="flex-1 min-w-0">
@@ -259,18 +251,13 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
                     </div>
                   </div>
                   <div className="flex space-x-1 ml-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(
-                          `/private/comunicacao-de-caso/editar/${notificacao.id}`
-                        );
-                      }}
-                      className="p-3 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-md transition-colors touch-manipulation"
-                      title="Editar"
+                    <a
+                      href={`/private/comunicacao-de-caso/editar/${notificacao.id}`}
+                      className="p-3 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-md transition-colors touch-manipulation inline-flex items-center justify-center"
+                      title="Editar (Ctrl+Click para nova aba)"
                     >
                       <Edit className="h-5 w-5" />
-                    </button>
+                    </a>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -357,13 +344,8 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
               notificacoes.map((notificacao) => (
                 <tr
                   key={notificacao.id}
-                  className="transition-all duration-200 cursor-pointer hover:shadow-lg"
+                  className="transition-all duration-200 hover:shadow-lg"
                   style={getTipoAtendimentoStyles(notificacao)}
-                  onClick={() =>
-                    navigate(
-                      `/private/comunicacao-de-caso/editar/${notificacao.id}`
-                    )
-                  }
                 >
                   {allColumns
                     .filter((col) => selectedColumns.includes(col.key))
@@ -381,19 +363,14 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
                       className="flex items-center justify-end space-x-1 md:space-x-2"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(
-                            `/private/comunicacao-de-caso/editar/${notificacao.id}`
-                          );
-                        }}
+                      <a
+                        href={`/private/comunicacao-de-caso/editar/${notificacao.id}`}
                         className="text-blue-600 hover:text-blue-900 flex items-center text-xs md:text-sm"
-                        title="Editar"
+                        title="Editar (Ctrl+Click para nova aba)"
                       >
                         <Edit className="h-3 w-3 md:h-4 md:w-4 mr-0.5 md:mr-1" />
                         <span className="hidden lg:inline">Editar</span>
-                      </button>
+                      </a>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
