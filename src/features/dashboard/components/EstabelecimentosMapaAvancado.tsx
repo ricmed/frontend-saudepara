@@ -177,6 +177,14 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
     return Array.from(datas).sort().reverse(); // Mais recentes primeiro
   }, [notificacoes]);
 
+  // 🆕 EFEITO: Pré-selecionar a data mais recente quando as datas estiverem disponíveis
+  useEffect(() => {
+    if (datasDisponiveis.length > 0 && dataSelecionada === null) {
+      setDataSelecionada(datasDisponiveis[0]); // Pré-selecionar a primeira (mais recente)
+      console.log('🔄 Mapa: Pré-selecionando data mais recente:', datasDisponiveis[0]);
+    }
+  }, [datasDisponiveis, dataSelecionada]);
+
   // Processar estabelecimentos de forma memoizada
   const estabelecimentosProcessados = useMemo(() => {
     // 🆕 USAR DATA DO DASHBOARD SE FORNECIDA, SENÃO USA ESTADO INTERNO DO MAPA
@@ -420,15 +428,6 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
     }
   }, [estabelecimentosProcessados, estabelecimentos]);
 
-  // 🆕 Atualizar automaticamente quando estiver no modo "última data" e a data mudar
-  useEffect(() => {
-    if (dataSelecionada === 'ultima-data' && datasDisponiveis.length > 0) {
-      const dataMaisRecente = datasDisponiveis[0];
-      console.log('🔄 Mapa (filtro interno): Modo "última data" ativo, data mais recente:', dataMaisRecente);
-      // O processamento já acontece automaticamente via useMemo, só precisamos garantir que o estado está correto
-    }
-  }, [dataSelecionada, datasDisponiveis]);
-
   // Converter para formato do mapa de forma memoizada
   const estabelecimentosParaMapa = useMemo(() => {
     return estabelecimentos.map(est => ({
@@ -548,13 +547,8 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
                 }
                 
                 if (dataSelecionada) {
-                  if (dataSelecionada === 'ultima-data' && datasDisponiveis.length > 0) {
-                    const dataFormatada = new Date(datasDisponiveis[0] + 'T00:00:00').toLocaleDateString('pt-BR');
-                    filtros.push(`Última data: ${dataFormatada} 🔄`);
-                  } else {
-                    const dataFormatada = new Date(dataSelecionada + 'T00:00:00').toLocaleDateString('pt-BR');
-                    filtros.push(`Data: ${dataFormatada}`);
-                  }
+                  const dataFormatada = new Date(dataSelecionada + 'T00:00:00').toLocaleDateString('pt-BR');
+                  filtros.push(`Data: ${dataFormatada}`);
                 }
                 
                 if (filtros.length > 0) {
@@ -613,12 +607,6 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="todas">📅 Todas as Datas ({notificacoes.length})</option>
-              {/* 🆕 OPÇÃO: Sempre última data */}
-              {datasDisponiveis.length > 0 && (
-                <option value="ultima-data">
-                  🔄 Sempre última data ({new Date(datasDisponiveis[0] + 'T00:00:00').toLocaleDateString('pt-BR')})
-                </option>
-              )}
               {datasDisponiveis.map((data) => {
                 const dataFormatada = new Date(data + 'T00:00:00').toLocaleDateString('pt-BR');
                 const timezone = 'America/Belem';
@@ -695,10 +683,7 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
               <div className="flex items-center gap-2 bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-xs">
                 <Calendar className="h-3 w-3" />
                 <span>
-                  {dataSelecionada === 'ultima-data' && datasDisponiveis.length > 0
-                    ? `Última data: ${new Date(datasDisponiveis[0] + 'T00:00:00').toLocaleDateString('pt-BR')} 🔄`
-                    : `Data: ${new Date(dataSelecionada + 'T00:00:00').toLocaleDateString('pt-BR')}`
-                  }
+                  Data: {new Date(dataSelecionada + 'T00:00:00').toLocaleDateString('pt-BR')}
                 </span>
                 <button
                   onClick={() => setDataSelecionada(null)}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   AlertCircle, 
@@ -9,7 +9,8 @@ import {
   CheckCircle,
   Info,
   ExternalLink,
-  RotateCcw
+  RotateCcw,
+  Calendar
 } from 'lucide-react';
 
 // Configuração de vigilância epidemiológica conforme diretrizes do MS
@@ -57,6 +58,76 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({ notificacoes = [] })
   const navigate = useNavigate();
   const [alertas, setAlertas] = useState<AlertaItem[]>([]);
   const [alertasAtivos, setAlertasAtivos] = useState<AlertaItem[]>([]);
+
+  // 🆕 NOVO: Seletor de data (padrão: primeira data disponível)
+  const [dataSelecionada, setDataSelecionada] = useState<string>('');
+
+  // 🆕 NOVO: Extrair datas disponíveis das notificações
+  const datasDisponiveis = useMemo(() => {
+    if (!notificacoes || notificacoes.length === 0) return [];
+
+    const datas = new Set<string>();
+    notificacoes.forEach((notif) => {
+      const dataCreated = notif?.created_at || notif?.original?.created_at;
+      if (dataCreated) {
+        try {
+          const dataLocal = new Date(dataCreated);
+          const ano = dataLocal.getFullYear();
+          const mes = (dataLocal.getMonth() + 1).toString().padStart(2, '0');
+          const dia = dataLocal.getDate().toString().padStart(2, '0');
+          const dataFormatada = `${ano}-${mes}-${dia}`;
+          datas.add(dataFormatada);
+        } catch (error) {
+          console.warn('Erro ao processar data:', error);
+        }
+      }
+    });
+
+    return Array.from(datas).sort().reverse(); // Mais recente primeiro
+  }, [notificacoes]);
+
+  // 🆕 EFEITO: Pré-selecionar a data mais recente quando as datas estiverem disponíveis
+  useEffect(() => {
+    if (datasDisponiveis.length > 0 && !dataSelecionada) {
+      setDataSelecionada(datasDisponiveis[0]); // Pré-selecionar a primeira (mais recente)
+    }
+  }, [datasDisponiveis, dataSelecionada]);
+
+  // 🆕 NOVO: Filtrar notificações por data
+  const notificacoesFiltradas = useMemo(() => {
+    if (!notificacoes || notificacoes.length === 0) return [];
+    
+    // Se for "todas", retornar todas as notificações
+    if (dataSelecionada === 'todas' || !dataSelecionada) return notificacoes;
+    
+    return notificacoes.filter((notif) => {
+      const dataCreated = notif?.created_at || notif?.original?.created_at;
+      if (!dataCreated) return false;
+
+      try {
+        const dataLocal = new Date(dataCreated);
+        const ano = dataLocal.getFullYear();
+        const mes = (dataLocal.getMonth() + 1).toString().padStart(2, '0');
+        const dia = dataLocal.getDate().toString().padStart(2, '0');
+        const dataNotificacao = `${ano}-${mes}-${dia}`;
+        
+        return dataNotificacao === dataSelecionada;
+      } catch (error) {
+        return false;
+      }
+    });
+  }, [notificacoes, dataSelecionada]);
+
+  // Função para formatar data para exibição
+  const formatarDataParaExibicao = useCallback((dataISO: string) => {
+    if (!dataISO) return '';
+    const data = new Date(dataISO + 'T00:00:00');
+    return data.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  }, []);
 
   // 🆕 FUNÇÃO: Converter idade de meses para anos (formatação correta)
   const formatarIdade = useCallback((idadeMeses: number | null | undefined): string => {
@@ -240,9 +311,9 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({ notificacoes = [] })
     }
   }, [navigate]);
 
-  // Processar alertas baseado nas notificações
+  // Processar alertas baseado nas notificações (FILTRADAS POR DATA)
   const processarAlertas = useCallback(() => {
-    if (!notificacoes || notificacoes.length === 0) {
+    if (!notificacoesFiltradas || notificacoesFiltradas.length === 0) {
       setAlertas([]);
       return;
     }
@@ -252,7 +323,7 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({ notificacoes = [] })
     // 🆕 AGRUPAMENTO: Agrupar casos por hipótese diagnóstica
     const casosAgrupados = new Map<string, Array<any>>();
     
-    notificacoes.forEach((notif) => {
+    notificacoesFiltradas.forEach((notif) => {
       const hipoteseNome = (
         notif.hipoteseDiagnostico ||
         notif.tipo_hipotese_diag?.descricao ||
@@ -267,7 +338,7 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({ notificacoes = [] })
     });
 
     // Usar o sistema de detecção configurado para identificar hipóteses críticas
-    const alertasDetectados = detectarAlertas(notificacoes);
+    const alertasDetectados = detectarAlertas(notificacoesFiltradas);
 
     // 🆕 CRIAR ALERTAS AGRUPADOS POR HIPÓTESE
     casosAgrupados.forEach((casos, hipotese) => {
@@ -372,7 +443,7 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({ notificacoes = [] })
     });
 
     // Adicionar alertas de volume se houver muitos casos
-    const totalNotificacoes = notificacoes.length;
+    const totalNotificacoes = notificacoesFiltradas.length;
     if (totalNotificacoes > 50) {
       novosAlertas.push({
         id: `volume-${Date.now()}`,
@@ -385,7 +456,7 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({ notificacoes = [] })
     }
 
     setAlertas(novosAlertas);
-  }, [notificacoes]);
+  }, [notificacoesFiltradas]);
 
   // Filtrar alertas ativos (não dismissed)
   useEffect(() => {
@@ -476,6 +547,43 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({ notificacoes = [] })
               >
                 <RotateCcw className="h-3 w-3" />
               </button>
+            </div>
+          </div>
+
+          {/* 🆕 NOVO: Seletor de Data */}
+          <div className="mb-4 pb-4 border-b border-gray-100">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-gray-600" />
+                <span className="text-sm font-medium text-gray-700">Filtrar por data:</span>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <select
+                  value={dataSelecionada}
+                  onChange={(e) => setDataSelecionada(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="todas">📊 Todas as datas</option>
+                  {datasDisponiveis.map((data) => (
+                    <option key={data} value={data}>
+                      📅 {formatarDataParaExibicao(data)}
+                    </option>
+                  ))}
+                </select>
+                
+                {dataSelecionada && dataSelecionada !== 'todas' && (
+                  <span className="text-xs text-gray-600">
+                    Mostrando: {formatarDataParaExibicao(dataSelecionada)}
+                  </span>
+                )}
+
+                {dataSelecionada === 'todas' && (
+                  <span className="text-xs text-gray-600">
+                    {notificacoes.length} notificações no total
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 

@@ -3401,7 +3401,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                   <p className="text-indigo-100 text-xs">
                     {selectedDataNotificacao 
                       ? selectedDataNotificacao === 'ultima-data'
-                        ? `Sempre última data - ${totalNotificacoesDia.toLocaleString()} casos (atualiza automaticamente)`
+                        ? `Hoje - ${totalNotificacoesDia.toLocaleString()} casos (atualiza automaticamente)`
                         : totalNotificacoesDia > 0 
                           ? `${totalNotificacoesDia.toLocaleString()} casos neste dia`
                           : `Sem casos neste dia - mostrando total do evento: ${notificacoesFiltradasPorEvento.length.toLocaleString()}`
@@ -3419,12 +3419,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                   className="px-3 py-2 text-xs text-gray-800 border border-white border-opacity-30 rounded-lg focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 bg-white bg-opacity-90 min-w-[180px]"
                 >
                   <option value="todos">📊 Todas as Datas</option>
-                  {/* 🆕 OPÇÃO: Sempre última data */}
-                  {datasNotificacaoDisponiveis.length > 0 && (
-                    <option value="ultima-data">
-                      🔄 Sempre última data ({new Date(datasNotificacaoDisponiveis[0] + 'T00:00:00').toLocaleDateString('pt-BR')})
-                    </option>
-                  )}
                   {datasNotificacaoDisponiveis.map((data) => {
                     // 🆕 CORREÇÃO: Contar apenas notificações do evento selecionado
                     const totalDia = contarNotificacoesPorData(notificacoesFiltradasPorEvento, data);
