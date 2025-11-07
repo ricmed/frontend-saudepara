@@ -76,6 +76,7 @@ import DistribuicaoRacaCorChart from './components/charts/DistribuicaoRacaCorCha
 import PrincipaisSintomasChart from './components/charts/PrincipaisSintomasChart';
 import TiposTraumaChart from './components/charts/TiposTraumaChart';
 import HipotesesDiagnosticasChart from './components/charts/HipotesesDiagnosticasChart';
+import SerieTemporalChart from './components/SerieTemporalChart';
 
 // 🕐 NOVO: Hook e Componente para filtro de período personalizado
 import useDashboardDateRangeFilter from './hooks/useDashboardTimeFilter';
@@ -455,13 +456,17 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   // 🕐 NOVO: FILTRAR NOTIFICAÇÕES PELO PERÍODO PERSONALIZADO (PRIMEIRO FILTRO)
   // Aplica o filtro de período ANTES de qualquer outro filtro
   const notificacoesFiltradasPorPeriodo = useMemo(() => {
+    console.log(`🕐 Total de notificações originais: ${notificacoes.length}`);
+    
     // Se o filtro de período está desabilitado, retornar todas as notificações dos últimos 30 dias
     if (!dateRangeConfig.enabled) {
-      console.log(`🕐 Filtro de período desabilitado - usando últimos 30 dias (${notificacoes.length} notificações)`);
-      return filterNotificationsByDateRange(notificacoes);
+      console.log(`🕐 Filtro de período desabilitado - usando últimos 30 dias`);
+      const filtradas = filterNotificationsByDateRange(notificacoes);
+      console.log(`✅ Filtradas por período (últimos 30 dias): ${notificacoes.length} → ${filtradas.length} notificações`);
+      return filtradas;
     }
 
-    // Aplicar o filtro de período
+    // Aplicar o filtro de período personalizado
     console.log(`🕐 Aplicando filtro de período personalizado`);
     console.log(`📅 De: ${periodStart.toLocaleString('pt-BR')}`);
     console.log(`📅 Até: ${periodEnd.toLocaleString('pt-BR')}`);
@@ -469,6 +474,15 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     const filtradas = filterNotificationsByDateRange(notificacoes);
     
     console.log(`✅ Filtro de período aplicado: ${notificacoes.length} → ${filtradas.length} notificações`);
+    
+    // Log das primeiras 3 notificações filtradas para debug
+    if (filtradas.length > 0) {
+      console.log(`🔍 Amostra de notificações após filtro de período:`);
+      filtradas.slice(0, 3).forEach((n: any, i: number) => {
+        console.log(`   ${i+1}. Evento: ${n.tipoEvento || n.original?.tipo_evento?.descricao}, Data: ${n.created_at}`);
+      });
+    }
+    
     return filtradas;
   }, [notificacoes, dateRangeConfig, filterNotificationsByDateRange, periodStart, periodEnd]);
 
@@ -483,11 +497,11 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
     // Filtrar pelo evento selecionado
     console.log(`🔍 Filtrando notificações pelo evento: "${selectedEvento}"`);
+    
     const filtradas = notificacoesFiltradasPorPeriodo.filter((notificacao: any) => {
-      // Buscar o nome do evento em múltiplos caminhos
+      // Buscar o nome do evento usando tipoEvento ou original.tipo_evento.descricao
       const eventoNome = notificacao.tipoEvento || 
-                        notificacao.original?.tipo_evento?.descricao ||
-                        notificacao.eventoNome;
+                        notificacao.original?.tipo_evento?.descricao;
       
       return eventoNome === selectedEvento;
     });
@@ -3750,185 +3764,13 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             />
           </div>
           
-          {/* Gráfico 1: Série temporal por dia */}
+          {/* Gráfico 1: Série temporal por dia - COMPONENTE INDEPENDENTE */}
           <div className="mb-6">
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 text-blue-700 rounded-lg">
-                    <Calendar className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900">
-                      Série Temporal por Dia de Notificação
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      Evolução diária do número de notificações
-                    </p>
-                  </div>
-                </div>
-                <ChartExportMenu
-                  chartId="serie-temporal-dia"
-                  chartData={(() => {
-                    const timezone = 'America/Belem';
-                    // 🆕 USAR NOTIFICAÇÕES FILTRADAS POR EVENTO
-                    const notificacoesPorDia = notificacoesFiltradasPorEvento.reduce((acc: any, notif: any) => {
-                      const dataCreated = notif?.created_at || notif?.original?.created_at;
-                      if (!dataCreated) return acc;
-                      try {
-                        const dataLocal = new Date(dataCreated);
-                        const data = dataLocal.toLocaleDateString('pt-BR', {
-                          timeZone: timezone,
-                          year: 'numeric',
-                          month: '2-digit',
-                          day: '2-digit'
-                        }).split('/').reverse().join('-');
-                        if (!acc[data]) {
-                          acc[data] = { total: 0 };
-                        }
-                        acc[data].total += 1;
-                      } catch (error) {
-                        console.warn('Erro ao processar data:', error);
-                      }
-                      return acc;
-                    }, {});
-                    return Object.entries(notificacoesPorDia)
-                      .map(([data, valores]: [string, any]) => ({
-                        name: new Date(data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-                        value: valores.total
-                      }))
-                      .sort((a, b) => a.name.localeCompare(b.name));
-                  })()}
-                  chartTitle="Série Temporal por Dia de Notificação"
-                  buttonVariant="icon"
-                />
-              </div>
-              
-              <div id="serie-temporal-dia" className="h-80">
-                {(() => {
-                  // Processar dados por dia - MESMA LÓGICA DO DASHBOARD E MAPA
-                  const timezone = 'America/Belem';
-                  // 🆕 USAR NOTIFICAÇÕES FILTRADAS POR EVENTO
-                  const notificacoesPorDia = notificacoesFiltradasPorEvento.reduce((acc: any, notif: any) => {
-                    const dataCreated = notif?.created_at || notif?.original?.created_at;
-                    if (!dataCreated) return acc;
-                    
-                    try {
-                      // Converter para o fuso horário local (IGUAL AO DASHBOARD/MAPA)
-                      const dataLocal = new Date(dataCreated);
-                      const data = dataLocal.toLocaleDateString('pt-BR', {
-                        timeZone: timezone,
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit'
-                      }).split('/').reverse().join('-'); // Converter para YYYY-MM-DD
-                      
-                      if (!acc[data]) {
-                        acc[data] = { total: 0 };
-                      }
-                      acc[data].total += 1;
-                    } catch (error) {
-                      console.warn('Erro ao processar data:', error);
-                    }
-                    
-                    return acc;
-                  }, {});
-                  
-                  const dadosGrafico = Object.entries(notificacoesPorDia)
-                    .map(([data, valores]: [string, any]) => ({
-                      data: new Date(data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-                      dataCompleta: data,
-                      quantidade: valores.total,
-                      percentual: ((valores.total / notificacoesFiltradasPorEvento.length) * 100).toFixed(1)
-                    }))
-                    .sort((a, b) => a.dataCompleta.localeCompare(b.dataCompleta));
-                  
-                  return dadosGrafico.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={dadosGrafico} margin={{ top: 30, right: 30, left: 20, bottom: 50 }}>
-                        <defs>
-                          <linearGradient id="colorQuantidade" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>
-                            <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.1}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis 
-                          dataKey="data" 
-                          stroke="#666"
-                          angle={-45}
-                          textAnchor="end"
-                          height={60}
-                          interval={0}
-                          tick={{ fontSize: 11 }}
-                        />
-                        <YAxis 
-                          stroke="#666"
-                          allowDecimals={false}
-                        />
-                        <Tooltip 
-                          contentStyle={{
-                            backgroundColor: "#fff",
-                            border: "1px solid #ddd",
-                            borderRadius: "8px"
-                          }}
-                          formatter={(value: any, name: string) => {
-                            if (name === 'quantidade') {
-                              const item = dadosGrafico.find((d: any) => d.quantidade === value);
-                              return [`${value} notificações (${item?.percentual}% do total geral)`, 'Total'];
-                            }
-                            return [value, name];
-                          }}
-                        />
-                        <Area 
-                          type="monotone"
-                          dataKey="quantidade" 
-                          stroke="#3B82F6"
-                          strokeWidth={2}
-                          fillOpacity={1}
-                          fill="url(#colorQuantidade)"
-                          dot={(props: any) => {
-                            if (props.payload.quantidade === 0) {
-                              return <circle cx={props.cx} cy={props.cy} r={0} fill="transparent" />;
-                            }
-                            return <circle cx={props.cx} cy={props.cy} r={4} fill="#3B82F6" strokeWidth={2} />;
-                          }}
-                          activeDot={(props: any) => {
-                            if (props.payload.quantidade === 0) {
-                              return <circle cx={props.cx} cy={props.cy} r={0} fill="transparent" />;
-                            }
-                            return <circle cx={props.cx} cy={props.cy} r={6} fill="#3B82F6" />;
-                          }}
-                        >
-                          <LabelList 
-                            dataKey="quantidade" 
-                            position="top" 
-                            style={{ fill: '#1e40af', fontWeight: 'bold', fontSize: 12 }}
-                            content={(props: any) => {
-                              if (props.value === 0) return null;
-                              return (
-                                <text 
-                                  x={props.x} 
-                                  y={props.y - 10} 
-                                  textAnchor="middle" 
-                                  style={{ fill: '#1e40af', fontWeight: 'bold', fontSize: 12 }}
-                                >
-                                  {props.value}
-                                </text>
-                              );
-                            }}
-                          />
-                        </Area>
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="h-full flex items-center justify-center text-gray-500">
-                      Não há dados disponíveis
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
+            <SerieTemporalChart 
+              notificacoes={notificacoes}
+              title="Série Temporal por Dia de Notificação"
+              description="Evolução diária do número de notificações"
+            />
           </div>
           
           {/* Gráfico 2: Série temporal por hora */}

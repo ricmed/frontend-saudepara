@@ -154,7 +154,7 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({
             <p className="text-sm text-gray-500">
               {enabled 
                 ? `De ${formatDateTime(startDate, startHour, startMinute)} até ${formatDateTime(endDate, endHour, endMinute)}`
-                : 'Mostrando últimos 30 dias'
+                : 'Mostrando todas as notificações'
               }
             </p>
           </div>
@@ -184,16 +184,14 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({
             {isExpanded ? 'Fechar' : 'Configurar'}
           </button>
 
-          {/* Botão de reset */}
-          {enabled && (
-            <button
-              onClick={handleReset}
-              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Resetar para padrão"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </button>
-          )}
+          {/* Botão de reset - sempre visível */}
+          <button
+            onClick={handleReset}
+            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Resetar e limpar configuração salva"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </button>
         </div>
       </div>
 

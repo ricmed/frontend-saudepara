@@ -95,6 +95,17 @@ export const useDashboardDateRangeFilter = (): UseDateRangeFilterReturn => {
   // Função para resetar para o padrão (hoje, desabilitado)
   const resetToDefault = useCallback(() => {
     const todayStr = getTodayString();
+    
+    console.log('🔄 Resetando configuração de período para padrão');
+    console.log('🗑️ Limpando localStorage');
+    
+    // Limpar localStorage explicitamente
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (error) {
+      console.warn('⚠️ Erro ao limpar localStorage:', error);
+    }
+    
     setDateRangeConfigState({
       startDate: todayStr,
       startHour: 0,
@@ -104,6 +115,8 @@ export const useDashboardDateRangeFilter = (): UseDateRangeFilterReturn => {
       endMinute: 59,
       enabled: false,
     });
+    
+    console.log('✅ Configuração resetada - filtro desabilitado');
   }, []);
 
   // Calcular o período atual (data/hora de início e fim)
@@ -139,30 +152,10 @@ export const useDashboardDateRangeFilter = (): UseDateRangeFilterReturn => {
    * @returns Array de notificações dentro do período definido
    */
   const filterNotificationsByDateRange = useCallback((notifications: any[]): any[] => {
-    // Se o filtro estiver desabilitado, retornar todas as notificações dos últimos 30 dias
+    // Se o filtro estiver desabilitado, retornar TODAS as notificações
     if (!dateRangeConfig.enabled) {
-      const now = new Date();
-      const thirtyDaysAgo = new Date(now);
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      thirtyDaysAgo.setHours(0, 0, 0, 0);
-      
-      return notifications.filter(notification => {
-        // Tentar diferentes campos de data
-        const dateField = 
-          notification.created_at ||
-          notification.original?.created_at ||
-          notification.data_notificacao || 
-          notification.original?.data_notificacao ||
-          notification.data_atendimento ||
-          notification.original?.data_atendimento ||
-          notification.createdAt ||
-          notification.original?.createdAt;
-        
-        if (!dateField) return false;
-        
-        const notificationDate = new Date(dateField);
-        return notificationDate >= thirtyDaysAgo && notificationDate <= now;
-      });
+      console.log(`🔓 Filtro de período desabilitado - retornando todas as ${notifications.length} notificações`);
+      return notifications;
     }
 
     // Filtrar notificações dentro do período personalizado
