@@ -77,6 +77,10 @@ import PrincipaisSintomasChart from './components/charts/PrincipaisSintomasChart
 import TiposTraumaChart from './components/charts/TiposTraumaChart';
 import HipotesesDiagnosticasChart from './components/charts/HipotesesDiagnosticasChart';
 
+// 🕐 NOVO: Hook e Componente para filtro de período personalizado
+import useDashboardDateRangeFilter from './hooks/useDashboardTimeFilter';
+import DateRangeSelector from './components/TimeRangeSelector';
+
 // 🆕 SISTEMA DE EXPORTAÇÃO DISPONÍVEL:
 // Para integrar exportação em um gráfico individual, importe:
 import ChartExportMenu from '../../components/common/ChartExportMenu';
@@ -321,6 +325,16 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   // Estado para controle de visualização
   const { activeTab, setActiveTab } = useDashboardTabs();
 
+  // 🕐 NOVO: Hook para gerenciar o filtro de período personalizado
+  const { 
+    dateRangeConfig, 
+    setDateRangeConfig, 
+    filterNotificationsByDateRange,
+    periodStart,
+    periodEnd,
+    resetToDefault: resetDateRange
+  } = useDashboardDateRangeFilter();
+
   // Estado para filtragem interativa
   const [loading, setLoading] = useState(false);
   const [selectedEvento, setSelectedEvento] = useState("Todos");
@@ -438,18 +452,38 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     return COLORS.blue[0];
   }, []);
 
+  // 🕐 NOVO: FILTRAR NOTIFICAÇÕES PELO PERÍODO PERSONALIZADO (PRIMEIRO FILTRO)
+  // Aplica o filtro de período ANTES de qualquer outro filtro
+  const notificacoesFiltradasPorPeriodo = useMemo(() => {
+    // Se o filtro de período está desabilitado, retornar todas as notificações dos últimos 30 dias
+    if (!dateRangeConfig.enabled) {
+      console.log(`🕐 Filtro de período desabilitado - usando últimos 30 dias (${notificacoes.length} notificações)`);
+      return filterNotificationsByDateRange(notificacoes);
+    }
+
+    // Aplicar o filtro de período
+    console.log(`🕐 Aplicando filtro de período personalizado`);
+    console.log(`📅 De: ${periodStart.toLocaleString('pt-BR')}`);
+    console.log(`📅 Até: ${periodEnd.toLocaleString('pt-BR')}`);
+    
+    const filtradas = filterNotificationsByDateRange(notificacoes);
+    
+    console.log(`✅ Filtro de período aplicado: ${notificacoes.length} → ${filtradas.length} notificações`);
+    return filtradas;
+  }, [notificacoes, dateRangeConfig, filterNotificationsByDateRange, periodStart, periodEnd]);
+
   // 🆕 FILTRAR NOTIFICAÇÕES PELO EVENTO SELECIONADO
   // IMPORTANTE: Deve vir antes de funções que dependem dele (ex: handleDataNotificacaoChange)
   const notificacoesFiltradasPorEvento = useMemo(() => {
-    // Se "Todos" está selecionado, retornar todas as notificações
+    // Se "Todos" está selecionado, retornar todas as notificações (já filtradas por período)
     if (selectedEvento === "Todos") {
-      console.log(`📊 Evento "Todos" selecionado - usando ${notificacoes.length} notificações`);
-      return notificacoes;
+      console.log(`📊 Evento "Todos" selecionado - usando ${notificacoesFiltradasPorPeriodo.length} notificações`);
+      return notificacoesFiltradasPorPeriodo;
     }
 
     // Filtrar pelo evento selecionado
     console.log(`🔍 Filtrando notificações pelo evento: "${selectedEvento}"`);
-    const filtradas = notificacoes.filter((notificacao: any) => {
+    const filtradas = notificacoesFiltradasPorPeriodo.filter((notificacao: any) => {
       // Buscar o nome do evento em múltiplos caminhos
       const eventoNome = notificacao.tipoEvento || 
                         notificacao.original?.tipo_evento?.descricao ||
@@ -458,9 +492,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       return eventoNome === selectedEvento;
     });
 
-    console.log(`✅ Filtro de evento aplicado: ${notificacoes.length} → ${filtradas.length} notificações`);
+    console.log(`✅ Filtro de evento aplicado: ${notificacoesFiltradasPorPeriodo.length} → ${filtradas.length} notificações`);
     return filtradas;
-  }, [notificacoes, selectedEvento]);
+  }, [notificacoesFiltradasPorPeriodo, selectedEvento]);
   
   // Função para obter a descrição de um tipo de atendimento pelo ID
   const getAtendimentoDescById = useCallback((idAtendimento: string | number): string => {
@@ -3167,6 +3201,25 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
       </header>
+
+      {/* 🕐 NOVO: Seletor de Período Personalizado */}
+      <div className={`${getMaxWidth()} mx-auto mt-4 px-4`}>
+        <DateRangeSelector
+          startDate={dateRangeConfig.startDate}
+          startHour={dateRangeConfig.startHour}
+          startMinute={dateRangeConfig.startMinute}
+          endDate={dateRangeConfig.endDate}
+          endHour={dateRangeConfig.endHour}
+          endMinute={dateRangeConfig.endMinute}
+          enabled={dateRangeConfig.enabled}
+          onChange={(startDate, startHour, startMinute, endDate, endHour, endMinute, enabled) => {
+            setDateRangeConfig({ startDate, startHour, startMinute, endDate, endHour, endMinute, enabled });
+          }}
+          onReset={resetDateRange}
+          periodStart={periodStart}
+          periodEnd={periodEnd}
+        />
+      </div>
 
       {/* Seção de Filtros */}
       <div className={`${getMaxWidth()} mx-auto mt-4 px-4`}>
