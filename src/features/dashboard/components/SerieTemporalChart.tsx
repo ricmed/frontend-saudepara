@@ -13,6 +13,18 @@ import {
 } from 'recharts';
 import ChartExportMenu from '../../../components/common/ChartExportMenu';
 
+const STORAGE_KEY = 'serie_temporal_config';
+
+interface SerieTemporalConfig {
+  selectedEvento: string;
+  startDate: string;
+  endDate: string;
+  startHour: number;
+  startMinute: number;
+  endHour: number;
+  endMinute: number;
+}
+
 interface SerieTemporalChartProps {
   notificacoes: any[];
   title?: string;
@@ -24,8 +36,25 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
   title = "Série Temporal por Dia de Notificação",
   description = "Evolução diária do número de notificações"
 }) => {
+  // Carregar configuração salva do localStorage
+  const loadSavedConfig = (): Partial<SerieTemporalConfig> | null => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        console.log('📦 Configuração da Série Temporal carregada:', parsed);
+        return parsed;
+      }
+    } catch (error) {
+      console.warn('⚠️ Erro ao carregar configuração da Série Temporal:', error);
+    }
+    return null;
+  };
+
+  const savedConfig = loadSavedConfig();
+  
   // Estado para o evento selecionado
-  const [selectedEvento, setSelectedEvento] = useState<string>("todos");
+  const [selectedEvento, setSelectedEvento] = useState<string>(savedConfig?.selectedEvento || "todos");
 
   // Extrair eventos únicos das notificações
   const eventosDisponiveis = useMemo(() => {
@@ -82,8 +111,32 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
   }, [notificacoes]);
 
   // Estado para o período personalizado da série temporal
-  const [startDate, setStartDate] = useState(periodoCompleto.inicio);
-  const [endDate, setEndDate] = useState(periodoCompleto.fim);
+  const [startDate, setStartDate] = useState(savedConfig?.startDate || periodoCompleto.inicio);
+  const [endDate, setEndDate] = useState(savedConfig?.endDate || periodoCompleto.fim);
+  const [startHour, setStartHour] = useState(savedConfig?.startHour ?? 0);
+  const [startMinute, setStartMinute] = useState(savedConfig?.startMinute ?? 0);
+  const [endHour, setEndHour] = useState(savedConfig?.endHour ?? 23);
+  const [endMinute, setEndMinute] = useState(savedConfig?.endMinute ?? 59);
+
+  // Salvar configuração no localStorage sempre que mudar
+  useEffect(() => {
+    const config: SerieTemporalConfig = {
+      selectedEvento,
+      startDate,
+      endDate,
+      startHour,
+      startMinute,
+      endHour,
+      endMinute,
+    };
+    
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+      console.log('💾 Configuração da Série Temporal salva:', config);
+    } catch (error) {
+      console.warn('⚠️ Erro ao salvar configuração da Série Temporal:', error);
+    }
+  }, [selectedEvento, startDate, endDate, startHour, startMinute, endHour, endMinute]);
 
   // Atualizar datas quando o período completo mudar
   useEffect(() => {
@@ -124,24 +177,17 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
 
   // Filtrar notificações por evento e período
   const notificacoesFiltradas = useMemo(() => {
-    const timezone = 'America/Belem';
+    // Criar datas com hora/minuto
+    const start = new Date(`${startDate}T${String(startHour).padStart(2, '0')}:${String(startMinute).padStart(2, '0')}:00`);
+    const end = new Date(`${endDate}T${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}:59`);
 
     return notificacoes.filter(notif => {
-      // Filtro de data
+      // Filtro de data/hora
       const dataCreated = notif?.created_at || notif?.original?.created_at;
       if (!dataCreated) return false;
       
-      // Converter para o fuso horário de Belém para comparação
       const date = new Date(dataCreated);
-      const dataLocalStr = date.toLocaleDateString('pt-BR', {
-        timeZone: timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      }).split('/').reverse().join('-'); // YYYY-MM-DD
-      
-      // Comparar as datas no formato YYYY-MM-DD
-      const dataValida = dataLocalStr >= startDate && dataLocalStr <= endDate;
+      const dataValida = date >= start && date <= end;
       
       // Filtro de evento
       if (selectedEvento === "todos") {
@@ -151,7 +197,7 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
       const eventoNotif = notif?.tipoEvento || notif?.original?.tipo_evento?.descricao;
       return dataValida && eventoNotif === selectedEvento;
     });
-  }, [notificacoes, startDate, endDate, selectedEvento]);
+  }, [notificacoes, startDate, endDate, startHour, startMinute, endHour, endMinute, selectedEvento]);
 
   // Processar dados para o gráfico
   const dadosGrafico = useMemo(() => {
@@ -255,7 +301,7 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 📅 Data de Início
               </label>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 mb-2">
                 <input
                   type="date"
                   value={startDate}
@@ -282,6 +328,33 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
                   </button>
                 </div>
               </div>
+              {/* Hora e Minuto de Início */}
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-600 mb-1">🕐 Hora</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="23"
+                    value={startHour}
+                    onChange={(e) => setStartHour(Math.max(0, Math.min(23, parseInt(e.target.value) || 0)))}
+                    onFocus={handleInputFocus}
+                    className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-600 mb-1">⏱️ Min</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={startMinute}
+                    onChange={(e) => setStartMinute(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
+                    onFocus={handleInputFocus}
+                    className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Data de Fim */}
@@ -289,7 +362,7 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 🏁 Data de Fim
               </label>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 mb-2">
                 <input
                   type="date"
                   value={endDate}
@@ -314,6 +387,33 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
                   >
                     <ChevronDown className="h-4 w-4" />
                   </button>
+                </div>
+              </div>
+              {/* Hora e Minuto de Fim */}
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-600 mb-1">🕐 Hora</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="23"
+                    value={endHour}
+                    onChange={(e) => setEndHour(Math.max(0, Math.min(23, parseInt(e.target.value) || 0)))}
+                    onFocus={handleInputFocus}
+                    className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-600 mb-1">⏱️ Min</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={endMinute}
+                    onChange={(e) => setEndMinute(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
+                    onFocus={handleInputFocus}
+                    className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
+                  />
                 </div>
               </div>
             </div>
