@@ -94,6 +94,14 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
     }
   }, []); // Dependências vazias - carrega apenas uma vez
 
+  // 🚫 LIMPAR FILTRO DE DATA INDIVIDUAL QUANDO FILTRO GLOBAL FOR ATIVADO
+  useEffect(() => {
+    if (isGlobalFilterActive()) {
+      console.log('🔒 Mapa: Filtro global ativado - limpando filtro de data individual');
+      setDataSelecionada(null);
+    }
+  }, [isGlobalFilterActive]);
+
   // ⏰ AUTO-REFRESH: Reprocessar quando notificações mudarem (alinhado com dashboard)
   useEffect(() => {
     console.log('🔄 Notificações atualizadas no mapa:', {
@@ -189,13 +197,20 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
 
   // Processar estabelecimentos de forma memoizada
   const estabelecimentosProcessados = useMemo(() => {
-    // 🆕 USAR DATA DO DASHBOARD SE FORNECIDA, SENÃO USA ESTADO INTERNO DO MAPA
-    let dataParaFiltrar = selectedDataNotificacao || dataSelecionada;
+    // 🚫 SE O FILTRO GLOBAL ESTIVER ATIVO, NÃO APLICAR FILTRO DE DATA INDIVIDUAL
+    let dataParaFiltrar = null;
     
-    // 🆕 SE ESTIVER NO MODO "SEMPRE ÚLTIMA DATA", USAR A DATA REAL
-    if (dataParaFiltrar === 'ultima-data' && datasNotificacaoDisponiveis.length > 0) {
-      dataParaFiltrar = datasNotificacaoDisponiveis[0]; // Primeira = mais recente
-      console.log('🔄 Mapa: Modo "sempre última data" ativo, usando:', dataParaFiltrar);
+    if (!isGlobalFilterActive()) {
+      // Só usa filtro de data individual se o filtro global NÃO estiver ativo
+      dataParaFiltrar = selectedDataNotificacao || dataSelecionada;
+      
+      // 🆕 SE ESTIVER NO MODO "SEMPRE ÚLTIMA DATA", USAR A DATA REAL
+      if (dataParaFiltrar === 'ultima-data' && datasNotificacaoDisponiveis.length > 0) {
+        dataParaFiltrar = datasNotificacaoDisponiveis[0]; // Primeira = mais recente
+        console.log('🔄 Mapa: Modo "sempre última data" ativo, usando:', dataParaFiltrar);
+      }
+    } else {
+      console.log('🔒 Mapa: Filtro global ativo - ignorando filtros de data individuais');
     }
     
     console.log('🔄 Processando estabelecimentos...', {
@@ -205,7 +220,8 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
         tipoEstabelecimento: tipoEstabelecimentoSelecionado,
         data: dataParaFiltrar,
         dataOriginalDashboard: selectedDataNotificacao,
-        dataInternaMap: dataSelecionada
+        dataInternaMap: dataSelecionada,
+        globalFilterActive: isGlobalFilterActive()
       }
     });
     
@@ -217,10 +233,10 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
       return [];
     }
 
-    // 🆕 Filtrar notificações por data se necessário (filtro do mapa, MESMA LÓGICA DO DASHBOARD)
+    // 🆕 Filtrar notificações por data se necessário (APENAS se o filtro global NÃO estiver ativo)
     let notificacoesFiltradas = notificacoes;
     
-    if (dataParaFiltrar) {
+    if (dataParaFiltrar && !isGlobalFilterActive()) {
       const timezone = 'America/Belem'; // Fuso horário local
       
       notificacoesFiltradas = notificacoes.filter((n: any) => {
@@ -243,7 +259,9 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
           return false;
         }
       });
-      console.log(`📅 Filtrado por data ${dataParaFiltrar}: ${notificacoesFiltradas.length} de ${notificacoes.length} notificações`);
+      console.log(`📅 Mapa: Filtrado por data ${dataParaFiltrar}: ${notificacoesFiltradas.length} de ${notificacoes.length} notificações`);
+    } else if (isGlobalFilterActive()) {
+      console.log(`🔒 Mapa: Usando notificações já filtradas pelo filtro global: ${notificacoes.length} notificações`);
     }
 
     const estabelecimentosMap = new Map<string, EstabelecimentoInfo>();
@@ -412,7 +430,7 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
     console.log(`✅ Retornando ${resultado.length} estabelecimentos processados`);
     
     return resultado;
-  }, [allPlacesMap, notificacoes, exportOptions, tipoEstabelecimentoSelecionado, dataSelecionada, selectedDataNotificacao, datasNotificacaoDisponiveis]);
+  }, [allPlacesMap, notificacoes, exportOptions, tipoEstabelecimentoSelecionado, dataSelecionada, selectedDataNotificacao, datasNotificacaoDisponiveis, isGlobalFilterActive]);
 
   // Atualizar estado apenas quando dados processados mudarem
   useEffect(() => {
