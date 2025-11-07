@@ -13,6 +13,7 @@ interface DateRangeConfig {
   endHour: number;
   endMinute: number;
   enabled: boolean;
+  selectedPublicos?: number[];
 }
 
 interface UseDateRangeFilterReturn {
@@ -74,6 +75,7 @@ export const useDashboardDateRangeFilter = (): UseDateRangeFilterReturn => {
       endHour: 23,
       endMinute: 59,
       enabled: false, // Por padrão, o filtro está desabilitado
+      selectedPublicos: [],
     };
   });
 
@@ -114,6 +116,7 @@ export const useDashboardDateRangeFilter = (): UseDateRangeFilterReturn => {
       endHour: 23,
       endMinute: 59,
       enabled: false,
+      selectedPublicos: [],
     });
     
     console.log('✅ Configuração resetada - filtro desabilitado');
@@ -121,15 +124,10 @@ export const useDashboardDateRangeFilter = (): UseDateRangeFilterReturn => {
 
   // Calcular o período atual (data/hora de início e fim)
   const { periodStart, periodEnd } = useMemo(() => {
-    // Se o filtro estiver desabilitado, retornar últimos 30 dias até agora
+    // Se o filtro estiver desabilitado, retornar um período muito amplo (toda a base de dados)
     if (!dateRangeConfig.enabled) {
-      const now = new Date();
-      const start = new Date(now);
-      start.setDate(start.getDate() - 30);
-      start.setHours(0, 0, 0, 0);
-      
-      const end = new Date(now);
-      end.setHours(23, 59, 59, 999);
+      const start = new Date('1900-01-01T00:00:00');
+      const end = new Date('2100-12-31T23:59:59');
       
       return { periodStart: start, periodEnd: end };
     }
@@ -146,10 +144,10 @@ export const useDashboardDateRangeFilter = (): UseDateRangeFilterReturn => {
   }, [dateRangeConfig]);
 
   /**
-   * Filtra as notificações baseado no período configurado
+   * Filtra as notificações baseado no período configurado e tipo de público
    * 
    * @param notifications Array de notificações a serem filtradas
-   * @returns Array de notificações dentro do período definido
+   * @returns Array de notificações dentro do período definido e tipo de público selecionado
    */
   const filterNotificationsByDateRange = useCallback((notifications: any[]): any[] => {
     // Se o filtro estiver desabilitado, retornar TODAS as notificações
@@ -158,9 +156,9 @@ export const useDashboardDateRangeFilter = (): UseDateRangeFilterReturn => {
       return notifications;
     }
 
-    // Filtrar notificações dentro do período personalizado
+    // Filtrar notificações dentro do período personalizado e tipo de público
     return notifications.filter(notification => {
-      // Tentar diferentes campos de data que podem existir
+      // Filtro de data/hora
       const dateField = 
         notification.created_at ||
         notification.original?.created_at ||
@@ -188,7 +186,21 @@ export const useDashboardDateRangeFilter = (): UseDateRangeFilterReturn => {
         // A notificação está dentro do período se estiver entre o início e o fim
         const isInPeriod = notificationDate >= periodStart && notificationDate <= periodEnd;
         
-        return isInPeriod;
+        if (!isInPeriod) {
+          return false;
+        }
+        
+        // Filtro de tipo de público (se configurado)
+        if (dateRangeConfig.selectedPublicos && dateRangeConfig.selectedPublicos.length > 0) {
+          const publicoId = notification?.original?.tipo_publico_idtipo_publico;
+          if (publicoId !== undefined && publicoId !== null) {
+            return dateRangeConfig.selectedPublicos.includes(Number(publicoId));
+          }
+          // Se não tem tipo de público definido, não passa no filtro
+          return false;
+        }
+        
+        return true;
       } catch (error) {
         console.warn('Erro ao processar data da notificação:', error, dateField);
         return false;

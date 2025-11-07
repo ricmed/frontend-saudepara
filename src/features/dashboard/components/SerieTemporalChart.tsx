@@ -432,7 +432,7 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
             <div className="text-gray-700 mb-2">
               <strong>📅 Período:</strong> {new Date(startDate + 'T12:00:00').toLocaleDateString('pt-BR')} às {String(startHour).padStart(2, '0')}:{String(startMinute).padStart(2, '0')} até {new Date(endDate + 'T12:00:00').toLocaleDateString('pt-BR')} às {String(endHour).padStart(2, '0')}:{String(endMinute).padStart(2, '0')}
             </div>
-            <div className="text-gray-600 text-xs">
+            <div className="text-gray-600 text-xs mb-1">
               <strong>Evento:</strong> {selectedEvento === "todos" ? "Todos os Eventos" : selectedEvento}
               {' '}•{' '}
               <strong>{notificacoesFiltradas.length}</strong> notificações encontradas

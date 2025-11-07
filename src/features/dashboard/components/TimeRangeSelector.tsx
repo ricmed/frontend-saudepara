@@ -12,7 +12,9 @@ interface DateRangeSelectorProps {
   endHour: number;
   endMinute: number;
   enabled: boolean;
-  onChange: (startDate: string, startHour: number, startMinute: number, endDate: string, endHour: number, endMinute: number, enabled: boolean) => void;
+  selectedPublicos?: number[];
+  publicoOptions?: Array<{ idtipo_publico: number; descricao: string }>;
+  onChange: (startDate: string, startHour: number, startMinute: number, endDate: string, endHour: number, endMinute: number, enabled: boolean, selectedPublicos?: number[]) => void;
   onReset?: () => void;
   periodStart?: Date;
   periodEnd?: Date;
@@ -26,6 +28,8 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({
   endHour,
   endMinute,
   enabled,
+  selectedPublicos = [],
+  publicoOptions = [],
   onChange,
   onReset,
   periodStart,
@@ -38,6 +42,22 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({
   const [tempEndDate, setTempEndDate] = useState(endDate);
   const [tempEndHour, setTempEndHour] = useState(endHour);
   const [tempEndMinute, setTempEndMinute] = useState(endMinute);
+  const [tempSelectedPublicos, setTempSelectedPublicos] = useState<number[]>(selectedPublicos);
+
+  // Inicializar com todos os públicos selecionados se não houver seleção e existirem opções
+  React.useEffect(() => {
+    console.log('TimeRangeSelector init effect:', {
+      publicoOptionsLength: publicoOptions.length,
+      selectedPublicosLength: selectedPublicos.length,
+      publicoOptions: publicoOptions.map(p => ({ id: p.idtipo_publico, desc: p.descricao }))
+    });
+    
+    if (publicoOptions.length > 0 && selectedPublicos.length === 0) {
+      const todosPublicos = publicoOptions.map(p => p.idtipo_publico);
+      console.log('Initializing with all publicos:', todosPublicos);
+      setTempSelectedPublicos(todosPublicos);
+    }
+  }, [publicoOptions, selectedPublicos]);
 
   // 🆕 Sincronizar estado temporário quando as props mudarem (ao carregar do localStorage)
   React.useEffect(() => {
@@ -47,10 +67,11 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({
     setTempEndDate(endDate);
     setTempEndHour(endHour);
     setTempEndMinute(endMinute);
-  }, [startDate, startHour, startMinute, endDate, endHour, endMinute]);
+    setTempSelectedPublicos(selectedPublicos);
+  }, [startDate, startHour, startMinute, endDate, endHour, endMinute, selectedPublicos]);
 
   const handleApply = () => {
-    onChange(tempStartDate, tempStartHour, tempStartMinute, tempEndDate, tempEndHour, tempEndMinute, true);
+    onChange(tempStartDate, tempStartHour, tempStartMinute, tempEndDate, tempEndHour, tempEndMinute, true, tempSelectedPublicos);
     setIsExpanded(false);
   };
 
@@ -61,17 +82,18 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({
     setTempEndDate(endDate);
     setTempEndHour(endHour);
     setTempEndMinute(endMinute);
+    setTempSelectedPublicos(selectedPublicos);
     setIsExpanded(false);
   };
 
   const handleToggle = () => {
-    onChange(startDate, startHour, startMinute, endDate, endHour, endMinute, !enabled);
+    onChange(startDate, startHour, startMinute, endDate, endHour, endMinute, !enabled, selectedPublicos);
   };
 
   const handleConfigureClick = () => {
     // Se o filtro está desabilitado, ativar primeiro
     if (!enabled) {
-      onChange(startDate, startHour, startMinute, endDate, endHour, endMinute, true);
+      onChange(startDate, startHour, startMinute, endDate, endHour, endMinute, true, selectedPublicos);
     }
     // Depois expandir o painel
     setIsExpanded(!isExpanded);
@@ -87,6 +109,7 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({
       setTempEndDate(todayStr);
       setTempEndHour(23);
       setTempEndMinute(59);
+      setTempSelectedPublicos([]);
     }
   };
 
@@ -381,6 +404,65 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({
                 <span className="font-medium">Preview:</span> {formatDateTime(tempEndDate, tempEndHour, tempEndMinute)}
               </div>
             </div>
+
+            {/* Filtro de Tipo de Público */}
+            {publicoOptions.length > 0 && (
+              <div className="border border-gray-300 rounded-lg p-4 bg-white">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  👥 Tipo de Público Atendido
+                </label>
+                
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-2 border border-gray-200 rounded-lg bg-gray-50">
+                  {publicoOptions.map((publico) => (
+                    <label
+                      key={publico.idtipo_publico}
+                      className="flex items-center gap-2 text-sm text-gray-700 hover:bg-white p-2 rounded cursor-pointer transition-colors"
+                    >
+                    <input
+                      type="checkbox"
+                      checked={tempSelectedPublicos.includes(publico.idtipo_publico)}
+                      onChange={(e) => {
+                        console.log('Checkbox clicked:', publico.descricao, 'ID:', publico.idtipo_publico, 'Checked:', e.target.checked);
+                        console.log('Current tempSelectedPublicos:', tempSelectedPublicos);
+                        if (e.target.checked) {
+                          const newSelection = [...tempSelectedPublicos, publico.idtipo_publico];
+                          console.log('Adding to selection:', newSelection);
+                          setTempSelectedPublicos(newSelection);
+                        } else {
+                          const newSelection = tempSelectedPublicos.filter(id => id !== publico.idtipo_publico);
+                          console.log('Removing from selection:', newSelection);
+                          setTempSelectedPublicos(newSelection);
+                        }
+                      }}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                    />
+                      <span className="flex-1">{publico.descricao}</span>
+                    </label>
+                  ))}
+                </div>
+                
+                <div className="flex items-center gap-3 mt-3">
+                  <button
+                    type="button"
+                    onClick={() => setTempSelectedPublicos(publicoOptions.map(p => p.idtipo_publico))}
+                    className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                  >
+                    Selecionar Todos
+                  </button>
+                  <span className="text-gray-300">•</span>
+                  <button
+                    type="button"
+                    onClick={() => setTempSelectedPublicos([])}
+                    className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                  >
+                    Limpar Seleção
+                  </button>
+                  <span className="text-gray-400 text-xs ml-auto">
+                    {tempSelectedPublicos.length} de {publicoOptions.length} selecionado{tempSelectedPublicos.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Botões de ação */}
             <div className="flex items-center gap-2 justify-end pt-2 border-t border-gray-200">

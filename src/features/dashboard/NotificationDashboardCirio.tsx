@@ -336,6 +336,22 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     resetToDefault: resetDateRange
   } = useDashboardDateRangeFilter();
 
+  // 🆕 Inicializar selectedPublicos com todos os públicos quando as opções carregarem
+  useEffect(() => {
+    console.log('Dashboard init effect - exportOptions.publicoOptions:', exportOptions?.publicoOptions);
+    console.log('Current dateRangeConfig.selectedPublicos:', dateRangeConfig.selectedPublicos);
+    
+    if (exportOptions?.publicoOptions?.length > 0 && 
+        (!dateRangeConfig.selectedPublicos || dateRangeConfig.selectedPublicos.length === 0)) {
+      const todosPublicos = exportOptions.publicoOptions.map((p: any) => p.idtipo_publico);
+      console.log('Initializing dashboard with all publicos:', todosPublicos);
+      setDateRangeConfig({
+        ...dateRangeConfig,
+        selectedPublicos: todosPublicos
+      });
+    }
+  }, [exportOptions?.publicoOptions]); // Remover dependências circulares
+
   // Estado para filtragem interativa
   const [loading, setLoading] = useState(false);
   const [selectedEvento, setSelectedEvento] = useState("Todos");
@@ -458,22 +474,17 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   const notificacoesFiltradasPorPeriodo = useMemo(() => {
     console.log(`🕐 Total de notificações originais: ${notificacoes.length}`);
     
-    // Se o filtro de período está desabilitado, retornar todas as notificações dos últimos 30 dias
-    if (!dateRangeConfig.enabled) {
-      console.log(`🕐 Filtro de período desabilitado - usando últimos 30 dias`);
-      const filtradas = filterNotificationsByDateRange(notificacoes);
-      console.log(`✅ Filtradas por período (últimos 30 dias): ${notificacoes.length} → ${filtradas.length} notificações`);
-      return filtradas;
-    }
-
-    // Aplicar o filtro de período personalizado
-    console.log(`🕐 Aplicando filtro de período personalizado`);
-    console.log(`📅 De: ${periodStart.toLocaleString('pt-BR')}`);
-    console.log(`📅 Até: ${periodEnd.toLocaleString('pt-BR')}`);
-    
+    // Sempre usar o hook do filtro - ele decide internamente se filtra ou retorna todas
     const filtradas = filterNotificationsByDateRange(notificacoes);
     
-    console.log(`✅ Filtro de período aplicado: ${notificacoes.length} → ${filtradas.length} notificações`);
+    if (dateRangeConfig.enabled) {
+      console.log(`🕐 Aplicando filtro de período personalizado`);
+      console.log(`📅 De: ${periodStart.toLocaleString('pt-BR')}`);
+      console.log(`📅 Até: ${periodEnd.toLocaleString('pt-BR')}`);
+      console.log(`✅ Filtro de período aplicado: ${notificacoes.length} → ${filtradas.length} notificações`);
+    } else {
+      console.log(`🔓 Filtro de período desabilitado - usando todas as notificações: ${filtradas.length}`);
+    }
     
     // Log das primeiras 3 notificações filtradas para debug
     if (filtradas.length > 0) {
@@ -3226,8 +3237,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           endHour={dateRangeConfig.endHour}
           endMinute={dateRangeConfig.endMinute}
           enabled={dateRangeConfig.enabled}
-          onChange={(startDate, startHour, startMinute, endDate, endHour, endMinute, enabled) => {
-            setDateRangeConfig({ startDate, startHour, startMinute, endDate, endHour, endMinute, enabled });
+          selectedPublicos={dateRangeConfig.selectedPublicos || []}
+          publicoOptions={exportOptions?.publicoOptions || []}
+          onChange={(startDate, startHour, startMinute, endDate, endHour, endMinute, enabled, selectedPublicos) => {
+            setDateRangeConfig({ startDate, startHour, startMinute, endDate, endHour, endMinute, enabled, selectedPublicos });
           }}
           onReset={resetDateRange}
           periodStart={periodStart}
@@ -3764,10 +3777,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             />
           </div>
           
-          {/* Gráfico 1: Série temporal por dia - COMPONENTE INDEPENDENTE */}
+          {/* Gráfico 1: Série temporal por dia - USANDO NOTIFICAÇÕES PRÉ-FILTRADAS */}
           <div className="mb-6">
             <SerieTemporalChart 
-              notificacoes={notificacoes}
+              notificacoes={notificacoesFiltradasPorPeriodo}
               title="Série Temporal por Dia de Notificação"
               description="Evolução diária do número de notificações"
             />
