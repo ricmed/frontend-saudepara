@@ -175,27 +175,36 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
     event.target.select();
   };
 
-  // Filtrar notificações por evento e período
+  // Filtrar notificações por evento e período com janelas de 24h
   const notificacoesFiltradas = useMemo(() => {
-    // Criar datas com hora/minuto
-    const start = new Date(`${startDate}T${String(startHour).padStart(2, '0')}:${String(startMinute).padStart(2, '0')}:00`);
-    const end = new Date(`${endDate}T${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}:59`);
-
     return notificacoes.filter(notif => {
       // Filtro de data/hora
       const dataCreated = notif?.created_at || notif?.original?.created_at;
       if (!dataCreated) return false;
       
       const date = new Date(dataCreated);
-      const dataValida = date >= start && date <= end;
+      
+      // Criar o timestamp de início e fim do período com horário de corte
+      // Ex: 01/10 16:01 até 10/10 16:00
+      const inicioTimestamp = new Date(`${startDate}T${String(startHour).padStart(2, '0')}:${String(startMinute).padStart(2, '0')}:00`);
+      
+      // O fim é no dia seguinte ao endDate no mesmo horário
+      const fimDate = new Date(endDate + 'T00:00:00');
+      fimDate.setDate(fimDate.getDate() + 1); // Adiciona 1 dia
+      const fimTimestamp = new Date(`${fimDate.toISOString().split('T')[0]}T${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}:00`);
+      
+      // Verificar se a notificação está dentro do período total
+      if (date < inicioTimestamp || date > fimTimestamp) {
+        return false;
+      }
       
       // Filtro de evento
       if (selectedEvento === "todos") {
-        return dataValida;
+        return true;
       }
       
       const eventoNotif = notif?.tipoEvento || notif?.original?.tipo_evento?.descricao;
-      return dataValida && eventoNotif === selectedEvento;
+      return eventoNotif === selectedEvento;
     });
   }, [notificacoes, startDate, endDate, startHour, startMinute, endHour, endMinute, selectedEvento]);
 
@@ -331,7 +340,7 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
               {/* Hora e Minuto de Início */}
               <div className="flex gap-2">
                 <div className="flex-1">
-                  <label className="block text-xs text-gray-600 mb-1">🕐 Hora</label>
+                  <label className="block text-xs text-gray-600 mb-1">🕐 Hora Início</label>
                   <input
                     type="number"
                     min="0"
@@ -343,7 +352,7 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
                   />
                 </div>
                 <div className="flex-1">
-                  <label className="block text-xs text-gray-600 mb-1">⏱️ Min</label>
+                  <label className="block text-xs text-gray-600 mb-1">⏱️ Min Início</label>
                   <input
                     type="number"
                     min="0"
@@ -392,7 +401,7 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
               {/* Hora e Minuto de Fim */}
               <div className="flex gap-2">
                 <div className="flex-1">
-                  <label className="block text-xs text-gray-600 mb-1">🕐 Hora</label>
+                  <label className="block text-xs text-gray-600 mb-1">🕐 Hora Fim</label>
                   <input
                     type="number"
                     min="0"
@@ -404,7 +413,7 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
                   />
                 </div>
                 <div className="flex-1">
-                  <label className="block text-xs text-gray-600 mb-1">⏱️ Min</label>
+                  <label className="block text-xs text-gray-600 mb-1">⏱️ Min Fim</label>
                   <input
                     type="number"
                     min="0"
@@ -419,12 +428,18 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
             </div>
           </div>
 
-          <div className="mt-3 text-sm text-gray-600">
-            <strong>Evento:</strong> {selectedEvento === "todos" ? "Todos os Eventos" : selectedEvento}
-            {' '}•{' '}
-            <strong>Período:</strong> {new Date(startDate + 'T12:00:00').toLocaleDateString('pt-BR')} até {new Date(endDate + 'T12:00:00').toLocaleDateString('pt-BR')}
-            {' '}•{' '}
-            <strong>{notificacoesFiltradas.length}</strong> notificações
+          <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded text-sm">
+            <div className="text-gray-700 mb-2">
+              <strong>📅 Período:</strong> {new Date(startDate + 'T12:00:00').toLocaleDateString('pt-BR')} às {String(startHour).padStart(2, '0')}:{String(startMinute).padStart(2, '0')} até {new Date(endDate + 'T12:00:00').toLocaleDateString('pt-BR')} às {String(endHour).padStart(2, '0')}:{String(endMinute).padStart(2, '0')}
+            </div>
+            <div className="text-gray-600 text-xs">
+              <strong>Evento:</strong> {selectedEvento === "todos" ? "Todos os Eventos" : selectedEvento}
+              {' '}•{' '}
+              <strong>{notificacoesFiltradas.length}</strong> notificações encontradas
+            </div>
+            <div className="text-blue-600 text-xs mt-1">
+              💡 Cada "dia" é uma janela de 24h iniciando no horário de corte especificado
+            </div>
           </div>
         </div>
       )}
