@@ -353,6 +353,18 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     }
   }, [exportOptions?.publicoOptions]); // Remover dependências circulares
 
+  // 🚫 LIMPAR FILTRO DE DATA INDIVIDUAL QUANDO FILTRO GLOBAL FOR ATIVADO
+  useEffect(() => {
+    if (isGlobalFilterActive()) {
+      console.log('🔒 Filtro global ativado - limpando filtro de data individual');
+      setSelectedDataNotificacao(null);
+      setActiveFilters(prev => ({
+        ...prev,
+        dataNotificacao: null
+      }));
+    }
+  }, [isGlobalFilterActive]);
+
   // Estado para filtragem interativa
   const [loading, setLoading] = useState(false);
   const [selectedEvento, setSelectedEvento] = useState("Todos");
@@ -902,6 +914,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             break;
             
           case 'dataNotificacao':
+            // 🚫 IGNORAR FILTRO DE DATA INDIVIDUAL SE O FILTRO GLOBAL ESTIVER ATIVO
+            if (isGlobalFilterActive()) {
+              console.log('🔒 Ignorando filtro de data individual - filtro global ativo');
+              break;
+            }
+            
             filteredData = filteredData.filter(n => {
               const dataCreated = n?.created_at || n?.original?.created_at;
               

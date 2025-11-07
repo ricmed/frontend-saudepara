@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
 const STORAGE_KEY = 'dashboard_date_range_filter';
+const BELEM_TIMEZONE = 'America/Belem'; // UTC-3
 
 interface DateRangeConfig {
   startDate: string; // YYYY-MM-DD
@@ -45,10 +46,12 @@ interface UseDateRangeFilterReturn {
  * const filteredNotifications = filterNotificationsByDateRange(allNotifications);
  */
 export const useDashboardDateRangeFilter = (): UseDateRangeFilterReturn => {
-  // Função para obter a data de hoje no formato YYYY-MM-DD
+  // Função para obter a data de hoje no formato YYYY-MM-DD no timezone de Belém
   const getTodayString = () => {
     const today = new Date();
-    return today.toISOString().split('T')[0];
+    // Converter para o timezone de Belém (UTC-3)
+    const belemTime = new Date(today.toLocaleString('en-US', { timeZone: BELEM_TIMEZONE }));
+    return belemTime.toISOString().split('T')[0];
   };
 
   // Estado para armazenar a configuração do período
@@ -123,7 +126,7 @@ export const useDashboardDateRangeFilter = (): UseDateRangeFilterReturn => {
     console.log('✅ Configuração resetada - filtro desabilitado');
   }, []);
 
-  // Calcular o período atual (data/hora de início e fim)
+  // Calcular o período atual (data/hora de início e fim) no timezone de Belém
   const { periodStart, periodEnd } = useMemo(() => {
     // Se o filtro estiver desabilitado, retornar um período muito amplo (toda a base de dados)
     if (!dateRangeConfig.enabled) {
@@ -133,13 +136,18 @@ export const useDashboardDateRangeFilter = (): UseDateRangeFilterReturn => {
       return { periodStart: start, periodEnd: end };
     }
 
-    // Criar data de início
-    const start = new Date(dateRangeConfig.startDate + 'T00:00:00');
-    start.setHours(dateRangeConfig.startHour, dateRangeConfig.startMinute, 0, 0);
+    // Criar data de início no timezone de Belém (UTC-3)
+    // Exemplo: Se usuário selecionou 06/11/2024 16:00, deve ser 06/11/2024 16:00 em Belém
+    const startDateString = `${dateRangeConfig.startDate}T${dateRangeConfig.startHour.toString().padStart(2, '0')}:${dateRangeConfig.startMinute.toString().padStart(2, '0')}:00.000-03:00`;
+    const start = new Date(startDateString);
     
-    // Criar data de fim
-    const end = new Date(dateRangeConfig.endDate + 'T00:00:00');
-    end.setHours(dateRangeConfig.endHour, dateRangeConfig.endMinute, 59, 999);
+    // Criar data de fim no timezone de Belém (UTC-3)
+    const endDateString = `${dateRangeConfig.endDate}T${dateRangeConfig.endHour.toString().padStart(2, '0')}:${dateRangeConfig.endMinute.toString().padStart(2, '0')}:59.999-03:00`;
+    const end = new Date(endDateString);
+
+    console.log(`🕐 Período calculado no timezone de Belém (UTC-3):`);
+    console.log(`📅 Início: ${start.toISOString()} (${start.toLocaleString('pt-BR', { timeZone: BELEM_TIMEZONE })})`);
+    console.log(`📅 Fim: ${end.toISOString()} (${end.toLocaleString('pt-BR', { timeZone: BELEM_TIMEZONE })})`);
     
     return { periodStart: start, periodEnd: end };
   }, [dateRangeConfig]);
@@ -157,8 +165,12 @@ export const useDashboardDateRangeFilter = (): UseDateRangeFilterReturn => {
       return notifications;
     }
 
+    console.log(`🕐 FILTRO GLOBAL ATIVO - Filtrando ${notifications.length} notificações`);
+    console.log(`📅 Período: ${periodStart.toISOString()} até ${periodEnd.toISOString()}`);
+    console.log(`📅 Período (horário Belém): ${periodStart.toLocaleString('pt-BR', { timeZone: BELEM_TIMEZONE })} até ${periodEnd.toLocaleString('pt-BR', { timeZone: BELEM_TIMEZONE })}`);
+
     // Filtrar notificações dentro do período personalizado e tipo de público
-    return notifications.filter(notification => {
+    const filteredNotifications = notifications.filter((notification, index) => {
       // Filtro de data/hora
       const dateField = 
         notification.created_at ||
@@ -187,6 +199,18 @@ export const useDashboardDateRangeFilter = (): UseDateRangeFilterReturn => {
         // A notificação está dentro do período se estiver entre o início e o fim
         const isInPeriod = notificationDate >= periodStart && notificationDate <= periodEnd;
         
+        // Log detalhado para debug das primeiras 5 notificações
+        if (index < 5) {
+          console.log(`🔍 Notificação ${index + 1}:`, {
+            data: notificationDate.toISOString(),
+            dataBelemTime: notificationDate.toLocaleString('pt-BR', { timeZone: BELEM_TIMEZONE }),
+            periodStart: periodStart.toISOString(),
+            periodEnd: periodEnd.toISOString(),
+            isInPeriod,
+            evento: notification.tipoEvento || notification.original?.tipo_evento?.descricao
+          });
+        }
+        
         if (!isInPeriod) {
           return false;
         }
@@ -207,6 +231,19 @@ export const useDashboardDateRangeFilter = (): UseDateRangeFilterReturn => {
         return false;
       }
     });
+
+    console.log(`✅ Filtro global aplicado: ${notifications.length} → ${filteredNotifications.length} notificações`);
+    
+    // Log das primeiras 3 notificações filtradas
+    if (filteredNotifications.length > 0) {
+      console.log(`🔍 Primeiras notificações filtradas:`);
+      filteredNotifications.slice(0, 3).forEach((n: any, i: number) => {
+        const dataNotif = new Date(n.created_at || n.original?.created_at);
+        console.log(`   ${i+1}. ${dataNotif.toLocaleString('pt-BR', { timeZone: BELEM_TIMEZONE })} - ${n.tipoEvento || n.original?.tipo_evento?.descricao}`);
+      });
+    }
+    
+    return filteredNotifications;
   }, [dateRangeConfig, periodStart, periodEnd]);
 
   // Função para verificar se o filtro global está ativo
