@@ -221,8 +221,11 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
             {notificacoes.map((notificacao) => (
               <div
                 key={notificacao.id}
-                className="p-4 transition-all duration-200 hover:shadow-md"
+                className="p-4 transition-all duration-200 hover:shadow-md cursor-pointer"
                 style={getTipoAtendimentoStyles(notificacao)}
+                onClick={() => {
+                  window.location.href = `/private/comunicacao-de-caso/editar/${notificacao.id}`;
+                }}
               >
                 <div className="flex justify-between items-start">
                   <div className="flex-1 min-w-0">
@@ -250,11 +253,12 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
                       )}
                     </div>
                   </div>
-                  <div className="flex space-x-1 ml-2">
+                  <div className="flex space-x-1 ml-2" onClick={(e) => e.stopPropagation()}>
                     <a
                       href={`/private/comunicacao-de-caso/editar/${notificacao.id}`}
                       className="p-3 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-md transition-colors touch-manipulation inline-flex items-center justify-center"
                       title="Editar (Ctrl+Click para nova aba)"
+                      onClick={(e) => e.stopPropagation()}
                     >
                       <Edit className="h-5 w-5" />
                     </a>
@@ -344,8 +348,11 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
               notificacoes.map((notificacao) => (
                 <tr
                   key={notificacao.id}
-                  className="transition-all duration-200 hover:shadow-lg"
+                  className="transition-all duration-200 hover:shadow-lg cursor-pointer"
                   style={getTipoAtendimentoStyles(notificacao)}
+                  onClick={() => {
+                    window.location.href = `/private/comunicacao-de-caso/editar/${notificacao.id}`;
+                  }}
                 >
                   {allColumns
                     .filter((col) => selectedColumns.includes(col.key))
@@ -367,6 +374,7 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
                         href={`/private/comunicacao-de-caso/editar/${notificacao.id}`}
                         className="text-blue-600 hover:text-blue-900 flex items-center text-xs md:text-sm"
                         title="Editar (Ctrl+Click para nova aba)"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         <Edit className="h-3 w-3 md:h-4 md:w-4 mr-0.5 md:mr-1" />
                         <span className="hidden lg:inline">Editar</span>
