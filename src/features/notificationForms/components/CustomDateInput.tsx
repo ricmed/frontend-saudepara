@@ -15,6 +15,23 @@ interface CustomDateInputProps {
   onValidationError?: (name: string, error: string | null) => void;
 }
 
+// 🌍 Função auxiliar para obter a data atual no fuso horário de Belém (UTC-3)
+const getBelemCurrentDate = (): Date => {
+  const now = new Date();
+  // Converter para o fuso horário de Belém (America/Belem ou America/Sao_Paulo)
+  const belemTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Belem' }));
+  return belemTime;
+};
+
+// 🌍 Função auxiliar para formatar data no formato ISO considerando o fuso de Belém
+const formatDateToISOInBelem = (date: Date): string => {
+  const belemDate = new Date(date.toLocaleString('en-US', { timeZone: 'America/Belem' }));
+  const year = belemDate.getFullYear();
+  const month = String(belemDate.getMonth() + 1).padStart(2, '0');
+  const day = String(belemDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const CustomDateInput: React.FC<CustomDateInputProps> = ({
   name,
   value,
@@ -39,9 +56,9 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
   const [persistentError, setPersistentError] = useState<string>("");
   const [shouldClearError, setShouldClearError] = useState(false);
 
-  // Verificar data máxima - usando a data atual por padrão (impede datas futuras)
-  const today = new Date();
-  const formattedToday = today.toISOString().split('T')[0];
+  // Verificar data máxima - usando a data atual no fuso de Belém por padrão (impede datas futuras)
+  const today = getBelemCurrentDate();
+  const formattedToday = formatDateToISOInBelem(today);
   const effectiveMaxDate = maxDate || formattedToday;
 
   // Sincronizar o valor manual com o valor do componente pai
@@ -362,6 +379,7 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
       const date = new Date(value);
       date.setDate(date.getDate() + 1);
       
+      // Usar data máxima no fuso de Belém
       const maxDate = new Date(effectiveMaxDate);
       if (date > maxDate) {
         const errorMsg = "A data não pode ser futura.";
@@ -376,7 +394,7 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
         return;
       }
       
-      const isoDate = date.toISOString().split('T')[0];
+      const isoDate = formatDateToISOInBelem(date);
       const syntheticEvent = {
         target: { name, value: isoDate },
         currentTarget: { name, value: isoDate }
@@ -384,8 +402,9 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
       
       onChange(syntheticEvent);
     } else {
-      const date = new Date();
-      const isoDate = date.toISOString().split('T')[0];
+      // 🌍 CORREÇÃO: Usar data atual no fuso de Belém ao invés de UTC
+      const date = getBelemCurrentDate();
+      const isoDate = formatDateToISOInBelem(date);
       const syntheticEvent = {
         target: { name, value: isoDate },
         currentTarget: { name, value: isoDate }
@@ -419,7 +438,7 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
         }
       }
       
-      const isoDate = date.toISOString().split('T')[0];
+      const isoDate = formatDateToISOInBelem(date);
       const syntheticEvent = {
         target: { name, value: isoDate },
         currentTarget: { name, value: isoDate }
@@ -427,7 +446,8 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
       
       onChange(syntheticEvent);
     } else {
-      const date = new Date();
+      // 🌍 CORREÇÃO: Usar data atual no fuso de Belém ao invés de UTC
+      const date = getBelemCurrentDate();
       date.setDate(date.getDate() - 1);
       
       if (minDate) {
@@ -446,7 +466,7 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
         }
       }
       
-      const isoDate = date.toISOString().split('T')[0];
+      const isoDate = formatDateToISOInBelem(date);
       const syntheticEvent = {
         target: { name, value: isoDate },
         currentTarget: { name, value: isoDate }

@@ -39,10 +39,39 @@ const formatarDataUniversal = (dateString: string): string => {
 };
 
 // Função para processar datas com ajuste de fuso horário
+// 🌍 CORREÇÃO: Converter de UTC para horário local de Belém ao carregar do backend
 const processarData = (dateString: string | null | undefined): string => {
   if (!dateString) return "";
-  // Pega apenas a parte da data, ignorando o fuso horário
-  return dateString.split("T")[0];
+  
+  try {
+    // Se a data vem do backend em UTC (formato ISO com Z ou offset)
+    if (dateString.includes('T')) {
+      // Criar objeto Date que interpreta o UTC corretamente
+      const utcDate = new Date(dateString);
+      
+      // Converter para o horário de Belém (America/Belem)
+      const belemDateStr = utcDate.toLocaleString('en-US', { 
+        timeZone: 'America/Belem',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      
+      // Converter de MM/DD/YYYY para YYYY-MM-DD
+      const [month, day, year] = belemDateStr.split('/');
+      const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      
+      console.log(`📥 processarData: ${dateString} (UTC) -> ${isoDate} (Belém)`);
+      return isoDate;
+    }
+    
+    // Se já está em formato de data simples YYYY-MM-DD, retornar como está
+    return dateString.split("T")[0];
+  } catch (error) {
+    console.error('Erro ao processar data:', error, dateString);
+    // Fallback: pegar apenas a parte da data
+    return dateString.split("T")[0];
+  }
 };
 
 // 🆕 FUNÇÃO OTIMIZADA: Processar data com timezone para envio ao backend
