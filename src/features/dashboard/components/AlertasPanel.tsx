@@ -52,9 +52,13 @@ interface AlertaItem {
 
 interface AlertasPanelProps {
   notificacoes: any[];
+  isGlobalFilterActive?: () => boolean;
 }
 
-export const AlertasPanel: React.FC<AlertasPanelProps> = ({ notificacoes = [] }) => {
+export const AlertasPanel: React.FC<AlertasPanelProps> = ({ 
+  notificacoes = [], 
+  isGlobalFilterActive = () => false 
+}) => {
   const navigate = useNavigate();
   const [alertas, setAlertas] = useState<AlertaItem[]>([]);
   const [alertasAtivos, setAlertasAtivos] = useState<AlertaItem[]>([]);
@@ -562,17 +566,25 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({ notificacoes = [] })
                 <select
                   value={dataSelecionada}
                   onChange={(e) => setDataSelecionada(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={isGlobalFilterActive()}
+                  className={`px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                    isGlobalFilterActive() 
+                      ? 'bg-gray-100 cursor-not-allowed opacity-60' 
+                      : ''
+                  }`}
+                  title={isGlobalFilterActive() ? 'Seletor desabilitado: filtro global ativo no dashboard' : ''}
                 >
-                  <option value="todas">📊 Todas as datas</option>
-                  {datasDisponiveis.map((data) => (
+                  <option value="todas">
+                    {isGlobalFilterActive() ? '🔒 Filtro Global Ativo' : '📊 Todas as datas'}
+                  </option>
+                  {!isGlobalFilterActive() && datasDisponiveis.map((data) => (
                     <option key={data} value={data}>
                       📅 {formatarDataParaExibicao(data)}
                     </option>
                   ))}
                 </select>
                 
-                {dataSelecionada && dataSelecionada !== 'todas' && (
+                {dataSelecionada && dataSelecionada !== 'todas' && !isGlobalFilterActive() && (
                   <span className="text-xs text-gray-600">
                     Mostrando: {formatarDataParaExibicao(dataSelecionada)}
                   </span>

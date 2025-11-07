@@ -45,13 +45,15 @@ interface EstabelecimentosMapaAvancadoProps {
   exportOptions?: any; // 🆕 Adicionar exportOptions para acessar hipóteses
   selectedDataNotificacao?: string | null; // 🆕 Data selecionada no dashboard (pode ser 'ultima-data')
   datasNotificacaoDisponiveis?: string[]; // 🆕 Datas disponíveis do dashboard
+  isGlobalFilterActive?: () => boolean; // 🆕 Função para verificar se o filtro global está ativo
 }
 
 const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> = memo(({ 
   notificacoes = [],
   exportOptions = {}, // 🆕 Receber exportOptions
   selectedDataNotificacao = null, // 🆕 Receber data selecionada do dashboard
-  datasNotificacaoDisponiveis = [] // 🆕 Receber datas disponíveis
+  datasNotificacaoDisponiveis = [], // 🆕 Receber datas disponíveis
+  isGlobalFilterActive = () => false // 🆕 Função para verificar se o filtro global está ativo
 }) => {
   console.log('🏁 EstabelecimentosMapaAvancado renderizado:', {
     notificacoesRecebidas: notificacoes.length,
@@ -604,10 +606,21 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
             <select
               value={dataSelecionada || 'todas'}
               onChange={(e) => setDataSelecionada(e.target.value === 'todas' ? null : e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              disabled={isGlobalFilterActive()}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                isGlobalFilterActive() 
+                  ? 'bg-gray-100 cursor-not-allowed opacity-60' 
+                  : ''
+              }`}
+              title={isGlobalFilterActive() ? 'Seletor desabilitado: filtro global ativo no dashboard' : ''}
             >
-              <option value="todas">📅 Todas as Datas ({notificacoes.length})</option>
-              {datasDisponiveis.map((data) => {
+              <option value="todas">
+                {isGlobalFilterActive() 
+                  ? `🔒 Filtro Global Ativo (${notificacoes.length})` 
+                  : `📅 Todas as Datas (${notificacoes.length})`
+                }
+              </option>
+              {!isGlobalFilterActive() && datasDisponiveis.map((data) => {
                 const dataFormatada = new Date(data + 'T00:00:00').toLocaleDateString('pt-BR');
                 const timezone = 'America/Belem';
                 

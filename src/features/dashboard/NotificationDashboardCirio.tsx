@@ -333,7 +333,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     filterNotificationsByDateRange,
     periodStart,
     periodEnd,
-    resetToDefault: resetDateRange
+    resetToDefault: resetDateRange,
+    isGlobalFilterActive
   } = useDashboardDateRangeFilter();
 
   // 🆕 Inicializar selectedPublicos com todos os públicos quando as opções carregarem
@@ -520,6 +521,30 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     console.log(`✅ Filtro de evento aplicado: ${notificacoesFiltradasPorPeriodo.length} → ${filtradas.length} notificações`);
     return filtradas;
   }, [notificacoesFiltradasPorPeriodo, selectedEvento]);
+
+  // 🆕 NOTIFICAÇÕES PARA ANÁLISE TEMPORAL (INDEPENDENTE DO FILTRO GLOBAL)
+  // Filtra apenas por evento, ignorando o filtro de período
+  const notificacoesParaAnalisetemporal = useMemo(() => {
+    // Se "Todos" está selecionado, retornar todas as notificações originais (sem filtro de período)
+    if (selectedEvento === "Todos") {
+      console.log(`📊 Análise Temporal - Evento "Todos" selecionado - usando ${notificacoes.length} notificações (sem filtro de período)`);
+      return notificacoes;
+    }
+
+    // Filtrar apenas pelo evento selecionado (ignorando período)
+    console.log(`🔍 Análise Temporal - Filtrando notificações pelo evento: "${selectedEvento}" (sem filtro de período)`);
+    
+    const filtradas = notificacoes.filter((notificacao: any) => {
+      // Buscar o nome do evento usando tipoEvento ou original.tipo_evento.descricao
+      const eventoNome = notificacao.tipoEvento || 
+                        notificacao.original?.tipo_evento?.descricao;
+      
+      return eventoNome === selectedEvento;
+    });
+
+    console.log(`✅ Análise Temporal - Filtro de evento aplicado: ${notificacoes.length} → ${filtradas.length} notificações (sem filtro de período)`);
+    return filtradas;
+  }, [notificacoes, selectedEvento]);
   
   // Função para obter a descrição de um tipo de atendimento pelo ID
   const getAtendimentoDescById = useCallback((idAtendimento: string | number): string => {
@@ -3496,10 +3521,18 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 <select
                   value={selectedDataNotificacao || 'todos'}
                   onChange={(e) => handleDataNotificacaoChange(e.target.value)}
-                  className="px-3 py-2 text-xs text-gray-800 border border-white border-opacity-30 rounded-lg focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 bg-white bg-opacity-90 min-w-[180px]"
+                  disabled={isGlobalFilterActive()}
+                  className={`px-3 py-2 text-xs text-gray-800 border border-white border-opacity-30 rounded-lg focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 min-w-[180px] ${
+                    isGlobalFilterActive() 
+                      ? 'bg-gray-200 cursor-not-allowed opacity-60' 
+                      : 'bg-white bg-opacity-90'
+                  }`}
+                  title={isGlobalFilterActive() ? 'Seletor desabilitado: filtro global ativo' : ''}
                 >
-                  <option value="todos">📊 Todas as Datas</option>
-                  {datasNotificacaoDisponiveis.map((data) => {
+                  <option value="todos">
+                    {isGlobalFilterActive() ? '🔒 Filtro Global Ativo' : '📊 Todas as Datas'}
+                  </option>
+                  {!isGlobalFilterActive() && datasNotificacaoDisponiveis.map((data) => {
                     // 🆕 CORREÇÃO: Contar apenas notificações do evento selecionado
                     const totalDia = contarNotificacoesPorData(notificacoesFiltradasPorEvento, data);
                     const dataFormatada = new Date(data + 'T00:00:00').toLocaleDateString('pt-BR');
@@ -3513,7 +3546,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                   })}
                 </select>
                 
-                {selectedDataNotificacao && (
+                {selectedDataNotificacao && !isGlobalFilterActive() && (
                   <button
                     onClick={() => handleDataNotificacaoChange('todos')}
                     className="px-2 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 text-white text-sm rounded-lg transition-all duration-200"
@@ -3777,19 +3810,19 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             />
           </div>
           
-          {/* Gráfico 1: Série temporal por dia - USANDO NOTIFICAÇÕES PRÉ-FILTRADAS */}
+          {/* Gráfico 1: Série temporal por dia - USANDO NOTIFICAÇÕES FILTRADAS APENAS POR EVENTO (INDEPENDENTE DO FILTRO GLOBAL) */}
           <div className="mb-6">
             <SerieTemporalChart 
-              notificacoes={notificacoesFiltradasPorPeriodo}
+              notificacoes={notificacoesParaAnalisetemporal}
               title="Série Temporal por Dia de Notificação"
               description="Evolução diária do número de notificações"
             />
           </div>
           
           {/* Gráfico 2: Série temporal por hora */}
-          {/* 🆕 USAR NOTIFICAÇÕES FILTRADAS POR EVENTO */}
+          {/* 🆕 USAR NOTIFICAÇÕES FILTRADAS POR EVENTO SEM FILTRO DE PERÍODO */}
           <AtendimentosPorHoraChart 
-            notificacoes={notificacoesFiltradasPorEvento} 
+            notificacoes={notificacoesParaAnalisetemporal} 
           />
         </main>
       )}
@@ -3831,6 +3864,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             exportOptions={exportOptions}
             selectedDataNotificacao={selectedDataNotificacao}
             datasNotificacaoDisponiveis={datasNotificacaoDisponiveis}
+            isGlobalFilterActive={isGlobalFilterActive}
           />
         </main>
       )}
@@ -3857,7 +3891,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       {/* 🆕 USAR NOTIFICAÇÕES FILTRADAS POR EVENTO */}
       <AlertasPanel 
         key={`alertas-${lastUpdate}-${notificacoesFiltradasPorEvento.length}`}
-        notificacoes={notificacoesFiltradasPorEvento} 
+        notificacoes={notificacoesFiltradasPorEvento}
+        isGlobalFilterActive={isGlobalFilterActive}
       />
 
       {/* Indicador de Carregamento */}

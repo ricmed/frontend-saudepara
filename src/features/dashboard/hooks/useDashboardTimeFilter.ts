@@ -23,6 +23,7 @@ interface UseDateRangeFilterReturn {
   periodStart: Date;
   periodEnd: Date;
   resetToDefault: () => void;
+  isGlobalFilterActive: () => boolean;
 }
 
 /**
@@ -208,6 +209,11 @@ export const useDashboardDateRangeFilter = (): UseDateRangeFilterReturn => {
     });
   }, [dateRangeConfig, periodStart, periodEnd]);
 
+  // Função para verificar se o filtro global está ativo
+  const isGlobalFilterActive = useCallback(() => {
+    return dateRangeConfig.enabled;
+  }, [dateRangeConfig.enabled]);
+
   return {
     dateRangeConfig,
     setDateRangeConfig,
@@ -215,6 +221,7 @@ export const useDashboardDateRangeFilter = (): UseDateRangeFilterReturn => {
     periodStart,
     periodEnd,
     resetToDefault,
+    isGlobalFilterActive,
   };
 };
 
