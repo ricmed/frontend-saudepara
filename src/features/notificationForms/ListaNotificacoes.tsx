@@ -10,8 +10,8 @@ import { useNotifications } from "./hooks/useNotifications";
 import { useTableControls } from "./hooks/useTableControls";
 import { allColumns, searchFields } from "./types";
 import type { SearchParams } from "./types";
-import { formatDate, compareValues, getValueForSorting } from "./utils";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { formatDate, compareValues, getValueForSorting, normalizeText } from "./utils";
+
 import type { Notificacao } from "./types";
 
 const ListaNotificacoes: React.FC = () => {
@@ -38,14 +38,14 @@ const ListaNotificacoes: React.FC = () => {
   const csvLinkAllRef = useRef<any>(null);
   
   // Adicionar contexto de idioma
-  const { selectedLanguage, setSelectedLanguage } = useLanguage();
+
 
   // Usar allNotificacoes quando disponível (modo de ordenação local) ou notificacoes (paginação do servidor)
   const todasNotificacoes = notifications.allNotificacoes.length > 0 
     ? notifications.allNotificacoes 
     : notifications.notificacoes;
 
-  // Filtrar notificações por tipo de atendimento
+  // Filtrar notificações por tipo de atendimento e termo de busca
   const notificacoesFiltradas = useMemo(() => {
     let filtradas = todasNotificacoes;
     
@@ -69,6 +69,40 @@ const ListaNotificacoes: React.FC = () => {
         }
       });
     }
+
+    // Aplicar filtro de busca se houver um termo com 3 ou mais caracteres
+    if (notifications.searchParams.term.length >= 3) {
+      const searchTerm = normalizeText(notifications.searchParams.term);
+      const searchField = notifications.searchParams.field;
+
+      filtradas = filtradas.filter((notificacao) => {
+        if (searchField === 'all') {
+          return (
+            normalizeText(notificacao.paciente).includes(searchTerm) ||
+            normalizeText(notificacao.tipoEvento).includes(searchTerm) ||
+            normalizeText(notificacao.tipoAtendimento).includes(searchTerm) ||
+            normalizeText(notificacao.tipoEncerramento).includes(searchTerm) ||
+            normalizeText(notificacao.original?.estabelecimento_notificacao_estabelecimento_idestabelecimentoToestabelecimento?.nome).includes(searchTerm)
+          );
+        }
+
+        // Buscar em campos específicos
+        switch (searchField) {
+          case 'paciente':
+            return normalizeText(notificacao.paciente).includes(searchTerm);
+          case 'evento':
+            return normalizeText(notificacao.tipoEvento).includes(searchTerm);
+          case 'atendimento':
+            return normalizeText(notificacao.tipoAtendimento).includes(searchTerm);
+          case 'encerramento':
+            return normalizeText(notificacao.tipoEncerramento).includes(searchTerm);
+          case 'unidade_notificadora':
+            return normalizeText(notificacao.original?.estabelecimento_notificacao_estabelecimento_idestabelecimentoToestabelecimento?.nome).includes(searchTerm);
+          default:
+            return true;
+        }
+      });
+    }
     
     // Aplicar ordenação se estivermos usando dados locais
     if (notifications.allNotificacoes.length > 0 && notifications.sortKey) {
@@ -80,7 +114,7 @@ const ListaNotificacoes: React.FC = () => {
     }
     
     return filtradas;
-  }, [todasNotificacoes, selectedTipoAtendimento, notifications.allNotificacoes.length, notifications.sortKey, notifications.sortOrder]);
+  }, [todasNotificacoes, selectedTipoAtendimento, notifications.allNotificacoes.length, notifications.sortKey, notifications.sortOrder, notifications.searchParams.term, notifications.searchParams.field]);
 
   // Aplicar paginação local nas notificações filtradas
   const notificacoesPaginadas = useMemo(() => {
@@ -134,8 +168,6 @@ const ListaNotificacoes: React.FC = () => {
       <SideMenu 
         isOpen={tableControls.isMenuOpen} 
         onClose={() => tableControls.setIsMenuOpen(false)}
-        selectedLanguage={selectedLanguage}
-        onLanguageChange={(language) => setSelectedLanguage(language)}
       />
 
       {/* Conteúdo principal */}

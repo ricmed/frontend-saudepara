@@ -3,6 +3,18 @@ import { Notificacao } from "../types";
 import { detectUserTimezone } from "../types/index2";
 
 /**
+ * Normaliza texto removendo acentos, cedilhas e convertendo para minúsculas
+ * @param text Texto a ser normalizado
+ * @returns Texto normalizado
+ */
+export const normalizeText = (text: string = ''): string => {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+};
+
+/**
  * Formata data para exibição no formato brasileiro DD/MM/YYYY
  * 🆕 ATUALIZADA: Agora com suporte a timezone
  */
