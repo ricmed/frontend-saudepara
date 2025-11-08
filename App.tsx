@@ -91,6 +91,7 @@ import FormularioPaciente from "@/features/paginaPacientesComu/components/Formul
 import ListaPacientes from "@/features/paginaPacientesComu/components/ListaPacientes";
 // Páginas
 import LoginPage from "@/paginas/LoginPage";
+import OfflineLoginPage from "@/features/auth/pages/OfflineLoginPage";
 import QualificarEstabelecimentos from "@/features/forms/EstablishmentForm";
 // Importação temporariamente comentada - será usada no futuro
 // import PaginaPacientesFicha from "@/features/paginaPacientesComu/components/PaginaPacientesFicha";
@@ -280,6 +281,7 @@ function App() {
           <Route path="/campanha-dezembro-vermelho" element={<DezembroVermelho />} />
           <Route path="/campanha-novembro-azul" element={<NovembroAzul />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/offline-login" element={<OfflineLoginPage />} />
           <Route path="/access-denied" element={<AccessDenied />} />
           {/* Contact Pages */}
           <Route path="/fale-conosco" element={<FaleConoscoPage />} />

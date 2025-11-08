@@ -9,10 +9,43 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [retryMessage, setRetryMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    // 🆕 Verificar se há login offline ativo
+    const offlineMode = localStorage.getItem('offline_mode');
+    const userData = localStorage.getItem('user_data');
+    
+    if (offlineMode === 'true' && userData) {
+      console.log('🔄 Detectado login offline, carregando usuário...');
+      try {
+        const parsedUser = JSON.parse(userData);
+        setUser(parsedUser);
+        setLoading(false);
+        return;
+      } catch (error) {
+        console.error('Erro ao carregar dados offline:', error);
+      }
+    }
+    
+    // Tentar login normal via API
     axios.get('/api-auth/protected/profile', { withCredentials: true })
-      .then(res => setUser(res.data))
+      .then(res => {
+        setUser(res.data);
+        // Limpar modo offline se conseguir conectar
+        localStorage.removeItem('offline_mode');
+        localStorage.removeItem('user_data');
+      })
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
+  }, []);
+
+  // 🆕 Listener para evento de login offline
+  useEffect(() => {
+    const handleOfflineLogin = (event: any) => {
+      console.log('📥 Evento de login offline recebido:', event.detail);
+      setUser(event.detail);
+    };
+
+    window.addEventListener('offline-login-success', handleOfflineLogin);
+    return () => window.removeEventListener('offline-login-success', handleOfflineLogin);
   }, []);
 
   const login = async (username: string, password: string) => {
@@ -39,6 +72,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } finally {
       setUser(null);
       setRetryMessage(null);
+      // 🆕 Limpar modo offline ao fazer logout
+      localStorage.removeItem('offline_mode');
+      localStorage.removeItem('user_data');
     }
   };
 

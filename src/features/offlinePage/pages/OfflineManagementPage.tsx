@@ -26,9 +26,12 @@ import { offlineDataManager } from '@/services/offlineDataManager';
 import syncService from '@/services/syncService';
 import PacienteService from '@/services/PacienteService';
 import indexedDBService from '@/services/indexedDB';
+import { offlineAuthService } from '@/services/offlineAuthService';
+import SetupPinModal from '@/features/auth/components/SetupPinModal';
 
 // Import do SideMenu real do sistema
 import SideMenu from '@/features/home/components/SideMenu';
+import PinManagementTab from '@/features/offlinePage/components/PinManagementTab';
 
 /**
  * Página de Gerenciamento Offline
@@ -48,7 +51,7 @@ const OfflineManagementPage: React.FC = () => {
   const [currentDownload, setCurrentDownload] = useState('');
   const [pendingSync, setPendingSync] = useState({ notificacoes: 0, pacientes: 0 });
   const [pendingNotifications, setPendingNotifications] = useState<any[]>([]); // ✅ NOVO: Lista detalhada de notificações pendentes
-  const [activeTab, setActiveTab] = useState<'overview' | 'patients' | 'sources' | 'notifications' | 'sync'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'patients' | 'sources' | 'notifications' | 'sync' | 'pin'>('overview');
   
   // ✅ NOVO: Estados para download de notificações
   const [notificationsStats, setNotificationsStats] = useState<any>(null);
@@ -62,6 +65,11 @@ const OfflineManagementPage: React.FC = () => {
   // 🆕 MODO OFFLINE FORÇADO (tipo Spotify)
   const [isOfflineModeForced, setIsOfflineModeForced] = useState(false);
   const [isTogglingOfflineMode, setIsTogglingOfflineMode] = useState(false);
+
+  // 🆕 Estados para gerenciamento de PIN
+  const [pinSessionInfo, setPinSessionInfo] = useState<any>(null);
+  const [showPinSetup, setShowPinSetup] = useState(false);
+  const [showChangePinModal, setShowChangePinModal] = useState(false);
 
   // ✅ CORRIGIDO: Estados específicos para pacientes
   const [patientsStats, setPatientsStats] = useState<any>(null);
@@ -579,7 +587,8 @@ const OfflineManagementPage: React.FC = () => {
               { id: 'patients', label: 'Base de Pacientes', icon: Users },
               { id: 'notifications', label: 'Notificações', icon: Download },
               { id: 'sources', label: 'Todas as Fontes', icon: Database },
-              { id: 'sync', label: 'Sincronização', icon: RefreshCw }
+              { id: 'sync', label: 'Sincronização', icon: RefreshCw },
+              { id: 'pin', label: 'Login Offline (PIN)', icon: Shield }
             ].map((tab) => {
               const IconComponent = tab.icon;
               return (
@@ -1384,6 +1393,18 @@ const OfflineManagementPage: React.FC = () => {
               </div>
             </div>
           </div>
+        )}
+
+        {/* 🆕 PIN Tab */}
+        {activeTab === 'pin' && (
+          <PinManagementTab
+            pinSessionInfo={pinSessionInfo}
+            setPinSessionInfo={setPinSessionInfo}
+            showPinSetup={showPinSetup}
+            setShowPinSetup={setShowPinSetup}
+            showChangePinModal={showChangePinModal}
+            setShowChangePinModal={setShowChangePinModal}
+          />
         )}
       </main>
 
