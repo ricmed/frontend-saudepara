@@ -158,9 +158,9 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
             </div>
             {/* Exibir data de sincronização para registros offline */}
             {original.created_offline && original.synced_at && (
-              <div className="flex items-center gap-2 text-xs text-gray-500 pl-1">
-                <span className="text-gray-400">↳ Sincronizado em:</span>
-                <span className="text-gray-600">
+              <div className="flex items-center gap-2 text-xs pl-1">
+                <span className="text-green-600 font-medium">↳ Sincronizado em:</span>
+                <span className="text-green-700 font-semibold">
                   {new Date(original.synced_at).toLocaleString('pt-BR', {
                     timeZone: 'America/Belem',
                     day: '2-digit',
