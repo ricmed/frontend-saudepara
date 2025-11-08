@@ -35,6 +35,7 @@ interface LocationInputProps {
   debug?: boolean;
   required?: boolean; // Adicionado suporte para campos obrigatórios
   error?: string; // Adicionado suporte para mensagens de erro
+  excludeValues?: string[]; // IDs de valores que devem ser excluídos da lista
 }
 
 const LocationInput: React.FC<LocationInputProps> = ({
@@ -52,7 +53,8 @@ const LocationInput: React.FC<LocationInputProps> = ({
   parentValue = "",
   debug = false,
   required = false, // Valor padrão para campos obrigatórios
-  error = "" // Valor padrão para mensagem de erro
+  error = "", // Valor padrão para mensagem de erro
+  excludeValues = [] // IDs de valores que devem ser excluídos
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [displayValue, setDisplayValue] = useState<string>("");
@@ -444,13 +446,23 @@ const LocationInput: React.FC<LocationInputProps> = ({
 
   // Filter local options based on search term with memo
   const filteredOptions = useMemo(() => {
-    // Se não há termo de busca, mostrar todos
-    if (!searchQuery) return localOptions;
+    // Primeiro aplica o filtro de exclusão
+    let optionsToFilter = localOptions;
+    
+    // ⚠️ Aplicar exclusão de valores específicos (ex: Belém quando não é residente)
+    if (excludeValues && excludeValues.length > 0) {
+      optionsToFilter = localOptions.filter(option => 
+        !excludeValues.includes(String(option[idField]))
+      );
+    }
+    
+    // Se não há termo de busca, mostrar todas as opções (já filtradas)
+    if (!searchQuery) return optionsToFilter;
     
     // Normalizar o termo de pesquisa
     const normalizedSearch = normalizeText(searchQuery);
-    return localOptions.filter(option => option.descricao.includes(normalizedSearch));
-  }, [localOptions, searchQuery]);
+    return optionsToFilter.filter(option => option.descricao.includes(normalizedSearch));
+  }, [localOptions, searchQuery, excludeValues, idField]);
 
   // Load selected option if there's a value - with manual editing check
   useEffect(() => {

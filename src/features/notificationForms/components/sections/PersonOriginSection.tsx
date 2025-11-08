@@ -36,7 +36,19 @@ const PersonOriginSection: React.FC<FormSectionProps> = ({
               label="Residente em Belém?"
               name="residenteBelem"
               value={formData.residenteBelem}
-              onChange={handleChange}
+              onChange={(e) => {
+                const newValue = e.target.value;
+                handleChange(e);
+                
+                // ⚠️ VALIDAÇÃO: Se mudou para "NÃO" e município é Belém, limpar
+                if (newValue === "2" && formData.municipio === "170") {
+                  setFormData((prev) => ({
+                    ...prev,
+                    residenteBelem: newValue,
+                    municipio: "", // Limpar Belém
+                  }));
+                }
+              }}
               type="select"
               required
               error={errors.residenteBelem}
@@ -88,7 +100,7 @@ const PersonOriginSection: React.FC<FormSectionProps> = ({
                       setFormData((prev) => ({
                         ...prev,
                         uf: value,
-                        municipio: "",
+                        municipio: "", // Sempre limpa município ao trocar de estado
                       }));
                     }}
                     placeholder="Selecione a UF"
@@ -104,6 +116,11 @@ const PersonOriginSection: React.FC<FormSectionProps> = ({
                     label="Município"
                     value={formData.municipio}
                     onChange={(value) => {
+                      // ⚠️ VALIDAÇÃO: Impedir seleção de Belém quando não é residente de Belém
+                      if (formData.residenteBelem === "2" && formData.uf === "15" && value === "170") {
+                        // Não permitir selecionar Belém
+                        return;
+                      }
                       setFormData((prev) => ({
                         ...prev,
                         municipio: value,
@@ -112,16 +129,24 @@ const PersonOriginSection: React.FC<FormSectionProps> = ({
                     placeholder={
                       isLoadingMunicipios
                         ? "Carregando municípios..."
-                        : "Selecione o município"
+                        : formData.uf === "15" 
+                          ? "Selecione o município (exceto Belém)"
+                          : "Selecione o município"
                     }
                     disabled={!formData.uf || isLoadingMunicipios}
                     apiEndpoint="api/tipo-municipio"
                     idField="idtipo_municipio"
                     parentValue={formData.uf}
                     debug={true}
+                    excludeValues={formData.residenteBelem === "2" && formData.uf === "15" ? ["170"] : []}
                   />
                   {ufError && (
                     <p className="mt-1 text-sm text-red-500">{ufError}</p>
+                  )}
+                  {formData.residenteBelem === "2" && formData.uf === "15" && (
+                    <p className="mt-1 text-sm text-amber-600">
+                      ⚠️ Belém não está disponível. Se a pessoa reside em Belém, selecione "SIM" em "Residente em Belém?"
+                    </p>
                   )}
                 </div>
                 <div>
