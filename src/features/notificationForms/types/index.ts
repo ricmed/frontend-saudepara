@@ -20,6 +20,7 @@ export interface Notificacao {
       device_id?: string;            // ID do dispositivo (fingerprint)
       created_offline?: boolean;     // Se foi criado offline
       sincronizado?: boolean;        // Se já foi sincronizado
+      synced_at?: string;            // Data e hora de sincronização
       paciente: {
         idpaciente: number;
         nome: string;

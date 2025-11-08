@@ -161,8 +161,15 @@ export const getValueForSorting = (notificacao: Notificacao, sortKey: keyof Noti
       ?.estabelecimento_notificacao_estabelecimento_idestabelecimentoToestabelecimento
       ?.nome || "";
   } else if (sortKey === "created_at") {
-    // 🆕 USAR DATA REAL: Se foi criado offline, usar timestamp do offline_id
+    // 🆕 PRIORIDADE: synced_at > offline_id timestamp > created_at
     const original = notificacao.original;
+    
+    // 1️⃣ Se tem synced_at (foi sincronizado), usar essa data
+    if (original?.synced_at) {
+      return new Date(original.synced_at).toISOString();
+    }
+    
+    // 2️⃣ Se foi criado offline, usar timestamp do offline_id
     if (original?.created_offline && original?.offline_id) {
       // Extrair timestamp do offline_id (formato: fp-XXXX-TIMESTAMP-XXXX)
       const parts = original.offline_id.split('-');
@@ -174,7 +181,8 @@ export const getValueForSorting = (notificacao: Notificacao, sortKey: keyof Noti
         }
       }
     }
-    // Se não tem offline_id ou não foi criado offline, usar created_at normal
+    
+    // 3️⃣ Fallback: usar created_at normal
     return original?.created_at || "";
   } else if (sortKey === "updated_at") {
     // 🆕 Retornar timestamp completo para ordenação precisa

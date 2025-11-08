@@ -106,7 +106,7 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
           </div>
         );
       case "created_at":
-        // 🆕 MOSTRAR DATA REAL (offline_id timestamp ou created_at)
+        // 🆕 MOSTRAR DATA REAL (offline_id timestamp ou created_at) + DATA DE SINCRONIZAÇÃO
         const original = notificacao.original;
         if (!original?.created_at) return "—";
         
@@ -140,20 +140,38 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
         }
         
         return (
-          <div className="text-sm flex items-center gap-2">
-            <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${badgeColor}`}>
-              Criado {badge}
-            </span>
-            <span className="text-gray-700">
-              {realDate.toLocaleString('pt-BR', {
-                timeZone: 'America/Belem',
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </span>
+          <div className="text-sm space-y-1">
+            <div className="flex items-center gap-2">
+              <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${badgeColor}`}>
+                Criado {badge}
+              </span>
+              <span className="text-gray-700">
+                {realDate.toLocaleString('pt-BR', {
+                  timeZone: 'America/Belem',
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </span>
+            </div>
+            {/* Exibir data de sincronização para registros offline */}
+            {original.created_offline && original.synced_at && (
+              <div className="flex items-center gap-2 text-xs text-gray-500 pl-1">
+                <span className="text-gray-400">↳ Sincronizado em:</span>
+                <span className="text-gray-600">
+                  {new Date(original.synced_at).toLocaleString('pt-BR', {
+                    timeZone: 'America/Belem',
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
+              </div>
+            )}
           </div>
         );
       case "updated_at":
