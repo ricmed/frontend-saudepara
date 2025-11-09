@@ -64,6 +64,7 @@ export const ptBR = {
   "menu.offline_management": "Dados Offline",
   "menu.educational": "Materiais Educativos",
   "menu.apps": "Apps Auxiliares",
+  "menu.patients_list": "Lista de Pacientes", // ✅ NOVO
   "menu.security": "Segurança",
   "menu.version": "Versão",
   "menu.bug": "Relate um Bug",

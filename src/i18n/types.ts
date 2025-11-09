@@ -82,6 +82,7 @@ export type TranslationRecord = {
   'menu.offline_management': string;
   'menu.educational': string;
   'menu.apps': string;
+  'menu.patients_list': string; // ✅ NOVO
   'menu.security': string;
   'menu.version': string;
   'menu.bug': string;

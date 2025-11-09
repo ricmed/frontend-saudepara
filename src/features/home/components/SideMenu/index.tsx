@@ -244,6 +244,16 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       onClick: () => {},
     }] : []),
     
+    // ✅ NOVO: Menu de Lista de Pacientes - apenas para admin master
+    ...(user && isAdminMaster() ? [{
+      icon: <Users />,
+      label: t("menu.patients_list") || "Lista de Pacientes",
+      onClick: () => {
+        navigate("/private/pacientes");
+        onClose();
+      },
+    }] : []),
+    
     {
       icon: <Network />,
       label: t("menu.version"),

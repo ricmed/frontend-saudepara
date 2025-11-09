@@ -67,6 +67,7 @@ export const es: TranslationRecord = {
   "menu.offline_management": "Datos Sin Conexión",
   "menu.educational": "Materiales Educativos",
   "menu.apps": "Apps Auxiliares",
+  "menu.patients_list": "Lista de Pacientes", // ✅ NOVO
   "menu.security": "Seguridad",
   "menu.version": "Versión",
   "menu.bug": "Reportar un Error",

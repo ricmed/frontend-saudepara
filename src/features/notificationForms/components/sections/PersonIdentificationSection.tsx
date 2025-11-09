@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { User, Search, X, HelpCircle } from 'lucide-react';
+import React from 'react';
+import { User, X, HelpCircle } from 'lucide-react';
 import { FormSectionProps } from '@/features/notificationForms/types/index2';
 import SectionHeader from '../shared/SectionHeader';
 import FormField from '../shared/FormField';
@@ -49,13 +49,16 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
   originalCpf,
   checkCpfOfflineSafe
 }) => {
-  const [typingTimer, setTypingTimer] = useState<NodeJS.Timeout | null>(null);
-  const [isValidCPF, setIsValidCPF] = useState<boolean>(false);
+  // ✅ REMOVIDO: Estados e validação de CPF duplicado (conforme solicitação)
+  // const [typingTimer, setTypingTimer] = useState<NodeJS.Timeout | null>(null);
+  // const [isValidCPF, setIsValidCPF] = useState<boolean>(false);
 
   // Função auxiliar para formatar CPF (remover caracteres não numéricos)
   const formatCPF = (cpf: string) => {
     return cpf.replace(/\D/g, "").slice(0, 11);
-  };   // Função para verificar CPF existente usando o serviço offline/online
+  };
+  
+  // ✅ SIMPLIFICADO: Apenas formatar CPF sem validação de duplicidade
   const handleCPFChangeWithValidation = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
     const formattedCPF = formatCPF(rawValue);
@@ -65,9 +68,6 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
       cpf: formattedCPF,
     }));
 
-    // Resetar estados de validação
-    setIsValidCPF(false);
-    
     // Limpar erro anterior
     if (errors.cpf) {
       setErrors((prev: Record<string, string>) => {
@@ -76,90 +76,7 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
         return newErrors;
       });
     }
-      // Se o CPF tem menos de 11 dígitos, não validar e limpar estados
-    if (formattedCPF.length < 11) {
-      setIsValidCPF(false);
-      // Limpar timer se existir
-      if (typingTimer) {
-        clearTimeout(typingTimer);
-        setTypingTimer(null);
-      }
-      return;
-    }
-    
-    // Só verificar com 11 dígitos - caso contrário não é um CPF válido
-    if (formattedCPF.length === 11) {
-      // Verificar se é o CPF original (modo edição) - não deve mostrar erro
-      if (formattedCPF === originalCpf) {
-        setIsValidCPF(true);
-        setErrors((prev: Record<string, string>) => {
-          const newErrors = { ...prev };
-          delete newErrors.cpf;
-          return newErrors;
-        });
-        return;
-      }
-
-      // Limpar timeout anterior
-      if (typingTimer) {
-        clearTimeout(typingTimer);
-      }
-      
-      // Usar um timer para debounce
-      const timer = setTimeout(async () => {
-        try {
-          // Adicionar feedback visual durante a verificação
-          setErrors((prev: Record<string, string>) => ({
-            ...prev,
-            cpf: "Verificando CPF..."
-          }));
-          
-          // ✅ USAR SISTEMA OFFLINE/ONLINE INTEGRADO
-          const exists = await checkCpfOfflineSafe(formattedCPF);
-          
-          if (exists) {
-            // Se o CPF já existe no sistema, mostramos erro
-            setIsValidCPF(false);
-            setErrors((prev: Record<string, string>) => ({
-              ...prev,
-              cpf: "CPF já cadastrado no sistema"
-            }));
-          } else {
-            // CPF não existe no sistema - é VÁLIDO para uso
-            setIsValidCPF(true);
-            
-            // Limpar o erro de verificação
-            setErrors((prev: Record<string, string>) => {
-              const newErrors = { ...prev };
-              delete newErrors.cpf;
-              return newErrors;
-            });
-          }
-        } catch (error) {
-          console.error("Erro ao verificar CPF:", error);
-          setIsValidCPF(false);
-          
-          // Limpar mensagem de verificação
-          setErrors((prev: Record<string, string>) => {
-            const newErrors = { ...prev };
-            delete newErrors.cpf;
-            return newErrors;
-          });
-        }
-      }, 300);
-      
-      setTypingTimer(timer);
-    }
   };
-
-  // Limpar o timer quando o componente for desmontado
-  useEffect(() => {
-    return () => {
-      if (typingTimer) {
-        clearTimeout(typingTimer);
-      }
-    };
-  }, [typingTimer]);
 
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -179,30 +96,21 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
                 Nome <span className="text-red-500">*</span>
               </label>
               <div className="relative paciente-suggestions-area">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    name="paciente"
-                    placeholder="Nome do paciente"
-                    className={`flex-1 p-3 border ${
-                      errors.paciente
-                        ? "border-red-500 bg-red-50"
-                        : "border-gray-200"
-                    } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
-                    value={formData.paciente}
-                    onChange={handlePacienteChange}
-                    maxLength={100}
-                    data-error={errors.paciente ? "true" : "false"}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setIsPatientModalOpen(true)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                  >
-                    <Search className="h-4 w-4" />
-                    <span>Pesquisar</span>
-                  </button>
-                </div>
+                {/* ✅ REMOVIDO: Botão azul de buscar paciente (conforme solicitação) */}
+                <input
+                  type="text"
+                  name="paciente"
+                  placeholder="Nome do paciente"
+                  className={`w-full p-3 border ${
+                    errors.paciente
+                      ? "border-red-500 bg-red-50"
+                      : "border-gray-200"
+                  } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
+                  value={formData.paciente}
+                  onChange={handlePacienteChange}
+                  maxLength={100}
+                  data-error={errors.paciente ? "true" : "false"}
+                />
 
                 {/* Mostrar sugestões */}
                 {showSuggestions && pacienteSuggestions.length > 0 && (
@@ -376,9 +284,7 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
                   className={`w-full p-3 border ${
                     errors.cpf
                       ? "border-red-500 bg-red-50"
-                      : isValidCPF
-                        ? "border-green-500 bg-green-50"
-                        : "border-gray-200"
+                      : "border-gray-200"
                   } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
                   value={
                     formData.cpf ? displayFormattedCPF(formData.cpf) : ""
@@ -386,31 +292,13 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
                   onChange={handleCPFChangeWithValidation}
                   maxLength={14}
                   data-error={errors.cpf ? "true" : "false"}
-                  data-valid={isValidCPF ? "true" : "false"}
                 />
-                {isValidCPF && (
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                    <svg 
-                      className="h-5 w-5 text-green-500" 
-                      xmlns="http://www.w3.org/2000/svg" 
-                      viewBox="0 0 20 20" 
-                      fill="currentColor"
-                    >
-                      <path 
-                        fillRule="evenodd" 
-                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" 
-                        clipRule="evenodd" 
-                      />
-                    </svg>
-                  </div>
-                )}
+                {/* ✅ REMOVIDO: Ícone de validação de CPF */}
               </div>
               {errors.cpf && (
                 <p className="mt-1 text-sm text-red-500">{errors.cpf}</p>
               )}
-              {isValidCPF && (
-                <p className="mt-1 text-sm text-green-500">CPF válido e disponível para cadastro</p>
-              )}
+              {/* ✅ REMOVIDO: Mensagem "CPF válido e disponível para cadastro" */}
             </div>
 
             {/* Identidade de Gênero */}

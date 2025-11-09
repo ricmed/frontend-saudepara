@@ -468,54 +468,123 @@ class SyncService {
             dadosCompletos: paciente
           });
           
-          // ✅ VERIFICAR SE JÁ EXISTE NO SERVIDOR POR CPF (evitar duplicação)
+          // ✅ VERIFICAR SE JÁ EXISTE NO SERVIDOR (evitar duplicação)
+          // Usar estratégia inteligente de múltiplos critérios
+          let pacienteExistenteServidor = null;
+          
+          // ESTRATÉGIA 1: Buscar por CPF (se disponível)
           if (paciente.cpf) {
             try {
+              console.log(`🔍 Buscando paciente no servidor por CPF: ${paciente.cpf}`);
               const existingSearch = await PacienteService.search(paciente.cpf);
               
               if (existingSearch.data && existingSearch.data.length > 0) {
-                // ✅ VERIFICAR SE É REALMENTE O MESMO PACIENTE
+                // Verificar se é realmente o mesmo paciente (CPF + Nome)
                 const matchingPatient = existingSearch.data.find((p: any) => 
                   p.cpf === paciente.cpf && 
                   p.nome.toLowerCase().trim() === paciente.nome.toLowerCase().trim()
                 );
                 
-                if (matchingPatient && matchingPatient.idpaciente) {
-  console.log(`✅ Paciente ${paciente.nome} já existe no servidor (ID: ${matchingPatient.idpaciente})`);
-  console.log(`🔍 DEBUG - Dados do servidor:`, {
-    gestante: matchingPatient.gestante,
-    nome: matchingPatient.nome
-  });
-  console.log(`🔍 DEBUG - Dados locais:`, {
-    gestante: paciente.gestante,
-    nome: paciente.nome
-  });
-  
-  // ✅ ATUALIZAR DADOS LOCAIS COM DADOS DO SERVIDOR (para consistência)
-  const updatedPaciente = {
-    ...paciente,
-    ...matchingPatient, // Sobrescrever com dados do servidor
-    idpaciente: paciente.idpaciente, // Manter ID local para referência
-    serverIdpaciente: matchingPatient.idpaciente,
-    synced: 'true',
-    syncedAt: Date.now()
-  };
-  
-  // ✅ USAR savePaciente que já existe para atualizar
-  await indexedDBService.savePaciente(updatedPaciente);
-  
-  // ✅ USAR ID DO SERVIDOR E MARCAR COMO SINCRONIZADO
-  pacienteIdMapping.set(paciente.idpaciente, matchingPatient.idpaciente);
-  // 🔧 CORREÇÃO: Passar também o ID do servidor
-  await indexedDBService.markPacienteAsSynced(paciente.idpaciente, matchingPatient.idpaciente);
-  syncedCount++;
-  
-  continue; // Não criar novo, usar existente
-}
+                if (matchingPatient) {
+                  pacienteExistenteServidor = matchingPatient;
+                  console.log(`✅ Paciente encontrado no servidor por CPF (ID: ${matchingPatient.idpaciente})`);
+                }
               }
             } catch (searchError) {
-              console.warn('⚠️ Erro ao verificar duplicação, continuando com criação:', searchError);
+              console.warn('⚠️ Erro ao buscar por CPF, tentando outros métodos...');
             }
+          }
+          
+          // ESTRATÉGIA 2: Buscar por Nome + Data de Nascimento (se não encontrou por CPF)
+          if (!pacienteExistenteServidor && paciente.nome && paciente.data_nascimento) {
+            try {
+              console.log(`🔍 Buscando paciente no servidor por Nome + Data de Nascimento`);
+              const existingSearch = await PacienteService.search(paciente.nome);
+              
+              if (existingSearch.data && existingSearch.data.length > 0) {
+                // ✅ FILTRAR: Nome EXATO + Data de nascimento
+                const nomeNormalizado = paciente.nome.toUpperCase().trim();
+                const matchingPatient = existingSearch.data.find((p: any) => {
+                  if (!p.data_nascimento) return false;
+                  const nomeMatch = p.nome.toUpperCase().trim() === nomeNormalizado;
+                  const dataPaciente = new Date(p.data_nascimento).toISOString().split('T')[0];
+                  const dataLocal = new Date(paciente.data_nascimento).toISOString().split('T')[0];
+                  const dataMatch = dataPaciente === dataLocal;
+                  return nomeMatch && dataMatch;
+                });
+                
+                if (matchingPatient) {
+                  pacienteExistenteServidor = matchingPatient;
+                  console.log(`✅ Paciente encontrado no servidor por Nome + Data (ID: ${matchingPatient.idpaciente})`);
+                }
+              }
+            } catch (searchError) {
+              console.warn('⚠️ Erro ao buscar por nome e data...');
+            }
+          }
+          
+          // ESTRATÉGIA 3: Buscar por Nome + Nome da Mãe (se ainda não encontrou)
+          if (!pacienteExistenteServidor && paciente.nome && paciente.nome_mae && paciente.nome_mae.length > 5) {
+            try {
+              console.log(`🔍 Buscando paciente no servidor por Nome + Nome da Mãe`);
+              const existingSearch = await PacienteService.search(paciente.nome);
+              
+              if (existingSearch.data && existingSearch.data.length > 0) {
+                // ✅ FILTRAR: Nome EXATO + Nome da mãe EXATO
+                const nomeNormalizado = paciente.nome.toUpperCase().trim();
+                const nomeMaeNormalizado = paciente.nome_mae.toUpperCase().trim();
+                const matchingPatient = existingSearch.data.find((p: any) => {
+                  if (!p.nome_mae) return false;
+                  const nomeMatch = p.nome.toUpperCase().trim() === nomeNormalizado;
+                  const nomeMaeServidor = p.nome_mae.toUpperCase().trim();
+                  const maeMatch = nomeMaeServidor === nomeMaeNormalizado;
+                  return nomeMatch && maeMatch;
+                });
+                
+                if (matchingPatient) {
+                  pacienteExistenteServidor = matchingPatient;
+                  console.log(`✅ Paciente encontrado no servidor por Nome + Mãe (ID: ${matchingPatient.idpaciente})`);
+                }
+              }
+            } catch (searchError) {
+              console.warn('⚠️ Erro ao buscar por nome e mãe...');
+            }
+          }
+          
+          // Se encontrou paciente existente no servidor, usar ele
+          if (pacienteExistenteServidor) {
+            console.log(`✅ Paciente ${paciente.nome} já existe no servidor (ID: ${pacienteExistenteServidor.idpaciente})`);
+            console.log(`🔍 DEBUG - Dados do servidor:`, {
+              gestante: pacienteExistenteServidor.gestante,
+              nome: pacienteExistenteServidor.nome
+            });
+            console.log(`🔍 DEBUG - Dados locais:`, {
+              gestante: paciente.gestante,
+              nome: paciente.nome
+            });
+            
+            // ✅ ATUALIZAR DADOS LOCAIS COM DADOS DO SERVIDOR (para consistência)
+            const updatedPaciente = {
+              ...paciente,
+              ...pacienteExistenteServidor, // Sobrescrever com dados do servidor
+              idpaciente: paciente.idpaciente, // Manter ID local para referência
+              serverIdpaciente: pacienteExistenteServidor.idpaciente,
+              synced: 'true',
+              syncedAt: Date.now()
+            };
+            
+            // ✅ USAR savePaciente que já existe para atualizar
+            await indexedDBService.savePaciente(updatedPaciente);
+            
+            // ✅ USAR ID DO SERVIDOR E MARCAR COMO SINCRONIZADO
+            if (pacienteExistenteServidor.idpaciente) {
+              pacienteIdMapping.set(paciente.idpaciente, pacienteExistenteServidor.idpaciente);
+              // 🔧 CORREÇÃO: Passar também o ID do servidor
+              await indexedDBService.markPacienteAsSynced(paciente.idpaciente, pacienteExistenteServidor.idpaciente);
+              syncedCount++;
+            }
+            
+            continue; // Não criar novo, usar existente
           }
           
           // ✅ CRIAR PACIENTE NO SERVIDOR (apenas se não existir)
@@ -652,6 +721,11 @@ class SyncService {
           
           const pacienteIdAtual = formDataAtualizada.pacienteId || formDataAtualizada.paciente_idpaciente;
           
+          console.log(`📊 [DEBUG PACIENTE] Estado antes do mapeamento:`);
+          console.log(`  - pacienteIdAtual: ${pacienteIdAtual} (tipo: ${typeof pacienteIdAtual})`);
+          console.log(`  - pacienteIdMapping tem ${pacienteIdMapping.size} entradas`);
+          console.log(`  - Mapeamento contém este ID? ${pacienteIdMapping.has(pacienteIdAtual)}`);
+          
           // ✅ ATUALIZAR REFERÊNCIA DE PACIENTE SE NECESSÁRIO
           if (pacienteIdAtual && typeof pacienteIdAtual === 'number' && pacienteIdMapping.has(pacienteIdAtual)) {
             const novoIdPaciente = pacienteIdMapping.get(pacienteIdAtual)!;
@@ -659,7 +733,14 @@ class SyncService {
             
             formDataAtualizada.pacienteId = novoIdPaciente;
             formDataAtualizada.paciente_idpaciente = novoIdPaciente;
+          } else if (pacienteIdAtual) {
+            console.log(`⚠️ ID ${pacienteIdAtual} NÃO está no mapeamento`);
+            console.log(`   Entradas do mapeamento:`, Array.from(pacienteIdMapping.entries()));
           }
+          
+          console.log(`📊 [DEBUG PACIENTE] Estado APÓS mapeamento:`);
+          console.log(`  - pacienteId: ${formDataAtualizada.pacienteId}`);
+          console.log(`  - paciente_idpaciente: ${formDataAtualizada.paciente_idpaciente}`);
           
           // ✅ NOVO: Atualizar referência de estabelecimento se necessário
           const estabelecimentoIdAtual = formDataAtualizada.estabelecimentoId || formDataAtualizada.estabelecimento_id;
@@ -673,28 +754,56 @@ class SyncService {
           
           // ✅ VERIFICAR ID VÁLIDO
           const pacienteIdFinal = formDataAtualizada.pacienteId || formDataAtualizada.paciente_idpaciente;
-          if (!pacienteIdFinal || pacienteIdFinal < 0) {
+          
+          console.log(`\n🔍 [VALIDAÇÃO ID] Verificando ID do paciente:`);
+          console.log(`  - pacienteIdFinal: ${pacienteIdFinal} (tipo: ${typeof pacienteIdFinal})`);
+          console.log(`  - É nulo/undefined? ${!pacienteIdFinal}`);
+          console.log(`  - É negativo? ${pacienteIdFinal < 0}`);
+          console.log(`  - É string cache? ${typeof pacienteIdFinal === 'string' && pacienteIdFinal.startsWith('cache_')}`);
+          
+          // ✅ NOVO: Verificar se é ID de cache (string) e buscar ID real
+          const isInvalidId = !pacienteIdFinal || 
+                              pacienteIdFinal < 0 || 
+                              (typeof pacienteIdFinal === 'string' && pacienteIdFinal.startsWith('cache_'));
+          
+          console.log(`  - ID considerado inválido? ${isInvalidId}\n`);
+          
+          if (isInvalidId) {
+            console.log(`⚠️ ID de paciente inválido (${pacienteIdFinal}), buscando no servidor...`);
+            console.log(`   Nome do paciente: "${formDataAtualizada.paciente}"`);
+            
             // ✅ BUSCAR PACIENTE PELO NOME SE NECESSÁRIO
             if (formDataAtualizada.paciente) {
               const pacientesEncontrados = await PacienteService.search(formDataAtualizada.paciente);
+              console.log(`   Pacientes encontrados no servidor: ${pacientesEncontrados.data?.length || 0}`);
               
               if (pacientesEncontrados.data && pacientesEncontrados.data.length > 0) {
-                const pacienteEncontrado = pacientesEncontrados.data.find((p: any) => 
-                  p.nome.toUpperCase().trim() === formDataAtualizada.paciente.toUpperCase().trim()
-                );
+                console.log(`   Buscando match exato para: "${formDataAtualizada.paciente.toUpperCase().trim()}"`);
+                
+                const pacienteEncontrado = pacientesEncontrados.data.find((p: any) => {
+                  const match = p.nome.toUpperCase().trim() === formDataAtualizada.paciente.toUpperCase().trim();
+                  console.log(`     ${match ? '✅' : '❌'} ${p.nome} (ID: ${p.idpaciente})`);
+                  return match;
+                });
                 
                 if (pacienteEncontrado) {
+                  console.log(`✅ Paciente encontrado no servidor: ${pacienteEncontrado.nome} (ID: ${pacienteEncontrado.idpaciente})`);
                   formDataAtualizada.pacienteId = pacienteEncontrado.idpaciente;
                   formDataAtualizada.paciente_idpaciente = pacienteEncontrado.idpaciente;
                 } else {
+                  console.error(`❌ ERRO: Paciente "${formDataAtualizada.paciente}" não encontrado com match exato`);
                   throw new Error(`Paciente "${formDataAtualizada.paciente}" não encontrado`);
                 }
               } else {
+                console.error(`❌ ERRO: Nenhum paciente retornado pela busca`);
                 throw new Error(`Nenhum paciente encontrado para "${formDataAtualizada.paciente}"`);
               }
             } else {
+              console.error(`❌ ERRO: Notificação sem nome de paciente`);
               throw new Error('Notificação sem referência válida de paciente');
             }
+          } else {
+            console.log(`✅ ID do paciente é válido: ${pacienteIdFinal}`);
           }
           
           // ✅ DEBUG ESPECÍFICO: Log dos campos de trauma antes da sincronização

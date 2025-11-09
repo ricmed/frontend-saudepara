@@ -1399,47 +1399,158 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     // Create patient automatically if name exists without ID
     if (formData.paciente.trim() && !formData.pacienteId) {
       try {
-        toast.info("Criando novo paciente automaticamente...");
-        console.log("Criando novo paciente com dados:", {
-          nome: formData.paciente,
-          nomeMae: formData.nomeMae,
-          dataNascimento: formData.dataNascimento,
-          cpf: formData.cpf
-        });        // ✅ USAR SISTEMA OFFLINE
-        const novoPaciente: any = {
-          nome: formData.paciente.toUpperCase(),
-          nome_mae: formData.nomeMae?.toUpperCase() || "",
-          data_nascimento: formData.dataNascimento || null,
-          cpf: formData.cpf || "",
-          contato: formData.contatoTelefonico || "",
-          ddi: formData.ddi || "55",
-          gestante: formData.gestante || null, // ✅ ADICIONADO: Incluir campo gestante
-          tipo_genero_idtipo_genero: formData.identidadeGenero ? parseInt(formData.identidadeGenero) : null,
-          tipo_raca_idtipo_raca: formData.raca ? parseInt(formData.raca) : null,
-          escolaridade_idescolaridade: formData.escolaridade ? parseInt(formData.escolaridade) : null,
-          cbo_idcbo: formData.profissao ? parseInt(formData.profissao) : null
-        };
+        // ✅ NOVO: Verificar se já existe paciente similar
+        // Usa múltiplos campos para identificar paciente (não apenas CPF)
+        let pacienteExistente = null;
         
-        // ✅ CORREÇÃO: SEMPRE enviar idade em meses quando não há data de nascimento
-        if ((!formData.dataNascimento || formData.dataNascimento.trim() === '') && formData.idadeMeses) {
-          novoPaciente.idade = parseInt(formData.idadeMeses); // Envia o total de meses
-        } else {
-          novoPaciente.idade = null;
+        console.log("🔍 Buscando paciente existente com critérios...");
+        
+        // ESTRATÉGIA 1: Buscar por CPF (se disponível e válido)
+        if (formData.cpf && formData.cpf.length === 11) {
+          console.log("🔍 Tentativa 1: Buscando por CPF:", formData.cpf);
+          try {
+            const pacientesPorCpf = await searchPatientsOfflineSafe(formData.cpf);
+            console.log(`📊 Resultado busca CPF:`, pacientesPorCpf);
+            if (pacientesPorCpf && pacientesPorCpf.length > 0) {
+              pacienteExistente = pacientesPorCpf[0];
+              console.log("✅ Paciente encontrado por CPF:", {
+                id: pacienteExistente.idpaciente,
+                nome: pacienteExistente.nome,
+                source: pacienteExistente.source
+              });
+            }
+          } catch (error) {
+            console.log("⚠️ Erro ao buscar por CPF, tentando outros métodos...");
+          }
         }
         
-        // ✅ DEBUG: Log para verificar se gestante e idade estão incluídos
-        console.log('🔍 DEBUG - Criando paciente com gestante e idade:', {
-          gestante: formData.gestante,
-          gestante_novoPaciente: novoPaciente.gestante,
-          idade_formData: formData.idadeMeses,
-          idade_novoPaciente: novoPaciente.idade,
-          dataNascimento: formData.dataNascimento
-        });
+        // ESTRATÉGIA 2: Buscar por Nome + Data de Nascimento (se não encontrou por CPF)
+        if (!pacienteExistente && formData.paciente && formData.dataNascimento) {
+          console.log("🔍 Tentativa 2: Buscando por Nome + Data de Nascimento");
+          console.log(`  Nome procurado: "${formData.paciente}"`);
+          console.log(`  Data procurada: "${formData.dataNascimento}"`);
+          try {
+            const pacientesPorNome = await searchPatientsOfflineSafe(formData.paciente);
+            console.log(`📊 Resultado busca Nome (total: ${pacientesPorNome?.length || 0}):`, pacientesPorNome);
+            
+            if (pacientesPorNome && pacientesPorNome.length > 0) {
+              // ✅ FILTRAR: Nome EXATO + Data de nascimento
+              const nomeNormalizado = formData.paciente.toUpperCase().trim();
+              console.log(`  Filtrando por nome exato: "${nomeNormalizado}"`);
+              
+              const pacienteMesmaData = pacientesPorNome.find((p: any) => {
+                if (!p.data_nascimento) {
+                  console.log(`    ❌ ${p.nome} - sem data de nascimento`);
+                  return false;
+                }
+                const nomeMatch = p.nome.toUpperCase().trim() === nomeNormalizado;
+                const dataPaciente = new Date(p.data_nascimento).toISOString().split('T')[0];
+                const dataMatch = dataPaciente === formData.dataNascimento;
+                
+                console.log(`    ${nomeMatch && dataMatch ? '✅' : '❌'} ${p.nome} (ID: ${p.idpaciente})`);
+                console.log(`       Nome: "${p.nome.toUpperCase().trim()}" === "${nomeNormalizado}" ? ${nomeMatch}`);
+                console.log(`       Data: ${dataPaciente} === ${formData.dataNascimento} ? ${dataMatch}`);
+                
+                return nomeMatch && dataMatch;
+              });
+              
+              if (pacienteMesmaData) {
+                pacienteExistente = pacienteMesmaData;
+                console.log("✅ Paciente encontrado por Nome + Data de Nascimento:", {
+                  id: pacienteExistente.idpaciente,
+                  nome: pacienteExistente.nome,
+                  source: pacienteExistente.source
+                });
+              } else {
+                console.log("❌ Nenhum paciente com nome E data correspondentes");
+              }
+            }
+          } catch (error) {
+            console.log("⚠️ Erro ao buscar por nome e data...");
+          }
+        }
+        
+        // ESTRATÉGIA 3: Buscar por Nome + Nome da Mãe (se não encontrou ainda)
+        if (!pacienteExistente && formData.paciente && formData.nomeMae && formData.nomeMae.length > 5) {
+          console.log("🔍 Tentativa 3: Buscando por Nome + Nome da Mãe");
+          try {
+            const pacientesPorNome = await searchPatientsOfflineSafe(formData.paciente);
+            
+            if (pacientesPorNome && pacientesPorNome.length > 0) {
+              // ✅ FILTRAR: Nome EXATO + Nome da mãe EXATO
+              const nomeNormalizado = formData.paciente.toUpperCase().trim();
+              const nomeMaeNormalizado = formData.nomeMae.toUpperCase().trim();
+              const pacienteMesmaMae = pacientesPorNome.find((p: any) => {
+                if (!p.nome_mae) return false;
+                const nomeMatch = p.nome.toUpperCase().trim() === nomeNormalizado;
+                const nomeMaePaciente = p.nome_mae.toUpperCase().trim();
+                const maeMatch = nomeMaePaciente === nomeMaeNormalizado;
+                return nomeMatch && maeMatch;
+              });
+              
+              if (pacienteMesmaMae) {
+                pacienteExistente = pacienteMesmaMae;
+                console.log("✅ Paciente encontrado por Nome + Nome da Mãe:", pacienteExistente.idpaciente);
+              }
+            }
+          } catch (error) {
+            console.log("⚠️ Erro ao buscar por nome e mãe...");
+          }
+        }
+        
+        // Se encontrou paciente existente, usar ele
+        if (pacienteExistente) {
+          formData.pacienteId = pacienteExistente.idpaciente;
+          console.log("✅ Paciente existente encontrado! ID:", pacienteExistente.idpaciente);
+          toast.success(`Paciente ${pacienteExistente.nome} encontrado e associado à notificação`);
+        } 
+        // Se não encontrou, criar novo paciente
+        else {
+          console.log("⚠️ Nenhum paciente similar encontrado, criando novo...");
+          
+          toast.info("Criando novo paciente automaticamente...");
+          console.log("Criando novo paciente com dados:", {
+            nome: formData.paciente,
+            nomeMae: formData.nomeMae,
+            dataNascimento: formData.dataNascimento,
+            cpf: formData.cpf
+          });        
+          
+          // ✅ USAR SISTEMA OFFLINE
+          const novoPaciente: any = {
+            nome: formData.paciente.toUpperCase(),
+            nome_mae: formData.nomeMae?.toUpperCase() || "",
+            data_nascimento: formData.dataNascimento || null,
+            cpf: formData.cpf || "",
+            contato: formData.contatoTelefonico || "",
+            ddi: formData.ddi || "55",
+            gestante: formData.gestante || null,
+            tipo_genero_idtipo_genero: formData.identidadeGenero ? parseInt(formData.identidadeGenero) : null,
+            tipo_raca_idtipo_raca: formData.raca ? parseInt(formData.raca) : null,
+            escolaridade_idescolaridade: formData.escolaridade ? parseInt(formData.escolaridade) : null,
+            cbo_idcbo: formData.profissao ? parseInt(formData.profissao) : null
+          };
+          
+          // ✅ CORREÇÃO: SEMPRE enviar idade em meses quando não há data de nascimento
+          if ((!formData.dataNascimento || formData.dataNascimento.trim() === '') && formData.idadeMeses) {
+            novoPaciente.idade = parseInt(formData.idadeMeses);
+          } else {
+            novoPaciente.idade = null;
+          }
+          
+          console.log('🔍 DEBUG - Criando paciente com gestante e idade:', {
+            gestante: formData.gestante,
+            gestante_novoPaciente: novoPaciente.gestante,
+            idade_formData: formData.idadeMeses,
+            idade_novoPaciente: novoPaciente.idade,
+            dataNascimento: formData.dataNascimento
+          });
 
-        const pacienteCriado = await savePatientOfflineSafe(novoPaciente);
-        formData.pacienteId = pacienteCriado.idpaciente;
+          const pacienteCriado = await savePatientOfflineSafe(novoPaciente);
+          formData.pacienteId = pacienteCriado.idpaciente;
 
-        console.log("Paciente criado automaticamente com ID:", pacienteCriado.idpaciente);
+          console.log("Paciente criado automaticamente com ID:", pacienteCriado.idpaciente);
+        }
       } catch (error: any) {
         console.error("Erro ao criar paciente automaticamente:", error);
 
@@ -2250,8 +2361,8 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       paciente: value,
     }));
 
-    // Buscar pacientes usando debounce
-    searchPacientes(value);
+    // ✅ REMOVIDO: Busca automática de pacientes (conforme solicitação)
+    // searchPacientes(value);
   };
 
   // Handler para seleção de paciente das sugestões

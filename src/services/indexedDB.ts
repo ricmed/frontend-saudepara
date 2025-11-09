@@ -49,7 +49,9 @@ interface NotificacaoDatabase extends DBSchema {
     key: string; // CPF como chave
     value: {
       cpf: string;
+      idpaciente: number; // ✅ ID do servidor
       nome: string;
+      nome_mae?: string; // ✅ Adicionar nome da mãe
       data_nascimento?: string;
       timestamp: number;
       source: 'download' | 'api'; // Origem dos dados
@@ -456,7 +458,9 @@ export class IndexedDBService {
         if (paciente.cpf) {
           const cacheEntry = {
             cpf: paciente.cpf.replace(/\D/g, ''), // Limpar formatação
+            idpaciente: paciente.idpaciente, // ✅ SALVAR ID DO SERVIDOR
             nome: paciente.nome?.toUpperCase() || '',
+            nome_mae: paciente.nome_mae?.toUpperCase() || '', // ✅ ADICIONAR NOME DA MÃE
             data_nascimento: paciente.data_nascimento,
             timestamp: Date.now(),
             source: 'download' as const
@@ -634,47 +638,121 @@ export class IndexedDBService {
   async searchPacientesExtended(query: string): Promise<any[]> {
     await this.init();
     
-    const searchTerm = query.toLowerCase();
-    const results: any[] = [];
+    const searchTerm = query.toLowerCase().trim();
+    const exactMatches: any[] = [];
+    const partialMatches: any[] = [];
+    
+    console.log(`\n🔍 ===== BUSCA DE PACIENTE =====`);
+    console.log(`Query original: "${query}"`);
+    console.log(`Search term normalizado: "${searchTerm}"`);
     
     try {
       // ✅ 1. Buscar no cache de verificação
       const allCacheEntries = await this.db!.getAll('pacientes_cache');
-      const cacheResults = allCacheEntries.filter(entry => 
-        entry.nome.toLowerCase().includes(searchTerm) ||
-        entry.cpf.includes(query)
-      );
+      console.log(`📦 Total pacientes no cache: ${allCacheEntries.length}`);
       
-      // Converter para formato compatível
-      cacheResults.forEach(entry => {
-        results.push({
-          idpaciente: `cache_${entry.cpf}`, // ID único para cache
-          nome: entry.nome,
-          cpf: entry.cpf,
-          data_nascimento: entry.data_nascimento,
-          source: 'cache' // Indicar origem
-        });
+      allCacheEntries.forEach(entry => {
+        const nomeNormalizado = entry.nome.toLowerCase().trim();
+        const cpfLimpo = entry.cpf.replace(/\D/g, '');
+        const queryLimpo = query.replace(/\D/g, '');
+        
+        // Match EXATO por CPF (prioridade máxima)
+        if (cpfLimpo && queryLimpo && cpfLimpo === queryLimpo) {
+          console.log(`✅ MATCH EXATO CPF: ${entry.nome} (ID: ${entry.idpaciente})`);
+          exactMatches.push({
+            idpaciente: entry.idpaciente || `cache_${entry.cpf}`,
+            nome: entry.nome,
+            cpf: entry.cpf,
+            data_nascimento: entry.data_nascimento,
+            nome_mae: entry.nome_mae,
+            source: 'cache',
+            matchType: 'cpf_exact'
+          });
+        }
+        // Match EXATO por nome (prioridade alta)
+        else if (nomeNormalizado === searchTerm) {
+          console.log(`✅ MATCH EXATO NOME: ${entry.nome} (ID: ${entry.idpaciente})`);
+          exactMatches.push({
+            idpaciente: entry.idpaciente || `cache_${entry.cpf}`,
+            nome: entry.nome,
+            cpf: entry.cpf,
+            data_nascimento: entry.data_nascimento,
+            nome_mae: entry.nome_mae,
+            source: 'cache',
+            matchType: 'nome_exact'
+          });
+        }
+        // Match PARCIAL (apenas se termo tem 3+ caracteres)
+        else if (searchTerm.length >= 3 && nomeNormalizado.includes(searchTerm)) {
+          console.log(`⚠️ MATCH PARCIAL: ${entry.nome} (ID: ${entry.idpaciente}) - contém "${searchTerm}"`);
+          partialMatches.push({
+            idpaciente: entry.idpaciente || `cache_${entry.cpf}`,
+            nome: entry.nome,
+            cpf: entry.cpf,
+            data_nascimento: entry.data_nascimento,
+            nome_mae: entry.nome_mae,
+            source: 'cache',
+            matchType: 'nome_partial'
+          });
+        }
       });
       
       // ✅ 2. Buscar em pacientes locais
       const allPacientes = await this.db!.getAll('pacientes');
-      const localResults = allPacientes.filter(paciente => 
-        (paciente.nome && paciente.nome.toLowerCase().includes(searchTerm)) ||
-        (paciente.cpf && paciente.cpf.includes(query)) ||
-        (paciente.nome_mae && paciente.nome_mae.toLowerCase().includes(searchTerm))
-      );
+      console.log(`📦 Total pacientes locais: ${allPacientes.length}`);
       
-      // Adicionar pacientes locais
-      localResults.forEach(paciente => {
-        results.push({
-          ...paciente,
-          source: paciente.source || 'local'
-        });
+      allPacientes.forEach(paciente => {
+        const nomeNormalizado = paciente.nome?.toLowerCase().trim() || '';
+        const cpfLimpo = paciente.cpf?.replace(/\D/g, '') || '';
+        const queryLimpo = query.replace(/\D/g, '');
+        
+        // Match EXATO por CPF
+        if (cpfLimpo && queryLimpo && cpfLimpo === queryLimpo) {
+          console.log(`✅ MATCH EXATO CPF (LOCAL): ${paciente.nome} (ID: ${paciente.idpaciente})`);
+          exactMatches.push({
+            ...paciente,
+            source: paciente.source || 'local',
+            matchType: 'cpf_exact'
+          });
+        }
+        // Match EXATO por nome
+        else if (nomeNormalizado === searchTerm) {
+          console.log(`✅ MATCH EXATO NOME (LOCAL): ${paciente.nome} (ID: ${paciente.idpaciente})`);
+          exactMatches.push({
+            ...paciente,
+            source: paciente.source || 'local',
+            matchType: 'nome_exact'
+          });
+        }
+        // Match PARCIAL
+        else if (searchTerm.length >= 3 && nomeNormalizado.includes(searchTerm)) {
+          console.log(`⚠️ MATCH PARCIAL (LOCAL): ${paciente.nome} (ID: ${paciente.idpaciente})`);
+          partialMatches.push({
+            ...paciente,
+            source: paciente.source || 'local',
+            matchType: 'nome_partial'
+          });
+        }
       });
       
-      console.log(`🔍 Busca '${query}': ${cacheResults.length} no cache, ${localResults.length} locais`);
+      // ✅ PRIORIZAR: Exatos primeiro, parciais depois
+      const finalResults = [...exactMatches, ...partialMatches];
       
-      return results;
+      console.log(`\n� RESULTADO DA BUSCA:`);
+      console.log(`  - Matches exatos: ${exactMatches.length}`);
+      console.log(`  - Matches parciais: ${partialMatches.length}`);
+      console.log(`  - Total retornado: ${finalResults.length}`);
+      
+      if (finalResults.length > 0) {
+        console.log(`\n📋 Pacientes encontrados (em ordem):`);
+        finalResults.forEach((p, idx) => {
+          console.log(`  ${idx + 1}. ${p.nome} (ID: ${p.idpaciente}) - ${p.matchType} - ${p.source}`);
+        });
+      }
+      
+      console.log(`===== FIM BUSCA =====\n`);
+      
+      return finalResults;
       
     } catch (error) {
       console.error('❌ Erro na busca estendida:', error);
@@ -996,7 +1074,7 @@ export class IndexedDBService {
       let kept = 0;
       
       // Para cada grupo, manter apenas a PRIMEIRA CRIADA (mais antiga)
-      for (const [chave, grupo] of grupos.entries()) {
+      for (const grupo of grupos.values()) {
         if (grupo.length > 1) {
           console.log(`🔍 Grupo com ${grupo.length} duplicatas encontrado`);
           

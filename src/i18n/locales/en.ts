@@ -67,6 +67,7 @@ export const en: TranslationRecord = {
   "menu.offline_management": "Offline Data",
   "menu.educational": "Educational Materials",
   "menu.apps": "Auxiliary Apps",
+  "menu.patients_list": "Patients List", // ✅ NOVO
   "menu.security": "Security",
   "menu.version": "Version",
   "menu.bug": "Report a Bug",

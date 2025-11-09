@@ -243,7 +243,6 @@ function App() {
             {/* Rotas de Pacientes e Notificações - Protegidas para Notificador */}
             <Route element={<ProtectedRoute requiredRoles={['notificador']} requiredGroups={['/grupo_notificador']}><Outlet /></ProtectedRoute>}>
             {/* Rotas Filhas Protegidas de Pacientes e Notificações - Protegidas para Notificador */}
-              <Route path="/private/pacientes" element={<ListaPacientes />} />
               <Route path="/private/pacientes/nova" element={<FormularioPaciente />} />
               <Route path="/private/pacientes/editar/:id" element={<FormularioPaciente />} />
               {/* Rota temporariamente desabilitada - módulo será usado no futuro */}
@@ -251,6 +250,11 @@ function App() {
               <Route path="/private/comunicacao-de-caso" element={<ListaNotificacoes />} />
               <Route path="/private/comunicacao-de-caso/nova" element={<NotificationForm />} />
               <Route path="/private/comunicacao-de-caso/editar/:id" element={<NotificationForm />} />
+            </Route>
+            
+            {/* ✅ NOVO: Rota de Lista de Pacientes - Protegida apenas para Admin Master */}
+            <Route element={<ProtectedRoute requiredRoles={['admin']}><Outlet /></ProtectedRoute>}>
+              <Route path="/private/pacientes" element={<ListaPacientes />} />
             </Route>
           </Route>
           <Route path="/perfil" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />

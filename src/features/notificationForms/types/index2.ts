@@ -201,7 +201,7 @@ export const detectUserTimezone = (): { timezone_name: string; timezone_offset_m
     const now = new Date();
     const timezone_offset_minutos = -now.getTimezoneOffset(); // Inverter sinal para padrão UTC
     
-    console.log(`🌍 Timezone detectado: ${timezone_name} (${timezone_offset_minutos} min)`);
+    // console.log(`🌍 Timezone detectado: ${timezone_name} (${timezone_offset_minutos} min)`);
     
     return {
       timezone_name,
