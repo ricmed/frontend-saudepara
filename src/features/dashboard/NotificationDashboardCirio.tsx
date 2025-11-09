@@ -2859,8 +2859,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   const FichasModal = useMemo(() => {
     if (!showFichasModal) return null;
 
-    // Obter os dados filtrados atuais
-    const fichasFiltradas = filteredNotificacoes.current;
+    // Obter os dados filtrados atuais e ordenar por data de criação (mais recentes primeiro)
+    const fichasFiltradas = [...filteredNotificacoes.current].sort((a: any, b: any) => {
+      const dateA = new Date((a.original || a).data_notificacao || 0).getTime();
+      const dateB = new Date((b.original || b).data_notificacao || 0).getTime();
+      return dateB - dateA; // Ordem decrescente (mais recentes primeiro)
+    });
     
     // Filtrar fichas baseado no termo de pesquisa
     const fichasPesquisadas = fichasFiltradas.filter((notificacao: any) => {
@@ -2918,31 +2922,20 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       return item ? item[descField] : 'N/A';
     };
 
-    // 🆕 Função para formatar idade corretamente (considera meses e anos)
+    // 🆕 Função para formatar idade corretamente (idade vem em MESES do banco)
     const formatIdade = (idade: number | null | undefined): string => {
       if (!idade || isNaN(Number(idade))) return 'N/A';
       
-      const idadeNum = Number(idade);
+      const idadeMeses = Number(idade);
       
-      // Se a idade for maior que 120, provavelmente está em meses - converter para anos
-      if (idadeNum > 120) {
-        const anos = Math.floor(idadeNum / 12);
-        return `${anos} ${anos === 1 ? 'ano' : 'anos'}`;
+      // Se for menor que 12 meses, mostrar em meses
+      if (idadeMeses < 12) {
+        return `${idadeMeses} ${idadeMeses === 1 ? 'mês' : 'meses'}`;
       }
       
-      // Se for menor que 12, é um bebê - mostrar em meses
-      if (idadeNum < 12) {
-        return `${idadeNum} ${idadeNum === 1 ? 'mês' : 'meses'}`;
-      }
-      
-      // Se for entre 12 e 24, converter para anos
-      if (idadeNum >= 12 && idadeNum <= 24) {
-        const anos = Math.floor(idadeNum / 12);
-        return `${anos} ${anos === 1 ? 'ano' : 'anos'}`;
-      }
-      
-      // Se for maior que 24, assumir que já é em anos
-      return `${idadeNum} ${idadeNum === 1 ? 'ano' : 'anos'}`;
+      // Se for 12 meses ou mais, converter para anos
+      const anos = Math.floor(idadeMeses / 12);
+      return `${anos} ${anos === 1 ? 'ano' : 'anos'}`;
     };
 
     // 🆕 Função para navegar para a ficha
