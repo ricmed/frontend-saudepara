@@ -22,6 +22,11 @@ const FormField: React.FC<FormFieldProps> = ({
     disabled ? 'bg-gray-100 cursor-not-allowed' : ''
   } ${className}`;
 
+  // Calcular caracteres restantes para textarea com maxLength
+  const currentLength = value?.toString().length || 0;
+  const isNearLimit = maxLength && currentLength > maxLength * 0.8;
+  const isAtLimit = maxLength && currentLength >= maxLength;
+
   return (
     <div>
       <label htmlFor={name} className="block mb-2 font-medium text-gray-700">
@@ -46,18 +51,32 @@ const FormField: React.FC<FormFieldProps> = ({
           ))}
         </select>
       ) : type === 'textarea' ? (
-        <textarea
-          id={name}
-          name={name}
-          value={value}
-          onChange={onChange}
-          placeholder={placeholder}
-          className={baseClasses}
-          disabled={disabled}
-          data-error={error ? 'true' : 'false'}
-          rows={3}
-          maxLength={maxLength}
-        />
+        <>
+          <textarea
+            id={name}
+            name={name}
+            value={value}
+            onChange={onChange}
+            placeholder={placeholder}
+            className={baseClasses}
+            disabled={disabled}
+            data-error={error ? 'true' : 'false'}
+            rows={3}
+            maxLength={maxLength}
+          />
+          {maxLength && (
+            <div className="flex justify-between items-center mt-1">
+              <p className={`text-xs ${
+                isAtLimit ? 'text-red-600 font-semibold' : 
+                isNearLimit ? 'text-orange-500 font-medium' : 
+                'text-gray-500'
+              }`}>
+                {currentLength} / {maxLength} caracteres
+                {isAtLimit && ' - Limite atingido'}
+              </p>
+            </div>
+          )}
+        </>
       ) : (
         <input
           id={name}

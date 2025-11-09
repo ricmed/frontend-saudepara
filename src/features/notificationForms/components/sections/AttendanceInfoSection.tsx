@@ -930,6 +930,7 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                     onChange={handleChange}
                     type="textarea"
                     placeholder="Informações adicionais sobre os sintomas..."
+                    maxLength={255}
                   />
                 </div>
               </>
@@ -964,6 +965,7 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                     onChange={handleChange}
                     type="textarea"
                     placeholder="Informações adicionais sobre o trauma..."
+                    maxLength={255}
                   />
                 </div>
               </>
@@ -980,6 +982,7 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                     onChange={handleChange}
                     type="textarea"
                     placeholder="Informações adicionais sobre o incidente..."
+                    maxLength={255}
                   />
                 </div>
               </>
@@ -1187,6 +1190,7 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                 onChange={handleChange}
                 type="textarea"
                 placeholder="Informações adicionais sobre a hipótese diagnóstica..."
+                maxLength={255}
               />
             </div>
           </div>

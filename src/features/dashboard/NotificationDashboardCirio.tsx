@@ -1007,6 +1007,28 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     return filteredData;
   }, [activeFilters, exportOptions, getAtendimentoDescById]);
 
+  // 🚨 NOVO: NOTIFICAÇÕES COM TODOS OS FILTROS APLICADOS (INCLUINDO ALERTAS)
+  // Aplica todos os filtros ativos (país, município, estabelecimento, hipótese, etc.) nas notificações filtradas por evento
+  const notificacoesComTodosFiltros = useMemo(() => {
+    console.log(`🔍 Aplicando todos os filtros ativos para alertas...`);
+    console.log(`📊 Iniciando com ${notificacoesFiltradasPorEvento.length} notificações (filtradas por evento)`);
+    console.log(`🎯 Filtros ativos:`, activeFilters);
+    
+    // Aplicar a função applyFilters que já existe e considera todos os filtros
+    const filtradas = applyFilters(notificacoesFiltradasPorEvento);
+    
+    console.log(`✅ Filtros aplicados: ${notificacoesFiltradasPorEvento.length} → ${filtradas.length} notificações`);
+    
+    // Log detalhado dos filtros aplicados
+    Object.entries(activeFilters).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) {
+        console.log(`   ✓ ${key}: ${value}`);
+      }
+    });
+    
+    return filtradas;
+  }, [notificacoesFiltradasPorEvento, activeFilters, applyFilters]);
+
   // 🆕 FUNÇÃO PARA ALTERNAR FILTRO
   const toggleFilter = useCallback((category: string, value: string) => {
     setActiveFilters(prev => {
@@ -3944,10 +3966,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       )} */}
 
       {/* Sistema de Alertas - Sempre visível */}
-      {/* 🆕 USAR NOTIFICAÇÕES FILTRADAS POR EVENTO */}
+      {/* 🆕 USAR NOTIFICAÇÕES COM TODOS OS FILTROS APLICADOS */}
       <AlertasPanel 
-        key={`alertas-${lastUpdate}-${notificacoesFiltradasPorEvento.length}`}
-        notificacoes={notificacoesFiltradasPorEvento}
+        key={`alertas-${lastUpdate}-${notificacoesComTodosFiltros.length}`}
+        notificacoes={notificacoesComTodosFiltros}
         isGlobalFilterActive={isGlobalFilterActive}
       />
 
