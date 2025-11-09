@@ -17,6 +17,7 @@ const STORAGE_KEY = 'serie_temporal_config';
 
 interface SerieTemporalConfig {
   selectedEvento: string;
+  selectedEstabelecimento: string;
   startDate: string;
   endDate: string;
   startHour: number;
@@ -29,12 +30,14 @@ interface SerieTemporalChartProps {
   notificacoes: any[];
   title?: string;
   description?: string;
+  estabelecimentoOptions?: any[];
 }
 
 const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
   notificacoes,
   title = "Série Temporal por Dia de Notificação",
-  description = "Evolução diária do número de notificações"
+  description = "Evolução diária do número de notificações",
+  estabelecimentoOptions = []
 }) => {
   // Carregar configuração salva do localStorage
   const loadSavedConfig = (): Partial<SerieTemporalConfig> | null => {
@@ -55,6 +58,9 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
   
   // Estado para o evento selecionado
   const [selectedEvento, setSelectedEvento] = useState<string>(savedConfig?.selectedEvento || "todos");
+  
+  // Estado para o estabelecimento selecionado
+  const [selectedEstabelecimento, setSelectedEstabelecimento] = useState<string>(savedConfig?.selectedEstabelecimento || "todos");
 
   // Extrair eventos únicos das notificações
   const eventosDisponiveis = useMemo(() => {
@@ -68,6 +74,26 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
     console.log('📋 Eventos disponíveis na Série Temporal:', Array.from(eventos));
     return Array.from(eventos).sort();
   }, [notificacoes]);
+
+  // Extrair estabelecimentos únicos das notificações
+  const estabelecimentosDisponiveis = useMemo(() => {
+    const estabelecimentos = new Map<string, string>();
+    notificacoes.forEach((notif: any) => {
+      const estabelecimentoId = notif?.original?.estabelecimento_idestabelecimento;
+      if (estabelecimentoId !== undefined && estabelecimentoOptions?.length > 0) {
+        const estabelecimento = estabelecimentoOptions.find(
+          (e: any) => String(e.idestabelecimento) === String(estabelecimentoId)
+        );
+        if (estabelecimento?.nome) {
+          estabelecimentos.set(String(estabelecimentoId), estabelecimento.nome);
+        }
+      }
+    });
+    console.log('🏥 Estabelecimentos disponíveis na Série Temporal:', Array.from(estabelecimentos.values()));
+    return Array.from(estabelecimentos.entries())
+      .map(([id, nome]) => ({ id, nome }))
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [notificacoes, estabelecimentoOptions]);
 
   // Calcular período completo (primeira até última notificação)
   const periodoCompleto = useMemo(() => {
@@ -122,6 +148,7 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
   useEffect(() => {
     const config: SerieTemporalConfig = {
       selectedEvento,
+      selectedEstabelecimento,
       startDate,
       endDate,
       startHour,
@@ -136,13 +163,15 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
     } catch (error) {
       console.warn('⚠️ Erro ao salvar configuração da Série Temporal:', error);
     }
-  }, [selectedEvento, startDate, endDate, startHour, startMinute, endHour, endMinute]);
+  }, [selectedEvento, selectedEstabelecimento, startDate, endDate, startHour, startMinute, endHour, endMinute]);
 
-  // Atualizar datas quando o período completo mudar
+  // Atualizar datas quando o período completo mudar APENAS se não houver configuração salva
   useEffect(() => {
-    setStartDate(periodoCompleto.inicio);
-    setEndDate(periodoCompleto.fim);
-  }, [periodoCompleto]);
+    if (!savedConfig?.startDate && !savedConfig?.endDate) {
+      setStartDate(periodoCompleto.inicio);
+      setEndDate(periodoCompleto.fim);
+    }
+  }, [periodoCompleto.inicio, periodoCompleto.fim, savedConfig?.startDate, savedConfig?.endDate]);
 
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -199,14 +228,31 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
       }
       
       // Filtro de evento
-      if (selectedEvento === "todos") {
-        return true;
+      if (selectedEvento !== "todos") {
+        const eventoNotif = notif?.tipoEvento || notif?.original?.tipo_evento?.descricao;
+        if (eventoNotif !== selectedEvento) {
+          return false;
+        }
       }
       
-      const eventoNotif = notif?.tipoEvento || notif?.original?.tipo_evento?.descricao;
-      return eventoNotif === selectedEvento;
+      // Filtro de estabelecimento
+      if (selectedEstabelecimento !== "todos") {
+        const estabelecimentoId = notif?.original?.estabelecimento_idestabelecimento;
+        if (estabelecimentoId !== undefined && estabelecimentoOptions?.length > 0) {
+          const estabelecimento = estabelecimentoOptions.find(
+            (e: any) => String(e.idestabelecimento) === String(estabelecimentoId)
+          );
+          if (estabelecimento?.nome !== selectedEstabelecimento) {
+            return false;
+          }
+        } else {
+          return false;
+        }
+      }
+      
+      return true;
     });
-  }, [notificacoes, startDate, endDate, startHour, startMinute, endHour, endMinute, selectedEvento]);
+  }, [notificacoes, startDate, endDate, startHour, startMinute, endHour, endMinute, selectedEvento, selectedEstabelecimento, estabelecimentoOptions]);
 
   // Processar dados para o gráfico
   const dadosGrafico = useMemo(() => {
@@ -299,6 +345,25 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
               {eventosDisponiveis.map((evento) => (
                 <option key={evento} value={evento}>
                   {evento}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Seletor de Estabelecimento */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              🏥 Estabelecimento
+            </label>
+            <select
+              value={selectedEstabelecimento}
+              onChange={(e) => setSelectedEstabelecimento(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+            >
+              <option value="todos">🏢 Todos os Estabelecimentos</option>
+              {estabelecimentosDisponiveis.map((estab) => (
+                <option key={estab.id} value={estab.nome}>
+                  {estab.nome}
                 </option>
               ))}
             </select>
@@ -435,6 +500,9 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
             <div className="text-gray-600 text-xs mb-1">
               <strong>Evento:</strong> {selectedEvento === "todos" ? "Todos os Eventos" : selectedEvento}
               {' '}•{' '}
+              <strong>Estabelecimento:</strong> {selectedEstabelecimento === "todos" ? "Todos os Estabelecimentos" : selectedEstabelecimento}
+            </div>
+            <div className="text-gray-600 text-xs mb-1">
               <strong>{notificacoesFiltradas.length}</strong> notificações encontradas
             </div>
             <div className="text-blue-600 text-xs mt-1">
@@ -446,8 +514,8 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
 
       {/* Gráfico */}
       <div id="serie-temporal-dia" className="h-80">
-        {dadosGrafico.length > 0 ? (
-          <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%">
+          {dadosGrafico.length > 0 ? (
             <AreaChart data={dadosGrafico} margin={{ top: 30, right: 30, left: 20, bottom: 50 }}>
               <defs>
                 <linearGradient id="colorQuantidade" x1="0" y1="0" x2="0" y2="1">
@@ -493,12 +561,21 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
                 />
               </Area>
             </AreaChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-gray-500">Nenhuma notificação encontrada no período selecionado</p>
-          </div>
-        )}
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+              <svg className="w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <p className="text-gray-500 text-lg font-medium mb-2">Nenhuma notificação encontrada</p>
+              <p className="text-gray-400 text-sm text-center max-w-md">
+                {notificacoes.length === 0 
+                  ? "Não há notificações cadastradas no sistema"
+                  : "Nenhuma notificação corresponde aos filtros selecionados. Tente ajustar o período ou os filtros acima."
+                }
+              </p>
+            </div>
+          )}
+        </ResponsiveContainer>
       </div>
     </div>
   );

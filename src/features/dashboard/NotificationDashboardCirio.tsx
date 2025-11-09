@@ -3834,6 +3834,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
               notificacoes={notificacoesParaAnalisetemporal}
               title="Série Temporal por Dia de Notificação"
               description="Evolução diária do número de notificações"
+              estabelecimentoOptions={exportOptions?.estabelecimentoOptions || []}
             />
           </div>
           

@@ -39,63 +39,56 @@ const DashboardPageCirio: React.FC = () => {
           );
         }
 
-        // Se não há eventos ativos, mostrar erro
+        // Se não há eventos ativos, ainda permite visualizar o dashboard (com dados vazios)
+        let notificacoesData: any[] = [];
+        
         if (eventosAtivos.length === 0) {
-          setError('Nenhum evento ativo encontrado. Ative pelo menos um evento para visualizar o dashboard.');
-          setLoading(false);
-          return;
-        }
+          console.warn('⚠️ Nenhum evento ativo encontrado. Dashboard será exibido sem dados.');
+          notificacoesData = []; // Dashboard vazio
+        } else {
+          const idsEventosAtivos = new Set(eventosAtivos.map((e: any) => e.idtipo_evento));
+          console.log(`📋 IDs dos eventos ativos: [${Array.from(idsEventosAtivos).join(', ')}]`);
 
-        const idsEventosAtivos = new Set(eventosAtivos.map((e: any) => e.idtipo_evento));
-        console.log(`📋 IDs dos eventos ativos: [${Array.from(idsEventosAtivos).join(', ')}]`);
+          // 🆕 PASSO 2: Buscar notificações e filtrar por eventos ativos
+          console.log("📥 Buscando notificações da API...");
+          let allNotificacoes: any[] = [];
+          let page = 1;
+          const pageSize = 100;
+          let hasMore = true;
 
-        // 🆕 PASSO 2: Buscar notificações e filtrar por eventos ativos
-        console.log("📥 Buscando notificações da API...");
-        let allNotificacoes: any[] = [];
-        let page = 1;
-        const pageSize = 100;
-        let hasMore = true;
-
-        // Buscar todas as notificações (paginado)
-        while (hasMore && allNotificacoes.length < 1000) {
-          const response = await NotificacaoService.getAll(page, pageSize);
-          if (response && response.data && response.data.length > 0) {
-            allNotificacoes = [...allNotificacoes, ...response.data];
-            console.log(`   📄 Página ${page}: ${response.data.length} notificações (Total: ${allNotificacoes.length})`);
-            
-            if (response.data.length < pageSize || allNotificacoes.length >= 1000) {
-              hasMore = false;
+          // Buscar todas as notificações (paginado)
+          while (hasMore && allNotificacoes.length < 1000) {
+            const response = await NotificacaoService.getAll(page, pageSize);
+            if (response && response.data && response.data.length > 0) {
+              allNotificacoes = [...allNotificacoes, ...response.data];
+              console.log(`   📄 Página ${page}: ${response.data.length} notificações (Total: ${allNotificacoes.length})`);
+              
+              if (response.data.length < pageSize || allNotificacoes.length >= 1000) {
+                hasMore = false;
+              } else {
+                page++;
+              }
             } else {
-              page++;
+              hasMore = false;
             }
-          } else {
-            hasMore = false;
           }
+
+          console.log(`✅ ${allNotificacoes.length} notificações baixadas da API`);
+
+          // 🆕 PASSO 3: Filtrar notificações por eventos ativos
+          console.log("🔍 Filtrando notificações por eventos ativos...");
+          const notificacoesFiltradas = allNotificacoes.filter((notificacao: any) => {
+            // Buscar idEvento em múltiplos caminhos
+            const idEvento = notificacao.original?.tipo_evento?.idtipo_evento || 
+                            notificacao.idtipo_evento || 
+                            notificacao.tipo_evento?.idtipo_evento;
+            
+            return idEvento && idsEventosAtivos.has(idEvento);
+          });
+
+          console.log(`✅ Filtro aplicado: ${allNotificacoes.length} → ${notificacoesFiltradas.length} notificações (apenas eventos ativos)`);
+          notificacoesData = notificacoesFiltradas;
         }
-
-        console.log(`✅ ${allNotificacoes.length} notificações baixadas da API`);
-
-        // 🆕 PASSO 3: Filtrar notificações por eventos ativos
-        console.log("🔍 Filtrando notificações por eventos ativos...");
-        const notificacoesFiltradas = allNotificacoes.filter((notificacao: any) => {
-          // Buscar idEvento em múltiplos caminhos
-          const idEvento = notificacao.original?.tipo_evento?.idtipo_evento || 
-                          notificacao.idtipo_evento || 
-                          notificacao.tipo_evento?.idtipo_evento;
-          
-          return idEvento && idsEventosAtivos.has(idEvento);
-        });
-
-        console.log(`✅ Filtro aplicado: ${allNotificacoes.length} → ${notificacoesFiltradas.length} notificações (apenas eventos ativos)`);
-
-        // Se nenhuma notificação passou no filtro, avisar
-        if (notificacoesFiltradas.length === 0) {
-          setError('Nenhuma notificação encontrada para os eventos ativos. Verifique se há notificações cadastradas.');
-          setLoading(false);
-          return;
-        }
-
-        const notificacoesData = notificacoesFiltradas;
 
         // 🆕 PASSO 4: Buscar todas as opções necessárias em paralelo
         console.log("📦 Carregando opções para o dashboard...");
@@ -183,9 +176,38 @@ const DashboardPageCirio: React.FC = () => {
         if (!eventosAtivos.length || !publicoOptions.length) {
           console.warn("⚠️ Algumas opções importantes estão vazias. Verifique as APIs.");
         }
+        
+        // Limpar erro se chegou até aqui
+        setError(null);
       } catch (error) {
-        console.error("Erro ao carregar dados para o dashboard:", error);
-        setError("Falha ao carregar dados. Por favor, tente novamente mais tarde.");
+        console.error("❌ Erro ao carregar dados para o dashboard:", error);
+        
+        // ✅ IMPORTANTE: Não bloquear o dashboard, apenas exibir com dados vazios
+        console.warn("⚠️ Exibindo dashboard vazio devido a erro no carregamento");
+        
+        // Garantir que o dashboard seja exibido com dados vazios
+        setNotificacoes([]);
+        setExportOptions({
+          eventoOptions: [],
+          publicoOptions: [],
+          paisOptions: [],
+          estadoOptions: [],
+          municipioOptions: [],
+          bairroOptions: [],
+          generoOptions: [],
+          racaOptions: [],
+          escolaridadeOptions: [],
+          atendimentoOptions: [],
+          sintomaOptions: [],
+          hipoteseDiagOptions: [],
+          traumaOptions: [],
+          estabelecimentoOptions: [],
+          encerramentoOptions: [],
+          cboOptions: []
+        });
+        
+        // Não setar erro para não bloquear a UI
+        // setError("Falha ao carregar dados. Por favor, tente novamente mais tarde.");
       } finally {
         setLoading(false);
       }
@@ -234,39 +256,7 @@ const DashboardPageCirio: React.FC = () => {
     );
   }
 
-  // Verificação se os dados mínimos foram carregados
-  const hasSufficientData = notificacoes.length > 0 && Object.keys(exportOptions).length > 0;
-  
-  // Se não houver notificações, mostrar mensagem apropriada
-  if (!hasSufficientData) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100">
-        <div className="bg-white p-8 rounded-lg shadow-md max-w-md text-center">
-          <h2 className="text-xl font-semibold text-yellow-600 mb-4">Sem dados disponíveis</h2>
-          <p className="text-gray-700 mb-4">
-            Não foram encontradas notificações para exibição no dashboard. 
-            Cadastre notificações para visualizar estatísticas.
-          </p>
-          <div className="flex justify-center gap-4">
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-            >
-              Atualizar
-            </button>
-            <button
-              onClick={() => window.location.href = '/notificacoes/criar'}
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-            >
-              Criar notificação
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Renderizar o dashboard com os dados carregados
+  // Renderizar o dashboard com os dados carregados (mesmo se estiver vazio)
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <EnhancedNotificationDashboard 
