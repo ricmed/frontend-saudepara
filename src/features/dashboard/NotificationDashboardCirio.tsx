@@ -406,6 +406,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   
   // 🆕 Estado para controlar o modal de fichas
   const [showFichasModal, setShowFichasModal] = useState(false);
+  
+  // 🆕 Estado para controlar o modal de detalhes do paciente
+  const [showPacienteModal, setShowPacienteModal] = useState(false);
+  const [pacienteSelecionado, setPacienteSelecionado] = useState<any>(null);
 
   // Dados base do dashboard
   const [totalNotifications, setTotalNotifications] = useState(0);
@@ -2938,16 +2942,11 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       return `${anos} ${anos === 1 ? 'ano' : 'anos'}`;
     };
 
-    // 🆕 Função para navegar para a ficha
-    const navegarParaFicha = (idNotificacao: number) => {
-      if (idNotificacao && !isNaN(Number(idNotificacao))) {
-        const url = `/private/comunicacao-de-caso/editar/${idNotificacao}`;
-        console.log('🚀 Navegando para:', url);
-        window.location.href = url;
-      } else {
-        console.error('❌ ID da notificação inválido:', idNotificacao);
-        alert('Erro: ID da notificação não encontrado ou inválido.');
-      }
+    // 🆕 Função para abrir modal de detalhes do paciente
+    const abrirDetalhesPaciente = (notificacao: any) => {
+      const original = notificacao.original || notificacao;
+      setPacienteSelecionado(original);
+      setShowPacienteModal(true);
     };
 
     return (
@@ -3133,11 +3132,11 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                       {/* Botão Ver Ficha - Centralizado */}
                       <div className="mt-3 pt-3 border-t border-gray-200 flex justify-center">
                         <button
-                          onClick={() => navegarParaFicha(original.idnotificacao)}
+                          onClick={() => abrirDetalhesPaciente(notificacao)}
                           className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors flex items-center gap-1"
                         >
                           <Info className="h-3 w-3" />
-                          Ver paciente
+                          Ver detalhes
                         </button>
                       </div>
                     </div>
@@ -3164,10 +3163,55 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     );
   }, [showFichasModal, filteredNotificacoes, exportOptions, modalSearchTerm]);
 
+  // 🆕 MODAL COM IFRAME DA PÁGINA DE EDIÇÃO DO PACIENTE
+  const PacienteDetalhesModal = useMemo(() => {
+    if (!showPacienteModal || !pacienteSelecionado) return null;
+
+    const urlFicha = `/private/comunicacao-de-caso/editar/${pacienteSelecionado.idnotificacao}`;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] p-4">
+        <div className="bg-white rounded-xl shadow-2xl w-[95vw] h-[90vh] overflow-hidden flex flex-col">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-4 text-white flex items-center justify-between flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white bg-opacity-20 rounded-lg">
+                <FileText className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold">Ficha do Paciente</h2>
+                <p className="text-blue-100 text-xs">
+                  Notificação #{pacienteSelecionado.idnotificacao}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowPacienteModal(false)}
+              className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
+              title="Fechar e voltar ao dashboard"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* Iframe com a página completa */}
+          <div className="flex-1 overflow-hidden">
+            <iframe
+              src={urlFicha}
+              className="w-full h-full border-0"
+              title="Ficha do Paciente"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }, [showPacienteModal, pacienteSelecionado]);
+
   return (
     <div data-dashboard="main" className={getContainerClasses()}>
-      {/* Renderizar o Modal */}
+      {/* Renderizar os Modais */}
       {FichasModal}
+      {PacienteDetalhesModal}
       
       {/* Cabeçalho */}
       <header className={getHeaderClasses()}>

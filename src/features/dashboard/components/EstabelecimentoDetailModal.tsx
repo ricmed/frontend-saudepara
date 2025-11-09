@@ -1,7 +1,6 @@
 // Modal de Detalhes do Estabelecimento - Mostra hipóteses diagnósticas e pacientes
-import React, { useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { X, AlertTriangle, Activity, Users, MapPin, Building, ExternalLink } from 'lucide-react';
+import React, { useMemo, useCallback, useState } from 'react';
+import { X, AlertTriangle, Activity, Users, MapPin, Building, ExternalLink, FileText } from 'lucide-react';
 
 interface Notificacao {
   id?: string;
@@ -48,7 +47,9 @@ const EstabelecimentoDetailModal: React.FC<EstabelecimentoDetailModalProps> = ({
   dataSelecionada = null, // 🆕 Receber data selecionada do componente pai
   onClose
 }) => {
-  const navigate = useNavigate();
+  // 🆕 Estados para controlar o modal de detalhes do paciente
+  const [showPacienteModal, setShowPacienteModal] = useState(false);
+  const [idNotificacaoSelecionada, setIdNotificacaoSelecionada] = useState<string | number | null>(null);
 
   // Função para formatar idade de meses para anos (mesma lógica do AlertasPanel)
   const formatarIdade = useCallback((idadeMeses: number | null | undefined): string => {
@@ -66,13 +67,13 @@ const EstabelecimentoDetailModal: React.FC<EstabelecimentoDetailModalProps> = ({
     return `${anos} ano${anos !== 1 ? 's' : ''}`;
   }, []);
 
-  // Função para navegar até a ficha do paciente
-  const navegarParaFicha = useCallback((idNotificacao: string | number) => {
+  // 🆕 Função para abrir modal de detalhes do paciente
+  const abrirDetalhesPaciente = useCallback((idNotificacao: string | number) => {
     if (idNotificacao && !isNaN(Number(idNotificacao))) {
-      const url = `/private/comunicacao-de-caso/editar/${idNotificacao}`;
-      navigate(url);
+      setIdNotificacaoSelecionada(idNotificacao);
+      setShowPacienteModal(true);
     }
-  }, [navigate]);
+  }, []);
 
   // Filtrar notificações deste estabelecimento
   const notificacoesEstabelecimento = useMemo(() => {
@@ -386,14 +387,14 @@ const EstabelecimentoDetailModal: React.FC<EstabelecimentoDetailModalProps> = ({
                             </div>
                           </div>
                           
-                          {/* Botão para navegar à ficha */}
+                          {/* Botão para abrir modal com detalhes */}
                           <button
-                            onClick={() => navegarParaFicha(paciente.idNotificacao)}
+                            onClick={() => abrirDetalhesPaciente(paciente.idNotificacao)}
                             className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
-                            title="Abrir ficha do paciente"
+                            title="Ver detalhes do paciente"
                           >
                             <ExternalLink className="h-4 w-4" />
-                            Ver Ficha
+                            Ver Detalhes
                           </button>
                         </div>
                       </div>
@@ -467,14 +468,14 @@ const EstabelecimentoDetailModal: React.FC<EstabelecimentoDetailModalProps> = ({
                         </div>
                       </div>
                       
-                      {/* Botão para navegar à ficha */}
+                      {/* Botão para abrir modal com detalhes */}
                       <button
-                        onClick={() => navegarParaFicha(notif.idNotificacao)}
+                        onClick={() => abrirDetalhesPaciente(notif.idNotificacao)}
                         className="flex items-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-all shadow-md hover:shadow-lg whitespace-nowrap"
-                        title="Abrir ficha completa do paciente"
+                        title="Ver detalhes completos do paciente"
                       >
                         <ExternalLink className="h-5 w-5" />
-                        <span className="hidden sm:inline">Ver Ficha</span>
+                        <span className="hidden sm:inline">Ver Detalhes</span>
                       </button>
                     </div>
                   </div>
@@ -504,6 +505,44 @@ const EstabelecimentoDetailModal: React.FC<EstabelecimentoDetailModalProps> = ({
           </div>
         </div>
       </div>
+      
+      {/* 🆕 MODAL COM IFRAME DA PÁGINA DE EDIÇÃO DO PACIENTE */}
+      {showPacienteModal && idNotificacaoSelecionada && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[70] p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-[95vw] h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-4 text-white flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white bg-opacity-20 rounded-lg">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">Ficha do Paciente</h2>
+                  <p className="text-blue-100 text-xs">
+                    Notificação #{idNotificacaoSelecionada}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPacienteModal(false)}
+                className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
+                title="Fechar e voltar ao estabelecimento"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Iframe com a página completa */}
+            <div className="flex-1 overflow-hidden">
+              <iframe
+                src={`/private/comunicacao-de-caso/editar/${idNotificacaoSelecionada}`}
+                className="w-full h-full border-0"
+                title="Ficha do Paciente"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
