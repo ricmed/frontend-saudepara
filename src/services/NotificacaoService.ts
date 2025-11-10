@@ -77,6 +77,9 @@ export interface TraumaOption extends BaseOption {
 
 export interface EstabelecimentoOption extends BaseOption {
   idestabelecimento: number;
+  nome: string; // ✅ Campo usado pelo UnidadeNotificadoraField
+  cnes?: string;
+  ativo?: string;
 }
 
 export interface EncerramentoOption extends BaseOption {
@@ -398,7 +401,7 @@ export const NotificacaoService = {
     return NotificacaoService.fetchOptions<TraumaOption>(TIPO_ENDPOINTS.TRAUMA);
   },
 
-  async getEstabelecimentoOptions(): Promise<EstabelecimentoOption[]> {
+  async getEstabelecimentoOptions(includeInactiveId?: number): Promise<EstabelecimentoOption[]> {
     try {
       // 🔄 CORRIGIDO: Buscar com limite adequado - backend não filtra por ativo na query
       const endpoint = `${TIPO_ENDPOINTS.ESTABELECIMENTO}?limit=15000`;
@@ -416,33 +419,45 @@ export const NotificacaoService = {
         }
       }
       
-      // 🔍 FILTRAR MANUALMENTE: apenas estabelecimentos ativos, com nome válido e CNES
-      const estabelecimentosAtivos = estabelecimentos.filter((est: any) => {
+      // 🔍 FILTRAR: ativos + o específico se fornecido (mesmo que inativo)
+      const estabelecimentosFiltrados = estabelecimentos.filter((est: any) => {
         const isAtivo = est.ativo === 'S' || est.ativo === '1' || est.ativo === true || est.ativo === 1;
         const temNome = est.nome && est.nome.trim() !== '';
         const temCnes = est.cnes && est.cnes.trim() !== '';
-        return isAtivo && temNome && temCnes;
+        
+        // ✅ Incluir se for ativo com dados válidos
+        if (isAtivo && temNome && temCnes) {
+          return true;
+        }
+        
+        // ✅ IMPORTANTE: Incluir também se for o ID específico solicitado (mesmo que inativo)
+        // Isso garante que notificações antigas com estabelecimentos inativos continuem funcionando
+        if (includeInactiveId && est.idestabelecimento === includeInactiveId && temNome) {
+          return true;
+        }
+        
+        return false;
       });
       
-      // 🏥 MAPEAR para a estrutura esperada pelo frontend (usar 'nome' ao invés de 'descricao')
-      const estabelecimentosFormatados = estabelecimentosAtivos.map((est: any) => ({
+      // 🏥 MAPEAR para a estrutura esperada pelo frontend
+      const estabelecimentosFormatados = estabelecimentosFiltrados.map((est: any) => ({
         idestabelecimento: est.idestabelecimento,
         id: est.idestabelecimento, // Compatibilidade com BaseOption
-        descricao: est.nome, // ← IMPORTANTE: usar 'nome' do backend como 'descricao' no frontend
+        nome: est.nome, // ✅ CORRIGIDO: usar 'nome' que é o campo esperado pelo UnidadeNotificadoraField
         cnes: est.cnes,
         ativo: est.ativo
       }));
       
       // 📊 ORDENAR ALFABETICAMENTE por nome
       estabelecimentosFormatados.sort((a: EstabelecimentoOption, b: EstabelecimentoOption) => 
-        a.descricao.localeCompare(b.descricao, 'pt-BR', { sensitivity: 'base' })
+        a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })
       );
       
       const percentual = estabelecimentos.length > 0 
-        ? Math.round(estabelecimentosFormatados.length / estabelecimentos.length * 100)
+        ? Math.round(estabelecimentosFiltrados.length / estabelecimentos.length * 100)
         : 0;
       
-      console.log(`✅ Estabelecimentos: ${estabelecimentos.length} total → ${estabelecimentosFormatados.length} ativos válidos (${percentual}%)`);
+      console.log(`✅ Estabelecimentos: ${estabelecimentos.length} total → ${estabelecimentosFiltrados.length} filtrados (${percentual}%)${includeInactiveId ? ` [incluindo ID ${includeInactiveId}]` : ''}`);
       
       return estabelecimentosFormatados;
     } catch (error) {

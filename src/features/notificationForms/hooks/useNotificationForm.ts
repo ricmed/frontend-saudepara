@@ -717,6 +717,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           if (newOption.descricao) {
             newOption.descricao = normalizeText(newOption.descricao);
           }
+          // ✅ ADICIONADO: Também normalizar o campo 'nome' se existir (para estabelecimentos)
+          if (newOption.nome) {
+            newOption.nome = normalizeText(newOption.nome);
+          }
           return newOption;
         });
       };
@@ -964,6 +968,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           if (newOption.descricao) {
             newOption.descricao = normalizeText(newOption.descricao);
           }
+          // ✅ ADICIONADO: Também normalizar o campo 'nome' se existir (para estabelecimentos)
+          if (newOption.nome) {
+            newOption.nome = normalizeText(newOption.nome);
+          }
           return newOption;
         });
       };
@@ -1057,7 +1065,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
   }, []);
 
   // ✅ FUNÇÃO: Carregar dados restantes em background
-  const loadRemainingOptions = async () => {
+  const loadRemainingOptions = async (currentEstabelecimentoId?: number) => {
     try {
       // ✅ VERIFICAR: Só carregar dados adicionais se estiver online/autenticado
       const canUseOnline = await syncService.canUseOnlineMode();
@@ -1083,7 +1091,8 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         NotificacaoService.getHipoteseDiagOptions(),
         NotificacaoService.getTraumaOptions(),
         NotificacaoService.getEncerramentoOptions(),
-        NotificacaoService.getEstabelecimentoOptions()
+        // ✅ IMPORTANTE: Passar ID do estabelecimento atual para incluir mesmo se inativo
+        NotificacaoService.getEstabelecimentoOptions(currentEstabelecimentoId)
       ]);
 
       // Converter descrições para caixa alta
@@ -1292,6 +1301,13 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         // 2. Armazena o CPF original para validações futuras.
         setOriginalCpf((dadosFormatados as any)?.cpf || "");
 
+        // ✅ IMPORTANTE: Recarregar estabelecimentos incluindo o atual (mesmo se inativo)
+        const estabelecimentoId = (dadosFormatados as any)?.estabelecimentoNotificadora;
+        if (estabelecimentoId) {
+          console.log(`🏥 Recarregando estabelecimentos incluindo ID ${estabelecimentoId} (pode estar inativo)`);
+          await loadRemainingOptions(estabelecimentoId);
+        }
+
         // 3. CORREÇÃO: Carrega municípios ANTES de definir os dados no formulário
         // para evitar problema visual de cidade não carregando em edição
         if ((dadosFormatados as any)?.uf) {
@@ -1312,7 +1328,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     } finally {
       setIsLoading(false);
     }
-  }, [navigate, loadMunicipiosByEstado]);
+  }, [navigate, loadMunicipiosByEstado, loadRemainingOptions]);
 
   // 🆕 NOVA FUNÇÃO: Adicionar timezone ao FormData
   const addTimezoneToFormData = useCallback((data: FormData): FormData => {

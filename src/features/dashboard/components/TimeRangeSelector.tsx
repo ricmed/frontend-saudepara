@@ -15,7 +15,7 @@ interface DateRangeSelectorProps {
   selectedPublicos?: number[];
   publicoOptions?: Array<{ idtipo_publico: number; descricao: string }>;
   selectedEstabelecimentos?: number[];
-  estabelecimentoOptions?: Array<{ idestabelecimento: number; descricao: string }>;
+  estabelecimentoOptions?: Array<{ idestabelecimento: number; nome: string }>; // ✅ CORRIGIDO: usar 'nome' ao invés de 'descricao'
   onChange: (startDate: string, startHour: number, startMinute: number, endDate: string, endHour: number, endMinute: number, enabled: boolean, selectedPublicos?: number[], selectedEstabelecimentos?: number[]) => void;
   onReset?: () => void;
   periodStart?: Date;
@@ -187,7 +187,7 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({
     }
     const searchLower = searchEstabelecimento.toLowerCase();
     return estabelecimentoOptions.filter(e => 
-      e.descricao.toLowerCase().includes(searchLower)
+      e.nome.toLowerCase().includes(searchLower) // ✅ CORRIGIDO: usar 'nome' ao invés de 'descricao'
     );
   }, [estabelecimentoOptions, searchEstabelecimento]);
 
@@ -537,7 +537,7 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({
                           }}
                           className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 flex-shrink-0"
                         />
-                        <span className="flex-1 break-words">{estabelecimento.descricao}</span>
+                        <span className="flex-1 break-words">{estabelecimento.nome}</span> {/* ✅ CORRIGIDO: usar 'nome' ao invés de 'descricao' */}
                       </label>
                     ))
                   )}
