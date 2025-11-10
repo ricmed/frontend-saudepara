@@ -14,7 +14,9 @@ interface DateRangeSelectorProps {
   enabled: boolean;
   selectedPublicos?: number[];
   publicoOptions?: Array<{ idtipo_publico: number; descricao: string }>;
-  onChange: (startDate: string, startHour: number, startMinute: number, endDate: string, endHour: number, endMinute: number, enabled: boolean, selectedPublicos?: number[]) => void;
+  selectedEstabelecimentos?: number[];
+  estabelecimentoOptions?: Array<{ idestabelecimento: number; descricao: string }>;
+  onChange: (startDate: string, startHour: number, startMinute: number, endDate: string, endHour: number, endMinute: number, enabled: boolean, selectedPublicos?: number[], selectedEstabelecimentos?: number[]) => void;
   onReset?: () => void;
   periodStart?: Date;
   periodEnd?: Date;
@@ -30,6 +32,8 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({
   enabled,
   selectedPublicos = [],
   publicoOptions = [],
+  selectedEstabelecimentos = [],
+  estabelecimentoOptions = [],
   onChange,
   onReset,
   periodStart,
@@ -43,21 +47,26 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({
   const [tempEndHour, setTempEndHour] = useState(endHour);
   const [tempEndMinute, setTempEndMinute] = useState(endMinute);
   const [tempSelectedPublicos, setTempSelectedPublicos] = useState<number[]>(selectedPublicos);
+  const [tempSelectedEstabelecimentos, setTempSelectedEstabelecimentos] = useState<number[]>(selectedEstabelecimentos);
+  
+  // 🔍 Estado para busca de estabelecimentos
+  const [searchEstabelecimento, setSearchEstabelecimento] = useState<string>('');
 
   // Inicializar com todos os públicos selecionados se não houver seleção e existirem opções
   React.useEffect(() => {
-    console.log('TimeRangeSelector init effect:', {
-      publicoOptionsLength: publicoOptions.length,
-      selectedPublicosLength: selectedPublicos.length,
-      publicoOptions: publicoOptions.map(p => ({ id: p.idtipo_publico, desc: p.descricao }))
-    });
-    
     if (publicoOptions.length > 0 && selectedPublicos.length === 0) {
       const todosPublicos = publicoOptions.map(p => p.idtipo_publico);
-      console.log('Initializing with all publicos:', todosPublicos);
       setTempSelectedPublicos(todosPublicos);
     }
   }, [publicoOptions, selectedPublicos]);
+
+  // Inicializar com todos os estabelecimentos selecionados se não houver seleção e existirem opções
+  React.useEffect(() => {
+    if (estabelecimentoOptions.length > 0 && selectedEstabelecimentos.length === 0) {
+      const todosEstabelecimentos = estabelecimentoOptions.map(e => e.idestabelecimento);
+      setTempSelectedEstabelecimentos(todosEstabelecimentos);
+    }
+  }, [estabelecimentoOptions, selectedEstabelecimentos]);
 
   // 🆕 Sincronizar estado temporário quando as props mudarem (ao carregar do localStorage)
   React.useEffect(() => {
@@ -68,10 +77,11 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({
     setTempEndHour(endHour);
     setTempEndMinute(endMinute);
     setTempSelectedPublicos(selectedPublicos);
-  }, [startDate, startHour, startMinute, endDate, endHour, endMinute, selectedPublicos]);
+    setTempSelectedEstabelecimentos(selectedEstabelecimentos);
+  }, [startDate, startHour, startMinute, endDate, endHour, endMinute, selectedPublicos, selectedEstabelecimentos]);
 
   const handleApply = () => {
-    onChange(tempStartDate, tempStartHour, tempStartMinute, tempEndDate, tempEndHour, tempEndMinute, true, tempSelectedPublicos);
+    onChange(tempStartDate, tempStartHour, tempStartMinute, tempEndDate, tempEndHour, tempEndMinute, true, tempSelectedPublicos, tempSelectedEstabelecimentos);
     setIsExpanded(false);
   };
 
@@ -83,17 +93,18 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({
     setTempEndHour(endHour);
     setTempEndMinute(endMinute);
     setTempSelectedPublicos(selectedPublicos);
+    setTempSelectedEstabelecimentos(selectedEstabelecimentos);
     setIsExpanded(false);
   };
 
   const handleToggle = () => {
-    onChange(startDate, startHour, startMinute, endDate, endHour, endMinute, !enabled, selectedPublicos);
+    onChange(startDate, startHour, startMinute, endDate, endHour, endMinute, !enabled, selectedPublicos, selectedEstabelecimentos);
   };
 
   const handleConfigureClick = () => {
     // Se o filtro está desabilitado, ativar primeiro
     if (!enabled) {
-      onChange(startDate, startHour, startMinute, endDate, endHour, endMinute, true, selectedPublicos);
+      onChange(startDate, startHour, startMinute, endDate, endHour, endMinute, true, selectedPublicos, selectedEstabelecimentos);
     }
     // Depois expandir o painel
     setIsExpanded(!isExpanded);
@@ -110,6 +121,7 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({
       setTempEndHour(23);
       setTempEndMinute(59);
       setTempSelectedPublicos([]);
+      setTempSelectedEstabelecimentos([]);
     }
   };
 
@@ -163,6 +175,21 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({
 
     return `${formatDate(periodStart)} até ${formatDate(periodEnd)}`;
   };
+
+  // Verificar se há opções disponíveis
+  const hasEstabelecimentoOptions = estabelecimentoOptions && estabelecimentoOptions.length > 0;
+  const hasPublicoOptions = publicoOptions && publicoOptions.length > 0;
+  
+  // 🔍 Filtrar estabelecimentos pela busca
+  const estabelecimentosFiltrados = React.useMemo(() => {
+    if (!searchEstabelecimento.trim()) {
+      return estabelecimentoOptions;
+    }
+    const searchLower = searchEstabelecimento.toLowerCase();
+    return estabelecimentoOptions.filter(e => 
+      e.descricao.toLowerCase().includes(searchLower)
+    );
+  }, [estabelecimentoOptions, searchEstabelecimento]);
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
@@ -406,7 +433,7 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({
             </div>
 
             {/* Filtro de Tipo de Público */}
-            {publicoOptions.length > 0 && (
+            {hasPublicoOptions && (
               <div className="border border-gray-300 rounded-lg p-4 bg-white">
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   👥 Tipo de Público Atendido
@@ -459,6 +486,81 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({
                   </button>
                   <span className="text-gray-400 text-xs ml-auto">
                     {tempSelectedPublicos.length} de {publicoOptions.length} selecionado{tempSelectedPublicos.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Filtro de Unidade Notificadora / Estabelecimento */}
+            {hasEstabelecimentoOptions && (
+              <div className="border border-gray-300 rounded-lg p-4 bg-white">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  🏥 Unidade Notificadora
+                </label>
+                
+                {/* Campo de busca */}
+                <div className="mb-3">
+                  <input
+                    type="text"
+                    placeholder="Buscar unidade..."
+                    value={searchEstabelecimento}
+                    onChange={(e) => setSearchEstabelecimento(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  {searchEstabelecimento && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Mostrando {estabelecimentosFiltrados.length} de {estabelecimentoOptions.length} unidades
+                    </p>
+                  )}
+                </div>
+                
+                <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto p-2 border border-gray-200 rounded-lg bg-gray-50">
+                  {estabelecimentosFiltrados.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-4">
+                      Nenhuma unidade encontrada
+                    </p>
+                  ) : (
+                    estabelecimentosFiltrados.map((estabelecimento) => (
+                      <label
+                        key={estabelecimento.idestabelecimento}
+                        className="flex items-center gap-2 text-sm text-gray-700 hover:bg-white p-2 rounded cursor-pointer transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={tempSelectedEstabelecimentos.includes(estabelecimento.idestabelecimento)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setTempSelectedEstabelecimentos([...tempSelectedEstabelecimentos, estabelecimento.idestabelecimento]);
+                            } else {
+                              setTempSelectedEstabelecimentos(tempSelectedEstabelecimentos.filter(id => id !== estabelecimento.idestabelecimento));
+                            }
+                          }}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 flex-shrink-0"
+                        />
+                        <span className="flex-1 break-words">{estabelecimento.descricao}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
+                
+                <div className="flex items-center gap-3 mt-3">
+                  <button
+                    type="button"
+                    onClick={() => setTempSelectedEstabelecimentos(estabelecimentoOptions.map(e => e.idestabelecimento))}
+                    className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                  >
+                    Selecionar Todos
+                  </button>
+                  <span className="text-gray-300">•</span>
+                  <button
+                    type="button"
+                    onClick={() => setTempSelectedEstabelecimentos([])}
+                    className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                  >
+                    Limpar Seleção
+                  </button>
+                  <span className="text-gray-400 text-xs ml-auto">
+                    {tempSelectedEstabelecimentos.length} de {estabelecimentoOptions.length} selecionado{tempSelectedEstabelecimentos.length !== 1 ? 's' : ''}
                   </span>
                 </div>
               </div>

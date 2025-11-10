@@ -339,19 +339,27 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
   // 🆕 Inicializar selectedPublicos com todos os públicos quando as opções carregarem
   useEffect(() => {
-    console.log('Dashboard init effect - exportOptions.publicoOptions:', exportOptions?.publicoOptions);
-    console.log('Current dateRangeConfig.selectedPublicos:', dateRangeConfig.selectedPublicos);
-    
     if (exportOptions?.publicoOptions?.length > 0 && 
         (!dateRangeConfig.selectedPublicos || dateRangeConfig.selectedPublicos.length === 0)) {
       const todosPublicos = exportOptions.publicoOptions.map((p: any) => p.idtipo_publico);
-      console.log('Initializing dashboard with all publicos:', todosPublicos);
       setDateRangeConfig({
         ...dateRangeConfig,
         selectedPublicos: todosPublicos
       });
     }
   }, [exportOptions?.publicoOptions]); // Remover dependências circulares
+
+  // 🆕 Inicializar selectedEstabelecimentos com todos os estabelecimentos quando as opções carregarem
+  useEffect(() => {
+    if (exportOptions?.estabelecimentoOptions?.length > 0 && 
+        (!dateRangeConfig.selectedEstabelecimentos || dateRangeConfig.selectedEstabelecimentos.length === 0)) {
+      const todosEstabelecimentos = exportOptions.estabelecimentoOptions.map((e: any) => e.idestabelecimento);
+      setDateRangeConfig({
+        ...dateRangeConfig,
+        selectedEstabelecimentos: todosEstabelecimentos
+      });
+    }
+  }, [exportOptions?.estabelecimentoOptions]); // Remover dependências circulares
 
   // 🚫 LIMPAR FILTRO DE DATA INDIVIDUAL QUANDO FILTRO GLOBAL FOR ATIVADO
   useEffect(() => {
@@ -3341,8 +3349,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           enabled={dateRangeConfig.enabled}
           selectedPublicos={dateRangeConfig.selectedPublicos || []}
           publicoOptions={exportOptions?.publicoOptions || []}
-          onChange={(startDate, startHour, startMinute, endDate, endHour, endMinute, enabled, selectedPublicos) => {
-            setDateRangeConfig({ startDate, startHour, startMinute, endDate, endHour, endMinute, enabled, selectedPublicos });
+          selectedEstabelecimentos={dateRangeConfig.selectedEstabelecimentos || []}
+          estabelecimentoOptions={exportOptions?.estabelecimentoOptions || []}
+          onChange={(startDate, startHour, startMinute, endDate, endHour, endMinute, enabled, selectedPublicos, selectedEstabelecimentos) => {
+            setDateRangeConfig({ startDate, startHour, startMinute, endDate, endHour, endMinute, enabled, selectedPublicos, selectedEstabelecimentos });
           }}
           onReset={resetDateRange}
           periodStart={periodStart}

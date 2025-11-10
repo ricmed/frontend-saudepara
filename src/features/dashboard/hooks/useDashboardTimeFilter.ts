@@ -15,6 +15,7 @@ interface DateRangeConfig {
   endMinute: number;
   enabled: boolean;
   selectedPublicos?: number[];
+  selectedEstabelecimentos?: number[];
 }
 
 interface UseDateRangeFilterReturn {
@@ -80,6 +81,7 @@ export const useDashboardDateRangeFilter = (): UseDateRangeFilterReturn => {
       endMinute: 59,
       enabled: false, // Por padrão, o filtro está desabilitado
       selectedPublicos: [],
+      selectedEstabelecimentos: [],
     };
   });
 
@@ -121,6 +123,7 @@ export const useDashboardDateRangeFilter = (): UseDateRangeFilterReturn => {
       endMinute: 59,
       enabled: false,
       selectedPublicos: [],
+      selectedEstabelecimentos: [],
     });
     
     console.log('✅ Configuração resetada - filtro desabilitado');
@@ -219,10 +222,28 @@ export const useDashboardDateRangeFilter = (): UseDateRangeFilterReturn => {
         if (dateRangeConfig.selectedPublicos && dateRangeConfig.selectedPublicos.length > 0) {
           const publicoId = notification?.original?.tipo_publico_idtipo_publico;
           if (publicoId !== undefined && publicoId !== null) {
-            return dateRangeConfig.selectedPublicos.includes(Number(publicoId));
+            const passesPublicoFilter = dateRangeConfig.selectedPublicos.includes(Number(publicoId));
+            if (!passesPublicoFilter) {
+              return false;
+            }
+          } else {
+            // Se não tem tipo de público definido, não passa no filtro
+            return false;
           }
-          // Se não tem tipo de público definido, não passa no filtro
-          return false;
+        }
+        
+        // Filtro de unidade notificadora/estabelecimento (se configurado)
+        if (dateRangeConfig.selectedEstabelecimentos && dateRangeConfig.selectedEstabelecimentos.length > 0) {
+          const estabelecimentoId = notification?.original?.estabelecimento_idestabelecimento;
+          if (estabelecimentoId !== undefined && estabelecimentoId !== null) {
+            const passesEstabelecimentoFilter = dateRangeConfig.selectedEstabelecimentos.includes(Number(estabelecimentoId));
+            if (!passesEstabelecimentoFilter) {
+              return false;
+            }
+          } else {
+            // Se não tem estabelecimento definido, não passa no filtro
+            return false;
+          }
         }
         
         return true;

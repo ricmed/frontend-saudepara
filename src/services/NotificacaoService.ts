@@ -399,7 +399,56 @@ export const NotificacaoService = {
   },
 
   async getEstabelecimentoOptions(): Promise<EstabelecimentoOption[]> {
-    return NotificacaoService.fetchOptions<EstabelecimentoOption>(TIPO_ENDPOINTS.ESTABELECIMENTO, 11000);
+    try {
+      // 🔄 CORRIGIDO: Buscar com limite adequado - backend não filtra por ativo na query
+      const endpoint = `${TIPO_ENDPOINTS.ESTABELECIMENTO}?limit=15000`;
+      const response = await axios.get(endpoint);
+      
+      let estabelecimentos = [];
+      if (Array.isArray(response.data)) {
+        estabelecimentos = response.data;
+      } else if (response.data?.data && Array.isArray(response.data.data)) {
+        estabelecimentos = response.data.data;
+      } else if (response.data) {
+        const possibleData = response.data.data || response.data.items;
+        if (Array.isArray(possibleData)) {
+          estabelecimentos = possibleData;
+        }
+      }
+      
+      // 🔍 FILTRAR MANUALMENTE: apenas estabelecimentos ativos, com nome válido e CNES
+      const estabelecimentosAtivos = estabelecimentos.filter((est: any) => {
+        const isAtivo = est.ativo === 'S' || est.ativo === '1' || est.ativo === true || est.ativo === 1;
+        const temNome = est.nome && est.nome.trim() !== '';
+        const temCnes = est.cnes && est.cnes.trim() !== '';
+        return isAtivo && temNome && temCnes;
+      });
+      
+      // 🏥 MAPEAR para a estrutura esperada pelo frontend (usar 'nome' ao invés de 'descricao')
+      const estabelecimentosFormatados = estabelecimentosAtivos.map((est: any) => ({
+        idestabelecimento: est.idestabelecimento,
+        id: est.idestabelecimento, // Compatibilidade com BaseOption
+        descricao: est.nome, // ← IMPORTANTE: usar 'nome' do backend como 'descricao' no frontend
+        cnes: est.cnes,
+        ativo: est.ativo
+      }));
+      
+      // 📊 ORDENAR ALFABETICAMENTE por nome
+      estabelecimentosFormatados.sort((a: EstabelecimentoOption, b: EstabelecimentoOption) => 
+        a.descricao.localeCompare(b.descricao, 'pt-BR', { sensitivity: 'base' })
+      );
+      
+      const percentual = estabelecimentos.length > 0 
+        ? Math.round(estabelecimentosFormatados.length / estabelecimentos.length * 100)
+        : 0;
+      
+      console.log(`✅ Estabelecimentos: ${estabelecimentos.length} total → ${estabelecimentosFormatados.length} ativos válidos (${percentual}%)`);
+      
+      return estabelecimentosFormatados;
+    } catch (error) {
+      console.error('❌ Erro ao buscar estabelecimentos:', error);
+      return []; // Retornar array vazio em caso de erro
+    }
   },
 
   async getEncerramentoOptions(): Promise<EncerramentoOption[]> {
