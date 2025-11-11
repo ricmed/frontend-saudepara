@@ -24,8 +24,19 @@ const FormField: React.FC<FormFieldProps> = ({
 
   // Calcular caracteres restantes para textarea com maxLength
   const currentLength = value?.toString().length || 0;
-  const isNearLimit = maxLength && currentLength > maxLength * 0.8;
-  const isAtLimit = maxLength && currentLength >= maxLength;
+  const isNearLimit = maxLength && currentLength > maxLength * 0.8; // Laranja após 80%
+  const isAtLimit = maxLength && currentLength >= maxLength; // Vermelho no limite
+
+  // Classes dinâmicas para o textarea baseado no limite
+  const textareaClasses = maxLength 
+    ? `w-full p-3 border ${
+        isAtLimit ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 
+        isNearLimit ? 'border-orange-400 bg-orange-50 ring-2 ring-orange-200' : 
+        error ? 'border-red-500 bg-red-50' : 'border-gray-200 bg-white'
+      } rounded-lg text-sm transition-all hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none ${
+        disabled ? 'bg-gray-100 cursor-not-allowed' : ''
+      } ${className}`
+    : baseClasses;
 
   return (
     <div>
@@ -58,7 +69,7 @@ const FormField: React.FC<FormFieldProps> = ({
             value={value}
             onChange={onChange}
             placeholder={placeholder}
-            className={baseClasses}
+            className={textareaClasses}
             disabled={disabled}
             data-error={error ? 'true' : 'false'}
             rows={3}
@@ -67,12 +78,13 @@ const FormField: React.FC<FormFieldProps> = ({
           {maxLength && (
             <div className="flex justify-between items-center mt-1">
               <p className={`text-xs ${
-                isAtLimit ? 'text-red-600 font-semibold' : 
-                isNearLimit ? 'text-orange-500 font-medium' : 
+                isAtLimit ? 'text-red-600 font-bold' : 
+                isNearLimit ? 'text-orange-600 font-semibold' : 
                 'text-gray-500'
               }`}>
                 {currentLength} / {maxLength} caracteres
-                {isAtLimit && ' - Limite atingido'}
+                {isAtLimit && ' - ⚠️ Limite máximo atingido'}
+                {isNearLimit && !isAtLimit && ' - ⚠️ Próximo ao limite'}
               </p>
             </div>
           )}

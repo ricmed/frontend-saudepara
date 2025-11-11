@@ -45,7 +45,7 @@ export const MenuGrid: React.FC = () => {
    {
      icon: <FileText className="h-6 w-6 text-blue-600 mb-2" />,
      label: t('menu.materials'),
-     onClick: () => navigate('/materiais')
+     onClick: () => navigate('/materiais-educativos')
    },
    {
      icon: <WhatsAppIcon />,

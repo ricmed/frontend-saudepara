@@ -293,5 +293,155 @@ export const en: TranslationRecord = {
   "campaignTitles.goldenAugust": "Golden August Campaign 2025",
   "campaignTitles.purpleJanuary": "Purple January Campaign 2025",
   "campaignTitles.redDecember": "Red December Campaign 2024",
-  "campaignTitles.blueNovember": "Blue November Campaign 2024"
+  "campaignTitles.blueNovember": "Blue November Campaign 2024",
+  
+  // Educational Materials - Main Page
+  "educationalMaterials.title": "Educational Materials",
+  "educationalMaterials.searchPlaceholder": "Search educational materials...",
+  "educationalMaterials.searchAriaLabel": "Search educational materials",
+  "educationalMaterials.clearSearchButton": "Clear search",
+  "educationalMaterials.openMenuButton": "Open menu",
+  "educationalMaterials.backButton": "Back",
+  "educationalMaterials.viewMaterialButton": "View Material",
+  "educationalMaterials.errorLoading": "Error loading educational materials",
+  "educationalMaterials.closeErrorButton": "Close error",
+  "educationalMaterials.listAriaLabel": "List of Educational Materials",
+  "educationalMaterials.itemAriaLabel": "Educational Material",
+  "educationalMaterials.noResults": "No results found",
+  "educationalMaterials.noMaterials": "No materials available",
+  "educationalMaterials.footerCopyright": "Pará State Department of Public Health",
+  "educationalMaterials.footer.about": "About",
+  "educationalMaterials.footer.contact": "Contact",
+  "educationalMaterials.footer.privacy": "Privacy",
+  "educationalMaterials.footer.terms": "Terms",
+  
+  // Educational Materials - List
+  "educationalMaterials.list.oralHealth": "Oral Health 2025",
+  "educationalMaterials.list.oralHealthDesc": "Dental services guide and oral health care",
+  "educationalMaterials.list.antiSmoking": "Smoke-Free Environments",
+  "educationalMaterials.list.antiSmokingDesc": "Information about the harmful effects of smoking and smoke-free environments",
+  "educationalMaterials.list.cdcnt": "Non-Communicable Chronic Diseases",
+  "educationalMaterials.list.cdcntDesc": "Prevention and control of non-communicable chronic diseases",
+  "educationalMaterials.list.childrensHealth": "Children's Health",
+  "educationalMaterials.list.childrensHealthDesc": "Complete guide for children's health care",
+  "educationalMaterials.list.sexualViolence": "Sexual Violence",
+  "educationalMaterials.list.sexualViolenceDesc": "Guidance and support for victims of sexual violence",
+  "educationalMaterials.list.hivPrevention": "HIV Prevention",
+  "educationalMaterials.list.hivPreventionDesc": "Information on HIV/AIDS prevention and treatment",
+  "educationalMaterials.list.leprosy": "Leprosy",
+  "educationalMaterials.list.leprosyDesc": "Information on leprosy diagnosis, treatment and prevention",
+  "educationalMaterials.list.tuberculosis": "Tuberculosis",
+  "educationalMaterials.list.tuberculosisDesc": "Tuberculosis guide: symptoms, diagnosis and treatment",
+  "educationalMaterials.list.hivMandala": "Combined Prevention Mandala - HIV",
+  "educationalMaterials.list.hivMandalaDesc": "Combined HIV prevention strategies",
+  "educationalMaterials.list.mpox": "MPOX (Monkeypox)",
+  "educationalMaterials.list.mpoxDesc": "MPOX information: transmission, symptoms and prevention",
+  "educationalMaterials.list.womensHealth": "Women's Health",
+  "educationalMaterials.list.womensHealthDesc": "Informative materials on women's health and violence prevention",
+  "educationalMaterials.list.syphilis": "Syphilis",
+  "educationalMaterials.list.syphilisDesc": "Information on syphilis: prevention, diagnosis and treatment",
+  
+  // Oral Health Details
+  "educationalMaterials.oralHealth.title": "Oral Health 2025",
+  "educationalMaterials.oralHealth.description1": "Oral health is essential for overall well-being. This guide presents dental services available through SUS and essential guidelines for maintaining good oral health.",
+  "educationalMaterials.oralHealth.description2": "Includes information on proper oral hygiene, prevention of cavities and periodontal diseases, as well as procedures available at health units.",
+  "educationalMaterials.oralHealth.description3": "Access to quality dental services is a right for all citizens. Seek the nearest health unit for care.",
+  "educationalMaterials.oralHealth.downloadButton": "Download Oral Health Material in English",
+  "educationalMaterials.oralHealth.pdfTitle": "Services Guide - Oral Health",
+  
+  // Anti-Smoking Details
+  "educationalMaterials.antiSmoking.title": "Smoke-Free Environments",
+  "educationalMaterials.antiSmoking.description1": "Smoking is one of the leading causes of preventable death worldwide. This campaign aims to promote smoke-free environments and raise awareness about tobacco risks.",
+  "educationalMaterials.antiSmoking.description2": "Cigarettes cause various types of cancer, cardiovascular and respiratory diseases. Second-hand smoke is also harmful to non-smokers' health.",
+  "educationalMaterials.antiSmoking.description3": "SUS offers free treatment for those who want to quit smoking. Seek a health unit and learn about available programs.",
+  "educationalMaterials.antiSmoking.downloadButton1": "Download Smoke-Free Environments Material - Poster 2 in English",
+  "educationalMaterials.antiSmoking.downloadButton2": "Download Smoke-Free Environments Material - Poster A3 in English",
+  "educationalMaterials.antiSmoking.pdf1Title": "Poster - Smoke-Free Environments",
+  "educationalMaterials.antiSmoking.pdf2Title": "Poster A3 - Smoke-Free Environments",
+  
+  // CDCNT Details
+  "educationalMaterials.cdcnt.title": "Non-Communicable Chronic Diseases (NCDs)",
+  "educationalMaterials.cdcnt.description1": "Non-communicable chronic diseases, such as diabetes, hypertension and heart diseases, are responsible for a large portion of deaths in Brazil.",
+  "educationalMaterials.cdcnt.description2": "Prevention includes healthy eating, regular physical exercise, not smoking and controlling alcohol consumption.",
+  "educationalMaterials.cdcnt.description3": "Early diagnosis and proper treatment are essential to control these diseases and ensure quality of life.",
+  "educationalMaterials.cdcnt.downloadButton1": "Download NCDs Material - Banner 1 in English",
+  "educationalMaterials.cdcnt.downloadButton2": "Download NCDs Material - Banner 2 in English",
+  "educationalMaterials.cdcnt.pdf1Title": "Banner 1 - Chronic Diseases",
+  "educationalMaterials.cdcnt.pdf2Title": "Banner 2 - Chronic Diseases",
+  
+  // Children's Health Details
+  "educationalMaterials.childrensHealth.title": "Children's Health",
+  "educationalMaterials.childrensHealth.description1": "Caring for children's health is essential to ensure healthy development. This guide presents important information on vaccination, nutrition and routine consultations.",
+  "educationalMaterials.childrensHealth.description2": "Vaccination is the most effective way to prevent various serious diseases. Keep the child's vaccination card always updated.",
+  "educationalMaterials.childrensHealth.description3": "Childcare consultations are essential to monitor the child's growth and development. Regularly visit the health unit.",
+  "educationalMaterials.childrensHealth.downloadButton": "Download Children's Health Material in English",
+  "educationalMaterials.childrensHealth.pdfTitle": "Guide - Children's Health",
+  
+  // Sexual Violence Details
+  "educationalMaterials.sexualViolence.title": "Sexual Violence",
+  "educationalMaterials.sexualViolence.description1": "Sexual violence is a serious crime that mainly affects women and children. It is essential to know the available reporting and support channels.",
+  "educationalMaterials.sexualViolence.description2": "In case of sexual violence, immediately seek a health unit to receive medical and psychological care. The service is confidential and humanized.",
+  "educationalMaterials.sexualViolence.description3": "Report by calling 100 or 180. You are not alone. Support and protection networks are available.",
+  "educationalMaterials.sexualViolence.downloadButton": "Download Sexual Violence Material in English",
+  "educationalMaterials.sexualViolence.pdfTitle": "Folder - Sexual Violence",
+  
+  // HIV Prevention Details
+  "educationalMaterials.hivPrevention.title": "HIV Prevention",
+  "educationalMaterials.hivPrevention.description1": "HIV can be prevented through condom use, regular testing and PrEP (Pre-Exposure Prophylaxis) for people at risk.",
+  "educationalMaterials.hivPrevention.description2": "Early diagnosis allows immediate treatment initiation, improving quality of life and reducing virus transmission.",
+  "educationalMaterials.hivPrevention.description3": "SUS offers free condoms, rapid tests, and antiretroviral treatment. Visit a health facility for more information.",
+  "educationalMaterials.hivPrevention.downloadButton": "Download HIV Prevention Material in Portuguese",
+  "educationalMaterials.hivPrevention.pdfTitle": "Brochure - HIV Prevention",
+  
+  // Leprosy Details
+  "educationalMaterials.leprosy.title": "Leprosy",
+  "educationalMaterials.leprosy.description1": "Leprosy is a curable infectious disease caused by bacteria. Early diagnosis and proper treatment prevent sequelae and interrupt transmission.",
+  "educationalMaterials.leprosy.description2": "Main symptoms include skin patches with loss of sensitivity, numbness in hands and feet, and muscle weakness.",
+  "educationalMaterials.leprosy.description3": "Treatment is free and available at all SUS health units. The earlier treatment starts, the lower the chances of sequelae.",
+  "educationalMaterials.leprosy.downloadButton1": "Download Leprosy Material - A4 Folder in Portuguese",
+  "educationalMaterials.leprosy.downloadButton2": "Download Leprosy Material - Digital Folder in Portuguese",
+  "educationalMaterials.leprosy.pdf1Title": "A4 Folder - Leprosy",
+  "educationalMaterials.leprosy.pdf2Title": "Digital Folder - Leprosy",
+  
+  // Tuberculosis Details
+  "educationalMaterials.tuberculosis.title": "Tuberculosis",
+  "educationalMaterials.tuberculosis.description1": "Tuberculosis is an infectious disease caused by bacteria that mainly affects the lungs. It is curable with proper treatment.",
+  "educationalMaterials.tuberculosis.description2": "Main symptoms are cough for more than three weeks, fever, night sweats and weight loss. Diagnosis is made through sputum tests and X-rays.",
+  "educationalMaterials.tuberculosis.description3": "Treatment is free through SUS and lasts at least 6 months. It is essential not to abandon treatment to ensure complete cure.",
+  "educationalMaterials.tuberculosis.downloadButton": "Download Tuberculosis Material in English",
+  "educationalMaterials.tuberculosis.pdfTitle": "Folder - Tuberculosis",
+  
+  // HIV Mandala Details
+  "educationalMaterials.hivMandala.title": "Combined Prevention Mandala - HIV",
+  "educationalMaterials.hivMandala.description1": "Combined HIV prevention uses different strategies in an integrated way, including condoms, PrEP, PEP, regular testing and treatment for all.",
+  "educationalMaterials.hivMandala.description2": "Each person can choose the combination of preventive methods that best suits their reality and life moment.",
+  "educationalMaterials.hivMandala.description3": "SUS offers all combined prevention tools for free. Talk to a health professional about the best strategy for you.",
+  "educationalMaterials.hivMandala.downloadButton": "Download HIV Prevention Mandala Material in Portuguese",
+  "educationalMaterials.hivMandala.pdfTitle": "Mandala - HIV Combined Prevention",
+  
+  // MPOX Details
+  "educationalMaterials.mpox.title": "MPOX (Monkeypox)",
+  "educationalMaterials.mpox.description1": "MPOX is a viral disease that can cause skin rashes, fever and flu-like symptoms. Transmission occurs mainly through close contact.",
+  "educationalMaterials.mpox.description2": "Symptoms include skin lesions, fever, headache, muscle pain and swollen lymph nodes. Seek medical care if you experience these symptoms.",
+  "educationalMaterials.mpox.description3": "Prevention includes avoiding close contact with infected people and maintaining good hygiene. The vaccine is available for risk groups.",
+  "educationalMaterials.mpox.downloadButton": "Download MPOX Material in English",
+  "educationalMaterials.mpox.pdfTitle": "Folder - MPOX",
+  
+  // Women's Health Details
+  "educationalMaterials.womensHealth.title": "Women's Health",
+  "educationalMaterials.womensHealth.description1": "Women's health encompasses various areas, including reproductive health, disease prevention and combating violence against women.",
+  "educationalMaterials.womensHealth.description2": "It is essential to regularly undergo preventive exams, such as Pap smear and mammography, for early disease detection.",
+  "educationalMaterials.womensHealth.description3": "In case of violence, seek help immediately. SUS offers specialized and confidential care for women in violent situations.",
+  "educationalMaterials.womensHealth.downloadButton1": "Download Women's Health Material - COP 30 in English",
+  "educationalMaterials.womensHealth.downloadButton2": "Download Women's Health Material - Flowchart in English",
+  "educationalMaterials.womensHealth.pdf1Title": "COP 30 Material - Women's Health",
+  "educationalMaterials.womensHealth.pdf2Title": "Flowchart - Violence Against Women",
+  
+  // Syphilis Details
+  "educationalMaterials.syphilis.title": "Syphilis",
+  "educationalMaterials.syphilis.description1": "Syphilis is a curable sexually transmitted infection caused by bacteria. Early diagnosis is essential to avoid serious complications.",
+  "educationalMaterials.syphilis.description2": "Symptoms vary according to the stage of the disease and may include painless sores, body spots and neurological symptoms in advanced cases.",
+  "educationalMaterials.syphilis.description3": "Treatment is done with penicillin and is available for free through SUS. Pregnant women should be tested to prevent congenital syphilis.",
+  "educationalMaterials.syphilis.downloadButton": "Download Syphilis Material in English",
+  "educationalMaterials.syphilis.pdfTitle": "Folder - Syphilis"
 };

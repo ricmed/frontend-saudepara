@@ -22,6 +22,20 @@ import SetembroAmarelo from "@/features/campaigns/pages/details/YellowSeptemberP
 import NovembroAzul from "@/features/campaigns/pages/details/BlueNovemberPage";
 import JaneiroRoxoPage from "@/features/campaigns/pages/details/JaneiroRoxoPage";
 import GoldenAugustPage from "@/features/campaigns/pages/details/GoldenAugustPage";
+// Features - Materiais Educativos
+import EducationalMaterialsPage from "@/features/educational-materials/pages/EducationalMaterialsPage";
+import OralHealthPage from "@/features/educational-materials/pages/details/OralHealthPage";
+import AntiSmokingPage from "@/features/educational-materials/pages/details/AntiSmokingPage";
+import CDCNTPage from "@/features/educational-materials/pages/details/CDCNTPage";
+import ChildrensHealthPage from "@/features/educational-materials/pages/details/ChildrensHealthPage";
+import SexualViolencePage from "@/features/educational-materials/pages/details/SexualViolencePage";
+import HIVPreventionPage from "@/features/educational-materials/pages/details/HIVPreventionPage";
+import LeprosyPage from "@/features/educational-materials/pages/details/LeprosyPage";
+import TuberculosisPage from "@/features/educational-materials/pages/details/TuberculosisPage";
+import HIVMandalaPage from "@/features/educational-materials/pages/details/HIVMandalaPage";
+import MPOXPage from "@/features/educational-materials/pages/details/MPOXPage";
+import WomensHealthPage from "@/features/educational-materials/pages/details/WomensHealthPage";
+import SyphilisPage from "@/features/educational-materials/pages/details/SyphilisPage";
 // Features - Componentes
 import ListaComponentes from "@/features/apps/list/ListaComponentes";
 import PaginaAppsAuxiliares from "@/features/apps/components/PaginaAppsAuxiliares";
@@ -284,6 +298,22 @@ function App() {
           <Route path="/janeiro-roxo" element={<JaneiroRoxoPage />} />
           <Route path="/campanha-dezembro-vermelho" element={<DezembroVermelho />} />
           <Route path="/campanha-novembro-azul" element={<NovembroAzul />} />
+          
+          {/* Rotas de Materiais Educativos */}
+          <Route path="/materiais-educativos" element={<EducationalMaterialsPage />} />
+          <Route path="/material-saude-bucal" element={<OralHealthPage />} />
+          <Route path="/material-anti-tabagismo" element={<AntiSmokingPage />} />
+          <Route path="/material-cdcnt" element={<CDCNTPage />} />
+          <Route path="/material-saude-crianca" element={<ChildrensHealthPage />} />
+          <Route path="/material-violencia-sexual" element={<SexualViolencePage />} />
+          <Route path="/material-prevencao-hiv" element={<HIVPreventionPage />} />
+          <Route path="/material-hanseniase" element={<LeprosyPage />} />
+          <Route path="/material-tuberculose" element={<TuberculosisPage />} />
+          <Route path="/material-mandala-hiv" element={<HIVMandalaPage />} />
+          <Route path="/material-mpox" element={<MPOXPage />} />
+          <Route path="/material-saude-mulher" element={<WomensHealthPage />} />
+          <Route path="/material-sifilis" element={<SyphilisPage />} />
+          
           <Route path="/login" element={<LoginPage />} />
           <Route path="/offline-login" element={<OfflineLoginPage />} />
           <Route path="/access-denied" element={<AccessDenied />} />

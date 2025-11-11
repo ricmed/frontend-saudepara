@@ -11,7 +11,6 @@ import { useChatSuporte } from '@/features/chat/hooks/useChatSuporte';
 import {
   FileText,
   ChartSpline,
-  BookType,
   Award,
   Network,
   AlertTriangle,
@@ -33,8 +32,8 @@ import {
   Stethoscope,
   Thermometer,
   UserCog,
-  Home, // ✅ NOVO: Ícone para Home
-  Database, // ✅ NOVO: Ícone para Gerenciamento Offline
+  Home,
+  Database,
 } from "lucide-react";
 
 interface SideMenuProps {
@@ -230,10 +229,24 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       onClick: () => navigate("/private/offline-management"), // ou "/private/dados-offline"
     }] : []),
     
+    // Campanhas de Saúde - acesso direto
     {
-      icon: <BookType />,
-      label: t("menu.educational"),
-      onClick: () => {},
+      icon: <HeartPulse />,
+      label: t("campaigns.title") || "Campanhas de Saúde",
+      onClick: () => {
+        navigate("/campanhas");
+        onClose();
+      },
+    },
+    
+    // Materiais Educativos - acesso direto
+    {
+      icon: <GraduationCap />,
+      label: t("educationalMaterials.title") || "Materiais Educativos",
+      onClick: () => {
+        navigate("/materiais-educativos");
+        onClose();
+      },
     },
     
     // Menu de Apps Auxiliares - apenas para admin master

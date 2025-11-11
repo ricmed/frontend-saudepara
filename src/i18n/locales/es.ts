@@ -293,5 +293,155 @@ export const es: TranslationRecord = {
   "campaignTitles.goldenAugust": "Campaña Agosto Dorado 2025",
   "campaignTitles.purpleJanuary": "Campaña Enero Púrpura 2025",
   "campaignTitles.redDecember": "Campaña Diciembre Rojo 2024",
-  "campaignTitles.blueNovember": "Campaña Noviembre Azul 2024"
+  "campaignTitles.blueNovember": "Campaña Noviembre Azul 2024",
+  
+  // Educational Materials - Main Page
+  "educationalMaterials.title": "Materiales Educativos",
+  "educationalMaterials.searchPlaceholder": "Buscar materiales educativos...",
+  "educationalMaterials.searchAriaLabel": "Buscar materiales educativos",
+  "educationalMaterials.clearSearchButton": "Limpiar búsqueda",
+  "educationalMaterials.openMenuButton": "Abrir menú",
+  "educationalMaterials.backButton": "Volver",
+  "educationalMaterials.viewMaterialButton": "Ver Material",
+  "educationalMaterials.errorLoading": "Error al cargar materiales educativos",
+  "educationalMaterials.closeErrorButton": "Cerrar error",
+  "educationalMaterials.listAriaLabel": "Lista de Materiales Educativos",
+  "educationalMaterials.itemAriaLabel": "Material Educativo",
+  "educationalMaterials.noResults": "No se encontraron resultados",
+  "educationalMaterials.noMaterials": "No hay materiales disponibles",
+  "educationalMaterials.footerCopyright": "Secretaría de Estado de Salud Pública de Pará",
+  "educationalMaterials.footer.about": "Acerca de",
+  "educationalMaterials.footer.contact": "Contacto",
+  "educationalMaterials.footer.privacy": "Privacidad",
+  "educationalMaterials.footer.terms": "Términos",
+  
+  // Educational Materials - List
+  "educationalMaterials.list.oralHealth": "Salud Bucal 2025",
+  "educationalMaterials.list.oralHealthDesc": "Guía de servicios dentales y cuidado de la salud bucal",
+  "educationalMaterials.list.antiSmoking": "Ambientes Libres de Humo",
+  "educationalMaterials.list.antiSmokingDesc": "Información sobre los efectos nocivos del tabaquismo y ambientes libres de humo",
+  "educationalMaterials.list.cdcnt": "Enfermedades Crónicas No Transmisibles",
+  "educationalMaterials.list.cdcntDesc": "Prevención y control de enfermedades crónicas no transmisibles",
+  "educationalMaterials.list.childrensHealth": "Salud Infantil",
+  "educationalMaterials.list.childrensHealthDesc": "Guía completa para el cuidado de la salud infantil",
+  "educationalMaterials.list.sexualViolence": "Violencia Sexual",
+  "educationalMaterials.list.sexualViolenceDesc": "Orientación y apoyo para víctimas de violencia sexual",
+  "educationalMaterials.list.hivPrevention": "Prevención del VIH",
+  "educationalMaterials.list.hivPreventionDesc": "Información sobre prevención y tratamiento del VIH/SIDA",
+  "educationalMaterials.list.leprosy": "Lepra",
+  "educationalMaterials.list.leprosyDesc": "Información sobre diagnóstico, tratamiento y prevención de la lepra",
+  "educationalMaterials.list.tuberculosis": "Tuberculosis",
+  "educationalMaterials.list.tuberculosisDesc": "Guía sobre tuberculosis: síntomas, diagnóstico y tratamiento",
+  "educationalMaterials.list.hivMandala": "Mandala de Prevención Combinada - VIH",
+  "educationalMaterials.list.hivMandalaDesc": "Estrategias combinadas de prevención del VIH",
+  "educationalMaterials.list.mpox": "MPOX (Viruela del Mono)",
+  "educationalMaterials.list.mpoxDesc": "Información sobre MPOX: transmisión, síntomas y prevención",
+  "educationalMaterials.list.womensHealth": "Salud de la Mujer",
+  "educationalMaterials.list.womensHealthDesc": "Materiales informativos sobre salud de la mujer y prevención de la violencia",
+  "educationalMaterials.list.syphilis": "Sífilis",
+  "educationalMaterials.list.syphilisDesc": "Información sobre sífilis: prevención, diagnóstico y tratamiento",
+  
+  // Oral Health Details
+  "educationalMaterials.oralHealth.title": "Salud Bucal 2025",
+  "educationalMaterials.oralHealth.description1": "La salud bucal es esencial para el bienestar general. Esta guía presenta los servicios dentales disponibles en el SUS y pautas esenciales para mantener una buena salud bucal.",
+  "educationalMaterials.oralHealth.description2": "Incluye información sobre higiene oral adecuada, prevención de caries y enfermedades periodontales, así como procedimientos disponibles en las unidades de salud.",
+  "educationalMaterials.oralHealth.description3": "El acceso a servicios dentales de calidad es un derecho de todos los ciudadanos. Busque la unidad de salud más cercana para atención.",
+  "educationalMaterials.oralHealth.downloadButton": "Descargar Material Salud Bucal en Inglés",
+  "educationalMaterials.oralHealth.pdfTitle": "Guía de Servicios - Salud Bucal",
+  
+  // Anti-Smoking Details
+  "educationalMaterials.antiSmoking.title": "Ambientes Libres de Humo",
+  "educationalMaterials.antiSmoking.description1": "El tabaquismo es una de las principales causas de muerte prevenible en el mundo. Esta campaña tiene como objetivo promover ambientes libres de humo y crear conciencia sobre los riesgos del tabaco.",
+  "educationalMaterials.antiSmoking.description2": "Los cigarrillos causan varios tipos de cáncer, enfermedades cardiovasculares y respiratorias. El humo de segunda mano también es perjudicial para la salud de los no fumadores.",
+  "educationalMaterials.antiSmoking.description3": "El SUS ofrece tratamiento gratuito para quienes desean dejar de fumar. Busque una unidad de salud y conozca los programas disponibles.",
+  "educationalMaterials.antiSmoking.downloadButton1": "Descargar Material Ambientes Libres de Humo - Póster 2 en Inglés",
+  "educationalMaterials.antiSmoking.downloadButton2": "Descargar Material Ambientes Libres de Humo - Póster A3 en Inglés",
+  "educationalMaterials.antiSmoking.pdf1Title": "Póster - Ambientes Libres de Humo",
+  "educationalMaterials.antiSmoking.pdf2Title": "Póster A3 - Ambientes Libres de Humo",
+  
+  // CDCNT Details
+  "educationalMaterials.cdcnt.title": "Enfermedades Crónicas No Transmisibles (ECNT)",
+  "educationalMaterials.cdcnt.description1": "Las enfermedades crónicas no transmisibles, como la diabetes, la hipertensión y las enfermedades cardíacas, son responsables de gran parte de las muertes en Brasil.",
+  "educationalMaterials.cdcnt.description2": "La prevención incluye alimentación saludable, ejercicio físico regular, no fumar y controlar el consumo de alcohol.",
+  "educationalMaterials.cdcnt.description3": "El diagnóstico temprano y el tratamiento adecuado son esenciales para controlar estas enfermedades y garantizar la calidad de vida.",
+  "educationalMaterials.cdcnt.downloadButton1": "Descargar Material ECNT - Banner 1 en Inglés",
+  "educationalMaterials.cdcnt.downloadButton2": "Descargar Material ECNT - Banner 2 en Inglés",
+  "educationalMaterials.cdcnt.pdf1Title": "Banner 1 - Enfermedades Crónicas",
+  "educationalMaterials.cdcnt.pdf2Title": "Banner 2 - Enfermedades Crónicas",
+  
+  // Children's Health Details
+  "educationalMaterials.childrensHealth.title": "Salud Infantil",
+  "educationalMaterials.childrensHealth.description1": "El cuidado de la salud infantil es esencial para garantizar el desarrollo saludable de los niños. Esta guía presenta información importante sobre vacunación, alimentación y consultas de rutina.",
+  "educationalMaterials.childrensHealth.description2": "La vacunación es la forma más efectiva de prevenir diversas enfermedades graves. Mantenga la tarjeta de vacunación del niño siempre actualizada.",
+  "educationalMaterials.childrensHealth.description3": "Las consultas de puericultura son fundamentales para acompañar el crecimiento y desarrollo del niño. Visite regularmente la unidad de salud.",
+  "educationalMaterials.childrensHealth.downloadButton": "Descargar Material Salud Infantil en Inglés",
+  "educationalMaterials.childrensHealth.pdfTitle": "Guía - Salud Infantil",
+  
+  // Sexual Violence Details
+  "educationalMaterials.sexualViolence.title": "Violencia Sexual",
+  "educationalMaterials.sexualViolence.description1": "La violencia sexual es un crimen grave que afecta principalmente a mujeres y niños. Es fundamental conocer los canales de denuncia y apoyo disponibles.",
+  "educationalMaterials.sexualViolence.description2": "En caso de violencia sexual, busque inmediatamente una unidad de salud para recibir atención médica y psicológica. El servicio es confidencial y humanizado.",
+  "educationalMaterials.sexualViolence.description3": "Denuncie llamando al 100 o 180. No está sola. Hay redes de apoyo y protección disponibles.",
+  "educationalMaterials.sexualViolence.downloadButton": "Descargar Material Violencia Sexual en Inglés",
+  "educationalMaterials.sexualViolence.pdfTitle": "Folleto - Violencia Sexual",
+  
+  // HIV Prevention Details
+  "educationalMaterials.hivPrevention.title": "Prevención del VIH",
+  "educationalMaterials.hivPrevention.description1": "El VIH se puede prevenir mediante el uso de preservativos, pruebas regulares y PrEP (Profilaxis Preexposición) para personas en riesgo.",
+  "educationalMaterials.hivPrevention.description2": "El diagnóstico temprano permite el inicio inmediato del tratamiento, mejorando la calidad de vida y reduciendo la transmisión del virus.",
+  "educationalMaterials.hivPrevention.description3": "El SUS ofrece gratuitamente preservativos, pruebas rápidas y tratamiento antirretroviral. Busque una unidad de salud para más información.",
+  "educationalMaterials.hivPrevention.downloadButton": "Descargar Material Prevención del VIH en Portugués",
+  "educationalMaterials.hivPrevention.pdfTitle": "Folleto - Prevención del VIH",
+  
+  // Leprosy Details
+  "educationalMaterials.leprosy.title": "Lepra",
+  "educationalMaterials.leprosy.description1": "La lepra es una enfermedad infecciosa curable causada por bacterias. El diagnóstico temprano y el tratamiento adecuado previenen secuelas e interrumpen la transmisión.",
+  "educationalMaterials.leprosy.description2": "Los principales síntomas incluyen manchas en la piel con pérdida de sensibilidad, entumecimiento en manos y pies, y debilidad muscular.",
+  "educationalMaterials.leprosy.description3": "El tratamiento es gratuito y está disponible en todas las unidades de salud del SUS. Cuanto antes comience el tratamiento, menores son las posibilidades de secuelas.",
+  "educationalMaterials.leprosy.downloadButton1": "Descargar Material Lepra - Folleto A4 en Portugués",
+  "educationalMaterials.leprosy.downloadButton2": "Descargar Material Lepra - Folleto Digital en Portugués",
+  "educationalMaterials.leprosy.pdf1Title": "Folleto A4 - Lepra",
+  "educationalMaterials.leprosy.pdf2Title": "Folleto Digital - Lepra",
+  
+  // Tuberculosis Details
+  "educationalMaterials.tuberculosis.title": "Tuberculosis",
+  "educationalMaterials.tuberculosis.description1": "La tuberculosis es una enfermedad infecciosa causada por bacterias que afecta principalmente los pulmones. Es curable con tratamiento adecuado.",
+  "educationalMaterials.tuberculosis.description2": "Los principales síntomas son tos por más de tres semanas, fiebre, sudores nocturnos y pérdida de peso. El diagnóstico se realiza mediante exámenes de esputo y radiografías.",
+  "educationalMaterials.tuberculosis.description3": "El tratamiento es gratuito en el SUS y dura al menos 6 meses. Es fundamental no abandonar el tratamiento para garantizar la cura completa.",
+  "educationalMaterials.tuberculosis.downloadButton": "Descargar Material Tuberculosis en Inglés",
+  "educationalMaterials.tuberculosis.pdfTitle": "Folleto - Tuberculosis",
+  
+  // HIV Mandala Details
+  "educationalMaterials.hivMandala.title": "Mandala de Prevención Combinada - VIH",
+  "educationalMaterials.hivMandala.description1": "La prevención combinada del VIH utiliza diferentes estrategias de forma integrada, incluyendo preservativos, PrEP, PEP, pruebas regulares y tratamiento para todos.",
+  "educationalMaterials.hivMandala.description2": "Cada persona puede elegir la combinación de métodos preventivos que mejor se adapte a su realidad y momento de vida.",
+  "educationalMaterials.hivMandala.description3": "El SUS ofrece gratuitamente todas las herramientas de prevención combinada. Hable con un profesional de la salud sobre la mejor estrategia para usted.",
+  "educationalMaterials.hivMandala.downloadButton": "Descargar Material Mandala de Prevención del VIH en Portugués",
+  "educationalMaterials.hivMandala.pdfTitle": "Mandala - Prevención Combinada VIH",
+  
+  // MPOX Details
+  "educationalMaterials.mpox.title": "MPOX (Viruela del Mono)",
+  "educationalMaterials.mpox.description1": "MPOX es una enfermedad viral que puede causar erupciones cutáneas, fiebre y síntomas similares a la gripe. La transmisión ocurre principalmente por contacto cercano.",
+  "educationalMaterials.mpox.description2": "Los síntomas incluyen lesiones en la piel, fiebre, dolor de cabeza, dolores musculares y ganglios inflamados. Busque atención médica si presenta estos síntomas.",
+  "educationalMaterials.mpox.description3": "La prevención incluye evitar el contacto cercano con personas infectadas y mantener buena higiene. La vacuna está disponible para grupos de riesgo.",
+  "educationalMaterials.mpox.downloadButton": "Descargar Material MPOX en Inglés",
+  "educationalMaterials.mpox.pdfTitle": "Folleto - MPOX",
+  
+  // Women's Health Details
+  "educationalMaterials.womensHealth.title": "Salud de la Mujer",
+  "educationalMaterials.womensHealth.description1": "La salud de la mujer abarca diversas áreas, incluyendo salud reproductiva, prevención de enfermedades y combate a la violencia contra la mujer.",
+  "educationalMaterials.womensHealth.description2": "Es fundamental realizar exámenes preventivos regularmente, como Papanicolaou y mamografía, para la detección temprana de enfermedades.",
+  "educationalMaterials.womensHealth.description3": "En caso de violencia, busque ayuda inmediatamente. El SUS ofrece atención especializada y confidencial para mujeres en situación de violencia.",
+  "educationalMaterials.womensHealth.downloadButton1": "Descargar Material Salud de la Mujer - COP 30 en Inglés",
+  "educationalMaterials.womensHealth.downloadButton2": "Descargar Material Salud de la Mujer - Flujograma en Inglés",
+  "educationalMaterials.womensHealth.pdf1Title": "Material COP 30 - Salud de la Mujer",
+  "educationalMaterials.womensHealth.pdf2Title": "Flujograma - Violencia contra la Mujer",
+  
+  // Syphilis Details
+  "educationalMaterials.syphilis.title": "Sífilis",
+  "educationalMaterials.syphilis.description1": "La sífilis es una infección de transmisión sexual curable causada por bacterias. El diagnóstico temprano es esencial para evitar complicaciones graves.",
+  "educationalMaterials.syphilis.description2": "Los síntomas varían según la etapa de la enfermedad y pueden incluir llagas indoloras, manchas en el cuerpo y síntomas neurológicos en casos avanzados.",
+  "educationalMaterials.syphilis.description3": "El tratamiento se realiza con penicilina y está disponible gratuitamente en el SUS. Las mujeres embarazadas deben hacerse la prueba para prevenir la sífilis congénita.",
+  "educationalMaterials.syphilis.downloadButton": "Descargar Material Sífilis en Inglés",
+  "educationalMaterials.syphilis.pdfTitle": "Folleto - Sífilis"
 };

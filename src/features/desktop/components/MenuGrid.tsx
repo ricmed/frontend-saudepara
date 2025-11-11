@@ -34,7 +34,7 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
     {
       icon: <Book className={`${isMobile ? 'h-6 w-6' : 'h-10 w-10'} text-[#3B5FFF] mb-${isMobile ? '2' : '3'}`} />,
       label: 'menu.materials',
-      onClick: () => navigate('/materiais')
+      onClick: () => navigate('/materiais-educativos')
     },
     {
       icon: <MessageCircle className={`${isMobile ? 'h-6 w-6' : 'h-10 w-10'} text-[#3B5FFF] mb-${isMobile ? '2' : '3'}`} />,
