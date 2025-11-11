@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MapPin, Globe, Building, Home } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
 import ChartExportMenu from '../../../../components/common/ChartExportMenu';
@@ -295,7 +295,7 @@ interface GeographicLocationPanelProps {
   estadoData: ChartDataItem[];
   municipioData: ChartDataItem[];
   bairroData: ChartDataItem[];
-  onFilterClick?: (category: string, value: string) => void;
+  onFilterClick?: (category: string, value: string, multiSelect?: boolean) => void;
   activeFilters?: Record<string, any>;
   exportMenu?: React.ReactNode;
 }
@@ -330,99 +330,127 @@ const abbreviateCountryName = (fullName: string): string => {
 };
 
 // Componente de tooltip personalizado
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    const data = payload[0];
-    return (
-      <div className="bg-white p-3 border rounded-lg shadow-lg">
-        <p className="font-semibold text-gray-800">{label}</p>
-        <p className="text-blue-600">
-          <span className="inline-block w-3 h-3 rounded-full mr-2" style={{ backgroundColor: data.fill }}></span>
-          Casos: <span className="font-bold">{data.value}</span>
-        </p>
-      </div>
-    );
-  }
-  return null;
-};
+// COMPONENTE NÃO UTILIZADO - Mantido para referência
+// const CustomTooltip = ({ active, payload, label }: any) => {
+//   if (active && payload && payload.length) {
+//     const data = payload[0];
+//     return (
+//       <div className="bg-white p-3 border rounded-lg shadow-lg">
+//         <p className="font-semibold text-gray-800">{label}</p>
+//         <p className="text-blue-600">
+//           <span className="inline-block w-3 h-3 rounded-full mr-2" style={{ backgroundColor: data.fill }}></span>
+//           Casos: <span className="font-bold">{data.value}</span>
+//         </p>
+//       </div>
+//     );
+//   }
+//   return null;
+// };
 
 // Componente de gráfico de barra interativo
-const InteractiveBarChart: React.FC<{
-  data: ChartDataItem[];
-  title: string;
-  icon: React.ReactNode;
-  onBarClick?: (category: string, value: string) => void;
-  filterCategory: string;
-  activeFilter?: string;
-  maxItems?: number;
-}> = ({ data, title, icon, onBarClick, filterCategory, activeFilter, maxItems = 10 }) => {
-  // Limitar dados para visualização
-  const displayData = data.slice(0, maxItems);
-  
-  const handleBarClick = (data: any) => {
-    if (onBarClick && data && data.name) {
-      onBarClick(filterCategory, data.name);
-    }
-  };
-
-  return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          {icon}
-          <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
-          <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
-            {data.length} {data.length === 1 ? 'item' : 'itens'}
-          </span>
-        </div>
-        {activeFilter && (
-          <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded">
-            <span>Filtro ativo: </span>
-            <span className="font-medium">{activeFilter}</span>
-          </div>
-        )}
-      </div>
-
-      {displayData.length > 0 ? (
-        <ResponsiveContainer width="100%" height={Math.max(200, displayData.length * 25)}>
-          <BarChart data={displayData} margin={{ top: 25, right: 30, left: 20, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis 
-              dataKey="name" 
-              angle={-45}
-              textAnchor="end"
-              height={80}
-              fontSize={12}
-            />
-            <YAxis fontSize={12} />
-            <Tooltip content={<CustomTooltip />} />
-            <Bar 
-              dataKey="value" 
-              fill="#3b5bdb"
-              cursor="pointer"
-              onClick={handleBarClick}
-              radius={[2, 2, 0, 0]}
-            >
-              <LabelList
-                dataKey="value"
-                position="top"
-                formatter={(value: number) => value.toLocaleString()}
-                style={{ fontSize: '14px', fontWeight: 'bold', fill: '#374151' }}
-              />
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      ) : (
-        <div className="flex items-center justify-center h-40 text-gray-500">
-          <div className="text-center">
-            <MapPin className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-            <p>Nenhum dado disponível</p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+// COMPONENTE NÃO UTILIZADO - Mantido para referência
+// const InteractiveBarChart: React.FC<{
+//   data: ChartDataItem[];
+//   title: string;
+//   icon: React.ReactNode;
+//   onBarClick?: (category: string, value: string, multiSelect?: boolean) => void;
+//   filterCategory: string;
+//   activeFilter?: string | string[];
+//   maxItems?: number;
+//   ctrlPressedRef: React.RefObject<boolean>;
+// }> = ({ data, title, icon, onBarClick, filterCategory, activeFilter, maxItems = 10, ctrlPressedRef }) => {
+//   // Limitar dados para visualização
+//   const displayData = data.slice(0, maxItems);
+//   
+//   const handleBarClick = (data: any) => {
+//     if (onBarClick && data && data.name) {
+//       onBarClick(filterCategory, data.name, ctrlPressedRef.current ?? false);
+//     }
+//   };
+// 
+//   // Função para verificar se um item está filtrado
+//   const isItemFiltered = (itemName: string) => {
+//     if (Array.isArray(activeFilter)) {
+//       return activeFilter.includes(itemName);
+//     }
+//     return activeFilter === itemName;
+//   };
+// 
+//   // Função para obter cor baseada no filtro
+//   const getCellColor = (itemName: string, baseColor: string) => {
+//     const hasFilter = activeFilter && (Array.isArray(activeFilter) ? activeFilter.length > 0 : true);
+//     if (!hasFilter) return baseColor;
+//     if (isItemFiltered(itemName)) return baseColor;
+//     // Adicionar 30% de opacidade
+//     return baseColor + "4D";
+//   };
+// 
+//   return (
+//     <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+//       <div className="flex items-center justify-between mb-4">
+//         <div className="flex items-center gap-2">
+//           {icon}
+//           <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
+//           <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+//             {data.length} {data.length === 1 ? 'item' : 'itens'}
+//           </span>
+//         </div>
+//         {activeFilter && (
+//           <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded">
+//             <span>Filtro ativo: </span>
+//             <span className="font-medium">{activeFilter}</span>
+//           </div>
+//         )}
+//       </div>
+// 
+//       {displayData.length > 0 ? (
+//         <ResponsiveContainer width="100%" height={Math.max(200, displayData.length * 25)}>
+//           <BarChart data={displayData} margin={{ top: 25, right: 30, left: 20, bottom: 5 }}>
+//             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+//             <XAxis 
+//               dataKey="name" 
+//               angle={-45}
+//               textAnchor="end"
+//               height={80}
+//               fontSize={12}
+//             />
+//             <YAxis fontSize={12} />
+//             <Tooltip content={<CustomTooltip />} />
+//             <Bar 
+//               dataKey="value" 
+//               fill="#3b5bdb"
+//               cursor="pointer"
+//               onClick={handleBarClick}
+//               radius={[2, 2, 0, 0]}
+//             >
+//               {displayData.map((entry, index) => (
+//                 <Cell 
+//                   key={`cell-${index}`} 
+//                   fill={getCellColor(entry.name, entry.fill || "#3b5bdb")}
+//                   stroke={isItemFiltered(entry.name) ? "#000" : "none"}
+//                   strokeWidth={isItemFiltered(entry.name) ? 4 : 0}
+//                 />
+//               ))}
+//               <LabelList
+//                 dataKey="value"
+//                 position="top"
+//                 formatter={(value: number) => value.toLocaleString()}
+//                 style={{ fontSize: '14px', fontWeight: 'bold', fill: '#374151' }}
+//               />
+//             </Bar>
+//           </BarChart>
+//         </ResponsiveContainer>
+//       ) : (
+//         <div className="flex items-center justify-center h-40 text-gray-500">
+//           <div className="text-center">
+//             <MapPin className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+//             <p>Nenhum dado disponível</p>
+//           </div>
+//         </div>
+//       )}
+//     </div>
+//   );
+// };
 
 // �️ FUNÇÃO PARA OBTER CÓDIGO DO ESTADO BRASILEIRO PARA BANDEIRAS
 const getStateFlagCode = (stateName: string): string | null => {
@@ -711,11 +739,12 @@ const MunicipalitiesChartWithTable: React.FC<{
   data: ChartDataItem[];
   title: string;
   icon: React.ReactNode;
-  onItemClick?: (category: string, value: string) => void;
+  onItemClick?: (category: string, value: string, multiSelect?: boolean) => void;
   filterCategory: string;
-  activeFilter?: string;
+  activeFilter?: string | string[];
   stateFilter?: string; // Novo: para mostrar se há filtro de estado ativo
-}> = ({ data, title, icon, onItemClick, filterCategory, activeFilter, stateFilter }) => {
+  ctrlPressed: boolean;
+}> = ({ data, title, icon, onItemClick, filterCategory, activeFilter, stateFilter, ctrlPressed }) => {
   // Top 10 municípios para o gráfico (ordenados por valor decrescente, excluindo "Ignorado")
   const top10Municipalities = [...data]
     .filter(item => item.name.toLowerCase() !== 'ignorado')
@@ -724,27 +753,35 @@ const MunicipalitiesChartWithTable: React.FC<{
   
   const handleBarClick = (item: any) => {
     if (onItemClick && item && item.name) {
-      onItemClick(filterCategory, item.name);
+      onItemClick(filterCategory, item.name, ctrlPressed);
     }
   };
 
   const handleTableClick = (municipalityName: string) => {
     if (onItemClick) {
-      onItemClick(filterCategory, municipalityName);
+      onItemClick(filterCategory, municipalityName, ctrlPressed);
     }
   };
 
-  // Componente de célula personalizada para as barras com cores graduais
-  const CustomMunicipalityCell = (props: any) => {
-    const { index } = props;
-    // Gradiente de azul para verde para os municípios
-    const colors = [
-      "#1976D2", "#1E88E5", "#2196F3", "#42A5F5", "#64B5F6",
-      "#81C784", "#66BB6A", "#4CAF50", "#43A047", "#388E3C"
-    ];
-    const color = colors[index % colors.length];
-    return <Cell {...props} fill={color} />;
+  // Verificar se um item está filtrado
+  const isItemFiltered = (itemName: string): boolean => {
+    if (!activeFilter) return false;
+    if (Array.isArray(activeFilter)) {
+      return activeFilter.includes(itemName);
+    }
+    return activeFilter === itemName;
   };
+
+  // Obter cor da célula baseado em filtros ativos
+  const getCellColor = (itemName: string, baseColor: string): string => {
+    if (!activeFilter) return baseColor;
+    if (Array.isArray(activeFilter) && activeFilter.length > 0) {
+      return isItemFiltered(itemName) ? baseColor : baseColor + '4D';
+    }
+    return baseColor;
+  };
+
+  // Componente de célula personalizada para as barras com cores graduais
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
@@ -834,9 +871,22 @@ const MunicipalitiesChartWithTable: React.FC<{
                     onClick={handleBarClick}
                     radius={[4, 4, 0, 0]}
                   >
-                    {top10Municipalities.map((_, index) => (
-                      <CustomMunicipalityCell key={`cell-${index}`} index={index} />
-                    ))}
+                    {top10Municipalities.map((entry, index) => {
+                      // Gradiente de azul do aplicativo (cores.tsx - blue palette)
+                      const colors = [
+                        "#1a3cad", "#2a49c4", "#3b5bdb", "#4c6cf1", "#5d7df7",
+                        "#7f96f9", "#a1affb", "#c2c9fd", "#e4e8fe", "#c2c9fd"
+                      ];
+                      const color = colors[index % colors.length];
+                      return (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={getCellColor(entry.name, color)}
+                          stroke={isItemFiltered(entry.name) ? '#000000' : 'none'}
+                          strokeWidth={isItemFiltered(entry.name) ? 4 : 0}
+                        />
+                      );
+                    })}
                     <LabelList
                       dataKey="value"
                       position="top"
@@ -931,12 +981,13 @@ const NeighborhoodsChartWithTable: React.FC<{
   data: ChartDataItem[];
   title: string;
   icon: React.ReactNode;
-  onItemClick?: (category: string, value: string) => void;
+  onItemClick?: (category: string, value: string, multiSelect?: boolean) => void;
   filterCategory: string;
-  activeFilter?: string;
+  activeFilter?: string | string[];
   municipalityFilter?: string; // Novo: para mostrar se há filtro de município ativo
   stateFilter?: string; // Novo: para mostrar se há filtro de estado ativo
-}> = ({ data, title, icon, onItemClick, filterCategory, activeFilter, municipalityFilter, stateFilter }) => {
+  ctrlPressed: boolean;
+}> = ({ data, title, icon, onItemClick, filterCategory, activeFilter, municipalityFilter, stateFilter, ctrlPressed }) => {
   // Top 10 bairros para o gráfico (ordenados por valor decrescente, excluindo "Ignorado")
   const top10Neighborhoods = [...data]
     .filter(item => item.name.toLowerCase() !== 'ignorado')
@@ -945,26 +996,32 @@ const NeighborhoodsChartWithTable: React.FC<{
   
   const handleBarClick = (item: any) => {
     if (onItemClick && item && item.name) {
-      onItemClick(filterCategory, item.name);
+      onItemClick(filterCategory, item.name, ctrlPressed);
     }
   };
 
   const handleTableClick = (neighborhoodName: string) => {
     if (onItemClick) {
-      onItemClick(filterCategory, neighborhoodName);
+      onItemClick(filterCategory, neighborhoodName, ctrlPressed);
     }
   };
 
-  // Componente de célula personalizada para as barras com cores graduais
-  const CustomNeighborhoodCell = (props: any) => {
-    const { index } = props;
-    // Gradiente de roxo para rosa para os bairros
-    const colors = [
-      "#9C27B0", "#AB47BC", "#BA68C8", "#CE93D8", "#E1BEE7",
-      "#F48FB1", "#F06292", "#EC407A", "#E91E63", "#AD1457"
-    ];
-    const color = colors[index % colors.length];
-    return <Cell {...props} fill={color} />;
+  // Verificar se um item está filtrado
+  const isItemFiltered = (itemName: string): boolean => {
+    if (!activeFilter) return false;
+    if (Array.isArray(activeFilter)) {
+      return activeFilter.includes(itemName);
+    }
+    return activeFilter === itemName;
+  };
+
+  // Obter cor da célula baseado em filtros ativos
+  const getCellColor = (itemName: string, baseColor: string): string => {
+    if (!activeFilter) return baseColor;
+    if (Array.isArray(activeFilter) && activeFilter.length > 0) {
+      return isItemFiltered(itemName) ? baseColor : baseColor + '4D';
+    }
+    return baseColor;
   };
 
   return (
@@ -1065,9 +1122,22 @@ const NeighborhoodsChartWithTable: React.FC<{
                     onClick={handleBarClick}
                     radius={[4, 4, 0, 0]}
                   >
-                    {top10Neighborhoods.map((_, index) => (
-                      <CustomNeighborhoodCell key={`cell-${index}`} index={index} />
-                    ))}
+                    {top10Neighborhoods.map((entry, index) => {
+                      // Gradiente de azul do aplicativo (cores.tsx - blue palette)
+                      const colors = [
+                        "#1a3cad", "#2a49c4", "#3b5bdb", "#4c6cf1", "#5d7df7",
+                        "#7f96f9", "#a1affb", "#c2c9fd", "#e4e8fe", "#c2c9fd"
+                      ];
+                      const color = colors[index % colors.length];
+                      return (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={getCellColor(entry.name, color)}
+                          stroke={isItemFiltered(entry.name) ? '#000000' : 'none'}
+                          strokeWidth={isItemFiltered(entry.name) ? 4 : 0}
+                        />
+                      );
+                    })}
                     <LabelList
                       dataKey="value"
                       position="top"
@@ -1170,10 +1240,11 @@ const StatesChartWithTable: React.FC<{
   data: ChartDataItem[];
   title: string;
   icon: React.ReactNode;
-  onItemClick?: (category: string, value: string) => void;
+  onItemClick?: (category: string, value: string, multiSelect?: boolean) => void;
   filterCategory: string;
-  activeFilter?: string;
-}> = ({ data, title, icon, onItemClick, filterCategory, activeFilter }) => {
+  activeFilter?: string | string[];
+  ctrlPressed: boolean;
+}> = ({ data, title, icon, onItemClick, filterCategory, activeFilter, ctrlPressed }) => {
   // Top 10 estados para o gráfico (ordenados por valor decrescente, excluindo "Ignorado")
   const top10States = [...data]
     .filter(item => item.name.toLowerCase() !== 'ignorado')
@@ -1182,21 +1253,32 @@ const StatesChartWithTable: React.FC<{
   
   const handleBarClick = (item: any) => {
     if (onItemClick && item && item.name) {
-      onItemClick(filterCategory, item.name);
+      onItemClick(filterCategory, item.name, ctrlPressed);
     }
   };
 
   const handleTableClick = (stateName: string) => {
     if (onItemClick) {
-      onItemClick(filterCategory, stateName);
+      onItemClick(filterCategory, stateName, ctrlPressed);
     }
   };
 
-  // Componente de célula personalizada para as barras com cores específicas
-  const CustomStateCell = (props: any) => {
-    const { payload } = props;
-    const stateColor = getStateColor(payload.name);
-    return <Cell {...props} fill={stateColor} />;
+  // Verificar se um item está filtrado
+  const isItemFiltered = (itemName: string): boolean => {
+    if (!activeFilter) return false;
+    if (Array.isArray(activeFilter)) {
+      return activeFilter.includes(itemName);
+    }
+    return activeFilter === itemName;
+  };
+
+  // Obter cor da célula baseado em filtros ativos
+  const getCellColor = (itemName: string, baseColor: string): string => {
+    if (!activeFilter) return baseColor;
+    if (Array.isArray(activeFilter) && activeFilter.length > 0) {
+      return isItemFiltered(itemName) ? baseColor : baseColor + '4D';
+    }
+    return baseColor;
   };
 
   return (
@@ -1278,7 +1360,12 @@ const StatesChartWithTable: React.FC<{
                     radius={[4, 4, 0, 0]}
                   >
                     {top10States.map((entry, index) => (
-                      <CustomStateCell key={`cell-${index}`} payload={entry} />
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={getCellColor(entry.name, getStateColor(entry.name))}
+                        stroke={isItemFiltered(entry.name) ? '#000000' : 'none'}
+                        strokeWidth={isItemFiltered(entry.name) ? 4 : 0}
+                      />
                     ))}
                     <LabelList
                       dataKey="value"
@@ -1353,10 +1440,11 @@ const CountriesChartWithTable: React.FC<{
   data: ChartDataItem[];
   title: string;
   icon: React.ReactNode;
-  onItemClick?: (category: string, value: string) => void;
+  onItemClick?: (category: string, value: string, multiSelect?: boolean) => void;
   filterCategory: string;
-  activeFilter?: string;
-}> = ({ data, title, icon, onItemClick, filterCategory, activeFilter }) => {
+  activeFilter?: string | string[];
+  ctrlPressed: boolean;
+}> = ({ data, title, icon, onItemClick, filterCategory, activeFilter, ctrlPressed }) => {
   // Top 10 países para o gráfico (ordenados por valor decrescente, excluindo "Ignorado")
   const top10Countries = [...data]
     .filter(item => item.name.toLowerCase() !== 'ignorado')
@@ -1365,7 +1453,7 @@ const CountriesChartWithTable: React.FC<{
   
   const handleItemClick = (countryName: string) => {
     if (onItemClick) {
-      onItemClick(filterCategory, countryName);
+      onItemClick(filterCategory, countryName, ctrlPressed);
     }
   };
 
@@ -1377,6 +1465,24 @@ const CountriesChartWithTable: React.FC<{
 
   const handleTableRowClick = (countryName: string) => {
     handleItemClick(countryName);
+  };
+
+  // Verificar se um item está filtrado (suporte para string ou array)
+  const isItemFiltered = (itemName: string): boolean => {
+    if (!activeFilter) return false;
+    if (Array.isArray(activeFilter)) {
+      return activeFilter.includes(itemName);
+    }
+    return activeFilter === itemName;
+  };
+
+  // Obter cor da célula baseado em filtros ativos
+  const getCellColor = (itemName: string, baseColor: string): string => {
+    if (!activeFilter) return baseColor;
+    if (Array.isArray(activeFilter) && activeFilter.length > 0) {
+      return isItemFiltered(itemName) ? baseColor : baseColor + '4D';
+    }
+    return baseColor;
   };
 
   return (
@@ -1484,7 +1590,12 @@ const CountriesChartWithTable: React.FC<{
                     radius={[2, 2, 0, 0]}
                   >
                     {top10Countries.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={getCellColor(entry.name, entry.fill)}
+                        stroke={isItemFiltered(entry.name) ? '#000000' : 'none'}
+                        strokeWidth={isItemFiltered(entry.name) ? 4 : 0}
+                      />
                     ))}
                     <LabelList
                       dataKey="value"
@@ -1585,6 +1696,32 @@ const GeographicLocationPanel: React.FC<GeographicLocationPanelProps> = ({
   activeFilters = {},
   exportMenu
 }) => {
+  // Ref para rastrear estado do Ctrl
+  const ctrlPressedRef = useRef(false);
+
+  // Adicionar listeners globais para detectar Ctrl
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Control' || e.key === 'Meta') {
+        ctrlPressedRef.current = true;
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Control' || e.key === 'Meta') {
+        ctrlPressedRef.current = false;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
   return (
     <div className="space-y-4" data-dashboard="geographic-location">
       {/* Cabeçalho do painel - Compacto */}
@@ -1628,6 +1765,7 @@ const GeographicLocationPanel: React.FC<GeographicLocationPanelProps> = ({
             onItemClick={onFilterClick}
             filterCategory="pais"
             activeFilter={activeFilters?.pais}
+            ctrlPressed={ctrlPressedRef.current}
           />
         </div>
 
@@ -1640,6 +1778,7 @@ const GeographicLocationPanel: React.FC<GeographicLocationPanelProps> = ({
             onItemClick={onFilterClick}
             filterCategory="estado"
             activeFilter={activeFilters?.estado}
+            ctrlPressed={ctrlPressedRef.current}
           />
         </div>
 
@@ -1653,6 +1792,7 @@ const GeographicLocationPanel: React.FC<GeographicLocationPanelProps> = ({
             filterCategory="municipio"
             activeFilter={activeFilters?.municipio}
             stateFilter={activeFilters?.estado} // Passa o filtro de estado ativo
+            ctrlPressed={ctrlPressedRef.current}
           />
         </div>
 
@@ -1667,6 +1807,7 @@ const GeographicLocationPanel: React.FC<GeographicLocationPanelProps> = ({
             activeFilter={activeFilters?.bairro}
             municipalityFilter={activeFilters?.municipio} // Passa o filtro de município ativo
             stateFilter={activeFilters?.estado} // Passa o filtro de estado ativo
+            ctrlPressed={ctrlPressedRef.current}
           />
         </div>
       </div>

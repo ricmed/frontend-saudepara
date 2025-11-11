@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import {
   BarChart,
   Bar,
@@ -25,8 +25,8 @@ interface ChartDataItem {
 // Interface das props do componente
 interface TiposTraumaChartProps {
   data: ChartDataItem[];
-  onChartClick?: (itemName: string) => void;
-  activeFilter?: string | null;
+  onChartClick?: (itemName: string, multiSelect?: boolean) => void;
+  activeFilter?: string | string[] | null;
   chartId?: string;
   title?: string;
   className?: string;
@@ -45,9 +45,35 @@ const TiposTraumaChart: React.FC<TiposTraumaChartProps> = ({
   exportMenu, // 🆕 Prop para menu de exportação personalizado
   isVisible = true
 }) => {
+  // 🆕 Ref para rastrear estado do Ctrl em tempo real
+  const ctrlPressedRef = useRef(false);
+
+  // 🆕 Listeners globais para rastrear Ctrl/Cmd
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Control' || e.key === 'Meta') {
+        ctrlPressedRef.current = true;
+      }
+    };
+    
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Control' || e.key === 'Meta') {
+        ctrlPressedRef.current = false;
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
   const handleChartItemClick = useCallback((itemName: string) => {
     if (onChartClick) {
-      onChartClick(itemName);
+      onChartClick(itemName, ctrlPressedRef.current);
     }
   }, [onChartClick]);
 
@@ -65,15 +91,19 @@ const TiposTraumaChart: React.FC<TiposTraumaChartProps> = ({
 
   // Função para verificar se um trauma está filtrado
   const isTraumaFiltered = (trauma: string) => {
+    if (Array.isArray(activeFilter)) {
+      return activeFilter.includes(trauma);
+    }
     return activeFilter === trauma;
   };
 
   // Função para obter cor baseada no filtro
   const getCellColor = (trauma: string, baseColor: string) => {
-    const hasFilter = activeFilter;
+    const hasFilter = activeFilter && (Array.isArray(activeFilter) ? activeFilter.length > 0 : true);
     if (!hasFilter) return baseColor;
     if (isTraumaFiltered(trauma)) return baseColor;
-    return baseColor.replace(')', ', 0.4)').replace('rgb', 'rgba');
+    // Adicionar 30% de opacidade
+    return baseColor + "4D";
   };
 
   if (!isVisible) {
@@ -151,8 +181,8 @@ const TiposTraumaChart: React.FC<TiposTraumaChartProps> = ({
                   <Cell 
                     key={`cell-${i}`} 
                     fill={getCellColor(entry.name, entry.fill)}
-                    stroke={activeFilter === entry.name ? "#000" : "none"}
-                    strokeWidth={activeFilter === entry.name ? 2 : 0}
+                    stroke={isTraumaFiltered(entry.name) ? "#000" : "none"}
+                    strokeWidth={isTraumaFiltered(entry.name) ? 4 : 0}
                   />
                 ))}
                 <LabelList

@@ -1,5 +1,5 @@
 // Componente de Gráfico de Desfecho dos Casos - usando endpoints existentes
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   PieChart,
   Pie,
@@ -19,7 +19,7 @@ interface DesfechoItem {
 
 interface DesfechoCasosChartProps {
   className?: string;
-  toggleFilter?: (category: string, value: string) => void;
+  toggleFilter?: (category: string, value: string, multiSelect?: boolean) => void;
   activeFilters?: Record<string, any>;
   filteredData?: any[];  exportMenu?: React.ReactNode; // 🆕 Prop opcional para menu de exportação personalizado
 }
@@ -34,6 +34,32 @@ const DesfechoCasosChart: React.FC<DesfechoCasosChartProps> = ({
   const [data, setData] = useState<DesfechoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // 🆕 Ref para rastrear estado do Ctrl em tempo real
+  const ctrlPressedRef = useRef(false);
+
+  // 🆕 Listeners globais para rastrear Ctrl/Cmd
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Control' || e.key === 'Meta') {
+        ctrlPressedRef.current = true;
+      }
+    };
+    
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Control' || e.key === 'Meta') {
+        ctrlPressedRef.current = false;
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
 
   // Cores para diferentes desfechos - mapeamento por nome
   const COLORS = [
@@ -129,12 +155,19 @@ const DesfechoCasosChart: React.FC<DesfechoCasosChartProps> = ({
 
   // Função para verificar se um desfecho está filtrado
   const isDesfechoFiltered = (desfecho: string) => {
-    return activeFilters?.desfecho === desfecho;
+    const filterValue = activeFilters?.desfecho;
+    if (Array.isArray(filterValue)) {
+      return filterValue.includes(desfecho);
+    }
+    return filterValue === desfecho;
   };
 
   // 🔧 FUNÇÃO CORRIGIDA: Obter a cor baseada no filtro mantendo cor original
   const getCellColor = (desfecho: string, baseColor: string) => {
-    const hasDesfechoFilter = activeFilters?.desfecho;
+    const desfechoFilter = activeFilters?.desfecho;
+    
+    // Verificar se há filtro ativo (array vazio = sem filtro)
+    const hasDesfechoFilter = desfechoFilter && (Array.isArray(desfechoFilter) ? desfechoFilter.length > 0 : true);
     
     // Se não há filtro ativo, usar cor original
     if (!hasDesfechoFilter) {
@@ -146,8 +179,8 @@ const DesfechoCasosChart: React.FC<DesfechoCasosChartProps> = ({
       return baseColor;
     }
     
-    // Se outro item está filtrado, usar cor original com transparência
-    return baseColor + "60"; // 60 = transparência ~40%
+    // Se outro item está filtrado, usar cor com 30% de opacidade
+    return baseColor + "4D"; // 4D = 30% em hexadecimal
   };
 
   // Tooltip customizado
@@ -233,7 +266,7 @@ const DesfechoCasosChart: React.FC<DesfechoCasosChartProps> = ({
                   onClick={(data) => {
                     console.log('🖱️ Clicou na fatia:', data);
                     if (toggleFilter && data.descricao) {
-                      toggleFilter('desfecho', data.descricao);
+                      toggleFilter('desfecho', data.descricao, ctrlPressedRef.current);
                     }
                   }}
                   style={{ cursor: 'pointer' }}
@@ -290,7 +323,7 @@ const DesfechoCasosChart: React.FC<DesfechoCasosChartProps> = ({
                   }`}
                   onClick={() => {
                     if (toggleFilter) {
-                      toggleFilter('desfecho', item.descricao);
+                      toggleFilter('desfecho', item.descricao, ctrlPressedRef.current);
                     }
                   }}
                   title={`🎯 Clique para filtrar por: ${item.descricao}`}
@@ -329,7 +362,14 @@ const DesfechoCasosChart: React.FC<DesfechoCasosChartProps> = ({
               {activeFilters?.desfecho && (
                 <div className="mt-4 text-center">
                   <button
-                    onClick={() => toggleFilter && toggleFilter('desfecho', activeFilters.desfecho)}
+                    onClick={() => {
+                      const filterValue = activeFilters.desfecho;
+                      if (Array.isArray(filterValue) && filterValue.length > 0) {
+                        toggleFilter && toggleFilter('desfecho', filterValue[0], ctrlPressedRef.current);
+                      } else if (typeof filterValue === 'string') {
+                        toggleFilter && toggleFilter('desfecho', filterValue, ctrlPressedRef.current);
+                      }
+                    }}
                     className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
                   >
                     🧹 Limpar Filtro de Desfecho

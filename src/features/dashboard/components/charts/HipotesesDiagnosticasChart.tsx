@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import {
   BarChart,
   Bar,
@@ -25,8 +25,8 @@ interface ChartDataItem {
 // Interface das props do componente
 interface HipotesesDiagnosticasChartProps {
   data: ChartDataItem[];
-  onChartClick?: (itemName: string) => void;
-  activeFilter?: string | null;
+  onChartClick?: (itemName: string, multiSelect?: boolean) => void;
+  activeFilter?: string | string[] | null;
   chartId?: string;
   title?: string;
   className?: string;
@@ -59,9 +59,35 @@ const HipotesesDiagnosticasChart: React.FC<HipotesesDiagnosticasChartProps> = ({
     normal: "#388e3c"
   }
 }) => {
+  // 🆕 Ref para rastrear estado do Ctrl em tempo real
+  const ctrlPressedRef = useRef(false);
+
+  // 🆕 Listeners globais para rastrear Ctrl/Cmd
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Control' || e.key === 'Meta') {
+        ctrlPressedRef.current = true;
+      }
+    };
+    
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Control' || e.key === 'Meta') {
+        ctrlPressedRef.current = false;
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
   const handleChartItemClick = useCallback((itemName: string) => {
     if (onChartClick) {
-      onChartClick(itemName);
+      onChartClick(itemName, ctrlPressedRef.current);
     }
   }, [onChartClick]);
 
@@ -79,7 +105,19 @@ const HipotesesDiagnosticasChart: React.FC<HipotesesDiagnosticasChartProps> = ({
 
   // Função para verificar se uma hipótese está filtrada
   const isHipoteseFiltered = (hipotese: string) => {
+    if (Array.isArray(activeFilter)) {
+      return activeFilter.includes(hipotese);
+    }
     return activeFilter === hipotese;
+  };
+
+  // Função para obter cor da célula baseada no filtro
+  const getCellColor = (hipotese: string, baseColor: string) => {
+    const hasFilter = activeFilter && (Array.isArray(activeFilter) ? activeFilter.length > 0 : true);
+    if (!hasFilter) return baseColor;
+    if (isHipoteseFiltered(hipotese)) return baseColor;
+    // Adicionar 30% de opacidade em hexadecimal
+    return baseColor + "4D";
   };
 
   if (!isVisible) {
@@ -173,14 +211,17 @@ const HipotesesDiagnosticasChart: React.FC<HipotesesDiagnosticasChartProps> = ({
                 }}
                 cursor="pointer"
               >
-                {limitedData.map((entry, i) => (
-                  <Cell 
-                    key={`cell-${i}`} 
-                    fill={entry.fill}
-                    stroke={activeFilter === entry.name ? "#000" : (entry.isAlarmante ? "#b71c1c" : "none")}
-                    strokeWidth={activeFilter === entry.name ? 2 : (entry.isAlarmante ? 2 : 0)}
-                  />
-                ))}
+                {limitedData.map((entry, i) => {
+                  const cellColor = getCellColor(entry.name, entry.fill);
+                  return (
+                    <Cell 
+                      key={`cell-${i}`} 
+                      fill={cellColor}
+                      stroke={isHipoteseFiltered(entry.name) ? "#000" : (entry.isAlarmante ? "#b71c1c" : "none")}
+                      strokeWidth={isHipoteseFiltered(entry.name) ? 4 : (entry.isAlarmante ? 2 : 0)}
+                    />
+                  );
+                })}
                 <LabelList
                   dataKey="value"
                   position="right"

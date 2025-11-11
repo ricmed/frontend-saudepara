@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Users } from 'lucide-react';
 import ChartExportMenu from '../../../../components/common/ChartExportMenu';
 
@@ -17,7 +17,7 @@ interface PiramideEtariaItem {
 
 interface PiramideEtariaChartProps {
   className?: string;
-  toggleFilter?: (category: string, value: string) => void;
+  toggleFilter?: (category: string, value: string, multiSelect?: boolean) => void;
   activeFilters?: Record<string, any>;
   filteredData?: any[];
   exportMenu?: React.ReactNode; // 🆕 Prop opcional para menu de exportação personalizado
@@ -33,6 +33,30 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
   const [data, setData] = useState<PiramideEtariaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const ctrlPressedRef = useRef(false);
+
+  // Rastrear tecla Ctrl pressionada
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        ctrlPressedRef.current = true;
+      }
+    };
+    
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (!e.ctrlKey && !e.metaKey) {
+        ctrlPressedRef.current = false;
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
 
   // Recarregar dados quando filteredData mudar
   useEffect(() => {
@@ -219,7 +243,12 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
 
   // Função para verificar se uma faixa etária está filtrada
   const isFaixaEtariaFiltered = (faixaEtaria: string) => {
-    return activeFilters?.faixaEtaria === faixaEtaria;
+    const filterValue = activeFilters?.faixaEtaria;
+    if (!filterValue) return false;
+    if (Array.isArray(filterValue)) {
+      return filterValue.includes(faixaEtaria);
+    }
+    return filterValue === faixaEtaria;
   };
 
   // Função para obter a cor da barra baseada no filtro
@@ -238,14 +267,17 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
     
     const color = baseColors[genero as keyof typeof baseColors] || baseColors.ignorado;
     
-    // Se não há filtros de faixa etária ativos ou se esta faixa está filtrada, usar cor normal
-    const hasFaixaEtariaFilter = activeFilters?.faixaEtaria;
+    // Verificar se há filtro de faixa etária ativo
+    const filterValue = activeFilters?.faixaEtaria;
+    const hasFaixaEtariaFilter = filterValue !== null && filterValue !== undefined;
+    
+    // Se não há filtro ou se esta faixa está selecionada, usar cor normal
     if (!hasFaixaEtariaFilter || isFaixaEtariaFiltered(faixaEtaria)) {
       return color;
     }
     
-    // Se há filtro de faixa etária ativo mas esta faixa não está filtrada, usar cor com transparência
-    return color + "60"; // 60 = transparência ~40%
+    // Se há filtro ativo mas esta faixa não está selecionada, usar cor com transparência
+    return color + "4D"; // 4D = transparência ~30%
   };
 
   if (loading) {
@@ -334,7 +366,7 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
                                 minWidth: '20px'
                               }}
                               title={`Homem Transgênero: ${homemTrans} - Clique para filtrar`}
-                              onClick={() => toggleFilter && toggleFilter('faixaEtaria', item.faixaEtaria)}
+                              onClick={() => toggleFilter && toggleFilter('faixaEtaria', item.faixaEtaria, ctrlPressedRef.current)}
                             >
                               {homemTrans}
                             </div>
@@ -351,7 +383,7 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
                                 minWidth: '20px'
                               }}
                               title={`Homem Cisgênero: ${homemCis} - Clique para filtrar`}
-                              onClick={() => toggleFilter && toggleFilter('faixaEtaria', item.faixaEtaria)}
+                              onClick={() => toggleFilter && toggleFilter('faixaEtaria', item.faixaEtaria, ctrlPressedRef.current)}
                             >
                               {homemCis}
                             </div>
@@ -364,7 +396,7 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
                         className={`w-32 text-center text-xs font-bold bg-gray-100 py-2 px-2 rounded border-2 cursor-pointer hover:bg-gray-200 transition-colors ${
                           isFaixaEtariaFiltered(item.faixaEtaria) ? 'border-blue-400 bg-blue-50' : 'border-gray-200'
                         }`}
-                        onClick={() => toggleFilter && toggleFilter('faixaEtaria', item.faixaEtaria)}
+                        onClick={() => toggleFilter && toggleFilter('faixaEtaria', item.faixaEtaria, ctrlPressedRef.current)}
                         title={`${item.faixaEtaria} - Clique para filtrar`}
                       >
                         {item.faixaEtaria}
@@ -385,7 +417,7 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
                                 minWidth: '20px'
                               }}
                               title={`Mulher Cisgênero: ${mulherCis} - Clique para filtrar`}
-                              onClick={() => toggleFilter && toggleFilter('faixaEtaria', item.faixaEtaria)}
+                              onClick={() => toggleFilter && toggleFilter('faixaEtaria', item.faixaEtaria, ctrlPressedRef.current)}
                             >
                               {mulherCis}
                             </div>
@@ -402,7 +434,7 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
                                 minWidth: '20px'
                               }}
                               title={`Mulher Transgênero: ${mulherTrans} - Clique para filtrar`}
-                              onClick={() => toggleFilter && toggleFilter('faixaEtaria', item.faixaEtaria)}
+                              onClick={() => toggleFilter && toggleFilter('faixaEtaria', item.faixaEtaria, ctrlPressedRef.current)}
                             >
                               {mulherTrans}
                             </div>
@@ -419,7 +451,7 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
                                 minWidth: '20px'
                               }}
                               title={`Travesti: ${travesti} - Clique para filtrar`}
-                              onClick={() => toggleFilter && toggleFilter('faixaEtaria', item.faixaEtaria)}
+                              onClick={() => toggleFilter && toggleFilter('faixaEtaria', item.faixaEtaria, ctrlPressedRef.current)}
                             >
                               {travesti}
                             </div>
@@ -453,7 +485,7 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
                             minWidth: '20px'
                           }}
                           title={`Não Binário: ${item.naoBinario} (${item.faixaEtaria})`}
-                          onClick={() => toggleFilter && toggleFilter('faixaEtaria', item.faixaEtaria)}
+                          onClick={() => toggleFilter && toggleFilter('faixaEtaria', item.faixaEtaria, ctrlPressedRef.current)}
                         >
                           {item.naoBinario}
                         </div>
@@ -494,7 +526,7 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
                                 minWidth: '20px'
                               }}
                               title={`Ignorado: ${item.ignorado} (${item.faixaEtaria})`}
-                              onClick={() => toggleFilter && toggleFilter('faixaEtaria', item.faixaEtaria)}
+                              onClick={() => toggleFilter && toggleFilter('faixaEtaria', item.faixaEtaria, ctrlPressedRef.current)}
                             >
                               {item.ignorado}
                             </div>
@@ -508,7 +540,7 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
                                 minWidth: '20px'
                               }}
                               title={`Não se Aplica: ${item.naoSeAplica} (${item.faixaEtaria})`}
-                              onClick={() => toggleFilter && toggleFilter('faixaEtaria', item.faixaEtaria)}
+                              onClick={() => toggleFilter && toggleFilter('faixaEtaria', item.faixaEtaria, ctrlPressedRef.current)}
                             >
                               {item.naoSeAplica}
                             </div>
@@ -591,31 +623,41 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
           <div className="grid grid-cols-5 gap-3 text-center text-sm">
             <div className="p-3 rounded-lg border-2 border-blue-200 bg-blue-50">
               <div className="text-2xl font-bold text-blue-700">
-                {data.reduce((sum, item) => sum + item.homemCisgenero, 0)}
+                {data
+                  .filter(item => !activeFilters?.faixaEtaria || isFaixaEtariaFiltered(item.faixaEtaria))
+                  .reduce((sum, item) => sum + item.homemCisgenero, 0)}
               </div>
               <div className="text-xs text-blue-600 font-medium mt-1">Homem Cisgênero</div>
             </div>
             <div className="p-3 rounded-lg border-2 border-blue-200 bg-blue-50">
               <div className="text-2xl font-bold text-blue-600">
-                {data.reduce((sum, item) => sum + item.homemTransgenero, 0)}
+                {data
+                  .filter(item => !activeFilters?.faixaEtaria || isFaixaEtariaFiltered(item.faixaEtaria))
+                  .reduce((sum, item) => sum + item.homemTransgenero, 0)}
               </div>
               <div className="text-xs text-blue-500 font-medium mt-1">Homem Transgênero</div>
             </div>
             <div className="p-3 rounded-lg border-2 border-pink-200 bg-pink-50">
               <div className="text-2xl font-bold text-pink-700">
-                {data.reduce((sum, item) => sum + item.mulherCisgenero, 0)}
+                {data
+                  .filter(item => !activeFilters?.faixaEtaria || isFaixaEtariaFiltered(item.faixaEtaria))
+                  .reduce((sum, item) => sum + item.mulherCisgenero, 0)}
               </div>
               <div className="text-xs text-pink-600 font-medium mt-1">Mulher Cisgênero</div>
             </div>
             <div className="p-3 rounded-lg border-2 border-pink-200 bg-pink-50">
               <div className="text-2xl font-bold text-pink-600">
-                {data.reduce((sum, item) => sum + item.mulherTransgenero, 0)}
+                {data
+                  .filter(item => !activeFilters?.faixaEtaria || isFaixaEtariaFiltered(item.faixaEtaria))
+                  .reduce((sum, item) => sum + item.mulherTransgenero, 0)}
               </div>
               <div className="text-xs text-pink-500 font-medium mt-1">Mulher Transgênero</div>
             </div>
             <div className="p-3 rounded-lg border-2 border-red-200 bg-red-50">
               <div className="text-2xl font-bold text-red-600">
-                {data.reduce((sum, item) => sum + item.travesti, 0)}
+                {data
+                  .filter(item => !activeFilters?.faixaEtaria || isFaixaEtariaFiltered(item.faixaEtaria))
+                  .reduce((sum, item) => sum + item.travesti, 0)}
               </div>
               <div className="text-xs text-red-600 font-medium mt-1">Travesti</div>
             </div>
@@ -625,19 +667,25 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
           <div className="grid grid-cols-3 gap-3 text-center text-sm">
             <div className="p-3 rounded-lg border-2 border-purple-200 bg-purple-50">
               <div className="text-2xl font-bold text-purple-700">
-                {data.reduce((sum, item) => sum + item.naoBinario, 0)}
+                {data
+                  .filter(item => !activeFilters?.faixaEtaria || isFaixaEtariaFiltered(item.faixaEtaria))
+                  .reduce((sum, item) => sum + item.naoBinario, 0)}
               </div>
               <div className="text-xs text-purple-600 font-medium mt-1">Não Binário</div>
             </div>
             <div className="p-3 rounded-lg border-2 border-gray-300 bg-gray-50">
               <div className="text-2xl font-bold text-gray-700">
-                {data.reduce((sum, item) => sum + item.ignorado, 0)}
+                {data
+                  .filter(item => !activeFilters?.faixaEtaria || isFaixaEtariaFiltered(item.faixaEtaria))
+                  .reduce((sum, item) => sum + item.ignorado, 0)}
               </div>
               <div className="text-xs text-gray-600 font-medium mt-1">Ignorado</div>
             </div>
             <div className="p-3 rounded-lg border-2 border-gray-300 bg-gray-50">
               <div className="text-2xl font-bold text-gray-700">
-                {data.reduce((sum, item) => sum + item.naoSeAplica, 0)}
+                {data
+                  .filter(item => !activeFilters?.faixaEtaria || isFaixaEtariaFiltered(item.faixaEtaria))
+                  .reduce((sum, item) => sum + item.naoSeAplica, 0)}
               </div>
               <div className="text-xs text-gray-600 font-medium mt-1">Não se Aplica</div>
             </div>
@@ -647,7 +695,9 @@ const PiramideEtariaChart: React.FC<PiramideEtariaChartProps> = ({
           <div className="text-center">
             <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-4 rounded-lg inline-block shadow-lg">
               <div className="text-3xl font-bold text-white">
-                {data.reduce((sum, item) => sum + item.total, 0)}
+                {data
+                  .filter(item => !activeFilters?.faixaEtaria || isFaixaEtariaFiltered(item.faixaEtaria))
+                  .reduce((sum, item) => sum + item.total, 0)}
               </div>
               <div className="text-sm text-indigo-100 font-medium mt-1">Total Geral de Casos</div>
             </div>

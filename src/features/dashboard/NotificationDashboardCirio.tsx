@@ -382,6 +382,32 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const [autoRefreshCountdown, setAutoRefreshCountdown] = useState(60); // 60 segundos = 1 minuto
 
+  // 🆕 Ref para rastrear estado do Ctrl em tempo real
+  const ctrlPressedRef = useRef(false);
+
+  // 🆕 Listeners globais para rastrear Ctrl/Cmd
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Control' || e.key === 'Meta') {
+        ctrlPressedRef.current = true;
+      }
+    };
+    
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Control' || e.key === 'Meta') {
+        ctrlPressedRef.current = false;
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
   // 🆕 SISTEMA DE FILTROS CRUZADOS (CROSS-FILTER)
   const [activeFilters, setActiveFilters] = useState<Record<string, any>>({
     evento: null,
@@ -722,207 +748,413 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     return resultado;
   }, [exportOptions, checkAtendimentoType]);
 
-  // 🆕 FUNÇÃO PARA APLICAR FILTROS CRUZADOS
-  const applyFilters = useCallback((notificacoes: any[]) => {
+  // 🆕 FUNÇÃO PARA APLICAR FILTROS CRUZADOS (com suporte a seleção múltipla)
+  const applyFilters = useCallback((notificacoes: any[], excludeCategory?: string) => {
     let filteredData = [...notificacoes];
     
-    // Aplicar cada filtro ativo
+    // Aplicar cada filtro ativo (exceto a categoria especificada)
     Object.entries(activeFilters).forEach(([category, filterValue]) => {
+      // 🔧 CORREÇÃO: Pular a categoria que queremos excluir (para o próprio gráfico não se auto-filtrar)
+      if (category === excludeCategory) {
+        return; // Não aplicar este filtro
+      }
+      
       if (filterValue !== null && filterValue !== undefined) {
         switch (category) {
           case 'evento':
-            filteredData = filteredData.filter(n => {
-              const eventoId = n?.original?.tipo_evento_idtipo_evento;
-              
-              if (eventoId !== undefined && exportOptions?.eventoOptions?.length > 0) {
-                const evento = exportOptions.eventoOptions.find(
-                  (e: any) => String(e.idtipo_evento) === String(eventoId) || String(e.idevento) === String(eventoId)
-                );
-                
-                return evento?.descricao === filterValue;
-              }
-              return false;
-            });
+            if (Array.isArray(filterValue)) {
+              // Seleção múltipla
+              filteredData = filteredData.filter(n => {
+                const eventoId = n?.original?.tipo_evento_idtipo_evento;
+                if (eventoId !== undefined && exportOptions?.eventoOptions?.length > 0) {
+                  const evento = exportOptions.eventoOptions.find(
+                    (e: any) => String(e.idtipo_evento) === String(eventoId) || String(e.idevento) === String(eventoId)
+                  );
+                  return evento?.descricao && filterValue.includes(evento.descricao);
+                }
+                return false;
+              });
+            } else {
+              // Seleção simples
+              filteredData = filteredData.filter(n => {
+                const eventoId = n?.original?.tipo_evento_idtipo_evento;
+                if (eventoId !== undefined && exportOptions?.eventoOptions?.length > 0) {
+                  const evento = exportOptions.eventoOptions.find(
+                    (e: any) => String(e.idtipo_evento) === String(eventoId) || String(e.idevento) === String(eventoId)
+                  );
+                  return evento?.descricao === filterValue;
+                }
+                return false;
+              });
+            }
             break;
             
           case 'tipoAtendimento':
-            filteredData = filteredData.filter(n => {
-              const tipoId = n?.original?.tipo_atendimento_idtipo_atendimento;
-              const tipoDesc = getAtendimentoDescById(tipoId);
-              return tipoDesc === filterValue;
-            });
+            if (Array.isArray(filterValue)) {
+              // Seleção múltipla
+              filteredData = filteredData.filter(n => {
+                const tipoId = n?.original?.tipo_atendimento_idtipo_atendimento;
+                const tipoDesc = getAtendimentoDescById(tipoId);
+                return tipoDesc && filterValue.includes(tipoDesc);
+              });
+            } else {
+              // Seleção simples
+              filteredData = filteredData.filter(n => {
+                const tipoId = n?.original?.tipo_atendimento_idtipo_atendimento;
+                const tipoDesc = getAtendimentoDescById(tipoId);
+                return tipoDesc === filterValue;
+              });
+            }
             break;
             
           case 'publico':
-            filteredData = filteredData.filter(n => {
-              const publicoId = n?.original?.tipo_publico_idtipo_publico;
-              if (publicoId !== undefined && exportOptions?.publicoOptions?.length > 0) {
-                const publico = exportOptions.publicoOptions.find(
-                  (p: any) => String(p.idtipo_publico) === String(publicoId)
-                );
-                return publico?.descricao === filterValue;
-              }
-              return false;
-            });
+            if (Array.isArray(filterValue)) {
+              // Seleção múltipla
+              filteredData = filteredData.filter(n => {
+                const publicoId = n?.original?.tipo_publico_idtipo_publico;
+                if (publicoId !== undefined && exportOptions?.publicoOptions?.length > 0) {
+                  const publico = exportOptions.publicoOptions.find(
+                    (p: any) => String(p.idtipo_publico) === String(publicoId)
+                  );
+                  return publico?.descricao && filterValue.includes(publico.descricao);
+                }
+                return false;
+              });
+            } else {
+              // Seleção simples
+              filteredData = filteredData.filter(n => {
+                const publicoId = n?.original?.tipo_publico_idtipo_publico;
+                if (publicoId !== undefined && exportOptions?.publicoOptions?.length > 0) {
+                  const publico = exportOptions.publicoOptions.find(
+                    (p: any) => String(p.idtipo_publico) === String(publicoId)
+                  );
+                  return publico?.descricao === filterValue;
+                }
+                return false;
+              });
+            }
             break;
             
           case 'genero':
-            filteredData = filteredData.filter(n => {
-              const generoId = n?.original?.paciente?.tipo_genero_idtipo_genero;
-              if (generoId !== undefined && exportOptions?.generoOptions?.length > 0) {
-                const genero = exportOptions.generoOptions.find(
-                  (g: any) => String(g.idtipo_genero) === String(generoId)
-                );
-                return genero?.descricao === filterValue;
-              }
-              return false;
-            });
+            if (Array.isArray(filterValue)) {
+              // Seleção múltipla
+              filteredData = filteredData.filter(n => {
+                const generoId = n?.original?.paciente?.tipo_genero_idtipo_genero;
+                if (generoId !== undefined && exportOptions?.generoOptions?.length > 0) {
+                  const genero = exportOptions.generoOptions.find(
+                    (g: any) => String(g.idtipo_genero) === String(generoId)
+                  );
+                  return genero?.descricao && filterValue.includes(genero.descricao);
+                }
+                return false;
+              });
+            } else {
+              // Seleção simples
+              filteredData = filteredData.filter(n => {
+                const generoId = n?.original?.paciente?.tipo_genero_idtipo_genero;
+                if (generoId !== undefined && exportOptions?.generoOptions?.length > 0) {
+                  const genero = exportOptions.generoOptions.find(
+                    (g: any) => String(g.idtipo_genero) === String(generoId)
+                  );
+                  return genero?.descricao === filterValue;
+                }
+                return false;
+              });
+            }
             break;
             
           case 'raca':
-            filteredData = filteredData.filter(n => {
-              const racaId = n?.original?.paciente?.tipo_raca_idtipo_raca;
-              if (racaId !== undefined && exportOptions?.racaOptions?.length > 0) {
-                const raca = exportOptions.racaOptions.find(
-                  (r: any) => String(r.idtipo_raca) === String(racaId)
-                );
-                return raca?.descricao === filterValue;
-              }
-              return false;
-            });
+            if (Array.isArray(filterValue)) {
+              // Seleção múltipla
+              filteredData = filteredData.filter(n => {
+                const racaId = n?.original?.paciente?.tipo_raca_idtipo_raca;
+                if (racaId !== undefined && exportOptions?.racaOptions?.length > 0) {
+                  const raca = exportOptions.racaOptions.find(
+                    (r: any) => String(r.idtipo_raca) === String(racaId)
+                  );
+                  return raca?.descricao && filterValue.includes(raca.descricao);
+                }
+                return false;
+              });
+            } else {
+              // Seleção simples
+              filteredData = filteredData.filter(n => {
+                const racaId = n?.original?.paciente?.tipo_raca_idtipo_raca;
+                if (racaId !== undefined && exportOptions?.racaOptions?.length > 0) {
+                  const raca = exportOptions.racaOptions.find(
+                    (r: any) => String(r.idtipo_raca) === String(racaId)
+                  );
+                  return raca?.descricao === filterValue;
+                }
+                return false;
+              });
+            }
             break;
             
           case 'escolaridade':
-            filteredData = filteredData.filter(n => {
-              const escolaridadeId = n?.original?.paciente?.escolaridade_idescolaridade;
-              if (escolaridadeId !== undefined && exportOptions?.escolaridadeOptions?.length > 0) {
-                const escolaridade = exportOptions.escolaridadeOptions.find(
-                  (e: any) => String(e.idtipo_escolaridade) === String(escolaridadeId)
-                );
-                return escolaridade?.descricao === filterValue;
-              }
-              return false;
-            });
+            if (Array.isArray(filterValue)) {
+              // Seleção múltipla
+              filteredData = filteredData.filter(n => {
+                const escolaridadeId = n?.original?.paciente?.escolaridade_idescolaridade;
+                if (escolaridadeId !== undefined && exportOptions?.escolaridadeOptions?.length > 0) {
+                  const escolaridade = exportOptions.escolaridadeOptions.find(
+                    (e: any) => String(e.idtipo_escolaridade) === String(escolaridadeId)
+                  );
+                  return escolaridade?.descricao && filterValue.includes(escolaridade.descricao);
+                }
+                return false;
+              });
+            } else {
+              // Seleção simples
+              filteredData = filteredData.filter(n => {
+                const escolaridadeId = n?.original?.paciente?.escolaridade_idescolaridade;
+                if (escolaridadeId !== undefined && exportOptions?.escolaridadeOptions?.length > 0) {
+                  const escolaridade = exportOptions.escolaridadeOptions.find(
+                    (e: any) => String(e.idtipo_escolaridade) === String(escolaridadeId)
+                  );
+                  return escolaridade?.descricao === filterValue;
+                }
+                return false;
+              });
+            }
             break;
             
           case 'unidade':
-            filteredData = filteredData.filter(n => {
-              const unidadeId = n?.original?.estabelecimento_idestabelecimento;
-              if (unidadeId !== undefined && exportOptions?.estabelecimentoOptions?.length > 0) {
-                const unidade = exportOptions.estabelecimentoOptions.find(
-                  (u: any) => String(u.idestabelecimento) === String(unidadeId)
-                );
-                return unidade?.nome === filterValue;
-              }
-              return false;
-            });
+            if (Array.isArray(filterValue)) {
+              // Seleção múltipla: filtra se o valor estiver no array
+              filteredData = filteredData.filter(n => {
+                const unidadeId = n?.original?.estabelecimento_idestabelecimento;
+                if (unidadeId !== undefined && exportOptions?.estabelecimentoOptions?.length > 0) {
+                  const unidade = exportOptions.estabelecimentoOptions.find(
+                    (u: any) => String(u.idestabelecimento) === String(unidadeId)
+                  );
+                  return unidade?.nome && filterValue.includes(unidade.nome);
+                }
+                return false;
+              });
+            } else {
+              // Seleção simples: filtra se o valor for igual
+              filteredData = filteredData.filter(n => {
+                const unidadeId = n?.original?.estabelecimento_idestabelecimento;
+                if (unidadeId !== undefined && exportOptions?.estabelecimentoOptions?.length > 0) {
+                  const unidade = exportOptions.estabelecimentoOptions.find(
+                    (u: any) => String(u.idestabelecimento) === String(unidadeId)
+                  );
+                  return unidade?.nome === filterValue;
+                }
+                return false;
+              });
+            }
             break;
             
           case 'hipotese':
-            filteredData = filteredData.filter(n => {
-              const hipoteseId = n?.original?.tipo_hipotese_diag_idtipo_hipotese_diag;
-              if (hipoteseId !== undefined && exportOptions?.hipoteseDiagOptions?.length > 0) {
-                const hipotese = exportOptions.hipoteseDiagOptions.find(
-                  (h: any) => String(h.idtipo_hipotese_diag) === String(hipoteseId)
-                );
-                return hipotese?.descricao === filterValue;
-              }
-              return false;
-            });
+            if (Array.isArray(filterValue)) {
+              // Seleção múltipla
+              filteredData = filteredData.filter(n => {
+                const hipoteseId = n?.original?.tipo_hipotese_diag_idtipo_hipotese_diag;
+                if (hipoteseId !== undefined && exportOptions?.hipoteseDiagOptions?.length > 0) {
+                  const hipotese = exportOptions.hipoteseDiagOptions.find(
+                    (h: any) => String(h.idtipo_hipotese_diag) === String(hipoteseId)
+                  );
+                  return hipotese?.descricao && filterValue.includes(hipotese.descricao);
+                }
+                return false;
+              });
+            } else {
+              // Seleção simples
+              filteredData = filteredData.filter(n => {
+                const hipoteseId = n?.original?.tipo_hipotese_diag_idtipo_hipotese_diag;
+                if (hipoteseId !== undefined && exportOptions?.hipoteseDiagOptions?.length > 0) {
+                  const hipotese = exportOptions.hipoteseDiagOptions.find(
+                    (h: any) => String(h.idtipo_hipotese_diag) === String(hipoteseId)
+                  );
+                  return hipotese?.descricao === filterValue;
+                }
+                return false;
+              });
+            }
             break;
             
           case 'trauma':
             console.log("🔍 Filtrando por trauma:", filterValue);
             console.log("🔧 traumaOptions disponíveis:", exportOptions?.traumaOptions?.length || 0);
             
-            filteredData = filteredData.filter(n => {
-              const traumas = n?.original?.notificacao_has_tipo_trauma;
-              console.log("🏥 Verificando traumas:", traumas, "na notificação");
-              
-              if (Array.isArray(traumas) && traumas.length > 0 && exportOptions?.traumaOptions?.length > 0) {
-                return traumas.some((traumaRel: any) => {
-                  const traumaId = traumaRel.tipo_trauma_idtipo_trauma;
-                  const trauma = exportOptions.traumaOptions.find(
-                    (t: any) => String(t.idtipo_trauma) === String(traumaId)
-                  );
-                  console.log("🔍 Trauma encontrado:", trauma?.descricao, "vs filtro:", filterValue);
-                  return trauma?.descricao === filterValue;
-                });
-              }
-              console.log("❌ Trauma não encontrado - traumas:", traumas, "traumaOptions:", exportOptions?.traumaOptions?.length);
-              return false;
-            });
+            if (Array.isArray(filterValue)) {
+              // Seleção múltipla
+              filteredData = filteredData.filter(n => {
+                const traumas = n?.original?.notificacao_has_tipo_trauma;
+                console.log("🏥 Verificando traumas:", traumas, "na notificação");
+                
+                if (Array.isArray(traumas) && traumas.length > 0 && exportOptions?.traumaOptions?.length > 0) {
+                  return traumas.some((traumaRel: any) => {
+                    const traumaId = traumaRel.tipo_trauma_idtipo_trauma;
+                    const trauma = exportOptions.traumaOptions.find(
+                      (t: any) => String(t.idtipo_trauma) === String(traumaId)
+                    );
+                    console.log("🔍 Trauma encontrado:", trauma?.descricao, "vs filtro:", filterValue);
+                    return trauma?.descricao && filterValue.includes(trauma.descricao);
+                  });
+                }
+                console.log("❌ Trauma não encontrado - traumas:", traumas, "traumaOptions:", exportOptions?.traumaOptions?.length);
+                return false;
+              });
+            } else {
+              // Seleção simples
+              filteredData = filteredData.filter(n => {
+                const traumas = n?.original?.notificacao_has_tipo_trauma;
+                
+                if (Array.isArray(traumas) && traumas.length > 0 && exportOptions?.traumaOptions?.length > 0) {
+                  return traumas.some((traumaRel: any) => {
+                    const traumaId = traumaRel.tipo_trauma_idtipo_trauma;
+                    const trauma = exportOptions.traumaOptions.find(
+                      (t: any) => String(t.idtipo_trauma) === String(traumaId)
+                    );
+                    return trauma?.descricao === filterValue;
+                  });
+                }
+                return false;
+              });
+            }
             break;
             
           case 'sintoma':
-            filteredData = filteredData.filter(n => {
-              const sintomas = n?.original?.notificacao_has_tipo_sintoma;
-              if (Array.isArray(sintomas) && exportOptions?.sintomaOptions?.length > 0) {
-                return sintomas.some((s: any) => {
-                  const sintoma = exportOptions.sintomaOptions.find(
-                    (opt: any) => String(opt.idtipo_sintoma) === String(s.tipo_sintoma_idtipo_sintoma)
-                  );
-                  return sintoma?.descricao === filterValue;
-                });
-              }
-              return false;
-            });
+            if (Array.isArray(filterValue)) {
+              // Seleção múltipla
+              filteredData = filteredData.filter(n => {
+                const sintomas = n?.original?.notificacao_has_tipo_sintoma;
+                if (Array.isArray(sintomas) && exportOptions?.sintomaOptions?.length > 0) {
+                  return sintomas.some((s: any) => {
+                    const sintoma = exportOptions.sintomaOptions.find(
+                      (opt: any) => String(opt.idtipo_sintoma) === String(s.tipo_sintoma_idtipo_sintoma)
+                    );
+                    return sintoma?.descricao && filterValue.includes(sintoma.descricao);
+                  });
+                }
+                return false;
+              });
+            } else {
+              // Seleção simples
+              filteredData = filteredData.filter(n => {
+                const sintomas = n?.original?.notificacao_has_tipo_sintoma;
+                if (Array.isArray(sintomas) && exportOptions?.sintomaOptions?.length > 0) {
+                  return sintomas.some((s: any) => {
+                    const sintoma = exportOptions.sintomaOptions.find(
+                      (opt: any) => String(opt.idtipo_sintoma) === String(s.tipo_sintoma_idtipo_sintoma)
+                    );
+                    return sintoma?.descricao === filterValue;
+                  });
+                }
+                return false;
+              });
+            }
             break;
 
           case 'faixaEtaria':
-            filteredData = filteredData.filter(n => {
-              // ✅ CORRIGIDO: Usar a mesma fonte de dados do PiramideEtariaChart
-              const paciente = n?.original?.paciente;
-              if (!paciente || paciente.idade === null || paciente.idade === undefined) {
-                return false;
-              }
-              
-              // Converter idade em meses para faixa etária usando a mesma lógica do gráfico
-              const idadeMeses = paciente.idade;
-              let faixaEtaria = '';
-              
-              if (idadeMeses < 12) {
-                faixaEtaria = 'Menor de 1 ano';
-              } else {
-                const anos = Math.floor(idadeMeses / 12);
+            if (Array.isArray(filterValue)) {
+              // Seleção múltipla
+              filteredData = filteredData.filter(n => {
+                const paciente = n?.original?.paciente;
+                if (!paciente || paciente.idade === null || paciente.idade === undefined) {
+                  return false;
+                }
                 
-                if (anos >= 1 && anos <= 4) faixaEtaria = '1 a 4 anos';
-                else if (anos >= 5 && anos <= 9) faixaEtaria = '5 a 9 anos';
-                else if (anos >= 10 && anos <= 14) faixaEtaria = '10 a 14 anos';
-                else if (anos >= 15 && anos <= 19) faixaEtaria = '15 a 19 anos';
-                else if (anos >= 20 && anos <= 24) faixaEtaria = '20 a 24 anos';
-                else if (anos >= 25 && anos <= 29) faixaEtaria = '25 a 29 anos';
-                else if (anos >= 30 && anos <= 34) faixaEtaria = '30 a 34 anos';
-                else if (anos >= 35 && anos <= 39) faixaEtaria = '35 a 39 anos';
-                else if (anos >= 40 && anos <= 44) faixaEtaria = '40 a 44 anos';
-                else if (anos >= 45 && anos <= 49) faixaEtaria = '45 a 49 anos';
-                else if (anos >= 50 && anos <= 54) faixaEtaria = '50 a 54 anos';
-                else if (anos >= 55 && anos <= 59) faixaEtaria = '55 a 59 anos';
-                else if (anos >= 60 && anos <= 64) faixaEtaria = '60 a 64 anos';
-                else if (anos >= 65 && anos <= 69) faixaEtaria = '65 a 69 anos';
-                else if (anos >= 70 && anos <= 74) faixaEtaria = '70 a 74 anos';
-                else if (anos >= 75 && anos <= 79) faixaEtaria = '75 a 79 anos';
-                else faixaEtaria = '80 ou mais anos';
-              }
-              
-              return faixaEtaria === filterValue;
-            });
+                const idadeMeses = paciente.idade;
+                let faixaEtaria = '';
+                
+                if (idadeMeses < 12) {
+                  faixaEtaria = 'Menor de 1 ano';
+                } else {
+                  const anos = Math.floor(idadeMeses / 12);
+                  
+                  if (anos >= 1 && anos <= 4) faixaEtaria = '1 a 4 anos';
+                  else if (anos >= 5 && anos <= 9) faixaEtaria = '5 a 9 anos';
+                  else if (anos >= 10 && anos <= 14) faixaEtaria = '10 a 14 anos';
+                  else if (anos >= 15 && anos <= 19) faixaEtaria = '15 a 19 anos';
+                  else if (anos >= 20 && anos <= 24) faixaEtaria = '20 a 24 anos';
+                  else if (anos >= 25 && anos <= 29) faixaEtaria = '25 a 29 anos';
+                  else if (anos >= 30 && anos <= 34) faixaEtaria = '30 a 34 anos';
+                  else if (anos >= 35 && anos <= 39) faixaEtaria = '35 a 39 anos';
+                  else if (anos >= 40 && anos <= 44) faixaEtaria = '40 a 44 anos';
+                  else if (anos >= 45 && anos <= 49) faixaEtaria = '45 a 49 anos';
+                  else if (anos >= 50 && anos <= 54) faixaEtaria = '50 a 54 anos';
+                  else if (anos >= 55 && anos <= 59) faixaEtaria = '55 a 59 anos';
+                  else if (anos >= 60 && anos <= 64) faixaEtaria = '60 a 64 anos';
+                  else if (anos >= 65 && anos <= 69) faixaEtaria = '65 a 69 anos';
+                  else if (anos >= 70 && anos <= 74) faixaEtaria = '70 a 74 anos';
+                  else if (anos >= 75 && anos <= 79) faixaEtaria = '75 a 79 anos';
+                  else faixaEtaria = '80 ou mais anos';
+                }
+                
+                return faixaEtaria && filterValue.includes(faixaEtaria);
+              });
+            } else {
+              // Seleção simples
+              filteredData = filteredData.filter(n => {
+                const paciente = n?.original?.paciente;
+                if (!paciente || paciente.idade === null || paciente.idade === undefined) {
+                  return false;
+                }
+                
+                const idadeMeses = paciente.idade;
+                let faixaEtaria = '';
+                
+                if (idadeMeses < 12) {
+                  faixaEtaria = 'Menor de 1 ano';
+                } else {
+                  const anos = Math.floor(idadeMeses / 12);
+                  
+                  if (anos >= 1 && anos <= 4) faixaEtaria = '1 a 4 anos';
+                  else if (anos >= 5 && anos <= 9) faixaEtaria = '5 a 9 anos';
+                  else if (anos >= 10 && anos <= 14) faixaEtaria = '10 a 14 anos';
+                  else if (anos >= 15 && anos <= 19) faixaEtaria = '15 a 19 anos';
+                  else if (anos >= 20 && anos <= 24) faixaEtaria = '20 a 24 anos';
+                  else if (anos >= 25 && anos <= 29) faixaEtaria = '25 a 29 anos';
+                  else if (anos >= 30 && anos <= 34) faixaEtaria = '30 a 34 anos';
+                  else if (anos >= 35 && anos <= 39) faixaEtaria = '35 a 39 anos';
+                  else if (anos >= 40 && anos <= 44) faixaEtaria = '40 a 44 anos';
+                  else if (anos >= 45 && anos <= 49) faixaEtaria = '45 a 49 anos';
+                  else if (anos >= 50 && anos <= 54) faixaEtaria = '50 a 54 anos';
+                  else if (anos >= 55 && anos <= 59) faixaEtaria = '55 a 59 anos';
+                  else if (anos >= 60 && anos <= 64) faixaEtaria = '60 a 64 anos';
+                  else if (anos >= 65 && anos <= 69) faixaEtaria = '65 a 69 anos';
+                  else if (anos >= 70 && anos <= 74) faixaEtaria = '70 a 74 anos';
+                  else if (anos >= 75 && anos <= 79) faixaEtaria = '75 a 79 anos';
+                  else faixaEtaria = '80 ou mais anos';
+                }
+                
+                return faixaEtaria === filterValue;
+              });
+            }
             break;
 
           case 'desfecho':
-            filteredData = filteredData.filter(n => {
-              // ✅ CORRIGIDO: Usar a mesma fonte de dados do DesfechoCasosChart
-              const original = n?.original || n;
-              const tipoEncerramento = original?.tipo_encerramento;
-              
-              if (tipoEncerramento && tipoEncerramento.descricao) {
-                return tipoEncerramento.descricao === filterValue;
-              }
-              
-              // Fallback: tentar campo desfecho direto também
-              const desfecho = original?.desfecho;
-              return desfecho === filterValue;
-            });
+            if (Array.isArray(filterValue)) {
+              // Seleção múltipla
+              filteredData = filteredData.filter(n => {
+                const original = n?.original || n;
+                const tipoEncerramento = original?.tipo_encerramento;
+                
+                if (tipoEncerramento && tipoEncerramento.descricao) {
+                  return filterValue.includes(tipoEncerramento.descricao);
+                }
+                
+                const desfecho = original?.desfecho;
+                return desfecho && filterValue.includes(desfecho);
+              });
+            } else {
+              // Seleção simples
+              filteredData = filteredData.filter(n => {
+                const original = n?.original || n;
+                const tipoEncerramento = original?.tipo_encerramento;
+                
+                if (tipoEncerramento && tipoEncerramento.descricao) {
+                  return tipoEncerramento.descricao === filterValue;
+                }
+                
+                const desfecho = original?.desfecho;
+                return desfecho === filterValue;
+              });
+            }
             break;
             
           case 'dataNotificacao':
@@ -958,55 +1190,115 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             
           // 🆕 NOVOS FILTROS PARA LOCALIZAÇÃO GEOGRÁFICA
           case 'pais':
-            filteredData = filteredData.filter(n => {
-              const paisId = n?.original?.tipo_pais_idtipo_pais;
-              if (paisId !== undefined && exportOptions?.paisOptions?.length > 0) {
-                const pais = exportOptions.paisOptions.find(
-                  (p: any) => String(p.idtipo_pais) === String(paisId)
-                );
-                return pais?.descricao === filterValue;
-              }
-              return false;
-            });
+            if (Array.isArray(filterValue)) {
+              // Seleção múltipla
+              filteredData = filteredData.filter(n => {
+                const paisId = n?.original?.tipo_pais_idtipo_pais;
+                if (paisId !== undefined && exportOptions?.paisOptions?.length > 0) {
+                  const pais = exportOptions.paisOptions.find(
+                    (p: any) => String(p.idtipo_pais) === String(paisId)
+                  );
+                  return pais?.descricao && filterValue.includes(pais.descricao);
+                }
+                return false;
+              });
+            } else {
+              // Seleção simples
+              filteredData = filteredData.filter(n => {
+                const paisId = n?.original?.tipo_pais_idtipo_pais;
+                if (paisId !== undefined && exportOptions?.paisOptions?.length > 0) {
+                  const pais = exportOptions.paisOptions.find(
+                    (p: any) => String(p.idtipo_pais) === String(paisId)
+                  );
+                  return pais?.descricao === filterValue;
+                }
+                return false;
+              });
+            }
             break;
             
           case 'estado':
-            filteredData = filteredData.filter(n => {
-              const estadoId = n?.original?.tipo_estado_idtipo_estado;
-              if (estadoId !== undefined && exportOptions?.estadoOptions?.length > 0) {
-                const estado = exportOptions.estadoOptions.find(
-                  (e: any) => String(e.idtipo_estado) === String(estadoId)
-                );
-                return estado?.descricao === filterValue;
-              }
-              return false;
-            });
+            if (Array.isArray(filterValue)) {
+              // Seleção múltipla
+              filteredData = filteredData.filter(n => {
+                const estadoId = n?.original?.tipo_estado_idtipo_estado;
+                if (estadoId !== undefined && exportOptions?.estadoOptions?.length > 0) {
+                  const estado = exportOptions.estadoOptions.find(
+                    (e: any) => String(e.idtipo_estado) === String(estadoId)
+                  );
+                  return estado?.descricao && filterValue.includes(estado.descricao);
+                }
+                return false;
+              });
+            } else {
+              // Seleção simples
+              filteredData = filteredData.filter(n => {
+                const estadoId = n?.original?.tipo_estado_idtipo_estado;
+                if (estadoId !== undefined && exportOptions?.estadoOptions?.length > 0) {
+                  const estado = exportOptions.estadoOptions.find(
+                    (e: any) => String(e.idtipo_estado) === String(estadoId)
+                  );
+                  return estado?.descricao === filterValue;
+                }
+                return false;
+              });
+            }
             break;
             
           case 'municipio':
-            filteredData = filteredData.filter(n => {
-              const municipioId = n?.original?.tipo_municipio_idtipo_municipio;
-              if (municipioId !== undefined && exportOptions?.municipioOptions?.length > 0) {
-                const municipio = exportOptions.municipioOptions.find(
-                  (m: any) => String(m.idtipo_municipio) === String(municipioId)
-                );
-                return municipio?.descricao === filterValue;
-              }
-              return false;
-            });
+            if (Array.isArray(filterValue)) {
+              // Seleção múltipla
+              filteredData = filteredData.filter(n => {
+                const municipioId = n?.original?.tipo_municipio_idtipo_municipio;
+                if (municipioId !== undefined && exportOptions?.municipioOptions?.length > 0) {
+                  const municipio = exportOptions.municipioOptions.find(
+                    (m: any) => String(m.idtipo_municipio) === String(municipioId)
+                  );
+                  return municipio?.descricao && filterValue.includes(municipio.descricao);
+                }
+                return false;
+              });
+            } else {
+              // Seleção simples
+              filteredData = filteredData.filter(n => {
+                const municipioId = n?.original?.tipo_municipio_idtipo_municipio;
+                if (municipioId !== undefined && exportOptions?.municipioOptions?.length > 0) {
+                  const municipio = exportOptions.municipioOptions.find(
+                    (m: any) => String(m.idtipo_municipio) === String(municipioId)
+                  );
+                  return municipio?.descricao === filterValue;
+                }
+                return false;
+              });
+            }
             break;
             
           case 'bairro':
-            filteredData = filteredData.filter(n => {
-              const bairroId = n?.original?.tipo_bairro_idtipo_bairro;
-              if (bairroId !== undefined && exportOptions?.bairroOptions?.length > 0) {
-                const bairro = exportOptions.bairroOptions.find(
-                  (b: any) => String(b.idtipo_bairro) === String(bairroId)
-                );
-                return bairro?.descricao === filterValue;
-              }
-              return false;
-            });
+            if (Array.isArray(filterValue)) {
+              // Seleção múltipla
+              filteredData = filteredData.filter(n => {
+                const bairroId = n?.original?.tipo_bairro_idtipo_bairro;
+                if (bairroId !== undefined && exportOptions?.bairroOptions?.length > 0) {
+                  const bairro = exportOptions.bairroOptions.find(
+                    (b: any) => String(b.idtipo_bairro) === String(bairroId)
+                  );
+                  return bairro?.descricao && filterValue.includes(bairro.descricao);
+                }
+                return false;
+              });
+            } else {
+              // Seleção simples
+              filteredData = filteredData.filter(n => {
+                const bairroId = n?.original?.tipo_bairro_idtipo_bairro;
+                if (bairroId !== undefined && exportOptions?.bairroOptions?.length > 0) {
+                  const bairro = exportOptions.bairroOptions.find(
+                    (b: any) => String(b.idtipo_bairro) === String(bairroId)
+                  );
+                  return bairro?.descricao === filterValue;
+                }
+                return false;
+              });
+            }
             break;
         }
       }
@@ -1037,20 +1329,40 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     return filtradas;
   }, [notificacoesFiltradasPorEvento, activeFilters, applyFilters]);
 
-  // 🆕 FUNÇÃO PARA ALTERNAR FILTRO
-  const toggleFilter = useCallback((category: string, value: string) => {
+  // 🆕 FUNÇÃO PARA ALTERNAR FILTRO (com suporte a seleção múltipla)
+  const toggleFilter = useCallback((category: string, value: string, multiSelect = false) => {
     setActiveFilters(prev => {
       const newFilters = { ...prev };
-      
-      // Se o mesmo filtro já está ativo, removê-lo
-      if (newFilters[category] === value) {
-        newFilters[category] = null;
+      const currVal = newFilters[category];
+
+      if (multiSelect) {
+        // Modo de seleção múltipla (Ctrl pressionado)
+        // SEMPRE trabalhar com arrays para consistência
+        const vals = Array.isArray(currVal) ? currVal : currVal ? [currVal] : [];
+        
+        if (vals.includes(value)) {
+          // Remove o valor se já estiver selecionado
+          const updated = vals.filter(v => v !== value);
+          newFilters[category] = updated.length ? updated : null;
+        } else {
+          // Adiciona o novo valor ao array
+          newFilters[category] = [...vals, value];
+        }
       } else {
-        // Caso contrário, definir o novo filtro
-        newFilters[category] = value;
+        // Modo de seleção simples (comportamento padrão)
+        // SEMPRE usar array para consistência visual
+        const vals = Array.isArray(currVal) ? currVal : currVal ? [currVal] : [];
+        
+        if (vals.includes(value)) {
+          // Se o mesmo filtro já está ativo, remove-o
+          newFilters[category] = null;
+        } else {
+          // Define o novo filtro como array de um único item
+          newFilters[category] = [value];
+        }
       }
       
-      console.log(`🎯 Filtro alterado:`, { category, value, newFilters });
+      console.log(`🎯 Filtro alterado:`, { category, value, multiSelect, newValue: newFilters[category] });
       return newFilters;
     });
   }, []);
@@ -1211,60 +1523,47 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     return applyFilters(baseData);
   }, [hasActiveFilters, applyFilters, notificacoesFiltradasPorEvento]);
 
+  // 🆕 FUNÇÃO PARA OBTER DADOS FILTRADOS EXCLUINDO DESFECHO (para o gráfico de Desfecho)
+  const getFilteredDataExcludingDesfecho = useCallback(() => {
+    const baseData = notificacoesFiltradasPorEvento;
+    
+    if (!hasActiveFilters) {
+      return baseData;
+    }
+    return applyFilters(baseData, 'desfecho');
+  }, [hasActiveFilters, applyFilters, notificacoesFiltradasPorEvento]);
+
+  // 🆕 FUNÇÃO PARA OBTER DADOS FILTRADOS EXCLUINDO UNIDADE (para o gráfico de Estabelecimentos)
+  const getFilteredDataExcludingUnidade = useCallback(() => {
+    const baseData = notificacoesFiltradasPorEvento;
+    
+    if (!hasActiveFilters) {
+      return baseData;
+    }
+    return applyFilters(baseData, 'unidade');
+  }, [hasActiveFilters, applyFilters, notificacoesFiltradasPorEvento]);
+
+  // 🆕 FUNÇÃO PARA OBTER DADOS FILTRADOS EXCLUINDO FAIXA ETÁRIA (para Pirâmide Etária)
+  const getFilteredDataExcludingFaixaEtaria = useCallback(() => {
+    const baseData = notificacoesFiltradasPorEvento;
+    
+    if (!hasActiveFilters) {
+      return baseData;
+    }
+    return applyFilters(baseData, 'faixaEtaria');
+  }, [hasActiveFilters, applyFilters, notificacoesFiltradasPorEvento]);
+
   // 🆕 FUNÇÃO PARA DETERMINAR QUAIS GRÁFICOS DEVEM SER VISÍVEIS BASEADO NO TIPO DE ATENDIMENTO
   const getVisibleCharts = useCallback(() => {
-    const tipoAtendimento = activeFilters.tipoAtendimento;
-    
-    if (!tipoAtendimento) {
-      // Se nenhum tipo de atendimento está selecionado, mostrar todos
-      return {
-        trauma: true,
-        sintomas: true,
-        hipoteses: true,
-        demograficos: true // público, gênero, raça
-      };
-    }
-
-    const tipoLower = tipoAtendimento.toLowerCase();
-    
-    // TRAUMA ou MÚLTIPLAS VÍTIMAS: apenas trauma
-    if (tipoLower.includes('trauma') || tipoLower.includes('múltiplas') || tipoLower.includes('multiplas')) {
-      return {
-        trauma: true,
-        sintomas: false,
-        hipoteses: false,
-        demograficos: true // mantém dados demográficos para análise
-      };
-    }
-    
-    // CLÍNICO: apenas sintomas e hipóteses
-    if (tipoLower.includes('clínico') || tipoLower.includes('clinico')) {
-      return {
-        trauma: false,
-        sintomas: true,
-        hipoteses: true,
-        demograficos: true // mantém dados demográficos para análise
-      };
-    }
-    
-    // INCIDENTE QBRN: todos os tipos
-    if (tipoLower.includes('qbrn') || tipoLower.includes('incidente')) {
-      return {
-        trauma: true,
-        sintomas: true,
-        hipoteses: true,
-        demograficos: true
-      };
-    }
-    
-    // Padrão: mostrar todos
+    // 🔧 MODIFICADO: Sempre mostrar todos os gráficos, independente dos filtros
+    // O próprio gráfico filtra os dados internamente
     return {
       trauma: true,
       sintomas: true,
       hipoteses: true,
       demograficos: true
     };
-  }, [activeFilters.tipoAtendimento]);
+  }, []);
 
   // Usar a função para obter quais gráficos devem ser visíveis
   const visibleCharts = getVisibleCharts();
@@ -1276,69 +1575,14 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
   // FUNÇÃO PARA CALCULAR SPANS DOS GRÁFICOS - Grid de 8 colunas (Sintomas 2, Trauma 2, Hipóteses 4)
   const getChartSpans = useCallback(() => {
-    const { trauma, sintomas, hipoteses } = visibleCharts;
-    
-    // CASO 1: Todos os 3 gráficos visíveis - Sintomas (2) + Trauma (2) + Hipóteses (4) = 8 cols
-    if (trauma && sintomas && hipoteses) {
-      return {
-        sintomas: "md:col-span-2 lg:col-span-2 xl:col-span-2",   // 2/8 colunas
-        trauma: "md:col-span-2 lg:col-span-2 xl:col-span-2",     // 2/8 colunas  
-        hipoteses: "md:col-span-2 lg:col-span-4 xl:col-span-4"   // 4/8 colunas (mais espaço para nomes longos)
-      };
-    }
-    
-    // CASO 2: CLÍNICO - só sintomas + hipóteses (sem trauma)
-    if (!trauma && sintomas && hipoteses) {
-      return {
-        sintomas: "md:col-span-2 lg:col-span-4 xl:col-span-4",  // 4/8 colunas
-        trauma: "md:col-span-2 lg:col-span-2 xl:col-span-2",    // não usado
-        hipoteses: "md:col-span-2 lg:col-span-4 xl:col-span-4"  // 4/8 colunas
-      };
-    }
-    
-    // CASO 3: TRAUMA/MÚLTIPLAS - só trauma (sem sintomas e hipóteses)  
-    if (trauma && !sintomas && !hipoteses) {
-      return {
-        sintomas: "md:col-span-2 lg:col-span-2 xl:col-span-2",  // não usado
-        trauma: "md:col-span-2 lg:col-span-4 xl:col-span-8",    // linha inteira 8/8
-        hipoteses: "md:col-span-2 lg:col-span-2 xl:col-span-2"  // não usado
-      };
-    }
-    
-    // CASO 4: Outros casos de 2 gráficos
-    if ((trauma && sintomas && !hipoteses) || (trauma && !sintomas && hipoteses)) {
-      return {
-        sintomas: "md:col-span-2 lg:col-span-4 xl:col-span-4",  // 4/8 colunas
-        trauma: "md:col-span-2 lg:col-span-2 xl:col-span-2",    // 2/8 colunas
-        hipoteses: "md:col-span-2 lg:col-span-4 xl:col-span-4"  // 4/8 colunas
-      };
-    }
-    
-    // CASO 5: Apenas sintomas
-    if (!trauma && sintomas && !hipoteses) {
-      return {
-        sintomas: "md:col-span-2 lg:col-span-4 xl:col-span-8",  // linha inteira 8/8
-        trauma: "md:col-span-2 lg:col-span-2 xl:col-span-2",
-        hipoteses: "md:col-span-2 lg:col-span-2 xl:col-span-2"
-      };
-    }
-    
-    // CASO 6: Apenas hipóteses  
-    if (!trauma && !sintomas && hipoteses) {
-      return {
-        sintomas: "md:col-span-2 lg:col-span-2 xl:col-span-2",
-        trauma: "md:col-span-2 lg:col-span-2 xl:col-span-2",
-        hipoteses: "md:col-span-2 lg:col-span-4 xl:col-span-8"  // linha inteira 8/8
-      };
-    }
-    
-    // Padrão (fallback)
+    // 🔧 MODIFICADO: Layout fixo com todos os 3 gráficos sempre visíveis
+    // Sintomas (2) + Trauma (2) + Hipóteses (4) = 8 cols
     return {
-      sintomas: "md:col-span-2 lg:col-span-2 xl:col-span-2",
-      trauma: "md:col-span-2 lg:col-span-2 xl:col-span-2", 
-      hipoteses: "md:col-span-2 lg:col-span-4 xl:col-span-4"
+      sintomas: "md:col-span-2 lg:col-span-2 xl:col-span-2",   // 2/8 colunas
+      trauma: "md:col-span-2 lg:col-span-2 xl:col-span-2",     // 2/8 colunas  
+      hipoteses: "md:col-span-2 lg:col-span-4 xl:col-span-4"   // 4/8 colunas (mais espaço para nomes longos)
     };
-  }, [visibleCharts]);
+  }, []);
 
   // Obter os spans calculados para os gráficos
   const chartSpans = getChartSpans();
@@ -1989,8 +2233,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
     try {
       // Processar cada categoria - usar paleta normal para barras, paleta pie para rosca/pizza
+      // 🔧 POWER BI STYLE: Cada gráfico usa dados SEM seu próprio filtro
+      const dadosSemFiltroRaca = hasActiveFilters ? applyFilters(notificacoesFiltradasPorEvento, 'raca') : notificacoesFiltradasPorEvento;
       const racaPorNotificacao = processarCategoria(
-        dadosFiltrados,
+        dadosSemFiltroRaca,
         "original.paciente.tipo_raca_idtipo_raca",
         exportOptions.racaOptions || [],
         "idtipo_raca",
@@ -2004,8 +2250,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         setOriginalRaca(racaPorNotificacao);
       }
 
+      const dadosSemFiltroEscolaridade = hasActiveFilters ? applyFilters(notificacoesFiltradasPorEvento, 'escolaridade') : notificacoesFiltradasPorEvento;
       const escolaridadePorNotificacao = processarCategoria(
-        dadosFiltrados,
+        dadosSemFiltroEscolaridade,
         "original.paciente.escolaridade_idescolaridade",
         exportOptions.escolaridadeOptions || [],
         "idtipo_escolaridade",
@@ -2019,8 +2266,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         setOriginalEscolaridade(escolaridadePorNotificacao);
       }
 
+      const dadosSemFiltroUnidade = hasActiveFilters ? applyFilters(notificacoesFiltradasPorEvento, 'unidade') : notificacoesFiltradasPorEvento;
       const unidadesPorNotificacao = processarCategoria(
-        dadosFiltrados,
+        dadosSemFiltroUnidade,
         "original.estabelecimento_idestabelecimento",
         exportOptions.estabelecimentoOptions || [],
         "idestabelecimento",
@@ -2035,8 +2283,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       }
 
       // Gênero como gráfico de pizza - usar paleta pie
+      // 🔧 POWER BI STYLE: Usar dados SEM filtro de gênero (mas COM outros filtros)
+      const dadosSemFiltroGenero = hasActiveFilters ? applyFilters(notificacoesFiltradasPorEvento, 'genero') : notificacoesFiltradasPorEvento;
       const generoPorNotificacao = processarCategoria(
-        dadosFiltrados,
+        dadosSemFiltroGenero,
         "original.paciente.tipo_genero_idtipo_genero",
         exportOptions.generoOptions || [],
         "idtipo_genero",
@@ -2050,8 +2300,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         setOriginalGenero(generoPorNotificacao);
       }
 
+      const dadosSemFiltroSintoma = hasActiveFilters ? applyFilters(notificacoesFiltradasPorEvento, 'sintoma') : notificacoesFiltradasPorEvento;
       const sintomasPorNotificacao = processarCategoriaMuitosParaMuitos(
-        dadosFiltrados,
+        dadosSemFiltroSintoma,
         "original.notificacao_has_tipo_sintoma",
         "tipo_sintoma_idtipo_sintoma",
         exportOptions.sintomaOptions || [],
@@ -2066,8 +2317,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         setOriginalSintomas(sintomasPorNotificacao);
       }
 
+      const dadosSemFiltroTipoAtendimento = hasActiveFilters ? applyFilters(notificacoesFiltradasPorEvento, 'tipoAtendimento') : notificacoesFiltradasPorEvento;
       const atendimentoPorNotificacao = processarCategoria(
-        dadosFiltrados,
+        dadosSemFiltroTipoAtendimento,
         "original.tipo_atendimento_idtipo_atendimento",
         exportOptions.atendimentoOptions || [],
         "idtipo_atendimento",
@@ -2082,8 +2334,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       }
 
       // Público como gráfico de rosca - usar paleta pie
+      const dadosSemFiltroPublico = hasActiveFilters ? applyFilters(notificacoesFiltradasPorEvento, 'publico') : notificacoesFiltradasPorEvento;
       const publicoPorNotificacao = processarCategoria(
-        dadosFiltrados,
+        dadosSemFiltroPublico,
         "original.tipo_publico_idtipo_publico",
         exportOptions.publicoOptions || [],
         "idtipo_publico",
@@ -2097,8 +2350,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         setOriginalPublico(publicoPorNotificacao);
       }
 
+      const dadosSemFiltroHipotese = hasActiveFilters ? applyFilters(notificacoesFiltradasPorEvento, 'hipotese') : notificacoesFiltradasPorEvento;
       const hipotesePorNotificacao = processarCategoria(
-        dadosFiltrados,
+        dadosSemFiltroHipotese,
         "original.tipo_hipotese_diag_idtipo_hipotese_diag",
         exportOptions.hipoteseDiagOptions || [],
         "idtipo_hipotese_diag",
@@ -2134,8 +2388,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       if (notificacoesComTrauma.length > 0) {
       }
 
+      const dadosSemFiltroTrauma = hasActiveFilters ? applyFilters(notificacoesFiltradasPorEvento, 'trauma') : notificacoesFiltradasPorEvento;
       const traumaPorNotificacao = processarCategoriaMuitosParaMuitos(
-        dadosFiltrados,
+        dadosSemFiltroTrauma,
         "original.notificacao_has_tipo_trauma",
         "tipo_trauma_idtipo_trauma",
         exportOptions.traumaOptions || [],
@@ -2157,8 +2412,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         console.log("🌍 Lista de países:", exportOptions.paisOptions.map((p: any) => p.descricao).sort());
       }
       
+      const dadosSemFiltroPais = hasActiveFilters ? applyFilters(notificacoesFiltradasPorEvento, 'pais') : notificacoesFiltradasPorEvento;
       const paisPorNotificacao = processarPaises(
-        dadosFiltrados,
+        dadosSemFiltroPais,
         "original.tipo_pais_idtipo_pais",
         exportOptions.paisOptions || [],
         "idtipo_pais",
@@ -2172,8 +2428,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       }
 
       // Estado/UF de residência com cores características dos estados brasileiros
+      const dadosSemFiltroEstado = hasActiveFilters ? applyFilters(notificacoesFiltradasPorEvento, 'estado') : notificacoesFiltradasPorEvento;
       const estadoPorNotificacao = processarEstados(
-        dadosFiltrados,
+        dadosSemFiltroEstado,
         "original.tipo_estado_idtipo_estado",
         exportOptions.estadoOptions || [],
         "idtipo_estado", 
@@ -2186,8 +2443,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       }
 
       // Municípios de residência
+      const dadosSemFiltroMunicipio = hasActiveFilters ? applyFilters(notificacoesFiltradasPorEvento, 'municipio') : notificacoesFiltradasPorEvento;
       const municipioPorNotificacao = processarCategoria(
-        dadosFiltrados,
+        dadosSemFiltroMunicipio,
         "original.tipo_municipio_idtipo_municipio",
         exportOptions.municipioOptions || [],
         "idtipo_municipio",
@@ -2202,8 +2460,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       }
 
       // Bairros de residência (específicos de Belém)
+      const dadosSemFiltroBairro = hasActiveFilters ? applyFilters(notificacoesFiltradasPorEvento, 'bairro') : notificacoesFiltradasPorEvento;
       const bairroPorNotificacao = processarCategoria(
-        dadosFiltrados,
+        dadosSemFiltroBairro,
         "original.tipo_bairro_idtipo_bairro",
         exportOptions.bairroOptions || [],
         "idtipo_bairro",
@@ -2227,7 +2486,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       originalSintomas, originalTipoAtendimento, originalPublico, 
       originalHipoteses, originalTrauma, 
       // 🆕 INCLUIR ESTADOS ORIGINAIS DE LOCALIZAÇÃO GEOGRÁFICA
-      originalPais, originalEstado, originalMunicipio, originalBairro]);
+      originalPais, originalEstado, originalMunicipio, originalBairro,
+      // 🔧 CORREÇÃO: Incluir dependências de filtros para que os gráficos sejam reprocessados
+      applyFilters, hasActiveFilters, notificacoesFiltradasPorEvento, activeFilters]);
 
   // Função para calcular estatísticas a partir das notificações
   const calcularEstatisticas = useCallback((dadosFiltrados: any[] = []) => {
@@ -2308,7 +2569,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     
     // 🆕 ATUALIZAR DATAS DISPONÍVEIS BASEADAS NOS DADOS FILTRADOS
     // 🆕 CORREÇÃO: Usar notificações filtradas por evento como base
-    let dadosParaDatas = [...notificacoesFiltradasPorEvento];
+    const baseData = notificacoesFiltradasPorEvento;
+    let dadosParaDatas = [...baseData];
     
     // Aplicar todos os filtros ativos exceto o filtro de data usando a função applyFilters
     const filtrosSemData = { ...activeFilters };
@@ -2794,9 +3056,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     console.log(`✅ ActiveFilters.evento atualizado para:`, eventoValue);
   }, []);
 
-  // Handler para cards e charts - ATUALIZADO para filtros cruzados
-  const handleCardClick = useCallback((tipoAtendimento: string) => {
-    console.log(`Card clicado: ${tipoAtendimento}`);
+  // Handler para cards e charts - ATUALIZADO para filtros cruzados (com suporte a Ctrl)
+  const handleCardClick = useCallback((tipoAtendimento: string, multiSelect = false) => {
+    console.log(`Card clicado: ${tipoAtendimento}`, multiSelect ? '(Ctrl pressionado)' : '');
     
     // Mapear para descrição correta
     let descricao = tipoAtendimento;
@@ -2827,13 +3089,13 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     }
     
     // Usar o novo sistema de filtros cruzados
-    toggleFilter('tipoAtendimento', descricao);
+    toggleFilter('tipoAtendimento', descricao, multiSelect);
   }, [exportOptions, toggleFilter]);
 
-  // 🆕 HANDLER GENÉRICO PARA CLIQUES EM GRÁFICOS
-  const handleChartClick = useCallback((category: string, itemName: string) => {
-    console.log(`🎯 Gráfico clicado: ${category} -> ${itemName}`);
-    toggleFilter(category, itemName);
+  // 🆕 HANDLER GENÉRICO PARA CLIQUES EM GRÁFICOS (com suporte a Ctrl para seleção múltipla)
+  const handleChartClick = useCallback((category: string, itemName: string, multiSelect = false) => {
+    console.log(`🎯 Gráfico clicado: ${category} -> ${itemName}`, multiSelect ? '(Ctrl pressionado)' : '');
+    toggleFilter(category, itemName, multiSelect);
   }, [toggleFilter]);
 
   // Handler para o botão de voltar
@@ -3673,22 +3935,22 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
               <h3 className="text-sm font-semibold text-gray-700">Resumo por Tipo de Atendimento</h3>
             </div>
             <div className="grid grid-cols-4 gap-2">
-              <div className="flex flex-col items-center gap-2 p-3 bg-green-50 rounded-lg cursor-pointer hover:bg-green-100 transition-colors" onClick={() => handleCardClick("clinico")}>
+              <div className="flex flex-col items-center gap-2 p-3 bg-green-50 rounded-lg cursor-pointer hover:bg-green-100 transition-colors" onClick={() => handleCardClick("clinico", ctrlPressedRef.current)}>
                 <Activity className="h-6 w-6 text-green-600" />
                 <p className="text-xs text-gray-600 font-medium">Clínico</p>
                 <p className="text-2xl font-bold text-green-700">{statCounts.clinico.toLocaleString()}</p>
               </div>
-              <div className="flex flex-col items-center gap-2 p-3 bg-red-50 rounded-lg cursor-pointer hover:bg-red-100 transition-colors" onClick={() => handleCardClick("trauma")}>
+              <div className="flex flex-col items-center gap-2 p-3 bg-red-50 rounded-lg cursor-pointer hover:bg-red-100 transition-colors" onClick={() => handleCardClick("trauma", ctrlPressedRef.current)}>
                 <AlertCircle className="h-6 w-6 text-red-600" />
                 <p className="text-xs text-gray-600 font-medium">Trauma</p>
                 <p className="text-2xl font-bold text-red-700">{statCounts.trauma.toLocaleString()}</p>
               </div>
-              <div className="flex flex-col items-center gap-2 p-3 bg-purple-50 rounded-lg cursor-pointer hover:bg-purple-100 transition-colors" onClick={() => handleCardClick("multiplas")}>
+              <div className="flex flex-col items-center gap-2 p-3 bg-purple-50 rounded-lg cursor-pointer hover:bg-purple-100 transition-colors" onClick={() => handleCardClick("multiplas", ctrlPressedRef.current)}>
                 <AlertTriangle className="h-6 w-6 text-purple-600" />
                 <p className="text-xs text-gray-600 font-medium">Múltiplas</p>
                 <p className="text-2xl font-bold text-purple-700">{statCounts.multiplas.toLocaleString()}</p>
               </div>
-              <div className="flex flex-col items-center gap-2 p-3 bg-orange-50 rounded-lg cursor-pointer hover:bg-orange-100 transition-colors" onClick={() => handleCardClick("qbrn")}>
+              <div className="flex flex-col items-center gap-2 p-3 bg-orange-50 rounded-lg cursor-pointer hover:bg-orange-100 transition-colors" onClick={() => handleCardClick("qbrn", ctrlPressedRef.current)}>
                 <Bomb className="h-6 w-6 text-orange-600" />
                 <p className="text-xs text-gray-600 font-medium">QBRN</p>
                 <p className="text-2xl font-bold text-orange-700">{statCounts.qbrn.toLocaleString()}</p>
@@ -3721,7 +3983,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           <div className="sm:col-span-2 lg:col-span-2 xl:col-span-2">
             <DistribuicaoPublicoAtendidoChart
               data={filteredPublico}
-              onChartClick={(itemName) => handleChartClick('publico', itemName)}
+              onChartClick={(itemName, multiSelect) => handleChartClick('publico', itemName, multiSelect)}
               activeFilter={activeFilters.publico}
               chartId="chart-publico"
               title="Distribuição por Público Atendido"
@@ -3732,7 +3994,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           <div className="sm:col-span-2 lg:col-span-2 xl:col-span-2">
             <DistribuicaoTipoAtendimentoChart
               data={filteredTipoAtendimento}
-              onChartClick={(itemName) => handleChartClick('tipoAtendimento', itemName)}
+              onChartClick={(itemName, multiSelect) => handleChartClick('tipoAtendimento', itemName, multiSelect)}
               activeFilter={activeFilters.tipoAtendimento}
               chartId="chart-tipo-atendimento"
               title="Distribuição por Tipo de Atendimento"
@@ -3743,7 +4005,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           <div className="sm:col-span-2 lg:col-span-2 xl:col-span-2">
             <DistribuicaoSexoChart
               data={filteredGenero}
-              onChartClick={(itemName) => handleChartClick('genero', itemName)}
+              onChartClick={(itemName, multiSelect) => handleChartClick('genero', itemName, multiSelect)}
               activeFilter={activeFilters.genero}
               chartId="chart-genero"
               title="Distribuição por Identidade de Gênero"
@@ -3754,7 +4016,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           <div className="sm:col-span-2 lg:col-span-2 xl:col-span-2">
             <DistribuicaoRacaCorChart
               data={filteredRaca}
-              onChartClick={(itemName) => handleChartClick('raca', itemName)}
+              onChartClick={(itemName, multiSelect) => handleChartClick('raca', itemName, multiSelect)}
               activeFilter={activeFilters.raca}
               chartId="chart-raca"
               title="Distribuição por Raça e Cor"
@@ -3786,7 +4048,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             <EstabelecimentosCasosChart 
               toggleFilter={toggleFilter}
               activeFilters={activeFilters}
-              filteredData={getFilteredData()}
+              filteredData={getFilteredDataExcludingUnidade()}
             />
           </div>
 
@@ -3795,7 +4057,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             <PiramideEtariaChart 
               toggleFilter={toggleFilter}
               activeFilters={activeFilters}
-              filteredData={getFilteredData()}
+              filteredData={getFilteredDataExcludingFaixaEtaria()}
             />
           </div>
 
@@ -3804,46 +4066,40 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           {/* =============================================== */}
           
           {/* Principais Sintomas - 2 colunas */}
-          {visibleCharts.sintomas && (
-            <PrincipaisSintomasChart
-              data={filteredSintomas}
-              onChartClick={(itemName) => handleChartClick('sintoma', itemName)}
-              activeFilter={activeFilters.sintoma}
-              chartId="chart-sintomas"
-              title="Principais Sinais e Sintomas"
-              className={`bg-white p-4 rounded-lg shadow-sm ${chartSpans.sintomas}`}
-              maxItems={10}
-              isVisible={visibleCharts.sintomas}
-            />
-          )}
+          <PrincipaisSintomasChart
+            data={filteredSintomas}
+            onChartClick={(itemName, multiSelect) => handleChartClick('sintoma', itemName, multiSelect)}
+            activeFilter={activeFilters.sintoma}
+            chartId="chart-sintomas"
+            title="Principais Sinais e Sintomas"
+            className={`bg-white p-4 rounded-lg shadow-sm ${chartSpans.sintomas}`}
+            maxItems={10}
+            isVisible={visibleCharts.sintomas}
+          />
 
           {/* Tipos de Trauma - 2 colunas */}
-          {visibleCharts.trauma && (
-            <TiposTraumaChart
-              data={filteredTrauma}
-              onChartClick={(itemName) => handleChartClick('trauma', itemName)}
-              activeFilter={activeFilters.trauma}
-              chartId="chart-trauma"
-              title="Tipos de Trauma"
-              className={`bg-white p-4 rounded-lg shadow-sm ${chartSpans.trauma}`}
-              isVisible={visibleCharts.trauma}
-            />
-          )}
+          <TiposTraumaChart
+            data={filteredTrauma}
+            onChartClick={(itemName, multiSelect) => handleChartClick('trauma', itemName, multiSelect)}
+            activeFilter={activeFilters.trauma}
+            chartId="chart-trauma"
+            title="Tipos de Trauma"
+            className={`bg-white p-4 rounded-lg shadow-sm ${chartSpans.trauma}`}
+            isVisible={visibleCharts.trauma}
+          />
 
           {/* Hipóteses Diagnósticas - 4 colunas (maior para mostrar nomes completos) */}
-          {visibleCharts.hipoteses && (
-            <HipotesesDiagnosticasChart
-              data={filteredHipoteses}
-              onChartClick={(itemName) => handleChartClick('hipotese', itemName)}
-              activeFilter={activeFilters.hipotese}
-              chartId="chart-hipoteses"
-              title="Hipóteses Diagnósticas"
-              className={`bg-white p-4 rounded-lg shadow-sm ${chartSpans.hipoteses}`}
-              maxItems={15}
-              isVisible={visibleCharts.hipoteses}
-              COLORS={COLORS}
-            />
-          )}
+          <HipotesesDiagnosticasChart
+            data={filteredHipoteses}
+            onChartClick={(itemName, multiSelect) => handleChartClick('hipotese', itemName, multiSelect)}
+            activeFilter={activeFilters.hipotese}
+            chartId="chart-hipoteses"
+            title="Hipóteses Diagnósticas"
+            className={`bg-white p-4 rounded-lg shadow-sm ${chartSpans.hipoteses}`}
+            maxItems={15}
+            isVisible={visibleCharts.hipoteses}
+            COLORS={COLORS}
+          />
 
           {/* =============================================== */}
           {/* LINHA 7: Desfecho dos Casos (Grid 8 cols: 1 offset + 6 gráfico + 1 offset = centralizado) */}
@@ -3857,7 +4113,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             <DesfechoCasosChart 
               toggleFilter={toggleFilter}
               activeFilters={activeFilters}
-              filteredData={getFilteredData()}
+              filteredData={getFilteredDataExcludingDesfecho()}
             />
           </div>
           

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   BarChart,
   Bar,
@@ -27,8 +27,8 @@ interface ChartDataItem {
 // Interface das props do componente
 interface DistribuicaoTipoAtendimentoChartProps {
   data: ChartDataItem[];
-  onChartClick?: (itemName: string) => void;
-  activeFilter?: string | null;
+  onChartClick?: (itemName: string, multiSelect?: boolean) => void;
+  activeFilter?: string | string[] | null;
   chartId?: string;
   title?: string;
   className?: string;
@@ -46,6 +46,32 @@ const DistribuicaoTipoAtendimentoChart: React.FC<DistribuicaoTipoAtendimentoChar
   exportMenu // 🆕 Prop exportMenu opcional
 }) => {
   const [chartType, setChartType] = useState<'bar' | 'pie'>('bar');
+  
+  // 🆕 Ref para rastrear estado do Ctrl em tempo real
+  const ctrlPressedRef = useRef(false);
+
+  // 🆕 Listeners globais para rastrear Ctrl/Cmd
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Control' || e.key === 'Meta') {
+        ctrlPressedRef.current = true;
+      }
+    };
+    
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Control' || e.key === 'Meta') {
+        ctrlPressedRef.current = false;
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
 
   const toggleChartType = useCallback(() => {
     setChartType(prev => prev === 'bar' ? 'pie' : 'bar');
@@ -53,9 +79,26 @@ const DistribuicaoTipoAtendimentoChart: React.FC<DistribuicaoTipoAtendimentoChar
 
   const handleChartItemClick = useCallback((itemName: string) => {
     if (onChartClick) {
-      onChartClick(itemName);
+      onChartClick(itemName, ctrlPressedRef.current);
     }
   }, [onChartClick]);
+  
+  // Função para verificar se um item está filtrado
+  const isItemFiltered = (item: string) => {
+    if (Array.isArray(activeFilter)) {
+      return activeFilter.includes(item);
+    }
+    return activeFilter === item;
+  };
+
+  // Função para obter cor baseada no filtro
+  const getCellColor = (item: string, baseColor: string) => {
+    const hasFilter = activeFilter && (Array.isArray(activeFilter) ? activeFilter.length > 0 : true);
+    if (!hasFilter) return baseColor;
+    if (isItemFiltered(item)) return baseColor;
+    // Adicionar 30% de opacidade
+    return baseColor + "4D";
+  };
 
   return (
     <div className={className}>
@@ -130,9 +173,9 @@ const DistribuicaoTipoAtendimentoChart: React.FC<DistribuicaoTipoAtendimentoChar
                   {data.map((entry, i) => (
                     <Cell 
                       key={`cell-${i}`} 
-                      fill={entry.fill}
-                      stroke={activeFilter === entry.name ? "#000" : "none"}
-                      strokeWidth={activeFilter === entry.name ? 2 : 0}
+                      fill={getCellColor(entry.name, entry.fill)}
+                      stroke={isItemFiltered(entry.name) ? "#000" : "none"}
+                      strokeWidth={isItemFiltered(entry.name) ? 4 : 0}
                     />
                   ))}
                   <LabelList 
@@ -170,9 +213,9 @@ const DistribuicaoTipoAtendimentoChart: React.FC<DistribuicaoTipoAtendimentoChar
                   {data.map((entry, i) => (
                     <Cell 
                       key={`cell-${i}`} 
-                      fill={entry.fill}
-                      stroke={activeFilter === entry.name ? "#000" : "none"}
-                      strokeWidth={activeFilter === entry.name ? 2 : 0}
+                      fill={getCellColor(entry.name, entry.fill)}
+                      stroke={isItemFiltered(entry.name) ? "#000" : "none"}
+                      strokeWidth={isItemFiltered(entry.name) ? 3 : 0}
                     />
                   ))}
                 </Pie>

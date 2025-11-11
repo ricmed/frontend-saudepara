@@ -1,5 +1,5 @@
 // Componente de Gráfico de Estabelecimentos por Número de Casos - usando endpoints existentes
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   BarChart,
   Bar,
@@ -22,7 +22,7 @@ interface EstabelecimentoItem {
 
 interface EstabelecimentosCasosChartProps {
   className?: string;
-  toggleFilter?: (category: string, value: string) => void;
+  toggleFilter?: (category: string, value: string, multiSelect?: boolean) => void;
   activeFilters?: Record<string, any>;
   filteredData?: any[];  exportMenu?: React.ReactNode; // 🆕 Prop opcional para menu de exportação personalizado
 }
@@ -37,6 +37,30 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
   const [data, setData] = useState<EstabelecimentoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const ctrlPressedRef = useRef(false);
+
+  // Rastrear tecla Ctrl pressionada
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        ctrlPressedRef.current = true;
+      }
+    };
+    
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (!e.ctrlKey && !e.metaKey) {
+        ctrlPressedRef.current = false;
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
 
   // Carregar dados sempre que filteredData mudar (incluindo na montagem inicial)
   useEffect(() => {
@@ -121,28 +145,41 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
   };
 
   const isEstabelecimentoFiltered = (estabelecimento: string) => {
-    return activeFilters?.unidade === estabelecimento;
+    const filterValue = activeFilters?.unidade;
+    if (Array.isArray(filterValue)) {
+      return filterValue.includes(estabelecimento);
+    }
+    return filterValue === estabelecimento;
   };
 
   const getCellColor = (estabelecimento: string, baseColor: string = "#8B5CF6") => {
-    // Se há filtro de unidade ativo
-    const hasUnidadeFilter = activeFilters?.unidade;
-    if (!hasUnidadeFilter) {
-      return baseColor; // Cor normal quando não há filtro
+    const filterValue = activeFilters?.unidade;
+    
+    // Se não há filtro ativo, usar cor base
+    if (!filterValue) {
+      return baseColor;
     }
     
-    // Se este estabelecimento está filtrado, usar cor destacada
-    if (isEstabelecimentoFiltered(estabelecimento)) {
-      return baseColor; // Manter cor original para item selecionado
+    // Verificar se este estabelecimento está selecionado
+    const isSelected = Array.isArray(filterValue) 
+      ? filterValue.includes(estabelecimento)
+      : filterValue === estabelecimento;
+    
+    // Se está selecionado, manter cor original
+    if (isSelected) {
+      return baseColor;
     }
     
-    // Outros estabelecimentos ficam com transparência reduzida
-    return "rgba(139, 92, 246, 0.4)"; // Cor mais transparente mas ainda visível
+    // Se não está selecionado mas há filtro ativo, reduzir opacidade
+    return "rgba(139, 92, 246, 0.3)";
   };
 
   // Função para obter propriedades da barra baseado no estado de filtro
   const getBarProperties = (estabelecimento: string) => {
-    const isSelected = isEstabelecimentoFiltered(estabelecimento);
+    const filterValue = activeFilters?.unidade;
+    const isSelected = Array.isArray(filterValue)
+      ? filterValue.includes(estabelecimento)
+      : filterValue === estabelecimento;
     
     return {
       fill: getCellColor(estabelecimento, "#8B5CF6"),
@@ -234,12 +271,14 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
               margin={{ top: 20, right: 100, left: 20, bottom: 120 }}
               layout="vertical"
               barCategoryGap="10%"
-              onClick={(data) => {
-                console.log('🖱️ Clicou na barra:', data);
+              onClick={(data: any) => {
+                // Usar ctrlPressedRef.current para garantir o valor mais atualizado
+                const multiSelect = ctrlPressedRef.current;
+                console.log('🖱️ Clicou na barra:', data, multiSelect ? '(Ctrl pressionado)' : '');
                 if (data && data.activePayload && data.activePayload[0] && toggleFilter) {
                   const payload = data.activePayload[0].payload;
-                  console.log('🎯 Estabelecimento selecionado:', payload.nome);
-                  toggleFilter('unidade', payload.nome);
+                  console.log('🎯 Estabelecimento selecionado:', payload.nome, multiSelect ? '(Ctrl pressionado)' : '');
+                  toggleFilter('unidade', payload.nome, multiSelect);
                 }
               }}
             >
@@ -307,7 +346,11 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
                     ? 'bg-purple-100 border-2 border-purple-400' 
                     : 'bg-gray-50 hover:bg-gray-100'
                 }`}
-                onClick={() => toggleFilter?.('unidade', item.nome)}
+                onClick={(e) => {
+                  const multiSelect = e.ctrlKey || e.metaKey;
+                  console.log('🖱️ Clicou no item da lista:', item.nome, multiSelect ? '(Ctrl pressionado)' : '');
+                  toggleFilter?.('unidade', item.nome, multiSelect);
+                }}
               >
                 <div className="flex items-center gap-3">
                   <div 

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   BarChart,
   Bar,
@@ -27,8 +27,8 @@ interface ChartDataItem {
 // Interface das props do componente
 interface DistribuicaoSexoChartProps {
   data: ChartDataItem[];
-  onChartClick?: (itemName: string) => void;
-  activeFilter?: string | null;
+  onChartClick?: (itemName: string, multiSelect?: boolean) => void;
+  activeFilter?: string | string[] | null;
   chartId?: string;
   title?: string;
   className?: string;
@@ -46,6 +46,30 @@ const DistribuicaoSexoChart: React.FC<DistribuicaoSexoChartProps> = ({
   exportMenu // 🆕 Prop para menu de exportação personalizado
 }) => {
   const [chartType, setChartType] = useState<'bar' | 'pie'>('bar');
+  const ctrlPressedRef = useRef(false);
+
+  // Rastrear tecla Ctrl pressionada
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        ctrlPressedRef.current = true;
+      }
+    };
+    
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (!e.ctrlKey && !e.metaKey) {
+        ctrlPressedRef.current = false;
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
 
   const toggleChartType = useCallback(() => {
     setChartType(prev => prev === 'bar' ? 'pie' : 'bar');
@@ -53,9 +77,26 @@ const DistribuicaoSexoChart: React.FC<DistribuicaoSexoChartProps> = ({
 
   const handleChartItemClick = useCallback((itemName: string) => {
     if (onChartClick) {
-      onChartClick(itemName);
+      // Usar ctrlPressedRef.current para garantir o valor mais atualizado
+      onChartClick(itemName, ctrlPressedRef.current);
     }
   }, [onChartClick]);
+
+  // Função auxiliar para verificar se um item está selecionado
+  const isItemSelected = (itemName: string): boolean => {
+    if (Array.isArray(activeFilter)) {
+      return activeFilter.includes(itemName);
+    }
+    return activeFilter === itemName;
+  };
+
+  // Função para obter a cor do item (com opacidade reduzida se não selecionado)
+  const getItemFillColor = (itemName: string, baseColor: string): string => {
+    const hasFilter = activeFilter && (Array.isArray(activeFilter) ? activeFilter.length > 0 : true);
+    if (!hasFilter) return baseColor;
+    if (isItemSelected(itemName)) return baseColor;
+    return baseColor + "4D";
+  };
 
   return (
     <div className={className}>
@@ -111,14 +152,18 @@ const DistribuicaoSexoChart: React.FC<DistribuicaoSexoChartProps> = ({
                     }
                   }}
                 >
-                  {data.map((entry, i) => (
-                    <Cell 
-                      key={`cell-${i}`} 
-                      fill={entry.fill}
-                      stroke={activeFilter === entry.name ? "#000" : "none"}
-                      strokeWidth={activeFilter === entry.name ? 2 : 0}
-                    />
-                  ))}
+                  {data.map((entry, i) => {
+                    const fillColor = getItemFillColor(entry.name, entry.fill);
+                    const selected = isItemSelected(entry.name);
+                    return (
+                      <Cell 
+                        key={`cell-${i}-${entry.name}-${selected}`}
+                        fill={fillColor}
+                        stroke={selected ? "#000" : "none"}
+                        strokeWidth={selected ? 2 : 0}
+                      />
+                    );
+                  })}
                 </Pie>
                 <Tooltip
                   contentStyle={{
@@ -171,14 +216,18 @@ const DistribuicaoSexoChart: React.FC<DistribuicaoSexoChartProps> = ({
                   }}
                   cursor="pointer"
                 >
-                  {data.map((entry, i) => (
-                    <Cell 
-                      key={`cell-${i}`} 
-                      fill={entry.fill}
-                      stroke={activeFilter === entry.name ? "#000" : "none"}
-                      strokeWidth={activeFilter === entry.name ? 2 : 0}
-                    />
-                  ))}
+                  {data.map((entry, i) => {
+                    const fillColor = getItemFillColor(entry.name, entry.fill);
+                    const selected = isItemSelected(entry.name);
+                    return (
+                      <Cell 
+                        key={`cell-${i}-${entry.name}-${selected}`}
+                        fill={fillColor}
+                        stroke={selected ? "#000" : "none"}
+                        strokeWidth={selected ? 2 : 0}
+                      />
+                    );
+                  })}
                   <LabelList
                     dataKey="value"
                     position="right"
