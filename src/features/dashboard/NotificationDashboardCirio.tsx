@@ -4153,20 +4153,19 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             />
           </div>
           
-          {/* Gráfico 1: Série temporal por dia - USANDO NOTIFICAÇÕES FILTRADAS APENAS POR EVENTO (INDEPENDENTE DO FILTRO GLOBAL) */}
+          {/* Gráfico 1: Série temporal por dia - USANDO NOTIFICAÇÕES COM FILTROS CRUZADOS */}
           <div className="mb-6">
             <SerieTemporalChart 
-              notificacoes={notificacoesParaAnalisetemporal}
+              notificacoes={hasActiveFilters ? filteredNotificacoes.current : notificacoesParaAnalisetemporal}
               title="Série Temporal por Dia de Notificação"
               description="Evolução diária do número de notificações"
               estabelecimentoOptions={exportOptions?.estabelecimentoOptions || []}
             />
           </div>
           
-          {/* Gráfico 2: Série temporal por hora */}
-          {/* 🆕 USAR NOTIFICAÇÕES FILTRADAS POR EVENTO SEM FILTRO DE PERÍODO */}
+          {/* Gráfico 2: Série temporal por hora - USANDO NOTIFICAÇÕES COM FILTROS CRUZADOS */}
           <AtendimentosPorHoraChart 
-            notificacoes={notificacoesParaAnalisetemporal} 
+            notificacoes={hasActiveFilters ? filteredNotificacoes.current : notificacoesParaAnalisetemporal} 
           />
         </main>
       )}
@@ -4202,9 +4201,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             />
           </div>
           
-          {/* 🆕 USAR NOTIFICAÇÕES FILTRADAS POR EVENTO E DATA DO DASHBOARD */}
+          {/* 🆕 USAR NOTIFICAÇÕES COM FILTROS CRUZADOS NO MAPA */}
           <EstabelecimentosMapaAvancado 
-            notificacoes={notificacoesFiltradasPorEvento}
+            notificacoes={hasActiveFilters ? filteredNotificacoes.current : notificacoesFiltradasPorEvento}
             exportOptions={exportOptions}
             selectedDataNotificacao={selectedDataNotificacao}
             datasNotificacaoDisponiveis={datasNotificacaoDisponiveis}
