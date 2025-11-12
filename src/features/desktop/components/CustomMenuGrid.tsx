@@ -28,7 +28,7 @@ export const CustomMenuGrid: React.FC<CustomMenuGridProps> = ({
     {
       icon: <Book className="h-8 w-8 text-[#4A6CF7] mb-3" />,
       label: t('menu.materials'),
-      onClick: () => navigate('/materiais')
+      onClick: () => navigate('/materiais-educativos')
     },
     {
       icon: <MessageCircle className="h-8 w-8 text-[#4A6CF7] mb-3" />,
