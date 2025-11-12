@@ -11,31 +11,6 @@ const DashboardPageCirio: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ⚡ Função auxiliar para buscar todas as notificações da API
-  const fetchAllNotifications = async (): Promise<any[]> => {
-    let allNotificacoes: any[] = [];
-    let page = 1;
-    const pageSize = 200;
-    let hasMore = true;
-
-    while (hasMore) {
-      const response = await NotificacaoService.getAll(page, pageSize);
-      if (response && response.data && response.data.length > 0) {
-        allNotificacoes = [...allNotificacoes, ...response.data];
-        
-        if (response.data.length < pageSize || page >= response.meta.totalPages) {
-          hasMore = false;
-        } else {
-          page++;
-        }
-      } else {
-        hasMore = false;
-      }
-    }
-
-    return allNotificacoes;
-  };
-
   // 🔧 Função para carregar dados do dashboard (reutilizável para refresh)
   const loadDashboardData = React.useCallback(async () => {
       try {
@@ -70,52 +45,26 @@ const DashboardPageCirio: React.FC = () => {
         } else {
           const idsEventosAtivos = new Set(eventosAtivos.map((e: any) => e.idtipo_evento));
 
-          // 🆕 PASSO 2: Buscar notificações com cache inteligente
+          // 🆕 PASSO 2: Buscar notificações e filtrar por eventos ativos
           let allNotificacoes: any[] = [];
-          let usouCache = false;
-          
-          // ⚡ CACHE: Tentar buscar do cache primeiro para exibição rápida
-          const cacheKey = 'dashboard-notificacoes-cache';
-          const cachedData = await indexedDBService.getOpcoes(cacheKey);
-          
-          if (cachedData && cachedData.length > 0) {
-            console.log(`⚡ Cache hit: ${cachedData.length} notificações carregadas instantaneamente`);
-            allNotificacoes = cachedData;
-            usouCache = true;
-          }
-          
-          // 🔄 SEMPRE verificar se há dados novos (mesmo quando usa cache)
-          try {
-            const firstPage = await NotificacaoService.getAll(1, 1);
-            const totalAtual = firstPage?.meta?.total || 0;
-            const totalCache = cachedData?.length || 0;
-            
-            // Se não tem cache OU se o total mudou, buscar tudo da API
-            if (!usouCache || totalAtual !== totalCache) {
-              if (usouCache) {
-                console.log(`🔄 Dados atualizados detectados (${totalCache} → ${totalAtual}), buscando novos dados...`);
+          let page = 1;
+          const pageSize = 200; // ⚡ Aumentado de 100 para 200 para reduzir requisições
+          let hasMore = true;
+
+          // ✅ CORRIGIDO: Buscar TODAS as notificações sem limite artificial (igual à lista de notificações)
+          while (hasMore) {
+            const response = await NotificacaoService.getAll(page, pageSize);
+            if (response && response.data && response.data.length > 0) {
+              allNotificacoes = [...allNotificacoes, ...response.data];
+              
+              // Parar quando: última página OU total de páginas atingido
+              if (response.data.length < pageSize || page >= response.meta.totalPages) {
+                hasMore = false;
               } else {
-                console.log('🌐 Cache miss: buscando notificações da API...');
-              }
-              
-              const freshData = await fetchAllNotifications();
-              
-              if (freshData.length > 0) {
-                allNotificacoes = freshData;
-                
-                // 💾 Salvar/Atualizar no cache
-                await indexedDBService.saveOpcoes(cacheKey, freshData);
-                console.log(`✅ Cache ${usouCache ? 'atualizado' : 'salvo'}: ${freshData.length} notificações`);
+                page++;
               }
             } else {
-              console.log(`✅ Cache válido: ${totalCache} notificações (sem mudanças)`);
-            }
-          } catch (apiError) {
-            // Se der erro ao verificar API mas temos cache, usar o cache
-            if (usouCache) {
-              console.warn('⚠️ Erro ao verificar atualizações, usando cache:', apiError);
-            } else {
-              throw apiError; // Propagar erro se não tem cache
+              hasMore = false;
             }
           }
 
