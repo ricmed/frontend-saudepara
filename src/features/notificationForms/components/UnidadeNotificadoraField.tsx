@@ -80,7 +80,15 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   // Track if initial load happened
   const initialLoadDone = useRef<boolean>(false);
   
-  // 🔤 Normalizador para busca acento/case-insensitive
+  // � Limpar cache em memória quando for para encaminhamento (para evitar uso de cache hierárquico)
+  useEffect(() => {
+    if (isForEncaminhamento) {
+      console.log('🗑️ Limpando cache em memória para campo de encaminhamento');
+      estabelecimentosCache.current = {};
+    }
+  }, [isForEncaminhamento]);
+  
+  // �🔤 Normalizador para busca acento/case-insensitive
   const norm = (s?: string) =>
     (s || "")
       .normalize("NFD")
@@ -149,9 +157,9 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
         return;
       }
       
-      // Check cache first
+      // Check cache first - MAS NÃO PARA ENCAMINHAMENTO (precisa buscar todos)
       const cacheKey = searchTerm;
-      if (estabelecimentosCache.current[cacheKey]) {
+      if (!isForEncaminhamento && estabelecimentosCache.current[cacheKey]) {
         console.log(`Using cached establishments for "${cacheKey}"`);
         let cachedEstabelecimentos = estabelecimentosCache.current[cacheKey];
         
@@ -168,6 +176,8 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
         setUnidadesNotificadoras(cachedEstabelecimentos);
         setLoadingUnidades(false);
         return;
+      } else if (isForEncaminhamento && estabelecimentosCache.current[cacheKey]) {
+        console.log(`🔄 Ignorando cache em memória para encaminhamento - buscando todos estabelecimentos`);
       }
       
       let estabelecimentosAtivos: Estabelecimento[] = [];
@@ -176,12 +186,21 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
       if (!navigator.onLine) {
         console.log('📱 Modo offline: buscando estabelecimentos em cache...');
         
-        // ✅ PRIMEIRO: Tentar buscar da chave 'estabelecimentos-permitidos' (filtrados no download)
-        let cachedEstabelecimentos = await indexedDBService.getOpcoes('estabelecimentos-permitidos');
+        let cachedEstabelecimentos = null;
         
-        if (!cachedEstabelecimentos || cachedEstabelecimentos.length === 0) {
-          console.warn('⚠️ Cache "estabelecimentos-permitidos" vazio, tentando cache geral...');
-          // Fallback para cache geral (menos seguro, mas melhor que nada)
+        // 🔑 IMPORTANTE: Se for para encaminhamento, buscar cache geral ao invés do hierárquico
+        if (!isForEncaminhamento) {
+          // ✅ PRIMEIRO: Tentar buscar da chave 'estabelecimentos-permitidos' (filtrados no download)
+          cachedEstabelecimentos = await indexedDBService.getOpcoes('estabelecimentos-permitidos');
+          
+          if (!cachedEstabelecimentos || cachedEstabelecimentos.length === 0) {
+            console.warn('⚠️ Cache "estabelecimentos-permitidos" vazio, tentando cache geral...');
+            // Fallback para cache geral (menos seguro, mas melhor que nada)
+            cachedEstabelecimentos = await indexedDBService.getOpcoes('estabelecimentos');
+          }
+        } else {
+          console.log('🔄 Campo de encaminhamento offline: usando cache geral ao invés do hierárquico');
+          // Para encaminhamento, buscar diretamente do cache geral
           cachedEstabelecimentos = await indexedDBService.getOpcoes('estabelecimentos');
         }
         
@@ -241,9 +260,16 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
       } else {
         // ✅ MODO ONLINE: PRIORIZAR CACHE FILTRADO para respeitar hierarquia
         try {
-          // 🔑 PRIMEIRO: Tentar buscar do cache 'estabelecimentos-permitidos' (filtrados hierarquicamente)
-          console.log('🌐 Modo online: verificando cache filtrado primeiro...');
-          let cachedEstabelecimentos = await indexedDBService.getOpcoes('estabelecimentos-permitidos');
+          // 🔑 IMPORTANTE: Se for para encaminhamento, NÃO usar cache hierárquico
+          let cachedEstabelecimentos = null;
+          
+          if (!isForEncaminhamento) {
+            // 🔑 PRIMEIRO: Tentar buscar do cache 'estabelecimentos-permitidos' (filtrados hierarquicamente)
+            console.log('🌐 Modo online: verificando cache filtrado primeiro...');
+            cachedEstabelecimentos = await indexedDBService.getOpcoes('estabelecimentos-permitidos');
+          } else {
+            console.log('🔄 Campo de encaminhamento: pulando cache hierárquico para buscar todos os estabelecimentos');
+          }
           
           if (cachedEstabelecimentos && cachedEstabelecimentos.length > 0) {
             console.log(`✅ Cache filtrado encontrado: ${cachedEstabelecimentos.length} estabelecimentos permitidos`);
@@ -369,8 +395,12 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
         }
       }
       
-      // Store all results in cache before filtering
-      estabelecimentosCache.current[cacheKey] = estabelecimentosAtivos;
+      // Store all results in cache before filtering - MAS NÃO PARA ENCAMINHAMENTO
+      if (!isForEncaminhamento) {
+        estabelecimentosCache.current[cacheKey] = estabelecimentosAtivos;
+      } else {
+        console.log(`🔄 Não salvando em cache (encaminhamento) - total: ${estabelecimentosAtivos.length} estabelecimentos`);
+      }
       
       // Filtrar por estabelecimentos específicos se fornecidos
       if (specificEstablishments && specificEstablishments.length > 0) {
