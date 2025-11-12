@@ -982,7 +982,7 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                     onChange={handleChange}
                     type="textarea"
                     placeholder="Informações adicionais sobre o incidente..."
-                    maxLength={255}
+                    maxLength={1500}
                   />
                 </div>
               </>
