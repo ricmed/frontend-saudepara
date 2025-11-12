@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { 
   MapPin, 
   Layers, 
@@ -55,11 +55,6 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
   datasNotificacaoDisponiveis = [], // 🆕 Receber datas disponíveis
   isGlobalFilterActive = () => false // 🆕 Função para verificar se o filtro global está ativo
 }) => {
-  console.log('🏁 EstabelecimentosMapaAvancado renderizado:', {
-    notificacoesRecebidas: notificacoes.length,
-    temExportOptions: !!exportOptions
-  });
-
   const [estabelecimentos, setEstabelecimentos] = useState<EstabelecimentoInfo[]>([]);
   const [selectedEstabelecimento, setSelectedEstabelecimento] = useState<EstabelecimentoInfo | null>(null);
   const [showLayers, setShowLayers] = useState(true);
@@ -68,52 +63,31 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
   const [tipoEstabelecimentoSelecionado, setTipoEstabelecimentoSelecionado] = useState<string | null>(null);
   const [dataSelecionada, setDataSelecionada] = useState<string | null>(null);
   
+  // 🔒 Ref para controlar se já foi inicializado (previne reset quando usuário escolhe "todas")
+  const jaInicializouData = useRef(false);
+  
   // Usar o hook do sistema de mapas existente
   const { allPlaces, isLoading, carregarEstabelecimentos } = useEstabelecimentos();
 
-  // Debug logs reduzidos - apenas quando necessário
-  const debugInfo = useMemo(() => ({
-    allPlaces: allPlaces.length,
-    isLoading,
-    estabelecimentos: estabelecimentos.length,
-    notificacoes: notificacoes.length
-  }), [allPlaces.length, isLoading, estabelecimentos.length, notificacoes.length]);
-
   // Carregar estabelecimentos apenas uma vez
   useEffect(() => {
-    console.log('🔍 Verificando carga de estabelecimentos:', {
-      allPlacesLength: allPlaces.length,
-      isLoading
-    });
-    
     if (allPlaces.length === 0 && !isLoading) {
-      console.log('🔄 Carregando estabelecimentos para o mapa...');
       carregarEstabelecimentos();
-    } else {
-      console.log('✅ Estabelecimentos já carregados ou em carregamento');
     }
   }, []); // Dependências vazias - carrega apenas uma vez
 
   // 🚫 LIMPAR FILTRO DE DATA INDIVIDUAL QUANDO FILTRO GLOBAL FOR ATIVADO
   useEffect(() => {
     if (isGlobalFilterActive()) {
-      console.log('🔒 Mapa: Filtro global ativado - limpando filtro de data individual');
       setDataSelecionada(null);
     }
   }, [isGlobalFilterActive]);
 
   // ⏰ AUTO-REFRESH: Reprocessar quando notificações mudarem (alinhado com dashboard)
+  // Os filtros (tipoEstabelecimentoSelecionado e dataSelecionada) são MANTIDOS durante o refresh
   useEffect(() => {
-    console.log('🔄 Notificações atualizadas no mapa:', {
-      totalNotificacoes: notificacoes.length,
-      filtrosAtivos: {
-        tipo: tipoEstabelecimentoSelecionado,
-        data: dataSelecionada
-      }
-    });
     // Força reprocessamento dos estabelecimentos quando notificações mudarem
-    // Os filtros (tipoEstabelecimentoSelecionado e dataSelecionada) são MANTIDOS durante o refresh
-  }, [notificacoes, tipoEstabelecimentoSelecionado, dataSelecionada]); // Depende das notificações para reagir às atualizações do dashboard
+  }, [notificacoes, tipoEstabelecimentoSelecionado, dataSelecionada]);
 
   // Memoizar o mapa de estabelecimentos para evitar recriações
   const allPlacesMap = useMemo(() => {
@@ -140,13 +114,6 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
     
     return placesMap;
   }, [allPlaces]);
-
-  // Memoizar IDs das notificações
-  const idsNotificacoes = useMemo(() => {
-    return notificacoes
-      .map(n => n?.original?.estabelecimento_idestabelecimento || n?.estabelecimentoId)
-      .filter(Boolean);
-  }, [notificacoes]);
 
   // 🆕 Extrair tipos de estabelecimento disponíveis
   const tiposEstabelecimento = useMemo(() => {
@@ -187,13 +154,14 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
     return Array.from(datas).sort().reverse(); // Mais recentes primeiro
   }, [notificacoes]);
 
-  // 🆕 EFEITO: Pré-selecionar a data mais recente quando as datas estiverem disponíveis
+  // 🆕 EFEITO: Pré-selecionar a data mais recente APENAS na primeira vez
+  // ✅ CORRIGIDO: Usa useRef para não resetar quando usuário seleciona "todas as datas"
   useEffect(() => {
-    if (datasDisponiveis.length > 0 && dataSelecionada === null) {
+    if (datasDisponiveis.length > 0 && !jaInicializouData.current) {
       setDataSelecionada(datasDisponiveis[0]); // Pré-selecionar a primeira (mais recente)
-      console.log('🔄 Mapa: Pré-selecionando data mais recente:', datasDisponiveis[0]);
+      jaInicializouData.current = true; // Marcar como inicializado
     }
-  }, [datasDisponiveis, dataSelecionada]);
+  }, [datasDisponiveis]);
 
   // Processar estabelecimentos de forma memoizada
   const estabelecimentosProcessados = useMemo(() => {
