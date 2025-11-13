@@ -2648,24 +2648,50 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       let page = 1;
       const pageSize = 200;
       let hasMore = true;
+      let totalExpected = 0;
+      const maxPages = 100; // 🔒 SEGURANÇA: Limite máximo de páginas (100 * 200 = 20.000 registros)
 
-      while (hasMore) {
-        const response = await NotificacaoService.getAll(page, pageSize);
+      while (hasMore && page <= maxPages) {
+        console.log(`📄 Buscando página ${page}/${maxPages}...`);
         
-        if (response && response.data && response.data.length > 0) {
-          allData = [...allData, ...response.data];
+        try {
+          const response = await NotificacaoService.getAll(page, pageSize);
           
-          if (response.data.length < pageSize || page >= response.meta.totalPages) {
-            hasMore = false;
+          if (response && response.data && response.data.length > 0) {
+            // Armazenar o total esperado da primeira página
+            if (page === 1 && response.meta) {
+              totalExpected = response.meta.total;
+              console.log(`📊 Total de notificações no servidor: ${totalExpected}`);
+              console.log(`📄 Total de páginas: ${response.meta.totalPages}`);
+            }
+            
+            allData = [...allData, ...response.data];
+            console.log(`✅ Página ${page}: ${response.data.length} registros | Total acumulado: ${allData.length}/${totalExpected}`);
+            
+            // Verificar se há mais páginas
+            if (response.data.length < pageSize || page >= response.meta.totalPages) {
+              console.log(`🏁 Última página alcançada (${page}/${response.meta.totalPages})`);
+              hasMore = false;
+            } else {
+              page++;
+            }
           } else {
-            page++;
+            console.log(`⚠️ Página ${page} retornou vazia - finalizando`);
+            hasMore = false;
           }
-        } else {
+        } catch (pageError) {
+          console.error(`❌ Erro ao buscar página ${page}:`, pageError);
+          // Se falhar em uma página, parar o loop mas retornar os dados já carregados
+          console.warn(`⚠️ Parando na página ${page} devido a erro. Total carregado até agora: ${allData.length}`);
           hasMore = false;
         }
       }
       
-      console.log(`📥 Dados frescos recebidos: ${allData.length} notificações`);
+      if (page > maxPages) {
+        console.warn(`⚠️ AVISO: Limite de segurança atingido (${maxPages} páginas). Total carregado: ${allData.length}`);
+      }
+      
+      console.log(`📥 Dados frescos recebidos: ${allData.length} notificações (esperado: ${totalExpected})`);
       
       // 🆕 PASSO 3: Filtrar apenas notificações de eventos ativos (igual ao DashboardPageCirio)
       const freshData = allData.filter((notificacao: any) => {
