@@ -17,7 +17,7 @@
 - ✅ Imports adicionados em `translations.ts`
 - ✅ Tipo `Language` atualizado para incluir "de" e "ja"
 - ✅ Seletor de idiomas atualizado para mostrar Alemão e Japonês
-
+1
 ## ⏳ Pendente
 
 ### Idiomas a Separar
