@@ -2643,27 +2643,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       
       console.log(`🔍 Buscando notificações... (${idsEventosAtivos.size} eventos ativos)`);
       
-      // 🌐 Buscar TODAS as notificações com paginação (SEM CACHE)
-      let allData: any[] = [];
-      let page = 1;
-      const pageSize = 200;
-      let hasMore = true;
-
-      while (hasMore) {
-        const response = await NotificacaoService.getAll(page, pageSize);
-        
-        if (response && response.data && response.data.length > 0) {
-          allData = [...allData, ...response.data];
-          
-          if (response.data.length < pageSize || page >= response.meta.totalPages) {
-            hasMore = false;
-          } else {
-            page++;
-          }
-        } else {
-          hasMore = false;
-        }
-      }
+      // PASSO 2: Buscar notificações da API
+      const response = await NotificacaoService.getAll(1, 1000);
+      const allData = response.data || [];
       
       console.log(`📥 Dados frescos recebidos: ${allData.length} notificações`);
       
@@ -2729,10 +2711,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           setTotalNotificacoesDia(novoTotalDia);
         }
         
-        // ✅ CORREÇÃO: Notificar o componente pai SEMPRE, não só quando o total muda
-        // Isso garante que os dados sejam atualizados mesmo quando há modificações
-        // nas notificações existentes (ex: mudança de status, edições, etc)
-        if (onDataRefresh) {
+        // Notificar o componente pai sobre novos dados
+        if (onDataRefresh && freshData.length !== notificacoes.length) {
           console.log("🔔 Notificando componente pai sobre novos dados...");
           onDataRefresh(freshData);
         }

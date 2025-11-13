@@ -1,5 +1,5 @@
 // Componente para gráfico de atendimentos por hora com filtro por data
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AreaChart,
   Area,
@@ -33,8 +33,11 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
 }) => {
   // ✅ NOVO: Estado para controlar a data selecionada
   const [dataSelecionada, setDataSelecionada] = useState<string | null>(null);
-  // 🔒 Ref para controlar se já foi inicializado (previne reset quando usuário escolhe "todas")
-  const jaInicializou = useRef(false);
+
+  console.log('🔍 [COMPONENT DEBUG] Estado inicial:', {
+    dataSelecionada,
+    totalNotificacoes: notificacoes?.length || 0
+  });
 
   const { atendimentosPorHora, estatisticas, loading, datasDisponiveis } = useAtendimentosPorHora({
     notificacoes,
@@ -42,14 +45,19 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
     dataFiltro: dataSelecionada
   });
 
-  // 🆕 EFEITO: Pré-selecionar a data mais recente APENAS na primeira vez
-  // ✅ CORRIGIDO: Usa useRef para não resetar quando usuário seleciona "todas as datas"
+  // 🆕 EFEITO: Pré-selecionar a data mais recente quando as datas estiverem disponíveis
   useEffect(() => {
-    if (datasDisponiveis.length > 0 && !jaInicializou.current) {
+    if (datasDisponiveis.length > 0 && dataSelecionada === null) {
       setDataSelecionada(datasDisponiveis[0]); // Pré-selecionar a primeira (mais recente)
-      jaInicializou.current = true; // Marcar como inicializado
     }
-  }, [datasDisponiveis]);
+  }, [datasDisponiveis, dataSelecionada]);
+
+  console.log('🔍 [COMPONENT DEBUG] Dados do hook:', {
+    datasDisponiveis: datasDisponiveis?.length || 0,
+    primeirasDatas: datasDisponiveis?.slice(0, 3),
+    atendimentosPorHora: atendimentosPorHora?.length || 0,
+    dataSelecionada
+  });
 
   if (loading) {
     return (
@@ -142,6 +150,11 @@ export const AtendimentosPorHoraChart: React.FC<AtendimentosPorHoraChartProps> =
               value={dataSelecionada || 'todas'}
               onChange={(e) => {
                 const novaData = e.target.value === 'todas' ? null : e.target.value;
+                console.log('🔍 [SELECT DEBUG] Mudança de data:', {
+                  valorAnterior: dataSelecionada,
+                  novoValor: novaData,
+                  eventValue: e.target.value
+                });
                 setDataSelecionada(novaData);
               }}
               className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"

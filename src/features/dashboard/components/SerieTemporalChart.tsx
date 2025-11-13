@@ -1,6 +1,6 @@
-// Componente de Série Temporal com seletor de evento e estabelecimento
+// Componente de Série Temporal com seletor de período e evento próprios
 import React, { useState, useMemo, useEffect } from 'react';
-import { Calendar } from 'lucide-react';
+import { Calendar, ChevronUp, ChevronDown } from 'lucide-react';
 import {
   AreaChart,
   Area,
@@ -44,18 +44,36 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        console.log('📦 Configuração da Série Temporal carregada:', parsed);
+        return parsed;
       }
     } catch (error) {
-      // Silencioso - erro ao carregar config não é crítico
+      console.warn('⚠️ Erro ao carregar configuração da Série Temporal:', error);
     }
     return null;
   };
 
   const savedConfig = loadSavedConfig();
   
-  // Estado para o estabelecimento selecionado (evento já vem filtrado do dashboard)
+  // Estado para o evento selecionado
+  const [selectedEvento, setSelectedEvento] = useState<string>(savedConfig?.selectedEvento || "todos");
+  
+  // Estado para o estabelecimento selecionado
   const [selectedEstabelecimento, setSelectedEstabelecimento] = useState<string>(savedConfig?.selectedEstabelecimento || "todos");
+
+  // Extrair eventos únicos das notificações
+  const eventosDisponiveis = useMemo(() => {
+    const eventos = new Set<string>();
+    notificacoes.forEach((notif: any) => {
+      const evento = notif?.tipoEvento || notif?.original?.tipo_evento?.descricao;
+      if (evento) {
+        eventos.add(evento);
+      }
+    });
+    console.log('📋 Eventos disponíveis na Série Temporal:', Array.from(eventos));
+    return Array.from(eventos).sort();
+  }, [notificacoes]);
 
   // Extrair estabelecimentos únicos das notificações
   const estabelecimentosDisponiveis = useMemo(() => {
@@ -71,6 +89,7 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
         }
       }
     });
+    console.log('🏥 Estabelecimentos disponíveis na Série Temporal:', Array.from(estabelecimentos.values()));
     return Array.from(estabelecimentos.entries())
       .map(([id, nome]) => ({ id, nome }))
       .sort((a, b) => a.nome.localeCompare(b.nome));
@@ -117,31 +136,105 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
     };
   }, [notificacoes]);
 
+  // Estado para o período personalizado da série temporal
+  const [startDate, setStartDate] = useState(savedConfig?.startDate || periodoCompleto.inicio);
+  const [endDate, setEndDate] = useState(savedConfig?.endDate || periodoCompleto.fim);
+  const [startHour, setStartHour] = useState(savedConfig?.startHour ?? 0);
+  const [startMinute, setStartMinute] = useState(savedConfig?.startMinute ?? 0);
+  const [endHour, setEndHour] = useState(savedConfig?.endHour ?? 23);
+  const [endMinute, setEndMinute] = useState(savedConfig?.endMinute ?? 59);
+
   // Salvar configuração no localStorage sempre que mudar
   useEffect(() => {
     const config: SerieTemporalConfig = {
-      selectedEvento: "todos", // Sempre todos - filtro de evento vem do dashboard
+      selectedEvento,
       selectedEstabelecimento,
-      startDate: periodoCompleto.inicio,
-      endDate: periodoCompleto.fim,
-      startHour: 0,
-      startMinute: 0,
-      endHour: 23,
-      endMinute: 59,
+      startDate,
+      endDate,
+      startHour,
+      startMinute,
+      endHour,
+      endMinute,
     };
     
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+      console.log('💾 Configuração da Série Temporal salva:', config);
     } catch (error) {
-      // Silencioso - erro ao salvar não é crítico
+      console.warn('⚠️ Erro ao salvar configuração da Série Temporal:', error);
     }
-  }, [selectedEstabelecimento, periodoCompleto.inicio, periodoCompleto.fim]);
+  }, [selectedEvento, selectedEstabelecimento, startDate, endDate, startHour, startMinute, endHour, endMinute]);
+
+  // Atualizar datas quando o período completo mudar APENAS se não houver configuração salva
+  useEffect(() => {
+    if (!savedConfig?.startDate && !savedConfig?.endDate) {
+      setStartDate(periodoCompleto.inicio);
+      setEndDate(periodoCompleto.fim);
+    }
+  }, [periodoCompleto.inicio, periodoCompleto.fim, savedConfig?.startDate, savedConfig?.endDate]);
 
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Filtrar notificações por estabelecimento (evento já vem filtrado do dashboard)
+  // Funções para incrementar/decrementar datas
+  const incrementStartDate = () => {
+    const date = new Date(startDate + 'T00:00:00');
+    date.setDate(date.getDate() + 1);
+    setStartDate(date.toISOString().split('T')[0]);
+  };
+
+  const decrementStartDate = () => {
+    const date = new Date(startDate + 'T00:00:00');
+    date.setDate(date.getDate() - 1);
+    setStartDate(date.toISOString().split('T')[0]);
+  };
+
+  const incrementEndDate = () => {
+    const date = new Date(endDate + 'T00:00:00');
+    date.setDate(date.getDate() + 1);
+    setEndDate(date.toISOString().split('T')[0]);
+  };
+
+  const decrementEndDate = () => {
+    const date = new Date(endDate + 'T00:00:00');
+    date.setDate(date.getDate() - 1);
+    setEndDate(date.toISOString().split('T')[0]);
+  };
+
+  const handleInputFocus = (event: React.FocusEvent<HTMLInputElement>) => {
+    event.target.select();
+  };
+
+  // Filtrar notificações por evento e período com janelas de 24h
   const notificacoesFiltradas = useMemo(() => {
     return notificacoes.filter(notif => {
+      // Filtro de data/hora
+      const dataCreated = notif?.created_at || notif?.original?.created_at;
+      if (!dataCreated) return false;
+      
+      const date = new Date(dataCreated);
+      
+      // Criar o timestamp de início e fim do período com horário de corte
+      // Ex: 01/10 16:01 até 10/10 16:00
+      const inicioTimestamp = new Date(`${startDate}T${String(startHour).padStart(2, '0')}:${String(startMinute).padStart(2, '0')}:00`);
+      
+      // O fim é no dia seguinte ao endDate no mesmo horário
+      const fimDate = new Date(endDate + 'T00:00:00');
+      fimDate.setDate(fimDate.getDate() + 1); // Adiciona 1 dia
+      const fimTimestamp = new Date(`${fimDate.toISOString().split('T')[0]}T${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}:00`);
+      
+      // Verificar se a notificação está dentro do período total
+      if (date < inicioTimestamp || date > fimTimestamp) {
+        return false;
+      }
+      
+      // Filtro de evento
+      if (selectedEvento !== "todos") {
+        const eventoNotif = notif?.tipoEvento || notif?.original?.tipo_evento?.descricao;
+        if (eventoNotif !== selectedEvento) {
+          return false;
+        }
+      }
+      
       // Filtro de estabelecimento
       if (selectedEstabelecimento !== "todos") {
         const estabelecimentoId = notif?.original?.estabelecimento_idestabelecimento;
@@ -159,7 +252,7 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
       
       return true;
     });
-  }, [notificacoes, selectedEstabelecimento, estabelecimentoOptions]);
+  }, [notificacoes, startDate, endDate, startHour, startMinute, endHour, endMinute, selectedEvento, selectedEstabelecimento, estabelecimentoOptions]);
 
   // Processar dados para o gráfico
   const dadosGrafico = useMemo(() => {
@@ -224,7 +317,7 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
             onClick={() => setIsExpanded(!isExpanded)}
             className="px-3 py-1 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
           >
-            {isExpanded ? 'Ocultar Filtros' : 'Filtros'}
+            {isExpanded ? 'Ocultar Período' : 'Período'}
           </button>
           <ChartExportMenu
             chartId="serie-temporal-dia"
@@ -235,9 +328,28 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
         </div>
       </div>
 
-      {/* Seletores de Filtro (Estabelecimento apenas - Evento já filtrado pelo dashboard) */}
+      {/* Seletor de Período e Evento */}
       {isExpanded && (
         <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+          {/* Seletor de Evento */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              🎯 Evento
+            </label>
+            <select
+              value={selectedEvento}
+              onChange={(e) => setSelectedEvento(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+            >
+              <option value="todos">📊 Todos os Eventos</option>
+              {eventosDisponiveis.map((evento) => (
+                <option key={evento} value={evento}>
+                  {evento}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Seletor de Estabelecimento */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -257,18 +369,144 @@ const SerieTemporalChart: React.FC<SerieTemporalChartProps> = ({
             </select>
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Data de Início */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                📅 Data de Início
+              </label>
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  onFocus={handleInputFocus}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <div className="flex flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={incrementStartDate}
+                    className="text-gray-500 hover:text-blue-600 focus:outline-none p-1"
+                    title="Próximo dia"
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={decrementStartDate}
+                    className="text-gray-500 hover:text-blue-600 focus:outline-none p-1"
+                    title="Dia anterior"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              {/* Hora e Minuto de Início */}
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-600 mb-1">🕐 Hora Início</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="23"
+                    value={startHour}
+                    onChange={(e) => setStartHour(Math.max(0, Math.min(23, parseInt(e.target.value) || 0)))}
+                    onFocus={handleInputFocus}
+                    className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-600 mb-1">⏱️ Min Início</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={startMinute}
+                    onChange={(e) => setStartMinute(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
+                    onFocus={handleInputFocus}
+                    className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Data de Fim */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                🏁 Data de Fim
+              </label>
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  onFocus={handleInputFocus}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <div className="flex flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={incrementEndDate}
+                    className="text-gray-500 hover:text-blue-600 focus:outline-none p-1"
+                    title="Próximo dia"
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={decrementEndDate}
+                    className="text-gray-500 hover:text-blue-600 focus:outline-none p-1"
+                    title="Dia anterior"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              {/* Hora e Minuto de Fim */}
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-600 mb-1">🕐 Hora Fim</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="23"
+                    value={endHour}
+                    onChange={(e) => setEndHour(Math.max(0, Math.min(23, parseInt(e.target.value) || 0)))}
+                    onFocus={handleInputFocus}
+                    className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-600 mb-1">⏱️ Min Fim</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={endMinute}
+                    onChange={(e) => setEndMinute(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
+                    onFocus={handleInputFocus}
+                    className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded text-sm">
             <div className="text-gray-700 mb-2">
-              <strong>📅 Período:</strong> {new Date(periodoCompleto.inicio + 'T12:00:00').toLocaleDateString('pt-BR')} até {new Date(periodoCompleto.fim + 'T12:00:00').toLocaleDateString('pt-BR')} (Todas as datas)
+              <strong>📅 Período:</strong> {new Date(startDate + 'T12:00:00').toLocaleDateString('pt-BR')} às {String(startHour).padStart(2, '0')}:{String(startMinute).padStart(2, '0')} até {new Date(endDate + 'T12:00:00').toLocaleDateString('pt-BR')} às {String(endHour).padStart(2, '0')}:{String(endMinute).padStart(2, '0')}
             </div>
             <div className="text-gray-600 text-xs mb-1">
+              <strong>Evento:</strong> {selectedEvento === "todos" ? "Todos os Eventos" : selectedEvento}
+              {' '}•{' '}
               <strong>Estabelecimento:</strong> {selectedEstabelecimento === "todos" ? "Todos os Estabelecimentos" : selectedEstabelecimento}
             </div>
             <div className="text-gray-600 text-xs mb-1">
               <strong>{notificacoesFiltradas.length}</strong> notificações encontradas
             </div>
             <div className="text-blue-600 text-xs mt-1">
-              ℹ️ Evento já filtrado pelo dashboard principal
+              💡 Cada "dia" é uma janela de 24h iniciando no horário de corte especificado
             </div>
           </div>
         </div>
