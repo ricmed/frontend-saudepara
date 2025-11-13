@@ -316,6 +316,13 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   exportOptions = {},
   onDataRefresh,
 }) => {
+  // 🚨 DEBUG: Log para verificar se o componente está sendo montado
+  console.log('🎯 [DASHBOARD CIRIO] Componente montado!', {
+    totalNotificacoes: notificacoes.length,
+    temExportOptions: !!exportOptions,
+    timestamp: new Date().toISOString()
+  });
+  
   // Para controlar se já fizemos o processamento inicial
   const initialProcessingDone = useRef(false);
   const originalNotificacoes = useRef<any[]>([]);

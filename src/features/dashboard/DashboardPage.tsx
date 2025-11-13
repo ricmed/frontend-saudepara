@@ -53,24 +53,41 @@ const DashboardPage: React.FC = () => {
           console.log("📥 Buscando notificações da API...");
           let allNotificacoes: any[] = [];
           let page = 1;
-          const pageSize = 100;
+          const pageSize = 200; // ⚡ Aumentado de 100 para 200
           let hasMore = true;
+          const maxPages = 100; // 🔒 SEGURANÇA: Limite máximo de páginas (100 * 200 = 20.000 registros)
 
-          // Buscar todas as notificações (paginado)
-          while (hasMore && allNotificacoes.length < 1000) {
-            const response = await NotificacaoService.getAll(page, pageSize);
-            if (response && response.data && response.data.length > 0) {
-              allNotificacoes = [...allNotificacoes, ...response.data];
-              console.log(`   📄 Página ${page}: ${response.data.length} notificações (Total: ${allNotificacoes.length})`);
+          // ✅ CORRIGIDO: Buscar TODAS as notificações sem limite artificial de 1000
+          while (hasMore && page <= maxPages) {
+            console.log(`📄 Buscando página ${page}/${maxPages}...`);
+            
+            try {
+              const response = await NotificacaoService.getAll(page, pageSize);
               
-              if (response.data.length < pageSize || allNotificacoes.length >= 1000) {
-                hasMore = false;
+              if (response && response.data && response.data.length > 0) {
+                allNotificacoes = [...allNotificacoes, ...response.data];
+                console.log(`   ✅ Página ${page}: ${response.data.length} notificações | Total acumulado: ${allNotificacoes.length}/${response.meta?.total || '?'}`);
+                
+                // Parar quando: última página OU total de páginas atingido
+                if (response.data.length < pageSize || page >= response.meta.totalPages) {
+                  console.log(`🏁 Última página alcançada (${page}/${response.meta.totalPages})`);
+                  hasMore = false;
+                } else {
+                  page++;
+                }
               } else {
-                page++;
+                console.log(`⚠️ Página ${page} retornou vazia - finalizando`);
+                hasMore = false;
               }
-            } else {
+            } catch (pageError) {
+              console.error(`❌ Erro ao buscar página ${page}:`, pageError);
+              console.warn(`⚠️ Parando na página ${page}. Total carregado: ${allNotificacoes.length}`);
               hasMore = false;
             }
+          }
+          
+          if (page > maxPages) {
+            console.warn(`⚠️ Limite de segurança atingido (${maxPages} páginas). Total carregado: ${allNotificacoes.length}`);
           }
 
           console.log(`✅ ${allNotificacoes.length} notificações baixadas da API`);
