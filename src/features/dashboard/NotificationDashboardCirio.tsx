@@ -2643,21 +2643,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       
       console.log(`🔍 Buscando notificações... (${idsEventosAtivos.size} eventos ativos)`);
       
-      // ⚡ OTIMIZAÇÃO: Primeiro buscar apenas 1 página para verificar o total
-      const firstPage = await NotificacaoService.getAll(1, 1);
-      const totalAtual = firstPage?.meta?.total || 0;
-      const totalAnterior = originalNotificacoes.current.length;
-      
-      console.log(`📊 Total: ${totalAtual} (anterior: ${totalAnterior})`);
-      
-      // ✅ SE O TOTAL NÃO MUDOU, usar dados em cache (muito mais rápido!)
-      if (totalAtual === totalAnterior && totalAnterior > 0) {
-        console.log(`⚡ Total não mudou - usando cache (sem buscar ${totalAtual} notificações novamente)`);
-        return originalNotificacoes.current;
-      }
-      
-      // 🌐 TOTAL MUDOU: Buscar TODAS as notificações com paginação
-      console.log(`🔄 Total mudou ou primeira carga - buscando todas as ${totalAtual} notificações...`);
+      // ✅ CORRIGIDO: Buscar TODAS as notificações com paginação (igual ao DashboardPageCirio)
       let allData: any[] = [];
       let page = 1;
       const pageSize = 200;
@@ -2742,10 +2728,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           setTotalNotificacoesDia(novoTotalDia);
         }
         
-        // ✅ CORREÇÃO: Notificar o componente pai SEMPRE, não só quando o total muda
-        // Isso garante que os dados sejam atualizados mesmo quando há modificações
-        // nas notificações existentes (ex: mudança de status, edições, etc)
-        if (onDataRefresh) {
+        // Notificar o componente pai sobre novos dados
+        if (onDataRefresh && freshData.length !== notificacoes.length) {
           console.log("🔔 Notificando componente pai sobre novos dados...");
           onDataRefresh(freshData);
         }
