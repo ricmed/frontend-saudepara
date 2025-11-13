@@ -2713,96 +2713,19 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       const freshData = await fetchFreshData();
       console.log(`📊 Dados recebidos: ${freshData?.length || 0} notificações`);
       
-      // Se conseguimos novos dados, processar
+      // Se conseguimos novos dados, notificar o componente pai
       if (freshData) {
-        // 🆕 PRESERVAR SELEÇÃO DE DATA DURANTE ATUALIZAÇÃO
-        const dataAtualmenteSeleciona = selectedDataNotificacao;
+        console.log("🔔 Notificando componente pai sobre novos dados...");
         
-        // Extrair novas datas disponíveis
-        const novasDatasDisponiveis = extrairDatasNotificacao(freshData);
-        setDatasNotificacaoDisponiveis(novasDatasDisponiveis);
-        
-        // Recalcular total de notificações para a data selecionada (se houver)
-        if (dataAtualmenteSeleciona) {
-          const novoTotalDia = contarNotificacoesPorData(freshData, dataAtualmenteSeleciona);
-          setTotalNotificacoesDia(novoTotalDia);
-        }
-        
-        // Notificar o componente pai sobre novos dados
-        if (onDataRefresh && freshData.length !== notificacoes.length) {
-          console.log("🔔 Notificando componente pai sobre novos dados...");
+        // ✅ CORREÇÃO: Sempre notificar o pai para recarregar tudo
+        // O pai vai atualizar as props e o useEffect vai reprocessar
+        if (onDataRefresh) {
           onDataRefresh(freshData);
         }
         
-        console.log("📈 Atualizando dados locais...");
-        
-        // 🆕 USAR SISTEMA DE FILTROS CRUZADOS DURANTE ATUALIZAÇÃO
-        const hasActiveFilter = Object.values(activeFilters).some(filter => filter !== null);
-        
-        if (hasActiveFilter) {
-          // 🆕 CORREÇÃO: Aplicar filtros nas notificações já filtradas por evento
-          const dadosComFiltrosCruzados = applyFilters(notificacoesFiltradasPorEvento);
-          filteredNotificacoes.current = dadosComFiltrosCruzados;
-          calcularEstatisticas(dadosComFiltrosCruzados);
-        } else if (selectedCategory) {
-          // Fallback para sistema antigo (compatibilidade)
-          const dadosFiltrados = filtrarNotificacoes(selectedCategory);
-          filteredNotificacoes.current = dadosFiltrados;
-          calcularEstatisticas(dadosFiltrados);
-        } else {
-          // 🆕 CORREÇÃO: Sem filtros ativos, usar notificações filtradas por evento
-          filteredNotificacoes.current = notificacoesFiltradasPorEvento;
-          calcularEstatisticas(notificacoesFiltradasPorEvento);
-        }
-      } else {
-        // Se não conseguirmos novos dados, verificar props
-        console.log("⚠️ Nenhum dado fresco obtido, verificando notificações via props...");
-        if (notificacoes && notificacoes.length > 0 && 
-            notificacoes.length !== originalNotificacoes.current.length) {
-          console.log("🔄 Detectada diferença nas notificações:", 
-                     "Original:", originalNotificacoes.current.length, 
-                     "Novas:", notificacoes.length);
-          
-          // 🆕 PRESERVAR SELEÇÃO DE DATA DURANTE ATUALIZAÇÃO (PROPS)
-          const dataAtualmenteSeleciona = selectedDataNotificacao;
-          
-          // Substituir os dados originais pelos novos
-          originalNotificacoes.current = [...notificacoes];
-          
-          // Extrair novas datas disponíveis
-          const novasDatasDisponiveis = extrairDatasNotificacao(notificacoes);
-          setDatasNotificacaoDisponiveis(novasDatasDisponiveis);
-          
-          // Recalcular total de notificações para a data selecionada (se houver)
-          if (dataAtualmenteSeleciona) {
-            const novoTotalDia = contarNotificacoesPorData(notificacoes, dataAtualmenteSeleciona);
-            setTotalNotificacoesDia(novoTotalDia);
-          }
-          
-          initialProcessingDone.current = false;
-        }
-        
-        // Reprocessar dados com filtros cruzados
-        const hasActiveFilter = Object.values(activeFilters).some(filter => filter !== null);
-        
-        if (hasActiveFilter) {
-          // 🆕 CORREÇÃO: Aplicar filtros nas notificações já filtradas por evento
-          const dadosComFiltrosCruzados = applyFilters(notificacoesFiltradasPorEvento);
-          filteredNotificacoes.current = dadosComFiltrosCruzados;
-          calcularEstatisticas(dadosComFiltrosCruzados);
-        } else if (selectedCategory) {
-          const dadosFiltrados = filtrarNotificacoes(selectedCategory);
-          filteredNotificacoes.current = dadosFiltrados;
-          calcularEstatisticas(dadosFiltrados);
-        } else {
-          // 🆕 CORREÇÃO: Sem filtros ativos, usar notificações filtradas por evento
-          filteredNotificacoes.current = notificacoesFiltradasPorEvento;
-          calcularEstatisticas(notificacoesFiltradasPorEvento);
-        }
+        // ✅ IMPORTANTE: Marcar para reprocessar na próxima vez que props mudarem
+        initialProcessingDone.current = false;
       }
-
-      // Reativa processamento inicial para que o filtro de eventos funcione
-      initialProcessingDone.current = true;
       
     } catch (error) {
       console.error("❌ Erro na atualização:", error);
@@ -2810,7 +2733,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       setLoading(false);
       setLastUpdate(new Date().toLocaleString());
     }
-  }, [loading, selectedCategory, selectedDataNotificacao, activeFilters, fetchFreshData, notificacoes, filtrarNotificacoes, calcularEstatisticas, onDataRefresh, extrairDatasNotificacao, contarNotificacoesPorData, applyFilters, notificacoesFiltradasPorEvento]);
+  }, [loading, fetchFreshData, onDataRefresh]);
 
   // 🔧 CORREÇÃO: Atribuir refreshData ao ref para que o auto-refresh funcione
   useEffect(() => {
