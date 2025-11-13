@@ -2643,9 +2643,29 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       
       console.log(`🔍 Buscando notificações... (${idsEventosAtivos.size} eventos ativos)`);
       
-      // PASSO 2: Buscar notificações da API
-      const response = await NotificacaoService.getAll(1, 1000);
-      const allData = response.data || [];
+      // PASSO 2: Buscar TODAS as notificações da API com paginação
+      let allData: any[] = [];
+      let page = 1;
+      const pageSize = 100;
+      let hasMore = true;
+
+      // Buscar todas as notificações (paginado) - SEM LIMITE
+      while (hasMore) {
+        const response = await NotificacaoService.getAll(page, pageSize);
+        if (response && response.data && response.data.length > 0) {
+          allData = [...allData, ...response.data];
+          console.log(`   📄 Auto-refresh - Página ${page}: ${response.data.length} notificações (Total: ${allData.length})`);
+          
+          // Para apenas quando não houver mais dados
+          if (response.data.length < pageSize) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
       
       console.log(`📥 Dados frescos recebidos: ${allData.length} notificações`);
       
