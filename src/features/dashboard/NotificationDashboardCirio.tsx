@@ -2637,97 +2637,64 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   // Função para buscar dados frescos do servidor
   const fetchFreshData = useCallback(async () => {
     try {
-      // 🆕 ESTRATÉGIA OTIMIZADA: Buscar apenas as 1000 notificações mais recentes
-      // A API já retorna ordenado por data de criação (mais recentes primeiro)
+      // 🆕 PASSO 1: Buscar eventos ativos para filtrar
       const eventosAtivos = exportOptions?.eventoOptions || [];
       const idsEventosAtivos = new Set(eventosAtivos.map((e: any) => e.idtipo_evento));
       
-      console.log(`🔍 [AUTO-REFRESH] Buscando 1000 notificações mais recentes... (${idsEventosAtivos.size} eventos ativos)`);
+      console.log(`🔍 Buscando notificações... (${idsEventosAtivos.size} eventos ativos)`);
       
-      // 🚀 Buscar apenas 10 páginas de 100 = 1000 notificações mais recentes
-      let recentData: any[] = [];
-      const pageSize = 100;
-      const maxPages = 10; // 10 páginas × 100 = 1000 notificações mais recentes
-      
-      for (let page = 1; page <= maxPages; page++) {
-        console.log(`   📄 [AUTO-REFRESH] Buscando página ${page}/${maxPages}...`);
+      // 🌐 Buscar TODAS as notificações com paginação (SEM CACHE)
+      let allData: any[] = [];
+      let page = 1;
+      const pageSize = 200;
+      let hasMore = true;
+
+      while (hasMore) {
         const response = await NotificacaoService.getAll(page, pageSize);
         
         if (response && response.data && response.data.length > 0) {
-          recentData = [...recentData, ...response.data];
-          console.log(`   ✅ Página ${page}: ${response.data.length} notificações | Total: ${recentData.length}`);
+          allData = [...allData, ...response.data];
           
-          // Se retornou menos que pageSize, não há mais páginas
-          if (response.data.length < pageSize) {
-            console.log(`   ⚠️ Última página encontrada (${response.data.length} < ${pageSize})`);
-            break;
+          if (response.data.length < pageSize || page >= response.meta.totalPages) {
+            hasMore = false;
+          } else {
+            page++;
           }
         } else {
-          console.log(`   ⚠️ Página ${page} retornou vazia`);
-          break;
+          hasMore = false;
         }
       }
       
-      console.log(`📥 [AUTO-REFRESH] ${recentData.length} notificações recentes recebidas`);
+      console.log(`📥 Dados frescos recebidos: ${allData.length} notificações`);
       
-      // Filtrar apenas notificações de eventos ativos
-      const recentDataFiltered = recentData.filter((notificacao: any) => {
+      // 🆕 PASSO 3: Filtrar apenas notificações de eventos ativos (igual ao DashboardPageCirio)
+      const freshData = allData.filter((notificacao: any) => {
         const idEvento = notificacao.original?.tipo_evento?.idtipo_evento || 
                         notificacao.idtipo_evento || 
                         notificacao.tipo_evento?.idtipo_evento;
+        
         return idEvento && idsEventosAtivos.has(idEvento);
       });
       
-      console.log(`🔍 [AUTO-REFRESH] Filtradas por eventos ativos: ${recentDataFiltered.length}`);
+      console.log(`✅ Filtro aplicado: ${allData.length} → ${freshData.length} notificações (apenas eventos ativos)`);
       
-      // 🆕 MERGE INTELIGENTE: Combinar com dados existentes
-      const existingData = originalNotificacoes.current || [];
-      console.log(`📊 [AUTO-REFRESH] Dados existentes: ${existingData.length} notificações`);
-      
-      // Criar um Map com as notificações existentes (por ID)
-      const existingMap = new Map();
-      existingData.forEach((notif: any) => {
-        const id = notif.id || notif.idnotificacao || notif.original?.idnotificacao;
-        if (id) existingMap.set(id, notif);
-      });
-      
-      // Adicionar/atualizar com as notificações recentes
-      let newCount = 0;
-      let updatedCount = 0;
-      
-      recentDataFiltered.forEach((notif: any) => {
-        const id = notif.id || notif.idnotificacao || notif.original?.idnotificacao;
-        if (id) {
-          if (existingMap.has(id)) {
-            // Atualizar notificação existente
-            existingMap.set(id, notif);
-            updatedCount++;
-          } else {
-            // Nova notificação
-            existingMap.set(id, notif);
-            newCount++;
-          }
-        }
-      });
-      
-      // Converter Map de volta para array
-      const mergedData = Array.from(existingMap.values());
-      
-      console.log(`✨ [AUTO-REFRESH] Merge concluído: ${newCount} novas, ${updatedCount} atualizadas, Total: ${mergedData.length}`);
-      
-      if (mergedData.length > 0) {
-        originalNotificacoes.current = [...mergedData];
-        return mergedData;
+      // Verificar se temos dados novos
+      if (freshData && Array.isArray(freshData) && freshData.length > 0) {
+        // Atualizar as notificações originais
+        originalNotificacoes.current = [...freshData];
+        return freshData;
       }
       
       return null;
     } catch (error) {
-      console.error("❌ [AUTO-REFRESH] Erro ao buscar dados:", error);
+      console.error("Erro ao buscar dados do servidor:", error);
       
-      // Em caso de erro, usar dados locais
+      // Em caso de erro, tentar usar dados locais se disponíveis
       if (notificacoes && notificacoes.length > 0) {
-        console.log("⚠️ [AUTO-REFRESH] Usando dados locais como fallback");
-        return [...notificacoes];
+        console.log("Usando dados locais como fallback...");
+        const mockData = [...notificacoes];
+        originalNotificacoes.current = [...mockData];
+        return mockData;
       }
       
       return null;
