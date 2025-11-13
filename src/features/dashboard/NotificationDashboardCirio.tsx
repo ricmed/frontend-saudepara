@@ -292,6 +292,7 @@ interface DashboardProps {
   notificacoes?: any[]; // Lista de notificações da API
   exportOptions?: any; // Opções de exportação com os tipos/categorias
   onDataRefresh?: (newData: any[]) => void; // Callback para notificar sobre novos dados
+  onRequestReload?: () => Promise<void>; // 🆕 Callback para solicitar recarga completa dos dados do componente pai
 }
 
 // Define interface for chart data
@@ -315,6 +316,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   notificacoes = [],
   exportOptions = {},
   onDataRefresh,
+  onRequestReload, // 🆕 Receber callback de recarga
 }) => {
   // Para controlar se já fizemos o processamento inicial
   const initialProcessingDone = useRef(false);
@@ -2634,120 +2636,31 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     }
   }, [getFilteredData, calcularEstatisticas, activeFilters, exportOptions, extrairDatasNotificacao, filtrarNotificacoes, notificacoesFiltradasPorEvento, contarNotificacoesPorData]);
 
-  // Função para buscar dados frescos do servidor
+  // 🆕 NOVA ABORDAGEM: Delegar a busca de dados para o componente pai
+  // Em vez de duplicar a lógica de paginação aqui, usamos o callback do pai
   const fetchFreshData = useCallback(async () => {
     try {
-      // 🆕 PASSO 1: Buscar eventos ativos para filtrar
-      const eventosAtivos = exportOptions?.eventoOptions || [];
-      const idsEventosAtivos = new Set(eventosAtivos.map((e: any) => e.idtipo_evento));
+      console.log(`� [AUTO-REFRESH] Solicitando recarga de dados do componente pai...`);
       
-      console.log(`🔍 [AUTO-REFRESH] Iniciando busca de notificações... (${idsEventosAtivos.size} eventos ativos)`);
-      
-      // PASSO 2: Buscar TODAS as notificações da API com paginação
-      let allData: any[] = [];
-      let page = 1;
-      const pageSize = 100;
-      let hasMore = true;
-      let totalRegistros = 0;
-      const MAX_PAGES = 100; // 🔧 Limite de segurança aumentado (100 páginas = 10000 notificações)
-
-      // Buscar todas as notificações (paginado) - SEM LIMITE
-      while (hasMore && page <= MAX_PAGES) {
-        console.log(`   🔄 [AUTO-REFRESH] Solicitando página ${page}/${MAX_PAGES} (pageSize=${pageSize})...`);
-        
-        try {
-          const response = await NotificacaoService.getAll(page, pageSize);
-          
-          // ✅ DEBUG: Log da resposta
-          console.log(`   📦 [AUTO-REFRESH] Página ${page} - Resposta:`, {
-            temResponse: !!response,
-            temData: !!response?.data,
-            tamanhoData: response?.data?.length || 0,
-            totalMeta: response?.meta?.total,
-            totalPagesMeta: response?.meta?.totalPages,
-            currentPageMeta: response?.meta?.page
-          });
-          
-          // ✅ CORREÇÃO: Capturar total de registros da API
-          if (response?.meta?.total && totalRegistros === 0) {
-            totalRegistros = response.meta.total;
-            console.log(`   📊 [AUTO-REFRESH] Total de registros na API: ${totalRegistros}`);
-          }
-          
-          if (response && response.data && Array.isArray(response.data) && response.data.length > 0) {
-            allData = [...allData, ...response.data];
-            console.log(`   📄 [AUTO-REFRESH] Página ${page}: ${response.data.length} notificações | Acumulado: ${allData.length}/${totalRegistros || '?'}`);
-            
-            // ✅ CORREÇÃO: Verificar se chegou no final de TRÊS formas:
-            // 1. Se a resposta trouxe menos registros que o pageSize
-            // 2. Se já temos todos os registros (allData.length >= totalRegistros)
-            // 3. Se a página atual é a última página informada pela API
-            const isLastPageBySize = response.data.length < pageSize;
-            const hasAllRecords = totalRegistros > 0 && allData.length >= totalRegistros;
-            const isLastPageByMeta = response?.meta?.totalPages && page >= response.meta.totalPages;
-            
-            console.log(`   🔍 [AUTO-REFRESH] Verificando condições de parada:`, {
-              isLastPageBySize,
-              hasAllRecords,
-              isLastPageByMeta,
-              'response.data.length': response.data.length,
-              pageSize,
-              'allData.length': allData.length,
-              totalRegistros,
-              'response.meta.totalPages': response?.meta?.totalPages,
-              currentPage: page
-            });
-            
-            if (isLastPageBySize) {
-              console.log(`   ✅ [AUTO-REFRESH] Última página detectada por tamanho (${response.data.length} < ${pageSize})`);
-              hasMore = false;
-            } else if (hasAllRecords) {
-              console.log(`   ✅ [AUTO-REFRESH] Todos os registros obtidos (${allData.length}/${totalRegistros})`);
-              hasMore = false;
-            } else if (isLastPageByMeta) {
-              console.log(`   ✅ [AUTO-REFRESH] Última página detectada por meta (página ${page}/${response.meta.totalPages})`);
-              hasMore = false;
-            } else {
-              console.log(`   ➡️ [AUTO-REFRESH] Continuando para próxima página (${page + 1})...`);
-              page++;
-            }
-          } else {
-            console.log(`   ⚠️ [AUTO-REFRESH] Página ${page} retornou vazia ou inválida. Parando busca...`);
-            hasMore = false;
-          }
-        } catch (error) {
-          console.error(`   ❌ [AUTO-REFRESH] Erro ao buscar página ${page}:`, error);
-          hasMore = false;
-        }
+      // ✅ SOLUÇÃO: Se o pai forneceu um callback de recarga, usar ele
+      if (onRequestReload) {
+        await onRequestReload();
+        console.log(`✅ [AUTO-REFRESH] Recarga solicitada com sucesso via callback do pai`);
+        // O componente pai vai recarregar os dados e passar via props
+        // Retornamos null pois os dados virão via props
+        return null;
       }
       
-      if (page > MAX_PAGES) {
-        console.warn(`   ⚠️ [AUTO-REFRESH] Limite máximo de páginas (${MAX_PAGES}) atingido! Pode haver mais dados disponíveis.`);
-      }
-      
-      console.log(`📥 Dados frescos recebidos: ${allData.length} notificações (Total da API: ${totalRegistros || 'desconhecido'})`);
-      
-      // 🆕 PASSO 3: Filtrar apenas notificações de eventos ativos (igual ao DashboardPageCirio)
-      const freshData = allData.filter((notificacao: any) => {
-        const idEvento = notificacao.original?.tipo_evento?.idtipo_evento || 
-                        notificacao.idtipo_evento || 
-                        notificacao.tipo_evento?.idtipo_evento;
-        
-        return idEvento && idsEventosAtivos.has(idEvento);
-      });
-      
-      console.log(`✅ Filtro aplicado: ${allData.length} → ${freshData.length} notificações (apenas eventos ativos)`);
-      
-      // Verificar se temos dados novos
-      if (freshData && Array.isArray(freshData) && freshData.length > 0) {
-        // Atualizar as notificações originais
-        originalNotificacoes.current = [...freshData];
-        return freshData;
+      // ⚠️ FALLBACK: Se não tem callback do pai, usar os dados atuais das props
+      console.warn(`⚠️ [AUTO-REFRESH] Callback onRequestReload não fornecido. Usando dados atuais das props.`);
+      if (notificacoes && notificacoes.length > 0) {
+        console.log(`📊 [AUTO-REFRESH] Usando ${notificacoes.length} notificações das props`);
+        return [...notificacoes];
       }
       
       return null;
     } catch (error) {
-      console.error("Erro ao buscar dados do servidor:", error);
+      console.error("❌ [AUTO-REFRESH] Erro ao solicitar recarga de dados:", error);
       
       // Em caso de erro, tentar usar dados locais se disponíveis
       if (notificacoes && notificacoes.length > 0) {
@@ -2759,7 +2672,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       
       return null;
     }
-  }, [notificacoes, exportOptions]);
+  }, [notificacoes, onRequestReload]); // ✅ Adicionar onRequestReload nas dependências
 
   // Função para atualizar os dados
   const refreshData = useCallback(async () => {
@@ -2770,14 +2683,27 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     setLoading(true);
     
     try {
-      // Buscar dados frescos do servidor usando o NotificacaoService
-      const freshData = await fetchFreshData();
-      console.log(`📊 Dados recebidos: ${freshData?.length || 0} notificações`);
+      console.log("🔄 [REFRESH] Iniciando atualização de dados...");
       
-      // Se conseguimos novos dados, processar
-      if (freshData) {
+      // 🆕 NOVA ABORDAGEM: Solicitar recarga do componente pai
+      const freshData = await fetchFreshData();
+      
+      // ✅ Se usou callback do pai (onRequestReload), os dados virão via props
+      // Então apenas aguardamos um momento e reprocessamos
+      if (onRequestReload && !freshData) {
+        console.log("⏳ [REFRESH] Aguardando dados atualizados via props...");
+        // Os dados atualizados virão via useEffect quando as props mudarem
+        // Não fazemos nada aqui, o useEffect vai processar
+      } 
+      // Se recebemos dados diretamente (fallback ou sem callback)
+      else if (freshData && freshData.length > 0) {
+        console.log(`📊 [REFRESH] Processando ${freshData.length} notificações recebidas`);
+        
         // 🆕 PRESERVAR SELEÇÃO DE DATA DURANTE ATUALIZAÇÃO
         const dataAtualmenteSeleciona = selectedDataNotificacao;
+        
+        // Atualizar referência local
+        originalNotificacoes.current = [...freshData];
         
         // Extrair novas datas disponíveis
         const novasDatasDisponiveis = extrairDatasNotificacao(freshData);
@@ -2789,65 +2715,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           setTotalNotificacoesDia(novoTotalDia);
         }
         
-        // Notificar o componente pai sobre novos dados
-        if (onDataRefresh && freshData.length !== notificacoes.length) {
-          console.log("🔔 Notificando componente pai sobre novos dados...");
-          onDataRefresh(freshData);
-        }
-        
-        console.log("📈 Atualizando dados locais...");
-        
         // 🆕 USAR SISTEMA DE FILTROS CRUZADOS DURANTE ATUALIZAÇÃO
         const hasActiveFilter = Object.values(activeFilters).some(filter => filter !== null);
         
         if (hasActiveFilter) {
-          // 🆕 CORREÇÃO: Aplicar filtros nas notificações já filtradas por evento
-          const dadosComFiltrosCruzados = applyFilters(notificacoesFiltradasPorEvento);
-          filteredNotificacoes.current = dadosComFiltrosCruzados;
-          calcularEstatisticas(dadosComFiltrosCruzados);
-        } else if (selectedCategory) {
-          // Fallback para sistema antigo (compatibilidade)
-          const dadosFiltrados = filtrarNotificacoes(selectedCategory);
-          filteredNotificacoes.current = dadosFiltrados;
-          calcularEstatisticas(dadosFiltrados);
-        } else {
-          // 🆕 CORREÇÃO: Sem filtros ativos, usar notificações filtradas por evento
-          filteredNotificacoes.current = notificacoesFiltradasPorEvento;
-          calcularEstatisticas(notificacoesFiltradasPorEvento);
-        }
-      } else {
-        // Se não conseguirmos novos dados, verificar props
-        console.log("⚠️ Nenhum dado fresco obtido, verificando notificações via props...");
-        if (notificacoes && notificacoes.length > 0 && 
-            notificacoes.length !== originalNotificacoes.current.length) {
-          console.log("🔄 Detectada diferença nas notificações:", 
-                     "Original:", originalNotificacoes.current.length, 
-                     "Novas:", notificacoes.length);
-          
-          // 🆕 PRESERVAR SELEÇÃO DE DATA DURANTE ATUALIZAÇÃO (PROPS)
-          const dataAtualmenteSeleciona = selectedDataNotificacao;
-          
-          // Substituir os dados originais pelos novos
-          originalNotificacoes.current = [...notificacoes];
-          
-          // Extrair novas datas disponíveis
-          const novasDatasDisponiveis = extrairDatasNotificacao(notificacoes);
-          setDatasNotificacaoDisponiveis(novasDatasDisponiveis);
-          
-          // Recalcular total de notificações para a data selecionada (se houver)
-          if (dataAtualmenteSeleciona) {
-            const novoTotalDia = contarNotificacoesPorData(notificacoes, dataAtualmenteSeleciona);
-            setTotalNotificacoesDia(novoTotalDia);
-          }
-          
-          initialProcessingDone.current = false;
-        }
-        
-        // Reprocessar dados com filtros cruzados
-        const hasActiveFilter = Object.values(activeFilters).some(filter => filter !== null);
-        
-        if (hasActiveFilter) {
-          // 🆕 CORREÇÃO: Aplicar filtros nas notificações já filtradas por evento
           const dadosComFiltrosCruzados = applyFilters(notificacoesFiltradasPorEvento);
           filteredNotificacoes.current = dadosComFiltrosCruzados;
           calcularEstatisticas(dadosComFiltrosCruzados);
@@ -2856,22 +2727,22 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           filteredNotificacoes.current = dadosFiltrados;
           calcularEstatisticas(dadosFiltrados);
         } else {
-          // 🆕 CORREÇÃO: Sem filtros ativos, usar notificações filtradas por evento
           filteredNotificacoes.current = notificacoesFiltradasPorEvento;
           calcularEstatisticas(notificacoesFiltradasPorEvento);
         }
+        
+        initialProcessingDone.current = true;
       }
-
-      // Reativa processamento inicial para que o filtro de eventos funcione
-      initialProcessingDone.current = true;
+      
+      console.log("✅ [REFRESH] Atualização concluída");
       
     } catch (error) {
-      console.error("❌ Erro na atualização:", error);
+      console.error("❌ [REFRESH] Erro na atualização:", error);
     } finally {
       setLoading(false);
       setLastUpdate(new Date().toLocaleString());
     }
-  }, [loading, selectedCategory, selectedDataNotificacao, activeFilters, fetchFreshData, notificacoes, filtrarNotificacoes, calcularEstatisticas, onDataRefresh, extrairDatasNotificacao, contarNotificacoesPorData, applyFilters, notificacoesFiltradasPorEvento]);
+  }, [loading, selectedCategory, selectedDataNotificacao, activeFilters, fetchFreshData, notificacoes, filtrarNotificacoes, calcularEstatisticas, onRequestReload, extrairDatasNotificacao, contarNotificacoesPorData, applyFilters, notificacoesFiltradasPorEvento]);
 
   // 🔧 CORREÇÃO: Atribuir refreshData ao ref para que o auto-refresh funcione
   useEffect(() => {
