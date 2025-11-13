@@ -2648,60 +2648,26 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       let page = 1;
       const pageSize = 100;
       let hasMore = true;
-      let totalRegistros = 0;
 
       // Buscar todas as notificações (paginado) - SEM LIMITE
       while (hasMore) {
-        console.log(`   🔄 Auto-refresh - Solicitando página ${page} com pageSize=${pageSize}...`);
         const response = await NotificacaoService.getAll(page, pageSize);
-        
-        // ✅ DEBUG: Log completo da resposta
-        console.log(`   📦 Auto-refresh - Resposta completa:`, JSON.stringify({
-          temResponse: !!response,
-          temData: !!response?.data,
-          tamanhoData: response?.data?.length || 0,
-          meta: response?.meta,
-          temMeta: !!response?.meta
-        }, null, 2));
-        
-        // ✅ CORREÇÃO: Capturar total de registros da API
-        if (response?.meta?.total) {
-          totalRegistros = response.meta.total;
-          console.log(`   📊 Total de registros na API: ${totalRegistros}`);
-        }
-        
         if (response && response.data && response.data.length > 0) {
           allData = [...allData, ...response.data];
-          console.log(`   📄 Auto-refresh - Página ${page}: ${response.data.length} notificações (Total acumulado: ${allData.length}/${totalRegistros || '?'})`);
+          console.log(`   📄 Auto-refresh - Página ${page}: ${response.data.length} notificações (Total: ${allData.length})`);
           
-          // ✅ CORREÇÃO: Verificar se chegou no final de TRÊS formas:
-          // 1. Se a resposta trouxe menos registros que o pageSize
-          // 2. Se já temos todos os registros (allData.length >= totalRegistros)
-          // 3. Se a página atual é a última página informada pela API
-          const isLastPageBySize = response.data.length < pageSize;
-          const hasAllRecords = totalRegistros > 0 && allData.length >= totalRegistros;
-          const isLastPageByMeta = response?.meta?.totalPages && page >= response.meta.totalPages;
-          
-          if (isLastPageBySize) {
-            console.log(`   ✅ Auto-refresh - Última página detectada por tamanho (${response.data.length} < ${pageSize})`);
-            hasMore = false;
-          } else if (hasAllRecords) {
-            console.log(`   ✅ Auto-refresh - Todos os registros obtidos (${allData.length}/${totalRegistros})`);
-            hasMore = false;
-          } else if (isLastPageByMeta) {
-            console.log(`   ✅ Auto-refresh - Última página detectada por meta (página ${page}/${response.meta.totalPages})`);
+          // Para apenas quando não houver mais dados
+          if (response.data.length < pageSize) {
             hasMore = false;
           } else {
-            console.log(`   ➡️ Auto-refresh - Continuando para próxima página...`);
             page++;
           }
         } else {
-          console.log(`   ⚠️ Auto-refresh - Página ${page} retornou vazia ou inválida. Parando...`);
           hasMore = false;
         }
       }
       
-      console.log(`📥 Dados frescos recebidos: ${allData.length} notificações (Total da API: ${totalRegistros || 'desconhecido'})`);
+      console.log(`📥 Dados frescos recebidos: ${allData.length} notificações`);
       
       // 🆕 PASSO 3: Filtrar apenas notificações de eventos ativos (igual ao DashboardPageCirio)
       const freshData = allData.filter((notificacao: any) => {
