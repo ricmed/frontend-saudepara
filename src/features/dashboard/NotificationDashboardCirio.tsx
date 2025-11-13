@@ -3103,10 +3103,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     window.history.back();
   }, []);
 
-  useEffect(() => {
-    refreshDataRef.current = refreshData;
-  }, [refreshData]);
-
   // Definir um tipo para as chaves do objeto chartType
   type ChartTypes = 'tipoAtendimento' | 'publico' | 'genero' | 'raca' | 'hipoteses' | 'sintomas';
   
