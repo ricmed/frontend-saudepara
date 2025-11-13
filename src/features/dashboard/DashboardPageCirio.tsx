@@ -225,6 +225,7 @@ const DashboardPageCirio: React.FC = () => {
         notificacoes={notificacoes}
         exportOptions={exportOptions}
         onDataRefresh={handleDataRefresh}
+        onAutoRefresh={loadDashboardData}
       />
     </div>
   );
