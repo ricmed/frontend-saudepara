@@ -237,12 +237,6 @@ const DashboardPageCirio: React.FC = () => {
     setNotificacoes(newData);
   }, []);
 
-  // 🆕 Callback para quando o dashboard filho solicitar recarga completa
-  const handleRequestReload = React.useCallback(async () => {
-    console.log(`🔄 DashboardPageCirio: Recarga solicitada pelo componente filho`);
-    await loadDashboardData();
-  }, [loadDashboardData]);
-
   // 🔧 useEffect para carregar dados inicialmente
   useEffect(() => {
     loadDashboardData();
@@ -287,7 +281,6 @@ const DashboardPageCirio: React.FC = () => {
         notificacoes={notificacoes}
         exportOptions={exportOptions}
         onDataRefresh={handleDataRefresh}
-        onRequestReload={handleRequestReload}
       />
     </div>
   );
