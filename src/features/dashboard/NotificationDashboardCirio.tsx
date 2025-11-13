@@ -348,7 +348,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         selectedPublicos: todosPublicos
       });
     }
-  }, [exportOptions?.publicoOptions, setDateRangeConfig]); // ✅ Corrigido: removido dateRangeConfig da dependência
+  }, [exportOptions?.publicoOptions]); // Remover dependências circulares
 
   // 🆕 Inicializar selectedEstabelecimentos com todos os estabelecimentos quando as opções carregarem
   useEffect(() => {
@@ -360,12 +360,11 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         selectedEstabelecimentos: todosEstabelecimentos
       });
     }
-  }, [exportOptions?.estabelecimentoOptions, setDateRangeConfig]); // ✅ Corrigido: removido dateRangeConfig da dependência
+  }, [exportOptions?.estabelecimentoOptions]); // Remover dependências circulares
 
   // 🚫 LIMPAR FILTRO DE DATA INDIVIDUAL QUANDO FILTRO GLOBAL FOR ATIVADO
-  const isGlobalActive = useMemo(() => isGlobalFilterActive(), [isGlobalFilterActive]);
   useEffect(() => {
-    if (isGlobalActive) {
+    if (isGlobalFilterActive()) {
       console.log('🔒 Filtro global ativado - limpando filtro de data individual');
       setSelectedDataNotificacao(null);
       setActiveFilters(prev => ({
@@ -373,7 +372,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         dataNotificacao: null
       }));
     }
-  }, [isGlobalActive]);
+  }, [isGlobalFilterActive]);
 
   // Estado para filtragem interativa
   const [loading, setLoading] = useState(false);
