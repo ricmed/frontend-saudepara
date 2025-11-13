@@ -55,17 +55,34 @@ const DashboardPageCirio: React.FC = () => {
           let page = 1;
           const pageSize = 100;
           let hasMore = true;
+          let totalRegistros = 0;
 
           // Buscar todas as notificações (paginado) - SEM LIMITE
           while (hasMore) {
             const response = await NotificacaoService.getAll(page, pageSize);
+            
+            // ✅ CORREÇÃO: Capturar total de registros da API
+            if (response?.meta?.total) {
+              totalRegistros = response.meta.total;
+            }
+            
             if (response && response.data && response.data.length > 0) {
               allNotificacoes = [...allNotificacoes, ...response.data];
-              console.log(`   📄 Página ${page}: ${response.data.length} notificações (Total: ${allNotificacoes.length})`);
+              console.log(`   📄 Página ${page}: ${response.data.length} notificações (Total: ${allNotificacoes.length}/${totalRegistros || '?'})`);
               
-              // Para apenas quando não houver mais dados
-              if (response.data.length < pageSize) {
+              // ✅ CORREÇÃO: Verificar se chegou no final de TRÊS formas:
+              // 1. Se a resposta trouxe menos registros que o pageSize
+              // 2. Se já temos todos os registros (allNotificacoes.length >= totalRegistros)
+              // 3. Se a página atual é a última página informada pela API
+              const isLastPageBySize = response.data.length < pageSize;
+              const hasAllRecords = totalRegistros > 0 && allNotificacoes.length >= totalRegistros;
+              const isLastPageByMeta = response?.meta?.totalPages && page >= response.meta.totalPages;
+              
+              if (isLastPageBySize || hasAllRecords || isLastPageByMeta) {
                 hasMore = false;
+                if (hasAllRecords) {
+                  console.log(`   ✅ Todos os registros obtidos (${allNotificacoes.length}/${totalRegistros})`);
+                }
               } else {
                 page++;
               }
@@ -74,7 +91,7 @@ const DashboardPageCirio: React.FC = () => {
             }
           }
 
-          console.log(`✅ ${allNotificacoes.length} notificações baixadas da API`);
+          console.log(`✅ ${allNotificacoes.length} notificações baixadas da API (Total: ${totalRegistros})`);
 
           // 🆕 PASSO 3: Filtrar notificações por eventos ativos
           console.log("🔍 Filtrando notificações por eventos ativos...");
