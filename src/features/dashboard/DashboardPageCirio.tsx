@@ -56,15 +56,14 @@ const DashboardPageCirio: React.FC = () => {
           const pageSize = 100;
           let hasMore = true;
 
-          // Buscar todas as notificações (paginado) - SEM LIMITE
-          while (hasMore) {
+          // Buscar todas as notificações (paginado)
+          while (hasMore && allNotificacoes.length < 1000) {
             const response = await NotificacaoService.getAll(page, pageSize);
             if (response && response.data && response.data.length > 0) {
               allNotificacoes = [...allNotificacoes, ...response.data];
               console.log(`   📄 Página ${page}: ${response.data.length} notificações (Total: ${allNotificacoes.length})`);
               
-              // Para apenas quando não houver mais dados
-              if (response.data.length < pageSize) {
+              if (response.data.length < pageSize || allNotificacoes.length >= 1000) {
                 hasMore = false;
               } else {
                 page++;
