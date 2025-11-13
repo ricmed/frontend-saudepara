@@ -322,7 +322,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   const filteredNotificacoes = useRef<any[]>([]);
   const autoRefreshInterval = useRef<NodeJS.Timeout | null>(null);
   const refreshDataRef = useRef<any>(null);
-  const isLoadingRef = useRef(false);
   
   // Estado para controle de visualização
   const { activeTab, setActiveTab } = useDashboardTabs();
@@ -2686,12 +2685,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
   // Função para atualizar os dados
   const refreshData = useCallback(async () => {
-    if (isLoadingRef.current) {
-      console.log("⏳ Atualização já em andamento, aguardando...");
+    if (loading) {
       return; // Evita atualizações simultâneas
     }
     
-    isLoadingRef.current = true;
     setLoading(true);
     
     try {
@@ -2793,11 +2790,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     } catch (error) {
       console.error("❌ Erro na atualização:", error);
     } finally {
-      isLoadingRef.current = false;
       setLoading(false);
       setLastUpdate(new Date().toLocaleString());
     }
-  }, [selectedCategory, selectedDataNotificacao, activeFilters, fetchFreshData, notificacoes, filtrarNotificacoes, calcularEstatisticas, onDataRefresh, extrairDatasNotificacao, contarNotificacoesPorData, applyFilters, notificacoesFiltradasPorEvento]);
+  }, [loading, selectedCategory, selectedDataNotificacao, activeFilters, fetchFreshData, notificacoes, filtrarNotificacoes, calcularEstatisticas, onDataRefresh, extrairDatasNotificacao, contarNotificacoesPorData, applyFilters, notificacoesFiltradasPorEvento]);
 
   // 🔧 CORREÇÃO: Atribuir refreshData ao ref para que o auto-refresh funcione
   useEffect(() => {
@@ -2815,21 +2811,20 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     // Se a atualização automática está habilitada, configurar o intervalo
     if (autoRefreshEnabled) {
       // Configurar o contador regressivo - 60 segundos (1 minuto)
-      setAutoRefreshCountdown(60);
+      let countdown = 60;
+      setAutoRefreshCountdown(countdown);
       
       // Atualizar o contador a cada segundo
       const countdownTimer = setInterval(() => {
-        setAutoRefreshCountdown(prev => {
-          const newCountdown = prev - 1;
-          
-          // Quando o contador chegar a zero, atualizar os dados
-          if (newCountdown <= 0) {
-            refreshDataRef.current && refreshDataRef.current();
-            return 60; // Resetar para 60 segundos
-          }
-          
-          return newCountdown;
-        });
+        countdown -= 1;
+        setAutoRefreshCountdown(countdown);
+        
+        // Quando o contador chegar a zero, atualizar os dados
+        if (countdown <= 0) {
+          refreshDataRef.current && refreshDataRef.current();
+          countdown = 60; // Resetar para 60 segundos
+          setAutoRefreshCountdown(countdown);
+        }
       }, 1000);
       
       autoRefreshInterval.current = countdownTimer;
