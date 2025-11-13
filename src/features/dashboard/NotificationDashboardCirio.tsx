@@ -292,6 +292,7 @@ interface DashboardProps {
   notificacoes?: any[]; // Lista de notificações da API
   exportOptions?: any; // Opções de exportação com os tipos/categorias
   onDataRefresh?: (newData: any[]) => void; // Callback para notificar sobre novos dados
+  onAutoRefresh?: () => Promise<void>; // 🆕 Callback para chamar loadDashboardData() do pai
 }
 
 // Define interface for chart data
@@ -315,6 +316,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   notificacoes = [],
   exportOptions = {},
   onDataRefresh,
+  onAutoRefresh, // 🆕 Recebe função do pai
 }) => {
   // Para controlar se já fizemos o processamento inicial
   const initialProcessingDone = useRef(false);
@@ -2700,117 +2702,29 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     }
   }, [notificacoes, exportOptions]);
 
-  // Função para atualizar os dados
+  // ✅ Função para atualizar os dados - USA A MESMA LÓGICA DO CARREGAMENTO INICIAL
   const refreshData = useCallback(async () => {
     if (loading) {
       return; // Evita atualizações simultâneas
     }
     
-    setLoading(true);
+    console.log("� Iniciando atualização automática dos dados...");
     
     try {
-      // Buscar dados frescos do servidor usando o NotificacaoService
-      const freshData = await fetchFreshData();
-      console.log(`📊 Dados recebidos: ${freshData?.length || 0} notificações`);
-      
-      // Se conseguimos novos dados, processar
-      if (freshData) {
-        // 🆕 PRESERVAR SELEÇÃO DE DATA DURANTE ATUALIZAÇÃO
-        const dataAtualmenteSeleciona = selectedDataNotificacao;
-        
-        // Extrair novas datas disponíveis
-        const novasDatasDisponiveis = extrairDatasNotificacao(freshData);
-        setDatasNotificacaoDisponiveis(novasDatasDisponiveis);
-        
-        // Recalcular total de notificações para a data selecionada (se houver)
-        if (dataAtualmenteSeleciona) {
-          const novoTotalDia = contarNotificacoesPorData(freshData, dataAtualmenteSeleciona);
-          setTotalNotificacoesDia(novoTotalDia);
-        }
-        
-        // Notificar o componente pai sobre novos dados
-        if (onDataRefresh && freshData.length !== notificacoes.length) {
-          console.log("🔔 Notificando componente pai sobre novos dados...");
-          onDataRefresh(freshData);
-        }
-        
-        console.log("📈 Atualizando dados locais...");
-        
-        // 🆕 USAR SISTEMA DE FILTROS CRUZADOS DURANTE ATUALIZAÇÃO
-        const hasActiveFilter = Object.values(activeFilters).some(filter => filter !== null);
-        
-        if (hasActiveFilter) {
-          // 🆕 CORREÇÃO: Aplicar filtros nas notificações já filtradas por evento
-          const dadosComFiltrosCruzados = applyFilters(notificacoesFiltradasPorEvento);
-          filteredNotificacoes.current = dadosComFiltrosCruzados;
-          calcularEstatisticas(dadosComFiltrosCruzados);
-        } else if (selectedCategory) {
-          // Fallback para sistema antigo (compatibilidade)
-          const dadosFiltrados = filtrarNotificacoes(selectedCategory);
-          filteredNotificacoes.current = dadosFiltrados;
-          calcularEstatisticas(dadosFiltrados);
-        } else {
-          // 🆕 CORREÇÃO: Sem filtros ativos, usar notificações filtradas por evento
-          filteredNotificacoes.current = notificacoesFiltradasPorEvento;
-          calcularEstatisticas(notificacoesFiltradasPorEvento);
-        }
+      // ✅ SOLUÇÃO DEFINITIVA: Usar a mesma função do carregamento inicial do pai
+      if (onAutoRefresh) {
+        await onAutoRefresh(); // Chama loadDashboardData() que já funciona perfeitamente
+        console.log("✅ Atualização automática concluída via loadDashboardData()");
       } else {
-        // Se não conseguirmos novos dados, verificar props
-        console.log("⚠️ Nenhum dado fresco obtido, verificando notificações via props...");
-        if (notificacoes && notificacoes.length > 0 && 
-            notificacoes.length !== originalNotificacoes.current.length) {
-          console.log("🔄 Detectada diferença nas notificações:", 
-                     "Original:", originalNotificacoes.current.length, 
-                     "Novas:", notificacoes.length);
-          
-          // 🆕 PRESERVAR SELEÇÃO DE DATA DURANTE ATUALIZAÇÃO (PROPS)
-          const dataAtualmenteSeleciona = selectedDataNotificacao;
-          
-          // Substituir os dados originais pelos novos
-          originalNotificacoes.current = [...notificacoes];
-          
-          // Extrair novas datas disponíveis
-          const novasDatasDisponiveis = extrairDatasNotificacao(notificacoes);
-          setDatasNotificacaoDisponiveis(novasDatasDisponiveis);
-          
-          // Recalcular total de notificações para a data selecionada (se houver)
-          if (dataAtualmenteSeleciona) {
-            const novoTotalDia = contarNotificacoesPorData(notificacoes, dataAtualmenteSeleciona);
-            setTotalNotificacoesDia(novoTotalDia);
-          }
-          
-          initialProcessingDone.current = false;
-        }
-        
-        // Reprocessar dados com filtros cruzados
-        const hasActiveFilter = Object.values(activeFilters).some(filter => filter !== null);
-        
-        if (hasActiveFilter) {
-          // 🆕 CORREÇÃO: Aplicar filtros nas notificações já filtradas por evento
-          const dadosComFiltrosCruzados = applyFilters(notificacoesFiltradasPorEvento);
-          filteredNotificacoes.current = dadosComFiltrosCruzados;
-          calcularEstatisticas(dadosComFiltrosCruzados);
-        } else if (selectedCategory) {
-          const dadosFiltrados = filtrarNotificacoes(selectedCategory);
-          filteredNotificacoes.current = dadosFiltrados;
-          calcularEstatisticas(dadosFiltrados);
-        } else {
-          // 🆕 CORREÇÃO: Sem filtros ativos, usar notificações filtradas por evento
-          filteredNotificacoes.current = notificacoesFiltradasPorEvento;
-          calcularEstatisticas(notificacoesFiltradasPorEvento);
-        }
+        console.warn("⚠️ onAutoRefresh não foi fornecido como prop");
       }
-
-      // Reativa processamento inicial para que o filtro de eventos funcione
-      initialProcessingDone.current = true;
       
     } catch (error) {
       console.error("❌ Erro na atualização:", error);
     } finally {
-      setLoading(false);
       setLastUpdate(new Date().toLocaleString());
     }
-  }, [loading, selectedCategory, selectedDataNotificacao, activeFilters, fetchFreshData, notificacoes, filtrarNotificacoes, calcularEstatisticas, onDataRefresh, extrairDatasNotificacao, contarNotificacoesPorData, applyFilters, notificacoesFiltradasPorEvento]);
+  }, [loading, onAutoRefresh]);
 
   // 🔧 CORREÇÃO: Atribuir refreshData ao ref para que o auto-refresh funcione
   useEffect(() => {
