@@ -2641,7 +2641,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       const eventosAtivos = exportOptions?.eventoOptions || [];
       const idsEventosAtivos = new Set(eventosAtivos.map((e: any) => e.idtipo_evento));
       
-      console.log(`🔍 [AUTO-REFRESH] Iniciando busca de notificações... (${idsEventosAtivos.size} eventos ativos)`);
+      console.log(`🔍 Buscando notificações... (${idsEventosAtivos.size} eventos ativos)`);
       
       // PASSO 2: Buscar TODAS as notificações da API com paginação
       let allData: any[] = [];
@@ -2649,80 +2649,56 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       const pageSize = 100;
       let hasMore = true;
       let totalRegistros = 0;
-      const MAX_PAGES = 100; // 🔧 Limite de segurança aumentado (100 páginas = 10000 notificações)
 
       // Buscar todas as notificações (paginado) - SEM LIMITE
-      while (hasMore && page <= MAX_PAGES) {
-        console.log(`   🔄 [AUTO-REFRESH] Solicitando página ${page}/${MAX_PAGES} (pageSize=${pageSize})...`);
+      while (hasMore) {
+        console.log(`   🔄 Auto-refresh - Solicitando página ${page} com pageSize=${pageSize}...`);
+        const response = await NotificacaoService.getAll(page, pageSize);
         
-        try {
-          const response = await NotificacaoService.getAll(page, pageSize);
+        // ✅ DEBUG: Log completo da resposta
+        console.log(`   📦 Auto-refresh - Resposta completa:`, JSON.stringify({
+          temResponse: !!response,
+          temData: !!response?.data,
+          tamanhoData: response?.data?.length || 0,
+          meta: response?.meta,
+          temMeta: !!response?.meta
+        }, null, 2));
+        
+        // ✅ CORREÇÃO: Capturar total de registros da API
+        if (response?.meta?.total) {
+          totalRegistros = response.meta.total;
+          console.log(`   📊 Total de registros na API: ${totalRegistros}`);
+        }
+        
+        if (response && response.data && response.data.length > 0) {
+          allData = [...allData, ...response.data];
+          console.log(`   📄 Auto-refresh - Página ${page}: ${response.data.length} notificações (Total acumulado: ${allData.length}/${totalRegistros || '?'})`);
           
-          // ✅ DEBUG: Log da resposta
-          console.log(`   📦 [AUTO-REFRESH] Página ${page} - Resposta:`, {
-            temResponse: !!response,
-            temData: !!response?.data,
-            tamanhoData: response?.data?.length || 0,
-            totalMeta: response?.meta?.total,
-            totalPagesMeta: response?.meta?.totalPages,
-            currentPageMeta: response?.meta?.page
-          });
+          // ✅ CORREÇÃO: Verificar se chegou no final de TRÊS formas:
+          // 1. Se a resposta trouxe menos registros que o pageSize
+          // 2. Se já temos todos os registros (allData.length >= totalRegistros)
+          // 3. Se a página atual é a última página informada pela API
+          const isLastPageBySize = response.data.length < pageSize;
+          const hasAllRecords = totalRegistros > 0 && allData.length >= totalRegistros;
+          const isLastPageByMeta = response?.meta?.totalPages && page >= response.meta.totalPages;
           
-          // ✅ CORREÇÃO: Capturar total de registros da API
-          if (response?.meta?.total && totalRegistros === 0) {
-            totalRegistros = response.meta.total;
-            console.log(`   📊 [AUTO-REFRESH] Total de registros na API: ${totalRegistros}`);
-          }
-          
-          if (response && response.data && Array.isArray(response.data) && response.data.length > 0) {
-            allData = [...allData, ...response.data];
-            console.log(`   📄 [AUTO-REFRESH] Página ${page}: ${response.data.length} notificações | Acumulado: ${allData.length}/${totalRegistros || '?'}`);
-            
-            // ✅ CORREÇÃO: Verificar se chegou no final de TRÊS formas:
-            // 1. Se a resposta trouxe menos registros que o pageSize
-            // 2. Se já temos todos os registros (allData.length >= totalRegistros)
-            // 3. Se a página atual é a última página informada pela API
-            const isLastPageBySize = response.data.length < pageSize;
-            const hasAllRecords = totalRegistros > 0 && allData.length >= totalRegistros;
-            const isLastPageByMeta = response?.meta?.totalPages && page >= response.meta.totalPages;
-            
-            console.log(`   🔍 [AUTO-REFRESH] Verificando condições de parada:`, {
-              isLastPageBySize,
-              hasAllRecords,
-              isLastPageByMeta,
-              'response.data.length': response.data.length,
-              pageSize,
-              'allData.length': allData.length,
-              totalRegistros,
-              'response.meta.totalPages': response?.meta?.totalPages,
-              currentPage: page
-            });
-            
-            if (isLastPageBySize) {
-              console.log(`   ✅ [AUTO-REFRESH] Última página detectada por tamanho (${response.data.length} < ${pageSize})`);
-              hasMore = false;
-            } else if (hasAllRecords) {
-              console.log(`   ✅ [AUTO-REFRESH] Todos os registros obtidos (${allData.length}/${totalRegistros})`);
-              hasMore = false;
-            } else if (isLastPageByMeta) {
-              console.log(`   ✅ [AUTO-REFRESH] Última página detectada por meta (página ${page}/${response.meta.totalPages})`);
-              hasMore = false;
-            } else {
-              console.log(`   ➡️ [AUTO-REFRESH] Continuando para próxima página (${page + 1})...`);
-              page++;
-            }
-          } else {
-            console.log(`   ⚠️ [AUTO-REFRESH] Página ${page} retornou vazia ou inválida. Parando busca...`);
+          if (isLastPageBySize) {
+            console.log(`   ✅ Auto-refresh - Última página detectada por tamanho (${response.data.length} < ${pageSize})`);
             hasMore = false;
+          } else if (hasAllRecords) {
+            console.log(`   ✅ Auto-refresh - Todos os registros obtidos (${allData.length}/${totalRegistros})`);
+            hasMore = false;
+          } else if (isLastPageByMeta) {
+            console.log(`   ✅ Auto-refresh - Última página detectada por meta (página ${page}/${response.meta.totalPages})`);
+            hasMore = false;
+          } else {
+            console.log(`   ➡️ Auto-refresh - Continuando para próxima página...`);
+            page++;
           }
-        } catch (error) {
-          console.error(`   ❌ [AUTO-REFRESH] Erro ao buscar página ${page}:`, error);
+        } else {
+          console.log(`   ⚠️ Auto-refresh - Página ${page} retornou vazia ou inválida. Parando...`);
           hasMore = false;
         }
-      }
-      
-      if (page > MAX_PAGES) {
-        console.warn(`   ⚠️ [AUTO-REFRESH] Limite máximo de páginas (${MAX_PAGES}) atingido! Pode haver mais dados disponíveis.`);
       }
       
       console.log(`📥 Dados frescos recebidos: ${allData.length} notificações (Total da API: ${totalRegistros || 'desconhecido'})`);
