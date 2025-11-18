@@ -174,16 +174,14 @@ export const useDashboardDateRangeFilter = (): UseDateRangeFilterReturn => {
 
     // Filtrar notificações dentro do período personalizado e tipo de público
     const filteredNotifications = notifications.filter((notification, index) => {
-      // Filtro de data/hora - prioriza datas do evento antes do timestamp de criação
-      const dateField =
-        notification.data_atendimento ||
-        notification.original?.data_atendimento ||
-        notification.data_notificacao ||
-        notification.original?.data_notificacao ||
-        notification.original?.data_ocorrencia ||
-        notification.dataOcorrencia ||
+      // Filtro de data/hora
+      const dateField = 
         notification.created_at ||
         notification.original?.created_at ||
+        notification.data_notificacao || 
+        notification.original?.data_notificacao ||
+        notification.data_atendimento ||
+        notification.original?.data_atendimento ||
         notification.createdAt ||
         notification.original?.createdAt;
       
