@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, startTransition } from "react";
 import NotificacaoService from '@/services/NotificacaoService';
 import DashboardExportMenu from '../../components/common/DashboardExportMenu';
 import {
@@ -77,6 +77,23 @@ import PrincipaisSintomasChart from './components/charts/PrincipaisSintomasChart
 import TiposTraumaChart from './components/charts/TiposTraumaChart';
 import HipotesesDiagnosticasChart from './components/charts/HipotesesDiagnosticasChart';
 import SerieTemporalChart from './components/SerieTemporalChart';
+
+// ⚡ OTIMIZAÇÃO: Memoizar componentes de gráfico para evitar re-renderizações desnecessárias
+const MemoizedPiramideEtariaChart = React.memo(PiramideEtariaChart);
+const MemoizedDesfechoCasosChart = React.memo(DesfechoCasosChart);
+const MemoizedEstabelecimentosCasosChart = React.memo(EstabelecimentosCasosChart);
+const MemoizedDistribuicaoPublicoAtendidoChart = React.memo(DistribuicaoPublicoAtendidoChart);
+const MemoizedDistribuicaoTipoAtendimentoChart = React.memo(DistribuicaoTipoAtendimentoChart);
+const MemoizedDistribuicaoSexoChart = React.memo(DistribuicaoSexoChart);
+const MemoizedDistribuicaoRacaCorChart = React.memo(DistribuicaoRacaCorChart);
+const MemoizedPrincipaisSintomasChart = React.memo(PrincipaisSintomasChart);
+const MemoizedTiposTraumaChart = React.memo(TiposTraumaChart);
+const MemoizedHipotesesDiagnosticasChart = React.memo(HipotesesDiagnosticasChart);
+const MemoizedSerieTemporalChart = React.memo(SerieTemporalChart);
+const MemoizedAtendimentosPorHoraChart = React.memo(AtendimentosPorHoraChart);
+const MemoizedEstabelecimentosMapaAvancado = React.memo(EstabelecimentosMapaAvancado);
+const MemoizedAlertasPanel = React.memo(AlertasPanel);
+const MemoizedGeographicLocationPanel = React.memo(GeographicLocationPanel);
 
 // 🕐 NOVO: Hook e Componente para filtro de período personalizado
 import useDashboardDateRangeFilter from './hooks/useDashboardTimeFilter';
@@ -316,8 +333,16 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   exportOptions = {},
   onDataRefresh,
 }) => {
+  // ⚡ OTIMIZAÇÃO: Sistema de log condicional para produção
+  const DEBUG_MODE = process.env.NODE_ENV === 'development';
+  const debugLog = useCallback((...args: any[]) => {
+    if (DEBUG_MODE) {
+      console.log(...args);
+    }
+  }, [DEBUG_MODE]);
+  
   // 🚨 DEBUG: Log para verificar se o componente está sendo montado
-  console.log('🎯 [DASHBOARD CIRIO] Componente montado!', {
+  debugLog('🎯 [DASHBOARD CIRIO] Componente montado!', {
     totalNotificacoes: notificacoes.length,
     temExportOptions: !!exportOptions,
     timestamp: new Date().toISOString()
@@ -2226,28 +2251,34 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     return resultado.sort((a, b) => b.value - a.value); // Ordenar pelo valor
   }, []);
 
-  // Processamento dos dados para gráficos
+  // ⚡ OTIMIZAÇÃO: Memoizar processamento de dados para evitar recálculos desnecessários
+  // Isso melhora drasticamente a performance com 3000+ notificações
   const processarDadosGraficos = useCallback((dadosFiltrados: any[]) => {
+    const startTime = performance.now();
+    
     // 🆕 CORREÇÃO: Se dadosFiltrados está vazio, LIMPAR todos os gráficos
     if (!Array.isArray(dadosFiltrados) || !dadosFiltrados.length) {
-      console.log('📊 processarDadosGraficos - Array vazio, limpando todos os gráficos...');
+      debugLog('📊 processarDadosGraficos - Array vazio, limpando todos os gráficos...');
       
-      // Limpar TODOS os gráficos
-      setFilteredRaca([]);
-      setFilteredEscolaridade([]);
-      setFilteredUnidades([]);
-      setFilteredGenero([]);
-      setFilteredSintomas([]);
-      setFilteredTipoAtendimento([]);
-      setFilteredPublico([]);
-      setFilteredHipoteses([]);
-      setFilteredTrauma([]);
-      
-      // Limpar gráficos de localização geográfica
-      setFilteredPais([]);
-      setFilteredEstado([]);
-      setFilteredMunicipio([]);
-      setFilteredBairro([]);
+      // ⚡ OTIMIZAÇÃO: Usar startTransition para tornar updates não-urgentes
+      startTransition(() => {
+        // Limpar TODOS os gráficos
+        setFilteredRaca([]);
+        setFilteredEscolaridade([]);
+        setFilteredUnidades([]);
+        setFilteredGenero([]);
+        setFilteredSintomas([]);
+        setFilteredTipoAtendimento([]);
+        setFilteredPublico([]);
+        setFilteredHipoteses([]);
+        setFilteredTrauma([]);
+        
+        // Limpar gráficos de localização geográfica
+        setFilteredPais([]);
+        setFilteredEstado([]);
+        setFilteredMunicipio([]);
+        setFilteredBairro([]);
+      });
       
       return false;
     }
@@ -2501,6 +2532,11 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         setOriginalBairro(bairroPorNotificacao);
       }
       
+      // ⚡ LOG DE PERFORMANCE: Medir tempo total de processamento
+      const endTime = performance.now();
+      const duration = (endTime - startTime).toFixed(2);
+      console.log(`⚡ Processamento de gráficos concluído em ${duration}ms (${dadosFiltrados.length} notificações)`);
+      
       return true;
     } catch (error) {
       console.error("Erro ao processar dados para gráficos:", error);
@@ -2515,8 +2551,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       // 🔧 CORREÇÃO: Incluir dependências de filtros para que os gráficos sejam reprocessados
       applyFilters, hasActiveFilters, notificacoesFiltradasPorEvento, activeFilters]);
 
-  // Função para calcular estatísticas a partir das notificações
+  // ⚡ Função otimizada para calcular estatísticas a partir das notificações
   const calcularEstatisticas = useCallback((dadosFiltrados: any[] = []) => {
+    const startTime = performance.now();
+    
     // 🆕 CORREÇÃO: Se dadosFiltrados está vazio, use array vazio (não use notificacoes como fallback)
     // Isso garante que quando filtro resulta em 0 notificações, o dashboard mostra 0 (correto)
     const dados = dadosFiltrados;
@@ -2570,8 +2608,18 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       console.log("Contagens calculadas:", counts);
       setStatCounts(counts);
 
-      // Processar dados para gráficos
-      const processResult = processarDadosGraficos(dados);
+      // ⚡ OTIMIZAÇÃO: Processar dados para gráficos em uma transição não-urgente
+      // Isso permite que o React priorize interações do usuário
+      let processResult = false;
+      startTransition(() => {
+        processResult = processarDadosGraficos(dados);
+      });
+      
+      // ⚡ LOG DE PERFORMANCE
+      const endTime = performance.now();
+      const duration = (endTime - startTime).toFixed(2);
+      console.log(`⚡ calcularEstatisticas concluído em ${duration}ms (${dados.length} notificações)`);
+      
       return processResult;
     } catch (error) {
       console.error("Erro ao calcular estatísticas:", error);
@@ -4052,7 +4100,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           
           {/* Gráfico de Público Atendido - 2 colunas */}
           <div className="sm:col-span-2 lg:col-span-2 xl:col-span-2">
-            <DistribuicaoPublicoAtendidoChart
+            <MemoizedDistribuicaoPublicoAtendidoChart
               data={filteredPublico}
               onChartClick={(itemName, multiSelect) => handleChartClick('publico', itemName, multiSelect)}
               activeFilter={activeFilters.publico}
@@ -4063,7 +4111,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
           {/* Gráfico de Tipo de Atendimento - 2 colunas */}
           <div className="sm:col-span-2 lg:col-span-2 xl:col-span-2">
-            <DistribuicaoTipoAtendimentoChart
+            <MemoizedDistribuicaoTipoAtendimentoChart
               data={filteredTipoAtendimento}
               onChartClick={(itemName, multiSelect) => handleChartClick('tipoAtendimento', itemName, multiSelect)}
               activeFilter={activeFilters.tipoAtendimento}
@@ -4074,7 +4122,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
           {/* Gráfico de Identidade de Gênero - 2 colunas */}
           <div className="sm:col-span-2 lg:col-span-2 xl:col-span-2">
-            <DistribuicaoSexoChart
+            <MemoizedDistribuicaoSexoChart
               data={filteredGenero}
               onChartClick={(itemName, multiSelect) => handleChartClick('genero', itemName, multiSelect)}
               activeFilter={activeFilters.genero}
@@ -4085,7 +4133,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
           {/* Gráfico de Raça/Cor - 2 colunas */}
           <div className="sm:col-span-2 lg:col-span-2 xl:col-span-2">
-            <DistribuicaoRacaCorChart
+            <MemoizedDistribuicaoRacaCorChart
               data={filteredRaca}
               onChartClick={(itemName, multiSelect) => handleChartClick('raca', itemName, multiSelect)}
               activeFilter={activeFilters.raca}
@@ -4100,7 +4148,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           
           {/* Painel de Localização Geográfica - 8 colunas (largura total) */}
           <div className="sm:col-span-2 lg:col-span-3 xl:col-span-8">
-            <GeographicLocationPanel
+            <MemoizedGeographicLocationPanel
               paisData={filteredPais}
               estadoData={filteredEstado}
               municipioData={filteredMunicipio}
@@ -4116,7 +4164,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           
           {/* Estabelecimentos por Número de Casos - 4 colunas */}
           <div className="sm:col-span-2 lg:col-span-3 xl:col-span-4">
-            <EstabelecimentosCasosChart 
+            <MemoizedEstabelecimentosCasosChart 
               toggleFilter={toggleFilter}
               activeFilters={activeFilters}
               filteredData={getFilteredDataExcludingUnidade()}
@@ -4125,7 +4173,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
           {/* Pirâmide Etária por Sexo - 4 colunas */}
           <div className="sm:col-span-2 lg:col-span-2 xl:col-span-4">
-            <PiramideEtariaChart 
+            <MemoizedPiramideEtariaChart 
               toggleFilter={toggleFilter}
               activeFilters={activeFilters}
               filteredData={getFilteredDataExcludingFaixaEtaria()}
@@ -4137,7 +4185,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           {/* =============================================== */}
           
           {/* Principais Sintomas - 2 colunas */}
-          <PrincipaisSintomasChart
+          <MemoizedPrincipaisSintomasChart
             data={filteredSintomas}
             onChartClick={(itemName, multiSelect) => handleChartClick('sintoma', itemName, multiSelect)}
             activeFilter={activeFilters.sintoma}
@@ -4149,7 +4197,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           />
 
           {/* Tipos de Trauma - 2 colunas */}
-          <TiposTraumaChart
+          <MemoizedTiposTraumaChart
             data={filteredTrauma}
             onChartClick={(itemName, multiSelect) => handleChartClick('trauma', itemName, multiSelect)}
             activeFilter={activeFilters.trauma}
@@ -4160,7 +4208,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           />
 
           {/* Hipóteses Diagnósticas - 4 colunas (maior para mostrar nomes completos) */}
-          <HipotesesDiagnosticasChart
+          <MemoizedHipotesesDiagnosticasChart
             data={filteredHipoteses}
             onChartClick={(itemName, multiSelect) => handleChartClick('hipotese', itemName, multiSelect)}
             activeFilter={activeFilters.hipotese}
@@ -4181,7 +4229,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           
           {/* Desfecho dos Casos - 6 colunas (divididas internamente) */}
           <div className="sm:col-span-2 lg:col-span-4 xl:col-span-6">
-            <DesfechoCasosChart 
+            <MemoizedDesfechoCasosChart 
               toggleFilter={toggleFilter}
               activeFilters={activeFilters}
               filteredData={getFilteredDataExcludingDesfecho()}
@@ -4226,7 +4274,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           
           {/* Gráfico 1: Série temporal por dia - FILTROS CRUZADOS SEM FILTRO DE PERÍODO */}
           <div className="mb-6">
-            <SerieTemporalChart 
+            <MemoizedSerieTemporalChart 
               notificacoes={hasActiveFilters ? filteredNotificacoesForTemporal : notificacoesParaAnalisetemporal}
               title="Série Temporal por Dia de Notificação"
               description="Evolução diária do número de notificações (do início ao fim do evento)"
@@ -4235,7 +4283,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           </div>
           
           {/* Gráfico 2: Série temporal por hora - FILTROS CRUZADOS SEM FILTRO DE PERÍODO */}
-          <AtendimentosPorHoraChart 
+          <MemoizedAtendimentosPorHoraChart 
             notificacoes={hasActiveFilters ? filteredNotificacoesForTemporal : notificacoesParaAnalisetemporal} 
           />
         </main>
@@ -4273,7 +4321,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           </div>
           
           {/* 🆕 USAR NOTIFICAÇÕES COM FILTROS CRUZADOS NO MAPA */}
-          <EstabelecimentosMapaAvancado 
+          <MemoizedEstabelecimentosMapaAvancado 
             notificacoes={hasActiveFilters ? filteredNotificacoes.current : notificacoesFiltradasPorEvento}
             exportOptions={exportOptions}
             selectedDataNotificacao={selectedDataNotificacao}
@@ -4303,7 +4351,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
       {/* Sistema de Alertas - Sempre visível */}
       {/* 🆕 USAR NOTIFICAÇÕES COM TODOS OS FILTROS APLICADOS */}
-      <AlertasPanel 
+      <MemoizedAlertasPanel 
         key={`alertas-${lastUpdate}-${notificacoesComTodosFiltros.length}`}
         notificacoes={notificacoesComTodosFiltros}
         isGlobalFilterActive={isGlobalFilterActive}
