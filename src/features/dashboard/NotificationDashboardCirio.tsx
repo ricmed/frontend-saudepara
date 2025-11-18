@@ -1530,6 +1530,24 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     return applyFilters(baseData);
   }, [hasActiveFilters, applyFilters, notificacoesFiltradasPorEvento]);
 
+  // 🆕 FUNÇÃO PARA OBTER DADOS FILTRADOS PARA ANÁLISE TEMPORAL
+  // (Ignora filtro de período, mas aplica filtros cruzados)
+  const getFilteredDataForTemporal = useCallback(() => {
+    // Base: notificações apenas filtradas por evento (SEM filtro de período)
+    const baseData = notificacoesParaAnalisetemporal;
+    
+    if (!hasActiveFilters) {
+      return baseData;
+    }
+    return applyFilters(baseData);
+  }, [hasActiveFilters, applyFilters, notificacoesParaAnalisetemporal]);
+
+  // 🆕 MEMO: Notificações filtradas para gráficos temporais
+  // (Ignora filtro de período, mas aplica filtros cruzados)
+  const filteredNotificacoesForTemporal = useMemo(() => {
+    return getFilteredDataForTemporal();
+  }, [getFilteredDataForTemporal]);
+
   // 🆕 FUNÇÃO PARA OBTER DADOS FILTRADOS EXCLUINDO DESFECHO (para o gráfico de Desfecho)
   const getFilteredDataExcludingDesfecho = useCallback(() => {
     const baseData = notificacoesFiltradasPorEvento;
@@ -4206,19 +4224,19 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             />
           </div>
           
-          {/* Gráfico 1: Série temporal por dia - USANDO NOTIFICAÇÕES COM FILTROS CRUZADOS */}
+          {/* Gráfico 1: Série temporal por dia - FILTROS CRUZADOS SEM FILTRO DE PERÍODO */}
           <div className="mb-6">
             <SerieTemporalChart 
-              notificacoes={hasActiveFilters ? filteredNotificacoes.current : notificacoesParaAnalisetemporal}
+              notificacoes={hasActiveFilters ? filteredNotificacoesForTemporal : notificacoesParaAnalisetemporal}
               title="Série Temporal por Dia de Notificação"
-              description="Evolução diária do número de notificações"
+              description="Evolução diária do número de notificações (do início ao fim do evento)"
               estabelecimentoOptions={exportOptions?.estabelecimentoOptions || []}
             />
           </div>
           
-          {/* Gráfico 2: Série temporal por hora - USANDO NOTIFICAÇÕES COM FILTROS CRUZADOS */}
+          {/* Gráfico 2: Série temporal por hora - FILTROS CRUZADOS SEM FILTRO DE PERÍODO */}
           <AtendimentosPorHoraChart 
-            notificacoes={hasActiveFilters ? filteredNotificacoes.current : notificacoesParaAnalisetemporal} 
+            notificacoes={hasActiveFilters ? filteredNotificacoesForTemporal : notificacoesParaAnalisetemporal} 
           />
         </main>
       )}
