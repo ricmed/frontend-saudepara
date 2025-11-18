@@ -91,20 +91,43 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({
   }, [notificacoes]);
 
   // 🆕 EFEITO: Pré-selecionar a data mais recente quando as datas estiverem disponíveis
+  // 🔒 REGRA: Não pré-selecionar data se o filtro global estiver ativo
   useEffect(() => {
-    if (datasDisponiveis.length > 0 && !dataSelecionada) {
-      setDataSelecionada(datasDisponiveis[0]); // Pré-selecionar a primeira (mais recente)
+    if (isGlobalFilterActive && isGlobalFilterActive()) {
+      // Filtro global ativo - limpar seleção de data individual
+      if (dataSelecionada && dataSelecionada !== 'todas') {
+        console.log('🔒 Filtro global ativo - limpando filtro de data individual do AlertasPanel');
+        setDataSelecionada('todas');
+      }
+    } else {
+      // Filtro global inativo - pode pré-selecionar data
+      if (datasDisponiveis.length > 0 && !dataSelecionada) {
+        setDataSelecionada(datasDisponiveis[0]); // Pré-selecionar a primeira (mais recente)
+      }
     }
-  }, [datasDisponiveis, dataSelecionada]);
+  }, [datasDisponiveis, dataSelecionada, isGlobalFilterActive]);
 
   // 🆕 NOVO: Filtrar notificações por data
+  // 🔒 REGRA: Se o filtro global estiver ativo, ignorar filtro de data individual
   const notificacoesFiltradas = useMemo(() => {
     if (!notificacoes || notificacoes.length === 0) return [];
     
-    // Se for "todas", retornar todas as notificações
-    if (dataSelecionada === 'todas' || !dataSelecionada) return notificacoes;
+    // 🔒 PRIORIDADE 1: Se o filtro global estiver ativo, retornar todas as notificações recebidas
+    // (elas já vêm filtradas pelo filtro global)
+    if (isGlobalFilterActive && isGlobalFilterActive()) {
+      console.log('🔒 Filtro global ativo - AlertasPanel usando notificações pré-filtradas:', notificacoes.length);
+      return notificacoes;
+    }
     
-    return notificacoes.filter((notif) => {
+    // 🔓 PRIORIDADE 2: Filtro global inativo - aplicar filtro de data individual
+    // Se for "todas", retornar todas as notificações
+    if (dataSelecionada === 'todas' || !dataSelecionada) {
+      console.log('📅 Nenhum filtro de data - AlertasPanel usando todas as notificações:', notificacoes.length);
+      return notificacoes;
+    }
+    
+    // Filtrar por data selecionada
+    const filtradas = notificacoes.filter((notif) => {
       const dataCreated = notif?.created_at || notif?.original?.created_at;
       if (!dataCreated) return false;
 
@@ -120,7 +143,10 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({
         return false;
       }
     });
-  }, [notificacoes, dataSelecionada]);
+    
+    console.log(`📅 Filtro de data individual aplicado (${dataSelecionada}): ${notificacoes.length} → ${filtradas.length}`);
+    return filtradas;
+  }, [notificacoes, dataSelecionada, isGlobalFilterActive]);
 
   // Função para formatar data para exibição
   const formatarDataParaExibicao = useCallback((dataISO: string) => {
@@ -556,6 +582,16 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({
 
           {/* 🆕 NOVO: Seletor de Data */}
           <div className="mb-4 pb-4 border-b border-gray-100">
+            {/* 🔒 AVISO: Filtro Global Ativo */}
+            {isGlobalFilterActive() && (
+              <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-md flex items-start gap-2">
+                <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div className="text-xs text-blue-800">
+                  <strong>Filtro Global de Período Ativo:</strong> Os alertas estão sendo filtrados pelo intervalo de datas definido no seletor de período do dashboard. O filtro de data individual está desabilitado.
+                </div>
+              </div>
+            )}
+            
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-gray-600" />
@@ -590,9 +626,15 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({
                   </span>
                 )}
 
-                {dataSelecionada === 'todas' && (
+                {!isGlobalFilterActive() && dataSelecionada === 'todas' && (
                   <span className="text-xs text-gray-600">
                     {notificacoes.length} notificações no total
+                  </span>
+                )}
+                
+                {isGlobalFilterActive() && (
+                  <span className="text-xs text-blue-700 font-medium">
+                    🔒 {notificacoes.length} notificações no período
                   </span>
                 )}
               </div>
