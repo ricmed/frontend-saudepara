@@ -19,6 +19,7 @@ interface DashboardExportMenuProps {
   municipioData?: ChartDataItem[];
   bairroData?: ChartDataItem[];
   // Dados adicionais de outros gráficos do dashboard
+  estabelecimentosData?: ChartDataItem[];
   publicoData?: ChartDataItem[];
   tipoAtendimentoData?: ChartDataItem[];
   generoData?: ChartDataItem[];
@@ -40,6 +41,7 @@ const DashboardExportMenu: React.FC<DashboardExportMenuProps> = ({
   estadoData = [],
   municipioData = [],
   bairroData = [],
+  estabelecimentosData = [],
   publicoData = [],
   tipoAtendimentoData = [],
   generoData = [],
@@ -65,6 +67,9 @@ const DashboardExportMenu: React.FC<DashboardExportMenuProps> = ({
     if (estadoData.length > 0) sections.push({ name: 'Estados/UF de Residência', data: estadoData });
     if (municipioData.length > 0) sections.push({ name: 'Municípios de Residência', data: municipioData });
     if (bairroData.length > 0) sections.push({ name: 'Bairros de Residência', data: bairroData });
+
+    // Seção de Estabelecimentos
+    if (estabelecimentosData.length > 0) sections.push({ name: 'Estabelecimentos de Saúde', data: estabelecimentosData });
 
     // Seção Demográfica
     if (publicoData.length > 0) sections.push({ name: 'Público Atendido', data: publicoData });

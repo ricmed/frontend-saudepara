@@ -2825,6 +2825,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 estadoData={filteredEstado}
                 municipioData={filteredMunicipio}
                 bairroData={filteredBairro}
+                estabelecimentosData={filteredUnidades}
                 publicoData={filteredPublico}
                 tipoAtendimentoData={filteredTipoAtendimento}
                 generoData={filteredGenero}
