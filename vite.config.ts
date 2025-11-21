@@ -99,7 +99,7 @@ export default defineConfig({
       
       workbox: {
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
-        skipWaiting: true,
+        // skipWaiting: true, // REMOVIDO: Para permitir que o usuário decida quando atualizar (registerType: 'prompt')
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         
