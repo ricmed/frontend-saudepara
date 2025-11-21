@@ -77,6 +77,26 @@ const getLabelFromOptions = (
 // Função universal de formatação de datas - 🆕 ATUALIZADA com timezone
 import { detectUserTimezone } from '@/features/notificationForms/types/index2';
 
+// 🆕 Função para formatar data de nascimento SEM timezone
+// Data de nascimento é uma data "pura" e não deve sofrer ajuste de fuso horário
+export const formatarDataNascimento = (dateString?: string | null): string => {
+  if (!dateString) return "";
+
+  try {
+    // Extrair apenas a parte da data (YYYY-MM-DD) sem conversão de timezone
+    const dateOnly = dateString.split("T")[0];
+    const [year, month, day] = dateOnly.split("-");
+    
+    // Retornar formatado como DD/MM/YYYY
+    const result = `${day}/${month}/${year}`;
+    console.log(`Data de nascimento: ${dateString} -> ${result} (sem conversão de timezone)`);
+    return result;
+  } catch (error) {
+    console.error("Erro ao formatar data de nascimento:", error);
+    return "Data inválida";
+  }
+};
+
 export const formatarDataUniversal = (dateString?: string | null): string => {
   if (!dateString) return "";
 
@@ -803,7 +823,7 @@ const prepareDataForExport = (
     // Seção 3: Identificação do indivíduo
     "Nome do Paciente": formData.paciente,
     "Nome da Mãe": formData.nomeMae,
-    "Data de Nascimento": formatarDataUniversal(formData.dataNascimento),
+    "Data de Nascimento": formatarDataNascimento(formData.dataNascimento),
     Idade: getAge(),
     CPF: formData.cpf,
     "Identidade de Gênero": getIdentidadeGeneroLabel(formData.identidadeGenero),
@@ -1557,7 +1577,7 @@ const formatNotificacaoForExport = (
     // Identificação do indivíduo
     "Nome do Paciente": paciente.nome || "",
     "Nome da Mãe": paciente.nome_mae || "",
-    "Data de Nascimento": formatarDataUniversal(paciente.data_nascimento),
+    "Data de Nascimento": formatarDataNascimento(paciente.data_nascimento),
     Idade: getAge(), // Usando a função aprimorada
     CPF: paciente.cpf || "",
     "Identidade de Gênero": getLabelFromOptions(

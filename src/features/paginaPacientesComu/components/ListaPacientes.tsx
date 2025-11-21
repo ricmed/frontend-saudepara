@@ -736,28 +736,45 @@ const ListaPacientes = () => {
   // Formatar data para exibição
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return "";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("pt-BR");
+    
+    try {
+      // Extrair apenas a parte da data (YYYY-MM-DD) sem conversão de timezone
+      const dateOnly = dateString.split("T")[0];
+      const [year, month, day] = dateOnly.split("-");
+      
+      // Retornar formatado como DD/MM/YYYY
+      return `${day}/${month}/${year}`;
+    } catch (error) {
+      console.error("Erro ao formatar data:", error);
+      return "";
+    }
   };
 
   // Calcular idade a partir da data de nascimento
   const calculateAge = (birthdate: string | null | undefined) => {
     if (!birthdate) return "";
 
-    const birthDate = new Date(birthdate);
-    const today = new Date();
+    try {
+      // Extrair apenas a parte da data (YYYY-MM-DD) sem conversão de timezone
+      const dateOnly = birthdate.split("T")[0];
+      const [year, month, day] = dateOnly.split("-").map(Number);
+      
+      const today = new Date();
+      let age = today.getFullYear() - year;
+      const monthDifference = today.getMonth() + 1 - month; // +1 porque getMonth() retorna 0-11
 
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDifference = today.getMonth() - birthDate.getMonth();
+      if (
+        monthDifference < 0 ||
+        (monthDifference === 0 && today.getDate() < day)
+      ) {
+        age--;
+      }
 
-    if (
-      monthDifference < 0 ||
-      (monthDifference === 0 && today.getDate() < birthDate.getDate())
-    ) {
-      age--;
+      return age;
+    } catch (error) {
+      console.error("Erro ao calcular idade:", error);
+      return "";
     }
-
-    return age;
   };
 
   // Formatar CPF
