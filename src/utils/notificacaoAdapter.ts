@@ -38,6 +38,22 @@ const formatarDataUniversal = (dateString: string): string => {
   }
 };
 
+// Função para processar data de nascimento SEM ajuste de timezone
+// Data de nascimento é uma data "pura" sem horário, não deve sofrer conversão
+const processarDataNascimento = (dateString: string | null | undefined): string => {
+  if (!dateString) return "";
+  
+  try {
+    // Extrair apenas a parte da data (YYYY-MM-DD) sem conversão de timezone
+    const dateOnly = dateString.split("T")[0];
+    console.log(`📅 processarDataNascimento: ${dateString} -> ${dateOnly} (sem conversão de timezone)`);
+    return dateOnly;
+  } catch (error) {
+    console.error('Erro ao processar data de nascimento:', error, dateString);
+    return "";
+  }
+};
+
 // Função para processar datas com ajuste de fuso horário
 // 🌍 CORREÇÃO: Converter de UTC para horário local de Belém ao carregar do backend
 const processarData = (dateString: string | null | undefined): string => {
@@ -248,7 +264,7 @@ export const formatFromBackend = async (
     paciente: backendData.paciente?.nome || "",
     pacienteId: backendData.paciente_idpaciente || undefined,
     nomeMae: backendData.paciente?.nome_mae || "",
-    dataNascimento: processarData(backendData.paciente?.data_nascimento),
+    dataNascimento: processarDataNascimento(backendData.paciente?.data_nascimento),
     idade,
     idadeMeses,
     idadeUnidade,
