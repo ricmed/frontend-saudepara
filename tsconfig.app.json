@@ -34,7 +34,7 @@
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
     "noResolve": false,
-    "types": []
+    "types": ["vite-plugin-pwa/client"]
   },
   "include": [
     "src/**/*.ts",
