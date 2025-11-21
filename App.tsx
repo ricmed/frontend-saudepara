@@ -124,7 +124,6 @@ import AscomPage from '@/features/contact/AscomPage';
 import OuvidoriaPage from '@/features/contact/OuvidoriaPage';
 // Version page
 import VersionPage from '@/pages/VersionPage';
-import ReloadPrompt from "@/components/ReloadPrompt";
 // Componente de layout protegido
 const ProtectedLayout = () => {
   return (
@@ -157,7 +156,6 @@ function App() {
   
   return (
     <LanguageProvider>
-      <ReloadPrompt />
       <Router>
         <Routes>          <Route path="/private" element={<ProtectedLayout />}>
             <Route path="/private/apps-auxiliares" element={<PaginaAppsAuxiliares />} />

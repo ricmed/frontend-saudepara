@@ -28,7 +28,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       includeAssets: [
         'favicon.ico', 
         'apple-touch-icon.png', 
@@ -99,7 +99,7 @@ export default defineConfig({
       
       workbox: {
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
-        // skipWaiting: true, // REMOVIDO: Para permitir que o usuário decida quando atualizar (registerType: 'prompt')
+        skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         
