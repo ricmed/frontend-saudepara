@@ -515,10 +515,10 @@ const prepareDataForExport = (
 
   // 1. Calcular idade a partir da data de nascimento
   const getAge = (): string => {
-    // Se já tem a idade informada
-    if (formData.idade) {
+    // CORREÇÃO: Usar idadeMeses (que tem o valor total em meses) ao invés de idade (que tem anos)
+    if (formData.idadeMeses) {
       // Verificar se é um número (sempre em meses)
-      const idadeNum = typeof formData.idade === 'string' ? parseInt(formData.idade) : formData.idade;
+      const idadeNum = typeof formData.idadeMeses === 'string' ? parseInt(formData.idadeMeses) : formData.idadeMeses;
       if (!isNaN(idadeNum)) {
         // Lógica: 0-11 são meses literais, 12+ são meses convertidos para anos
         if (idadeNum === 0) {
@@ -533,9 +533,6 @@ const prepareDataForExport = (
           const years = Math.floor(idadeNum / 12);
           return years === 1 ? "1 ano" : `${years} anos`;
         }
-      } else {
-        // Se não for numérico, retornar como está
-        return formData.idade;
       }
     }
 
