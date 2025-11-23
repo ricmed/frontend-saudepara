@@ -170,7 +170,7 @@ export const exportChartAsPNG = async (chartId: string, title: string): Promise<
     // Usar html2canvas para capturar o elemento com configurações otimizadas
     const canvas = await html2canvas(element, {
       backgroundColor: '#ffffff',
-      scale: 2, // Melhor qualidade
+      scale: 3, // Alta qualidade para impressão
       useCORS: true,
       allowTaint: true,
       logging: false,
@@ -196,10 +196,10 @@ export const exportChartAsPNG = async (chartId: string, title: string): Promise<
       element.style.height = originalHeight;
     });
 
-    // Criar link para download
+    // Criar link para download com máxima qualidade
     const link = document.createElement('a');
     link.download = `${title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.png`;
-    link.href = canvas.toDataURL('image/png');
+    link.href = canvas.toDataURL('image/png', 1.0);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -275,7 +275,7 @@ export const exportChartAsPDF = async (chartId: string, title: string): Promise<
     // Capturar elemento como imagem com configurações otimizadas
     const canvas = await html2canvas(element, {
       backgroundColor: '#ffffff',
-      scale: 2,
+      scale: 3, // Alta qualidade para impressão
       useCORS: true,
       allowTaint: true,
       logging: false,
@@ -301,8 +301,8 @@ export const exportChartAsPDF = async (chartId: string, title: string): Promise<
       element.style.height = originalHeight;
     });
 
-    // Criar PDF
-    const imgData = canvas.toDataURL('image/png');
+    // Criar PDF com alta qualidade
+    const imgData = canvas.toDataURL('image/png', 1.0);
     const pdf = new jsPDF({
       orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
       unit: 'mm',
@@ -423,7 +423,7 @@ export const exportChartAsWord = async (chartId: string, data: ChartDataItem[], 
     // Capturar gráfico como imagem com configurações otimizadas
     const canvas = await html2canvas(element, {
       backgroundColor: '#ffffff',
-      scale: 2,
+      scale: 3, // Alta qualidade para impressão
       useCORS: true,
       allowTaint: true,
       logging: false,
@@ -449,7 +449,7 @@ export const exportChartAsWord = async (chartId: string, data: ChartDataItem[], 
       element.style.height = originalHeight;
     });
 
-    const imgData = canvas.toDataURL('image/png');
+    const imgData = canvas.toDataURL('image/png', 1.0);
 
     // Criar conteúdo HTML para Word
     const htmlContent = `
@@ -788,10 +788,10 @@ const exportDashboardAsPDF = async (data: DashboardData, filename: string): Prom
       pdf.setFont('helvetica', 'normal');
       
       // Capturar a imagem do dashboard com melhor qualidade e sem cortes
-      // Usar scale 1.5 para equilibrar qualidade e tamanho
+      // Usar scale 2.5 para alta qualidade de impressão
       const canvas = await html2canvas(dashboardElement, {
         backgroundColor: '#ffffff',
-        scale: 1.5,
+        scale: 2.5,
         useCORS: true,
         allowTaint: true,
         logging: false,
@@ -811,7 +811,7 @@ const exportDashboardAsPDF = async (data: DashboardData, filename: string): Prom
         htmlEl.style.display = originalDisplays[index];
       });
 
-      const imgData = canvas.toDataURL('image/png');
+      const imgData = canvas.toDataURL('image/png', 1.0);
       
       // Calcular dimensões mantendo proporção
       const imgWidth = pageWidth - (2 * margin);
@@ -852,7 +852,7 @@ const exportDashboardAsPDF = async (data: DashboardData, filename: string): Prom
             0, 0,
             canvas.width, firstPageCanvas.height
           );
-          const firstPageImgData = firstPageCanvas.toDataURL('image/png');
+          const firstPageImgData = firstPageCanvas.toDataURL('image/png', 1.0);
           const firstPageHeight = (firstPageCanvas.height * imgWidth) / canvas.width;
           pdf.addImage(firstPageImgData, 'PNG', margin, yPosition, imgWidth, firstPageHeight);
         }
@@ -882,7 +882,7 @@ const exportDashboardAsPDF = async (data: DashboardData, filename: string): Prom
               0, 0,
               canvas.width, heightToRender
             );
-            const pageImgData = pageCanvas.toDataURL('image/png');
+            const pageImgData = pageCanvas.toDataURL('image/png', 1.0);
             const pageImgHeight = (heightToRender * imgWidth) / canvas.width;
             pdf.addImage(pageImgData, 'PNG', margin, yPosition, imgWidth, pageImgHeight);
           }
@@ -1047,12 +1047,12 @@ const exportDashboardAsWord = async (data: DashboardData, filename: string): Pro
 
   const canvas = await html2canvas(dashboardElement, {
     backgroundColor: '#ffffff',
-    scale: 2,
+    scale: 3, // Alta qualidade para impressão
     useCORS: true,
     allowTaint: true
   });
 
-  const imgData = canvas.toDataURL('image/png');
+  const imgData = canvas.toDataURL('image/png', 1.0);
 
   // HTML completo para Word
   const htmlContent = `
