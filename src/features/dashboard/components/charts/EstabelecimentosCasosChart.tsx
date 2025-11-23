@@ -35,6 +35,7 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
   filteredData
 }) => {
   const [data, setData] = useState<EstabelecimentoItem[]>([]);
+  const [allData, setAllData] = useState<EstabelecimentoItem[]>([]); // 🆕 Armazena TODOS os estabelecimentos para o resumo
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const ctrlPressedRef = useRef(false);
@@ -105,16 +106,20 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
       
       const total = Object.values(contadores).reduce((acc, curr) => acc + curr.count, 0);
       
-      const processedData: EstabelecimentoItem[] = Object.values(contadores)
+      const allProcessedData: EstabelecimentoItem[] = Object.values(contadores)
         .map(item => ({
           nome: item.nome,
           totalCasos: item.count,
           percentual: total > 0 ? Math.round((item.count / total) * 100) : 0
         }))
-        .sort((a, b) => b.totalCasos - a.totalCasos)
-        .slice(0, 15); // Pegar apenas os top 15
+        .sort((a, b) => b.totalCasos - a.totalCasos);
       
-      setData(processedData);
+      // Guardar TODOS os dados para o resumo
+      setAllData(allProcessedData);
+      
+      // Pegar apenas top 15 para o gráfico
+      const top15Data = allProcessedData.slice(0, 15);
+      setData(top15Data);
     } catch (error) {
       console.error('Erro ao carregar dados de estabelecimentos:', error);
       setError(error instanceof Error ? error.message : 'Erro desconhecido');
@@ -224,7 +229,7 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
         <div className="flex items-center gap-3">
           <Building className="h-6 w-6 text-purple-600" />
           <div>
-            <h3 className="text-xl font-semibold text-gray-900">Estabelecimentos por Casos</h3>
+            <h3 className="text-xl font-semibold text-gray-900">Top 15 Estabelecimentos por Casos</h3>
             <p className="text-sm text-gray-600">
               Top estabelecimentos notificadores
               {activeFilters?.unidade && (
@@ -249,7 +254,7 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
       {/* Container completo para exportação */}
       <div id="estabelecimentos-casos-completo">
         {/* Gráfico */}
-        <div className="h-[500px] relative estabelecimentos-chart">
+        <div className="h-[625px] relative estabelecimentos-chart">
         <style>{`
           .estabelecimentos-chart .recharts-bar-rectangle:hover {
             transform-origin: center !important;
@@ -268,7 +273,7 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data}
-              margin={{ top: 20, right: 100, left: 20, bottom: 120 }}
+              margin={{ top: 20, right: 100, left: 10, bottom: 120 }}
               layout="vertical"
               barCategoryGap="10%"
               onClick={(data: any) => {
@@ -282,7 +287,7 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
                 }
               }}
             >
-              <CartesianGrid strokeDasharray="3 3" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" strokeOpacity={0.3} />
               <XAxis 
                 type="number" 
                 allowDecimals={false}
@@ -290,7 +295,7 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
               <YAxis 
                 type="category"
                 dataKey="nome"
-                width={180}
+                width={160}
                 interval={0}
                 tickFormatter={(value) => truncateName(value, 25)}
                 fontSize={11}
@@ -334,11 +339,11 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
       </div>
 
       {/* Lista detalhada */}
-      {data.length > 0 && (
-        <div className="mt-6">
-          <h4 className="text-lg font-semibold text-gray-900 mb-3">Top Estabelecimentos</h4>
+      {allData.length > 0 && (
+        <div className="-mt-8">
+          <h4 className="text-base font-semibold text-gray-900 mb-1">Todos os Estabelecimentos</h4>
           <div className="space-y-2 max-h-60 overflow-y-auto">
-            {data.map((item, index) => (
+            {allData.map((item, index) => (
               <div 
                 key={index} 
                 className={`flex items-center justify-between p-3 rounded cursor-pointer transition-all duration-200 ${
@@ -371,6 +376,28 @@ const EstabelecimentosCasosChart: React.FC<EstabelecimentosCasosChartProps> = ({
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Resumo Estatístico */}
+          <div className="mt-2 grid grid-cols-3 gap-4">
+            <div className="bg-purple-50 p-4 rounded-lg text-center">
+              <div className="text-2xl font-bold text-purple-700">
+                {allData.length}
+              </div>
+              <div className="text-xs text-gray-600 font-medium mt-1">Estabelecimentos</div>
+            </div>
+            <div className="bg-blue-50 p-4 rounded-lg text-center">
+              <div className="text-2xl font-bold text-blue-700">
+                {allData.reduce((sum, item) => sum + item.totalCasos, 0)}
+              </div>
+              <div className="text-xs text-gray-600 font-medium mt-1">Total de Casos</div>
+            </div>
+            <div className="bg-green-50 p-4 rounded-lg text-center">
+              <div className="text-2xl font-bold text-green-700">
+                {allData.length > 0 ? Math.round(allData.reduce((sum, item) => sum + item.totalCasos, 0) / allData.length) : 0}
+              </div>
+              <div className="text-xs text-gray-600 font-medium mt-1">Média por Estabelecimento</div>
+            </div>
           </div>
         </div>
       )}

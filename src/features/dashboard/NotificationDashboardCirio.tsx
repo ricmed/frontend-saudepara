@@ -4164,7 +4164,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           {/* =============================================== */}
           
           {/* Estabelecimentos por Número de Casos - 4 colunas */}
-          <div className="sm:col-span-2 lg:col-span-3 xl:col-span-4">
+          <div className="sm:col-span-2 lg:col-span-4 xl:col-span-4">
             <MemoizedEstabelecimentosCasosChart 
               toggleFilter={toggleFilter}
               activeFilters={activeFilters}
@@ -4173,7 +4173,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           </div>
 
           {/* Pirâmide Etária por Sexo - 4 colunas */}
-          <div className="sm:col-span-2 lg:col-span-2 xl:col-span-4">
+          <div className="sm:col-span-2 lg:col-span-4 xl:col-span-4">
             <MemoizedPiramideEtariaChart 
               toggleFilter={toggleFilter}
               activeFilters={activeFilters}
