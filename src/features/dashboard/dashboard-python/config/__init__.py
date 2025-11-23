@@ -1,0 +1,68 @@
+"""
+Arquivo __init__.py para o pacote config
+"""
+
+from .colors import (
+    COLORS,
+    BLUE_PALETTE,
+    PIE_PALETTE,
+    TRAUMA_PALETTE,
+    ATENDIMENTO_COLORS,
+    ALERT_COLORS,
+    GENDER_COLORS,
+    RACE_COLORS,
+    get_color_from_palette,
+    get_color_palette,
+)
+
+from .constants import (
+    FAIXAS_ETARIAS,
+    TIPOS_ATENDIMENTO,
+    TIPOS_PUBLICO,
+    TIPOS_GENERO,
+    TIPOS_RACA,
+    NIVEIS_ESCOLARIDADE,
+    TIPOS_DESFECHO,
+    AUTO_REFRESH_INTERVAL,
+    DEFAULT_DATE_RANGE,
+    ITEMS_PER_PAGE,
+    MAX_ITEMS_PER_PAGE,
+    EXPORT_FORMATS,
+    HIPOTESES_ALARMANTES,
+    MAP_DEFAULT_CENTER,
+    MAP_DEFAULT_ZOOM,
+    DEFAULT_TIMEZONE,
+    DATE_FORMAT,
+    DATETIME_FORMAT,
+)
+
+__all__ = [
+    'COLORS',
+    'BLUE_PALETTE',
+    'PIE_PALETTE',
+    'TRAUMA_PALETTE',
+    'ATENDIMENTO_COLORS',
+    'ALERT_COLORS',
+    'GENDER_COLORS',
+    'RACE_COLORS',
+    'get_color_from_palette',
+    'get_color_palette',
+    'FAIXAS_ETARIAS',
+    'TIPOS_ATENDIMENTO',
+    'TIPOS_PUBLICO',
+    'TIPOS_GENERO',
+    'TIPOS_RACA',
+    'NIVEIS_ESCOLARIDADE',
+    'TIPOS_DESFECHO',
+    'AUTO_REFRESH_INTERVAL',
+    'DEFAULT_DATE_RANGE',
+    'ITEMS_PER_PAGE',
+    'MAX_ITEMS_PER_PAGE',
+    'EXPORT_FORMATS',
+    'HIPOTESES_ALARMANTES',
+    'MAP_DEFAULT_CENTER',
+    'MAP_DEFAULT_ZOOM',
+    'DEFAULT_TIMEZONE',
+    'DATE_FORMAT',
+    'DATETIME_FORMAT',
+]
