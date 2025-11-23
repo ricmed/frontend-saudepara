@@ -1,0 +1,81 @@
+# Arquivo .gitignore para Dashboard Python
+
+# Ambientes virtuais Python
+venv/
+env/
+ENV/
+.venv
+.env
+
+# Arquivos Python compilados
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Diretórios de build
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Dados sensíveis
+*.csv
+*.xlsx
+*.xls
+dados/
+data/
+
+# Arquivos de exportação
+exports/
+*.png
+*.pdf
+relatorios/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Sistema Operacional
+.DS_Store
+Thumbs.db
+*.log
+
+# Credenciais
+.env
+.env.local
+.env.production
+secrets.json
+credentials.json
+
+# Cache
+.cache/
+*.cache
+
+# Pytest
+.pytest_cache/
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
