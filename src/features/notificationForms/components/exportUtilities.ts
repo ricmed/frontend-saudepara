@@ -3,6 +3,7 @@ import jsPDF from "jspdf";
 import "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { PDFDocument } from "pdf-lib";
+import { getRealCreationDate } from "@/utils/offlineIdUtils";
 
 // Interface para os dados exportados
 interface ExportData {
@@ -872,7 +873,12 @@ const prepareDataForExport = (
     "Local de Encaminhamento": getLocalEncaminhamentoText(),
 
     // Seção 7: Campos de Auditoria
-    "Data e Hora de Criação": formatarDataHoraUniversal(formData.created_at),
+    "Data e Hora de Criação Original": formData.created_offline 
+      ? formatarDataHoraUniversal(getRealCreationDate(formData))
+      : formatarDataHoraUniversal(formData.created_at),
+    "Data e Hora de Sincronização": formData.created_offline && formData.created_at
+      ? formatarDataHoraUniversal(formData.created_at)
+      : "—",
     "Data e Hora de Atualização": formatarDataHoraUniversal(formData.updated_at),
     "Criado por (ID)": formData.created_by_userid || "—",
     "Atualizado por (ID)": formData.updated_by_userid || "—",
@@ -1650,7 +1656,12 @@ const formatNotificacaoForExport = (
     "Local de Encaminhamento": getLocalEncaminhamentoText(), // Usando a função aprimorada
 
     // Campos de Auditoria
-    "Data e Hora de Criação": formatarDataHoraUniversal(original.created_at),
+    "Data e Hora de Criação Original": original.created_offline 
+      ? formatarDataHoraUniversal(getRealCreationDate(original))
+      : formatarDataHoraUniversal(original.created_at),
+    "Data e Hora de Sincronização": original.created_offline && original.created_at
+      ? formatarDataHoraUniversal(original.created_at)
+      : "—",
     "Data e Hora de Atualização": formatarDataHoraUniversal(original.updated_at),
     "Criado por (ID)": original.created_by_userid || "—",
     "Atualizado por (ID)": original.updated_by_userid || "—",
@@ -1724,7 +1735,8 @@ export const exportListToExcel = (
       { wch: 15 }, // Data de Encerramento
       { wch: 20 }, // Tipo de Encerramento
       { wch: 30 }, // Local de Encaminhamento
-      { wch: 20 }, // Data e Hora de Criação
+      { wch: 20 }, // Data e Hora de Criação Original
+      { wch: 20 }, // Data e Hora de Sincronização
       { wch: 20 }, // Data e Hora de Atualização
       { wch: 15 }, // Criado por (ID)
       { wch: 15 }, // Atualizado por (ID)
@@ -1745,7 +1757,8 @@ export const exportListToExcel = (
     
     // Campos de data e hora (formato diferente)
     const dateTimeFields = [
-      "Data e Hora de Criação",
+      "Data e Hora de Criação Original",
+      "Data e Hora de Sincronização",
       "Data e Hora de Atualização",
     ];
     
