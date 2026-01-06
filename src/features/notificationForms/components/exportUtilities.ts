@@ -876,6 +876,10 @@ const prepareDataForExport = (
     "Data e Hora de Atualização": formatarDataHoraUniversal(formData.updated_at),
     "Criado por (ID)": formData.created_by_userid || "—",
     "Atualizado por (ID)": formData.updated_by_userid || "—",
+    
+    // Seção 8: Rastreamento Offline
+    "Device ID": formData.device_id || "—",
+    "Criado Offline": formData.created_offline ? "Sim" : "Não",
   };
 };
 
@@ -1650,6 +1654,10 @@ const formatNotificacaoForExport = (
     "Data e Hora de Atualização": formatarDataHoraUniversal(original.updated_at),
     "Criado por (ID)": original.created_by_userid || "—",
     "Atualizado por (ID)": original.updated_by_userid || "—",
+    
+    // Rastreamento Offline
+    "Device ID": original.device_id || "—",
+    "Criado Offline": original.created_offline ? "Sim" : "Não",
   };
 };
 
@@ -1720,6 +1728,8 @@ export const exportListToExcel = (
       { wch: 20 }, // Data e Hora de Atualização
       { wch: 15 }, // Criado por (ID)
       { wch: 15 }, // Atualizado por (ID)
+      { wch: 25 }, // Device ID
+      { wch: 15 }, // Criado Offline
     ];
 
     worksheet["!cols"] = columnsWidth;
