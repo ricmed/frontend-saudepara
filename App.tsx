@@ -118,6 +118,13 @@ import HomePage from "@/features/home/HomePage";
 import DashboardPage from '@/features/dashboard/DashboardPage';
 import DashboardPageCirio from '@/features/dashboard/DashboardPageCirio'; // 🎉 Dashboard Círio de Nazaré com Modo TV
 import OfflineManagementPage from '@/features/offlinePage/pages/OfflineManagementPage';
+// Features - Comunicação DAE
+import ComunicacaoDaePage from '@/features/comunicacao-dae/ComunicacaoDaePage';
+import ComunicacaoDaeFormPage from '@/features/comunicacao-dae/ComunicacaoDaeFormPage';
+import DaePage from '@/features/comunicacao-dae/DaePage';
+import NhePage from '@/features/comunicacao-dae/NhePage';
+import CievsPage from '@/features/comunicacao-dae/CievsPage';
+import CrsPage from '@/features/comunicacao-dae/CrsPage';
 // Contact pages
 import FaleConoscoPage from '@/features/contact/FaleConoscoPage';
 import AscomPage from '@/features/contact/AscomPage';
@@ -269,6 +276,25 @@ function App() {
             {/* ✅ NOVO: Rota de Lista de Pacientes - Protegida apenas para Admin Master */}
             <Route element={<ProtectedRoute requiredRoles={['admin']}><Outlet /></ProtectedRoute>}>
               <Route path="/private/pacientes" element={<ListaPacientes />} />
+            </Route>
+
+            {/* ✅ NOVO: Rotas de Comunicação DAE - Protegidas para Admin e Admin.Estado */}
+            <Route element={<ProtectedRoute requiredRoles={['admin', 'admin.estado']}><Outlet /></ProtectedRoute>}>
+              {/* Listagem e formulário principal */}
+              <Route path="/private/comunicacao-dae" element={<ComunicacaoDaePage />} />
+              <Route path="/private/comunicacao-dae/nova" element={<ComunicacaoDaeFormPage />} />
+              <Route path="/private/comunicacao-dae/:id" element={<ComunicacaoDaeFormPage />} />
+              <Route path="/private/comunicacao-dae/editar/:id" element={<ComunicacaoDaeFormPage />} />
+              
+              {/* Gerenciamento de entidades auxiliares */}
+              <Route path="/private/apps/comunicacao-dae/dae" element={<DaePage />} />
+              <Route path="/private/apps/comunicacao-dae/dae/:id" element={<DaePage />} />
+              <Route path="/private/apps/comunicacao-dae/nhe" element={<NhePage />} />
+              <Route path="/private/apps/comunicacao-dae/nhe/:id" element={<NhePage />} />
+              <Route path="/private/apps/comunicacao-dae/cievs" element={<CievsPage />} />
+              <Route path="/private/apps/comunicacao-dae/cievs/:id" element={<CievsPage />} />
+              <Route path="/private/apps/comunicacao-dae/crs" element={<CrsPage />} />
+              <Route path="/private/apps/comunicacao-dae/crs/:id" element={<CrsPage />} />
             </Route>
           </Route>
           <Route path="/perfil" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />

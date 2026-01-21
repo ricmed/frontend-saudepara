@@ -51,6 +51,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
   const { user } = useAuth();
   const permissions = useUserPermissions();
   const [showAppsSubmenu, setShowAppsSubmenu] = useState(false);
+  const [showComunicacaoDaeSubmenu, setShowComunicacaoDaeSubmenu] = useState(false);
   
   // ✅ NOVO: Chat de suporte
   const { isOpen: isChatOpen, abrirChat, fecharChat, mensagensNaoLidas } = useChatSuporte();
@@ -192,6 +193,35 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     ] : []),
   ];
 
+  // ✅ NOVO: Itens do submenu de Comunicação DAE
+  const comunicacaoDaeMenuItems = [
+    {
+      icon: <FileText className="h-6 w-6 text-white" />,
+      nome: "Comunicações DAE",
+      link: "/private/comunicacao-dae",
+    },
+    {
+      icon: <Building2 className="h-6 w-6 text-white" />,
+      nome: "Gerenciar DAE",
+      link: "/private/apps/comunicacao-dae/dae",
+    },
+    {
+      icon: <Building2 className="h-6 w-6 text-white" />,
+      nome: "Gerenciar NHE",
+      link: "/private/apps/comunicacao-dae/nhe",
+    },
+    {
+      icon: <Building2 className="h-6 w-6 text-white" />,
+      nome: "Gerenciar CIEVS",
+      link: "/private/apps/comunicacao-dae/cievs",
+    },
+    {
+      icon: <Building2 className="h-6 w-6 text-white" />,
+      nome: "Gerenciar CRS",
+      link: "/private/apps/comunicacao-dae/crs",
+    },
+  ];
+
   // ✅ NOVO: Main menu items reorganizados com Home e Gerenciamento Offline
   const menuItems = [
     // ✅ NOVO: Home - sempre visível
@@ -265,6 +295,14 @@ export const SideMenu: React.FC<SideMenuProps> = ({
         navigate("/private/pacientes");
         onClose();
       },
+    }] : []),
+    
+    // ✅ NOVO: Menu de Comunicação DAE - para admin e admin.estado
+    ...(user && (user.roles?.includes('admin') || user.roles?.includes('admin.estado')) ? [{
+      icon: <FileText />,
+      label: "Comunicação DAE",
+      submenu: true,
+      onClick: () => {},
     }] : []),
     
     {
@@ -346,14 +384,26 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                 className="relative"
                 onMouseEnter={() => {
                   if (item.submenu) {
-                    setShowAppsSubmenu(true);
+                    // Verifica qual submenu abrir baseado no label
+                    if (item.label === "Comunicação DAE") {
+                      setShowComunicacaoDaeSubmenu(true);
+                      setShowAppsSubmenu(false);
+                    } else {
+                      setShowAppsSubmenu(true);
+                      setShowComunicacaoDaeSubmenu(false);
+                    }
                   } else {
                     setShowAppsSubmenu(false);
+                    setShowComunicacaoDaeSubmenu(false);
                   }
                 }}
                 onMouseLeave={() => {
                   if (item.submenu) {
-                    setShowAppsSubmenu(false);
+                    if (item.label === "Comunicação DAE") {
+                      setShowComunicacaoDaeSubmenu(false);
+                    } else {
+                      setShowAppsSubmenu(false);
+                    }
                   }
                 }}
               >
@@ -361,7 +411,11 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                   className="flex items-center gap-3 text-white py-3 px-2 hover:bg-blue-800 rounded-lg cursor-pointer relative"
                   onClick={() => {
                     if (item.submenu) {
-                      navigate("/private/apps-auxiliares");
+                      if (item.label === "Comunicação DAE") {
+                        navigate("/private/comunicacao-dae");
+                      } else {
+                        navigate("/private/apps-auxiliares");
+                      }
                     } else {
                       item.onClick();
                       onClose();
@@ -382,7 +436,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                 </div>
 
                 {/* Apps Submenu */}
-                {item.submenu && showAppsSubmenu && (
+                {item.submenu && showAppsSubmenu && item.label !== "Comunicação DAE" && (
                   <div
                     className="fixed top-0 left-64 w-64 h-full bg-blue-900 z-[1110] overflow-y-auto"
                     onMouseEnter={() => setShowAppsSubmenu(true)}
@@ -403,6 +457,35 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                           {appItem.icon}
                           <span className="text-white text-sm">
                             {appItem.nome}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Comunicação DAE Submenu */}
+                {item.submenu && showComunicacaoDaeSubmenu && item.label === "Comunicação DAE" && (
+                  <div
+                    className="fixed top-0 left-64 w-64 h-full bg-blue-900 z-[1110] overflow-y-auto"
+                    onMouseEnter={() => setShowComunicacaoDaeSubmenu(true)}
+                    onMouseLeave={() => setShowComunicacaoDaeSubmenu(false)}
+                  >
+                    <div className="p-4 flex items-center h-[70px] border-b border-blue-800">
+                      <h2 className="text-xl font-bold text-white">
+                        Comunicação DAE
+                      </h2>
+                    </div>
+                    <div>
+                      {comunicacaoDaeMenuItems.map((daeItem) => (
+                        <button
+                          key={daeItem.link}
+                          onClick={() => handleAppNavigation(daeItem.link)}
+                          className="flex items-center w-full gap-3 p-3 hover:bg-blue-800 transition-colors"
+                        >
+                          {daeItem.icon}
+                          <span className="text-white text-sm">
+                            {daeItem.nome}
                           </span>
                         </button>
                       ))}
