@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Plus, Edit, Trash2, ArrowLeft, X } from 'lucide-react';
-import SideMenu from '@/features/home/components/SideMenu';
+import { Plus, Edit, Trash2, ArrowLeft, X, Menu } from 'lucide-react';
+import SideBarMenuAppsAuxiliares from '@/features/apps/components/SideBarMenuAppsAuxiliares';
 
 interface GenericEntity {
   id_dae?: number;
@@ -157,54 +157,57 @@ export const GenericEntityManager: React.FC<GenericEntityManagerProps> = ({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+      {/* Header com padrão dos Apps Auxiliares */}
+      <header className="bg-blue-600 text-white shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4 flex-1">
               <button
                 onClick={() => setIsMenuOpen(true)}
-                className="p-2 rounded-md hover:bg-gray-100"
+                className="p-2 hover:bg-blue-700 rounded-full transition-colors"
+                aria-label="Abrir menu"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
+                <Menu className="h-6 w-6" />
               </button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Gerenciar {entityName}</h1>
-                <p className="text-sm text-gray-500 mt-1">{entityTitle}</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-2">
+
               <button
                 onClick={() => navigate('/private/comunicacao-dae')}
-                className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+                className="p-2 hover:bg-blue-700 rounded-full transition-colors"
+                aria-label="Voltar"
               >
-                <ArrowLeft className="w-5 h-5" />
-                <span>Voltar</span>
+                <ArrowLeft className="h-6 w-6" />
               </button>
-              {!showForm && (
-                <button
-                  onClick={() => setShowForm(true)}
-                  className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                >
-                  <Plus className="w-5 h-5" />
-                  <span>Novo {entityName}</span>
-                </button>
-              )}
+
+              <div>
+                <h1 className="text-2xl font-bold">{entityTitle}</h1>
+                <p className="text-sm text-blue-100 mt-0.5">Gerenciar {entityName}</p>
+              </div>
             </div>
+
+            {!showForm && (
+              <button
+                onClick={() => setShowForm(true)}
+                className="flex items-center gap-2 px-6 py-2 bg-white text-blue-600 rounded-full hover:bg-gray-100 transition-colors shadow-md"
+                aria-label={`Novo ${entityName}`}
+              >
+                <Plus className="h-5 w-5" />
+                Novo
+              </button>
+            )}
           </div>
         </div>
       </header>
 
-      <SideMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
+      <SideBarMenuAppsAuxiliares
+        isOpen={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
+      />
 
       {/* Conteúdo */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="max-w-7xl mx-auto px-4 py-8">
         {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
-            <span className="text-red-800">{error}</span>
+          <div className="bg-red-50 text-red-700 p-4 mb-4 rounded-lg flex justify-between items-center">
+            <span>{error}</span>
             <button onClick={() => setError(null)} className="text-red-600 hover:text-red-800">
               <X className="w-5 h-5" />
             </button>
@@ -213,8 +216,8 @@ export const GenericEntityManager: React.FC<GenericEntityManagerProps> = ({
 
         {/* Formulário */}
         {showForm && (
-          <div className="bg-white shadow-md rounded-lg p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-6">
               {editingId ? `Editar ${entityName}` : `Novo ${entityName}`}
             </h2>
             
@@ -248,18 +251,18 @@ export const GenericEntityManager: React.FC<GenericEntityManagerProps> = ({
                 />
               </div>
 
-              <div className="flex items-center justify-end space-x-2">
+              <div className="flex items-center justify-end space-x-3 pt-4">
                 <button
                   type="button"
                   onClick={handleCancel}
-                  className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+                  className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {loading ? 'Salvando...' : editingId ? 'Atualizar' : 'Salvar'}
                 </button>
@@ -270,91 +273,96 @@ export const GenericEntityManager: React.FC<GenericEntityManagerProps> = ({
 
         {/* Lista */}
         {loading && !showForm ? (
-          <div className="flex justify-center py-12">
+          <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
-        ) : entities.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-lg shadow-md">
-            <h3 className="text-sm font-medium text-gray-900">Nenhum {entityName} encontrado</h3>
-            <p className="mt-1 text-sm text-gray-500">Comece criando um novo registro.</p>
+        ) : entities.length === 0 && !showForm ? (
+          <div className="bg-white rounded-xl shadow-md p-12 text-center">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum {entityName} encontrado</h3>
+            <p className="text-sm text-gray-500">Comece criando um novo registro.</p>
           </div>
-        ) : (
+        ) : !showForm ? (
           <>
-            <div className="bg-white shadow-md rounded-lg overflow-hidden">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ID
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Nome
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Código
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {entities.map((entity) => (
-                    <tr key={entity[idField]} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {entity[idField]}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {entity.nome}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {entity.codigo || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex items-center justify-end space-x-2">
-                          <button
-                            onClick={() => handleEdit(entity)}
-                            className="text-yellow-600 hover:text-yellow-900"
-                            title="Editar"
-                          >
-                            <Edit className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(entity[idField] as number)}
-                            className="text-red-600 hover:text-red-900"
-                            title="Excluir"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </td>
+            <div className="bg-white rounded-xl shadow-md overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-blue-50">
+                    <tr>
+                      <th className="px-8 py-4 text-left text-sm font-semibold text-blue-600 uppercase">
+                        ID
+                      </th>
+                      <th className="px-8 py-4 text-left text-sm font-semibold text-blue-600 uppercase">
+                        Nome
+                      </th>
+                      <th className="px-8 py-4 text-left text-sm font-semibold text-blue-600 uppercase">
+                        Código
+                      </th>
+                      <th className="px-8 py-4 text-right text-sm font-semibold text-blue-600 uppercase">
+                        Ações
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {entities.map((entity, index) => (
+                      <tr 
+                        key={entity[idField]} 
+                        className={`${index % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-blue-50 transition-colors`}
+                      >
+                        <td className="px-8 py-4 text-gray-600">
+                          {entity[idField]}
+                        </td>
+                        <td className="px-8 py-4 text-gray-900 font-medium">
+                          {entity.nome}
+                        </td>
+                        <td className="px-8 py-4 text-gray-600">
+                          {entity.codigo || '-'}
+                        </td>
+                        <td className="px-8 py-4">
+                          <div className="flex items-center justify-end space-x-3">
+                            <button
+                              onClick={() => handleEdit(entity)}
+                              className="p-2 text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors"
+                              title="Editar"
+                            >
+                              <Edit className="w-5 h-5" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(entity[idField] as number)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Excluir"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* Paginação */}
             {Math.ceil(total / itemsPerPage) > 1 && (
-              <div className="mt-6 flex items-center justify-between">
+              <div className="mt-6 flex items-center justify-between bg-white rounded-lg shadow-md px-6 py-4">
                 <div className="text-sm text-gray-700">
-                  Total: {total} registros
+                  <span className="font-semibold text-blue-600">{total}</span> registros no total
                 </div>
-                <div className="flex space-x-2">
+                <div className="flex items-center space-x-2">
                   <button
                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                     disabled={currentPage === 1}
-                    className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                    className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
                   >
                     Anterior
                   </button>
-                  <span className="px-4 py-2 border border-gray-300 rounded-md bg-white">
-                    Página {currentPage} de {Math.ceil(total / itemsPerPage)}
+                  <span className="px-4 py-2 text-sm font-medium text-gray-700">
+                    Página <span className="font-bold text-blue-600">{currentPage}</span> de <span className="font-bold">{Math.ceil(total / itemsPerPage)}</span>
                   </span>
                   <button
                     onClick={() => setCurrentPage(prev => Math.min(Math.ceil(total / itemsPerPage), prev + 1))}
                     disabled={currentPage === Math.ceil(total / itemsPerPage)}
-                    className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                    className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
                   >
                     Próxima
                   </button>
@@ -362,7 +370,7 @@ export const GenericEntityManager: React.FC<GenericEntityManagerProps> = ({
               </div>
             )}
           </>
-        )}
+        ) : null}
       </main>
     </div>
   );

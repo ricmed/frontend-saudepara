@@ -251,6 +251,14 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       label: t("menu.dashboard"),
       onClick: () => navigate("/dashboard-page"),
     }] : []),
+
+    // ✅ MOVIDO E CORRIGIDO: Menu de Comunicação DAE - Agora abaixo do Dashboard
+    ...(user && (user.roles?.includes('admin') || user.roles?.includes('admin.estado')) ? [{
+      icon: <FileText />,
+      label: "Comunicação DAE",
+      submenu: true,
+      onClick: () => {},
+    }] : []),
     
     // ✅ NOVO: Gerenciamento Offline - disponível para todos os usuários logados
     ...(user ? [{
@@ -295,14 +303,6 @@ export const SideMenu: React.FC<SideMenuProps> = ({
         navigate("/private/pacientes");
         onClose();
       },
-    }] : []),
-    
-    // ✅ NOVO: Menu de Comunicação DAE - para admin e admin.estado
-    ...(user && (user.roles?.includes('admin') || user.roles?.includes('admin.estado')) ? [{
-      icon: <FileText />,
-      label: "Comunicação DAE",
-      submenu: true,
-      onClick: () => {},
     }] : []),
     
     {
@@ -381,7 +381,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
             {menuItems.map((item, i) => (
               <div
                 key={i}
-                className="relative"
+                className="relative group"
                 onMouseEnter={() => {
                   if (item.submenu) {
                     // Verifica qual submenu abrir baseado no label
@@ -392,23 +392,12 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                       setShowAppsSubmenu(true);
                       setShowComunicacaoDaeSubmenu(false);
                     }
-                  } else {
-                    setShowAppsSubmenu(false);
-                    setShowComunicacaoDaeSubmenu(false);
                   }
                 }}
-                onMouseLeave={() => {
-                  if (item.submenu) {
-                    if (item.label === "Comunicação DAE") {
-                      setShowComunicacaoDaeSubmenu(false);
-                    } else {
-                      setShowAppsSubmenu(false);
-                    }
-                  }
-                }}
+                // ❌ REMOVIDO onMouseLeave do item pai - deixar o submenu controlar
               >
                 <div
-                  className="flex items-center gap-3 text-white py-3 px-2 hover:bg-blue-800 rounded-lg cursor-pointer relative"
+                  className="flex items-center gap-3 text-white py-3 px-2 hover:bg-blue-800 rounded-lg cursor-pointer relative z-10"
                   onClick={() => {
                     if (item.submenu) {
                       if (item.label === "Comunicação DAE") {
@@ -439,9 +428,13 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                 {item.submenu && showAppsSubmenu && item.label !== "Comunicação DAE" && (
                   <div
                     className="fixed top-0 left-64 w-64 h-full bg-blue-900 z-[1110] overflow-y-auto"
+                    style={{ marginLeft: "-10px", paddingLeft: "10px" }}
                     onMouseEnter={() => setShowAppsSubmenu(true)}
                     onMouseLeave={() => setShowAppsSubmenu(false)}
                   >
+                    {/* Ponte invisível expandida para garantir transição suave */}
+                    <div className="absolute top-0 -left-16 w-16 h-full bg-transparent z-50" />
+                    
                     <div className="p-4 flex items-center h-[70px] border-b border-blue-800">
                       <h2 className="text-xl font-bold text-white">
                         Aplicativos Auxiliares
@@ -468,9 +461,13 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                 {item.submenu && showComunicacaoDaeSubmenu && item.label === "Comunicação DAE" && (
                   <div
                     className="fixed top-0 left-64 w-64 h-full bg-blue-900 z-[1110] overflow-y-auto"
+                    style={{ marginLeft: "-10px", paddingLeft: "10px" }}
                     onMouseEnter={() => setShowComunicacaoDaeSubmenu(true)}
                     onMouseLeave={() => setShowComunicacaoDaeSubmenu(false)}
                   >
+                    {/* Ponte invisível expandida para garantir transição suave */}
+                    <div className="absolute top-0 -left-16 w-16 h-full bg-transparent z-50" />
+
                     <div className="p-4 flex items-center h-[70px] border-b border-blue-800">
                       <h2 className="text-xl font-bold text-white">
                         Comunicação DAE
@@ -481,7 +478,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                         <button
                           key={daeItem.link}
                           onClick={() => handleAppNavigation(daeItem.link)}
-                          className="flex items-center w-full gap-3 p-3 hover:bg-blue-800 transition-colors"
+                          className="flex items-center w-full gap-3 p-3 hover:bg-blue-800 transition-colors relative z-20" // z-20 para ficar acima da ponte
                         >
                           {daeItem.icon}
                           <span className="text-white text-sm">

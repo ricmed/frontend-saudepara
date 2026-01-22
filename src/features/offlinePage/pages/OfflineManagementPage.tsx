@@ -30,7 +30,7 @@ import { offlineAuthService } from '@/services/offlineAuthService';
 import SetupPinModal from '@/features/auth/components/SetupPinModal';
 
 // Import do SideMenu real do sistema
-import SideMenu from '@/features/home/components/SideMenu';
+import { SideMenu } from '@/features/home/components/SideMenu';
 import PinManagementTab from '@/features/offlinePage/components/PinManagementTab';
 
 /**

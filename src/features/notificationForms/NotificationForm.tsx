@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import ModalBuscaPaciente from "@/features/paginaPacientesComu/components/ModalBuscaPaciente";
 // Atualizar a importação do SideMenu
-import SideMenu from "@/features/home/components/SideMenu";
+import { SideMenu } from "@/features/home/components/SideMenu";
 import ConnectionStatus from "@/components/ConnectionStatus";
 
 // Import custom hooks

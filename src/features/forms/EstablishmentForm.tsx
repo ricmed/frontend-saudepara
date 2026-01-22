@@ -16,7 +16,7 @@ import DadosPrincipais from "@/features/forms/components/PrimaryData";
 import Endereco from "@/features/forms/components/Address";
 import InformacoesComplementares from "@/features/forms/components/ComplementaryInformations";
 import QualificacoesHabilitacoes from "@/features/forms/components/QualificationsHabilitations";
-import SideMenu from "@/features/home/components/SideMenu";
+import { SideMenu } from "@/features/home/components/SideMenu";
 import { Language } from "@/i18n/types";
 
 export interface OptionItem {

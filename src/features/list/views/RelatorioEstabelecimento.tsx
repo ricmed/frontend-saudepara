@@ -15,7 +15,7 @@ import TableBody from "../components/RelatorioEstabelecimento/TableBody";
 import PaginationControls from "../components/RelatorioEstabelecimento/PaginationControls";
 import SearchBar from "../components/RelatorioEstabelecimento/SearchBar";
 import ColumnsMenu from "../components/RelatorioEstabelecimento/ColumnsMenu";
-import SideMenu from "@/features/home/components/SideMenu";
+import { SideMenu } from "@/features/home/components/SideMenu";
 
 // Importando tipos e utilitários
 import {

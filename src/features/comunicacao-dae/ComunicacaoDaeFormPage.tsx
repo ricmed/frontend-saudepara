@@ -1,20 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Save, X, Upload, FileText, Download, Trash2, ArrowLeft } from 'lucide-react';
+import { 
+  Save, 
+  X, 
+  Upload, 
+  FileText, 
+  Download, 
+  Trash2, 
+  ArrowLeft, 
+  Menu, 
+  FileCheck, 
+  AlertCircle,
+  Loader,
+  ChevronDown
+} from 'lucide-react';
 import ComunicacaoDaeService, { CreateComunicacaoDaeData, OrigemTipo, TipoAnexo, ComunicacaoDae, ComunicacaoDaeAnexo } from '@/services/ComunicacaoDaeService';
 import DaeService, { Dae } from '@/services/DaeService';
 import NheService, { Nhe } from '@/services/NheService';
 import CievsService, { Cievs } from '@/services/CievsService';
 import CrsService, { Crs } from '@/services/CrsService';
-import { MunicipioService } from '@/services/MunicipioService';
-import SideMenu from '@/features/home/components/SideMenu';
+import { SideMenu } from '@/features/home/components/SideMenu';
+import LocationInput from '@/features/notificationForms/components/LocationInput';
 
-interface Municipio {
-  idtipo_municipio: number;
-  codigo: string;
-  descricao: string;
-  tipo_estado_idtipo_estado: number;
-}
+// Funções auxiliares para timezone
+const getLocalDateTime = (date: Date = new Date()): string => {
+  // Converte para timezone America/Belem (UTC-3)
+  const localDate = new Date(date.toLocaleString('en-US', { timeZone: 'America/Belem' }));
+  const year = localDate.getFullYear();
+  const month = String(localDate.getMonth() + 1).padStart(2, '0');
+  const day = String(localDate.getDate()).padStart(2, '0');
+  const hours = String(localDate.getHours()).padStart(2, '0');
+  const minutes = String(localDate.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
+const convertUTCToLocal = (utcDateString: string): string => {
+  const date = new Date(utcDateString);
+  return getLocalDateTime(date);
+};
 
 const ComunicacaoDaeFormPage: React.FC = () => {
   const navigate = useNavigate();
@@ -26,9 +49,23 @@ const ComunicacaoDaeFormPage: React.FC = () => {
   const [loadingData, setLoadingData] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Controle de seções expansíveis
+  const [expandedSections, setExpandedSections] = useState({
+    origem: true,
+    paciente: true,
+    documentacao: true
+  });
+
+  const toggleSection = (section: 'origem' | 'paciente' | 'documentacao') => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
   // Dados do formulário
   const [formData, setFormData] = useState<CreateComunicacaoDaeData>({
-    data_comunicacao: new Date().toISOString().slice(0, 16),
+    data_comunicacao: getLocalDateTime(),
     nome_paciente: '',
     observacao_descricao: '',
     id_municipio_ocorrencia: 0,
@@ -45,13 +82,48 @@ const ComunicacaoDaeFormPage: React.FC = () => {
   const [nhes, setNhes] = useState<Nhe[]>([]);
   const [cievsList, setCievsList] = useState<Cievs[]>([]);
   const [crsList, setCrsList] = useState<Crs[]>([]);
-  const [municipios, setMunicipios] = useState<Municipio[]>([]);
+
+  // Estados para UF e município
+  const [ufOcorrencia, setUfOcorrencia] = useState<string>('15'); // Pará por padrão
+  const [municipioOcorrencia, setMunicipioOcorrencia] = useState<string>('');
+  const [isLoadingMunicipios] = useState(false);
 
   // Anexos
   const [anexos, setAnexos] = useState<ComunicacaoDaeAnexo[]>([]);
   const [fichaFile, setFichaFile] = useState<File | null>(null);
   const [relatorioFile, setRelatorioFile] = useState<File | null>(null);
   const [uploadingAnexo, setUploadingAnexo] = useState(false);
+
+  // Função para limpar o formulário
+  const handleClearForm = () => {
+    if (window.confirm('Deseja realmente limpar todos os campos do formulário?')) {
+      setFormData({
+        data_comunicacao: getLocalDateTime(),
+        nome_paciente: '',
+        observacao_descricao: '',
+        id_municipio_ocorrencia: 0,
+        origem_tipo: 'CRS' as OrigemTipo,
+        origem_id: 0,
+        id_dae: 0,
+      });
+      setUfOcorrencia('15'); // Resetar para Pará
+      setMunicipioOcorrencia('');
+      if (!isEditMode) {
+        setFichaFile(null);
+        setRelatorioFile(null);
+      }
+    }
+  };
+
+  // Atualizar formData quando municipioOcorrencia mudar
+  useEffect(() => {
+    if (municipioOcorrencia) {
+      setFormData(prev => ({
+        ...prev,
+        id_municipio_ocorrencia: Number(municipioOcorrencia)
+      }));
+    }
+  }, [municipioOcorrencia]);
 
   useEffect(() => {
     loadSelectOptions();
@@ -62,24 +134,32 @@ const ComunicacaoDaeFormPage: React.FC = () => {
 
   const loadSelectOptions = async () => {
     try {
-      const [daesRes, nhesRes, cievsRes, crsRes, municipiosRes] = await Promise.all([
+      const [daesRes, nhesRes, cievsRes, crsRes] = await Promise.all([
         DaeService.getAll(1, 100),
         NheService.getAll(1, 100),
         CievsService.getAll(1, 100),
         CrsService.getAll(1, 100),
-        MunicipioService.getAll(),
       ]);
 
       setDaes(daesRes.data);
       setNhes(nhesRes.data);
       setCievsList(cievsRes.data);
       setCrsList(crsRes.data);
-      setMunicipios(municipiosRes);
     } catch (err) {
       console.error('Erro ao carregar opções:', err);
       setError('Erro ao carregar dados do formulário');
     }
   };
+
+  // Atualizar formData quando municipioOcorrencia mudar
+  useEffect(() => {
+    if (municipioOcorrencia) {
+      setFormData(prev => ({
+        ...prev,
+        id_municipio_ocorrencia: Number(municipioOcorrencia)
+      }));
+    }
+  }, [municipioOcorrencia]);
 
   const loadComunicacao = async (comunicacaoId: number) => {
     try {
@@ -88,7 +168,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       setComunicacaoCompleta(data);
       
       setFormData({
-        data_comunicacao: new Date(data.data_comunicacao).toISOString().slice(0, 16),
+        data_comunicacao: convertUTCToLocal(data.data_comunicacao),
         nome_paciente: data.nome_paciente,
         observacao_descricao: data.observacao_descricao || '',
         id_municipio_ocorrencia: data.id_municipio_ocorrencia,
@@ -96,6 +176,12 @@ const ComunicacaoDaeFormPage: React.FC = () => {
         origem_id: data.origem_id,
         id_dae: data.id_dae,
       });
+
+      // Definir o município de ocorrência para o LocationInput
+      if (data.id_municipio_ocorrencia) {
+        setMunicipioOcorrencia(String(data.id_municipio_ocorrencia));
+        // UF será carregado automaticamente pelo LocationInput ao ter o parentValue
+      }
 
       if (data.comunicacao_dae_anexo) {
         setAnexos(data.comunicacao_dae_anexo);
@@ -203,7 +289,6 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       setUploadingAnexo(true);
       const anexo = await ComunicacaoDaeService.addAnexo(Number(id), file, tipo);
       setAnexos(prev => [...prev, anexo]);
-      alert('Anexo adicionado com sucesso!');
     } catch (err: any) {
       alert(err.response?.data?.message || 'Erro ao adicionar anexo');
     } finally {
@@ -217,7 +302,6 @@ const ComunicacaoDaeFormPage: React.FC = () => {
     try {
       await ComunicacaoDaeService.removeAnexo(anexoId);
       setAnexos(prev => prev.filter(a => a.id_anexo !== anexoId));
-      alert('Anexo removido com sucesso!');
     } catch (err: any) {
       alert(err.response?.data?.message || 'Erro ao remover anexo');
     }
@@ -246,43 +330,88 @@ const ComunicacaoDaeFormPage: React.FC = () => {
 
   if (loadingData) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
+        <Loader className="h-10 w-10 text-blue-500 animate-spin mb-4" />
+        <p className="text-lg text-gray-600">Carregando dados...</p>
       </div>
     );
   }
 
+  // Estilos padronizados seguindo NotificationForm
+  const sectionTitleClass = "text-lg font-semibold text-gray-900 flex items-center gap-2 mb-5 pb-3 border-b-2 border-blue-100";
+  const cardClass = "bg-white shadow-sm rounded-xl border border-gray-100 p-6 hover:shadow-md transition-shadow";
+  const labelClass = "block mb-2 font-medium text-gray-700 text-sm";
+  const inputClass = "w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-all hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none";
+  const selectClass = "w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-all hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none cursor-pointer";
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setIsMenuOpen(true)}
-                className="p-2 rounded-md hover:bg-gray-100"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {isEditMode ? 'Editar Comunicação DAE' : 'Nova Comunicação DAE'}
-                </h1>
-                <p className="text-sm text-gray-500 mt-1">
-                  Formulário de Comunicação de Doenças Agravos e Eventos
-                </p>
-              </div>
-            </div>
+      {/* Header com Gradiente - Tamanho restaurado para igualar ao NotificationForm (p-4 sm:p-6) */}
+      <header className="bg-gradient-to-r from-blue-600 to-blue-800 p-4 sm:p-6 shadow-lg sticky top-0 z-20">
+        <div className="max-w-5xl mx-auto">
+          {/* Linha 1: Navegação e Título */}
+          <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
+            <button
+              onClick={() => setIsMenuOpen(true)}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
+              title="Menu"
+            >
+              <Menu className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+            </button>
             
             <button
               onClick={() => navigate('/private/comunicacao-dae')}
-              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
+              title="Voltar"
             >
-              <ArrowLeft className="w-5 h-5" />
-              <span>Voltar</span>
+              <ArrowLeft className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+            </button>
+            
+            <div className="flex flex-col flex-1 truncate">
+              <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-white truncate flex-1">
+                {isEditMode ? 'Editar Comunicação DAE' : 'Nova Comunicação DAE'}
+              </h1>
+              {isEditMode && comunicacaoCompleta && (
+                <p className="text-xs text-blue-200 font-medium">ID: #{comunicacaoCompleta.id_comunicacao}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Linha 2: Botões de Ação */}
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="submit"
+              form="comunicacao-form"
+              disabled={loading || uploadingAnexo}
+              className="p-2 sm:w-auto sm:inline-flex sm:items-center sm:justify-center sm:gap-2 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed shadow-sm border border-transparent"
+              title="Salvar"
+            >
+              {loading || uploadingAnexo ? (
+                <Loader className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              <span className="hidden sm:inline">{isEditMode ? 'Atualizar' : 'Salvar'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleClearForm}
+              className="p-2 sm:w-auto sm:inline-flex sm:items-center sm:justify-center sm:gap-2 sm:px-4 sm:py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+              title="Limpar Formulário"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Limpar</span>
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => navigate('/private/comunicacao-dae')}
+              className="p-2 sm:w-auto sm:inline-flex sm:items-center sm:justify-center sm:gap-2 sm:px-4 sm:py-2 bg-white/10 text-white rounded-md hover:bg-white/20 transition-colors"
+              title="Cancelar"
+            >
+              <X className="h-4 w-4" />
+              <span className="hidden sm:inline">Cancelar</span>
             </button>
           </div>
         </div>
@@ -290,67 +419,95 @@ const ComunicacaoDaeFormPage: React.FC = () => {
 
       <SideMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
 
-      {/* Formulário */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      {/* Conteúdo Principal */}
+      <main className="max-w-5xl mx-auto p-4 sm:p-6">
+        
+        {/* Mensagem de Erro */}
         {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
-            <span className="text-red-800">{error}</span>
-            <button onClick={() => setError(null)} className="text-red-600 hover:text-red-800">
-              <X className="w-5 h-5" />
-            </button>
+          <div className="mb-6 rounded-lg bg-red-50 p-4 border border-red-200 shadow-sm animate-fade-in">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <AlertCircle className="h-5 w-5 text-red-500" aria-hidden="true" />
+              </div>
+              <div className="ml-3 flex-1">
+                <h3 className="text-sm font-medium text-red-800">Erro no formulário</h3>
+                <div className="mt-2 text-sm text-red-700">
+                  <p>{error}</p>
+                </div>
+              </div>
+              <div className="ml-auto pl-3">
+                 <button
+                    onClick={() => setError(null)}
+                    type="button"
+                    className="inline-flex rounded-md bg-red-50 p-1.5 text-red-500 hover:bg-red-100"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+              </div>
+            </div>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Card Principal */}
-          <div className="bg-white shadow-md rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Dados da Comunicação</h2>
-            
-            {/* Nº da Comunicação (somente em modo de edição) */}
-            {isEditMode && comunicacaoCompleta && (
-              <div className="mb-4 p-4 bg-blue-50 rounded-lg">
-                <p className="text-sm font-medium text-blue-900">
-                  Nº da Comunicação: <span className="text-2xl">#{comunicacaoCompleta.id_comunicacao}</span>
-                </p>
+        <form id="comunicacao-form" onSubmit={handleSubmit} className="space-y-6">
+          
+          {/* Seção: Origem e Localização */}
+          <div className={cardClass}>
+            <button
+              type="button"
+              onClick={() => toggleSection('origem')}
+              className="w-full flex items-center justify-between cursor-pointer group"
+            >
+              <div className={sectionTitleClass}>
+                <FileCheck className="w-6 h-6 text-blue-600" />
+                <span>1. Origem e Localização</span>
               </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ChevronDown 
+                className={`w-5 h-5 text-gray-400 transition-transform duration-200 group-hover:text-blue-600 ${
+                  expandedSections.origem ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+            
+            {expandedSections.origem && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-100 mt-4 animate-fade-in">
               {/* Origem Da Comunicação */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  2. Origem Da Comunicação <span className="text-red-500">*</span>
+                <label htmlFor="origem_tipo" className={labelClass}>
+                  Tipo de Origem <span className="text-red-500">*</span>
                 </label>
                 <select
+                  id="origem_tipo"
                   value={formData.origem_tipo}
                   onChange={(e) => {
                     setFormData({ 
                       ...formData, 
                       origem_tipo: e.target.value as OrigemTipo,
-                      origem_id: 0 // Reset origem_id quando mudar o tipo
+                      origem_id: 0
                     });
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={selectClass}
                   required
                 >
-                  <option value="CRS">CRS (abre lista com os CRS)</option>
-                  <option value="NHE">NHE (abre lista dos hospitais com NHE)</option>
-                  <option value="CIEVS">UNIDADE CIEVS (abre unidades da rede CIEVS)</option>
+                  <option value="CRS">CRS - Centro Regional de Saúde</option>
+                  <option value="NHE">NHE - Núcleo Hospitalar de Epidemiologia</option>
+                  <option value="CIEVS">CIEVS - Centro de Informações Estratégicas em Vigilância</option>
                 </select>
+                <p className="mt-1.5 text-xs text-gray-500">Selecione o tipo de unidade que originou a comunicação</p>
               </div>
 
-              {/* Seleção específica da origem */}
+              {/* Unidade Específica */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Selecione a {formData.origem_tipo} <span className="text-red-500">*</span>
+                <label htmlFor="origem_id" className={labelClass}>
+                  Unidade Notificadora <span className="text-red-500">*</span>
                 </label>
                 <select
+                  id="origem_id"
                   value={formData.origem_id}
                   onChange={(e) => setFormData({ ...formData, origem_id: Number(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={selectClass}
                   required
                 >
-                  <option value={0}>Selecione...</option>
+                  <option value={0}>Selecione a unidade...</option>
                   {getOrigemOptions().map((option: any) => (
                     <option 
                       key={option.id_crs || option.id_nhe || option.id_cievs} 
@@ -360,286 +517,380 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                     </option>
                   ))}
                 </select>
+                <p className="mt-1.5 text-xs text-gray-500">Escolha a unidade específica {formData.origem_tipo}</p>
               </div>
 
               {/* Data da comunicação */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  3. Data da Comunicação <span className="text-red-500">*</span>
+                <label htmlFor="data_comunicacao" className={labelClass}>
+                  Data e Hora da Comunicação <span className="text-red-500">*</span>
                 </label>
                 <input
+                  id="data_comunicacao"
                   type="datetime-local"
                   value={formData.data_comunicacao}
                   onChange={(e) => setFormData({ ...formData, data_comunicacao: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={inputClass}
                   required
                 />
+                <p className="mt-1.5 text-xs text-gray-500">Informe quando a comunicação foi realizada</p>
               </div>
 
-              {/* Município De Ocorrência */}
+              {/* UF de Ocorrência */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  4. Município De Ocorrência <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={formData.id_municipio_ocorrencia}
-                  onChange={(e) => setFormData({ ...formData, id_municipio_ocorrencia: Number(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                <LocationInput
+                  name="uf"
+                  label="UF de Ocorrência"
+                  value={ufOcorrencia}
+                  onChange={(value) => {
+                    setUfOcorrencia(value);
+                    setMunicipioOcorrencia(''); // Limpar município ao trocar UF
+                  }}
+                  placeholder="Selecione a UF"
+                  disabled={false}
+                  apiEndpoint="api/tipo-estado"
+                  idField="idtipo_estado"
                   required
-                >
-                  <option value={0}>Selecione...</option>
-                  {municipios.map((municipio) => (
-                    <option key={municipio.idtipo_municipio} value={municipio.idtipo_municipio}>
-                      {municipio.descricao}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Nome Do Paciente */}
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  5. Nome Do Paciente <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.nome_paciente}
-                  onChange={(e) => setFormData({ ...formData, nome_paciente: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Nome completo do paciente"
-                  maxLength={150}
-                  required
+                  className={inputClass}
                 />
+                <p className="mt-1.5 text-xs text-gray-500">Estado onde ocorreu o evento</p>
               </div>
 
-              {/* DAE */}
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  6. DAE: abre lista de DAE <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={formData.id_dae}
-                  onChange={(e) => setFormData({ ...formData, id_dae: Number(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              {/* Município de Ocorrência */}
+              <div>
+                <LocationInput
+                  name="municipio"
+                  label="Município de Ocorrência"
+                  value={municipioOcorrencia}
+                  onChange={(value) => {
+                    setMunicipioOcorrencia(value);
+                  }}
+                  placeholder={
+                    isLoadingMunicipios
+                      ? "Carregando municípios..."
+                      : ufOcorrencia
+                        ? "Selecione o município"
+                        : "Primeiro selecione a UF"
+                  }
+                  disabled={!ufOcorrencia || isLoadingMunicipios}
+                  apiEndpoint="api/tipo-municipio"
+                  idField="idtipo_municipio"
+                  parentValue={ufOcorrencia}
                   required
-                >
-                  <option value={0}>Selecione...</option>
-                  {daes.map((dae) => (
-                    <option key={dae.id_dae} value={dae.id_dae}>
-                      {dae.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Observação/Descrição Do Caso */}
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  7. Observação/Descrição Do Caso
-                </label>
-                <textarea
-                  value={formData.observacao_descricao}
-                  onChange={(e) => setFormData({ ...formData, observacao_descricao: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={4}
-                  placeholder="Descreva o caso..."
-                  maxLength={1500}
+                  className={inputClass}
+                  debug={true}
                 />
-                <p className="mt-1 text-sm text-gray-500">
-                  {formData.observacao_descricao?.length || 0}/1500 caracteres
-                </p>
+                <p className="mt-1.5 text-xs text-gray-500">Município onde ocorreu o evento que está sendo comunicado</p>
               </div>
             </div>
-          </div>
-
-          {/* Card de Anexos */}
-          <div className="bg-white shadow-md rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Anexos</h2>
-            
-            {/* Anexo 1: Ficha De Notificação */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                8. Anexo - Ficha De Notificação
-              </label>
-              
-              {isEditMode && getAnexoByTipo('FICHA_NOTIFICACAO') ? (
-                <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-md">
-                  <div className="flex items-center space-x-2">
-                    <FileText className="w-5 h-5 text-green-600" />
-                    <span className="text-sm text-green-800">
-                      {getAnexoByTipo('FICHA_NOTIFICACAO')?.nome_arquivo_original}
-                    </span>
-                  </div>
-                  <div className="flex space-x-2">
-                    <button
-                      type="button"
-                      onClick={() => handleDownloadAnexo(getAnexoByTipo('FICHA_NOTIFICACAO')!)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded"
-                    >
-                      <Download className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveAnexo(getAnexoByTipo('FICHA_NOTIFICACAO')!.id_anexo)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ) : fichaFile ? (
-                <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-md">
-                  <div className="flex items-center space-x-2">
-                    <FileText className="w-5 h-5 text-blue-600" />
-                    <span className="text-sm text-blue-800">{fichaFile.name}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setFichaFile(null)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center w-full">
-                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <Upload className="w-8 h-8 mb-2 text-gray-400" />
-                      <p className="mb-2 text-sm text-gray-500">
-                        <span className="font-semibold">Clique para fazer upload</span> ou arraste e solte
-                      </p>
-                      <p className="text-xs text-gray-500">PDF, DOC, DOCX, XLS, XLSX, PNG, JPG (MAX. 10MB)</p>
-                    </div>
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          if (isEditMode && id) {
-                            handleAddAnexo('FICHA_NOTIFICACAO', file);
-                          } else {
-                            setFichaFile(file);
-                          }
-                        }
-                      }}
-                    />
-                  </label>
-                </div>
-              )}
-            </div>
-
-            {/* Anexo 2: Relatório De Investigação */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                9. Anexo - Relatório De Investigação
-              </label>
-              
-              {isEditMode && getAnexoByTipo('RELATORIO_INVESTIGACAO') ? (
-                <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-md">
-                  <div className="flex items-center space-x-2">
-                    <FileText className="w-5 h-5 text-green-600" />
-                    <span className="text-sm text-green-800">
-                      {getAnexoByTipo('RELATORIO_INVESTIGACAO')?.nome_arquivo_original}
-                    </span>
-                  </div>
-                  <div className="flex space-x-2">
-                    <button
-                      type="button"
-                      onClick={() => handleDownloadAnexo(getAnexoByTipo('RELATORIO_INVESTIGACAO')!)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded"
-                    >
-                      <Download className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveAnexo(getAnexoByTipo('RELATORIO_INVESTIGACAO')!.id_anexo)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ) : relatorioFile ? (
-                <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-md">
-                  <div className="flex items-center space-x-2">
-                    <FileText className="w-5 h-5 text-blue-600" />
-                    <span className="text-sm text-blue-800">{relatorioFile.name}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setRelatorioFile(null)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center w-full">
-                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <Upload className="w-8 h-8 mb-2 text-gray-400" />
-                      <p className="mb-2 text-sm text-gray-500">
-                        <span className="font-semibold">Clique para fazer upload</span> ou arraste e solte
-                      </p>
-                      <p className="text-xs text-gray-500">PDF, DOC, DOCX, XLS, XLSX, PNG, JPG (MAX. 10MB)</p>
-                    </div>
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          if (isEditMode && id) {
-                            handleAddAnexo('RELATORIO_INVESTIGACAO', file);
-                          } else {
-                            setRelatorioFile(file);
-                          }
-                        }
-                      }}
-                    />
-                  </label>
-                </div>
-              )}
-            </div>
-
-            {uploadingAnexo && (
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                <p className="text-sm text-blue-800">Fazendo upload do anexo...</p>
-              </div>
             )}
           </div>
 
-          {/* Botões de Ação */}
-          <div className="flex items-center justify-end space-x-4">
+          {/* Seção: Dados do Paciente */}
+          <div className={cardClass}>
             <button
               type="button"
-              onClick={() => navigate('/private/comunicacao-dae')}
-              className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              onClick={() => toggleSection('paciente')}
+              className="w-full flex items-center justify-between cursor-pointer group"
             >
-              Cancelar
+              <div className={sectionTitleClass}>
+                <AlertCircle className="w-6 h-6 text-blue-600" />
+                <span>2. Dados do Paciente e Agravo</span>
+              </div>
+              <ChevronDown 
+                className={`w-5 h-5 text-gray-400 transition-transform duration-200 group-hover:text-blue-600 ${
+                  expandedSections.paciente ? 'rotate-180' : ''
+                }`}
+              />
             </button>
+            
+            {expandedSections.paciente && (
+              <div className="space-y-6 pt-4 border-t border-gray-100 mt-4 animate-fade-in">
+              {/* Nome Do Paciente */}
+              <div>
+                <label htmlFor="nome_paciente" className={labelClass}>
+                  Nome do Paciente <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="nome_paciente"
+                  type="text"
+                  value={formData.nome_paciente}
+                  onChange={(e) => setFormData({ ...formData, nome_paciente: e.target.value })}
+                  className={inputClass}
+                  placeholder="Ex: João da Silva Santos"
+                  maxLength={150}
+                  required
+                />
+                <p className="mt-1.5 text-xs text-gray-500 flex items-center justify-between">
+                  <span>Nome completo do paciente acometido</span>
+                  <span className="font-medium">{formData.nome_paciente.length}/150</span>
+                </p>
+              </div>
+
+              {/* DAE */}
+              <div>
+                <label htmlFor="id_dae" className={labelClass}>
+                  Doença, Agravo ou Evento (DAE) <span className="text-red-500">*</span>
+                </label>
+                <select
+                  id="id_dae"
+                  value={formData.id_dae}
+                  onChange={(e) => setFormData({ ...formData, id_dae: Number(e.target.value) })}
+                  className={selectClass}
+                  required
+                >
+                  <option value={0}>Selecione o agravo...</option>
+                  {daes.map((dae) => (
+                    <option key={dae.id_dae} value={dae.id_dae}>
+                      {dae.nome} {dae.codigo ? `(${dae.codigo})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-xs text-gray-500">Selecione a doença ou agravo notificado</p>
+              </div>
+
+              {/* Observação */}
+              <div>
+                <label htmlFor="observacao_descricao" className={labelClass}>
+                  Observações e Descrição do Caso
+                  <span className="text-gray-400 text-sm ml-2">(opcional)</span>
+                </label>
+                <textarea
+                  id="observacao_descricao"
+                  value={formData.observacao_descricao}
+                  onChange={(e) => setFormData({ ...formData, observacao_descricao: e.target.value })}
+                  className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-all hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none resize-none"
+                  rows={5}
+                  placeholder="Descreva detalhadamente: sintomas, evolução do caso, medidas tomadas, contexto epidemiológico, etc."
+                  maxLength={1500}
+                />
+                <div className="mt-1.5 flex justify-between items-center">
+                  <p className="text-xs text-gray-500">Informações complementares sobre o caso</p>
+                  <p className={`text-xs font-medium ${(formData.observacao_descricao?.length || 0) > 1200 ? 'text-orange-600' : 'text-gray-500'}`}>
+                    {formData.observacao_descricao?.length || 0}/1500
+                  </p>
+                </div>
+              </div>
+            </div>
+            )}
+          </div>
+
+          {/* Seção: Anexos */}
+          <div className={cardClass}>
+            <button
+              type="button"
+              onClick={() => toggleSection('documentacao')}
+              className="w-full flex items-center justify-between cursor-pointer group"
+            >
+              <div className="flex flex-col items-start">
+                <div className={sectionTitleClass}>
+                  <FileText className="w-6 h-6 text-blue-600" />
+                  <span>3. Documentação Anexa</span>
+                </div>
+                <p className="text-sm text-gray-600 -mt-3">Anexe os documentos relacionados à comunicação (Ficha de notificação, relatórios, etc.)</p>
+              </div>
+              <ChevronDown 
+                className={`w-5 h-5 text-gray-400 transition-transform duration-200 group-hover:text-blue-600 flex-shrink-0 ml-4 ${
+                  expandedSections.documentacao ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+            
+            {expandedSections.documentacao && (
+              <div className="pt-4 border-t border-gray-100 mt-4 animate-fade-in">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Anexo 1: Ficha */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <label className="block text-sm font-medium text-gray-900 mb-3 flex items-center justify-between">
+                  <span>Ficha de Notificação</span>
+                  <span className="text-xs font-normal text-white bg-blue-600 px-2 py-0.5 rounded">Recomendado</span>
+                </label>
+                
+                {isEditMode && getAnexoByTipo('FICHA_NOTIFICACAO') ? (
+                  <div className="flex items-center justify-between bg-white p-3 rounded border border-gray-200 shadow-sm">
+                    <div className="flex items-center gap-3 truncate">
+                      <div className="bg-blue-100 p-2 rounded text-blue-600">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div className="truncate">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {getAnexoByTipo('FICHA_NOTIFICACAO')?.nome_arquivo_original}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-1">
+                       <button
+                        type="button"
+                        onClick={() => handleDownloadAnexo(getAnexoByTipo('FICHA_NOTIFICACAO')!)}
+                        className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                        title="Baixar"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAnexo(getAnexoByTipo('FICHA_NOTIFICACAO')!.id_anexo)}
+                        className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
+                        title="Remover"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ) : fichaFile ? (
+                  <div className="flex items-center justify-between bg-blue-50 p-3 rounded border border-blue-200">
+                    <div className="flex items-center gap-3 truncate">
+                      <FileText className="w-5 h-5 text-blue-600" />
+                      <span className="text-sm font-medium text-blue-900 truncate">{fichaFile.name}</span>
+                    </div>
+                    <button type="button" onClick={() => setFichaFile(null)} className="text-blue-400 hover:text-blue-700">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-white hover:bg-gray-50 transition-colores">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <Upload className="w-8 h-8 mb-2 text-gray-400" />
+                      <p className="text-sm text-gray-500 font-medium">Clique para enviar</p>
+                      <p className="text-xs text-gray-400">PDF, JPG, PNG até 10MB</p>
+                    </div>
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (isEditMode && id) handleAddAnexo('FICHA_NOTIFICACAO', file);
+                          else setFichaFile(file);
+                        }
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
+
+              {/* Anexo 2: Relatório */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <label className="block text-sm font-medium text-gray-900 mb-3 flex items-center justify-between">
+                  <span>Relatório de Investigação</span>
+                  <span className="text-xs font-normal text-gray-500 bg-gray-200 px-2 py-0.5 rounded">Opcional</span>
+                </label>
+                
+                {isEditMode && getAnexoByTipo('RELATORIO_INVESTIGACAO') ? (
+                  <div className="flex items-center justify-between bg-white p-3 rounded border border-gray-200 shadow-sm">
+                    <div className="flex items-center gap-3 truncate">
+                      <div className="bg-purple-100 p-2 rounded text-purple-600">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div className="truncate">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {getAnexoByTipo('RELATORIO_INVESTIGACAO')?.nome_arquivo_original}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-1">
+                       <button
+                        type="button"
+                        onClick={() => handleDownloadAnexo(getAnexoByTipo('RELATORIO_INVESTIGACAO')!)}
+                        className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAnexo(getAnexoByTipo('RELATORIO_INVESTIGACAO')!.id_anexo)}
+                        className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ) : relatorioFile ? (
+                  <div className="flex items-center justify-between bg-purple-50 p-3 rounded border border-purple-200">
+                    <div className="flex items-center gap-3 truncate">
+                      <FileText className="w-5 h-5 text-purple-600" />
+                      <span className="text-sm font-medium text-purple-900 truncate">{relatorioFile.name}</span>
+                    </div>
+                    <button type="button" onClick={() => setRelatorioFile(null)} className="text-purple-400 hover:text-purple-700">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-white hover:bg-gray-50 transition-colores">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <Upload className="w-8 h-8 mb-2 text-gray-400" />
+                      <p className="text-sm text-gray-500 font-medium">Clique para enviar</p>
+                      <p className="text-xs text-gray-400">Documentos complementares</p>
+                    </div>
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (isEditMode && id) handleAddAnexo('RELATORIO_INVESTIGACAO', file);
+                          else setRelatorioFile(file);
+                        }
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
+            </div>
+
+            {/* Status de Upload */}
+            {uploadingAnexo && (
+              <div className="mt-4 p-3 bg-blue-50 text-blue-700 rounded-md flex items-center gap-3">
+                <Loader className="h-5 w-5 animate-spin text-blue-600" />
+                <span className="text-sm font-medium">Enviando arquivos para o servidor...</span>
+              </div>
+            )}
+            </div>
+            )}
+          </div>
+
+          {/* Rodapé com botões de ação CENTRALIZADOS */}
+          <div className="flex items-center justify-center space-x-4 pt-6 border-t border-gray-200 mt-8 mb-8">
             <button
               type="submit"
               disabled={loading || uploadingAnexo}
-              className="flex items-center space-x-2 px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center px-6 py-2.5 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px] justify-center"
             >
               {loading || uploadingAnexo ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>Salvando...</span>
-                </>
+                 <>
+                   <Loader className="w-5 h-5 mr-2 animate-spin" />
+                   Processando...
+                 </>
               ) : (
                 <>
-                  <Save className="w-5 h-5" />
-                  <span>{isEditMode ? 'Atualizar' : 'Salvar'} Comunicação</span>
+                  <Save className="w-5 h-5 mr-2" />
+                  {isEditMode ? 'Salvar Alterações' : 'Salvar'}
                 </>
               )}
             </button>
+
+            <button
+              type="button"
+              onClick={handleClearForm}
+              className="inline-flex items-center px-6 py-2.5 border border-transparent text-base font-medium rounded-md text-white bg-gray-500 hover:bg-gray-600 shadow-sm min-w-[120px] justify-center"
+            >
+              <Trash2 className="w-5 h-5 mr-2" />
+              Limpar
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/private/comunicacao-dae')}
+              className="inline-flex items-center px-6 py-2.5 border border-gray-300 shadow-sm text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 min-w-[120px] justify-center"
+            >
+              <X className="w-5 h-5 mr-2" />
+              Cancelar
+            </button>
           </div>
+
+          <div className="h-4"></div>
         </form>
       </main>
     </div>
