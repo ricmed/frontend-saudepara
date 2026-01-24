@@ -34,6 +34,8 @@ import {
   UserCog,
   Home,
   Database,
+  ClipboardList,
+  Settings,
 } from "lucide-react";
 
 interface SideMenuProps {
@@ -245,6 +247,13 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       onClick: () => navigate("/private/comunicacao-de-caso"),
     }] : []),
     
+    // ✅ NOVO: Formulários Dinâmicos - apenas para notificadores (OCULTO TEMPORARIAMENTE)
+    // ...(permissions.isNotificador ? [{
+    //   icon: <ClipboardList />,
+    //   label: t("menu.dynamic_forms"),
+    //   onClick: () => navigate("/private/formularios"),
+    // }] : []),
+    
     // Menu Dashboard - para notificadores OU usuários com role dashboard
     ...(permissions.isNotificador || permissions.isDashboard ? [{
       icon: <ChartSpline />,
@@ -294,6 +303,16 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       submenu: true,
       onClick: () => {},
     }] : []),
+    
+    // ✅ NOVO: Gerenciar Formulários - apenas para admin master (OCULTO TEMPORARIAMENTE)
+    // ...(user && isAdminMaster() ? [{
+    //   icon: <Settings />,
+    //   label: "Gerenciar Formulários",
+    //   onClick: () => {
+    //     navigate("/private/formularios-admin");
+    //     onClose();
+    //   },
+    // }] : []),
     
     // ✅ NOVO: Menu de Lista de Pacientes - apenas para admin master
     ...(user && isAdminMaster() ? [{

@@ -78,6 +78,7 @@ export type TranslationRecord = {
   'menu.qualify_establishments': string;
   'menu.notification': string;
   'menu.notify_case': string;
+  'menu.dynamic_forms': string;
   'menu.dashboard': string;
   'menu.offline_management': string;
   'menu.educational': string;

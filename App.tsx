@@ -131,6 +131,12 @@ import AscomPage from '@/features/contact/AscomPage';
 import OuvidoriaPage from '@/features/contact/OuvidoriaPage';
 // Version page
 import VersionPage from '@/pages/VersionPage';
+// Dynamic Forms System
+import { DynamicFormPage } from '@/features/dynamic-forms/pages/DynamicFormPage';
+import { FormsListPage } from '@/features/dynamic-forms/pages/FormsListPage';
+import { FormBuilderPage } from '@/features/dynamic-forms/pages/FormBuilderPage';
+import { FormAdminListPage } from '@/features/dynamic-forms/pages/FormAdminListPage';
+import { FormSubmissionsListPage } from '@/features/dynamic-forms/pages/FormSubmissionsListPage';
 // Componente de layout protegido
 const ProtectedLayout = () => {
   return (
@@ -271,6 +277,20 @@ function App() {
               <Route path="/private/comunicacao-de-caso" element={<ListaNotificacoes />} />
               <Route path="/private/comunicacao-de-caso/nova" element={<NotificationForm />} />
               <Route path="/private/comunicacao-de-caso/editar/:id" element={<NotificationForm />} />
+              
+              {/* ✅ NOVO: Rotas de Formulários Dinâmicos (SINAN/e-SUS style) */}
+              <Route path="/private/formularios" element={<FormsListPage />} />
+              <Route path="/private/formularios/:agravo" element={<FormSubmissionsListPage />} />
+              <Route path="/private/formularios/:agravo/nova" element={<DynamicFormPage />} />
+              <Route path="/private/formularios/:agravo/editar/:id" element={<DynamicFormPage />} />
+              <Route path="/private/formularios/:agravo/visualizar/:id" element={<DynamicFormPage />} />
+            </Route>
+
+            {/* ✅ NOVO: Rotas de Administração de Formulários - Apenas Admin */}
+            <Route element={<ProtectedRoute requiredRoles={['admin']}><Outlet /></ProtectedRoute>}>
+              <Route path="/private/formularios-admin" element={<FormAdminListPage />} />
+              <Route path="/private/formularios-admin/novo" element={<FormBuilderPage />} />
+              <Route path="/private/formularios-admin/editar/:id" element={<FormBuilderPage />} />
             </Route>
             
             {/* ✅ NOVO: Rota de Lista de Pacientes - Protegida apenas para Admin Master */}
