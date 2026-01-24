@@ -92,8 +92,8 @@ const ComunicacaoDaeFormPage: React.FC = () => {
 
   // Anexos
   const [anexos, setAnexos] = useState<ComunicacaoDaeAnexo[]>([]);
-  const [fichaFile, setFichaFile] = useState<File | null>(null);
-  const [relatorioFile, setRelatorioFile] = useState<File | null>(null);
+  const [fichaFiles, setFichaFiles] = useState<File[]>([]);
+  const [relatorioFiles, setRelatorioFiles] = useState<File[]>([]);
   const [uploadingAnexo, setUploadingAnexo] = useState(false);
 
   // Função para limpar o formulário
@@ -233,7 +233,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
         comunicacaoId = Number(created.id_comunicacao);
         
         // Fazer upload dos anexos se houver
-        if (fichaFile || relatorioFile) {
+        if (fichaFiles.length > 0 || relatorioFiles.length > 0) {
           await uploadAnexos(comunicacaoId);
         }
         
@@ -254,15 +254,17 @@ const ComunicacaoDaeFormPage: React.FC = () => {
     try {
       const uploads: Promise<any>[] = [];
 
-      if (fichaFile) {
+      // Upload de fichas
+      for (const file of fichaFiles) {
         uploads.push(
-          ComunicacaoDaeService.addAnexo(comunicacaoId, fichaFile, 'FICHA_NOTIFICACAO')
+          ComunicacaoDaeService.addAnexo(comunicacaoId, file, 'FICHA_NOTIFICACAO')
         );
       }
 
-      if (relatorioFile) {
+      // Upload de relatórios
+      for (const file of relatorioFiles) {
         uploads.push(
-          ComunicacaoDaeService.addAnexo(comunicacaoId, relatorioFile, 'RELATORIO_INVESTIGACAO')
+          ComunicacaoDaeService.addAnexo(comunicacaoId, file, 'RELATORIO_INVESTIGACAO')
         );
       }
 
@@ -276,29 +278,35 @@ const ComunicacaoDaeFormPage: React.FC = () => {
   };
 
   const handleAddAnexo = async (tipo: TipoAnexo, file: File) => {
-    if (!isEditMode || !id) {
-      // Modo de criação: apenas armazena o arquivo
-      if (tipo === 'FICHA_NOTIFICACAO') {
-        setFichaFile(file);
-      } else {
-        setRelatorioFile(file);
-      }
+    // Calcular total de arquivos já adicionados
+    const totalArquivos = isEditMode 
+      ? anexos.length 
+      : fichaFiles.length + relatorioFiles.length;
+    
+    // Validar limite de 10 arquivos
+    if (totalArquivos >= 10) {
+      alert('Limite máximo de 10 arquivos atingido!');
       return;
     }
 
-    // Validar limite de 10 anexos
-    if (anexos.length >= 10) {
-      alert('Limite máximo de 10 anexos atingido!');
-      return;
+    // Calcular tamanho total
+    let tamanhoTotal = 0;
+    
+    if (isEditMode) {
+      // Modo edição: somar anexos do banco
+      tamanhoTotal = anexos.reduce((total, anexo) => {
+        const bytes = typeof anexo.tamanho_bytes === 'string' 
+          ? parseInt(anexo.tamanho_bytes, 10) 
+          : Number(anexo.tamanho_bytes);
+        return total + (isNaN(bytes) ? 0 : bytes);
+      }, 0);
+    } else {
+      // Modo criação: somar arquivos locais
+      tamanhoTotal = [...fichaFiles, ...relatorioFiles].reduce(
+        (total, f) => total + f.size, 
+        0
+      );
     }
-
-    // Validar tamanho total (10MB)
-    const tamanhoTotal = anexos.reduce((total, anexo) => {
-      const bytes = typeof anexo.tamanho_bytes === 'string' 
-        ? parseInt(anexo.tamanho_bytes, 10) 
-        : Number(anexo.tamanho_bytes);
-      return total + (isNaN(bytes) ? 0 : bytes);
-    }, 0);
     
     const novoTamanhoTotal = tamanhoTotal + file.size;
     const LIMITE_10MB = 10 * 1024 * 1024;
@@ -308,6 +316,16 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       const tamanhoArquivoMB = (file.size / 1024 / 1024).toFixed(2);
       const totalMB = (novoTamanhoTotal / 1024 / 1024).toFixed(2);
       alert(`Tamanho total dos anexos excederia 10MB!\n\nAtual: ${tamanhoAtualMB}MB\nNovo arquivo: ${tamanhoArquivoMB}MB\nTotal: ${totalMB}MB`);
+      return;
+    }
+
+    if (!isEditMode || !id) {
+      // Modo de criação: apenas armazena o arquivo
+      if (tipo === 'FICHA_NOTIFICACAO') {
+        setFichaFiles(prev => [...prev, file]);
+      } else {
+        setRelatorioFiles(prev => [...prev, file]);
+      }
       return;
     }
 
@@ -349,10 +367,6 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       case 'CIEVS': return cievsList;
       default: return [];
     }
-  };
-
-  const getAnexoByTipo = (tipo: TipoAnexo) => {
-    return anexos.find(a => a.tipo_anexo === tipo);
   };
 
   if (loadingData) {
@@ -720,16 +734,23 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                 <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm text-blue-900 font-medium">
-                      📎 Anexos: {anexos.length}/10
+                      📎 Anexos: {isEditMode 
+                        ? anexos.length 
+                        : fichaFiles.length + relatorioFiles.length}/10
                     </p>
                     <p className="text-sm text-blue-900 font-medium">
                       {(() => {
-                        const totalBytes = anexos.reduce((total, anexo) => {
-                          const bytes = typeof anexo.tamanho_bytes === 'string' 
-                            ? parseInt(anexo.tamanho_bytes, 10) 
-                            : Number(anexo.tamanho_bytes);
-                          return total + (isNaN(bytes) ? 0 : bytes);
-                        }, 0);
+                        const totalBytes = isEditMode 
+                          ? anexos.reduce((total, anexo) => {
+                              const bytes = typeof anexo.tamanho_bytes === 'string' 
+                                ? parseInt(anexo.tamanho_bytes, 10) 
+                                : Number(anexo.tamanho_bytes);
+                              return total + (isNaN(bytes) ? 0 : bytes);
+                            }, 0)
+                          : [...fichaFiles, ...relatorioFiles].reduce(
+                              (total, file) => total + file.size, 
+                              0
+                            );
                         return `${(totalBytes / 1024 / 1024).toFixed(2)}MB / 10MB`;
                       })()}
                     </p>
@@ -740,12 +761,17 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                     <div 
                       className={`h-full transition-all duration-300 rounded-full ${
                         (() => {
-                          const totalBytes = anexos.reduce((total, anexo) => {
-                            const bytes = typeof anexo.tamanho_bytes === 'string' 
-                              ? parseInt(anexo.tamanho_bytes, 10) 
-                              : Number(anexo.tamanho_bytes);
-                            return total + (isNaN(bytes) ? 0 : bytes);
-                          }, 0);
+                          const totalBytes = isEditMode 
+                            ? anexos.reduce((total, anexo) => {
+                                const bytes = typeof anexo.tamanho_bytes === 'string' 
+                                  ? parseInt(anexo.tamanho_bytes, 10) 
+                                  : Number(anexo.tamanho_bytes);
+                                return total + (isNaN(bytes) ? 0 : bytes);
+                              }, 0)
+                            : [...fichaFiles, ...relatorioFiles].reduce(
+                                (total, file) => total + file.size, 
+                                0
+                              );
                           const percentage = (totalBytes / (10 * 1024 * 1024)) * 100;
                           if (percentage < 50) return 'bg-green-500';
                           if (percentage < 80) return 'bg-yellow-500';
@@ -754,12 +780,17 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                       }`}
                       style={{
                         width: `${(() => {
-                          const totalBytes = anexos.reduce((total, anexo) => {
-                            const bytes = typeof anexo.tamanho_bytes === 'string' 
-                              ? parseInt(anexo.tamanho_bytes, 10) 
-                              : Number(anexo.tamanho_bytes);
-                            return total + (isNaN(bytes) ? 0 : bytes);
-                          }, 0);
+                          const totalBytes = isEditMode 
+                            ? anexos.reduce((total, anexo) => {
+                                const bytes = typeof anexo.tamanho_bytes === 'string' 
+                                  ? parseInt(anexo.tamanho_bytes, 10) 
+                                  : Number(anexo.tamanho_bytes);
+                                return total + (isNaN(bytes) ? 0 : bytes);
+                              }, 0)
+                            : [...fichaFiles, ...relatorioFiles].reduce(
+                                (total, file) => total + file.size, 
+                                0
+                              );
                           return Math.min((totalBytes / (10 * 1024 * 1024)) * 100, 100);
                         })()}%`
                       }}
@@ -779,54 +810,79 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                   <span className="text-xs font-normal text-white bg-blue-600 px-2 py-0.5 rounded">Recomendado</span>
                 </label>
                 
-                {isEditMode && getAnexoByTipo('FICHA_NOTIFICACAO') ? (
-                  <div className="flex items-center justify-between bg-white p-3 rounded border border-gray-200 shadow-sm">
-                    <div className="flex items-center gap-3 truncate">
-                      <div className="bg-blue-100 p-2 rounded text-blue-600">
-                        <FileText className="w-5 h-5" />
+                {/* Lista de arquivos da ficha */}
+                <div className="space-y-2 mb-3">
+                  {/* Arquivos já salvos no banco */}
+                  {isEditMode && anexos.filter(a => a.tipo_anexo === 'FICHA_NOTIFICACAO').map((anexo) => (
+                    <div key={anexo.id_anexo} className="flex items-center justify-between bg-white p-3 rounded border border-gray-200 shadow-sm">
+                      <div className="flex items-center gap-3 truncate">
+                        <div className="bg-blue-100 p-2 rounded text-blue-600">
+                          <FileText className="w-5 h-5" />
+                        </div>
+                        <div className="truncate">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {anexo.nome_arquivo_original}
+                          </p>
+                        </div>
                       </div>
-                      <div className="truncate">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {getAnexoByTipo('FICHA_NOTIFICACAO')?.nome_arquivo_original}
-                        </p>
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadAnexo(anexo)}
+                          className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                          title="Baixar"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAnexo(anexo.id_anexo)}
+                          className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
+                          title="Remover"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
-                    <div className="flex gap-1">
-                       <button
-                        type="button"
-                        onClick={() => handleDownloadAnexo(getAnexoByTipo('FICHA_NOTIFICACAO')!)}
-                        className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
-                        title="Baixar"
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
+                  ))}
+                  
+                  {/* Arquivos pendentes (modo criação) */}
+                  {!isEditMode && fichaFiles.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between bg-white p-3 rounded border border-gray-200 shadow-sm">
+                      <div className="flex items-center gap-3 truncate">
+                        <div className="bg-blue-100 p-2 rounded text-blue-600">
+                          <FileText className="w-5 h-5" />
+                        </div>
+                        <div className="truncate">
+                          <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                          <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(2)} KB</p>
+                        </div>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => handleRemoveAnexo(getAnexoByTipo('FICHA_NOTIFICACAO')!.id_anexo)}
+                        onClick={() => setFichaFiles(prev => prev.filter((_, i) => i !== index))}
                         className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
                         title="Remover"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                  </div>
-                ) : (
-                  <FileUploadWithCompression
-                    label=""
-                    file={fichaFile}
-                    onFileSelect={(file) => {
-                      if (file) {
-                        if (isEditMode && id) handleAddAnexo('FICHA_NOTIFICACAO', file);
-                        else setFichaFile(file);
-                      } else {
-                        setFichaFile(null);
-                      }
-                    }}
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.heic"
-                    maxSizeMB={2}
-                    disabled={uploadingAnexo}
-                  />
-                )}
+                  ))}
+                </div>
+
+                {/* Botão + para adicionar mais arquivos */}
+                <FileUploadWithCompression
+                  label="+ Adicionar arquivo"
+                  file={null}
+                  onFileSelect={(file) => {
+                    if (file) {
+                      handleAddAnexo('FICHA_NOTIFICACAO', file);
+                    }
+                  }}
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.heic"
+                  maxSizeMB={2}
+                  disabled={uploadingAnexo}
+                />
               </div>
 
               {/* Anexo 2: Relatório */}
@@ -836,52 +892,79 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                   <span className="text-xs font-normal text-gray-500 bg-gray-200 px-2 py-0.5 rounded">Opcional</span>
                 </label>
                 
-                {isEditMode && getAnexoByTipo('RELATORIO_INVESTIGACAO') ? (
-                  <div className="flex items-center justify-between bg-white p-3 rounded border border-gray-200 shadow-sm">
-                    <div className="flex items-center gap-3 truncate">
-                      <div className="bg-purple-100 p-2 rounded text-purple-600">
-                        <FileText className="w-5 h-5" />
+                {/* Lista de arquivos do relatório */}
+                <div className="space-y-2 mb-3">
+                  {/* Arquivos já salvos no banco */}
+                  {isEditMode && anexos.filter(a => a.tipo_anexo === 'RELATORIO_INVESTIGACAO').map((anexo) => (
+                    <div key={anexo.id_anexo} className="flex items-center justify-between bg-white p-3 rounded border border-gray-200 shadow-sm">
+                      <div className="flex items-center gap-3 truncate">
+                        <div className="bg-purple-100 p-2 rounded text-purple-600">
+                          <FileText className="w-5 h-5" />
+                        </div>
+                        <div className="truncate">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {anexo.nome_arquivo_original}
+                          </p>
+                        </div>
                       </div>
-                      <div className="truncate">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {getAnexoByTipo('RELATORIO_INVESTIGACAO')?.nome_arquivo_original}
-                        </p>
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadAnexo(anexo)}
+                          className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                          title="Baixar"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAnexo(anexo.id_anexo)}
+                          className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
+                          title="Remover"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
-                    <div className="flex gap-1">
-                       <button
-                        type="button"
-                        onClick={() => handleDownloadAnexo(getAnexoByTipo('RELATORIO_INVESTIGACAO')!)}
-                        className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
+                  ))}
+                  
+                  {/* Arquivos pendentes (modo criação) */}
+                  {!isEditMode && relatorioFiles.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between bg-white p-3 rounded border border-gray-200 shadow-sm">
+                      <div className="flex items-center gap-3 truncate">
+                        <div className="bg-purple-100 p-2 rounded text-purple-600">
+                          <FileText className="w-5 h-5" />
+                        </div>
+                        <div className="truncate">
+                          <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                          <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(2)} KB</p>
+                        </div>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => handleRemoveAnexo(getAnexoByTipo('RELATORIO_INVESTIGACAO')!.id_anexo)}
+                        onClick={() => setRelatorioFiles(prev => prev.filter((_, i) => i !== index))}
                         className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
+                        title="Remover"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                  </div>
-                ) : (
-                  <FileUploadWithCompression
-                    label=""
-                    file={relatorioFile}
-                    onFileSelect={(file) => {
-                      if (file) {
-                        if (isEditMode && id) handleAddAnexo('RELATORIO_INVESTIGACAO', file);
-                        else setRelatorioFile(file);
-                      } else {
-                        setRelatorioFile(null);
-                      }
-                    }}
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.heic"
-                    maxSizeMB={2}
-                    disabled={uploadingAnexo}
-                  />
-                )}
+                  ))}
+                </div>
+
+                {/* Botão + para adicionar mais arquivos */}
+                <FileUploadWithCompression
+                  label="+ Adicionar arquivo"
+                  file={null}
+                  onFileSelect={(file) => {
+                    if (file) {
+                      handleAddAnexo('RELATORIO_INVESTIGACAO', file);
+                    }
+                  }}
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.heic"
+                  maxSizeMB={2}
+                  disabled={uploadingAnexo}
+                />
               </div>
             </div>
 
