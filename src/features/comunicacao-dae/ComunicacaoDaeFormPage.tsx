@@ -22,6 +22,7 @@ import CrsService, { Crs } from '@/services/CrsService';
 import { SideMenu } from '@/features/home/components/SideMenu';
 import LocationInput from '@/features/notificationForms/components/LocationInput';
 import { SearchableSelect } from '@/components/SearchableSelect';
+import FileUploadWithCompression from '@/components/FileUploadWithCompression';
 
 // Funções auxiliares para timezone
 const getLocalDateTime = (date: Date = new Date()): string => {
@@ -285,13 +286,38 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       return;
     }
 
+    // Validar limite de 10 anexos
+    if (anexos.length >= 10) {
+      alert('Limite máximo de 10 anexos atingido!');
+      return;
+    }
+
+    // Validar tamanho total (10MB)
+    const tamanhoTotal = anexos.reduce((total, anexo) => {
+      const bytes = typeof anexo.tamanho_bytes === 'string' 
+        ? parseInt(anexo.tamanho_bytes, 10) 
+        : Number(anexo.tamanho_bytes);
+      return total + (isNaN(bytes) ? 0 : bytes);
+    }, 0);
+    
+    const novoTamanhoTotal = tamanhoTotal + file.size;
+    const LIMITE_10MB = 10 * 1024 * 1024;
+    
+    if (novoTamanhoTotal > LIMITE_10MB) {
+      const tamanhoAtualMB = (tamanhoTotal / 1024 / 1024).toFixed(2);
+      const tamanhoArquivoMB = (file.size / 1024 / 1024).toFixed(2);
+      const totalMB = (novoTamanhoTotal / 1024 / 1024).toFixed(2);
+      alert(`Tamanho total dos anexos excederia 10MB!\n\nAtual: ${tamanhoAtualMB}MB\nNovo arquivo: ${tamanhoArquivoMB}MB\nTotal: ${totalMB}MB`);
+      return;
+    }
+
     // Modo de edição: faz upload imediatamente
     try {
       setUploadingAnexo(true);
       const anexo = await ComunicacaoDaeService.addAnexo(Number(id), file, tipo);
       setAnexos(prev => [...prev, anexo]);
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Erro ao adicionar anexo');
+      alert(err.response?.data?.error || 'Erro ao adicionar anexo');
     } finally {
       setUploadingAnexo(false);
     }
@@ -690,6 +716,61 @@ const ComunicacaoDaeFormPage: React.FC = () => {
             
             {expandedSections.documentacao && (
               <div className="pt-4 border-t border-gray-100 mt-4 animate-fade-in">
+                {/* Informação sobre limites com barra de progresso */}
+                <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm text-blue-900 font-medium">
+                      📎 Anexos: {anexos.length}/10
+                    </p>
+                    <p className="text-sm text-blue-900 font-medium">
+                      {(() => {
+                        const totalBytes = anexos.reduce((total, anexo) => {
+                          const bytes = typeof anexo.tamanho_bytes === 'string' 
+                            ? parseInt(anexo.tamanho_bytes, 10) 
+                            : Number(anexo.tamanho_bytes);
+                          return total + (isNaN(bytes) ? 0 : bytes);
+                        }, 0);
+                        return `${(totalBytes / 1024 / 1024).toFixed(2)}MB / 10MB`;
+                      })()}
+                    </p>
+                  </div>
+                  
+                  {/* Barra de progresso */}
+                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-300 rounded-full ${
+                        (() => {
+                          const totalBytes = anexos.reduce((total, anexo) => {
+                            const bytes = typeof anexo.tamanho_bytes === 'string' 
+                              ? parseInt(anexo.tamanho_bytes, 10) 
+                              : Number(anexo.tamanho_bytes);
+                            return total + (isNaN(bytes) ? 0 : bytes);
+                          }, 0);
+                          const percentage = (totalBytes / (10 * 1024 * 1024)) * 100;
+                          if (percentage < 50) return 'bg-green-500';
+                          if (percentage < 80) return 'bg-yellow-500';
+                          return 'bg-red-500';
+                        })()
+                      }`}
+                      style={{
+                        width: `${(() => {
+                          const totalBytes = anexos.reduce((total, anexo) => {
+                            const bytes = typeof anexo.tamanho_bytes === 'string' 
+                              ? parseInt(anexo.tamanho_bytes, 10) 
+                              : Number(anexo.tamanho_bytes);
+                            return total + (isNaN(bytes) ? 0 : bytes);
+                          }, 0);
+                          return Math.min((totalBytes / (10 * 1024 * 1024)) * 100, 100);
+                        })()}%`
+                      }}
+                    />
+                  </div>
+                  
+                  <p className="text-xs text-blue-700 mt-2">
+                    💡 Máximo de 10 arquivos, tamanho total até 10MB
+                  </p>
+                </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Anexo 1: Ficha */}
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
@@ -729,36 +810,22 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                       </button>
                     </div>
                   </div>
-                ) : fichaFile ? (
-                  <div className="flex items-center justify-between bg-blue-50 p-3 rounded border border-blue-200">
-                    <div className="flex items-center gap-3 truncate">
-                      <FileText className="w-5 h-5 text-blue-600" />
-                      <span className="text-sm font-medium text-blue-900 truncate">{fichaFile.name}</span>
-                    </div>
-                    <button type="button" onClick={() => setFichaFile(null)} className="text-blue-400 hover:text-blue-700">
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
                 ) : (
-                  <label className="flex flex-col items-center justify-center h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-white hover:bg-gray-50 transition-colores">
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <Upload className="w-8 h-8 mb-2 text-gray-400" />
-                      <p className="text-sm text-gray-500 font-medium">Clique para enviar</p>
-                      <p className="text-xs text-gray-400">PDF, JPG, PNG até 10MB</p>
-                    </div>
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          if (isEditMode && id) handleAddAnexo('FICHA_NOTIFICACAO', file);
-                          else setFichaFile(file);
-                        }
-                      }}
-                    />
-                  </label>
+                  <FileUploadWithCompression
+                    label=""
+                    file={fichaFile}
+                    onFileSelect={(file) => {
+                      if (file) {
+                        if (isEditMode && id) handleAddAnexo('FICHA_NOTIFICACAO', file);
+                        else setFichaFile(file);
+                      } else {
+                        setFichaFile(null);
+                      }
+                    }}
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.heic"
+                    maxSizeMB={2}
+                    disabled={uploadingAnexo}
+                  />
                 )}
               </div>
 
@@ -798,36 +865,22 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                       </button>
                     </div>
                   </div>
-                ) : relatorioFile ? (
-                  <div className="flex items-center justify-between bg-purple-50 p-3 rounded border border-purple-200">
-                    <div className="flex items-center gap-3 truncate">
-                      <FileText className="w-5 h-5 text-purple-600" />
-                      <span className="text-sm font-medium text-purple-900 truncate">{relatorioFile.name}</span>
-                    </div>
-                    <button type="button" onClick={() => setRelatorioFile(null)} className="text-purple-400 hover:text-purple-700">
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
                 ) : (
-                  <label className="flex flex-col items-center justify-center h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-white hover:bg-gray-50 transition-colores">
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <Upload className="w-8 h-8 mb-2 text-gray-400" />
-                      <p className="text-sm text-gray-500 font-medium">Clique para enviar</p>
-                      <p className="text-xs text-gray-400">Documentos complementares</p>
-                    </div>
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          if (isEditMode && id) handleAddAnexo('RELATORIO_INVESTIGACAO', file);
-                          else setRelatorioFile(file);
-                        }
-                      }}
-                    />
-                  </label>
+                  <FileUploadWithCompression
+                    label=""
+                    file={relatorioFile}
+                    onFileSelect={(file) => {
+                      if (file) {
+                        if (isEditMode && id) handleAddAnexo('RELATORIO_INVESTIGACAO', file);
+                        else setRelatorioFile(file);
+                      } else {
+                        setRelatorioFile(null);
+                      }
+                    }}
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.heic"
+                    maxSizeMB={2}
+                    disabled={uploadingAnexo}
+                  />
                 )}
               </div>
             </div>
