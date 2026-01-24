@@ -26,7 +26,13 @@ class CrsService {
       params: { page, limit },
       withCredentials: true
     });
-    return response.data;
+    // Mapear resposta do backend para o formato esperado
+    return {
+      data: response.data.data,
+      total: response.data.pagination.total,
+      page: response.data.pagination.currentPage,
+      limit: response.data.pagination.itemsPerPage
+    };
   }
 
   /**

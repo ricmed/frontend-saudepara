@@ -21,6 +21,7 @@ import CievsService, { Cievs } from '@/services/CievsService';
 import CrsService, { Crs } from '@/services/CrsService';
 import { SideMenu } from '@/features/home/components/SideMenu';
 import LocationInput from '@/features/notificationForms/components/LocationInput';
+import { SearchableSelect } from '@/components/SearchableSelect';
 
 // Funções auxiliares para timezone
 const getLocalDateTime = (date: Date = new Date()): string => {
@@ -497,26 +498,20 @@ const ComunicacaoDaeFormPage: React.FC = () => {
 
               {/* Unidade Específica */}
               <div>
-                <label htmlFor="origem_id" className={labelClass}>
-                  Unidade Notificadora <span className="text-red-500">*</span>
-                </label>
-                <select
-                  id="origem_id"
+                <SearchableSelect
+                  label="Unidade Notificadora"
+                  options={getOrigemOptions().map((option: any) => ({
+                    id: option.id_crs || option.id_nhe || option.id_cievs,
+                    label: option.nome,
+                    codigo: option.codigo
+                  }))}
                   value={formData.origem_id}
-                  onChange={(e) => setFormData({ ...formData, origem_id: Number(e.target.value) })}
-                  className={selectClass}
+                  onChange={(value) => setFormData({ ...formData, origem_id: Number(value) })}
+                  placeholder="Selecione a unidade..."
                   required
-                >
-                  <option value={0}>Selecione a unidade...</option>
-                  {getOrigemOptions().map((option: any) => (
-                    <option 
-                      key={option.id_crs || option.id_nhe || option.id_cievs} 
-                      value={option.id_crs || option.id_nhe || option.id_cievs}
-                    >
-                      {option.nome}
-                    </option>
-                  ))}
-                </select>
+                  searchPlaceholder="Digite o nome ou código da unidade..."
+                  emptyMessage="Nenhuma unidade encontrada"
+                />
                 <p className="mt-1.5 text-xs text-gray-500">Escolha a unidade específica {formData.origem_tipo}</p>
               </div>
 
@@ -629,23 +624,20 @@ const ComunicacaoDaeFormPage: React.FC = () => {
 
               {/* DAE */}
               <div>
-                <label htmlFor="id_dae" className={labelClass}>
-                  Doença, Agravo ou Evento (DAE) <span className="text-red-500">*</span>
-                </label>
-                <select
-                  id="id_dae"
+                <SearchableSelect
+                  label="Doença, Agravo ou Evento (DAE)"
+                  options={daes.map((dae) => ({
+                    id: dae.id_dae,
+                    label: dae.nome,
+                    codigo: dae.codigo || undefined
+                  }))}
                   value={formData.id_dae}
-                  onChange={(e) => setFormData({ ...formData, id_dae: Number(e.target.value) })}
-                  className={selectClass}
+                  onChange={(value) => setFormData({ ...formData, id_dae: Number(value) })}
+                  placeholder="Selecione o agravo..."
                   required
-                >
-                  <option value={0}>Selecione o agravo...</option>
-                  {daes.map((dae) => (
-                    <option key={dae.id_dae} value={dae.id_dae}>
-                      {dae.nome} {dae.codigo ? `(${dae.codigo})` : ''}
-                    </option>
-                  ))}
-                </select>
+                  searchPlaceholder="Digite o nome ou código CID..."
+                  emptyMessage="Nenhum agravo encontrado"
+                />
                 <p className="mt-1.5 text-xs text-gray-500">Selecione a doença ou agravo notificado</p>
               </div>
 
