@@ -23,6 +23,7 @@ import { SideMenu } from '@/features/home/components/SideMenu';
 import LocationInput from '@/features/notificationForms/components/LocationInput';
 import { SearchableSelect } from '@/components/SearchableSelect';
 import FileUploadWithCompression from '@/components/FileUploadWithCompression';
+import DaeCheckboxList from './components/DaeCheckboxList';
 
 // Funções auxiliares para timezone
 const getLocalDateTime = (date: Date = new Date()): string => {
@@ -198,6 +199,12 @@ const ComunicacaoDaeFormPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // ✅ PROTEÇÃO: Prevenir múltiplas submissões
+    if (loading || uploadingAnexo) {
+      console.warn('⚠️ Submissão bloqueada: operação em andamento');
+      return;
+    }
+    
     // Validações
     if (!formData.nome_paciente.trim()) {
       setError('Nome do paciente é obrigatório');
@@ -219,33 +226,43 @@ const ComunicacaoDaeFormPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
+      console.log('📝 Iniciando salvamento da comunicação DAE...');
 
       let comunicacaoId: number;
 
       if (isEditMode && id) {
         // Atualizar comunicação existente
+        console.log('🔄 Atualizando comunicação existente...');
         const updated = await ComunicacaoDaeService.update(Number(id), formData);
         comunicacaoId = Number(updated.id_comunicacao);
+        console.log('✅ Comunicação atualizada com sucesso!');
         alert('Comunicação atualizada com sucesso!');
       } else {
         // Criar nova comunicação
+        console.log('➕ Criando nova comunicação...');
         const created = await ComunicacaoDaeService.create(formData);
         comunicacaoId = Number(created.id_comunicacao);
+        console.log(`✅ Comunicação criada! ID: ${comunicacaoId}`);
         
         // Fazer upload dos anexos se houver
         if (fichaFiles.length > 0 || relatorioFiles.length > 0) {
+          console.log('📎 Enviando anexos...');
           await uploadAnexos(comunicacaoId);
         }
         
         alert('Comunicação criada com sucesso!');
       }
 
+      console.log('🔄 Redirecionando para lista de comunicações...');
       navigate('/private/comunicacao-dae');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Erro ao salvar comunicação');
-      console.error('Erro ao salvar:', err);
+      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || 'Erro ao salvar comunicação';
+      setError(errorMessage);
+      console.error('❌ Erro ao salvar comunicação DAE:', err);
+      alert(`Erro ao salvar: ${errorMessage}`);
     } finally {
       setLoading(false);
+      console.log('🏁 Processo de salvamento finalizado');
     }
   };
 
@@ -361,12 +378,35 @@ const ComunicacaoDaeFormPage: React.FC = () => {
   };
 
   const getOrigemOptions = () => {
+    let options: any[] = [];
     switch (formData.origem_tipo) {
-      case 'CRS': return crsList;
-      case 'NHE': return nhes;
-      case 'CIEVS': return cievsList;
-      default: return [];
+      case 'CRS': 
+        options = [...crsList];
+        break;
+      case 'NHE': 
+        options = [...nhes];
+        break;
+      case 'CIEVS': 
+        options = [...cievsList];
+        break;
+      default: 
+        return [];
     }
+    
+    // Ordenar numericamente extraindo números do nome
+    return options.sort((a, b) => {
+      // Extrai o primeiro número do nome (ex: "1º CRS" -> 1, "10º CRS" -> 10)
+      const numA = parseInt(a.nome.match(/\d+/)?.[0] || '0');
+      const numB = parseInt(b.nome.match(/\d+/)?.[0] || '0');
+      
+      // Se ambos têm números, ordenar por número
+      if (numA && numB) {
+        return numA - numB;
+      }
+      
+      // Se não têm números, ordenar alfabeticamente
+      return a.nome.localeCompare(b.nome, 'pt-BR');
+    });
   };
 
   if (loadingData) {
@@ -662,23 +702,17 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                 </p>
               </div>
 
-              {/* DAE */}
-              <div>
-                <SearchableSelect
-                  label="Doença, Agravo ou Evento (DAE)"
-                  options={daes.map((dae) => ({
-                    id: dae.id_dae,
-                    label: dae.nome,
-                    codigo: dae.codigo || undefined
-                  }))}
-                  value={formData.id_dae}
-                  onChange={(value) => setFormData({ ...formData, id_dae: Number(value) })}
-                  placeholder="Selecione o agravo..."
-                  required
-                  searchPlaceholder="Digite o nome ou código CID..."
-                  emptyMessage="Nenhum agravo encontrado"
+              {/* DAE - Seleção com Checkboxes */}
+              <div className="md:col-span-2">
+                <DaeCheckboxList
+                  daes={daes}
+                  selectedDaeId={formData.id_dae}
+                  onChange={(daeId) => {
+                    setFormData({ ...formData, id_dae: daeId });
+                    setError(null); // Limpar erro ao selecionar
+                  }}
+                  error={error && !formData.id_dae ? 'Selecione um DAE' : undefined}
                 />
-                <p className="mt-1.5 text-xs text-gray-500">Selecione a doença ou agravo notificado</p>
               </div>
 
               {/* Observação */}

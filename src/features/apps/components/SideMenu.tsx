@@ -55,7 +55,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({ isOpen, onClose }) => {
     {
       icon: <Building2 />,
       label: t("menu.apps"),
-      onClick: () => navigate("/private/apps-auxiliares"),
+      onClick: () => navigate("/private/escolha-apps-auxiliares"),
     },
     {
       icon: <Lock />,

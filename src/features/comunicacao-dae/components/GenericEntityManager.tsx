@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Plus, Edit, Trash2, ArrowLeft, X, Menu } from 'lucide-react';
-import SideBarMenuAppsAuxiliares from '@/features/apps/components/SideBarMenuAppsAuxiliares';
+import SideBarMenuAppsAuxiliaresDae from '@/features/apps/components/SideBarMenuAppsAuxiliaresDae';
 
 interface GenericEntity {
   id_dae?: number;
@@ -171,7 +171,7 @@ export const GenericEntityManager: React.FC<GenericEntityManagerProps> = ({
               </button>
 
               <button
-                onClick={() => navigate('/private/comunicacao-dae')}
+                onClick={() => navigate('/private/apps-auxiliares-dae')}
                 className="p-2 hover:bg-blue-700 rounded-full transition-colors"
                 aria-label="Voltar"
               >
@@ -198,7 +198,7 @@ export const GenericEntityManager: React.FC<GenericEntityManagerProps> = ({
         </div>
       </header>
 
-      <SideBarMenuAppsAuxiliares
+      <SideBarMenuAppsAuxiliaresDae
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
       />

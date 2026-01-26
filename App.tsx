@@ -39,6 +39,8 @@ import SyphilisPage from "@/features/educational-materials/pages/details/Syphili
 // Features - Componentes
 import ListaComponentes from "@/features/apps/list/ListaComponentes";
 import PaginaAppsAuxiliares from "@/features/apps/components/PaginaAppsAuxiliares";
+import PaginaEscolhaAppsAuxiliares from "@/features/apps/components/PaginaEscolhaAppsAuxiliares";
+import PaginaAppsAuxiliaresDae from "@/features/apps/components/PaginaAppsAuxiliaresDae";
 import CadastroComponente from "@/features/apps/components/CadastroComponente";
 // Features - Tipos de Encerramento
 import ListaTiposEncerramento from "@/features/apps/list/ListaTipoEncerramento";
@@ -171,7 +173,9 @@ function App() {
     <LanguageProvider>
       <Router>
         <Routes>          <Route path="/private" element={<ProtectedLayout />}>
+            <Route path="/private/escolha-apps-auxiliares" element={<PaginaEscolhaAppsAuxiliares />} />
             <Route path="/private/apps-auxiliares" element={<PaginaAppsAuxiliares />} />
+            <Route path="/private/apps-auxiliares-dae" element={<PaginaAppsAuxiliaresDae />} />
             <Route path="/private/offline-management" element={<OfflineManagementPage />} />
             {/* Rotas de Qualificações */}
             <Route path="/private/qualificacao" element={<RelatorioQualificacao />} />
