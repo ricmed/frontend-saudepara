@@ -19,6 +19,8 @@ interface PendingData {
   notificacoes: number;
   pacientes: number;
   estabelecimentos: number;
+  comunicacoes_dae: number;
+  anexos: number;
   total: number;
 }
 
@@ -48,7 +50,7 @@ export function useOfflineSystem() {  const [state, setState] = useState<Offline
     isOnline: navigator.onLine,
     syncing: false,
     stats: null,
-    pendingData: { notificacoes: 0, pacientes: 0, estabelecimentos: 0, total: 0 },
+    pendingData: { notificacoes: 0, pacientes: 0, estabelecimentos: 0, comunicacoes_dae: 0, anexos: 0, total: 0 },
     patientsCache: { verificacao: 0, locais: 0, pendentes: 0 },
     estabelecimentosCache: { verificacao: 0, locais: 0, pendentes: 0 },
     initialized: false
@@ -117,7 +119,9 @@ export function useOfflineSystem() {  const [state, setState] = useState<Offline
       const pending = await syncService.getPendingCount();
       const pendingData = {
         ...pending,
-        total: pending.notificacoes + pending.pacientes + pending.estabelecimentos
+        comunicacoes_dae: pending.comunicacoes_dae || 0,
+        anexos: pending.anexos || 0,
+        total: pending.notificacoes + pending.pacientes + pending.estabelecimentos + (pending.comunicacoes_dae || 0) + (pending.anexos || 0)
       };
       
       setState(prev => ({ ...prev, pendingData }));

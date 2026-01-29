@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FileText, Calendar, MapPin, Filter, X, Trash2, Edit, Eye, Menu, Download, ChevronDown, Search, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet } from 'lucide-react';
+import { Plus, FileText, Calendar, MapPin, Filter, X, Trash2, Edit, Eye, Menu, Download, ChevronDown, Search, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, Wifi, WifiOff } from 'lucide-react';
 import ComunicacaoDaeService, { ComunicacaoDae, ComunicacaoDaeFilters } from '@/services/ComunicacaoDaeService';
 import { SideMenu } from '@/features/home/components/SideMenu';
 import { usuarioGestaoService } from '@/services/UsuarioGestaoService'; // 🔒 Importar service de permissões
+import { useOfflineSystem } from '@/hooks/useOfflineSystem';
+import ConnectionStatus from '@/components/ConnectionStatus';
 import {
   exportarComunicacoesDaeCSV,
   exportarComunicacoesDaeExcel,
@@ -37,6 +39,14 @@ const searchFields = [
 
 const ComunicacaoDaePage: React.FC = () => {
   const navigate = useNavigate();
+  
+  // ✅ Hook do sistema offline
+  const {
+    isOnline,
+    pendingData,
+    getOfflineStatusMessage
+  } = useOfflineSystem();
+  
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [comunicacoes, setComunicacoes] = useState<ComunicacaoDae[]>([]);
   const [loading, setLoading] = useState(false);
@@ -323,11 +333,24 @@ const ComunicacaoDaePage: React.FC = () => {
                 <Menu className="w-6 h-6" />
               </button>
               <div>
-                <h1 className="text-2xl font-bold text-white">
-                  Comunicação DAE
-                </h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-bold text-white">
+                    Comunicação DAE
+                  </h1>
+                  {/* Indicador Online/Offline */}
+                  {isOnline ? (
+                    <Wifi className="h-5 w-5 text-green-300" title="Online" />
+                  ) : (
+                    <WifiOff className="h-5 w-5 text-orange-300" title="Offline" />
+                  )}
+                </div>
                 <p className="text-sm text-blue-100 mt-0.5">
                   Gerenciar Doenças, Agravos e Eventos
+                  {pendingData.comunicacoes_dae && pendingData.comunicacoes_dae > 0 && (
+                    <span className="ml-2 text-yellow-200">
+                      • {pendingData.comunicacoes_dae} pendente(s)
+                    </span>
+                  )}
                 </p>
               </div>
             </div>
@@ -594,6 +617,12 @@ const ComunicacaoDaePage: React.FC = () => {
 
       {/* Conteúdo Principal */}
       <main className="w-full max-w-[98%] mx-auto px-1 sm:px-2 lg:px-3 xl:px-4 py-4 md:py-6 lg:py-8">
+        {/* Status de Conexão */}
+        <ConnectionStatus 
+          showForceSync={true}
+          className="mb-4"
+        />
+        
         {/* Alert de Erro */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg flex items-start justify-between shadow-sm animate-fade-in">

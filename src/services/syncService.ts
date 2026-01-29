@@ -703,7 +703,108 @@ class SyncService {
             errorCount++;
           }
         }
-      }      // ===== 3. SINCRONIZAR NOTIFICAÇÕES =====
+      }
+
+      // ===== 3. SINCRONIZAR COMUNICAÇÕES DAE =====
+      const pendingComunicacoesDae = await indexedDBService.getPendingComunicacoesDae();
+      console.log(`🔄 Sincronizando ${pendingComunicacoesDae.length} comunicações DAE...`);
+      
+      const ComunicacaoDaeService = (await import('@/services/ComunicacaoDaeService')).default;
+      
+      for (const comunicacao of pendingComunicacoesDae) {
+        try {
+          console.log(`📋 Sincronizando comunicação DAE offlineId: ${comunicacao.offlineId}`);
+          
+          const formDataAtualizada = { ...comunicacao.formData };
+          
+          // Adicionar campos de rastreamento
+          formDataAtualizada.offline_id = comunicacao.offlineId;
+          formDataAtualizada.device_id = comunicacao.deviceId;
+          formDataAtualizada.created_offline = true;
+          
+          // Marcar como syncing
+          await indexedDBService.updateComunicacaoDaeSyncStatus(comunicacao.offlineId, 'syncing');
+          
+          // Sincronizar com servidor
+          let comunicacaoId: number;
+          if (comunicacao.isEdit && comunicacao.id) {
+            await ComunicacaoDaeService.update(comunicacao.id, formDataAtualizada);
+            comunicacaoId = comunicacao.id;
+            console.log(`✅ Comunicação DAE atualizada: ID ${comunicacao.id}`);
+          } else {
+            const result = await ComunicacaoDaeService.create(formDataAtualizada);
+            comunicacaoId = result.id_comunicacao;
+            console.log(`✅ Nova comunicação DAE criada: ID ${result.id_comunicacao}`);
+            
+            // ✅ Atualizar anexos com o ID da comunicação
+            await indexedDBService.updateAnexosComunicacaoId(comunicacao.offlineId, comunicacaoId);
+          }
+          
+          // Marcar como sincronizada
+          await indexedDBService.updateComunicacaoDaeSyncStatus(comunicacao.offlineId, 'synced');
+          syncedCount++;
+          
+        } catch (error: any) {
+          console.error(`❌ Erro ao sincronizar comunicação DAE ${comunicacao.offlineId}:`, error);
+          
+          // Marcar como erro
+          await indexedDBService.updateComunicacaoDaeSyncStatus(
+            comunicacao.offlineId,
+            'error',
+            {
+              message: error.message || 'Erro desconhecido',
+              timestamp: Date.now(),
+              lastError: error.toString()
+            }
+          );
+          errorCount++;
+        }
+      }
+
+      // ===== 3.5. SINCRONIZAR ANEXOS PENDENTES =====
+      const pendingAnexos = await indexedDBService.getAllAnexosPendentes();
+      console.log(`📎 Sincronizando ${pendingAnexos.length} anexos pendentes...`);
+      
+      for (const anexo of pendingAnexos) {
+        try {
+          // Verificar se tem comunicacaoId (comunicação já foi sincronizada)
+          if (!anexo.comunicacaoId) {
+            console.log(`⏭️ Pulando anexo ${anexo.anexoId}: comunicação ainda não sincronizada`);
+            continue;
+          }
+          
+          console.log(`📎 Sincronizando anexo: ${anexo.fileName} para comunicação ID ${anexo.comunicacaoId}`);
+          
+          // Marcar como syncing
+          await indexedDBService.updateAnexoSyncStatus(anexo.anexoId, 'syncing');
+          
+          // Converter Blob de volta para File
+          const file = new File([anexo.file], anexo.fileName, { type: anexo.mimeType });
+          
+          // Fazer upload do anexo
+          await ComunicacaoDaeService.addAnexo(anexo.comunicacaoId, file, anexo.tipo_anexo);
+          
+          console.log(`✅ Anexo sincronizado: ${anexo.fileName}`);
+          
+          // Marcar como sincronizado e deletar
+          await indexedDBService.updateAnexoSyncStatus(anexo.anexoId, 'synced');
+          await indexedDBService.deleteAnexo(anexo.anexoId);
+          syncedCount++;
+          
+        } catch (error: any) {
+          console.error(`❌ Erro ao sincronizar anexo ${anexo.anexoId}:`, error);
+          
+          // Marcar como erro
+          await indexedDBService.updateAnexoSyncStatus(
+            anexo.anexoId,
+            'error',
+            error.message || 'Erro desconhecido'
+          );
+          errorCount++;
+        }
+      }
+
+      // ===== 4. SINCRONIZAR NOTIFICAÇÕES =====
       const pendingNotificacoes = await indexedDBService.getPendingNotificacoes();
       console.log(`🔄 Sincronizando ${pendingNotificacoes.length} notificações...`);
       
@@ -1194,6 +1295,52 @@ class SyncService {
       : `📱 ${isEdit ? 'Edição salva' : 'Salvo'} offline! Sincronizará quando voltar online.`;
     
     toast.success(message);
+  }
+
+  // ✅ SALVAR COMUNICAÇÃO DAE (NOVA OU EXISTENTE)
+  async saveComunicacaoDae(formData: any, isEdit: boolean = false): Promise<{ offlineId?: string; comunicacaoId?: number }> {
+    const comunicacaoId = formData.id || formData.id_comunicacao;
+    
+    await this.checkAuthenticationStatus();
+    
+    // Tentar salvar online primeiro (se disponível)
+    if (this.shouldUseOnlineMode()) {
+      try {
+        const ComunicacaoDaeService = (await import('@/services/ComunicacaoDaeService')).default;
+        
+        if (isEdit && comunicacaoId) {
+          await ComunicacaoDaeService.update(comunicacaoId, formData);
+          toast.success('✅ Comunicação DAE atualizada!');
+          return { comunicacaoId };
+        } else {
+          const result = await ComunicacaoDaeService.create(formData);
+          toast.success('✅ Comunicação DAE salva!');
+          return { comunicacaoId: result.id_comunicacao };
+        }
+      } catch (error) {
+        console.warn('Falha online, salvando comunicação DAE offline:', error);
+        this.isAuthenticated = false;
+      }
+    }
+
+    // Salvar offline
+    const formDataParaSalvar = { ...formData };
+    
+    console.log(`💾 Salvando ${isEdit ? 'edição' : 'nova comunicação DAE'} offline:`, {
+      id: comunicacaoId || 'novo',
+      offline_id: formDataParaSalvar.offline_id || formDataParaSalvar.offlineId || 'será gerado',
+      isEdit
+    });
+
+    const offlineId = await indexedDBService.saveComunicacaoDae(formDataParaSalvar, isEdit, comunicacaoId);
+    
+    const message = this.shouldUseOnlineMode() 
+      ? '📡 Erro na conexão - Comunicação DAE salva offline!'
+      : `📱 Comunicação DAE ${isEdit ? 'editada' : 'salva'} offline! Sincronizará quando voltar online.`;
+    
+    toast.success(message);
+    
+    return { offlineId };
   }
 
   // *** OUTROS MÉTODOS (sem alteração) ***

@@ -12,7 +12,9 @@ import {
   FileCheck, 
   AlertCircle,
   Loader,
-  ChevronDown
+  ChevronDown,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 import ComunicacaoDaeService, { CreateComunicacaoDaeData, OrigemTipo, TipoAnexo, ComunicacaoDae, ComunicacaoDaeAnexo } from '@/services/ComunicacaoDaeService';
 import DaeService, { Dae } from '@/services/DaeService';
@@ -24,6 +26,10 @@ import LocationInput from '@/features/notificationForms/components/LocationInput
 import { SearchableSelect } from '@/components/SearchableSelect';
 import FileUploadWithCompression from '@/components/FileUploadWithCompression';
 import DaeCheckboxList from './components/DaeCheckboxList';
+import { useOfflineSystem } from '@/hooks/useOfflineSystem';
+import { OfflineComunicacaoDaeServiceProxy } from '@/services/OfflineComunicacaoDaeServiceProxy';
+import ConnectionStatus from '@/components/ConnectionStatus';
+import indexedDBService from '@/services/indexedDB';
 
 // Funções auxiliares para timezone
 const getLocalDateTime = (date: Date = new Date()): string => {
@@ -42,10 +48,27 @@ const convertUTCToLocal = (utcDateString: string): string => {
   return getLocalDateTime(date);
 };
 
+// Função para normalizar texto (remover acentos e converter para maiúsculas)
+const normalizeText = (text: string): string => {
+  if (!text) return "";
+  // Remove acentos e converte para caixa alta
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+    .toUpperCase();
+};
+
 const ComunicacaoDaeFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
+
+  // ✅ Hook do sistema offline
+  const {
+    isOnline,
+    pendingData,
+    getOfflineStatusMessage
+  } = useOfflineSystem();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -137,20 +160,23 @@ const ComunicacaoDaeFormPage: React.FC = () => {
 
   const loadSelectOptions = async () => {
     try {
-      const [daesRes, nhesRes, cievsRes, crsRes] = await Promise.all([
-        DaeService.getAll(1, 100),
-        NheService.getAll(1, 100),
-        CievsService.getAll(1, 100),
-        CrsService.getAll(1, 100),
+      // ✅ Usar proxy offline para cache automático
+      const [daesData, nhesData, cievsData, crsData] = await Promise.all([
+        OfflineComunicacaoDaeServiceProxy.getDaeOptions(),
+        OfflineComunicacaoDaeServiceProxy.getNheOptions(),
+        OfflineComunicacaoDaeServiceProxy.getCievsOptions(),
+        OfflineComunicacaoDaeServiceProxy.getCrsOptions(),
       ]);
 
-      setDaes(daesRes.data);
-      setNhes(nhesRes.data);
-      setCievsList(cievsRes.data);
-      setCrsList(crsRes.data);
+      setDaes(daesData);
+      setNhes(nhesData);
+      setCievsList(cievsData);
+      setCrsList(crsData);
+      
+      console.log(`✅ Opções carregadas: ${daesData.length} DAEs, ${nhesData.length} NHEs, ${cievsData.length} CIEVS, ${crsData.length} CRS`);
     } catch (err) {
       console.error('Erro ao carregar opções:', err);
-      setError('Erro ao carregar dados do formulário');
+      setError('Erro ao carregar dados do formulário. Alguns dados podem estar indisponíveis offline.');
     }
   };
 
@@ -172,8 +198,8 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       
       setFormData({
         data_comunicacao: convertUTCToLocal(data.data_comunicacao),
-        nome_paciente: data.nome_paciente,
-        observacao_descricao: data.observacao_descricao || '',
+        nome_paciente: normalizeText(data.nome_paciente),
+        observacao_descricao: normalizeText(data.observacao_descricao || ''),
         id_municipio_ocorrencia: data.id_municipio_ocorrencia,
         origem_tipo: data.origem_tipo,
         origem_id: data.origem_id,
@@ -228,33 +254,59 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       setError(null);
       console.log('📝 Iniciando salvamento da comunicação DAE...');
 
-      let comunicacaoId: number;
-
+      // ✅ USAR SISTEMA OFFLINE
+      const syncService = (await import('@/services/syncService')).default;
+      
       if (isEditMode && id) {
         // Atualizar comunicação existente
         console.log('🔄 Atualizando comunicação existente...');
-        const updated = await ComunicacaoDaeService.update(Number(id), formData);
-        comunicacaoId = Number(updated.id_comunicacao);
-        console.log('✅ Comunicação atualizada com sucesso!');
-        alert('Comunicação atualizada com sucesso!');
+        const formDataWithId = { ...formData, id: Number(id), id_comunicacao: Number(id) };
+        const result = await syncService.saveComunicacaoDae(formDataWithId, true);
+        console.log('✅ Comunicação atualizada!');
+        
+        // Salvar anexos se houver
+        if (fichaFiles.length > 0 || relatorioFiles.length > 0) {
+          if (isOnline && result.comunicacaoId) {
+            // Upload direto se online
+            await uploadAnexos(result.comunicacaoId);
+            alert('✅ Comunicação e anexos atualizados!');
+          } else if (result.offlineId) {
+            // Salvar anexos offline
+            await saveAnexosOffline(result.offlineId, result.comunicacaoId);
+            alert('📱 Comunicação e anexos salvos offline! Serão sincronizados quando voltar online.');
+          }
+        } else {
+          alert(isOnline ? '✅ Comunicação atualizada com sucesso!' : '📱 Comunicação atualizada offline!');
+        }
       } else {
         // Criar nova comunicação
         console.log('➕ Criando nova comunicação...');
-        const created = await ComunicacaoDaeService.create(formData);
-        comunicacaoId = Number(created.id_comunicacao);
-        console.log(`✅ Comunicação criada! ID: ${comunicacaoId}`);
+        const result = await syncService.saveComunicacaoDae(formData, false);
+        console.log('✅ Comunicação criada!');
         
-        // Fazer upload dos anexos se houver
+        // Salvar anexos se houver
         if (fichaFiles.length > 0 || relatorioFiles.length > 0) {
-          console.log('📎 Enviando anexos...');
-          await uploadAnexos(comunicacaoId);
+          if (isOnline && result.comunicacaoId) {
+            // Upload direto se online
+            await uploadAnexos(result.comunicacaoId);
+            alert('✅ Comunicação criada e anexos enviados!');
+          } else if (result.offlineId) {
+            // Salvar anexos offline
+            await saveAnexosOffline(result.offlineId, result.comunicacaoId);
+            alert('📱 Comunicação e anexos salvos offline! Serão sincronizados quando voltar online.');
+          }
+        } else {
+          alert(isOnline ? '✅ Comunicação criada com sucesso!' : '📱 Comunicação salva offline!');
         }
-        
-        alert('Comunicação criada com sucesso!');
       }
 
       console.log('🔄 Redirecionando para lista de comunicações...');
-      navigate('/private/comunicacao-dae');
+      
+      // Pequeno delay para o usuário ver a mensagem
+      setTimeout(() => {
+        navigate('/private/comunicacao-dae');
+      }, 1500);
+      
     } catch (err: any) {
       const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || 'Erro ao salvar comunicação';
       setError(errorMessage);
@@ -266,6 +318,43 @@ const ComunicacaoDaeFormPage: React.FC = () => {
     }
   };
 
+  // ✅ Salvar anexos offline
+  const saveAnexosOffline = async (comunicacaoOfflineId: string, comunicacaoId?: number) => {
+    try {
+      const anexosSalvos: string[] = [];
+
+      // Salvar fichas
+      for (const file of fichaFiles) {
+        const anexoId = await indexedDBService.saveAnexoPendente(
+          file,
+          'FICHA_NOTIFICACAO',
+          comunicacaoOfflineId,
+          comunicacaoId
+        );
+        anexosSalvos.push(anexoId);
+        console.log(`📎 Ficha salva para sincronização: ${file.name}`);
+      }
+
+      // Salvar relatórios
+      for (const file of relatorioFiles) {
+        const anexoId = await indexedDBService.saveAnexoPendente(
+          file,
+          'RELATORIO_INVESTIGACAO',
+          comunicacaoOfflineId,
+          comunicacaoId
+        );
+        anexosSalvos.push(anexoId);
+        console.log(`📎 Relatório salvo para sincronização: ${file.name}`);
+      }
+
+      return anexosSalvos;
+    } catch (err: any) {
+      console.error('❌ Erro ao salvar anexos offline:', err);
+      throw err;
+    }
+  };
+
+  // Upload de anexos online
   const uploadAnexos = async (comunicacaoId: number) => {
     setUploadingAnexo(true);
     try {
@@ -449,11 +538,25 @@ const ComunicacaoDaeFormPage: React.FC = () => {
             </button>
             
             <div className="flex flex-col flex-1 truncate">
-              <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-white truncate flex-1">
-                {isEditMode ? 'Editar Comunicação DAE' : 'Nova Comunicação DAE'}
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-white truncate flex-1">
+                  {isEditMode ? 'Editar Comunicação DAE' : 'Nova Comunicação DAE'}
+                </h1>
+                {/* Indicador Online/Offline */}
+                {isOnline ? (
+                  <Wifi className="h-5 w-5 text-green-300" title="Online" />
+                ) : (
+                  <WifiOff className="h-5 w-5 text-orange-300" title="Offline" />
+                )}
+              </div>
               {isEditMode && comunicacaoCompleta && (
                 <p className="text-xs text-blue-200 font-medium">ID: #{comunicacaoCompleta.id_comunicacao}</p>
+              )}
+              {/* Status de dados pendentes */}
+              {pendingData.comunicacoes_dae && pendingData.comunicacoes_dae > 0 && (
+                <p className="text-xs text-yellow-200 font-medium">
+                  📱 {pendingData.comunicacoes_dae} comunicação(ões) aguardando sincronização
+                </p>
               )}
             </div>
           </div>
@@ -502,6 +605,12 @@ const ComunicacaoDaeFormPage: React.FC = () => {
 
       {/* Conteúdo Principal */}
       <main className="max-w-5xl mx-auto p-4 sm:p-6">
+        
+        {/* Status de Conexão */}
+        <ConnectionStatus 
+          showForceSync={true}
+          className="mb-4"
+        />
         
         {/* Mensagem de Erro */}
         {error && (
@@ -690,14 +799,14 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                   id="nome_paciente"
                   type="text"
                   value={formData.nome_paciente}
-                  onChange={(e) => setFormData({ ...formData, nome_paciente: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, nome_paciente: normalizeText(e.target.value) })}
                   className={inputClass}
-                  placeholder="Ex: João da Silva Santos"
+                  placeholder="Ex: JOAO DA SILVA SANTOS"
                   maxLength={150}
                   required
                 />
                 <p className="mt-1.5 text-xs text-gray-500 flex items-center justify-between">
-                  <span>Nome completo do paciente acometido</span>
+                  <span>Nome completo do paciente (será convertido para MAIÚSCULAS sem acentos)</span>
                   <span className="font-medium">{formData.nome_paciente.length}/150</span>
                 </p>
               </div>
@@ -724,14 +833,14 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                 <textarea
                   id="observacao_descricao"
                   value={formData.observacao_descricao}
-                  onChange={(e) => setFormData({ ...formData, observacao_descricao: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, observacao_descricao: normalizeText(e.target.value) })}
                   className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-all hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none resize-none"
                   rows={5}
-                  placeholder="Descreva detalhadamente: sintomas, evolução do caso, medidas tomadas, contexto epidemiológico, etc."
+                  placeholder="DESCREVA DETALHADAMENTE: SINTOMAS, EVOLUCAO DO CASO, MEDIDAS TOMADAS, CONTEXTO EPIDEMIOLOGICO, ETC."
                   maxLength={1500}
                 />
                 <div className="mt-1.5 flex justify-between items-center">
-                  <p className="text-xs text-gray-500">Informações complementares sobre o caso</p>
+                  <p className="text-xs text-gray-500">Informações complementares (será convertido para MAIÚSCULAS sem acentos)</p>
                   <p className={`text-xs font-medium ${(formData.observacao_descricao?.length || 0) > 1200 ? 'text-orange-600' : 'text-gray-500'}`}>
                     {formData.observacao_descricao?.length || 0}/1500
                   </p>

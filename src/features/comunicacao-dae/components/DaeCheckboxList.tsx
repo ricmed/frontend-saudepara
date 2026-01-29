@@ -16,7 +16,6 @@ const DaeCheckboxList: React.FC<DaeCheckboxListProps> = ({
   error
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [showAll, setShowAll] = useState(false);
 
   // Filtrar DAEs com base na busca
   const filteredDaes = useMemo(() => {
@@ -28,10 +27,6 @@ const DaeCheckboxList: React.FC<DaeCheckboxListProps> = ({
       dae.codigo?.toLowerCase().includes(lowerSearch)
     );
   }, [daes, searchTerm]);
-
-  // Mostrar apenas os primeiros 9 ou todos (3 colunas x 3 linhas)
-  const displayedDaes = showAll ? filteredDaes : filteredDaes.slice(0, 9);
-  const hasMore = filteredDaes.length > 9;
 
   return (
     <div className="space-y-4">
@@ -82,77 +77,59 @@ const DaeCheckboxList: React.FC<DaeCheckboxListProps> = ({
           </p>
         </div>
       ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-            {displayedDaes.map((dae) => {
-              const isSelected = selectedDaeId === dae.id_dae;
-              
-              return (
-                <label
-                  key={dae.id_dae}
-                  className={`
-                    flex items-start gap-3 p-5 rounded-xl cursor-pointer transition-all duration-200 min-h-[100px]
-                    ${isSelected 
-                      ? 'bg-blue-50 border-2 border-blue-500 shadow-md scale-[1.02]' 
-                      : 'bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-sm'
-                    }
-                  `}
-                >
-                  <div className="flex items-center h-6 mt-0.5">
-                    <input
-                      type="radio"
-                      name="dae-selection"
-                      checked={isSelected}
-                      onChange={() => onChange(dae.id_dae)}
-                      className="w-6 h-6 rounded-full border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer"
-                    />
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <span className={`text-sm font-medium transition-colors leading-relaxed ${
-                        isSelected ? 'text-blue-900' : 'text-gray-900'
-                      }`}>
-                        {dae.nome}
-                      </span>
-                      {isSelected && (
-                        <Check className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                      )}
-                    </div>
-                    
-                    {dae.codigo && (
-                      <div className="mt-2">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded text-xs font-medium ${
-                          isSelected 
-                            ? 'bg-blue-100 text-blue-700' 
-                            : 'bg-gray-100 text-gray-600'
-                        }`}>
-                          CID: {dae.codigo}
-                        </span>
-                      </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+          {filteredDaes.map((dae) => {
+            const isSelected = selectedDaeId === dae.id_dae;
+            
+            return (
+              <label
+                key={dae.id_dae}
+                className={`
+                  flex items-start gap-3 p-5 rounded-xl cursor-pointer transition-all duration-200 min-h-[100px]
+                  ${isSelected 
+                    ? 'bg-blue-50 border-2 border-blue-500 shadow-md scale-[1.02]' 
+                    : 'bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-sm'
+                  }
+                `}
+              >
+                <div className="flex items-center h-6 mt-0.5">
+                  <input
+                    type="radio"
+                    name="dae-selection"
+                    checked={isSelected}
+                    onChange={() => onChange(dae.id_dae)}
+                    className="w-6 h-6 rounded-full border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer"
+                  />
+                </div>
+                
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className={`text-sm font-medium transition-colors leading-relaxed ${
+                      isSelected ? 'text-blue-900' : 'text-gray-900'
+                    }`}>
+                      {dae.nome}
+                    </span>
+                    {isSelected && (
+                      <Check className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
                     )}
                   </div>
-                </label>
-              );
-            })}
-          </div>
-
-          {/* Botão "Ver Mais/Menos" */}
-          {hasMore && (
-            <div className="flex justify-center pt-2">
-              <button
-                type="button"
-                onClick={() => setShowAll(!showAll)}
-                className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
-              >
-                {showAll 
-                  ? `Mostrar menos ↑` 
-                  : `Ver todos (${filteredDaes.length - 9} mais) ↓`
-                }
-              </button>
-            </div>
-          )}
-        </>
+                  
+                  {dae.codigo && (
+                    <div className="mt-2">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded text-xs font-medium ${
+                        isSelected 
+                          ? 'bg-blue-100 text-blue-700' 
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        CID: {dae.codigo}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </label>
+            );
+          })}
+        </div>
       )}
 
       {/* Mensagem de ajuda */}
