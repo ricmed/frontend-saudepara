@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, FileText, Calendar, MapPin, Filter, X, Trash2, Edit, Eye, Menu, Download, ChevronDown, Search, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet } from 'lucide-react';
 import ComunicacaoDaeService, { ComunicacaoDae, ComunicacaoDaeFilters } from '@/services/ComunicacaoDaeService';
 import { SideMenu } from '@/features/home/components/SideMenu';
+import { usuarioGestaoService } from '@/services/UsuarioGestaoService'; // 🔒 Importar service de permissões
 import {
   exportarComunicacoesDaeCSV,
   exportarComunicacoesDaeExcel,
@@ -164,7 +165,36 @@ const ComunicacaoDaePage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await ComunicacaoDaeService.getAll(currentPage, itemsPerPage, filters);
+      
+      // 🔒 BUSCAR PERMISSÕES DO USUÁRIO
+      let filtrosComPermissoes = { ...filters };
+      
+      try {
+        console.log('🔒 Verificando permissões do usuário para comunicações DAE...');
+        const userAccess = await usuarioGestaoService.getUserAccess();
+        
+        if (userAccess) {
+          console.log('📋 Permissões do usuário:', userAccess);
+          
+          // Se o usuário tem acesso apenas a um estabelecimento, aplicar filtro
+          if (userAccess.isEstabelecimento && userAccess.estabelecimentoId) {
+            console.log(`🔒 Aplicando filtro de segurança: estabelecimento ID ${userAccess.estabelecimentoId}`);
+            filtrosComPermissoes.estabelecimento_id = userAccess.estabelecimentoId;
+          }
+          // TODO: Implementar filtros para município e estado no futuro
+          else if (userAccess.isMunicipio && userAccess.municipioId) {
+            console.log(`🔒 Usuário de município: ${userAccess.municipioId} (filtro não implementado ainda)`);
+          } else if (userAccess.isEstado && userAccess.estadoId) {
+            console.log(`🔒 Usuário de estado: ${userAccess.estadoId} (filtro não implementado ainda)`);
+          } else {
+            console.log('✅ Usuário com acesso total - sem filtros de segurança');
+          }
+        }
+      } catch (permError) {
+        console.warn('⚠️ Erro ao verificar permissões, continuando sem filtros:', permError);
+      }
+      
+      const response = await ComunicacaoDaeService.getAll(currentPage, itemsPerPage, filtrosComPermissoes);
       setComunicacoes(response.data);
       setTotal(response.total);
       setTotalPages(Math.ceil(response.total / itemsPerPage));
