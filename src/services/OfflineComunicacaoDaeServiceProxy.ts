@@ -14,6 +14,7 @@ import { toast } from 'react-toastify';
 export const OfflineComunicacaoDaeServiceProxy = {
   /**
    * Método genérico para buscar opções com suporte offline
+   * Estratégia: "stale-while-revalidate" (cache primeiro, atualiza em background)
    * @param serviceFn Função original do serviço para buscar opções
    * @param cacheKey Chave para armazenar no cache
    */
@@ -21,52 +22,79 @@ export const OfflineComunicacaoDaeServiceProxy = {
     serviceFn: () => Promise<T[]>,
     cacheKey: string
   ): Promise<T[]> {
-    // Tentar buscar do cache primeiro
-    try {
-      const cachedData = await indexedDBService.getOpcoes(cacheKey);
-      if (cachedData) {
-        console.log(`✅ Usando dados em cache para ${cacheKey}`);
-        return cachedData as T[];
-      }
-    } catch (e) {
-      console.error(`❌ Erro ao buscar ${cacheKey} do cache:`, e);
-    }
-
-    // Se não tem cache e está online, busca da API
-    if (syncService.isNetworkAvailable()) {
+    // ✅ ONLINE: Cache primeiro, API em background
+    if (navigator.onLine) {
       try {
+        // 1️⃣ BUSCAR DO CACHE PRIMEIRO (instantâneo)
+        const cachedData = await indexedDBService.getOpcoes(cacheKey);
+        
+        if (cachedData && cachedData.length > 0) {
+          console.log(`⚡ [${cacheKey}] ${cachedData.length} registros carregados do cache (instantâneo)`);
+          
+          // 2️⃣ ATUALIZAR DA API EM BACKGROUND (sem bloquear)
+          serviceFn()
+            .then(async (apiData) => {
+              if (apiData && apiData.length > 0) {
+                await indexedDBService.saveOpcoes(cacheKey, apiData);
+                console.log(`🔄 [${cacheKey}] Cache atualizado com ${apiData.length} registros da API`);
+              }
+            })
+            .catch((error) => {
+              console.warn(`⚠️ [${cacheKey}] Falha ao atualizar em background:`, error);
+            });
+          
+          // Retorna cache imediatamente
+          return cachedData as T[];
+        }
+        
+        // 3️⃣ SE NÃO TEM CACHE: buscar da API (primeira vez)
+        console.log(`🌐 [${cacheKey}] Cache vazio, buscando da API...`);
         const apiData = await serviceFn();
         
-        // Salvar no cache para uso offline
         if (apiData && apiData.length > 0) {
           await indexedDBService.saveOpcoes(cacheKey, apiData);
-          console.log(`💾 ${apiData.length} ${cacheKey} salvos no cache`);
+          console.log(`✅ [${cacheKey}] ${apiData.length} registros carregados da API e salvos no cache`);
+        } else {
+          console.warn(`⚠️ [${cacheKey}] API retornou array vazio`);
         }
         
         return apiData;
       } catch (error) {
-        console.error(`❌ Erro ao buscar ${cacheKey} da API:`, error);
+        console.warn(`⚠️ [${cacheKey}] Erro ao buscar dados:`, error);
         
-        // Se falhou, tenta o cache novamente (pode ter dados mais antigos)
-        const cachedData = await indexedDBService.getOpcoes(cacheKey);
-        if (cachedData) {
-          toast.warning(`⚠️ Usando dados em cache para ${cacheKey} devido a erro na API`);
-          return cachedData as T[];
+        // ✅ FALLBACK: Tentar cache mesmo com erro
+        try {
+          const cachedData = await indexedDBService.getOpcoes(cacheKey);
+          if (cachedData && cachedData.length > 0) {
+            console.log(`✅ [${cacheKey}] ${cachedData.length} registros do cache (fallback após erro)`);
+            return cachedData as T[];
+          } else {
+            console.warn(`⚠️ [${cacheKey}] Nenhum dado disponível`);
+            toast.error(`Não há dados disponíveis para ${cacheKey}`);
+            return [] as T[];
+          }
+        } catch (cacheError) {
+          console.error(`❌ [${cacheKey}] Erro ao buscar do cache:`, cacheError);
+          return [] as T[];
         }
-        
-        throw error;
       }
     } else {
-      // Se está offline, busca apenas do cache
-      const cachedData = await indexedDBService.getOpcoes(cacheKey);
-      if (cachedData) {
-        toast.info(`📦 Modo offline: usando dados em cache para ${cacheKey}`);
-        return cachedData as T[];
+      // ✅ OFFLINE: Buscar apenas do cache
+      console.log(`📱 [${cacheKey}] Modo offline, buscando do cache...`);
+      try {
+        const cachedData = await indexedDBService.getOpcoes(cacheKey);
+        if (cachedData && cachedData.length > 0) {
+          console.log(`✅ [${cacheKey}] ${cachedData.length} registros do cache (offline)`);
+          return cachedData as T[];
+        } else {
+          console.warn(`⚠️ [${cacheKey}] Sem dados no cache e offline`);
+          toast.warning(`Sem dados offline para ${cacheKey}. Conecte-se e baixe no gerenciador offline.`);
+          return [] as T[];
+        }
+      } catch (cacheError) {
+        console.error(`❌ [${cacheKey}] Erro ao buscar do cache:`, cacheError);
+        return [] as T[];
       }
-      
-      // Se não tem cache e está offline, retorna array vazio
-      console.warn(`⚠️ Não há dados em cache para ${cacheKey} e está offline`);
-      return [] as T[];
     }
   },
 
