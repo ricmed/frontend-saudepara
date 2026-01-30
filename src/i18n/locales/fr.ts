@@ -18,6 +18,8 @@ export const fr: TranslationRecord = {
   "menu.servicos": "Services",
   "menu.reportCase": "Signaler un Cas",
   "menu.reportCaseDesc": "Enregistrez rapidement un nouveau cas",
+  "menu.reportDAE": "Signaler DAE",
+  "menu.reportDAEDesc": "Enregistrez rapidement une communication DAE",
   
   "logout.confirmation.title": "Voulez-vous vous déconnecter ?",
   "logout.confirmation.confirm": "Oui, se déconnecter",

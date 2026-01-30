@@ -61,6 +61,8 @@ export const ja = {
   "menu.dashboard": "ダッシュボード",
   "menu.reportCase": "症例を報告",
   "menu.reportCaseDesc": "新しい症例を迅速に登録",
+  "menu.reportDAE": "DAEを報告",
+  "menu.reportDAEDesc": "DAE通信を迅速に登録",
   "menu.offline_management": "オフラインデータ",
   "menu.educational": "教育資料",
   "menu.apps": "補助アプリ",

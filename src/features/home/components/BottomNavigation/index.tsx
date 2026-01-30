@@ -68,13 +68,14 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           </button>
         </div>
 
-        {/* FAB Button */}
+        {/* FAB Button - Comunicar DAE */}
         <div className="w-12"></div>
         <button 
           className="absolute -top-6 left-1/2 -translate-x-1/2 w-14 h-14 bg-blue-600 rounded-full flex flex-col items-center justify-center shadow-lg"
           onClick={() => {
-            navigate("/private/comunicacao-de-caso/nova");
+            navigate("/private/comunicacao-dae/nova");
           }}
+          title="Comunicar DAE"
         >
           <FileText className="w-6 h-6 text-white" />
         </button>

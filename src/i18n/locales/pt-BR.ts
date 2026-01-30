@@ -18,6 +18,8 @@ export const ptBR = {
   "menu.faq": "Perguntas Frequentes",
   "menu.reportCase": "Comunicar Caso",
   "menu.reportCaseDesc": "Registre um novo caso rapidamente",
+  "menu.reportDAE": "Comunicar DAE",
+  "menu.reportDAEDesc": "Registre uma comunicação DAE rapidamente",
 
   // Logout Confirmation
   "logout.confirmation.title": "Deseja sair?",

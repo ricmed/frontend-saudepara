@@ -60,6 +60,8 @@ export const ko: TranslationRecord = {
   "menu.dashboard": "대시보드",
   "menu.reportCase": "사례 보고",
   "menu.reportCaseDesc": "새 사례 빠르게 등록",
+  "menu.reportDAE": "DAE 보고",
+  "menu.reportDAEDesc": "DAE 통신 빠르게 등록",
   "menu.offline_management": "오프라인 데이터",
   "menu.educational": "교육 자료",
   "menu.apps": "보조 앱",

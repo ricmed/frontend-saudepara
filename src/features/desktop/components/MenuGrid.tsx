@@ -43,7 +43,7 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
     }
   ];
 
-  // Botão especial para comunicação de caso (apenas para notificadores e apenas na versão desktop)
+  // Botão especial para comunicação DAE (apenas para notificadores e apenas na versão desktop)
   const notificationButton = user && permissions.isNotificador && !isMobile ? {
     icon: (
       <div className="relative">
@@ -51,7 +51,7 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
         <Plus className="h-4 w-4 text-white absolute -top-1 -right-1 bg-green-500 rounded-full p-0.5" />
       </div>
     ),
-    onClick: () => navigate('/private/comunicacao-de-caso/nova'),
+    onClick: () => navigate('/private/comunicacao-dae/nova'),
     isSpecial: true
   } : null;
 
@@ -74,7 +74,7 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
 
   return (
     <div className="py-12 max-w-6xl mx-auto px-6">
-      {/* Botão especial de comunicação de caso - destaque superior */}
+      {/* Botão especial de comunicação DAE - destaque superior */}
       {notificationButton && (
         <div className="mb-8 flex justify-center">
           <div 
@@ -84,9 +84,9 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
             <div className="mb-3">
               {notificationButton.icon}
             </div>
-            <span className="text-lg font-semibold mb-1">{t('menu.reportCase')}</span>
+            <span className="text-lg font-semibold mb-1">{t('menu.reportDAE')}</span>
             <span className="text-xs text-blue-100 text-center">
-              {t('menu.reportCaseDesc')}
+              {t('menu.reportDAEDesc')}
             </span>
           </div>
         </div>

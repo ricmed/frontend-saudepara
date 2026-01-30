@@ -60,6 +60,8 @@ export const ar: TranslationRecord = {
   "menu.dashboard": "لوحة التحكم",
   "menu.reportCase": "الإبلاغ عن حالة",
   "menu.reportCaseDesc": "تسجيل حالة جديدة بسرعة",
+  "menu.reportDAE": "الإبلاغ عن DAE",
+  "menu.reportDAEDesc": "تسجيل اتصال DAE بسرعة",
   "menu.offline_management": "البيانات غير المتصلة",
   "menu.educational": "مواد تعليمية",
   "menu.apps": "تطبيقات مساعدة",
