@@ -16,6 +16,7 @@ import {
   Wifi,
   WifiOff
 } from 'lucide-react';
+import axios from 'axios';
 import ComunicacaoDaeService, { CreateComunicacaoDaeData, OrigemTipo, TipoAnexo, ComunicacaoDae, ComunicacaoDaeAnexo } from '@/services/ComunicacaoDaeService';
 import DaeService, { Dae } from '@/services/DaeService';
 import NheService, { Nhe } from '@/services/NheService';
@@ -193,7 +194,28 @@ const ComunicacaoDaeFormPage: React.FC = () => {
   const loadComunicacao = async (comunicacaoId: number) => {
     try {
       setLoadingData(true);
-      const data = await ComunicacaoDaeService.getById(comunicacaoId);
+      
+      // ✅ ONLINE: API primeiro, cache como fallback
+      let data: ComunicacaoDae;
+      try {
+        console.log(`🔍 Buscando comunicação ${comunicacaoId} da API...`);
+        data = await ComunicacaoDaeService.getById(comunicacaoId);
+        console.log('✅ Comunicação carregada da API');
+      } catch (err) {
+        console.warn('⚠️ API falhou, tentando buscar do cache offline...', err);
+        
+        // ✅ FALLBACK: Tentar buscar do cache offline
+        const cachedData = await indexedDBService.getOpcoes('comunicacoes_dae');
+        const comunicacaoOffline = cachedData?.find((c: any) => c.id_comunicacao === comunicacaoId);
+        
+        if (comunicacaoOffline) {
+          console.log('✅ Comunicação encontrada no cache offline');
+          data = comunicacaoOffline;
+        } else {
+          throw new Error('Comunicação não encontrada na API nem no cache offline');
+        }
+      }
+      
       setComunicacaoCompleta(data);
       
       setFormData({
@@ -206,17 +228,55 @@ const ComunicacaoDaeFormPage: React.FC = () => {
         id_dae: data.id_dae,
       });
 
-      // Definir o município de ocorrência para o LocationInput
+      // ✅ CORRIGIDO: Buscar a UF do município primeiro
       if (data.id_municipio_ocorrencia) {
-        setMunicipioOcorrencia(String(data.id_municipio_ocorrencia));
-        // UF será carregado automaticamente pelo LocationInput ao ter o parentValue
+        try {
+          // Buscar informações do município para obter a UF
+          const municipios = await indexedDBService.getOpcoes('municipios');
+          const municipioData = municipios?.find((m: any) => 
+            Number(m.idtipo_municipio) === Number(data.id_municipio_ocorrencia)
+          );
+          
+          if (municipioData && municipioData.tipo_estado_idtipo_estado) {
+            // Setar UF primeiro
+            setUfOcorrencia(String(municipioData.tipo_estado_idtipo_estado));
+            console.log(`✅ UF carregada: ${municipioData.tipo_estado_idtipo_estado}`);
+            
+            // Pequeno delay para garantir que a UF foi setada antes do município
+            setTimeout(() => {
+              setMunicipioOcorrencia(String(data.id_municipio_ocorrencia));
+              console.log(`✅ Município carregado: ${data.id_municipio_ocorrencia}`);
+            }, 100);
+          } else {
+            console.warn('⚠️ Não foi possível encontrar a UF do município no cache');
+            // Tentar buscar do backend como fallback
+            try {
+              const server = import.meta.env.VITE_API_SERVER || "";
+              const port = import.meta.env.VITE_API_PORT || "";
+              const baseUrl = server && port ? `${server}:${port}/` : "/";
+              const response = await axios.get(`${baseUrl}api/tipo-municipio/${data.id_municipio_ocorrencia}`);
+              
+              if (response.data && response.data.tipo_estado_idtipo_estado) {
+                setUfOcorrencia(String(response.data.tipo_estado_idtipo_estado));
+                setTimeout(() => {
+                  setMunicipioOcorrencia(String(data.id_municipio_ocorrencia));
+                }, 100);
+              }
+            } catch (apiErr) {
+              console.error('❌ Erro ao buscar município da API:', apiErr);
+              setError('Não foi possível carregar o município de ocorrência. Verifique sua conexão.');
+            }
+          }
+        } catch (err) {
+          console.error('❌ Erro ao buscar UF do município:', err);
+        }
       }
 
       if (data.comunicacao_dae_anexo) {
         setAnexos(data.comunicacao_dae_anexo);
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Erro ao carregar comunicação');
+      setError(err.response?.data?.message || err.message || 'Erro ao carregar comunicação');
     } finally {
       setLoadingData(false);
     }

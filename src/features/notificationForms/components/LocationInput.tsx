@@ -412,32 +412,83 @@ const LocationInput: React.FC<LocationInputProps> = ({
     }
   };
 
-  // Fetch specific item by ID
+  // Fetch specific item by ID with offline support
   const fetchById = async (id: string) => {
     try {
       setIsLoading(true);
-      const server = import.meta.env.VITE_API_SERVER || "";
-      const port = import.meta.env.VITE_API_PORT || "";
-      const baseUrl = server && port ? `${server}:${port}/` : "/";
+      debugLog(`Fetching item by ID: ${id}`);
       
-      const url = `${baseUrl}${apiEndpoint}/${id}`;
-      debugLog(`Fetching item by ID: ${url}`);
+      const cacheKey = name === 'uf' ? 'estados' : 
+                      name === 'paisProcedencia' ? 'paises' :
+                      name === 'municipio' ? 'municipios' :
+                      null;
       
-      const response = await axios.get(url);
-      
-      if (response.data && response.data[idField]) {
-        // Normalizar a descrição do item
-        if (response.data.descricao) {
-          response.data.descricao = normalizeText(response.data.descricao);
+      // ✅ SE ESTIVER ONLINE: TENTAR API PRIMEIRO, CACHE COMO FALLBACK
+      if (navigator.onLine) {
+        try {
+          const server = import.meta.env.VITE_API_SERVER || "";
+          const port = import.meta.env.VITE_API_PORT || "";
+          const baseUrl = server && port ? `${server}:${port}/` : "/";
+          
+          const url = `${baseUrl}${apiEndpoint}/${id}`;
+          debugLog(`Fetching from API: ${url}`);
+          
+          const response = await axios.get(url);
+          
+          if (response.data && response.data[idField]) {
+            // Normalizar a descrição do item
+            if (response.data.descricao) {
+              response.data.descricao = normalizeText(response.data.descricao);
+            }
+            debugLog(`✅ Item found in API: ${response.data.descricao}`);
+            return response.data;
+          }
+        } catch (apiError) {
+          console.warn(`⚠️ API falhou ao buscar item ${id}, tentando cache...`, apiError);
+          
+          // ✅ FALLBACK: Buscar no cache se a API falhar
+          if (cacheKey) {
+            const cachedOptions = await indexedDBService.getOpcoes(cacheKey);
+            if (cachedOptions && cachedOptions.length > 0) {
+              const foundInCache = cachedOptions.find((option: any) => 
+                String(option[idField]) === String(id)
+              );
+              
+              if (foundInCache) {
+                if (foundInCache.descricao) {
+                  foundInCache.descricao = normalizeText(foundInCache.descricao);
+                }
+                debugLog(`✅ Item found in cache as fallback: ${foundInCache.descricao}`);
+                return foundInCache;
+              }
+            }
+          }
         }
-        debugLog(`Item found: ${response.data.descricao}`);
-        return response.data;
+      } else {
+        // ✅ SE ESTIVER OFFLINE: USAR APENAS O CACHE
+        debugLog(`📱 Modo offline: buscando apenas no cache`);
+        if (cacheKey) {
+          const cachedOptions = await indexedDBService.getOpcoes(cacheKey);
+          if (cachedOptions && cachedOptions.length > 0) {
+            const foundInCache = cachedOptions.find((option: any) => 
+              String(option[idField]) === String(id)
+            );
+            
+            if (foundInCache) {
+              if (foundInCache.descricao) {
+                foundInCache.descricao = normalizeText(foundInCache.descricao);
+              }
+              debugLog(`✅ Item found in cache (offline): ${foundInCache.descricao}`);
+              return foundInCache;
+            }
+          }
+        }
       }
       
-      debugLog(`Item with ID ${id} not found`);
+      debugLog(`❌ Item with ID ${id} not found`);
       return null;
     } catch (error: unknown) {
-      debugLog(`Error fetching by ID: ${id}`, error);
+      debugLog(`❌ Error fetching by ID: ${id}`, error);
       return null;
     } finally {
       setIsLoading(false);
