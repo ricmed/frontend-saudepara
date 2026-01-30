@@ -53,6 +53,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       role === 'admin' || 
       role === 'admin.unidade' || 
       role === 'admin.municipio' || 
+      role === 'admin.crs' || 
       role === 'admin.estado'
     );
   };
@@ -61,6 +62,12 @@ export const SideMenu: React.FC<SideMenuProps> = ({
   const isAdminMaster = () => {
     if (!user) return false;
     return user.roles?.includes('admin');
+  };
+
+  // Função para verificar se é admin.crs
+  const isAdminCrs = () => {
+    if (!user) return false;
+    return user.roles?.includes('admin.crs');
   };
 
   // ✅ NOVO: Submenu simplificado de Apps Auxiliares - apenas duas categorias principais
@@ -89,15 +96,15 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       onClick: () => navigate("/"), // ou "/private/dashboard" ou "/"
     },
     
-    // Menu Qualificar Estabelecimentos - apenas para qualificadores
-    ...(permissions.isQualificador ? [{
+    // Menu Qualificar Estabelecimentos - apenas para qualificadores (OCULTAR para admin.crs)
+    ...(!isAdminCrs() && permissions.isQualificador ? [{
       icon: <Award />,
       label: t("menu.qualify_establishments"),
       onClick: () => navigate("/private/relatorio-estabelecimentos"),
     }] : []),
     
-    // Menu Notificação - apenas para notificadores
-    ...(permissions.isNotificador ? [{
+    // Menu Notificação - apenas para notificadores (OCULTAR para admin.crs)
+    ...(!isAdminCrs() && permissions.isNotificador ? [{
       icon: <FileText />,
       label: t("menu.notification"),
       onClick: () => navigate("/private/comunicacao-de-caso"),
@@ -110,15 +117,15 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     //   onClick: () => navigate("/private/formularios"),
     // }] : []),
     
-    // Menu Dashboard - para notificadores OU usuários com role dashboard
-    ...(permissions.isNotificador || permissions.isDashboard ? [{
+    // Menu Dashboard - para notificadores OU usuários com role dashboard (OCULTAR para admin.crs)
+    ...(!isAdminCrs() && (permissions.isNotificador || permissions.isDashboard) ? [{
       icon: <ChartSpline />,
       label: t("menu.dashboard"),
       onClick: () => navigate("/dashboard-page"),
     }] : []),
 
     // ✅ MOVIDO E CORRIGIDO: Menu de Comunicação DAE - Acesso direto à lista
-    ...(user && (user.roles?.includes('admin') || user.roles?.includes('admin.estado')) ? [{
+    ...(user && (user.roles?.includes('admin') || user.roles?.includes('admin.estado') || user.roles?.includes('admin.crs')) ? [{
       icon: <FileText />,
       label: "Comunicação DAE",
       onClick: () => navigate("/private/comunicacao-dae"),
@@ -151,8 +158,8 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       },
     },
     
-    // Menu de Apps Auxiliares - apenas para admin master
-    ...(user && isAdminMaster() ? [{
+    // Menu de Apps Auxiliares - apenas para admin master (OCULTAR para admin.crs)
+    ...(user && isAdminMaster() && !isAdminCrs() ? [{
       icon: <Building2 />,
       label: t("menu.apps"),
       submenu: true,
@@ -169,8 +176,8 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     //   },
     // }] : []),
     
-    // ✅ NOVO: Menu de Lista de Pacientes - apenas para admin master
-    ...(user && isAdminMaster() ? [{
+    // ✅ NOVO: Menu de Lista de Pacientes - apenas para admin master (OCULTAR para admin.crs)
+    ...(user && isAdminMaster() && !isAdminCrs() ? [{
       icon: <Users />,
       label: t("menu.patients_list") || "Lista de Pacientes",
       onClick: () => {
@@ -208,7 +215,20 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     ...(user && isAdmin() ? [{
       icon: <UserCog />,
       label: t("menu.manage_users"),
-      onClick: () => navigate("/admin"),
+      onClick: () => {
+        // Redirecionar baseado na role
+        if (user.roles?.includes('admin.crs')) {
+          navigate("/admin/crs");
+        } else if (user.roles?.includes('admin.estado')) {
+          navigate("/admin/estado");
+        } else if (user.roles?.includes('admin.municipio')) {
+          navigate("/admin/municipio");
+        } else if (user.roles?.includes('admin.unidade')) {
+          navigate("/admin/unidade");
+        } else {
+          navigate("/admin");
+        }
+      },
     }] : []),
     
     // Menu de Logout - apenas para usuários logados

@@ -14,12 +14,15 @@ import AdminReports from './AdminReports';
 // Importar as páginas administrativas hierárquicas
 import DashboardUnidade from './DashboardUnidade';
 import DashboardMunicipio from './DashboardMunicipio';
+import DashboardCrs from './DashboardCrs';
 import DashboardEstado from './DashboardEstado';
 import UserFormUnidade from './UserFormUnidade';
 import UserFormMunicipio from './UserFormMunicipio';
+import UserFormCrs from './UserFormCrs';
 import UserFormEstado from './UserFormEstado';
 import UserListUnidade from './UserListUnidade';
 import UserListMunicipio from './UserListMunicipio';
+import UserListCrs from './UserListCrs';
 import UserListEstado from './UserListEstado';
 
 // Componente de proteção para verificar se o usuário tem role admin hierárquica
@@ -30,6 +33,7 @@ const AdminProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children
   const isAdmin = user?.roles?.includes('admin') || 
                   user?.roles?.includes('admin.unidade') ||
                   user?.roles?.includes('admin.municipio') ||
+                  user?.roles?.includes('admin.crs') ||
                   user?.roles?.includes('admin.estado') || 
                   false;
 
@@ -41,6 +45,7 @@ const AdminProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children
     hasAdminMaster: user?.roles?.includes('admin'),
     hasAdminUnidade: user?.roles?.includes('admin.unidade'),
     hasAdminMunicipio: user?.roles?.includes('admin.municipio'),
+    hasAdminCrs: user?.roles?.includes('admin.crs'),
     hasAdminEstado: user?.roles?.includes('admin.estado')
   });
   
@@ -146,6 +151,16 @@ const AdminRoutes: React.FC = () => {
         <Route path="/municipio/users/new" element={<UserFormMunicipio />} />
         <Route path="/municipio/users/:id/edit" element={<UserFormMunicipio />} />
         <Route path="/municipio/users/:id/reset-password" element={<PasswordReset />} />
+        
+        {/* =============================================== */}
+        {/* ROTAS HIERÁRQUICAS - ADMIN.CRS */}
+        {/* =============================================== */}
+        <Route path="/crs" element={<DashboardCrs />} />
+        <Route path="/crs/dashboard" element={<Navigate to="/admin/crs" replace />} />
+        <Route path="/crs/users" element={<UserListCrs />} />
+        <Route path="/crs/users/new" element={<UserFormCrs />} />
+        <Route path="/crs/users/:id/edit" element={<UserFormCrs />} />
+        <Route path="/crs/users/:id/reset-password" element={<PasswordReset />} />
         
         {/* =============================================== */}
         {/* ROTAS HIERÁRQUICAS - ADMIN.ESTADO */}

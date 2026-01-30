@@ -26,12 +26,16 @@ class CrsService {
       params: { page, limit },
       withCredentials: true
     });
-    // Mapear resposta do backend para o formato esperado
+    
+    // ✅ Suporte para resposta com ou sem paginação
+    const data = response.data.data || response.data || [];
+    const pagination = response.data.pagination;
+    
     return {
-      data: response.data.data,
-      total: response.data.pagination.total,
-      page: response.data.pagination.currentPage,
-      limit: response.data.pagination.itemsPerPage
+      data: Array.isArray(data) ? data : [],
+      total: pagination?.total || data.length || 0,
+      page: pagination?.currentPage || page,
+      limit: pagination?.itemsPerPage || limit
     };
   }
 

@@ -10,6 +10,7 @@ export interface UserPermissions {
   // Níveis de acesso
   isEstabelecimento: boolean;
   isMunicipio: boolean;
+  isCrs: boolean;
   isEstado: boolean;
   isAdmin: boolean;
   
@@ -21,6 +22,7 @@ export interface UserPermissions {
   // Dados do usuário
   estabelecimentoId?: number;
   municipioId?: number;
+  crsId?: number;
   estadoId?: number;
   nivel?: string;
   
@@ -164,6 +166,7 @@ export const useUserPermissions = (): UserPermissions => {
     return {
       isEstabelecimento: false,
       isMunicipio: false,
+      isCrs: false,
       isEstado: false,
       isAdmin: false,
       isQualificador: false,
@@ -187,6 +190,7 @@ export const useUserPermissions = (): UserPermissions => {
     userAccess = {
       estabelecimentoId: user.usuario_acesso[0].estabelecimento_id,
       municipioId: user.usuario_acesso[0].tipo_municipio_id,
+      crsId: user.usuario_acesso[0].crs_id,
       estadoId: user.usuario_acesso[0].tipo_estado_id,
       nivel: user.usuario_acesso[0].nivel_acesso
     };
@@ -196,11 +200,13 @@ export const useUserPermissions = (): UserPermissions => {
                            userAccess?.nivel === 'unidade' || 
                            (!isAdmin && !userAccess?.nivel);
   const isMunicipio = userAccess?.nivel === 'municipio';
+  const isCrs = userAccess?.nivel === 'crs';
   const isEstado = userAccess?.nivel === 'estado';
 
   return {
     isEstabelecimento,
     isMunicipio,
+    isCrs,
     isEstado,
     isAdmin,
     isQualificador,
@@ -208,6 +214,7 @@ export const useUserPermissions = (): UserPermissions => {
     isDashboard,
     estabelecimentoId: userAccess?.estabelecimentoId,
     municipioId: userAccess?.municipioId,
+    crsId: userAccess?.crsId,
     estadoId: userAccess?.estadoId,
     // ✅ CORREÇÃO: Retornar o nível REAL do backend, não normalizado
     nivel: userAccess?.nivel,
