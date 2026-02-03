@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FormService, { type Form } from '@/services/FormService';
-import { Plus, Edit, Eye, Trash2, FileText, Copy } from 'lucide-react';
+import { Plus, Edit, Eye, Trash2, FileText, Copy, Settings } from 'lucide-react';
 import { useAuth } from '@/keycloak/AuthProvider';
 
 export const FormAdminListPage: React.FC = () => {
@@ -177,35 +177,47 @@ export const FormAdminListPage: React.FC = () => {
                   )}
                 </div>
 
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => navigate(`/private/formularios-admin/editar/${form.id}`)}
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center justify-center gap-2"
-                  >
-                    <Edit className="h-4 w-4" />
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => handleDuplicate(form)}
-                    className="px-4 py-2 bg-green-50 text-green-600 rounded hover:bg-green-100"
-                    title="Duplicar formulário"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => navigate(`/private/formularios/${form.agravo_key}`)}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
-                    title="Visualizar notificações"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(form.id)}
-                    className="px-4 py-2 bg-red-50 text-red-600 rounded hover:bg-red-100"
-                    title="Excluir formulário"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => navigate(`/private/formularios-admin/editar/${form.id}`)}
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center justify-center gap-2"
+                    >
+                      <Edit className="h-4 w-4" />
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => handleDuplicate(form)}
+                      className="px-4 py-2 bg-green-50 text-green-600 rounded hover:bg-green-100"
+                      title="Duplicar formulário"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => navigate(`/private/formularios/${form.agravo_key}`)}
+                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                      title="Visualizar notificações"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(form.id)}
+                      className="px-4 py-2 bg-red-50 text-red-600 rounded hover:bg-red-100"
+                      title="Excluir formulário"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                  {form.active_version_id && (
+                    <button
+                      onClick={() => navigate(`/private/formularios-admin/${form.id}/versoes/${form.active_version_id}/campos-fixos`)}
+                      className="w-full px-4 py-2 bg-purple-50 text-purple-700 rounded hover:bg-purple-100 flex items-center justify-center gap-2 text-sm"
+                      title="Configurar colunas fixas (Modelo Híbrido SINAN)"
+                    >
+                      <Settings className="h-4 w-4" />
+                      Colunas Fixas
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

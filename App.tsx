@@ -139,6 +139,7 @@ import { FormsListPage } from '@/features/dynamic-forms/pages/FormsListPage';
 import { FormBuilderPage } from '@/features/dynamic-forms/pages/FormBuilderPage';
 import { FormAdminListPage } from '@/features/dynamic-forms/pages/FormAdminListPage';
 import { FormSubmissionsListPage } from '@/features/dynamic-forms/pages/FormSubmissionsListPage';
+import FixedColumnsConfigPage from '@/features/dynamic-forms/pages/FixedColumnsConfigPage';
 // Componente de layout protegido
 const ProtectedLayout = () => {
   return (
@@ -295,6 +296,7 @@ function App() {
               <Route path="/private/formularios-admin" element={<FormAdminListPage />} />
               <Route path="/private/formularios-admin/novo" element={<FormBuilderPage />} />
               <Route path="/private/formularios-admin/editar/:id" element={<FormBuilderPage />} />
+              <Route path="/private/formularios-admin/:formId/versoes/:versionId/campos-fixos" element={<FixedColumnsConfigPage />} />
             </Route>
             
             {/* ✅ NOVO: Rota de Lista de Pacientes - Protegida apenas para Admin Master */}
