@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/keycloak/AuthProvider';
 import FormService, { type FormSchema, type FormSection, type FormField, type FormRule, type RuleCondition, type RuleAction } from '@/services/FormService';
-import { Plus, Trash2, Save, Eye, Settings, GripVertical, X, Download, Upload, ChevronUp, ChevronDown, Code } from 'lucide-react';
+import { Plus, Trash2, Save, Eye, Settings, GripVertical, X, Download, Upload, ChevronUp, ChevronDown, Code, FileEdit } from 'lucide-react';
 import { FormRenderer } from '../components/FormRenderer';
+import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 
 export const FormBuilderPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -40,16 +41,16 @@ export const FormBuilderPage: React.FC = () => {
       setAgravoKey(form.agravo_key);
       setCategoria(form.categoria || 'notificacao');
       
-      // Buscar versão draft ou criar nova
-      // TODO: implementar getLatestVersion
-      setSchema({
-        titulo: form.nome,
-        descricao: form.descricao || '',
-        versao: '1.0',
-        sections: []
-      });
+      // Buscar versão ativa e carregar o schema
+      if (form.active_version_id && form.versions) {
+        const activeVersion = form.versions.find(v => v.id === form.active_version_id);
+        if (activeVersion && activeVersion.schema_json) {
+          setSchema(activeVersion.schema_json);
+        }
+      }
     } catch (err) {
       console.error('Erro ao carregar formulário:', err);
+      alert('Erro ao carregar formulário');
     } finally {
       setLoading(false);
     }
@@ -122,7 +123,8 @@ export const FormBuilderPage: React.FC = () => {
       type: 'text',
       label: 'Novo Campo',
       required: false,
-      order: schema.sections[sectionIdx].fields.length + 1
+      order: schema.sections[sectionIdx].fields.length + 1,
+      maxLength: 1500
     };
     
     const newSections = [...schema.sections];
@@ -362,72 +364,57 @@ export const FormBuilderPage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                {id ? 'Editar Formulário' : 'Novo Formulário'}
-              </h1>
-              <p className="text-sm text-gray-600 mt-1">
-                Construtor visual de formulários SINAN/e-SUS
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => navigate('/private/formularios-admin')}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleExportJSON}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
-                title="Exportar formulário como JSON"
-              >
-                <Download className="h-4 w-4" />
-                Exportar
-              </button>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
-                title="Importar formulário de JSON"
-              >
-                <Upload className="h-4 w-4" />
-                Importar
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json"
-                onChange={handleImportJSON}
-                className="hidden"
-              />
-              <button
-                onClick={() => setShowPreview(true)}
-                className="px-4 py-2 text-blue-700 bg-white border border-blue-300 rounded-md hover:bg-blue-50 flex items-center gap-2"
-                disabled={schema.sections.length === 0}
-              >
-                <Eye className="h-4 w-4" />
-                Preview
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
-              >
-                <Save className="h-4 w-4" />
-                Salvar
-              </button>
-            </div>
-          </div>
+    <AppPageLayout
+      title={id ? 'Editar Formulário' : 'Novo Formulário'}
+      subtitle="Construtor visual de formulários SINAN/e-SUS"
+      icon={<FileEdit className="h-8 w-8" />}
+      variant="desktop"
+      showBottomNav={false}
+      headerActions={
+        <div className="flex gap-2">
+          <button
+            onClick={handleExportJSON}
+            className="px-3 py-2 text-white bg-blue-500 hover:bg-blue-600 rounded-md flex items-center gap-2"
+            title="Exportar formulário como JSON"
+          >
+            <Download className="h-4 w-4" />
+            Exportar
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="px-3 py-2 text-white bg-blue-500 hover:bg-blue-600 rounded-md flex items-center gap-2"
+            title="Importar formulário de JSON"
+          >
+            <Upload className="h-4 w-4" />
+            Importar
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleImportJSON}
+            className="hidden"
+          />
+          <button
+            onClick={() => setShowPreview(true)}
+            className="px-3 py-2 text-white bg-purple-600 hover:bg-purple-700 rounded-md flex items-center gap-2"
+            disabled={schema.sections.length === 0}
+          >
+            <Eye className="h-4 w-4" />
+            Preview
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={loading}
+            className="px-4 py-2 bg-white text-blue-600 hover:bg-blue-50 rounded-md flex items-center gap-2 font-medium"
+          >
+            <Save className="h-4 w-4" />
+            Salvar
+          </button>
         </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      }
+    >
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Configurações Gerais */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow p-6 sticky top-4">
@@ -704,6 +691,49 @@ export const FormBuilderPage: React.FC = () => {
                               className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded"
                               placeholder="Placeholder..."
                             />
+                            {(field.type === 'text' || field.type === 'textarea') && (
+                              <div className="flex items-center gap-1">
+                                <label className="text-xs text-gray-600 whitespace-nowrap">Máx. caracteres:</label>
+                                <input
+                                  type="number"
+                                  value={field.maxLength ?? ''}
+                                  onChange={(e) => updateField(sectionIdx, fieldIdx, { maxLength: e.target.value ? Number(e.target.value) : undefined })}
+                                  onBlur={(e) => {
+                                    if (!e.target.value) {
+                                      updateField(sectionIdx, fieldIdx, { maxLength: 1500 });
+                                    }
+                                  }}
+                                  className="w-20 px-2 py-1 text-xs border border-gray-300 rounded"
+                                  min="1"
+                                  max="5000"
+                                  placeholder="1500"
+                                />
+                              </div>
+                            )}
+                            {field.type === 'number' && (
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1">
+                                  <label className="text-xs text-gray-600 whitespace-nowrap">Min:</label>
+                                  <input
+                                    type="number"
+                                    value={field.min ?? ''}
+                                    onChange={(e) => updateField(sectionIdx, fieldIdx, { min: e.target.value ? Number(e.target.value) : undefined })}
+                                    className="w-20 px-2 py-1 text-xs border border-gray-300 rounded"
+                                    placeholder="0"
+                                  />
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <label className="text-xs text-gray-600 whitespace-nowrap">Max:</label>
+                                  <input
+                                    type="number"
+                                    value={field.max ?? ''}
+                                    onChange={(e) => updateField(sectionIdx, fieldIdx, { max: e.target.value ? Number(e.target.value) : undefined })}
+                                    className="w-20 px-2 py-1 text-xs border border-gray-300 rounded"
+                                    placeholder="999999"
+                                  />
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))
@@ -1003,7 +1033,6 @@ export const FormBuilderPage: React.FC = () => {
               </div>
             )}
           </div>
-        </div>
       </div>
 
       {/* Modal de Preview */}
@@ -1065,6 +1094,6 @@ export const FormBuilderPage: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </AppPageLayout>
   );
 };

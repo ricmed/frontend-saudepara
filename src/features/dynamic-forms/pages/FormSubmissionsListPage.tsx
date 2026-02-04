@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import FormService, { type Form } from '@/services/FormService';
 import FormSubmissionService, { type FormSubmission } from '@/services/FormSubmissionService';
-import { Plus, Edit, Eye, Trash2, Calendar, User } from 'lucide-react';
+import { Plus, Edit, Eye, Trash2, Calendar, User, FileText } from 'lucide-react';
+import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 
 export const FormSubmissionsListPage: React.FC = () => {
   const { agravo } = useParams<{ agravo: string }>();
@@ -91,19 +92,33 @@ export const FormSubmissionsListPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Carregando...</p>
+      <AppPageLayout
+        title="Notificações"
+        subtitle="Carregando..."
+        icon={<FileText className="h-8 w-8" />}
+        variant="desktop"
+        showBottomNav={false}
+      >
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Carregando...</p>
+          </div>
         </div>
-      </div>
+      </AppPageLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg shadow p-8 max-w-md">
+      <AppPageLayout
+        title="Erro"
+        subtitle="Erro ao carregar dados"
+        icon={<FileText className="h-8 w-8" />}
+        variant="desktop"
+        showBottomNav={false}
+      >
+        <div className="bg-white rounded-lg shadow p-8 max-w-md mx-auto">
           <h2 className="text-xl font-bold text-red-600 mb-4">Erro</h2>
           <p className="text-gray-600">{error}</p>
           <button
@@ -113,43 +128,27 @@ export const FormSubmissionsListPage: React.FC = () => {
             Voltar
           </button>
         </div>
-      </div>
+      </AppPageLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">{form?.nome}</h1>
-              <p className="text-sm text-gray-500 mt-1">
-                {submissions.length} notificação(ões) cadastrada(s)
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => navigate('/private/formularios')}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-              >
-                Voltar
-              </button>
-              <button
-                onClick={() => navigate(`/private/formularios/${agravo}/nova`)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Nova Notificação
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Lista de Submissions */}
-      <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+    <AppPageLayout
+      title={form?.nome || 'Notificações'}
+      subtitle={`${submissions.length} notificação(ões) cadastrada(s)`}
+      icon={<FileText className="h-8 w-8" />}
+      variant="desktop"
+      showBottomNav={false}
+      headerActions={
+        <button
+          onClick={() => navigate(`/private/formularios/${agravo}/nova`)}
+          className="px-4 py-2 bg-white text-blue-600 rounded-md hover:bg-blue-50 flex items-center gap-2 font-medium"
+        >
+          <Plus className="h-4 w-4" />
+          Nova Notificação
+        </button>
+      }
+    >
         {submissions.length === 0 ? (
           <div className="bg-white rounded-lg shadow p-12 text-center">
             <p className="text-gray-500 mb-4">Nenhuma notificação cadastrada ainda</p>
@@ -235,7 +234,6 @@ export const FormSubmissionsListPage: React.FC = () => {
             </table>
           </div>
         )}
-      </div>
-    </div>
-  );
-};
+      </AppPageLayout>
+    );
+  };

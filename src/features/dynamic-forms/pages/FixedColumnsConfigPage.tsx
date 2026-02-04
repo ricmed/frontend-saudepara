@@ -10,9 +10,11 @@ import {
   ChevronUp,
   AlertCircle,
   CheckCircle,
-  Database
+  Database,
+  Settings
 } from 'lucide-react';
 import axios from 'axios';
+import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 
 // Criar instância do axios com mesma configuração do FormService
 const server = import.meta.env.VITE_API_SERVER;
@@ -176,23 +178,37 @@ const FixedColumnsConfigPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Carregando...</p>
+      <AppPageLayout
+        title="Configurar Colunas Fixas"
+        subtitle="Modelo Híbrido SINAN"
+        icon={<Settings className="h-8 w-8" />}
+        variant="desktop"
+        showBottomNav={false}
+      >
+        <div className="flex justify-center items-center min-h-[50vh]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Carregando...</p>
+          </div>
         </div>
-      </div>
+      </AppPageLayout>
     );
   }
 
   if (!data) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <AppPageLayout
+        title="Configurar Colunas Fixas"
+        subtitle="Modelo Híbrido SINAN"
+        icon={<Settings className="h-8 w-8" />}
+        variant="desktop"
+        showBottomNav={false}
+      >
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
           <AlertCircle className="h-5 w-5 text-red-600" />
           <span className="text-red-800">Dados não encontrados</span>
         </div>
-      </div>
+      </AppPageLayout>
     );
   }
 
@@ -202,24 +218,33 @@ const FixedColumnsConfigPage: React.FC = () => {
   );
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-4 mb-4">
+    <AppPageLayout
+      title="Configurar Colunas Fixas"
+      subtitle="Modelo Híbrido SINAN"
+      icon={<Settings className="h-8 w-8" />}
+      variant="desktop"
+      showBottomNav={false}
+      headerActions={
+        <div className="flex gap-2">
           <button
-            onClick={() => navigate(`/private/admin/forms/${formId}/versions/${versionId}`)}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            onClick={handleAutoMark}
+            disabled={saving}
+            className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 flex items-center gap-2 disabled:opacity-50"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <Wand2 className="h-4 w-4" />
+            Auto-Marcar
           </button>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800">Configurar Colunas Fixas</h1>
-            <p className="text-gray-600 mt-1">Modelo Híbrido SINAN</p>
-          </div>
+          <button
+            onClick={handleSave}
+            disabled={saving || !hasChanges}
+            className="px-4 py-2 bg-white text-blue-600 rounded-md hover:bg-blue-50 flex items-center gap-2 font-medium disabled:opacity-50"
+          >
+            <Save className="h-4 w-4" />
+            Salvar
+          </button>
         </div>
-      </div>
-
-      {/* Alerts */}
+      }
+    >
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
           <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -441,7 +466,7 @@ const FixedColumnsConfigPage: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </AppPageLayout>
   );
 };
 

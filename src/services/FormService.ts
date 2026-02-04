@@ -21,6 +21,7 @@ export interface Form {
   nome: string;
   descricao?: string;
   status: string;
+  is_active: boolean;
   active_version_id?: number;
   created_by: string;
   created_at: string;
@@ -209,6 +210,17 @@ class FormService {
       return response.data;
     } catch (error) {
       console.error('Erro ao publicar versão:', error);
+      throw error;
+    }
+  }
+
+  // Ativar/Desativar formulário
+  async toggleActive(id: number, is_active: boolean): Promise<Form> {
+    try {
+      const response = await api.patch(`/forms/${id}/toggle-active`, { is_active });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao ativar/desativar formulário:', error);
       throw error;
     }
   }

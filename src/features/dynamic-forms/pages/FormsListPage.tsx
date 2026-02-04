@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FormService, { type Form } from '@/services/FormService';
+import { FileText, ClipboardList } from 'lucide-react';
+import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 
 export const FormsListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -16,7 +18,9 @@ export const FormsListPage: React.FC = () => {
     try {
       setLoading(true);
       const data = await FormService.getAllForms();
-      setForms(data);
+      // Filtrar apenas formulários ativos
+      const activeForms = data.filter(form => form.is_active);
+      setForms(activeForms);
     } catch (err) {
       console.error('Erro ao carregar formulários:', err);
       setError('Erro ao carregar formulários disponíveis');
@@ -31,36 +35,47 @@ export const FormsListPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Carregando formulários...</p>
+      <AppPageLayout
+        title="Formulários de Notificação"
+        subtitle="Selecione um agravo para preencher o formulário"
+        icon={<ClipboardList className="h-8 w-8" />}
+        variant="desktop"
+        showBottomNav={false}
+      >
+        <div className="flex justify-center items-center min-h-[50vh]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Carregando formulários...</p>
+          </div>
         </div>
-      </div>
+      </AppPageLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <AppPageLayout
+        title="Formulários de Notificação"
+        subtitle="Selecione um agravo para preencher o formulário"
+        icon={<ClipboardList className="h-8 w-8" />}
+        variant="desktop"
+        showBottomNav={false}
+      >
         <div className="bg-red-50 border-l-4 border-red-500 p-4">
           <p className="text-red-700">{error}</p>
         </div>
-      </div>
+      </AppPageLayout>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">
-          Formulários de Notificação
-        </h1>
-        <p className="text-gray-600">
-          Selecione um agravo para preencher o formulário de notificação
-        </p>
-      </div>
-
+    <AppPageLayout
+      title="Formulários de Notificação"
+      subtitle="Selecione um agravo para preencher o formulário"
+      icon={<ClipboardList className="h-8 w-8" />}
+      variant="desktop"
+      showBottomNav={false}
+    >
       {forms.length === 0 ? (
         <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4">
           <p className="text-yellow-700">
@@ -123,6 +138,6 @@ export const FormsListPage: React.FC = () => {
           ))}
         </div>
       )}
-    </div>
+    </AppPageLayout>
   );
 };

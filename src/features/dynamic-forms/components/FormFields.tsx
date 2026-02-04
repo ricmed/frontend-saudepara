@@ -18,6 +18,9 @@ export const TextField: React.FC<TextFieldProps> = ({
   required,
   disabled,
 }) => {
+  const maxLength = field.maxLength || 1500;
+  const currentLength = (value || '').length;
+  
   return (
     <div className="mb-4">
       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -30,13 +33,21 @@ export const TextField: React.FC<TextFieldProps> = ({
         onChange={(e) => onChange(e.target.value)}
         placeholder={field.placeholder}
         disabled={disabled || field.disabled}
+        maxLength={maxLength}
         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
           error
             ? 'border-red-500 focus:ring-red-500'
             : 'border-gray-300 focus:ring-blue-500'
         } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
       />
-      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+      <div className="flex justify-between items-center mt-1">
+        {error && <p className="text-red-500 text-sm">{error}</p>}
+        <p className={`text-xs ml-auto ${
+          currentLength > maxLength * 0.9 ? 'text-orange-600' : 'text-gray-500'
+        }`}>
+          {currentLength}/{maxLength} caracteres
+        </p>
+      </div>
     </div>
   );
 };
@@ -81,6 +92,9 @@ export const NumberField: React.FC<TextFieldProps> = ({
   required,
   disabled,
 }) => {
+  const min = field.min;
+  const max = field.max;
+  
   return (
     <div className="mb-4">
       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -89,19 +103,30 @@ export const NumberField: React.FC<TextFieldProps> = ({
       </label>
       <input
         type="number"
-        value={value || ''}
+        value={value ?? ''}
         onChange={(e) => onChange(e.target.value ? Number(e.target.value) : '')}
         placeholder={field.placeholder}
         disabled={disabled || field.disabled}
-        min={field.min}
-        max={field.max}
+        min={min}
+        max={max}
         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
           error
             ? 'border-red-500 focus:ring-red-500'
             : 'border-gray-300 focus:ring-blue-500'
         } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
       />
-      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+      <div className="flex justify-between items-center mt-1">
+        {error && <p className="text-red-500 text-sm">{error}</p>}
+        {(min !== undefined || max !== undefined) && (
+          <p className="text-xs text-gray-500 ml-auto">
+            {min !== undefined && max !== undefined
+              ? `Valor entre ${min} e ${max}`
+              : min !== undefined
+              ? `Mínimo: ${min}`
+              : `Máximo: ${max}`}
+          </p>
+        )}
+      </div>
     </div>
   );
 };
@@ -114,6 +139,9 @@ export const TextareaField: React.FC<TextFieldProps> = ({
   required,
   disabled,
 }) => {
+  const maxLength = field.maxLength || 1500;
+  const currentLength = (value || '').length;
+  
   return (
     <div className="mb-4">
       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -125,6 +153,7 @@ export const TextareaField: React.FC<TextFieldProps> = ({
         onChange={(e) => onChange(e.target.value)}
         placeholder={field.placeholder}
         disabled={disabled || field.disabled}
+        maxLength={maxLength}
         rows={4}
         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 resize-y ${
           error
@@ -132,7 +161,14 @@ export const TextareaField: React.FC<TextFieldProps> = ({
             : 'border-gray-300 focus:ring-blue-500'
         } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
       />
-      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+      <div className="flex justify-between items-center mt-1">
+        {error && <p className="text-red-500 text-sm">{error}</p>}
+        <p className={`text-xs ml-auto ${
+          currentLength > maxLength * 0.9 ? 'text-orange-600' : 'text-gray-500'
+        }`}>
+          {currentLength}/{maxLength} caracteres
+        </p>
+      </div>
     </div>
   );
 };
