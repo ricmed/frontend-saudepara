@@ -60,25 +60,82 @@ export const DateField: React.FC<TextFieldProps> = ({
   required,
   disabled,
 }) => {
+  const today = new Date().toISOString().split('T')[0];
+  // Usa field.max apenas se for uma string de data válida, caso contrário usa today
+  const maxDate = (typeof field.max === 'string' && field.max.match(/^\d{4}-\d{2}-\d{2}$/)) ? field.max : today;
+
+  const incrementDate = () => {
+    // Se não houver valor, define como hoje
+    if (!value) {
+      onChange(today);
+      return;
+    }
+    
+    // Se houver valor, incrementa 1 dia
+    const currentDate = new Date(value + 'T12:00:00');
+    const maxDateObj = new Date(maxDate + 'T12:00:00');
+    
+    // Só incrementa se a data atual for menor que a máxima
+    if (currentDate < maxDateObj) {
+      currentDate.setDate(currentDate.getDate() + 1);
+      const newDate = currentDate.toISOString().split('T')[0];
+      onChange(newDate);
+    }
+  };
+
+  const decrementDate = () => {
+    // Se não houver valor, define como hoje
+    if (!value) {
+      onChange(today);
+      return;
+    }
+    
+    // Se houver valor, decrementa 1 dia
+    const currentDate = new Date(value + 'T12:00:00');
+    currentDate.setDate(currentDate.getDate() - 1);
+    onChange(currentDate.toISOString().split('T')[0]);
+  };
+
+  // Desabilita o botão + apenas se já estiver na data máxima
+  const isPlusDisabled = disabled || field.disabled || (!!value && value >= maxDate);
+
   return (
     <div className="mb-4">
       <label className="block text-sm font-medium text-gray-700 mb-1">
         {field.label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
-      <input
-        type="date"
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled || field.disabled}
-        min={field.min}
-        max={field.max}
-        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-          error
-            ? 'border-red-500 focus:ring-red-500'
-            : 'border-gray-300 focus:ring-blue-500'
-        } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-      />
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={decrementDate}
+          disabled={disabled || field.disabled}
+          className="px-3 py-2 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:cursor-not-allowed rounded-md text-gray-700 font-bold"
+        >
+          −
+        </button>
+        <input
+          type="date"
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled || field.disabled}
+          min={field.min}
+          max={maxDate}
+          className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+            error
+              ? 'border-red-500 focus:ring-red-500'
+              : 'border-gray-300 focus:ring-blue-500'
+          } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+        />
+        <button
+          type="button"
+          onClick={incrementDate}
+          disabled={isPlusDisabled}
+          className="px-3 py-2 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:cursor-not-allowed rounded-md text-gray-700 font-bold"
+        >
+          +
+        </button>
+      </div>
       {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
     </div>
   );

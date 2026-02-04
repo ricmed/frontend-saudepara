@@ -82,9 +82,12 @@ export const DynamicFormPage: React.FC = () => {
           userId
         );
         
+        console.log('shouldSubmit:', shouldSubmit);
         // Enviar (finalizar) apenas se shouldSubmit = true
         if (shouldSubmit) {
-          await FormSubmissionService.submitSubmission(Number(id), userId);
+          console.log('Chamando submitSubmission para id:', id);
+          const result = await FormSubmissionService.submitSubmission(Number(id), userId);
+          console.log('Resultado submitSubmission:', result);
         }
       } else {
         // Criar nova submission
@@ -95,9 +98,12 @@ export const DynamicFormPage: React.FC = () => {
           created_offline: false,
         });
 
+        console.log('Nova submission criada:', submission.id, 'shouldSubmit:', shouldSubmit);
         // Enviar (finalizar) apenas se shouldSubmit = true
         if (shouldSubmit) {
-          await FormSubmissionService.submitSubmission(submission.id, userId);
+          console.log('Chamando submitSubmission para nova submission id:', submission.id);
+          const result = await FormSubmissionService.submitSubmission(submission.id, userId);
+          console.log('Resultado submitSubmission:', result);
         } else {
           // Se salvou como rascunho, redirecionar para edição
           navigate(`/private/formularios-dinamicos/editar/${submission.id}`, { replace: true });

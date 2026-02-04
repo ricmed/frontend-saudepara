@@ -370,6 +370,7 @@ export const FormBuilderPage: React.FC = () => {
       icon={<FileEdit className="h-8 w-8" />}
       variant="desktop"
       showBottomNav={false}
+      backPath="/private/formularios-admin"
       headerActions={
         <div className="flex gap-2">
           <button

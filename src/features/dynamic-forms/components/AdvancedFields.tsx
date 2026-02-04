@@ -269,25 +269,102 @@ export const DateTimeField: React.FC<AdvancedFieldProps> = ({
   required,
   disabled,
 }) => {
+  // Obtém data/hora atual no fuso horário local no formato datetime-local (YYYY-MM-DDTHH:MM)
+  const getLocalDateTime = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const now = getLocalDateTime();
+  // Usa field.max apenas se for uma string válida, caso contrário usa agora como máximo
+  const maxDateTime = (typeof field.max === 'string' && field.max.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/)) ? field.max : now;
+
+  const incrementDateTime = () => {
+    // Se não houver valor, define como agora
+    if (!value) {
+      onChange(now);
+      return;
+    }
+    
+    // Se houver valor, incrementa 1 dia
+    const currentDateTime = new Date(value);
+    const maxDateTimeObj = new Date(maxDateTime);
+    
+    // Só incrementa se a data/hora atual for menor que a máxima
+    if (currentDateTime < maxDateTimeObj) {
+      currentDateTime.setDate(currentDateTime.getDate() + 1);
+      const year = currentDateTime.getFullYear();
+      const month = String(currentDateTime.getMonth() + 1).padStart(2, '0');
+      const day = String(currentDateTime.getDate()).padStart(2, '0');
+      const hours = String(currentDateTime.getHours()).padStart(2, '0');
+      const minutes = String(currentDateTime.getMinutes()).padStart(2, '0');
+      onChange(`${year}-${month}-${day}T${hours}:${minutes}`);
+    }
+  };
+
+  const decrementDateTime = () => {
+    // Se não houver valor, define como agora
+    if (!value) {
+      onChange(now);
+      return;
+    }
+    
+    // Se houver valor, decrementa 1 dia
+    const currentDateTime = new Date(value);
+    currentDateTime.setDate(currentDateTime.getDate() - 1);
+    const year = currentDateTime.getFullYear();
+    const month = String(currentDateTime.getMonth() + 1).padStart(2, '0');
+    const day = String(currentDateTime.getDate()).padStart(2, '0');
+    const hours = String(currentDateTime.getHours()).padStart(2, '0');
+    const minutes = String(currentDateTime.getMinutes()).padStart(2, '0');
+    onChange(`${year}-${month}-${day}T${hours}:${minutes}`);
+  };
+
+  // Desabilita o botão + apenas se já estiver na data/hora máxima
+  const isPlusDisabled = disabled || field.disabled || (!!value && value >= maxDateTime);
+
   return (
     <div className="mb-4">
       <label className="block text-sm font-medium text-gray-700 mb-1">
         {field.label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
-      <input
-        type="datetime-local"
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled || field.disabled}
-        min={field.min}
-        max={field.max}
-        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-          error
-            ? 'border-red-500 focus:ring-red-500'
-            : 'border-gray-300 focus:ring-blue-500'
-        } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-      />
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={decrementDateTime}
+          disabled={disabled || field.disabled}
+          className="px-3 py-2 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:cursor-not-allowed rounded-md text-gray-700 font-bold"
+        >
+          −
+        </button>
+        <input
+          type="datetime-local"
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled || field.disabled}
+          min={field.min}
+          max={maxDateTime}
+          className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+            error
+              ? 'border-red-500 focus:ring-red-500'
+              : 'border-gray-300 focus:ring-blue-500'
+          } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+        />
+        <button
+          type="button"
+          onClick={incrementDateTime}
+          disabled={isPlusDisabled}
+          className="px-3 py-2 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:cursor-not-allowed rounded-md text-gray-700 font-bold"
+        >
+          +
+        </button>
+      </div>
       {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
       {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
     </div>

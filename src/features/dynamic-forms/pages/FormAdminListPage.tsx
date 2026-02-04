@@ -140,7 +140,7 @@ export const FormAdminListPage: React.FC = () => {
       icon={<FileText className="h-8 w-8" />}
       variant="desktop"
       showBottomNav={false}
-      backPath="/private/home"
+      backPath="/"
       headerActions={
         <button
           onClick={() => navigate('/private/formularios-admin/novo')}
