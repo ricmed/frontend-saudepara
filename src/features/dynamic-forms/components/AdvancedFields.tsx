@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { FormField } from '@/services/FormService';
 import { Search, X } from 'lucide-react';
+import PhoneInput from '@/features/notificationForms/components/PhoneInput';
 
 interface AdvancedFieldProps {
   field: FormField;
@@ -578,6 +579,31 @@ export const CEPField: React.FC<AdvancedFieldProps> = ({
           </div>
         )}
       </div>
+      {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+    </div>
+  );
+};
+
+// ========== INTERNATIONAL PHONE FIELD (telefone internacional com DDI) ==========
+export const InternationalPhoneField: React.FC<AdvancedFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+}) => {
+  return (
+    <div className="mb-4">
+      <PhoneInput
+        value={value || ''}
+        onChange={onChange}
+        name={field.key}
+        label={field.label}
+        placeholder={field.placeholder || 'Digite o telefone'}
+        className={error ? 'border-red-500' : ''}
+      />
       {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
       {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
     </div>

@@ -12,7 +12,8 @@ import {
   EmailField, 
   PhoneField, 
   CPFField, 
-  CEPField 
+  CEPField,
+  InternationalPhoneField
 } from './AdvancedFields';
 import {
   FileUploadField,
@@ -22,7 +23,8 @@ import {
   ColorPickerField,
   SliderField,
   StarRatingField,
-  GoogleMapsAddressField
+  GoogleMapsAddressField,
+  AddressField
 } from './SpecialFields';
 
 interface FormRendererProps {
@@ -135,6 +137,8 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
         return <EmailField {...commonProps} />;
       case 'phone':
         return <PhoneField {...commonProps} />;
+      case 'international-phone':
+        return <InternationalPhoneField {...commonProps} />;
       case 'cpf':
         return <CPFField {...commonProps} />;
       case 'cep':
@@ -155,6 +159,8 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
         return <StarRatingField {...commonProps} />;
       case 'google-address':
         return <GoogleMapsAddressField {...commonProps} />;
+      case 'address':
+        return <AddressField {...commonProps} />;
       default:
         return (
           <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">

@@ -124,7 +124,8 @@ export const FormBuilderPage: React.FC = () => {
       label: 'Novo Campo',
       required: false,
       order: schema.sections[sectionIdx].fields.length + 1,
-      maxLength: 1500
+      maxLength: 1500,
+      addressFields: ['cep', 'state', 'city', 'street', 'neighborhood', 'number', 'complement', 'reference']
     };
     
     const newSections = [...schema.sections];
@@ -344,8 +345,9 @@ export const FormBuilderPage: React.FC = () => {
     { value: 'time', label: '⏰ Hora' },
     { value: 'email', label: '📧 Email' },
     { value: 'phone', label: '📱 Telefone' },
+    { value: 'international-phone', label: '🌍 Telefone Internacional' },
     { value: 'cpf', label: '🆔 CPF' },
-    { value: 'cep', label: '📍 CEP' },
+    { value: 'address', label: '🏠 Endereço Completo' },
     { value: 'textarea', label: '📄 Texto Longo' },
     { value: 'checkbox', label: '☑️ Checkbox' },
     { value: 'checkbox-group', label: '☑️ Grupo de Checkboxes' },
@@ -732,6 +734,41 @@ export const FormBuilderPage: React.FC = () => {
                                     className="w-20 px-2 py-1 text-xs border border-gray-300 rounded"
                                     placeholder="999999"
                                   />
+                                </div>
+                              </div>
+                            )}
+                            {field.type === 'address' && (
+                              <div className="mt-3 p-3 border border-gray-200 rounded-lg bg-gray-50">
+                                <label className="block text-xs font-medium text-gray-700 mb-2">
+                                  Campos do Endereço a Exibir:
+                                </label>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {[
+                                    { value: 'cep', label: 'CEP' },
+                                    { value: 'state', label: 'Estado' },
+                                    { value: 'city', label: 'Cidade' },
+                                    { value: 'street', label: 'Rua' },
+                                    { value: 'neighborhood', label: 'Bairro' },
+                                    { value: 'number', label: 'Número' },
+                                    { value: 'complement', label: 'Complemento' },
+                                    { value: 'reference', label: 'Ponto de Referência' },
+                                  ].map((option) => (
+                                    <label key={option.value} className="flex items-center space-x-2 cursor-pointer text-xs">
+                                      <input
+                                        type="checkbox"
+                                        checked={(field.addressFields || []).includes(option.value)}
+                                        onChange={(e) => {
+                                          const current = field.addressFields || [];
+                                          const updated = e.target.checked
+                                            ? [...current, option.value]
+                                            : current.filter(f => f !== option.value);
+                                          updateField(sectionIdx, fieldIdx, { addressFields: updated });
+                                        }}
+                                        className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                      />
+                                      <span className="text-gray-700">{option.label}</span>
+                                    </label>
+                                  ))}
                                 </div>
                               </div>
                             )}

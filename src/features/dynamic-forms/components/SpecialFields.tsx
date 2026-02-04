@@ -795,3 +795,245 @@ export const GoogleMapsAddressField: React.FC<SpecialFieldProps> = ({
     </div>
   );
 };
+
+// ========== ADDRESS FIELD (Endereço com CEP BrasilAPI) ==========
+export const AddressField: React.FC<SpecialFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+}) => {
+  const [loading, setLoading] = useState(false);
+  const [cepError, setCepError] = useState('');
+
+  // Campos configuráveis - quais campos devem aparecer
+  const enabledFields = field.addressFields || ['cep', 'state', 'city', 'street', 'neighborhood', 'number', 'complement', 'reference'];
+  
+  // Valor padrão
+  const addressData = value || {
+    cep: '',
+    state: '',
+    city: '',
+    street: '',
+    neighborhood: '',
+    number: '',
+    complement: '',
+    reference: ''
+  };
+
+  const handleCepChange = async (cep: string) => {
+    const cleanCep = cep.replace(/\D/g, '');
+    
+    // Atualiza o CEP
+    onChange({ ...addressData, cep: cleanCep });
+    setCepError('');
+
+    // Se o CEP tiver 8 dígitos, busca os dados
+    if (cleanCep.length === 8) {
+      try {
+        setLoading(true);
+        const response = await fetch(`https://brasilapi.com.br/api/cep/v2/${cleanCep}`);
+        
+        if (!response.ok) {
+          throw new Error('CEP não encontrado');
+        }
+
+        const data = await response.json();
+        
+        // Preenche os campos automaticamente
+        onChange({
+          ...addressData,
+          cep: cleanCep,
+          state: data.state || '',
+          city: data.city || '',
+          street: data.street || '',
+          neighborhood: data.neighborhood || ''
+        });
+      } catch (err) {
+        setCepError('CEP não encontrado');
+        console.error('Erro ao buscar CEP:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleFieldChange = (fieldName: string, fieldValue: string) => {
+    onChange({ ...addressData, [fieldName]: fieldValue });
+  };
+
+  const formatCep = (value: string) => {
+    const clean = value.replace(/\D/g, '');
+    if (clean.length <= 5) return clean;
+    return `${clean.slice(0, 5)}-${clean.slice(5, 8)}`;
+  };
+
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      
+      <div className="space-y-3">
+        {/* CEP */}
+        {enabledFields.includes('cep') && (
+          <div className="relative">
+            <label className="block text-xs text-gray-600 mb-1">CEP</label>
+            <div className="relative">
+              <input
+                type="text"
+                value={formatCep(addressData.cep || '')}
+                onChange={(e) => handleCepChange(e.target.value)}
+                placeholder="00000-000"
+                maxLength={9}
+                disabled={disabled || field.disabled}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                  cepError
+                    ? 'border-red-500 focus:ring-red-500'
+                    : 'border-gray-300 focus:ring-blue-500'
+                } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+              />
+              {loading && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                </div>
+              )}
+            </div>
+            {cepError && <p className="text-red-500 text-xs mt-1">{cepError}</p>}
+          </div>
+        )}
+
+        {/* Estado e Cidade na mesma linha */}
+        <div className="grid grid-cols-2 gap-3">
+          {enabledFields.includes('state') && (
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Estado</label>
+              <input
+                type="text"
+                value={addressData.state || ''}
+                onChange={(e) => handleFieldChange('state', e.target.value)}
+                placeholder="UF"
+                maxLength={2}
+                disabled={disabled || field.disabled}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 border-gray-300 focus:ring-blue-500 ${
+                  disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''
+                }`}
+              />
+            </div>
+          )}
+
+          {enabledFields.includes('city') && (
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Cidade</label>
+              <input
+                type="text"
+                value={addressData.city || ''}
+                onChange={(e) => handleFieldChange('city', e.target.value)}
+                placeholder="Cidade"
+                disabled={disabled || field.disabled}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 border-gray-300 focus:ring-blue-500 ${
+                  disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''
+                }`}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Endereço */}
+        {enabledFields.includes('street') && (
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">Endereço</label>
+            <input
+              type="text"
+              value={addressData.street || ''}
+              onChange={(e) => handleFieldChange('street', e.target.value)}
+              placeholder="Rua, Avenida, etc."
+              disabled={disabled || field.disabled}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 border-gray-300 focus:ring-blue-500 ${
+                disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''
+              }`}
+            />
+          </div>
+        )}
+
+        {/* Bairro e Número na mesma linha */}
+        <div className="grid grid-cols-2 gap-3">
+          {enabledFields.includes('neighborhood') && (
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Bairro</label>
+              <input
+                type="text"
+                value={addressData.neighborhood || ''}
+                onChange={(e) => handleFieldChange('neighborhood', e.target.value)}
+                placeholder="Bairro"
+                disabled={disabled || field.disabled}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 border-gray-300 focus:ring-blue-500 ${
+                  disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''
+                }`}
+              />
+            </div>
+          )}
+
+          {enabledFields.includes('number') && (
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Número</label>
+              <input
+                type="text"
+                value={addressData.number || ''}
+                onChange={(e) => handleFieldChange('number', e.target.value)}
+                placeholder="Nº"
+                disabled={disabled || field.disabled}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 border-gray-300 focus:ring-blue-500 ${
+                  disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''
+                }`}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Complemento */}
+        {enabledFields.includes('complement') && (
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">Complemento</label>
+            <input
+              type="text"
+              value={addressData.complement || ''}
+              onChange={(e) => handleFieldChange('complement', e.target.value)}
+              placeholder="Apto, Bloco, etc."
+              disabled={disabled || field.disabled}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 border-gray-300 focus:ring-blue-500 ${
+                disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''
+              }`}
+            />
+          </div>
+        )}
+
+        {/* Ponto de Referência */}
+        {enabledFields.includes('reference') && (
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">
+              <MapPin className="inline w-3 h-3 mr-1" />
+              Ponto de Referência
+            </label>
+            <input
+              type="text"
+              value={addressData.reference || ''}
+              onChange={(e) => handleFieldChange('reference', e.target.value)}
+              placeholder="Ex: Próximo ao mercado, ao lado da praça..."
+              disabled={disabled || field.disabled}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 border-gray-300 focus:ring-blue-500 ${
+                disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''
+              }`}
+            />
+          </div>
+        )}
+      </div>
+
+      {field.helpText && <p className="text-xs text-gray-500 mt-2">{field.helpText}</p>}
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+    </div>
+  );
+};
