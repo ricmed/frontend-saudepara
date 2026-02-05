@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/keycloak/AuthProvider';
 import FormService, { type FormSchema, type FormSection, type FormField, type FormRule, type RuleCondition, type RuleAction } from '@/services/FormService';
+import DatabaseService, { type TableColumn } from '@/services/DatabaseService';
 import { Plus, Trash2, Save, Eye, Settings, GripVertical, X, Download, Upload, ChevronUp, ChevronDown, Code, FileEdit } from 'lucide-react';
 import { FormRenderer } from '../components/FormRenderer';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
@@ -25,11 +26,17 @@ export const FormBuilderPage: React.FC = () => {
   const [showPreview, setShowPreview] = useState(false);
   const [activeTab, setActiveTab] = useState<'fields' | 'rules'>('fields');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Estados para configuração de banco de dados
+  const [availableTables, setAvailableTables] = useState<string[]>([]);
+  const [availableColumns, setAvailableColumns] = useState<Record<string, TableColumn[]>>({});
+  const [loadingTables, setLoadingTables] = useState(false);
 
   useEffect(() => {
     if (id) {
       loadForm();
     }
+    loadTables();
   }, [id]);
 
   const loadForm = async () => {
@@ -53,6 +60,32 @@ export const FormBuilderPage: React.FC = () => {
       alert('Erro ao carregar formulário');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadTables = async () => {
+    try {
+      setLoadingTables(true);
+      console.log('Carregando tabelas do banco...');
+      const tables = await DatabaseService.getTables();
+      console.log('Tabelas carregadas:', tables);
+      setAvailableTables(tables);
+    } catch (error) {
+      console.error('Erro ao carregar tabelas:', error);
+      alert('Erro ao carregar tabelas do banco de dados. Verifique se o backend está rodando.');
+    } finally {
+      setLoadingTables(false);
+    }
+  };
+
+  const loadColumns = async (table: string) => {
+    if (availableColumns[table]) return; // Já carregou
+    
+    try {
+      const columns = await DatabaseService.getColumns(table);
+      setAvailableColumns(prev => ({ ...prev, [table]: columns }));
+    } catch (error) {
+      console.error('Erro ao carregar colunas:', error);
     }
   };
 
@@ -124,7 +157,7 @@ export const FormBuilderPage: React.FC = () => {
       label: 'Novo Campo',
       required: false,
       order: schema.sections[sectionIdx].fields.length + 1,
-      maxLength: 1500,
+      maxLength: 255,
       addressFields: ['cep', 'state', 'city', 'street', 'neighborhood', 'number', 'complement', 'reference']
     };
     
@@ -703,13 +736,14 @@ export const FormBuilderPage: React.FC = () => {
                                   onChange={(e) => updateField(sectionIdx, fieldIdx, { maxLength: e.target.value ? Number(e.target.value) : undefined })}
                                   onBlur={(e) => {
                                     if (!e.target.value) {
-                                      updateField(sectionIdx, fieldIdx, { maxLength: 1500 });
+                                      const defaultValue = field.type === 'text' ? 255 : 1500;
+                                      updateField(sectionIdx, fieldIdx, { maxLength: defaultValue });
                                     }
                                   }}
                                   className="w-20 px-2 py-1 text-xs border border-gray-300 rounded"
                                   min="1"
                                   max="5000"
-                                  placeholder="1500"
+                                  placeholder={field.type === 'text' ? '255' : '1500'}
                                 />
                               </div>
                             )}
@@ -735,6 +769,189 @@ export const FormBuilderPage: React.FC = () => {
                                     placeholder="999999"
                                   />
                                 </div>
+                              </div>
+                            )}
+                            {(field.type === 'checkbox-group' || field.type === 'radio' || field.type === 'select' || field.type === 'select-search' || field.type === 'multi-select') && (
+                              <div className="mt-3 p-3 border border-gray-200 rounded-lg bg-gray-50">
+                                {/* Seletor de Origem dos Dados */}
+                                <div className="mb-3">
+                                  <label className="block text-xs font-medium text-gray-700 mb-2">
+                                    Origem dos Dados:
+                                  </label>
+                                  <div className="flex gap-4">
+                                    <label className="flex items-center cursor-pointer">
+                                      <input
+                                        type="radio"
+                                        name={`dataSource_${sectionIdx}_${fieldIdx}`}
+                                        checked={!field.dataSource || field.dataSource === 'manual'}
+                                        onChange={() => updateField(sectionIdx, fieldIdx, { 
+                                          dataSource: 'manual',
+                                          dataTable: undefined,
+                                          dataValueColumn: undefined,
+                                          dataLabelColumn: undefined
+                                        })}
+                                        className="w-3 h-3 text-blue-600"
+                                      />
+                                      <span className="ml-2 text-xs text-gray-700">Manual</span>
+                                    </label>
+                                    <label className="flex items-center cursor-pointer">
+                                      <input
+                                        type="radio"
+                                        name={`dataSource_${sectionIdx}_${fieldIdx}`}
+                                        checked={field.dataSource === 'database'}
+                                        onChange={() => updateField(sectionIdx, fieldIdx, { 
+                                          dataSource: 'database',
+                                          options: undefined
+                                        })}
+                                        className="w-3 h-3 text-blue-600"
+                                      />
+                                      <span className="ml-2 text-xs text-gray-700">Banco de Dados</span>
+                                    </label>
+                                  </div>
+                                </div>
+
+                                {/* Configuração Manual */}
+                                {(!field.dataSource || field.dataSource === 'manual') && (
+                                  <>
+                                    <div className="flex justify-between items-center mb-2">
+                                      <label className="block text-xs font-medium text-gray-700">
+                                        Opções:
+                                      </label>
+                                      <button
+                                        onClick={() => {
+                                          const newOption = { value: `option_${Date.now()}`, label: 'Nova Opção' };
+                                          updateField(sectionIdx, fieldIdx, { 
+                                            options: [...(field.options || []), newOption] 
+                                          });
+                                        }}
+                                        className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                                      >
+                                        + Adicionar Opção
+                                      </button>
+                                    </div>
+                                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                                      {(field.options || []).map((option, optIdx) => (
+                                        <div key={optIdx} className="flex gap-2 items-center">
+                                          <input
+                                            type="text"
+                                            value={option.label}
+                                            onChange={(e) => {
+                                              const newOptions = [...(field.options || [])];
+                                              newOptions[optIdx] = { ...newOptions[optIdx], label: e.target.value };
+                                              updateField(sectionIdx, fieldIdx, { options: newOptions });
+                                            }}
+                                            placeholder="Nome da opção"
+                                            className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded"
+                                          />
+                                          <input
+                                            type="text"
+                                            value={option.value}
+                                            onChange={(e) => {
+                                              const newOptions = [...(field.options || [])];
+                                              newOptions[optIdx] = { ...newOptions[optIdx], value: e.target.value };
+                                              updateField(sectionIdx, fieldIdx, { options: newOptions });
+                                            }}
+                                            placeholder="Valor"
+                                            className="w-24 px-2 py-1 text-xs border border-gray-300 rounded"
+                                          />
+                                          <button
+                                            onClick={() => {
+                                              const newOptions = (field.options || []).filter((_, i) => i !== optIdx);
+                                              updateField(sectionIdx, fieldIdx, { options: newOptions });
+                                            }}
+                                            className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded"
+                                          >
+                                            ✕
+                                          </button>
+                                        </div>
+                                      ))}
+                                      {(!field.options || field.options.length === 0) && (
+                                        <p className="text-xs text-gray-500 text-center py-2">Nenhuma opção adicionada</p>
+                                      )}
+                                    </div>
+                                  </>
+                                )}
+
+                                {/* Configuração de Banco de Dados */}
+                                {field.dataSource === 'database' && (
+                                  <div className="space-y-3">
+                                    {/* Seletor de Tabela */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Tabela:
+                                      </label>
+                                      <select
+                                        value={field.dataTable || ''}
+                                        onChange={(e) => {
+                                          const table = e.target.value;
+                                          updateField(sectionIdx, fieldIdx, { 
+                                            dataTable: table,
+                                            dataValueColumn: undefined,
+                                            dataLabelColumn: undefined
+                                          });
+                                          if (table) loadColumns(table);
+                                        }}
+                                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                                        disabled={loadingTables}
+                                      >
+                                        <option value="">
+                                          {loadingTables ? 'Carregando...' : 'Selecione uma tabela'}
+                                        </option>
+                                        {availableTables.map(table => (
+                                          <option key={table} value={table}>{table}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+
+                                    {/* Seletor de Coluna de Valor */}
+                                    {field.dataTable && (
+                                      <>
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            Coluna para Valor:
+                                          </label>
+                                          <select
+                                            value={field.dataValueColumn || ''}
+                                            onChange={(e) => updateField(sectionIdx, fieldIdx, { dataValueColumn: e.target.value })}
+                                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                                          >
+                                            <option value="">Selecione uma coluna</option>
+                                            {(availableColumns[field.dataTable] || []).map(col => (
+                                              <option key={col.name} value={col.name}>
+                                                {col.name} ({col.type})
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </div>
+
+                                        {/* Seletor de Coluna de Label */}
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            Coluna para Nome:
+                                          </label>
+                                          <select
+                                            value={field.dataLabelColumn || ''}
+                                            onChange={(e) => updateField(sectionIdx, fieldIdx, { dataLabelColumn: e.target.value })}
+                                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                                          >
+                                            <option value="">Selecione uma coluna</option>
+                                            {(availableColumns[field.dataTable] || []).map(col => (
+                                              <option key={col.name} value={col.name}>
+                                                {col.name} ({col.type})
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </div>
+
+                                        {field.dataValueColumn && field.dataLabelColumn && (
+                                          <p className="text-xs text-green-600">
+                                            ✓ Configurado: {field.dataTable}.{field.dataValueColumn} → {field.dataLabelColumn}
+                                          </p>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             )}
                             {field.type === 'address' && (

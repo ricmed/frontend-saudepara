@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { FormField } from '@/services/FormService';
 import CodeListService, { type CodeListItem } from '@/services/CodeListService';
+import DatabaseService from '@/services/DatabaseService';
 
 interface SelectFieldProps {
   field: FormField;
@@ -19,6 +20,36 @@ export const SelectField: React.FC<SelectFieldProps> = ({
   required,
   disabled,
 }) => {
+  const [options, setOptions] = useState(field.options || []);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (field.dataSource === 'database' && field.dataTable && field.dataValueColumn && field.dataLabelColumn) {
+      loadDatabaseOptions();
+    } else {
+      setOptions(field.options || []);
+    }
+  }, [field.dataSource, field.dataTable, field.dataValueColumn, field.dataLabelColumn, field.options]);
+
+  const loadDatabaseOptions = async () => {
+    if (!field.dataTable || !field.dataValueColumn || !field.dataLabelColumn) return;
+    
+    try {
+      setLoading(true);
+      const data = await DatabaseService.getTableData(
+        field.dataTable,
+        field.dataValueColumn,
+        field.dataLabelColumn
+      );
+      setOptions(data);
+    } catch (error) {
+      console.error('Erro ao carregar opções do banco:', error);
+      setOptions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="mb-4">
       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -28,15 +59,15 @@ export const SelectField: React.FC<SelectFieldProps> = ({
       <select
         value={value || ''}
         onChange={(e) => onChange(e.target.value)}
-        disabled={disabled || field.disabled}
+        disabled={disabled || field.disabled || loading}
         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
           error
             ? 'border-red-500 focus:ring-red-500'
             : 'border-gray-300 focus:ring-blue-500'
-        } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+        } ${disabled || field.disabled || loading ? 'bg-gray-100 cursor-not-allowed' : ''}`}
       >
-        <option value="">Selecione...</option>
-        {field.options?.map((option) => (
+        <option value="">{loading ? 'Carregando...' : 'Selecione...'}</option>
+        {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
           </option>

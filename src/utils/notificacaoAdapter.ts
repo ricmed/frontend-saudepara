@@ -610,6 +610,9 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
     ...((trimmedData as any).created_offline !== undefined && { created_offline: (trimmedData as any).created_offline }),
     ...((trimmedData as any).sincronizado !== undefined && { sincronizado: (trimmedData as any).sincronizado }),
     
+    // ✅ Campo updated_at obrigatório para criação/atualização
+    updated_at: new Date().toISOString(),
+    
     ...(trimmedData.dataInicioSintomas && {
       data_inicio_sintomas: processarDataParaUTC(
         trimmedData.dataInicioSintomas,

@@ -3,6 +3,7 @@ import PacienteService from '@/services/PacienteService';
 import { EstabelecimentoFormService } from '@/services/EstabelecimentoFormService';
 import { salvarNotificacaoCompleta } from '@/utils/notificacaoAdapter';
 import { toast } from 'react-toastify';
+import { convertLocalDateTimeToUTC } from '@/utils/timezoneUtils';
 
 class SyncService {
   private isOnline: boolean;
@@ -1303,17 +1304,36 @@ class SyncService {
     
     await this.checkAuthenticationStatus();
     
+    // ✅ Converter data_comunicacao de datetime-local para UTC antes de enviar
+    const formDataParaEnvio = { ...formData };
+    if (formDataParaEnvio.data_comunicacao) {
+      console.log('💾 [SYNC] Data original:', formDataParaEnvio.data_comunicacao);
+      
+      // Se não tiver Z ou +/-, é datetime-local e precisa converter
+      if (!formDataParaEnvio.data_comunicacao.includes('Z') && 
+          !formDataParaEnvio.data_comunicacao.includes('+') &&
+          formDataParaEnvio.data_comunicacao.length <= 16) {
+        const dataConvertida = convertLocalDateTimeToUTC(formDataParaEnvio.data_comunicacao);
+        console.log('💾 [SYNC] Data convertida para UTC:', dataConvertida);
+        formDataParaEnvio.data_comunicacao = dataConvertida;
+      } else {
+        console.log('💾 [SYNC] Data já está em UTC, não convertendo');
+      }
+    }
+    
+    console.log('💾 [SYNC] Dados que serão enviados ao backend:', formDataParaEnvio);
+    
     // Tentar salvar online primeiro (se disponível)
     if (this.shouldUseOnlineMode()) {
       try {
         const ComunicacaoDaeService = (await import('@/services/ComunicacaoDaeService')).default;
         
         if (isEdit && comunicacaoId) {
-          await ComunicacaoDaeService.update(comunicacaoId, formData);
+          await ComunicacaoDaeService.update(comunicacaoId, formDataParaEnvio);
           toast.success('✅ Comunicação DAE atualizada!');
           return { comunicacaoId };
         } else {
-          const result = await ComunicacaoDaeService.create(formData);
+          const result = await ComunicacaoDaeService.create(formDataParaEnvio);
           toast.success('✅ Comunicação DAE salva!');
           return { comunicacaoId: result.id_comunicacao };
         }
@@ -1323,7 +1343,7 @@ class SyncService {
       }
     }
 
-    // Salvar offline
+    // Salvar offline (mantém datetime-local)
     const formDataParaSalvar = { ...formData };
     
     console.log(`💾 Salvando ${isEdit ? 'edição' : 'nova comunicação DAE'} offline:`, {

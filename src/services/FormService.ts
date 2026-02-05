@@ -74,6 +74,14 @@ export interface FormField {
   pattern?: string;
   disabled?: boolean;
   hidden?: boolean;
+  helpText?: string;
+  // Configuração de origem de dados
+  dataSource?: 'manual' | 'database';
+  dataTable?: string;
+  dataValueColumn?: string;
+  dataLabelColumn?: string;
+  // Configuração de campos de endereço
+  addressFields?: string[];
 }
 
 export interface FormRule {

@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { FormField } from '@/services/FormService';
+import { getLocalDateTime, convertUTCToLocalDateTime } from '@/utils/timezoneUtils';
+import DatabaseService from '@/services/DatabaseService';
 import { Search, X } from 'lucide-react';
 import PhoneInput from '@/features/notificationForms/components/PhoneInput';
 
@@ -22,6 +24,35 @@ export const CheckboxGroupField: React.FC<AdvancedFieldProps> = ({
   disabled,
 }) => {
   const selectedValues = Array.isArray(value) ? value : [];
+  const [options, setOptions] = useState(field.options || []);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (field.dataSource === 'database' && field.dataTable && field.dataValueColumn && field.dataLabelColumn) {
+      loadDatabaseOptions();
+    } else {
+      setOptions(field.options || []);
+    }
+  }, [field.dataSource, field.dataTable, field.dataValueColumn, field.dataLabelColumn, field.options]);
+
+  const loadDatabaseOptions = async () => {
+    if (!field.dataTable || !field.dataValueColumn || !field.dataLabelColumn) return;
+    
+    try {
+      setLoading(true);
+      const data = await DatabaseService.getTableData(
+        field.dataTable,
+        field.dataValueColumn,
+        field.dataLabelColumn
+      );
+      setOptions(data);
+    } catch (error) {
+      console.error('Erro ao carregar opções do banco:', error);
+      setOptions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleToggle = (optionValue: string) => {
     if (selectedValues.includes(optionValue)) {
@@ -30,6 +61,18 @@ export const CheckboxGroupField: React.FC<AdvancedFieldProps> = ({
       onChange([...selectedValues, optionValue]);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          {field.label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+        <p className="text-sm text-gray-500">Carregando opções...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="mb-4">
@@ -41,7 +84,7 @@ export const CheckboxGroupField: React.FC<AdvancedFieldProps> = ({
         <p className="text-xs text-gray-500 mb-2">{field.helpText}</p>
       )}
       <div className="space-y-2">
-        {field.options?.map((option) => (
+        {options.map((option) => (
           <label key={option.value} className="flex items-center cursor-pointer group">
             <input
               type="checkbox"
@@ -74,6 +117,48 @@ export const RadioGroupField: React.FC<AdvancedFieldProps> = ({
   required,
   disabled,
 }) => {
+  const [options, setOptions] = useState(field.options || []);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (field.dataSource === 'database' && field.dataTable && field.dataValueColumn && field.dataLabelColumn) {
+      loadDatabaseOptions();
+    } else {
+      setOptions(field.options || []);
+    }
+  }, [field.dataSource, field.dataTable, field.dataValueColumn, field.dataLabelColumn, field.options]);
+
+  const loadDatabaseOptions = async () => {
+    if (!field.dataTable || !field.dataValueColumn || !field.dataLabelColumn) return;
+    
+    try {
+      setLoading(true);
+      const data = await DatabaseService.getTableData(
+        field.dataTable,
+        field.dataValueColumn,
+        field.dataLabelColumn
+      );
+      setOptions(data);
+    } catch (error) {
+      console.error('Erro ao carregar opções do banco:', error);
+      setOptions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          {field.label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+        <p className="text-sm text-gray-500">Carregando opções...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="mb-4">
       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -84,7 +169,7 @@ export const RadioGroupField: React.FC<AdvancedFieldProps> = ({
         <p className="text-xs text-gray-500 mb-2">{field.helpText}</p>
       )}
       <div className="space-y-2">
-        {field.options?.map((option) => (
+        {options.map((option) => (
           <label key={option.value} className="flex items-center cursor-pointer group">
             <input
               type="radio"
@@ -120,11 +205,40 @@ export const MultiSelectField: React.FC<AdvancedFieldProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
+  const [options, setOptions] = useState(field.options || []);
+  const [loading, setLoading] = useState(false);
   const selectedValues = Array.isArray(value) ? value : [];
 
-  const filteredOptions = field.options?.filter(option =>
+  useEffect(() => {
+    if (field.dataSource === 'database' && field.dataTable && field.dataValueColumn && field.dataLabelColumn) {
+      loadDatabaseOptions();
+    } else {
+      setOptions(field.options || []);
+    }
+  }, [field.dataSource, field.dataTable, field.dataValueColumn, field.dataLabelColumn, field.options]);
+
+  const loadDatabaseOptions = async () => {
+    if (!field.dataTable || !field.dataValueColumn || !field.dataLabelColumn) return;
+    
+    try {
+      setLoading(true);
+      const data = await DatabaseService.getTableData(
+        field.dataTable,
+        field.dataValueColumn,
+        field.dataLabelColumn
+      );
+      setOptions(data);
+    } catch (error) {
+      console.error('Erro ao carregar opções do banco:', error);
+      setOptions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredOptions = options.filter(option =>
     option.label.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  );
 
   const handleToggle = (optionValue: string) => {
     if (selectedValues.includes(optionValue)) {
@@ -140,7 +254,7 @@ export const MultiSelectField: React.FC<AdvancedFieldProps> = ({
 
   const getSelectedLabels = () => {
     return selectedValues
-      .map(val => field.options?.find(opt => opt.value === val)?.label)
+      .map(val => options.find(opt => opt.value === val)?.label)
       .filter(Boolean);
   };
 
@@ -270,16 +384,22 @@ export const DateTimeField: React.FC<AdvancedFieldProps> = ({
   required,
   disabled,
 }) => {
-  // Obtém data/hora atual no fuso horário local no formato datetime-local (YYYY-MM-DDTHH:MM)
-  const getLocalDateTime = () => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
-  };
+  // Normaliza o valor vindo do backend (se for UTC, converte para local)
+  const normalizedValue = React.useMemo(() => {
+    if (!value) return '';
+    
+    // Se o valor já está no formato datetime-local (YYYY-MM-DDTHH:MM), usar direto
+    if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+      return value;
+    }
+    
+    // Se parece com UTC ou ISO, converter
+    if (typeof value === 'string' && (value.includes('Z') || value.includes('+') || value.length > 16)) {
+      return convertUTCToLocalDateTime(value);
+    }
+    
+    return value;
+  }, [value]);
 
   const now = getLocalDateTime();
   // Usa field.max apenas se for uma string válida, caso contrário usa agora como máximo
@@ -287,13 +407,13 @@ export const DateTimeField: React.FC<AdvancedFieldProps> = ({
 
   const incrementDateTime = () => {
     // Se não houver valor, define como agora
-    if (!value) {
+    if (!normalizedValue) {
       onChange(now);
       return;
     }
     
     // Se houver valor, incrementa 1 dia
-    const currentDateTime = new Date(value);
+    const currentDateTime = new Date(normalizedValue);
     const maxDateTimeObj = new Date(maxDateTime);
     
     // Só incrementa se a data/hora atual for menor que a máxima
@@ -310,13 +430,13 @@ export const DateTimeField: React.FC<AdvancedFieldProps> = ({
 
   const decrementDateTime = () => {
     // Se não houver valor, define como agora
-    if (!value) {
+    if (!normalizedValue) {
       onChange(now);
       return;
     }
     
     // Se houver valor, decrementa 1 dia
-    const currentDateTime = new Date(value);
+    const currentDateTime = new Date(normalizedValue);
     currentDateTime.setDate(currentDateTime.getDate() - 1);
     const year = currentDateTime.getFullYear();
     const month = String(currentDateTime.getMonth() + 1).padStart(2, '0');
@@ -327,7 +447,7 @@ export const DateTimeField: React.FC<AdvancedFieldProps> = ({
   };
 
   // Desabilita o botão + apenas se já estiver na data/hora máxima
-  const isPlusDisabled = disabled || field.disabled || (!!value && value >= maxDateTime);
+  const isPlusDisabled = disabled || field.disabled || (!!normalizedValue && normalizedValue >= maxDateTime);
 
   return (
     <div className="mb-4">
@@ -346,7 +466,7 @@ export const DateTimeField: React.FC<AdvancedFieldProps> = ({
         </button>
         <input
           type="datetime-local"
-          value={value || ''}
+          value={normalizedValue}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled || field.disabled}
           min={field.min}

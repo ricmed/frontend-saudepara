@@ -26,6 +26,7 @@ import {
   GoogleMapsAddressField,
   AddressField
 } from './SpecialFields';
+import { convertLocalDateTimeToUTC } from '@/utils/timezoneUtils';
 
 interface FormRendererProps {
   schema: FormSchema;
@@ -67,13 +68,38 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     onDataChange,
   });
 
+  // Função para converter campos datetime-local para UTC antes de enviar
+  const convertDateTimeFieldsToUTC = (data: Record<string, any>, schema: FormSchema): Record<string, any> => {
+    const result = { ...data };
+    
+    // Percorrer todas as seções e campos para encontrar datetime fields
+    schema.sections.forEach(section => {
+      section.fields.forEach(field => {
+        if (field.type === 'datetime' && result[field.key]) {
+          const value = result[field.key];
+          // Se for datetime-local (sem timezone), converter para UTC
+          if (typeof value === 'string' && 
+              !value.includes('Z') && 
+              !value.includes('+') &&
+              value.length <= 16) {
+            result[field.key] = convertLocalDateTimeToUTC(value);
+          }
+        }
+      });
+    });
+    
+    return result;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (readOnly) return;
 
     if (validateAll()) {
-      onSubmit?.(formData);
+      // Converter datetime fields antes de enviar
+      const dataToSubmit = convertDateTimeFieldsToUTC(formData, schema);
+      onSubmit?.(dataToSubmit);
     }
   };
 
@@ -82,7 +108,9 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     
     if (readOnly) return;
 
-    onSaveDraft?.(formData);
+    // Converter datetime fields antes de salvar rascunho também
+    const dataToSave = convertDateTimeFieldsToUTC(formData, schema);
+    onSaveDraft?.(dataToSave);
   };
 
   const renderField = (field: any) => {

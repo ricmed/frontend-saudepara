@@ -31,23 +31,7 @@ import { useOfflineSystem } from '@/hooks/useOfflineSystem';
 import { OfflineComunicacaoDaeServiceProxy } from '@/services/OfflineComunicacaoDaeServiceProxy';
 import ConnectionStatus from '@/components/ConnectionStatus';
 import indexedDBService from '@/services/indexedDB';
-
-// Funções auxiliares para timezone
-const getLocalDateTime = (date: Date = new Date()): string => {
-  // Converte para timezone America/Belem (UTC-3)
-  const localDate = new Date(date.toLocaleString('en-US', { timeZone: 'America/Belem' }));
-  const year = localDate.getFullYear();
-  const month = String(localDate.getMonth() + 1).padStart(2, '0');
-  const day = String(localDate.getDate()).padStart(2, '0');
-  const hours = String(localDate.getHours()).padStart(2, '0');
-  const minutes = String(localDate.getMinutes()).padStart(2, '0');
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
-};
-
-const convertUTCToLocal = (utcDateString: string): string => {
-  const date = new Date(utcDateString);
-  return getLocalDateTime(date);
-};
+import { getLocalDateTime, convertUTCToLocalDateTime } from '@/utils/timezoneUtils';
 
 // Função para normalizar texto (remover acentos e converter para maiúsculas)
 const normalizeText = (text: string): string => {
@@ -218,8 +202,12 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       
       setComunicacaoCompleta(data);
       
+      console.log('📅 Data recebida do backend:', data.data_comunicacao);
+      const dataConvertida = convertUTCToLocalDateTime(data.data_comunicacao);
+      console.log('📅 Data convertida para local:', dataConvertida);
+      
       setFormData({
-        data_comunicacao: convertUTCToLocal(data.data_comunicacao),
+        data_comunicacao: dataConvertida,
         nome_paciente: normalizeText(data.nome_paciente),
         observacao_descricao: normalizeText(data.observacao_descricao || ''),
         id_municipio_ocorrencia: data.id_municipio_ocorrencia,
