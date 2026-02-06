@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Search, X, Check, AlertCircle } from 'lucide-react';
 import { Dae } from '@/services/DaeService';
 
@@ -16,17 +16,45 @@ const DaeCheckboxList: React.FC<DaeCheckboxListProps> = ({
   error
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Capturar o DAE selecionado APENAS no carregamento inicial
+  // Não atualizar durante a interação do usuário
+  const initialSelectedDaeId = useRef<number | null>(null);
+  const hasSetInitialValue = useRef(false);
+  
+  useEffect(() => {
+    // Define apenas uma vez quando selectedDaeId for carregado do backend (> 0)
+    if (!hasSetInitialValue.current && selectedDaeId > 0) {
+      initialSelectedDaeId.current = selectedDaeId;
+      hasSetInitialValue.current = true;
+    }
+  }, [selectedDaeId]);
 
-  // Filtrar DAEs com base na busca
+  // Filtrar e ordenar DAEs
   const filteredDaes = useMemo(() => {
-    if (!searchTerm) return daes;
+    let result = [...daes]; // Criar cópia para não mutar o original
     
-    const lowerSearch = searchTerm.toLowerCase();
-    return daes.filter(dae => 
-      dae.nome.toLowerCase().includes(lowerSearch) ||
-      dae.codigo?.toLowerCase().includes(lowerSearch)
-    );
-  }, [daes, searchTerm]);
+    // Aplicar filtro de busca se houver
+    if (searchTerm) {
+      const lowerSearch = searchTerm.toLowerCase();
+      result = result.filter(dae => 
+        dae.nome.toLowerCase().includes(lowerSearch) ||
+        dae.codigo?.toLowerCase().includes(lowerSearch)
+      );
+    }
+    
+    // Ordenar: apenas se houver um DAE selecionado INICIALMENTE (do banco)
+    // Não reordena durante a seleção do usuário
+    if (initialSelectedDaeId.current && initialSelectedDaeId.current > 0) {
+      result.sort((a, b) => {
+        if (a.id_dae === initialSelectedDaeId.current) return -1;
+        if (b.id_dae === initialSelectedDaeId.current) return 1;
+        return 0;
+      });
+    }
+    
+    return result;
+  }, [daes, searchTerm, initialSelectedDaeId.current]);
 
   return (
     <div className="space-y-4">

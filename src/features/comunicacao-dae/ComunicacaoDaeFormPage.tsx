@@ -79,6 +79,8 @@ const ComunicacaoDaeFormPage: React.FC = () => {
     data_comunicacao: getLocalDateTime(),
     nome_paciente: '',
     observacao_descricao: '',
+    digitador: '',
+    telefone_digitador: '',
     id_municipio_ocorrencia: 0,
     origem_tipo: 'CRS' as OrigemTipo,
     origem_id: 0,
@@ -112,6 +114,8 @@ const ComunicacaoDaeFormPage: React.FC = () => {
         data_comunicacao: getLocalDateTime(),
         nome_paciente: '',
         observacao_descricao: '',
+        digitador: '',
+        telefone_digitador: '',
         id_municipio_ocorrencia: 0,
         origem_tipo: 'CRS' as OrigemTipo,
         origem_id: 0,
@@ -157,8 +161,6 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       setNhes(nhesData);
       setCievsList(cievsData);
       setCrsList(crsData);
-      
-      console.log(`✅ Opções carregadas: ${daesData.length} DAEs, ${nhesData.length} NHEs, ${cievsData.length} CIEVS, ${crsData.length} CRS`);
     } catch (err) {
       console.error('Erro ao carregar opções:', err);
       setError('Erro ao carregar dados do formulário. Alguns dados podem estar indisponíveis offline.');
@@ -182,18 +184,13 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       // ✅ ONLINE: API primeiro, cache como fallback
       let data: ComunicacaoDae;
       try {
-        console.log(`🔍 Buscando comunicação ${comunicacaoId} da API...`);
         data = await ComunicacaoDaeService.getById(comunicacaoId);
-        console.log('✅ Comunicação carregada da API');
       } catch (err) {
-        console.warn('⚠️ API falhou, tentando buscar do cache offline...', err);
-        
         // ✅ FALLBACK: Tentar buscar do cache offline
         const cachedData = await indexedDBService.getOpcoes('comunicacoes_dae');
         const comunicacaoOffline = cachedData?.find((c: any) => c.id_comunicacao === comunicacaoId);
         
         if (comunicacaoOffline) {
-          console.log('✅ Comunicação encontrada no cache offline');
           data = comunicacaoOffline;
         } else {
           throw new Error('Comunicação não encontrada na API nem no cache offline');
@@ -202,14 +199,14 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       
       setComunicacaoCompleta(data);
       
-      console.log('📅 Data recebida do backend:', data.data_comunicacao);
       const dataConvertida = convertUTCToLocalDateTime(data.data_comunicacao);
-      console.log('📅 Data convertida para local:', dataConvertida);
       
       setFormData({
         data_comunicacao: dataConvertida,
         nome_paciente: normalizeText(data.nome_paciente),
         observacao_descricao: normalizeText(data.observacao_descricao || ''),
+        digitador: data.digitador ? normalizeText(data.digitador) : '',
+        telefone_digitador: data.telefone_digitador || '',
         id_municipio_ocorrencia: data.id_municipio_ocorrencia,
         origem_tipo: data.origem_tipo,
         origem_id: data.origem_id,
@@ -228,15 +225,12 @@ const ComunicacaoDaeFormPage: React.FC = () => {
           if (municipioData && municipioData.tipo_estado_idtipo_estado) {
             // Setar UF primeiro
             setUfOcorrencia(String(municipioData.tipo_estado_idtipo_estado));
-            console.log(`✅ UF carregada: ${municipioData.tipo_estado_idtipo_estado}`);
             
             // Pequeno delay para garantir que a UF foi setada antes do município
             setTimeout(() => {
               setMunicipioOcorrencia(String(data.id_municipio_ocorrencia));
-              console.log(`✅ Município carregado: ${data.id_municipio_ocorrencia}`);
             }, 100);
           } else {
-            console.warn('⚠️ Não foi possível encontrar a UF do município no cache');
             // Tentar buscar do backend como fallback
             try {
               const server = import.meta.env.VITE_API_SERVER || "";
@@ -251,12 +245,11 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                 }, 100);
               }
             } catch (apiErr) {
-              console.error('❌ Erro ao buscar município da API:', apiErr);
               setError('Não foi possível carregar o município de ocorrência. Verifique sua conexão.');
             }
           }
         } catch (err) {
-          console.error('❌ Erro ao buscar UF do município:', err);
+          // Silenciar erro
         }
       }
 
@@ -275,7 +268,6 @@ const ComunicacaoDaeFormPage: React.FC = () => {
     
     // ✅ PROTEÇÃO: Prevenir múltiplas submissões
     if (loading || uploadingAnexo) {
-      console.warn('⚠️ Submissão bloqueada: operação em andamento');
       return;
     }
     
@@ -892,6 +884,71 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                   <p className={`text-xs font-medium ${(formData.observacao_descricao?.length || 0) > 1200 ? 'text-orange-600' : 'text-gray-500'}`}>
                     {formData.observacao_descricao?.length || 0}/1500
                   </p>
+                </div>
+              </div>
+
+              {/* Digitador e Telefone */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Nome do Digitador */}
+                <div>
+                  <label htmlFor="digitador" className={labelClass}>
+                    Nome do Digitador
+                    <span className="text-gray-400 text-sm ml-2">(opcional)</span>
+                  </label>
+                  <input
+                    id="digitador"
+                    type="text"
+                    value={formData.digitador || ''}
+                    onChange={(e) => setFormData({ ...formData, digitador: normalizeText(e.target.value) })}
+                    className={inputClass}
+                    placeholder="Ex: MARIA OLIVEIRA SANTOS"
+                    maxLength={150}
+                  />
+                  <p className="mt-1.5 text-xs text-gray-500 flex items-center justify-between">
+                    <span>Nome de quem está inserindo os dados (será convertido para MAIÚSCULAS sem acentos)</span>
+                    <span className="font-medium">{(formData.digitador || '').length}/150</span>
+                  </p>
+                </div>
+
+                {/* Telefone do Digitador */}
+                <div>
+                  <label htmlFor="telefone_digitador" className={labelClass}>
+                    Telefone do Digitador
+                    <span className="text-gray-400 text-sm ml-2">(opcional)</span>
+                  </label>
+                  <input
+                    id="telefone_digitador"
+                    type="tel"
+                    value={formData.telefone_digitador || ''}
+                    onChange={(e) => {
+                      // Aplicar máscara de telefone brasileiro
+                      let value = e.target.value.replace(/\D/g, ''); // Remove tudo que não é dígito
+                      
+                      // Limitar a 11 dígitos (DDD + 9 dígitos)
+                      if (value.length > 11) {
+                        value = value.substring(0, 11);
+                      }
+                      
+                      // Aplicar máscara: (99) 99999-9999 ou (99) 9999-9999
+                      if (value.length > 10) {
+                        // Celular com 9 dígitos
+                        value = value.replace(/^(\d{2})(\d{5})(\d{4}).*/, '($1) $2-$3');
+                      } else if (value.length > 6) {
+                        // Fixo com 8 dígitos ou celular parcial
+                        value = value.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, '($1) $2-$3');
+                      } else if (value.length > 2) {
+                        value = value.replace(/^(\d{2})(\d{0,5})/, '($1) $2');
+                      } else if (value.length > 0) {
+                        value = value.replace(/^(\d{0,2})/, '($1');
+                      }
+                      
+                      setFormData({ ...formData, telefone_digitador: value });
+                    }}
+                    className={inputClass}
+                    placeholder="(91) 98765-4321"
+                    maxLength={15}
+                  />
+                  <p className="mt-1.5 text-xs text-gray-500">Telefone de contato do digitador (celular ou fixo com DDD)</p>
                 </div>
               </div>
             </div>

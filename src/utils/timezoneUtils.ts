@@ -12,8 +12,6 @@ export const getTimezoneInfo = () => {
     const now = new Date();
     const timezone_offset_minutos = -now.getTimezoneOffset();
     
-    console.log(`🌍 Timezone detectado: ${timezone_name} (UTC${timezone_offset_minutos >= 0 ? '+' : ''}${timezone_offset_minutos / 60})`);
-    
     return {
       timezone_name,
       timezone_offset_minutos
@@ -96,7 +94,6 @@ export const convertLocalDateToUTC = (localDateString: string): string => {
     const offsetString = `${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
     
     const result = `${isoString}${offsetString}`;
-    console.log(`📤 Convertendo para backend: ${localDateString} -> ${result}`);
     
     return result;
   } catch (error) {
@@ -226,8 +223,6 @@ export const convertUTCToLocalDateTime = (utcDateString: string | null | undefin
     // Garante que a string seja interpretada como UTC
     let dateStr = utcDateString.trim();
     
-    console.log('🔍 convertUTCToLocalDateTime - Input:', dateStr);
-    
     // Se for apenas uma data sem horário nem timezone, adiciona horário
     if (!dateStr.includes('T')) {
       dateStr = dateStr + 'T00:00:00Z';
@@ -237,20 +232,14 @@ export const convertUTCToLocalDateTime = (utcDateString: string | null | undefin
       dateStr = dateStr + 'Z';
     }
     
-    console.log('🔍 convertUTCToLocalDateTime - DateStr com Z:', dateStr);
-    
     const date = new Date(dateStr);
-    
-    console.log('🔍 convertUTCToLocalDateTime - Date object:', date.toISOString());
     
     // Verifica se a data é válida
     if (isNaN(date.getTime())) {
-      console.warn('⚠️ Data inválida:', utcDateString);
       return getLocalDateTime();
     }
     
     const result = getLocalDateTime(date);
-    console.log('🔍 convertUTCToLocalDateTime - Result:', result);
     
     return result;
   } catch (error) {
@@ -268,13 +257,10 @@ export const convertLocalDateTimeToUTC = (localDateTimeString: string): string =
   if (!localDateTimeString) return new Date().toISOString();
   
   try {
-    console.log('📤 convertLocalDateTimeToUTC - Input:', localDateTimeString);
-    
     // Parse da string local
     const parts = localDateTimeString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
     
     if (!parts) {
-      console.warn('⚠️ Formato de datetime inválido:', localDateTimeString);
       return new Date().toISOString();
     }
     
@@ -282,15 +268,11 @@ export const convertLocalDateTimeToUTC = (localDateTimeString: string): string =
     
     // Criar string de data completa com segundos (sem timezone)
     const dateString = `${year}-${month}-${day}T${hour}:${minute}:00`;
-    console.log('📤 DateString criada:', dateString);
     
     // ✅ CORREÇÃO: new Date() sem timezone interpreta como horário LOCAL do navegador
     // e toISOString() já converte automaticamente para UTC!
     const localDate = new Date(dateString);
     const utcString = localDate.toISOString();
-    
-    console.log('📤 Data local do navegador:', localDate.toString());
-    console.log('📤 Convertido para UTC:', utcString);
     
     return utcString;
   } catch (error) {

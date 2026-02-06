@@ -22,6 +22,8 @@ export interface ComunicacaoDae {
   data_comunicacao: string;
   nome_paciente: string;
   observacao_descricao?: string;
+  digitador?: string;
+  telefone_digitador?: string;
   id_municipio_ocorrencia: number;
   origem_tipo: OrigemTipo;
   origem_id: number;
@@ -42,9 +44,12 @@ export interface ComunicacaoDae {
 
 export interface ComunicacaoDaeListResponse {
   data: ComunicacaoDae[];
-  total: number;
-  page: number;
-  limit: number;
+  pagination: {
+    currentPage: number;
+    itemsPerPage: number;
+    pages: number;
+    total: number;
+  };
 }
 
 export interface ComunicacaoDaeFilters {
@@ -60,6 +65,8 @@ export interface CreateComunicacaoDaeData {
   data_comunicacao: string;
   nome_paciente: string;
   observacao_descricao?: string;
+  digitador?: string;
+  telefone_digitador?: string;
   id_municipio_ocorrencia: number;
   origem_tipo: OrigemTipo;
   origem_id: number;
@@ -70,6 +77,8 @@ export interface UpdateComunicacaoDaeData {
   data_comunicacao?: string;
   nome_paciente?: string;
   observacao_descricao?: string;
+  digitador?: string;
+  telefone_digitador?: string;
   id_municipio_ocorrencia?: number;
   origem_tipo?: OrigemTipo;
   origem_id?: number;

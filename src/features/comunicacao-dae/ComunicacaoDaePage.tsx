@@ -78,7 +78,7 @@ const ComunicacaoDaePage: React.FC = () => {
 
   useEffect(() => {
     loadComunicacoes();
-  }, [currentPage, filters]);
+  }, [currentPage, filters, itemsPerPage]);
 
   // Fechar dropdown de pesquisa ao clicar fora
   useEffect(() => {
@@ -180,34 +180,22 @@ const ComunicacaoDaePage: React.FC = () => {
       let filtrosComPermissoes = { ...filters };
       
       try {
-        console.log('🔒 Verificando permissões do usuário para comunicações DAE...');
         const userAccess = await usuarioGestaoService.getUserAccess();
         
         if (userAccess) {
-          console.log('📋 Permissões do usuário:', userAccess);
-          
           // Se o usuário tem acesso apenas a um estabelecimento, aplicar filtro
           if (userAccess.isEstabelecimento && userAccess.estabelecimentoId) {
-            console.log(`🔒 Aplicando filtro de segurança: estabelecimento ID ${userAccess.estabelecimentoId}`);
             filtrosComPermissoes.estabelecimento_id = userAccess.estabelecimentoId;
-          }
-          // TODO: Implementar filtros para município e estado no futuro
-          else if (userAccess.isMunicipio && userAccess.municipioId) {
-            console.log(`🔒 Usuário de município: ${userAccess.municipioId} (filtro não implementado ainda)`);
-          } else if (userAccess.isEstado && userAccess.estadoId) {
-            console.log(`🔒 Usuário de estado: ${userAccess.estadoId} (filtro não implementado ainda)`);
-          } else {
-            console.log('✅ Usuário com acesso total - sem filtros de segurança');
           }
         }
       } catch (permError) {
-        console.warn('⚠️ Erro ao verificar permissões, continuando sem filtros:', permError);
+        // Silenciar erro de permissões
       }
       
       const response = await ComunicacaoDaeService.getAll(currentPage, itemsPerPage, filtrosComPermissoes);
-      setComunicacoes(response.data);
-      setTotal(response.total);
-      setTotalPages(Math.ceil(response.total / itemsPerPage));
+      setComunicacoes(response.data || []);
+      setTotal(response.pagination?.total || 0);
+      setTotalPages(response.pagination?.pages || 1);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Erro ao carregar comunicações');
       console.error('Erro ao carregar comunicações:', err);
@@ -814,18 +802,18 @@ const ComunicacaoDaePage: React.FC = () => {
               </div>
             </div>
 
-            {/* Paginação Moderna */}
-            {totalPages > 1 && (
-              <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                  {/* Informações de Registros */}
-                  <div className="text-sm text-gray-600">
-                    Mostrando <span className="font-semibold text-gray-900">{((currentPage - 1) * itemsPerPage) + 1}</span> a{' '}
-                    <span className="font-semibold text-gray-900">{Math.min(currentPage * itemsPerPage, total)}</span> de{' '}
-                    <span className="font-semibold text-gray-900">{total}</span> registros
-                  </div>
+            {/* Paginação e Controles */}
+            <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                {/* Informações de Registros */}
+                <div className="text-sm text-gray-600">
+                  Mostrando <span className="font-semibold text-gray-900">{total > 0 ? ((currentPage - 1) * itemsPerPage) + 1 : 0}</span> a{' '}
+                  <span className="font-semibold text-gray-900">{Math.min(currentPage * itemsPerPage, total)}</span> de{' '}
+                  <span className="font-semibold text-gray-900">{total}</span> registros
+                </div>
 
-                  {/* Controles de Paginação */}
+                {/* Controles de Paginação - Só mostra se houver múltiplas páginas */}
+                {totalPages > 1 && (
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => setCurrentPage(1)}
@@ -864,27 +852,27 @@ const ComunicacaoDaePage: React.FC = () => {
                       »»
                     </button>
                   </div>
+                )}
 
-                  {/* Seletor de Itens por Página */}
-                  <div className="flex items-center space-x-2">
-                    <label className="text-sm text-gray-600 font-medium">Itens por página:</label>
-                    <select
-                      value={itemsPerPage}
-                      onChange={(e) => {
-                        setItemsPerPage(Number(e.target.value));
-                        setCurrentPage(1);
-                      }}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium"
-                    >
-                      <option value={10}>10</option>
-                      <option value={25}>25</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
-                  </div>
+                {/* Seletor de Itens por Página - SEMPRE VISÍVEL */}
+                <div className="flex items-center space-x-2">
+                  <label className="text-sm text-gray-600 font-medium whitespace-nowrap">Itens por página:</label>
+                  <select
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      setItemsPerPage(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium"
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
                 </div>
               </div>
-            )}
+            </div>
           </>
         )}
       </main>
