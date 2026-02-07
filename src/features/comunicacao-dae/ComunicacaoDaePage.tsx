@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FileText, Calendar, MapPin, Filter, X, Trash2, Edit, Eye, Menu, Download, ChevronDown, Search, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, Wifi, WifiOff } from 'lucide-react';
+import { Plus, FileText, Calendar, MapPin, Filter, X, Trash2, Edit, Eye, Menu, Download, ChevronDown, Search, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, Wifi, WifiOff, BarChart2 } from 'lucide-react';
 import ComunicacaoDaeService, { ComunicacaoDae, ComunicacaoDaeFilters } from '@/services/ComunicacaoDaeService';
 import { SideMenu } from '@/features/home/components/SideMenu';
 import { usuarioGestaoService } from '@/services/UsuarioGestaoService'; // 🔒 Importar service de permissões
@@ -421,6 +421,15 @@ const ComunicacaoDaePage: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {/* Botão Dashboard */}
+              <button
+                onClick={() => navigate('/private/comunicacao-dae/dashboard')}
+                className="flex items-center space-x-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white px-4 py-2.5 rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-200 shadow-md font-medium"
+              >
+                <BarChart2 className="w-5 h-5" />
+                <span className="hidden sm:inline">Dashboard</span>
+              </button>
 
               {/* Botão Nova Comunicação */}
               <button

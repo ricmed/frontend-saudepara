@@ -211,6 +211,112 @@ export const exportChartAsPNG = async (chartId: string, title: string): Promise<
   }
 };
 
+// 📋 EXPORTAÇÃO PARA JSON (Dados Estruturados)
+export const exportChartAsJSON = (data: ChartDataItem[], title: string): void => {
+  try {
+    // Preparar dados JSON com metadados
+    const jsonData = {
+      title,
+      exportDate: new Date().toISOString(),
+      exportDateFormatted: new Date().toLocaleString('pt-BR'),
+      totalItems: data.length,
+      totalValue: data.reduce((sum, item) => sum + item.value, 0),
+      data: data.map(item => ({
+        name: item.name,
+        value: item.value,
+        fill: item.fill || null,
+        isAlarmante: item.isAlarmante || false
+      }))
+    };
+
+    // Criar string JSON formatada
+    const jsonString = JSON.stringify(jsonData, null, 2);
+    
+    // Criar blob e download
+    const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    
+    console.log(`✅ JSON exportado: ${link.download}`);
+  } catch (error) {
+    console.error('❌ Erro ao exportar JSON:', error);
+    alert('Erro ao exportar JSON');
+  }
+};
+
+// 🎨 EXPORTAÇÃO PARA SVG (Vetorial - Alta Qualidade)
+export const exportChartAsSVG = async (chartId: string, title: string): Promise<void> => {
+  try {
+    const element = document.getElementById(chartId);
+    if (!element) {
+      alert('Elemento do gráfico não encontrado!');
+      return;
+    }
+
+    // Procurar pelo elemento SVG dentro do container
+    const svgElement = element.querySelector('svg');
+    if (!svgElement) {
+      alert('Gráfico SVG não encontrado! Este formato só funciona para gráficos baseados em SVG.');
+      return;
+    }
+
+    // Clonar o SVG para não alterar o original
+    const clonedSvg = svgElement.cloneNode(true) as SVGElement;
+    
+    // Obter dimensões do SVG
+    const bbox = svgElement.getBBox();
+    const width = bbox.width || svgElement.clientWidth || 800;
+    const height = bbox.height || svgElement.clientHeight || 600;
+    
+    // Configurar atributos do SVG clonado
+    clonedSvg.setAttribute('width', width.toString());
+    clonedSvg.setAttribute('height', height.toString());
+    clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    
+    // Adicionar estilos inline ao SVG
+    const styles = Array.from(document.styleSheets)
+      .map(sheet => {
+        try {
+          return Array.from(sheet.cssRules)
+            .map(rule => rule.cssText)
+            .join('\n');
+        } catch (e) {
+          return '';
+        }
+      })
+      .join('\n');
+    
+    // Criar elemento de estilo
+    const styleElement = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+    styleElement.textContent = styles;
+    clonedSvg.insertBefore(styleElement, clonedSvg.firstChild);
+    
+    // Serializar o SVG
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(clonedSvg);
+    
+    // Criar blob e download
+    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.svg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    
+    console.log(`✅ SVG exportado: ${link.download}`);
+  } catch (error) {
+    console.error('❌ Erro ao exportar SVG:', error);
+    alert('Erro ao exportar SVG. Este formato funciona apenas para gráficos baseados em SVG.');
+  }
+};
+
 // 📄 EXPORTAÇÃO PARA PDF
 export const exportChartAsPDF = async (chartId: string, title: string): Promise<void> => {
   try {
@@ -461,28 +567,85 @@ export const exportChartAsWord = async (chartId: string, data: ChartDataItem[], 
           <xml>
             <w:WordDocument>
               <w:View>Print</w:View>
-              <w:Zoom>90</w:Zoom>
+              <w:Zoom>100</w:Zoom>
               <w:DoNotPromptForConvert/>
               <w:DoNotShowRevisions/>
               <w:DoNotPrintRevisions/>
             </w:WordDocument>
+            <w:PageSetup>
+              <w:PageWidth>11906</w:PageWidth>
+              <w:PageHeight>16838</w:PageHeight>
+              <w:MarginLeft>1134</w:MarginLeft>
+              <w:MarginRight>1134</w:MarginRight>
+              <w:MarginTop>1134</w:MarginTop>
+              <w:MarginBottom>1134</w:MarginBottom>
+            </w:PageSetup>
           </xml>
           <![endif]-->
           <style>
-            body { font-family: Arial, sans-serif; margin: 40px; }
-            h1 { color: #333; border-bottom: 2px solid #007acc; padding-bottom: 10px; }
-            table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f2f2f2; font-weight: bold; }
-            .metadata { margin-top: 30px; font-size: 12px; color: #666; }
-            .chart-image { margin: 20px 0; text-align: center; }
+            @page {
+              size: A4;
+              margin: 2cm;
+            }
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 2cm;
+              max-width: 21cm;
+            }
+            h1 { 
+              color: #333; 
+              border-bottom: 2px solid #007acc; 
+              padding-bottom: 10px;
+              font-size: 18pt;
+              margin-bottom: 20px;
+            }
+            h2 {
+              color: #555;
+              font-size: 14pt;
+              margin-top: 30px;
+              margin-bottom: 15px;
+            }
+            table { 
+              border-collapse: collapse; 
+              width: 100%; 
+              margin-top: 20px;
+              page-break-inside: avoid;
+            }
+            th, td { 
+              border: 1px solid #ddd; 
+              padding: 8px; 
+              text-align: left;
+              font-size: 10pt;
+            }
+            th { 
+              background-color: #f2f2f2; 
+              font-weight: bold; 
+            }
+            .metadata { 
+              margin-top: 30px; 
+              font-size: 10pt; 
+              color: #666;
+              page-break-inside: avoid;
+            }
+            .chart-image { 
+              margin: 20px 0; 
+              text-align: center;
+              page-break-inside: avoid;
+            }
+            .chart-image img {
+              max-width: 100% !important;
+              width: 100% !important;
+              height: auto !important;
+              display: block;
+              margin: 0 auto;
+            }
           </style>
         </head>
         <body>
           <h1>${title}</h1>
           
           <div class="chart-image">
-            <img src="${imgData}" alt="Gráfico ${title}" style="max-width: 100%; height: auto;">
+            <img src="${imgData}" alt="Gráfico ${title}">
           </div>
           
           <h2>Dados Detalhados</h2>
@@ -1045,14 +1208,43 @@ const exportDashboardAsWord = async (data: DashboardData, filename: string): Pro
     return;
   }
 
-  const canvas = await html2canvas(dashboardElement, {
-    backgroundColor: '#ffffff',
-    scale: 3, // Alta qualidade para impressão
-    useCORS: true,
-    allowTaint: true
-  });
+  try {
+    // Fechar menus e dropdowns antes de capturar
+    const bodyElement = document.body;
+    bodyElement.click();
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Esconder elementos de UI que não devem aparecer
+    const elementsToHide = document.querySelectorAll('[data-export-menu], .export-menu, [role="menu"]');
+    const originalDisplays: string[] = [];
+    
+    elementsToHide.forEach((el) => {
+      const htmlEl = el as HTMLElement;
+      originalDisplays.push(htmlEl.style.display);
+      htmlEl.style.display = 'none';
+    });
 
-  const imgData = canvas.toDataURL('image/png', 1.0);
+    const canvas = await html2canvas(dashboardElement, {
+      backgroundColor: '#ffffff',
+      scale: 2.5, // Reduzido de 3 para 2.5 para melhor ajuste no Word
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      width: dashboardElement.scrollWidth,
+      height: dashboardElement.scrollHeight,
+      windowWidth: dashboardElement.scrollWidth,
+      windowHeight: dashboardElement.scrollHeight,
+      scrollX: 0,
+      scrollY: 0
+    });
+    
+    // Restaurar elementos escondidos
+    elementsToHide.forEach((el, index) => {
+      const htmlEl = el as HTMLElement;
+      htmlEl.style.display = originalDisplays[index];
+    });
+
+    const imgData = canvas.toDataURL('image/png', 1.0);
 
   // HTML completo para Word
   const htmlContent = `
@@ -1060,15 +1252,88 @@ const exportDashboardAsWord = async (data: DashboardData, filename: string): Pro
       <head>
         <meta charset="UTF-8">
         <title>${data.title}</title>
+        <!--[if gte mso 9]>
+        <xml>
+          <w:WordDocument>
+            <w:View>Print</w:View>
+            <w:Zoom>100</w:Zoom>
+            <w:DoNotPromptForConvert/>
+            <w:DoNotShowRevisions/>
+            <w:DoNotPrintRevisions/>
+          </w:WordDocument>
+          <w:PageSetup>
+            <w:PageWidth>11906</w:PageWidth>
+            <w:PageHeight>16838</w:PageHeight>
+            <w:MarginLeft>1134</w:MarginLeft>
+            <w:MarginRight>1134</w:MarginRight>
+            <w:MarginTop>1134</w:MarginTop>
+            <w:MarginBottom>1134</w:MarginBottom>
+          </w:PageSetup>
+        </xml>
+        <![endif]-->
         <style>
-          body { font-family: Arial, sans-serif; margin: 40px; }
-          h1 { color: #333; border-bottom: 3px solid #007acc; padding-bottom: 15px; }
-          h2 { color: #555; margin-top: 30px; }
-          .dashboard-image { margin: 20px 0; text-align: center; }
-          table { border-collapse: collapse; width: 100%; margin: 15px 0; }
-          th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-          th { background-color: #f8f9fa; font-weight: bold; }
-          .summary { background-color: #e3f2fd; padding: 20px; border-radius: 8px; margin: 20px 0; }
+          @page {
+            size: A4;
+            margin: 2cm;
+          }
+          body { 
+            font-family: Arial, sans-serif; 
+            margin: 2cm;
+            max-width: 21cm;
+          }
+          h1 { 
+            color: #333; 
+            border-bottom: 3px solid #007acc; 
+            padding-bottom: 15px;
+            font-size: 20pt;
+            margin-bottom: 20px;
+            page-break-after: avoid;
+          }
+          h2 { 
+            color: #555; 
+            margin-top: 30px;
+            font-size: 14pt;
+            page-break-after: avoid;
+          }
+          .dashboard-image { 
+            margin: 20px 0; 
+            text-align: center;
+            page-break-inside: avoid;
+          }
+          .dashboard-image img {
+            max-width: 100% !important;
+            width: 100% !important;
+            height: auto !important;
+            display: block;
+            margin: 0 auto;
+          }
+          table { 
+            border-collapse: collapse; 
+            width: 100%; 
+            margin: 15px 0;
+            font-size: 10pt;
+            page-break-inside: avoid;
+          }
+          th, td { 
+            border: 1px solid #ddd; 
+            padding: 8px; 
+            text-align: left; 
+          }
+          th { 
+            background-color: #f8f9fa; 
+            font-weight: bold; 
+          }
+          .summary { 
+            background-color: #e3f2fd; 
+            padding: 20px; 
+            border-radius: 8px; 
+            margin: 20px 0;
+            page-break-inside: avoid;
+          }
+          .summary p {
+            margin: 8px 0;
+            font-size: 11pt;
+          }
         </style>
       </head>
       <body>
@@ -1078,10 +1343,11 @@ const exportDashboardAsWord = async (data: DashboardData, filename: string): Pro
           <h2>Resumo Executivo</h2>
           <p><strong>Total de Registros:</strong> ${data.metadata?.totalRecords || 0}</p>
           <p><strong>Data de Geração:</strong> ${data.metadata?.dateGenerated || new Date().toLocaleString('pt-BR')}</p>
+          <p><strong>Seções Incluídas:</strong> ${data.sections.length}</p>
         </div>
         
         <div class="dashboard-image">
-          <img src="${imgData}" alt="Dashboard Completo" style="max-width: 100%; height: auto;">
+          <img src="${imgData}" alt="Dashboard Completo">
         </div>
         
         ${data.sections.map(section => {
@@ -1112,7 +1378,7 @@ const exportDashboardAsWord = async (data: DashboardData, filename: string): Pro
           `;
         }).join('')}
         
-        <div style="margin-top: 40px; font-size: 12px; color: #666; text-align: center;">
+        <div style="margin-top: 40px; font-size: 12px; color: #666; text-align: center; page-break-inside: avoid;">
           <p>Documento gerado automaticamente pelo App Saúde Pará</p>
           <p>Comunicação de Eventos - ${new Date().toLocaleString('pt-BR')}</p>
         </div>
@@ -1120,16 +1386,20 @@ const exportDashboardAsWord = async (data: DashboardData, filename: string): Pro
     </html>
   `;
 
-  const blob = new Blob([htmlContent], { type: 'application/msword' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = `${filename}.doc`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(link.href);
-  
-  console.log(`✅ Dashboard Word exportado: ${filename}.doc`);
+    const blob = new Blob([htmlContent], { type: 'application/msword' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${filename}.doc`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    
+    console.log(`✅ Dashboard Word exportado: ${filename}.doc`);
+  } catch (error) {
+    console.error('❌ Erro ao exportar dashboard para Word:', error);
+    alert('Erro ao exportar dashboard para Word. Verifique se a biblioteca html2canvas está instalada.');
+  }
 };
 
 // 🎯 FUNÇÃO UTILITÁRIA PARA PREPARAR DADOS DO DASHBOARD
