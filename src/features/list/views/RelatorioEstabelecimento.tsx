@@ -264,24 +264,15 @@ export function RelatorioEstabelecimento() {
       console.log('🟢 Serão ativados (ativo = "Sim"):', ativosIds.length);
       console.log('⚫ Serão desativados (ativo = "Não"):', todosEstabelecimentos.length - ativosIds.length);
       
-      // TODO: Implementar chamada ao backend para atualizar campo 'ativo'
-      // IMPORTANTE: O backend usa "S" e "N" no banco, mas retorna "Sim" e "Não"
-      // Será necessário criar um endpoint que:
-      // 1. Receba a lista de IDs que devem estar ativos
-      // 2. Atualize TODOS os estabelecimentos:
-      //    - ativo = "S" para os IDs da lista (banco de dados usa "S")
-      //    - ativo = "N" para os demais (banco de dados usa "N")
-      //
-      // Exemplo:
-      // await ListaDeEstabelecimentoService.atualizarAtivacao(ativosIds);
-      //
-      // Backend deve fazer algo como:
-      // UPDATE estabelecimento SET ativo = 'N' WHERE 1=1;
-      // UPDATE estabelecimento SET ativo = 'S' WHERE idestabelecimento IN (ativosIds);
+      // ✅ Implementação completa de bulk activation
+      console.log('🔄 Iniciando bulk activation...');
       
-      // Simulação (remover após implementar backend)
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Chamar endpoint de bulk activation
+      const result = await ListaDeEstabelecimentoService.bulkActivation(ativosIds);
       
+      console.log('✅ Bulk activation concluído:', result);
+      
+      // Atualizar estado local
       setEstabelecimentosAtivos(ativosIds);
       
       // Recarregar a lista principal
@@ -298,7 +289,7 @@ export function RelatorioEstabelecimento() {
         setPaginationMeta(response.meta);
       }
       
-      alert(`✅ Ativação atualizada com sucesso!\n\n🟢 ${ativosIds.length} ativado(s)\n⚫ ${todosEstabelecimentos.length - ativosIds.length} desativado(s)`);
+      alert(`✅ Ativação atualizada com sucesso!\n\n🟢 ${result.ativados} ativado(s)\n⚫ ${result.desativados} desativado(s)\n📊 Total: ${result.total} estabelecimentos`);
     } catch (error) {
       console.error('❌ Erro ao salvar:', error);
       throw error;
