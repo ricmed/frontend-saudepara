@@ -73,6 +73,16 @@ class CievsService {
       withCredentials: true
     });
   }
+
+  /**
+   * Buscar todos os CIEVS com informações de localização do estabelecimento vinculado
+   */
+  async getAllWithLocation(): Promise<any[]> {
+    const response = await axios.get(`${API_URL}/cievs/with-location/all`, {
+      withCredentials: true
+    });
+    return response.data;
+  }
 }
 
 export default new CievsService();

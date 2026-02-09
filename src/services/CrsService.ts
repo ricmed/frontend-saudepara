@@ -90,6 +90,16 @@ class CrsService {
       withCredentials: true
     });
   }
+
+  /**
+   * Buscar todos os CRS com informações de localização do estabelecimento vinculado
+   */
+  async getAllWithLocation(): Promise<any[]> {
+    const response = await axios.get(`${API_URL}/crs/with-location/all`, {
+      withCredentials: true
+    });
+    return response.data;
+  }
 }
 
 export default new CrsService();

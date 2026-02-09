@@ -40,6 +40,8 @@ import {
 import { SideMenu } from '@/features/home/components/SideMenu';
 import ChartExportMenu from '@/components/common/ChartExportMenu';
 import DashboardExportMenu from '@/components/common/DashboardExportMenu';
+import MapaDashboardDAE, { LocalizacaoMapa, LocalizacaoTipo } from '@/features/dashboard/components/MapaDashboardDAE';
+import { MapProviderProvider } from '@/features/maps/leaflet/contexts/MapProviderContext';
 
 interface ChartDataItem {
   name: string;
@@ -76,6 +78,15 @@ const ComunicacaoDaeDashboard: React.FC = () => {
   // Modal de comunicações
   const [showComunicacoesModal, setShowComunicacoesModal] = useState(false);
   const [modalSearchTerm, setModalSearchTerm] = useState('');
+  
+  // Estado para localizações do mapa
+  const [localizacoes, setLocalizacoes] = useState<LocalizacaoMapa[]>([]);
+  const [selectedLocalizacao, setSelectedLocalizacao] = useState<LocalizacaoMapa | null>(null);
+  const [showLocalizacaoModal, setShowLocalizacaoModal] = useState(false);
+  
+  // Estado para modal de visualização de ficha
+  const [selectedComunicacao, setSelectedComunicacao] = useState<ComunicacaoDae | null>(null);
+  const [showFichaModal, setShowFichaModal] = useState(false);
 
   // Filtros
   const [activeFilters, setActiveFilters] = useState<ActiveFilters>({
@@ -155,6 +166,8 @@ const ComunicacaoDaeDashboard: React.FC = () => {
       
       // Atualizar timestamp da última atualização
       setLastUpdate(new Date().toLocaleString('pt-BR'));
+      
+      // As localizações serão carregadas automaticamente pelo useEffect que observa dadosFiltrados
     } catch (err: any) {
       setError('Erro ao carregar dados do dashboard');
       console.error('Erro ao carregar dados:', err);
@@ -162,6 +175,84 @@ const ComunicacaoDaeDashboard: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const loadLocalizacoes = useCallback(async (comunicacoesData: ComunicacaoDae[], filteredComunicacoes?: ComunicacaoDae[]) => {
+    try {
+      // Usar comunicações filtradas se fornecidas, senão usar todas
+      const comunicacoesParaContar = filteredComunicacoes || comunicacoesData;
+
+      // Buscar NHE, CIEVS e CRS com localização
+      const [nheWithLocation, cievsWithLocation, crsWithLocation] = await Promise.all([
+        NheService.getAllWithLocation(),
+        CievsService.getAllWithLocation(),
+        CrsService.getAllWithLocation()
+      ]);
+
+      const localizacoesData: LocalizacaoMapa[] = [];
+
+      // Processar NHE
+      nheWithLocation.forEach((nhe: any) => {
+        if (nhe.estabelecimento && nhe.estabelecimento.latitude && nhe.estabelecimento.longitude) {
+          // Contar fichas relacionadas a este NHE (usando comunicações filtradas)
+          const fichasCount = comunicacoesParaContar.filter(
+            c => c.origem_tipo === 'NHE' && c.origem_id === nhe.id_nhe
+          ).length;
+
+          localizacoesData.push({
+            id: `nhe-${nhe.id_nhe}`,
+            nome: nhe.nome,
+            tipo: 'NHE' as LocalizacaoTipo,
+            lat: parseFloat(nhe.estabelecimento.latitude),
+            lng: parseFloat(nhe.estabelecimento.longitude),
+            endereco: `${nhe.estabelecimento.logradouro || ''}, ${nhe.estabelecimento.numero || 's/n'} - ${nhe.estabelecimento.bairro || ''}, ${nhe.estabelecimento.cidade || ''}`.trim(),
+            fichasCount
+          });
+        }
+      });
+
+      // Processar CIEVS
+      cievsWithLocation.forEach((cievs: any) => {
+        if (cievs.estabelecimento && cievs.estabelecimento.latitude && cievs.estabelecimento.longitude) {
+          const fichasCount = comunicacoesParaContar.filter(
+            c => c.origem_tipo === 'CIEVS' && c.origem_id === cievs.id_cievs
+          ).length;
+
+          localizacoesData.push({
+            id: `cievs-${cievs.id_cievs}`,
+            nome: cievs.nome,
+            tipo: 'CIEVS' as LocalizacaoTipo,
+            lat: parseFloat(cievs.estabelecimento.latitude),
+            lng: parseFloat(cievs.estabelecimento.longitude),
+            endereco: `${cievs.estabelecimento.logradouro || ''}, ${cievs.estabelecimento.numero || 's/n'} - ${cievs.estabelecimento.bairro || ''}, ${cievs.estabelecimento.cidade || ''}`.trim(),
+            fichasCount
+          });
+        }
+      });
+
+      // Processar CRS
+      crsWithLocation.forEach((crs: any) => {
+        if (crs.estabelecimento && crs.estabelecimento.latitude && crs.estabelecimento.longitude) {
+          const fichasCount = comunicacoesParaContar.filter(
+            c => c.origem_tipo === 'CRS' && c.origem_id === crs.id_crs
+          ).length;
+
+          localizacoesData.push({
+            id: `crs-${crs.id_crs}`,
+            nome: crs.nome,
+            tipo: 'CRS' as LocalizacaoTipo,
+            lat: parseFloat(crs.estabelecimento.latitude),
+            lng: parseFloat(crs.estabelecimento.longitude),
+            endereco: `${crs.estabelecimento.logradouro || ''}, ${crs.estabelecimento.numero || 's/n'} - ${crs.estabelecimento.bairro || ''}, ${crs.estabelecimento.cidade || ''}`.trim(),
+            fichasCount
+          });
+        }
+      });
+
+      setLocalizacoes(localizacoesData);
+    } catch (err) {
+      console.error('Erro ao carregar localizações:', err);
+    }
+  }, []);
 
   // Registrar função de refresh para uso do auto-refresh
   useEffect(() => {
@@ -749,6 +840,14 @@ const ComunicacaoDaeDashboard: React.FC = () => {
       return `/images/bandeiras_pa_mini/municipio-${normalized}-bandeira-mini`;
     }
   };
+
+  // 🗺️ Atualizar localizações do mapa sempre que os filtros ou dados mudarem
+  useEffect(() => {
+    if (comunicacoes.length > 0 && !loading) {
+      // Recalcular localizações com base nas comunicações filtradas
+      loadLocalizacoes(comunicacoes, dadosFiltrados);
+    }
+  }, [comunicacoes, dadosFiltrados, loading, loadLocalizacoes]);
 
   // Função para alternar filtros (com suporte a seleção múltipla)
   const toggleFilter = useCallback((filterKey: keyof ActiveFilters, value: any, multiSelect = false) => {
@@ -1762,7 +1861,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                   </div>
                   
                   <div id="chart-municipios">
-                    <ResponsiveContainer width="100%" height={400}>
+                    <ResponsiveContainer width="100%" height={550}>
                     <BarChart data={dadosMunicipios.slice(0, 10)} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                       <XAxis 
@@ -1841,7 +1940,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                     <p className="text-sm text-gray-500">Clique para filtrar</p>
                   </div>
                   
-                  <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
+                  <div className="bg-gray-50 rounded-lg p-4 max-h-[750px] overflow-y-auto">
                     <div className="space-y-2">
                       {dadosMunicipios.map((item, index) => {
                         const isActive = isFilterActive(item.id, activeFilters.municipio_id);
@@ -2091,6 +2190,33 @@ const ComunicacaoDaeDashboard: React.FC = () => {
 
         </div>
 
+        {/* Mapa de Localização - NHE, CIEVS e CRS */}
+        <div className="mt-8 bg-white p-6 rounded-lg shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-blue-600" />
+              <h3 className="text-lg font-semibold text-gray-800">Mapa de Localizações</h3>
+              <span className="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full">
+                {localizacoes.filter(loc => (loc.fichasCount || 0) > 0).length} local(is) com fichas
+              </span>
+            </div>
+          </div>
+
+          <div className="text-sm text-gray-600 mb-4">
+            <p>Visualize as localizações com fichas cadastradas. Clique nas bolinhas para ver os detalhes.</p>
+          </div>
+
+          <MapProviderProvider>
+            <MapaDashboardDAE 
+              localizacoes={localizacoes.filter(loc => (loc.fichasCount || 0) > 0)}
+              onLocalizacaoClick={(loc) => {
+                setSelectedLocalizacao(loc);
+                setShowLocalizacaoModal(true);
+              }}
+            />
+          </MapProviderProvider>
+        </div>
+
         {/* Informações e Legendas */}
         <div className="mt-6 bg-white p-4 rounded-lg shadow-sm">
           <div className="flex items-start gap-3">
@@ -2107,11 +2233,214 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                 <li>• <strong>Todos os gráficos são interconectados</strong> - refletem os filtros ativos simultaneamente</li>
                 <li>• <strong>Passe o mouse sobre os pontos</strong> do gráfico temporal para ver valores absolutos e porcentagens</li>
                 <li>• <strong>Use "Limpar Todos os Filtros"</strong> para resetar e ver todos os dados novamente</li>
+                <li>• <strong>No mapa</strong>, clique nas bolinhas coloridas para ver as fichas relacionadas a cada localização</li>
               </ul>
             </div>
           </div>
         </div>
       </main>
+
+      {/* Modal de Fichas por Localização */}
+      {showLocalizacaoModal && selectedLocalizacao && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4"
+          style={{ zIndex: 9999 }}
+          onClick={() => setShowLocalizacaoModal(false)}
+        >
+          <div 
+            className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header do Modal */}
+            <div className={`p-6 border-b flex items-center justify-between ${
+              selectedLocalizacao.tipo === 'NHE' ? 'bg-green-50' :
+              selectedLocalizacao.tipo === 'CIEVS' ? 'bg-purple-50' :
+              'bg-orange-50'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className={`w-4 h-4 rounded-full ${
+                  selectedLocalizacao.tipo === 'NHE' ? 'bg-green-600' :
+                  selectedLocalizacao.tipo === 'CIEVS' ? 'bg-purple-600' :
+                  'bg-orange-600'
+                }`}></div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {selectedLocalizacao.nome}
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    {selectedLocalizacao.tipo} • {selectedLocalizacao.fichasCount} ficha(s)
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowLocalizacaoModal(false)}
+                className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Conteúdo do Modal */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="mb-4">
+                <p className="text-sm text-gray-600">
+                  <strong>Endereço:</strong> {selectedLocalizacao.endereco}
+                </p>
+              </div>
+
+              {/* Lista de Comunicações */}
+              <div className="space-y-3">
+                <h4 className="font-semibold text-gray-800 mb-3">
+                  Comunicações Relacionadas
+                </h4>
+                
+                {dadosFiltrados
+                  .filter(c => {
+                    const [tipo, id] = selectedLocalizacao.id.split('-');
+                    return c.origem_tipo === tipo.toUpperCase() && 
+                           c.origem_id === parseInt(id);
+                  })
+                  .map((comunicacao, index) => (
+                    <div
+                      key={comunicacao.id_comunicacao}
+                      className="bg-gray-50 p-4 rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded">
+                              #{index + 1}
+                            </span>
+                            <span className="text-sm font-medium text-gray-900">
+                              {comunicacao.nome_paciente || 'Nome não informado'}
+                            </span>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                            <div>
+                              <strong>Data:</strong> {new Date(comunicacao.data_comunicacao).toLocaleDateString('pt-BR')}
+                            </div>
+                            <div>
+                              <strong>Hora:</strong> {new Date(comunicacao.data_comunicacao).toLocaleTimeString('pt-BR')}
+                            </div>
+                            <div>
+                              <strong>Município:</strong> {comunicacao.tipo_municipio?.nome || 'N/A'}
+                            </div>
+                            <div>
+                              <strong>DAE:</strong> {comunicacao.dae?.nome || 'N/A'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedComunicacao(comunicacao);
+                              setShowFichaModal(true);
+                            }}
+                            className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1"
+                            title="Visualizar"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            Ver
+                          </button>
+                          <button
+                            onClick={() => {
+                              // Abre em nova aba para editar
+                              window.open(`/private/comunicacao-dae/editar/${comunicacao.id_comunicacao}`, '_blank');
+                            }}
+                            className="px-3 py-1.5 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-1"
+                            title="Editar em nova aba"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                            Editar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                {dadosFiltrados.filter(c => {
+                  const [tipo, id] = selectedLocalizacao.id.split('-');
+                  return c.origem_tipo === tipo.toUpperCase() && c.origem_id === parseInt(id);
+                }).length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <FileText className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                    <p>Nenhuma comunicação encontrada para esta localização</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer do Modal */}
+            <div className="p-4 border-t bg-gray-50 flex justify-end">
+              <button
+                onClick={() => setShowLocalizacaoModal(false)}
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors font-medium"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Visualização da Ficha */}
+      {showFichaModal && selectedComunicacao && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4"
+          style={{ zIndex: 10000 }}
+          onClick={() => setShowFichaModal(false)}
+        >
+          <div 
+            className="bg-white rounded-lg shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header do Modal */}
+            <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-t-lg">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Comunicação DAE - ID: {selectedComunicacao.id_comunicacao}
+              </h3>
+              <button
+                onClick={() => setShowFichaModal(false)}
+                className="p-2 hover:bg-blue-700 rounded-lg transition-colors"
+                title="Fechar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Conteúdo - Iframe com a página real */}
+            <div className="flex-1 overflow-hidden">
+              <iframe
+                src={`/private/comunicacao-dae/${selectedComunicacao.id_comunicacao}`}
+                className="w-full h-full border-0"
+                title="Visualização da Comunicação DAE"
+              />
+            </div>
+
+            {/* Footer com botão de editar */}
+            <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
+              <button
+                onClick={() => setShowFichaModal(false)}
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors font-medium"
+              >
+                Fechar
+              </button>
+              <button
+                onClick={() => {
+                  window.open(`/private/comunicacao-dae/editar/${selectedComunicacao.id_comunicacao}`, '_blank');
+                }}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium flex items-center gap-2"
+              >
+                <Edit className="h-4 w-4" />
+                Editar em Nova Aba
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

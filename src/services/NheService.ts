@@ -73,6 +73,16 @@ class NheService {
       withCredentials: true
     });
   }
+
+  /**
+   * Buscar todos os NHEs com informações de localização do estabelecimento vinculado
+   */
+  async getAllWithLocation(): Promise<any[]> {
+    const response = await axios.get(`${API_URL}/nhe/with-location/all`, {
+      withCredentials: true
+    });
+    return response.data;
+  }
 }
 
 export default new NheService();
