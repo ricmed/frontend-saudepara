@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// Usar o mesmo padrão dos outros serviços
+const server = import.meta.env.VITE_API_SERVER || 'http://localhost';
+const port = import.meta.env.VITE_API_PORT || '3000';
+const API_URL = `${server}:${port}`;
 
 export interface TableColumn {
   name: string;

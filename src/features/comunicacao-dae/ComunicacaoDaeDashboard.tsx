@@ -87,6 +87,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
   // Estado para modal de visualização de ficha
   const [selectedComunicacao, setSelectedComunicacao] = useState<ComunicacaoDae | null>(null);
   const [showFichaModal, setShowFichaModal] = useState(false);
+  const [fichaModalMode, setFichaModalMode] = useState<'view' | 'edit'>('view');
 
   // Filtros
   const [activeFilters, setActiveFilters] = useState<ActiveFilters>({
@@ -1033,16 +1034,24 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                       {/* Ações */}
                       <div className="flex flex-col gap-2">
                         <button
-                          onClick={() => navigate(`/private/comunicacao-dae/${com.id_comunicacao}`)}
+                          onClick={() => {
+                            setSelectedComunicacao(com);
+                            setFichaModalMode('view');
+                            setShowFichaModal(true);
+                          }}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Visualizar"
+                          title="Visualizar em modal"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => navigate(`/private/comunicacao-dae/editar/${com.id_comunicacao}`)}
+                          onClick={() => {
+                            setSelectedComunicacao(com);
+                            setFichaModalMode('edit');
+                            setShowFichaModal(true);
+                          }}
                           className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                          title="Editar"
+                          title="Editar em modal"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
@@ -2336,21 +2345,23 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                           <button
                             onClick={() => {
                               setSelectedComunicacao(comunicacao);
+                              setFichaModalMode('view');
                               setShowFichaModal(true);
                             }}
                             className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1"
-                            title="Visualizar"
+                            title="Visualizar em modal"
                           >
                             <Eye className="h-3.5 w-3.5" />
                             Ver
                           </button>
                           <button
                             onClick={() => {
-                              // Abre em nova aba para editar
-                              window.open(`/private/comunicacao-dae/editar/${comunicacao.id_comunicacao}`, '_blank');
+                              setSelectedComunicacao(comunicacao);
+                              setFichaModalMode('edit');
+                              setShowFichaModal(true);
                             }}
                             className="px-3 py-1.5 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-1"
-                            title="Editar em nova aba"
+                            title="Editar em modal"
                           >
                             <Edit className="h-3.5 w-3.5" />
                             Editar
@@ -2397,14 +2408,20 @@ const ComunicacaoDaeDashboard: React.FC = () => {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header do Modal */}
-            <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-t-lg">
+            <div className={`flex items-center justify-between p-4 border-b text-white rounded-t-lg ${
+              fichaModalMode === 'edit' 
+                ? 'bg-gradient-to-r from-green-500 to-green-600' 
+                : 'bg-gradient-to-r from-blue-500 to-blue-600'
+            }`}>
               <h3 className="text-lg font-semibold flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Comunicação DAE - ID: {selectedComunicacao.id_comunicacao}
+                {fichaModalMode === 'edit' ? <Edit className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+                {fichaModalMode === 'edit' ? 'Editar' : 'Visualizar'} Comunicação DAE - ID: {selectedComunicacao.id_comunicacao}
               </h3>
               <button
                 onClick={() => setShowFichaModal(false)}
-                className="p-2 hover:bg-blue-700 rounded-lg transition-colors"
+                className={`p-2 rounded-lg transition-colors ${
+                  fichaModalMode === 'edit' ? 'hover:bg-green-700' : 'hover:bg-blue-700'
+                }`}
                 title="Fechar"
               >
                 <X className="h-5 w-5" />
@@ -2414,28 +2431,22 @@ const ComunicacaoDaeDashboard: React.FC = () => {
             {/* Conteúdo - Iframe com a página real */}
             <div className="flex-1 overflow-hidden">
               <iframe
-                src={`/private/comunicacao-dae/${selectedComunicacao.id_comunicacao}`}
+                src={fichaModalMode === 'edit' 
+                  ? `/private/comunicacao-dae/editar/${selectedComunicacao.id_comunicacao}`
+                  : `/private/comunicacao-dae/${selectedComunicacao.id_comunicacao}`
+                }
                 className="w-full h-full border-0"
-                title="Visualização da Comunicação DAE"
+                title={`${fichaModalMode === 'edit' ? 'Edição' : 'Visualização'} da Comunicação DAE`}
               />
             </div>
 
-            {/* Footer com botão de editar */}
-            <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
+            {/* Footer */}
+            <div className="p-4 border-t bg-gray-50 flex justify-end">
               <button
                 onClick={() => setShowFichaModal(false)}
                 className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors font-medium"
               >
                 Fechar
-              </button>
-              <button
-                onClick={() => {
-                  window.open(`/private/comunicacao-dae/editar/${selectedComunicacao.id_comunicacao}`, '_blank');
-                }}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium flex items-center gap-2"
-              >
-                <Edit className="h-4 w-4" />
-                Editar em Nova Aba
               </button>
             </div>
           </div>
