@@ -4,7 +4,6 @@ import { Building, Heart, Book, MessageCircle, FileText, Plus } from 'lucide-rea
 import { useTranslation } from '@/i18n/useTranslations';
 import { Language } from '@/i18n/types';
 import { useAuth } from '@/keycloak/AuthProvider';
-import { useUserPermissions } from '@/hooks/useUserPermissions';
 
 interface MenuGridProps {
   isMobile?: boolean;
@@ -18,7 +17,10 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
   const navigate = useNavigate();
   const { t } = useTranslation(selectedLanguage || 'pt-BR');
   const { user } = useAuth();
-  const permissions = useUserPermissions();
+
+  const canAccessComunicacaoDae = !!user?.roles?.some((role: string) =>
+    ['comunicacao.dae', 'admin', 'admin.estado', 'admin.crs'].includes(role)
+  );
 
   const menuItems = [
     {
@@ -43,8 +45,8 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
     }
   ];
 
-  // Botão especial para comunicação DAE (apenas para notificadores e apenas na versão desktop)
-  const notificationButton = user && permissions.isNotificador && !isMobile ? {
+  // Botão especial para comunicação DAE (apenas para quem tem role de acesso)
+  const notificationButton = canAccessComunicacaoDae && !isMobile ? {
     icon: (
       <div className="relative">
         <FileText className="h-10 w-10 text-white" />

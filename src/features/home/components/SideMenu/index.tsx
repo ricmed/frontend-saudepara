@@ -127,7 +127,12 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     }] : []),
 
     // ✅ MOVIDO E CORRIGIDO: Menu de Comunicação DAE - Acesso direto à lista
-    ...(user && (user.roles?.includes('admin') || user.roles?.includes('admin.estado') || user.roles?.includes('admin.crs')) ? [{
+    ...(user && (
+      user.roles?.includes('comunicacao.dae') ||
+      user.roles?.includes('admin') ||
+      user.roles?.includes('admin.estado') ||
+      user.roles?.includes('admin.crs')
+    ) ? [{
       icon: <FileText />,
       label: "Comunicação DAE",
       onClick: () => navigate("/private/comunicacao-dae"),

@@ -1,5 +1,4 @@
 import axios from 'axios';
-import useFilteredRequests from '@/hooks/useFilteredRequests';
 
 // Configurações das APIs
 const KEYCLOAK_API_URL = '/api-auth'; // Usar proxy do Vite

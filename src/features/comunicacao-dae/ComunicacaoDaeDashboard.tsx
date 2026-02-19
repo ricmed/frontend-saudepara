@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ComunicacaoDaeService, { ComunicacaoDae } from '@/services/ComunicacaoDaeService';
+import ComunicacaoDaeService, { ComunicacaoDae, ComunicacaoDaeFilters } from '@/services/ComunicacaoDaeService';
 import CrsService, { Crs } from '@/services/CrsService';
 import NheService, { Nhe } from '@/services/NheService';
 import CievsService, { Cievs } from '@/services/CievsService';
+import { usuarioGestaoService } from '@/services/UsuarioGestaoService';
 import {
   BarChart,
   Bar,
@@ -61,7 +62,10 @@ interface ActiveFilters {
   origem_id: number | number[] | null;
   dae_id: number | number[] | null;
   municipio_id: number | number[] | null;
+  municipio_residencia_id: number | number[] | null;
 }
+
+type OrigemTipo = 'CRS' | 'NHE' | 'CIEVS';
 
 const ComunicacaoDaeDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -69,6 +73,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [comunicacoes, setComunicacoes] = useState<ComunicacaoDae[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isRestrictedOriginView, setIsRestrictedOriginView] = useState(false);
 
   // Listas de CRS, NHE e CIEVS para nomes descritivos
   const [crsList, setCrsList] = useState<Crs[]>([]);
@@ -95,6 +100,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
     origem_id: null,
     dae_id: null,
     municipio_id: null,
+    municipio_residencia_id: null,
   });
   
   // Filtro de período
@@ -151,10 +157,24 @@ const ComunicacaoDaeDashboard: React.FC = () => {
       
       setLoading(true);
       setError(null);
+
+      // Aplicar escopo de acesso do usuário (mesma lógica da listagem)
+      const filtrosComPermissoes: ComunicacaoDaeFilters = {};
+      let restrictedOriginView = false;
+      try {
+        const userAccess = await usuarioGestaoService.getUserAccess();
+        if (userAccess?.isEstabelecimento && userAccess.estabelecimentoId) {
+          filtrosComPermissoes.estabelecimento_id = userAccess.estabelecimentoId;
+          restrictedOriginView = true;
+        }
+      } catch (permError) {
+        // Em caso de falha ao buscar permissões, mantém fallback sem filtro
+      }
+      setIsRestrictedOriginView(restrictedOriginView);
       
       // Carregar dados em paralelo
       const [comunicacoesRes, crsRes, nheRes, cievsRes] = await Promise.all([
-        ComunicacaoDaeService.getAll(1, 9999, {}),
+        ComunicacaoDaeService.getAll(1, 9999, filtrosComPermissoes),
         CrsService.getAll(1, 9999),
         NheService.getAll(1, 9999),
         CievsService.getAll(1, 9999)
@@ -316,7 +336,8 @@ const ComunicacaoDaeDashboard: React.FC = () => {
       origem_tipo: null,
       origem_id: null,
       dae_id: null,
-      municipio_id: null
+      municipio_id: null,
+      municipio_residencia_id: null
     });
     setDataInicio('');
     setDataFim('');
@@ -437,6 +458,9 @@ const ComunicacaoDaeDashboard: React.FC = () => {
     if (activeFilters.municipio_id) {
       filtered = filtered.filter(c => matchesFilter(c.id_municipio_ocorrencia, activeFilters.municipio_id));
     }
+    if (activeFilters.municipio_residencia_id) {
+      filtered = filtered.filter(c => matchesFilter(c.id_municipio_residencia, activeFilters.municipio_residencia_id));
+    }
 
     return filtered;
   }, [comunicacoesFiltradas, activeFilters]);
@@ -452,6 +476,29 @@ const ComunicacaoDaeDashboard: React.FC = () => {
     console.log('📊 Stats calculados:', calculatedStats);
     return calculatedStats;
   }, [dadosFiltrados]);
+
+  // No escopo restrito, exibir apenas cards dos tipos realmente disponíveis ao usuário.
+  const visibleOrigemCards = useMemo<OrigemTipo[]>(() => {
+    const allTypes: OrigemTipo[] = ['CRS', 'NHE', 'CIEVS'];
+    if (!isRestrictedOriginView) return allTypes;
+
+    const availableTypes = new Set(
+      comunicacoes
+        .map(c => c.origem_tipo)
+        .filter((tipo): tipo is OrigemTipo => tipo === 'CRS' || tipo === 'NHE' || tipo === 'CIEVS')
+    );
+
+    const restrictedTypes = allTypes.filter(tipo => availableTypes.has(tipo));
+    return restrictedTypes.length > 0 ? restrictedTypes : allTypes;
+  }, [isRestrictedOriginView, comunicacoes]);
+
+  const summaryCardSpanClass = useMemo(() => {
+    const totalCards = 1 + visibleOrigemCards.length; // +1 = card "Total"
+    if (totalCards === 2) {
+      return 'sm:col-span-2 lg:col-span-4 xl:col-span-4';
+    }
+    return 'sm:col-span-2 lg:col-span-2 xl:col-span-2';
+  }, [visibleOrigemCards]);
 
   // Dados para série temporal
   const dadosSerieTemporalData = useMemo(() => {
@@ -492,7 +539,8 @@ const ComunicacaoDaeDashboard: React.FC = () => {
       ? comunicacoesFiltradas.filter(c => 
           (!activeFilters.origem_tipo || c.origem_tipo === activeFilters.origem_tipo) &&
           (!activeFilters.origem_id || c.origem_id === activeFilters.origem_id) &&
-          (!activeFilters.dae_id || c.id_dae === activeFilters.dae_id)
+          (!activeFilters.dae_id || c.id_dae === activeFilters.dae_id) &&
+          (!activeFilters.municipio_residencia_id || c.id_municipio_residencia === activeFilters.municipio_residencia_id)
         )
       : dadosFiltrados;
 
@@ -510,13 +558,39 @@ const ComunicacaoDaeDashboard: React.FC = () => {
     return Object.values(counts).sort((a, b) => b.value - a.value).slice(0, 10);
   }, [comunicacoesFiltradas, activeFilters, dadosFiltrados]);
 
+  // Dados para gráfico de municípios de residência
+  const dadosMunicipiosResidencia = useMemo(() => {
+    const excludingMunicipioResidencia = activeFilters.municipio_residencia_id
+      ? comunicacoesFiltradas.filter(c =>
+          (!activeFilters.origem_tipo || c.origem_tipo === activeFilters.origem_tipo) &&
+          (!activeFilters.origem_id || c.origem_id === activeFilters.origem_id) &&
+          (!activeFilters.dae_id || c.id_dae === activeFilters.dae_id) &&
+          (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id)
+        )
+      : dadosFiltrados;
+
+    const counts = excludingMunicipioResidencia.reduce((acc, com) => {
+      const municipio = com.tipo_municipio_residencia?.descricao || 'Não informado';
+      const id = com.id_municipio_residencia;
+      const key = `${id}_${municipio}`;
+      if (!acc[key]) {
+        acc[key] = { name: municipio, value: 0, id };
+      }
+      acc[key].value++;
+      return acc;
+    }, {} as Record<string, ChartDataItem>);
+
+    return Object.values(counts).sort((a, b) => b.value - a.value).slice(0, 10);
+  }, [comunicacoesFiltradas, activeFilters, dadosFiltrados]);
+
   // Dados para gráfico de DAE (Agravos)
   const dadosDae = useMemo(() => {
     const excludingDae = activeFilters.dae_id
       ? comunicacoesFiltradas.filter(c => 
           (!activeFilters.origem_tipo || c.origem_tipo === activeFilters.origem_tipo) &&
           (!activeFilters.origem_id || c.origem_id === activeFilters.origem_id) &&
-          (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id)
+          (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id) &&
+          (!activeFilters.municipio_residencia_id || c.id_municipio_residencia === activeFilters.municipio_residencia_id)
         )
       : dadosFiltrados;
 
@@ -575,7 +649,8 @@ const ComunicacaoDaeDashboard: React.FC = () => {
       ? comunicacoesFiltradas.filter(c => 
           c.origem_tipo === 'CRS' &&
           (!activeFilters.dae_id || c.id_dae === activeFilters.dae_id) &&
-          (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id)
+          (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id) &&
+          (!activeFilters.municipio_residencia_id || c.id_municipio_residencia === activeFilters.municipio_residencia_id)
         )
       : comunicacoesFiltradas.filter(c => c.origem_tipo === 'CRS');
 
@@ -589,7 +664,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
     }, {} as Record<string, ChartDataItem>);
 
     return Object.values(counts).sort((a, b) => b.value - a.value);
-  }, [comunicacoesFiltradas, activeFilters.origem_tipo, activeFilters.origem_id, activeFilters.dae_id, activeFilters.municipio_id, crsMap]);
+  }, [comunicacoesFiltradas, activeFilters.origem_tipo, activeFilters.origem_id, activeFilters.dae_id, activeFilters.municipio_id, activeFilters.municipio_residencia_id, crsMap]);
 
   // Dados para gráfico de NHE - se origem_tipo estiver filtrado e não for NHE, ou se origem_id de outro tipo estiver filtrado, retornar vazio
   const dadosNhe = useMemo(() => {
@@ -614,7 +689,8 @@ const ComunicacaoDaeDashboard: React.FC = () => {
       ? comunicacoesFiltradas.filter(c => 
           c.origem_tipo === 'NHE' &&
           (!activeFilters.dae_id || c.id_dae === activeFilters.dae_id) &&
-          (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id)
+          (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id) &&
+          (!activeFilters.municipio_residencia_id || c.id_municipio_residencia === activeFilters.municipio_residencia_id)
         )
       : comunicacoesFiltradas.filter(c => c.origem_tipo === 'NHE');
 
@@ -628,7 +704,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
     }, {} as Record<string, ChartDataItem>);
 
     return Object.values(counts).sort((a, b) => b.value - a.value).slice(0, 10);
-  }, [comunicacoesFiltradas, activeFilters.origem_tipo, activeFilters.origem_id, activeFilters.dae_id, activeFilters.municipio_id, nheMap]);
+  }, [comunicacoesFiltradas, activeFilters.origem_tipo, activeFilters.origem_id, activeFilters.dae_id, activeFilters.municipio_id, activeFilters.municipio_residencia_id, nheMap]);
 
   // Dados para gráfico de CIEVS (todos os 11) - se origem_tipo estiver filtrado e não for CIEVS, ou se origem_id de outro tipo estiver filtrado, retornar vazio
   const dadosCievs = useMemo(() => {
@@ -653,7 +729,8 @@ const ComunicacaoDaeDashboard: React.FC = () => {
       ? comunicacoesFiltradas.filter(c => 
           c.origem_tipo === 'CIEVS' &&
           (!activeFilters.dae_id || c.id_dae === activeFilters.dae_id) &&
-          (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id)
+          (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id) &&
+          (!activeFilters.municipio_residencia_id || c.id_municipio_residencia === activeFilters.municipio_residencia_id)
         )
       : comunicacoesFiltradas.filter(c => c.origem_tipo === 'CIEVS');
 
@@ -667,7 +744,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
     }, {} as Record<string, ChartDataItem>);
 
     return Object.values(counts).sort((a, b) => b.value - a.value);
-  }, [comunicacoesFiltradas, activeFilters.origem_tipo, activeFilters.origem_id, activeFilters.dae_id, activeFilters.municipio_id, cievsMap]);
+  }, [comunicacoesFiltradas, activeFilters.origem_tipo, activeFilters.origem_id, activeFilters.dae_id, activeFilters.municipio_id, activeFilters.municipio_residencia_id, cievsMap]);
 
   // Mapeamento de municípios do Pará para códigos das bandeiras
   // Formato do arquivo: municipio-{nome}-bandeira-mini-{código}.jpg
@@ -844,11 +921,11 @@ const ComunicacaoDaeDashboard: React.FC = () => {
 
   // 🗺️ Atualizar localizações do mapa sempre que os filtros ou dados mudarem
   useEffect(() => {
-    if (comunicacoes.length > 0 && !loading) {
+    if (comunicacoes.length > 0 && !loading && !isRestrictedOriginView) {
       // Recalcular localizações com base nas comunicações filtradas
       loadLocalizacoes(comunicacoes, dadosFiltrados);
     }
-  }, [comunicacoes, dadosFiltrados, loading, loadLocalizacoes]);
+  }, [comunicacoes, dadosFiltrados, loading, loadLocalizacoes, isRestrictedOriginView]);
 
   // Função para alternar filtros (com suporte a seleção múltipla)
   const toggleFilter = useCallback((filterKey: keyof ActiveFilters, value: any, multiSelect = false) => {
@@ -932,6 +1009,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
         com.nome_paciente?.toLowerCase().includes(termo) ||
         com.dae?.nome?.toLowerCase().includes(termo) ||
         com.tipo_municipio?.descricao?.toLowerCase().includes(termo) ||
+        com.tipo_municipio_residencia?.descricao?.toLowerCase().includes(termo) ||
         com.origem_tipo?.toLowerCase().includes(termo)
       );
     });
@@ -1025,8 +1103,13 @@ const ComunicacaoDaeDashboard: React.FC = () => {
 
                         {/* Coluna 3 */}
                         <div>
-                          <p className="text-xs text-gray-500 mb-1">Município / Data</p>
-                          <p className="text-sm text-gray-700">{com.tipo_municipio?.descricao || 'Não informado'}</p>
+                          <p className="text-xs text-gray-500 mb-1">Município Ocorrência / Residência</p>
+                          <p className="text-sm text-gray-700">
+                            Ocor.: {com.tipo_municipio?.descricao || 'Não informado'}
+                          </p>
+                          <p className="text-xs text-gray-600">
+                            Res.: {com.tipo_municipio_residencia?.descricao || 'Não informado'}
+                          </p>
                           <p className="text-xs text-gray-600">{formatDate(com.data_comunicacao)}</p>
                         </div>
                       </div>
@@ -1153,7 +1236,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                 </button>
 
                 <DashboardExportMenu
-                  municipioData={dadosMunicipios}
+                  municipioData={dadosMunicipiosResidencia}
                   totalRecords={stats.total}
                   activeFilters={{
                     ...activeFilters,
@@ -1293,11 +1376,11 @@ const ComunicacaoDaeDashboard: React.FC = () => {
             )}
           </div>
 
-          {/* LINHA 2: Cards de Resumo - 8 colunas (4 cards na mesma linha: 2+2+2+2) */}
+          {/* LINHA 2: Cards de Resumo - layout adaptável por perfil de acesso */}
           
           {/* Total de Comunicações - 2 colunas */}
           <div
-            className="bg-gradient-to-br from-blue-500 to-blue-700 p-4 rounded-lg shadow-lg flex items-center gap-3 text-white sm:col-span-2 lg:col-span-2 xl:col-span-2 cursor-pointer hover:shadow-xl hover:from-blue-600 hover:to-blue-800 transition-all"
+            className={`bg-gradient-to-br from-blue-500 to-blue-700 p-4 rounded-lg shadow-lg flex items-center gap-3 text-white ${summaryCardSpanClass} cursor-pointer hover:shadow-xl hover:from-blue-600 hover:to-blue-800 transition-all`}
             onClick={() => handleCardClick('all')}
             title="Clique para ver todas as comunicações"
           >
@@ -1315,80 +1398,83 @@ const ComunicacaoDaeDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* CRS - 2 colunas */}
-          <div 
-            className="p-4 rounded-lg shadow-lg flex items-center gap-3 text-white sm:col-span-2 lg:col-span-2 xl:col-span-2 cursor-pointer hover:shadow-xl transition-all"
-            onClick={(e) => toggleFilter('origem_tipo', 'CRS', e.ctrlKey || e.metaKey)}
-            style={{ 
-              background: isFilterActive('CRS', activeFilters.origem_tipo)
-                ? 'linear-gradient(to bottom right, #67e8f9, #22d3ee)' 
-                : 'linear-gradient(to bottom right, #06b6d4, #0891b2)',
-              minHeight: '100px',
-              border: isFilterActive('CRS', activeFilters.origem_tipo) ? '3px solid #0891b2' : 'none'
-            }}
-          >
-            <div className="p-3 bg-white bg-opacity-20 rounded-full flex-shrink-0">
-              <Building2 className="h-8 w-8" />
+          {visibleOrigemCards.includes('CRS') && (
+            <div 
+              className={`p-4 rounded-lg shadow-lg flex items-center gap-3 text-white ${summaryCardSpanClass} cursor-pointer hover:shadow-xl transition-all`}
+              onClick={(e) => toggleFilter('origem_tipo', 'CRS', e.ctrlKey || e.metaKey)}
+              style={{ 
+                background: isFilterActive('CRS', activeFilters.origem_tipo)
+                  ? 'linear-gradient(to bottom right, #67e8f9, #22d3ee)' 
+                  : 'linear-gradient(to bottom right, #06b6d4, #0891b2)',
+                minHeight: '100px',
+                border: isFilterActive('CRS', activeFilters.origem_tipo) ? '3px solid #0891b2' : 'none'
+              }}
+            >
+              <div className="p-3 bg-white bg-opacity-20 rounded-full flex-shrink-0">
+                <Building2 className="h-8 w-8" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-xs uppercase tracking-wide opacity-90">
+                  CRS {isFilterActive('CRS', activeFilters.origem_tipo) && '✓'}
+                </h3>
+                <p className="text-4xl font-bold">
+                  {stats.crs.toLocaleString()}
+                </p>
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="text-xs uppercase tracking-wide opacity-90">
-                CRS {isFilterActive('CRS', activeFilters.origem_tipo) && '✓'}
-              </h3>
-              <p className="text-4xl font-bold">
-                {stats.crs.toLocaleString()}
-              </p>
-            </div>
-          </div>
+          )}
 
-          {/* NHE - 2 colunas */}
-          <div 
-            className="p-4 rounded-lg shadow-lg flex items-center gap-3 text-white sm:col-span-2 lg:col-span-2 xl:col-span-2 cursor-pointer hover:shadow-xl transition-all"
-            onClick={(e) => toggleFilter('origem_tipo', 'NHE', e.ctrlKey || e.metaKey)}
-            style={{ 
-              background: isFilterActive('NHE', activeFilters.origem_tipo)
-                ? 'linear-gradient(to bottom right, #6ee7b7, #34d399)' 
-                : 'linear-gradient(to bottom right, #10b981, #059669)', 
-              minHeight: '100px',
-              border: isFilterActive('NHE', activeFilters.origem_tipo) ? '3px solid #059669' : 'none'
-            }}
-          >
-            <div className="p-3 bg-white bg-opacity-20 rounded-full flex-shrink-0">
-              <Hospital className="h-8 w-8" />
+          {visibleOrigemCards.includes('NHE') && (
+            <div 
+              className={`p-4 rounded-lg shadow-lg flex items-center gap-3 text-white ${summaryCardSpanClass} cursor-pointer hover:shadow-xl transition-all`}
+              onClick={(e) => toggleFilter('origem_tipo', 'NHE', e.ctrlKey || e.metaKey)}
+              style={{ 
+                background: isFilterActive('NHE', activeFilters.origem_tipo)
+                  ? 'linear-gradient(to bottom right, #6ee7b7, #34d399)' 
+                  : 'linear-gradient(to bottom right, #10b981, #059669)', 
+                minHeight: '100px',
+                border: isFilterActive('NHE', activeFilters.origem_tipo) ? '3px solid #059669' : 'none'
+              }}
+            >
+              <div className="p-3 bg-white bg-opacity-20 rounded-full flex-shrink-0">
+                <Hospital className="h-8 w-8" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-xs uppercase tracking-wide opacity-90">
+                  NHE {isFilterActive('NHE', activeFilters.origem_tipo) && '✓'}
+                </h3>
+                <p className="text-4xl font-bold">
+                  {stats.nhe.toLocaleString()}
+                </p>
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="text-xs uppercase tracking-wide opacity-90">
-                NHE {isFilterActive('NHE', activeFilters.origem_tipo) && '✓'}
-              </h3>
-              <p className="text-4xl font-bold">
-                {stats.nhe.toLocaleString()}
-              </p>
-            </div>
-          </div>
+          )}
 
-          {/* CIEVS - 2 colunas */}
-          <div 
-            className="p-4 rounded-lg shadow-lg flex items-center gap-3 text-white sm:col-span-2 lg:col-span-2 xl:col-span-2 cursor-pointer hover:shadow-xl transition-all"
-            onClick={(e) => toggleFilter('origem_tipo', 'CIEVS', e.ctrlKey || e.metaKey)}
-            style={{ 
-              background: isFilterActive('CIEVS', activeFilters.origem_tipo)
-                ? 'linear-gradient(to bottom right, #c4b5fd, #a78bfa)' 
-                : 'linear-gradient(to bottom right, #8b5cf6, #7c3aed)', 
-              minHeight: '100px',
-              border: isFilterActive('CIEVS', activeFilters.origem_tipo) ? '3px solid #7c3aed' : 'none'
-            }}
-          >
-            <div className="p-3 bg-white bg-opacity-20 rounded-full flex-shrink-0">
-              <Activity className="h-8 w-8" />
+          {visibleOrigemCards.includes('CIEVS') && (
+            <div 
+              className={`p-4 rounded-lg shadow-lg flex items-center gap-3 text-white ${summaryCardSpanClass} cursor-pointer hover:shadow-xl transition-all`}
+              onClick={(e) => toggleFilter('origem_tipo', 'CIEVS', e.ctrlKey || e.metaKey)}
+              style={{ 
+                background: isFilterActive('CIEVS', activeFilters.origem_tipo)
+                  ? 'linear-gradient(to bottom right, #c4b5fd, #a78bfa)' 
+                  : 'linear-gradient(to bottom right, #8b5cf6, #7c3aed)', 
+                minHeight: '100px',
+                border: isFilterActive('CIEVS', activeFilters.origem_tipo) ? '3px solid #7c3aed' : 'none'
+              }}
+            >
+              <div className="p-3 bg-white bg-opacity-20 rounded-full flex-shrink-0">
+                <Activity className="h-8 w-8" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-xs uppercase tracking-wide opacity-90">
+                  CIEVS {isFilterActive('CIEVS', activeFilters.origem_tipo) && '✓'}
+                </h3>
+                <p className="text-4xl font-bold">
+                  {stats.cievs.toLocaleString()}
+                </p>
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="text-xs uppercase tracking-wide opacity-90">
-                CIEVS {isFilterActive('CIEVS', activeFilters.origem_tipo) && '✓'}
-              </h3>
-              <p className="text-4xl font-bold">
-                {stats.cievs.toLocaleString()}
-              </p>
-            </div>
-          </div>
+          )}
 
           {/* Indicador de Filtros Ativos */}
           {hasActiveFilters && (
@@ -1519,6 +1605,8 @@ const ComunicacaoDaeDashboard: React.FC = () => {
             )}
           </div>
 
+          {!isRestrictedOriginView && (
+          <>
           {/* LINHA 5: Gráficos CRS, NHE e CIEVS - 8 colunas divididas em 3 */}
           
           {/* Gráfico de CRS */}
@@ -1832,15 +1920,17 @@ const ComunicacaoDaeDashboard: React.FC = () => {
               </>
             )}
           </div>
+          </>
+          )}
 
           {/* LINHA 6: Municípios e DAE - 4+4 colunas */}
           
-          {/* Gráfico de Municípios - 4 colunas (estilo Dashboard Círio) */}
-          <div className="bg-white p-6 rounded-lg shadow-sm sm:col-span-2 lg:col-span-4 xl:col-span-4">
+          {/* Gráfico de Municípios de Ocorrência - 4 colunas */}
+          <div className="bg-white p-4 rounded-lg shadow-sm sm:col-span-2 lg:col-span-4 xl:col-span-4">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-2">
                 <MapPin className="h-5 w-5 text-blue-600" />
-                <h3 className="text-xl font-semibold text-gray-800">Municípios</h3>
+                <h3 className="text-xl font-semibold text-gray-800">Municípios de Ocorrência</h3>
                 <span className="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full">
                   {dadosMunicipios.length} {dadosMunicipios.length === 1 ? 'município' : 'municípios'}
                 </span>
@@ -1848,13 +1938,13 @@ const ComunicacaoDaeDashboard: React.FC = () => {
               <ChartExportMenu
                 chartId="chart-municipios"
                 chartData={dadosMunicipios}
-                chartTitle="Municípios - Distribuição Geográfica"
+                chartTitle="Municípios de Ocorrência - Distribuição Geográfica"
                 buttonVariant="icon"
               />
             </div>
 
             {dadosMunicipios.length === 0 ? (
-              <div className="flex items-center justify-center h-[400px] text-gray-500">
+              <div className="flex items-center justify-center h-[320px] text-gray-500">
                 <div className="text-center">
                   <MapPin className="h-12 w-12 mx-auto mb-2 text-gray-300" />
                   <p>Nenhum dado de município disponível</p>
@@ -1870,7 +1960,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                   </div>
                   
                   <div id="chart-municipios">
-                    <ResponsiveContainer width="100%" height={550}>
+                    <ResponsiveContainer width="100%" height={440}>
                     <BarChart data={dadosMunicipios.slice(0, 10)} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                       <XAxis 
@@ -1949,7 +2039,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                     <p className="text-sm text-gray-500">Clique para filtrar</p>
                   </div>
                   
-                  <div className="bg-gray-50 rounded-lg p-4 max-h-[750px] overflow-y-auto">
+                  <div className="bg-gray-50 rounded-lg p-4 min-h-[260px] max-h-[320px] overflow-y-auto">
                     <div className="space-y-2">
                       {dadosMunicipios.map((item, index) => {
                         const isActive = isFilterActive(item.id, activeFilters.municipio_id);
@@ -2020,7 +2110,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
           </div>
 
           {/* Gráfico de DAE (Agravos) - 4 colunas - Estilo Dashboard Círio */}
-          <div className="bg-white p-6 rounded-lg shadow-sm sm:col-span-2 lg:col-span-4 xl:col-span-4">
+          <div className="bg-white p-6 rounded-lg shadow-sm sm:col-span-2 lg:col-span-4 xl:col-span-4 xl:row-span-2 h-full">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Activity className="h-5 w-5 text-teal-600" />
@@ -2197,34 +2287,192 @@ const ComunicacaoDaeDashboard: React.FC = () => {
             )}
           </div>
 
-        </div>
-
-        {/* Mapa de Localização - NHE, CIEVS e CRS */}
-        <div className="mt-8 bg-white p-6 rounded-lg shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-blue-600" />
-              <h3 className="text-lg font-semibold text-gray-800">Mapa de Localizações</h3>
-              <span className="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full">
-                {localizacoes.filter(loc => (loc.fichasCount || 0) > 0).length} local(is) com fichas
-              </span>
+          {/* LINHA 7: Municípios de Residência - 4 colunas (abaixo de Ocorrência) */}
+          <div className="bg-white p-4 rounded-lg shadow-sm sm:col-span-2 lg:col-span-4 xl:col-span-4">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-emerald-600" />
+                <h3 className="text-xl font-semibold text-gray-800">Municípios de Residência</h3>
+                <span className="bg-emerald-100 text-emerald-800 text-sm font-medium px-3 py-1 rounded-full">
+                  {dadosMunicipiosResidencia.length} {dadosMunicipiosResidencia.length === 1 ? 'município' : 'municípios'}
+                </span>
+              </div>
+              <ChartExportMenu
+                chartId="chart-municipios-residencia"
+                chartData={dadosMunicipiosResidencia}
+                chartTitle="Municípios de Residência - Distribuição Geográfica"
+                buttonVariant="icon"
+              />
             </div>
+
+            {dadosMunicipiosResidencia.length === 0 ? (
+              <div className="flex items-center justify-center h-[300px] text-gray-500">
+                <div className="text-center">
+                  <MapPin className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                  <p>Nenhum dado de município de residência disponível</p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="xl:col-span-2">
+                  <div className="mb-4">
+                    <h4 className="text-lg font-medium text-gray-700 mb-2">Top 10 Municípios de Residência</h4>
+                    <p className="text-sm text-gray-500">Clique nas barras para filtrar por município de residência</p>
+                  </div>
+
+                  <div id="chart-municipios-residencia">
+                    <ResponsiveContainer width="100%" height={400}>
+                      <BarChart data={dadosMunicipiosResidencia.slice(0, 10)} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis
+                          dataKey="name"
+                          angle={-45}
+                          textAnchor="end"
+                          height={100}
+                          fontSize={11}
+                          interval={0}
+                        />
+                        <YAxis fontSize={12} allowDecimals={false} />
+                        <Tooltip />
+                        <Bar
+                          dataKey="value"
+                          cursor="pointer"
+                          onClick={(data) => data && toggleFilter('municipio_residencia_id', data.id, ctrlPressedRef.current)}
+                          radius={[4, 4, 0, 0]}
+                        >
+                          {dadosMunicipiosResidencia.slice(0, 10).map((entry, index) => {
+                            const colors = [
+                              "#047857", "#059669", "#10b981", "#34d399", "#6ee7b7",
+                              "#0ea5e9", "#0284c7", "#0369a1", "#38bdf8", "#7dd3fc"
+                            ];
+                            const baseColor = colors[index % colors.length];
+                            return (
+                              <Cell
+                                key={`cell-res-${index}`}
+                                fill={getCellColor(entry.id, activeFilters.municipio_residencia_id, baseColor)}
+                                stroke={isFilterActive(entry.id, activeFilters.municipio_residencia_id) ? "#000" : "none"}
+                                strokeWidth={isFilterActive(entry.id, activeFilters.municipio_residencia_id) ? 3 : 0}
+                              />
+                            );
+                          })}
+                          <LabelList
+                            dataKey="value"
+                            position="top"
+                            style={{
+                              fontSize: '14px',
+                              fontWeight: 'bold',
+                              fill: '#374151'
+                            }}
+                            formatter={(value: number) => value.toLocaleString()}
+                          />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div className="xl:col-span-1">
+                  <div className="mb-4">
+                    <h4 className="text-lg font-medium text-gray-700 mb-2">Todos os Municípios de Residência</h4>
+                    <p className="text-sm text-gray-500">Clique para filtrar</p>
+                  </div>
+
+                  <div className="bg-gray-50 rounded-lg p-4 min-h-[240px] max-h-[300px] overflow-y-auto">
+                    <div className="space-y-2">
+                      {dadosMunicipiosResidencia.map((item, index) => {
+                        const isActive = isFilterActive(item.id, activeFilters.municipio_residencia_id);
+                        const colors = [
+                          "#047857", "#059669", "#10b981", "#34d399", "#6ee7b7",
+                          "#0ea5e9", "#0284c7", "#0369a1", "#38bdf8", "#7dd3fc"
+                        ];
+                        const itemColor = colors[index % colors.length];
+                        const bandeiraPattern = getMunicipioBandeira(item.name);
+                        return (
+                          <div
+                            key={`item-res-${index}`}
+                            className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all duration-200 ${
+                              isActive
+                                ? 'bg-emerald-100 border border-emerald-300 shadow-sm'
+                                : 'bg-white hover:bg-gray-100 border border-transparent hover:shadow-sm'
+                            }`}
+                            onClick={(e) => toggleFilter('municipio_residencia_id', item.id, e.ctrlKey || e.metaKey)}
+                            title={`Clique para filtrar por ${item.name}`}
+                          >
+                            <div className="flex items-center gap-3 flex-1">
+                              {/* Bandeira do município */}
+                              <img
+                                src={`${bandeiraPattern}.jpg`}
+                                alt={`Bandeira de ${item.name}`}
+                                className="w-10 h-7 object-cover rounded shadow-sm border border-gray-200"
+                                onError={(e) => {
+                                  const target = e.currentTarget;
+                                  if (target.src.endsWith('.jpg')) {
+                                    target.src = `${bandeiraPattern}.png`;
+                                  } else {
+                                    target.style.display = 'none';
+                                  }
+                                }}
+                              />
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className="w-4 h-4 rounded border border-gray-200 flex items-center justify-center"
+                                  style={{ backgroundColor: itemColor + '20' }}
+                                >
+                                  <div
+                                    className="w-2 h-2 rounded-full"
+                                    style={{ backgroundColor: itemColor }}
+                                  ></div>
+                                </div>
+                                <span className={`font-medium text-sm ${isActive ? 'text-emerald-800' : 'text-gray-700'}`}>
+                                  {item.name}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm font-semibold ${isActive ? 'text-emerald-700' : 'text-gray-600'}`}>
+                                {item.value}
+                              </span>
+                              {isActive && <span className="text-emerald-500 text-xs">●</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="text-sm text-gray-600 mb-4">
-            <p>Visualize as localizações com fichas cadastradas. Clique nas bolinhas para ver os detalhes.</p>
-          </div>
-
-          <MapProviderProvider>
-            <MapaDashboardDAE 
-              localizacoes={localizacoes.filter(loc => (loc.fichasCount || 0) > 0)}
-              onLocalizacaoClick={(loc) => {
-                setSelectedLocalizacao(loc);
-                setShowLocalizacaoModal(true);
-              }}
-            />
-          </MapProviderProvider>
         </div>
+
+        {!isRestrictedOriginView && (
+          <div className="mt-8 bg-white p-6 rounded-lg shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-blue-600" />
+                <h3 className="text-lg font-semibold text-gray-800">Mapa de Localizações</h3>
+                <span className="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full">
+                  {localizacoes.filter(loc => (loc.fichasCount || 0) > 0).length} local(is) com fichas
+                </span>
+              </div>
+            </div>
+
+            <div className="text-sm text-gray-600 mb-4">
+              <p>Visualize as localizações com fichas cadastradas. Clique nas bolinhas para ver os detalhes.</p>
+            </div>
+
+            <MapProviderProvider>
+              <MapaDashboardDAE 
+                localizacoes={localizacoes.filter(loc => (loc.fichasCount || 0) > 0)}
+                onLocalizacaoClick={(loc) => {
+                  setSelectedLocalizacao(loc);
+                  setShowLocalizacaoModal(true);
+                }}
+              />
+            </MapProviderProvider>
+          </div>
+        )}
 
         {/* Informações e Legendas */}
         <div className="mt-6 bg-white p-4 rounded-lg shadow-sm">
@@ -2238,11 +2486,13 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                 <li>• <strong>Clique no card "Total"</strong> para ver a lista completa de comunicações</li>
                 <li>• <strong>Clique nos cards</strong> CRS/NHE/CIEVS para filtrar por tipo de origem</li>
                 <li>• <strong>Use os filtros de período e horário</strong> para analisar intervalos específicos de tempo</li>
-                <li>• <strong>Clique nos gráficos</strong> de municípios ou DAE para aplicar filtros específicos</li>
+                <li>• <strong>Clique nos gráficos</strong> de municípios (ocorrência/residência) ou DAE para aplicar filtros específicos</li>
                 <li>• <strong>Todos os gráficos são interconectados</strong> - refletem os filtros ativos simultaneamente</li>
                 <li>• <strong>Passe o mouse sobre os pontos</strong> do gráfico temporal para ver valores absolutos e porcentagens</li>
                 <li>• <strong>Use "Limpar Todos os Filtros"</strong> para resetar e ver todos os dados novamente</li>
-                <li>• <strong>No mapa</strong>, clique nas bolinhas coloridas para ver as fichas relacionadas a cada localização</li>
+                {!isRestrictedOriginView && (
+                  <li>• <strong>No mapa</strong>, clique nas bolinhas coloridas para ver as fichas relacionadas a cada localização</li>
+                )}
               </ul>
             </div>
           </div>
@@ -2333,11 +2583,12 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                               <strong>Hora:</strong> {new Date(comunicacao.data_comunicacao).toLocaleTimeString('pt-BR')}
                             </div>
                             <div>
-                              <strong>Município:</strong> {comunicacao.tipo_municipio?.nome || 'N/A'}
+                              <strong>Município (Ocorrência):</strong> {comunicacao.tipo_municipio?.descricao || 'N/A'}
                             </div>
                             <div>
-                              <strong>DAE:</strong> {comunicacao.dae?.nome || 'N/A'}
+                              <strong>Município (Residência):</strong> {comunicacao.tipo_municipio_residencia?.descricao || 'N/A'}
                             </div>
+                            <div><strong>DAE:</strong> {comunicacao.dae?.nome || 'N/A'}</div>
                           </div>
                         </div>
 

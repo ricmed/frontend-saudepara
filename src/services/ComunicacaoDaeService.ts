@@ -25,6 +25,7 @@ export interface ComunicacaoDae {
   digitador?: string;
   telefone_digitador?: string;
   id_municipio_ocorrencia: number;
+  id_municipio_residencia: number;
   origem_tipo: OrigemTipo;
   origem_id: number;
   id_dae: number;
@@ -36,6 +37,10 @@ export interface ComunicacaoDae {
     codigo?: string;
   };
   tipo_municipio?: {
+    idtipo_municipio: number;
+    descricao: string;
+  };
+  tipo_municipio_residencia?: {
     idtipo_municipio: number;
     descricao: string;
   };
@@ -57,8 +62,10 @@ export interface ComunicacaoDaeFilters {
   origem_tipo?: OrigemTipo;
   origem_id?: number;
   id_municipio_ocorrencia?: number;
+  id_municipio_residencia?: number;
   data_inicio?: string;
   data_fim?: string;
+  estabelecimento_id?: number;
 }
 
 export interface CreateComunicacaoDaeData {
@@ -68,6 +75,7 @@ export interface CreateComunicacaoDaeData {
   digitador?: string;
   telefone_digitador?: string;
   id_municipio_ocorrencia: number;
+  id_municipio_residencia: number;
   origem_tipo: OrigemTipo;
   origem_id: number;
   id_dae: number;
@@ -80,6 +88,7 @@ export interface UpdateComunicacaoDaeData {
   digitador?: string;
   telefone_digitador?: string;
   id_municipio_ocorrencia?: number;
+  id_municipio_residencia?: number;
   origem_tipo?: OrigemTipo;
   origem_id?: number;
   id_dae?: number;

@@ -85,6 +85,27 @@ const LocationInput: React.FC<LocationInputProps> = ({
     }
   };
 
+  // Detectar tipo do campo pela combinação de name + endpoint
+  const endpoint = (apiEndpoint || "").toLowerCase();
+  const isMunicipioInput =
+    endpoint.includes("tipo-municipio") ||
+    name === "municipio" ||
+    name.startsWith("municipio");
+  const isEstadoInput =
+    endpoint.includes("tipo-estado") ||
+    name === "uf" ||
+    name.startsWith("uf");
+  const isPaisInput =
+    endpoint.includes("tipo-pais") ||
+    name === "paisProcedencia" ||
+    name.startsWith("pais");
+
+  const getCacheKey = (): "estados" | "paises" | "municipios" => {
+    if (isEstadoInput) return "estados";
+    if (isPaisInput) return "paises";
+    return "municipios";
+  };
+
   // Função para normalizar as opções recebidas, removendo acentos e cedilhas
   const normalizeOptions = (options: LocationOption[]): LocationOption[] => {
     return options.map(option => ({
@@ -105,7 +126,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
 
   // Reset selection when parent value changes (for municipalities)
   useEffect(() => {
-    if (name === "municipio" && parentValue !== undefined) {
+    if (isMunicipioInput && parentValue !== undefined) {
       debugLog(`State value changed to: ${parentValue}`);
       
       // Avoid processing if parent value hasn't changed
@@ -135,7 +156,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
         fetchMunicipiosByEstado(parentValue);
       }
     }
-  }, [parentValue, name]);
+  }, [parentValue, isMunicipioInput]);
 
   // Função para atualizar a posição do dropdown
   const updateDropdownPosition = () => {
@@ -310,9 +331,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
       if (!navigator.onLine) {
         console.log(`📱 [${name}] Modo offline: buscando em cache...`);
         
-        const cacheKey = name === 'uf' ? 'estados' : 
-                        name === 'paisProcedencia' ? 'paises' :
-                        'municipios';
+        const cacheKey = getCacheKey();
         const cachedOptions = await indexedDBService.getOpcoes(cacheKey);
         
         if (cachedOptions && cachedOptions.length > 0) {
@@ -338,7 +357,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
           const baseUrl = server && port ? `${server}:${port}/` : "/";
           
           let url = `${baseUrl}${apiEndpoint}`;
-          const limit = name === "paisProcedencia" ? 300 : 1000;
+          const limit = isPaisInput ? 300 : 1000;
           
           if (query) {
             const normalizedQuery = normalizeText(query);
@@ -358,18 +377,14 @@ const LocationInput: React.FC<LocationInputProps> = ({
           
           // ✅ SALVAR NO CACHE PARA USO FUTURO
           if (!query) { // Só salva busca geral, não buscas específicas
-            const cacheKey = name === 'uf' ? 'estados' : 
-                            name === 'paisProcedencia' ? 'paises' :
-                            'municipios';
+            const cacheKey = getCacheKey();
             await indexedDBService.saveOpcoes(cacheKey, options);
           }
           
         } catch (apiError) {
           console.warn(`⚠️ [${name}] API falhou, tentando cache...`);
           
-          const cacheKey = name === 'uf' ? 'estados' : 
-                          name === 'paisProcedencia' ? 'paises' :
-                          'municipios';
+          const cacheKey = getCacheKey();
           const cachedOptions = await indexedDBService.getOpcoes(cacheKey);
           
           if (cachedOptions && cachedOptions.length > 0) {
@@ -418,10 +433,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
       setIsLoading(true);
       debugLog(`Fetching item by ID: ${id}`);
       
-      const cacheKey = name === 'uf' ? 'estados' : 
-                      name === 'paisProcedencia' ? 'paises' :
-                      name === 'municipio' ? 'municipios' :
-                      null;
+      const cacheKey = apiEndpoint ? getCacheKey() : null;
       
       // ✅ SE ESTIVER ONLINE: TENTAR API PRIMEIRO, CACHE COMO FALLBACK
       if (navigator.onLine) {
@@ -597,7 +609,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
       updateDropdownPosition();
       
       // Load options when dropdown is opened
-      if (name === "municipio") {
+      if (isMunicipioInput) {
         // For municipalities, we need the state value
         if (parentValue && localOptions.length === 0) {
           fetchMunicipiosByEstado(parentValue);
@@ -619,13 +631,13 @@ const LocationInput: React.FC<LocationInputProps> = ({
         window.removeEventListener('scroll', updateDropdownPosition);
       };
     }
-  }, [isDropdownOpen, name, parentValue, localOptions.length, searchQuery]);
+  }, [isDropdownOpen, isMunicipioInput, parentValue, localOptions.length, searchQuery]);
   
   // Text search with debounce
   useEffect(() => {
     if (isDropdownOpen && searchQuery.length >= 2) {
       const timer = setTimeout(() => {
-        if (name === "municipio" && parentValue) {
+        if (isMunicipioInput && parentValue) {
           // For municipalities, we filter locally already loaded options
           // We don't need to make another API call
         } else {
@@ -636,7 +648,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
       
       return () => clearTimeout(timer);
     }
-  }, [searchQuery, isDropdownOpen, name, parentValue]);
+  }, [searchQuery, isDropdownOpen, isMunicipioInput, parentValue]);
 
   // Cancel pending requests when unmounting component
   useEffect(() => {
@@ -766,7 +778,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
             <div className="px-4 py-2 text-sm text-gray-500">
               {searchQuery.length > 0 
                 ? 'Nenhum resultado encontrado' 
-                : name === "municipio" && !parentValue 
+                : isMunicipioInput && !parentValue 
                   ? 'Selecione uma UF primeiro'
                   : 'Nenhuma opção disponível'}
             </div>

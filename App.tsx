@@ -305,16 +305,17 @@ function App() {
               <Route path="/private/pacientes" element={<ListaPacientes />} />
             </Route>
 
-            {/* ✅ NOVO: Rotas de Comunicação DAE - Protegidas para Admin e Admin.Estado */}
-            <Route element={<ProtectedRoute requiredRoles={['admin', 'admin.estado']}><Outlet /></ProtectedRoute>}>
-              {/* Listagem e formulário principal */}
+            {/* ✅ Rotas de Comunicação DAE (lista/form/dashboard) */}
+            <Route element={<ProtectedRoute requiredRoles={['comunicacao.dae', 'admin', 'admin.estado', 'admin.crs']}><Outlet /></ProtectedRoute>}>
               <Route path="/private/comunicacao-dae" element={<ComunicacaoDaePage />} />
               <Route path="/private/comunicacao-dae/dashboard" element={<ComunicacaoDaeDashboard />} />
               <Route path="/private/comunicacao-dae/nova" element={<ComunicacaoDaeFormPage />} />
               <Route path="/private/comunicacao-dae/:id" element={<ComunicacaoDaeFormPage />} />
               <Route path="/private/comunicacao-dae/editar/:id" element={<ComunicacaoDaeFormPage />} />
-              
-              {/* Gerenciamento de entidades auxiliares */}
+            </Route>
+
+            {/* Gerenciamento de entidades auxiliares da Comunicação DAE */}
+            <Route element={<ProtectedRoute requiredRoles={['admin', 'admin.estado', 'admin.crs']}><Outlet /></ProtectedRoute>}>
               <Route path="/private/apps/comunicacao-dae/dae" element={<DaePage />} />
               <Route path="/private/apps/comunicacao-dae/dae/:id" element={<DaePage />} />
               <Route path="/private/apps/comunicacao-dae/nhe" element={<NhePage />} />

@@ -82,6 +82,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
     digitador: '',
     telefone_digitador: '',
     id_municipio_ocorrencia: 0,
+    id_municipio_residencia: 0,
     origem_tipo: 'CRS' as OrigemTipo,
     origem_id: 0,
     id_dae: 0,
@@ -99,6 +100,8 @@ const ComunicacaoDaeFormPage: React.FC = () => {
   // Estados para UF e município
   const [ufOcorrencia, setUfOcorrencia] = useState<string>('15'); // Pará por padrão
   const [municipioOcorrencia, setMunicipioOcorrencia] = useState<string>('');
+  const [ufResidencia, setUfResidencia] = useState<string>('15'); // Pará por padrão
+  const [municipioResidencia, setMunicipioResidencia] = useState<string>('');
   const [isLoadingMunicipios] = useState(false);
 
   // Anexos
@@ -117,12 +120,15 @@ const ComunicacaoDaeFormPage: React.FC = () => {
         digitador: '',
         telefone_digitador: '',
         id_municipio_ocorrencia: 0,
+        id_municipio_residencia: 0,
         origem_tipo: 'CRS' as OrigemTipo,
         origem_id: 0,
         id_dae: 0,
       });
       setUfOcorrencia('15'); // Resetar para Pará
       setMunicipioOcorrencia('');
+      setUfResidencia('15'); // Resetar para Pará
+      setMunicipioResidencia('');
       if (!isEditMode) {
         setFichaFile(null);
         setRelatorioFile(null);
@@ -132,13 +138,19 @@ const ComunicacaoDaeFormPage: React.FC = () => {
 
   // Atualizar formData quando municipioOcorrencia mudar
   useEffect(() => {
-    if (municipioOcorrencia) {
-      setFormData(prev => ({
-        ...prev,
-        id_municipio_ocorrencia: Number(municipioOcorrencia)
-      }));
-    }
+    setFormData(prev => ({
+      ...prev,
+      id_municipio_ocorrencia: municipioOcorrencia ? Number(municipioOcorrencia) : 0
+    }));
   }, [municipioOcorrencia]);
+
+  // Atualizar formData quando municipioResidencia mudar
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      id_municipio_residencia: municipioResidencia ? Number(municipioResidencia) : 0
+    }));
+  }, [municipioResidencia]);
 
   useEffect(() => {
     loadSelectOptions();
@@ -166,16 +178,6 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       setError('Erro ao carregar dados do formulário. Alguns dados podem estar indisponíveis offline.');
     }
   };
-
-  // Atualizar formData quando municipioOcorrencia mudar
-  useEffect(() => {
-    if (municipioOcorrencia) {
-      setFormData(prev => ({
-        ...prev,
-        id_municipio_ocorrencia: Number(municipioOcorrencia)
-      }));
-    }
-  }, [municipioOcorrencia]);
 
   const loadComunicacao = async (comunicacaoId: number) => {
     try {
@@ -208,50 +210,65 @@ const ComunicacaoDaeFormPage: React.FC = () => {
         digitador: data.digitador ? normalizeText(data.digitador) : '',
         telefone_digitador: data.telefone_digitador || '',
         id_municipio_ocorrencia: data.id_municipio_ocorrencia,
+        id_municipio_residencia: data.id_municipio_residencia || 0,
         origem_tipo: data.origem_tipo,
         origem_id: data.origem_id,
         id_dae: data.id_dae,
       });
 
-      // ✅ CORRIGIDO: Buscar a UF do município primeiro
-      if (data.id_municipio_ocorrencia) {
+      const carregarUfEMunicipio = async (
+        municipioId: number | undefined,
+        setUf: (value: string) => void,
+        setMunicipio: (value: string) => void,
+        nomeCampo: string
+      ) => {
+        if (!municipioId) return;
+
         try {
           // Buscar informações do município para obter a UF
           const municipios = await indexedDBService.getOpcoes('municipios');
-          const municipioData = municipios?.find((m: any) => 
-            Number(m.idtipo_municipio) === Number(data.id_municipio_ocorrencia)
+          const municipioData = municipios?.find((m: any) =>
+            Number(m.idtipo_municipio) === Number(municipioId)
           );
-          
+
           if (municipioData && municipioData.tipo_estado_idtipo_estado) {
-            // Setar UF primeiro
-            setUfOcorrencia(String(municipioData.tipo_estado_idtipo_estado));
-            
-            // Pequeno delay para garantir que a UF foi setada antes do município
+            setUf(String(municipioData.tipo_estado_idtipo_estado));
             setTimeout(() => {
-              setMunicipioOcorrencia(String(data.id_municipio_ocorrencia));
+              setMunicipio(String(municipioId));
             }, 100);
-          } else {
-            // Tentar buscar do backend como fallback
-            try {
-              const server = import.meta.env.VITE_API_SERVER || "";
-              const port = import.meta.env.VITE_API_PORT || "";
-              const baseUrl = server && port ? `${server}:${port}/` : "/";
-              const response = await axios.get(`${baseUrl}api/tipo-municipio/${data.id_municipio_ocorrencia}`);
-              
-              if (response.data && response.data.tipo_estado_idtipo_estado) {
-                setUfOcorrencia(String(response.data.tipo_estado_idtipo_estado));
-                setTimeout(() => {
-                  setMunicipioOcorrencia(String(data.id_municipio_ocorrencia));
-                }, 100);
-              }
-            } catch (apiErr) {
-              setError('Não foi possível carregar o município de ocorrência. Verifique sua conexão.');
-            }
+            return;
           }
-        } catch (err) {
-          // Silenciar erro
+
+          // Tentar buscar do backend como fallback
+          const server = import.meta.env.VITE_API_SERVER || "";
+          const port = import.meta.env.VITE_API_PORT || "";
+          const baseUrl = server && port ? `${server}:${port}/` : "/";
+          const response = await axios.get(`${baseUrl}api/tipo-municipio/${municipioId}`);
+
+          if (response.data && response.data.tipo_estado_idtipo_estado) {
+            setUf(String(response.data.tipo_estado_idtipo_estado));
+            setTimeout(() => {
+              setMunicipio(String(municipioId));
+            }, 100);
+          }
+        } catch (apiErr) {
+          setError(`Não foi possível carregar o município de ${nomeCampo}. Verifique sua conexão.`);
         }
-      }
+      };
+
+      await carregarUfEMunicipio(
+        data.id_municipio_ocorrencia,
+        setUfOcorrencia,
+        setMunicipioOcorrencia,
+        'ocorrência'
+      );
+
+      await carregarUfEMunicipio(
+        data.id_municipio_residencia,
+        setUfResidencia,
+        setMunicipioResidencia,
+        'residência'
+      );
 
       if (data.comunicacao_dae_anexo) {
         setAnexos(data.comunicacao_dae_anexo);
@@ -278,6 +295,10 @@ const ComunicacaoDaeFormPage: React.FC = () => {
     }
     if (!formData.id_municipio_ocorrencia) {
       setError('Município de ocorrência é obrigatório');
+      return;
+    }
+    if (!formData.id_municipio_residencia) {
+      setError('Município de residência é obrigatório');
       return;
     }
     if (!formData.origem_id) {
@@ -805,6 +826,53 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                   debug={true}
                 />
                 <p className="mt-1.5 text-xs text-gray-500">Município onde ocorreu o evento que está sendo comunicado</p>
+              </div>
+
+              {/* UF de Residência */}
+              <div>
+                <LocationInput
+                  name="uf_residencia"
+                  label="UF de Residência"
+                  value={ufResidencia}
+                  onChange={(value) => {
+                    setUfResidencia(value);
+                    setMunicipioResidencia(''); // Limpar município ao trocar UF
+                  }}
+                  placeholder="Selecione a UF"
+                  disabled={false}
+                  apiEndpoint="api/tipo-estado"
+                  idField="idtipo_estado"
+                  required
+                  className={inputClass}
+                />
+                <p className="mt-1.5 text-xs text-gray-500">Estado de residência do paciente</p>
+              </div>
+
+              {/* Município de Residência */}
+              <div>
+                <LocationInput
+                  name="municipio_residencia"
+                  label="Município de Residência"
+                  value={municipioResidencia}
+                  onChange={(value) => {
+                    setMunicipioResidencia(value);
+                  }}
+                  placeholder={
+                    isLoadingMunicipios
+                      ? "Carregando municípios..."
+                      : ufResidencia
+                        ? "Selecione o município"
+                        : "Primeiro selecione a UF"
+                  }
+                  disabled={!ufResidencia || isLoadingMunicipios}
+                  apiEndpoint="api/tipo-municipio"
+                  idField="idtipo_municipio"
+                  parentValue={ufResidencia}
+                  required
+                  className={inputClass}
+                  debug={true}
+                />
+                <p className="mt-1.5 text-xs text-gray-500">Município de residência do paciente</p>
               </div>
             </div>
             )}
