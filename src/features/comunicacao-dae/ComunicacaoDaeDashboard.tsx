@@ -115,6 +115,9 @@ const ComunicacaoDaeDashboard: React.FC = () => {
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const [autoRefreshCountdown, setAutoRefreshCountdown] = useState(60); // 60 segundos = 1 minuto
   const [lastUpdate, setLastUpdate] = useState(new Date().toLocaleString('pt-BR'));
+  const [viewportWidth, setViewportWidth] = useState(
+    typeof window !== 'undefined' ? window.innerWidth : 1280
+  );
   const autoRefreshInterval = useRef<NodeJS.Timeout | null>(null);
   const refreshDataRef = useRef<(() => void) | null>(null);
   const ctrlPressedRef = useRef(false);
@@ -145,6 +148,15 @@ const ComunicacaoDaeDashboard: React.FC = () => {
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, []);
+
+  // Detectar largura da tela para ajustes finos de gráficos no mobile
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const isMobileViewport = viewportWidth < 640;
 
   useEffect(() => {
     loadAllData();
@@ -1015,15 +1027,15 @@ const ComunicacaoDaeDashboard: React.FC = () => {
     });
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[85vh] overflow-hidden">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
+        <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] sm:max-h-[85vh] overflow-hidden">
           {/* Header */}
-          <div className="p-6 border-b border-gray-200">
-            <div className="flex items-center justify-between mb-4">
+          <div className="p-4 sm:p-6 border-b border-gray-200">
+            <div className="flex items-start sm:items-center justify-between mb-4 gap-3">
               <div className="flex items-center gap-3">
-                <FileText className="h-6 w-6 text-blue-600" />
+                <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900">
+                  <h2 className="text-lg sm:text-xl font-bold text-gray-900">
                     Comunicações DAE
                   </h2>
                   <p className="text-sm text-gray-600">
@@ -1061,7 +1073,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
           </div>
 
           {/* Lista de Comunicações */}
-          <div className="p-6 overflow-y-auto max-h-[calc(85vh-200px)]">
+          <div className="p-3 sm:p-6 overflow-y-auto max-h-[calc(90vh-180px)] sm:max-h-[calc(85vh-200px)]">
             {comunicacoesPesquisadas.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-gray-500">
                 <Search className="h-16 w-16 mb-4 text-gray-300" />
@@ -1073,9 +1085,9 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                 {comunicacoesPesquisadas.map((com) => (
                   <div
                     key={com.id_comunicacao}
-                    className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors border border-gray-200"
+                    className="bg-gray-50 rounded-lg p-3 sm:p-4 hover:bg-gray-100 transition-colors border border-gray-200"
                   >
-                    <div className="flex items-start justify-between gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                       {/* Info Principal */}
                       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                         {/* Coluna 1 */}
@@ -1115,7 +1127,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                       </div>
 
                       {/* Ações */}
-                      <div className="flex flex-col gap-2">
+                      <div className="flex sm:flex-col gap-2">
                         <button
                           onClick={() => {
                             setSelectedComunicacao(com);
@@ -1148,13 +1160,13 @@ const ComunicacaoDaeDashboard: React.FC = () => {
 
           {/* Footer */}
           <div className="p-4 border-t border-gray-200 bg-gray-50">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <p className="text-sm text-gray-600">
                 Total: {comunicacoesPesquisadas.length} comunicação(ões)
               </p>
               <button
                 onClick={() => setShowComunicacoesModal(false)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors w-full sm:w-auto"
               >
                 Fechar
               </button>
@@ -1184,23 +1196,23 @@ const ComunicacaoDaeDashboard: React.FC = () => {
       {/* Header */}
       <header className="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-xl sticky top-0 z-40">
         <div className="w-full max-w-[98%] mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
               <button
                 onClick={() => setIsMenuOpen(true)}
                 className="p-2 rounded-lg hover:bg-blue-700 transition-colors"
               >
                 <Menu className="w-6 h-6" />
               </button>
-              <div>
-                <h1 className="text-2xl font-bold">Dashboard - Comunicação DAE</h1>
-                <p className="text-sm text-blue-100">Análise Completa de Doenças, Agravos e Eventos</p>
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl lg:text-2xl font-bold truncate">Dashboard - Comunicação DAE</h1>
+                <p className="text-xs sm:text-sm text-blue-100 truncate">Análise Completa de Doenças, Agravos e Eventos</p>
               </div>
             </div>
             
-            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 sm:gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-end lg:items-center gap-2 sm:gap-3 w-full lg:w-auto">
               {/* Timestamp e Contador */}
-              <div className="flex items-center gap-2 bg-white/10 p-2 rounded text-white text-xs sm:text-sm" data-export-menu>
+              <div className="flex items-center gap-2 bg-white/10 p-2 rounded text-white text-xs sm:text-sm w-full sm:w-auto" data-export-menu>
                 <Clock className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                 <span className="truncate">Última atualização: {lastUpdate}</span>
                 {autoRefreshEnabled && (
@@ -1211,7 +1223,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
               </div>
 
               {/* Botões de Ação */}
-              <div className="flex gap-2" data-export-menu>
+              <div className="flex flex-wrap justify-end gap-2" data-export-menu>
                 <button
                   onClick={loadAllData}
                   disabled={loading}
@@ -1275,14 +1287,14 @@ const ComunicacaoDaeDashboard: React.FC = () => {
 
       {/* Indicador de seleção múltipla ativa */}
       {isCtrlPressed && (
-        <div className="fixed top-20 right-4 z-40 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-in slide-in-from-top duration-200">
+        <div className="hidden md:flex fixed top-20 right-4 z-40 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg items-center gap-2 animate-in slide-in-from-top duration-200">
           <span className="font-semibold">Modo de Seleção Múltipla Ativo</span>
           <span className="text-xs bg-white/20 px-2 py-1 rounded">Ctrl pressionado</span>
         </div>
       )}
 
       {/* Container Principal */}
-      <main className="w-full max-w-[98%] mx-auto px-4 py-6" data-dashboard="main">
+      <main className="w-full max-w-[98%] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6" data-dashboard="main">
         {error && (
           <div className="mb-4 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg flex items-start justify-between">
             <div className="flex items-start gap-3">
@@ -1297,7 +1309,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
 
         {/* Indicador de filtros ativos e botão de limpar */}
         {activeFiltersCount > 0 && (
-          <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-r-lg flex items-center justify-between">
+          <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-r-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-3">
               <Filter className="w-5 h-5 text-blue-600" />
               <div>
@@ -1311,7 +1323,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
             </div>
             <button
               onClick={clearAllFilters}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors text-sm"
+              className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors text-sm w-full sm:w-auto"
             >
               <X className="w-4 h-4" />
               Limpar Filtros
@@ -1328,7 +1340,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
               <Calendar className="w-5 h-5" />
               <h3 className="text-sm font-semibold">Filtros de Período e Horário</h3>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
               <div>
                 <label className="block text-xs text-blue-100 mb-1">Data Início</label>
                 <input
@@ -1389,7 +1401,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
             </div>
             <div className="min-w-0 flex-1">
               <h3 className="text-xs text-blue-100 uppercase tracking-wide">Total de Comunicações</h3>
-              <p className="text-4xl font-bold">
+              <p className="text-3xl sm:text-4xl font-bold">
                 {stats.total.toLocaleString()}
               </p>
               <p className="text-xs text-blue-200 mt-1">
@@ -1417,7 +1429,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                 <h3 className="text-xs uppercase tracking-wide opacity-90">
                   CRS {isFilterActive('CRS', activeFilters.origem_tipo) && '✓'}
                 </h3>
-                <p className="text-4xl font-bold">
+                <p className="text-3xl sm:text-4xl font-bold">
                   {stats.crs.toLocaleString()}
                 </p>
               </div>
@@ -1443,7 +1455,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                 <h3 className="text-xs uppercase tracking-wide opacity-90">
                   NHE {isFilterActive('NHE', activeFilters.origem_tipo) && '✓'}
                 </h3>
-                <p className="text-4xl font-bold">
+                <p className="text-3xl sm:text-4xl font-bold">
                   {stats.nhe.toLocaleString()}
                 </p>
               </div>
@@ -1469,7 +1481,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                 <h3 className="text-xs uppercase tracking-wide opacity-90">
                   CIEVS {isFilterActive('CIEVS', activeFilters.origem_tipo) && '✓'}
                 </h3>
-                <p className="text-4xl font-bold">
+                <p className="text-3xl sm:text-4xl font-bold">
                   {stats.cievs.toLocaleString()}
                 </p>
               </div>
@@ -1501,8 +1513,8 @@ const ComunicacaoDaeDashboard: React.FC = () => {
           )}
 
           {/* LINHA 4: Série Temporal - 8 colunas */}
-          <div className="bg-white p-6 rounded-lg shadow-sm sm:col-span-2 lg:col-span-4 xl:col-span-8">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm sm:col-span-2 lg:col-span-4 xl:col-span-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-100 text-blue-700 rounded-lg">
                   <Calendar className="h-5 w-5" />
@@ -2147,7 +2159,11 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                     <BarChart
                       data={dadosDae.slice(0, 15)}
                       layout="vertical"
-                      margin={{ top: 5, right: 100, left: 10, bottom: 5 }}
+                      margin={
+                        isMobileViewport
+                          ? { top: 5, right: 12, left: 0, bottom: 5 }
+                          : { top: 5, right: 100, left: 10, bottom: 5 }
+                      }
                       barCategoryGap="15%"
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -2161,9 +2177,14 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                         dataKey="name"
                         type="category"
                         stroke="#666"
-                        width={200}
+                        width={isMobileViewport ? 120 : 200}
                         interval={0}
-                        tick={{ fontSize: 11 }}
+                        tick={{ fontSize: isMobileViewport ? 10 : 11 }}
+                        tickFormatter={(value: string) =>
+                          isMobileViewport && value?.length > 24
+                            ? `${value.slice(0, 22)}...`
+                            : value
+                        }
                       />
                       <Tooltip
                         contentStyle={{
@@ -2203,9 +2224,13 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                         })}
                         <LabelList
                           dataKey="value"
-                          position="right"
+                          position={isMobileViewport ? 'insideRight' : 'right'}
                           formatter={(value: number) => value.toLocaleString()}
-                          style={{ fontSize: '14px', fontWeight: 'bold', fill: '#374151' }}
+                          style={{
+                            fontSize: isMobileViewport ? '11px' : '14px',
+                            fontWeight: 'bold',
+                            fill: '#374151'
+                          }}
                         />
                       </Bar>
                     </BarChart>
@@ -2502,16 +2527,16 @@ const ComunicacaoDaeDashboard: React.FC = () => {
       {/* Modal de Fichas por Localização */}
       {showLocalizacaoModal && selectedLocalizacao && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-3 sm:p-4"
           style={{ zIndex: 9999 }}
           onClick={() => setShowLocalizacaoModal(false)}
         >
           <div 
-            className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[80vh] flex flex-col"
+            className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] sm:max-h-[80vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header do Modal */}
-            <div className={`p-6 border-b flex items-center justify-between ${
+            <div className={`p-4 sm:p-6 border-b flex items-start sm:items-center justify-between gap-3 ${
               selectedLocalizacao.tipo === 'NHE' ? 'bg-green-50' :
               selectedLocalizacao.tipo === 'CIEVS' ? 'bg-purple-50' :
               'bg-orange-50'
@@ -2540,7 +2565,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
             </div>
 
             {/* Conteúdo do Modal */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
               <div className="mb-4">
                 <p className="text-sm text-gray-600">
                   <strong>Endereço:</strong> {selectedLocalizacao.endereco}
@@ -2564,7 +2589,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                       key={comunicacao.id_comunicacao}
                       className="bg-gray-50 p-4 rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
                     >
-                      <div className="flex items-start justify-between">
+                      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
                             <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded">
@@ -2575,7 +2600,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                             </span>
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-600">
                             <div>
                               <strong>Data:</strong> {new Date(comunicacao.data_comunicacao).toLocaleDateString('pt-BR')}
                             </div>
@@ -2592,7 +2617,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           <button
                             onClick={() => {
                               setSelectedComunicacao(comunicacao);
@@ -2650,12 +2675,12 @@ const ComunicacaoDaeDashboard: React.FC = () => {
       {/* Modal de Visualização da Ficha */}
       {showFichaModal && selectedComunicacao && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-3 sm:p-4"
           style={{ zIndex: 10000 }}
           onClick={() => setShowFichaModal(false)}
         >
           <div 
-            className="bg-white rounded-lg shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col"
+            className="bg-white rounded-lg shadow-2xl w-full max-w-6xl h-[95vh] sm:h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header do Modal */}
@@ -2664,7 +2689,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                 ? 'bg-gradient-to-r from-green-500 to-green-600' 
                 : 'bg-gradient-to-r from-blue-500 to-blue-600'
             }`}>
-              <h3 className="text-lg font-semibold flex items-center gap-2">
+              <h3 className="text-sm sm:text-lg font-semibold flex items-center gap-2 flex-wrap">
                 {fichaModalMode === 'edit' ? <Edit className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
                 {fichaModalMode === 'edit' ? 'Editar' : 'Visualizar'} Comunicação DAE - ID: {selectedComunicacao.id_comunicacao}
               </h3>

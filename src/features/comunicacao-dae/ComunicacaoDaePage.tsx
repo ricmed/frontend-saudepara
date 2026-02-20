@@ -9,9 +9,12 @@ import ConnectionStatus from '@/components/ConnectionStatus';
 import {
   exportarComunicacoesDaeCSV,
   exportarComunicacoesDaeExcel,
-  exportarComunicacoesDaePDF,
   ComunicacaoDaeExportData
 } from './components/exportUtilities';
+import {
+  exportarComunicacoesDaeListaPDF,
+  exportarComunicacoesDaeListaWord,
+} from './components/listDocumentExporters';
 
 // Tipos para pesquisa
 type SearchField = 'all' | 'nome_paciente' | 'origem' | 'dae' | 'municipio';
@@ -246,7 +249,7 @@ const ComunicacaoDaePage: React.FC = () => {
       <ArrowDown className="h-4 w-4 text-blue-600" />;
   };
 
-  const handleExport = async (format: 'csv' | 'excel' | 'pdf', type: 'page' | 'all') => {
+  const handleExport = async (format: 'csv' | 'excel' | 'pdf' | 'word', type: 'page' | 'all') => {
     try {
       let dataToExport: ComunicacaoDae[] = [];
 
@@ -275,7 +278,10 @@ const ComunicacaoDaePage: React.FC = () => {
           exportarComunicacoesDaeExcel(exportData, filename);
           break;
         case 'pdf':
-          exportarComunicacoesDaePDF(exportData, filename);
+          await exportarComunicacoesDaeListaPDF(dataToExport, filename);
+          break;
+        case 'word':
+          await exportarComunicacoesDaeListaWord(dataToExport, filename);
           break;
       }
 
@@ -308,11 +314,11 @@ const ComunicacaoDaePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       {/* Header com Azul Padrão */}
-      <header className="bg-blue-600 text-white shadow-lg">
+      <header className="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg sticky top-0 z-20">
         <div className="w-full max-w-[98%] mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             {/* Lado esquerdo - Menu e Título */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
               <button
                 onClick={() => setIsMenuOpen(true)}
                 className="p-2 rounded-lg hover:bg-blue-700 transition-colors duration-200"
@@ -320,9 +326,9 @@ const ComunicacaoDaePage: React.FC = () => {
               >
                 <Menu className="w-6 h-6" />
               </button>
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <h1 className="text-2xl font-bold text-white">
+                  <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-white truncate">
                     Comunicação DAE
                   </h1>
                   {/* Indicador Online/Offline */}
@@ -344,13 +350,13 @@ const ComunicacaoDaePage: React.FC = () => {
             </div>
             
             {/* Lado direito - Botões de Ação */}
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3 w-full lg:w-auto">
               {/* Botão Exportar */}
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => setShowExportMenu(!showExportMenu)}
-                  className="flex items-center space-x-2 bg-blue-700 hover:bg-blue-800 text-white px-4 py-2.5 rounded-lg transition-colors duration-200 shadow-md"
+                  className="p-2 sm:w-auto sm:inline-flex sm:items-center sm:justify-center sm:space-x-2 sm:px-4 sm:py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg transition-colors duration-200 shadow-md"
                 >
                   <Download className="w-5 h-5" />
                   <span className="font-medium hidden sm:inline">Exportar</span>
@@ -388,6 +394,14 @@ const ComunicacaoDaePage: React.FC = () => {
                         <FileText className="w-4 h-4 text-red-600" />
                         <span className="text-sm font-medium">PDF</span>
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => handleExport('word', 'page')}
+                        className="w-full px-4 py-2.5 text-left text-gray-700 hover:bg-blue-50 flex items-center space-x-3 transition-colors"
+                      >
+                        <FileText className="w-4 h-4 text-indigo-600" />
+                        <span className="text-sm font-medium">Word (.docx)</span>
+                      </button>
 
                       {/* Exportar Tudo */}
                       <div className="px-3 py-2 bg-gray-50 border-t border-b border-gray-200 mt-1">
@@ -417,6 +431,14 @@ const ComunicacaoDaePage: React.FC = () => {
                         <FileText className="w-4 h-4 text-red-600" />
                         <span className="text-sm font-medium">PDF Completo</span>
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => handleExport('word', 'all')}
+                        className="w-full px-4 py-2.5 text-left text-gray-700 hover:bg-blue-50 flex items-center space-x-3 transition-colors"
+                      >
+                        <FileText className="w-4 h-4 text-indigo-600" />
+                        <span className="text-sm font-medium">Word Completo (.docx)</span>
+                      </button>
                     </div>
                   </div>
                 )}
@@ -425,7 +447,7 @@ const ComunicacaoDaePage: React.FC = () => {
               {/* Botão Dashboard */}
               <button
                 onClick={() => navigate('/private/comunicacao-dae/dashboard')}
-                className="flex items-center space-x-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white px-4 py-2.5 rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-200 shadow-md font-medium"
+                className="p-2 sm:w-auto sm:inline-flex sm:items-center sm:justify-center sm:space-x-2 sm:px-4 sm:py-2.5 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-200 shadow-md font-medium"
               >
                 <BarChart2 className="w-5 h-5" />
                 <span className="hidden sm:inline">Dashboard</span>
@@ -434,7 +456,7 @@ const ComunicacaoDaePage: React.FC = () => {
               {/* Botão Nova Comunicação */}
               <button
                 onClick={() => navigate('/private/comunicacao-dae/nova')}
-                className="flex items-center space-x-2 bg-white text-blue-600 px-4 py-2.5 rounded-lg hover:bg-blue-50 transition-all duration-200 shadow-md font-medium"
+                className="p-2 sm:w-auto sm:inline-flex sm:items-center sm:justify-center sm:space-x-2 sm:px-4 sm:py-2.5 bg-white text-blue-600 rounded-lg hover:bg-blue-50 transition-all duration-200 shadow-md font-medium"
               >
                 <Plus className="w-5 h-5" />
                 <span className="hidden sm:inline">Nova Comunicação</span>
@@ -465,7 +487,7 @@ const ComunicacaoDaePage: React.FC = () => {
             </div>
 
             {/* Barra de Pesquisa */}
-            <div className="flex-1 max-w-xl">
+            <div className="flex-1 w-full sm:max-w-xl">
               <div className="relative flex items-center">
                 {/* Dropdown de campos de pesquisa */}
                 <div className="relative" ref={searchDropdownRef}>
@@ -538,7 +560,7 @@ const ComunicacaoDaePage: React.FC = () => {
             </div>
 
             {/* Informações de Registros */}
-            <div className="text-sm text-blue-100">
+            <div className="text-sm text-blue-100 self-start sm:self-auto">
               <span className="font-semibold text-white">{filteredComunicacoes.length}</span> de <span className="font-semibold text-white">{total}</span> comunicações
             </div>
           </div>
@@ -594,7 +616,7 @@ const ComunicacaoDaePage: React.FC = () => {
               </div>
             </div>
             
-            <div className="mt-6 flex justify-end space-x-3">
+            <div className="mt-6 flex flex-col sm:flex-row sm:justify-end gap-3">
               <button
                 onClick={handleClearFilters}
                 className="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
@@ -613,7 +635,7 @@ const ComunicacaoDaePage: React.FC = () => {
       )}
 
       {/* Conteúdo Principal */}
-      <main className="w-full max-w-[98%] mx-auto px-1 sm:px-2 lg:px-3 xl:px-4 py-4 md:py-6 lg:py-8">
+      <main className="w-full max-w-[98%] mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-6 lg:py-8">
         {/* Status de Conexão */}
         <ConnectionStatus 
           showForceSync={true}
@@ -651,7 +673,7 @@ const ComunicacaoDaePage: React.FC = () => {
           </div>
         ) : filteredComunicacoes.length === 0 ? (
           /* Estado Vazio */
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-12 text-center">
             <div className="mx-auto w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-4">
               <FileText className="w-10 h-10 text-blue-600" />
             </div>
@@ -675,7 +697,70 @@ const ComunicacaoDaePage: React.FC = () => {
           <>
             {/* Tabela de Comunicações */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200/60 overflow-hidden">
-              <div className="overflow-x-auto">
+              {/* Mobile: Cards */}
+              <div className="block md:hidden divide-y divide-gray-100">
+                {sortedComunicacoes.map((comunicacao) => (
+                  <div key={comunicacao.id_comunicacao} className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-sm font-bold text-blue-600">
+                            #{comunicacao.id_comunicacao}
+                          </span>
+                          <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${getOrigemBadgeColor(comunicacao.origem_tipo)}`}>
+                            {comunicacao.origem_tipo}
+                          </span>
+                        </div>
+
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          {comunicacao.nome_paciente || 'Não informado'}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {formatDate(comunicacao.data_comunicacao)}
+                        </p>
+                        <p className="text-xs text-gray-700 mt-2">
+                          <span className="font-medium">DAE:</span> {comunicacao.dae?.nome || '-'}
+                        </p>
+                        <p className="text-xs text-gray-700">
+                          <span className="font-medium">Município:</span> {comunicacao.tipo_municipio?.descricao || '-'}
+                        </p>
+
+                        <span className="mt-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          <FileText className="w-3 h-3 mr-1" />
+                          {comunicacao.comunicacao_dae_anexo?.length || 0} anexo(s)
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <button
+                          onClick={() => navigate(`/private/comunicacao-dae/${comunicacao.id_comunicacao}`)}
+                          className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors touch-manipulation"
+                          title="Visualizar"
+                        >
+                          <Eye className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => navigate(`/private/comunicacao-dae/editar/${comunicacao.id_comunicacao}`)}
+                          className="p-2.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors touch-manipulation"
+                          title="Editar"
+                        >
+                          <Edit className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(Number(comunicacao.id_comunicacao))}
+                          className="p-2.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors touch-manipulation"
+                          title="Excluir"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop: Tabela */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                     <tr>
@@ -813,9 +898,9 @@ const ComunicacaoDaePage: React.FC = () => {
 
             {/* Paginação e Controles */}
             <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 {/* Informações de Registros */}
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-gray-600 text-center lg:text-left">
                   Mostrando <span className="font-semibold text-gray-900">{total > 0 ? ((currentPage - 1) * itemsPerPage) + 1 : 0}</span> a{' '}
                   <span className="font-semibold text-gray-900">{Math.min(currentPage * itemsPerPage, total)}</span> de{' '}
                   <span className="font-semibold text-gray-900">{total}</span> registros
@@ -823,7 +908,7 @@ const ComunicacaoDaePage: React.FC = () => {
 
                 {/* Controles de Paginação - Só mostra se houver múltiplas páginas */}
                 {totalPages > 1 && (
-                  <div className="flex items-center space-x-2">
+                  <div className="flex flex-wrap items-center justify-center gap-2">
                     <button
                       onClick={() => setCurrentPage(1)}
                       disabled={currentPage === 1}
@@ -864,7 +949,7 @@ const ComunicacaoDaePage: React.FC = () => {
                 )}
 
                 {/* Seletor de Itens por Página - SEMPRE VISÍVEL */}
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center justify-center gap-2 w-full lg:w-auto">
                   <label className="text-sm text-gray-600 font-medium whitespace-nowrap">Itens por página:</label>
                   <select
                     value={itemsPerPage}

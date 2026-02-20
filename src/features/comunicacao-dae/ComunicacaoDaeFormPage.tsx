@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   Save, 
@@ -33,6 +33,11 @@ import ConnectionStatus from '@/components/ConnectionStatus';
 import indexedDBService from '@/services/indexedDB';
 import { getLocalDateTime, convertUTCToLocalDateTime } from '@/utils/timezoneUtils';
 import { useAuth } from '@/keycloak/AuthProvider';
+import {
+  ComunicacaoDaeFormExportData,
+  exportarComunicacaoDaeFormularioPDF,
+  exportarComunicacaoDaeFormularioWord,
+} from './components/formDocumentExporters';
 
 // Função para normalizar texto (remover acentos e converter para maiúsculas)
 const normalizeText = (text: string): string => {
@@ -115,6 +120,9 @@ const ComunicacaoDaeFormPage: React.FC = () => {
   const [fichaFiles, setFichaFiles] = useState<File[]>([]);
   const [relatorioFiles, setRelatorioFiles] = useState<File[]>([]);
   const [uploadingAnexo, setUploadingAnexo] = useState(false);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [exportingDocument, setExportingDocument] = useState<'pdf' | 'word' | null>(null);
+  const exportMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Função para limpar o formulário
   const handleClearForm = () => {
@@ -141,8 +149,8 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       setUfResidencia('15'); // Resetar para Pará
       setMunicipioResidencia('');
       if (!isEditMode) {
-        setFichaFile(null);
-        setRelatorioFile(null);
+        setFichaFiles([]);
+        setRelatorioFiles([]);
       }
     }
   };
@@ -275,6 +283,19 @@ const ComunicacaoDaeFormPage: React.FC = () => {
 
     setupOrigemByUserScope();
   }, [authLoading, isEditMode, isOriginScopeInitialized, isAdminUser, user, crsList, nhes, cievsList]);
+
+  useEffect(() => {
+    if (!isExportMenuOpen) return;
+
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setIsExportMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [isExportMenuOpen]);
 
   const loadSelectOptions = async () => {
     try {
@@ -644,6 +665,109 @@ const ComunicacaoDaeFormPage: React.FC = () => {
     }
   };
 
+  const getOrigemSelecionada = (): { nome?: string; codigo?: string } | null => {
+    const origemId = Number(formData.origem_id || 0);
+    if (!origemId) return null;
+
+    switch (formData.origem_tipo) {
+      case 'CRS':
+        return crsList.find((item) => item.id_crs === origemId) || null;
+      case 'NHE':
+        return nhes.find((item) => item.id_nhe === origemId) || null;
+      case 'CIEVS':
+        return cievsList.find((item) => item.id_cievs === origemId) || null;
+      default:
+        return null;
+    }
+  };
+
+  const resolveMunicipioNome = async (municipioId: number, fallbackName?: string): Promise<string> => {
+    if (fallbackName && fallbackName.trim()) {
+      return fallbackName;
+    }
+
+    if (!municipioId) {
+      return '-';
+    }
+
+    try {
+      const municipios = await indexedDBService.getOpcoes('municipios');
+      const municipio = municipios?.find((item: any) => Number(item.idtipo_municipio) === Number(municipioId));
+      return municipio?.descricao || municipio?.nome || `ID ${municipioId}`;
+    } catch {
+      return `ID ${municipioId}`;
+    }
+  };
+
+  const buildExportData = async (): Promise<ComunicacaoDaeFormExportData> => {
+    const origemSelecionada = getOrigemSelecionada();
+    const daeSelecionado = daes.find((item) => item.id_dae === Number(formData.id_dae));
+
+    const [municipioOcorrenciaNome, municipioResidenciaNome] = await Promise.all([
+      resolveMunicipioNome(formData.id_municipio_ocorrencia, comunicacaoCompleta?.tipo_municipio?.descricao),
+      resolveMunicipioNome(formData.id_municipio_residencia, comunicacaoCompleta?.tipo_municipio_residencia?.descricao),
+    ]);
+
+    const anexosSalvos = anexos.map((anexo) => ({
+      nome_arquivo: anexo.nome_arquivo_original,
+      tipo_anexo: anexo.tipo_anexo,
+      tamanho_bytes:
+        typeof anexo.tamanho_bytes === 'string'
+          ? Number.parseInt(anexo.tamanho_bytes, 10)
+          : Number(anexo.tamanho_bytes),
+    }));
+
+    const anexosPendentes = [
+      ...fichaFiles.map((file) => ({
+        nome_arquivo: file.name,
+        tipo_anexo: 'FICHA_NOTIFICACAO',
+        tamanho_bytes: file.size,
+      })),
+      ...relatorioFiles.map((file) => ({
+        nome_arquivo: file.name,
+        tipo_anexo: 'RELATORIO_INVESTIGACAO',
+        tamanho_bytes: file.size,
+      })),
+    ];
+
+    return {
+      idComunicacao: comunicacaoCompleta?.id_comunicacao ?? (isEditMode && id ? Number(id) : undefined),
+      dataComunicacao: formData.data_comunicacao || comunicacaoCompleta?.data_comunicacao,
+      nomePaciente: formData.nome_paciente || comunicacaoCompleta?.nome_paciente,
+      origemTipo: formData.origem_tipo || comunicacaoCompleta?.origem_tipo,
+      origemNome: origemSelecionada?.nome || origemPreSelecionadaNome || '-',
+      daeNome: daeSelecionado?.nome || comunicacaoCompleta?.dae?.nome || '-',
+      daeCodigo: daeSelecionado?.codigo || comunicacaoCompleta?.dae?.codigo || '-',
+      municipioOcorrencia: municipioOcorrenciaNome,
+      municipioResidencia: municipioResidenciaNome,
+      digitador: formData.digitador || comunicacaoCompleta?.digitador || '-',
+      telefoneDigitador: formData.telefone_digitador || comunicacaoCompleta?.telefone_digitador || '-',
+      observacao: formData.observacao_descricao || comunicacaoCompleta?.observacao_descricao || '-',
+      anexos: [...anexosSalvos, ...anexosPendentes],
+    };
+  };
+
+  const handleExportDocumento = async (tipo: 'pdf' | 'word') => {
+    try {
+      setIsExportMenuOpen(false);
+      setExportingDocument(tipo);
+      setError(null);
+
+      const exportData = await buildExportData();
+
+      if (tipo === 'pdf') {
+        await exportarComunicacaoDaeFormularioPDF(exportData);
+      } else {
+        await exportarComunicacaoDaeFormularioWord(exportData);
+      }
+    } catch (err) {
+      console.error('Erro ao exportar documento DAE:', err);
+      setError('Nao foi possivel exportar o documento. Tente novamente.');
+    } finally {
+      setExportingDocument(null);
+    }
+  };
+
   const getOrigemOptions = () => {
     if (!allowedOrigemTipos.includes(formData.origem_tipo)) {
       return [];
@@ -697,7 +821,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
 
   // Estilos padronizados seguindo NotificationForm
   const sectionTitleClass = "text-lg font-semibold text-gray-900 flex items-center gap-2 mb-5 pb-3 border-b-2 border-blue-100";
-  const cardClass = "bg-white shadow-sm rounded-xl border border-gray-100 p-6 hover:shadow-md transition-shadow";
+  const cardClass = "bg-white shadow-sm rounded-xl border border-gray-100 p-4 sm:p-6 hover:shadow-md transition-shadow";
   const labelClass = "block mb-2 font-medium text-gray-700 text-sm";
   const inputClass = "w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-all hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none";
   const selectClass = "w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-all hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none cursor-pointer";
@@ -750,11 +874,11 @@ const ComunicacaoDaeFormPage: React.FC = () => {
           </div>
 
           {/* Linha 2: Botões de Ação */}
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-2 flex-wrap">
             <button
               type="submit"
               form="comunicacao-form"
-              disabled={loading || uploadingAnexo}
+              disabled={loading || uploadingAnexo || !!exportingDocument}
               className="p-2 sm:w-auto sm:inline-flex sm:items-center sm:justify-center sm:gap-2 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed shadow-sm border border-transparent"
               title="Salvar"
             >
@@ -765,6 +889,51 @@ const ComunicacaoDaeFormPage: React.FC = () => {
               )}
               <span className="hidden sm:inline">{isEditMode ? 'Atualizar' : 'Salvar'}</span>
             </button>
+
+            <div ref={exportMenuRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setIsExportMenuOpen((prev) => !prev)}
+                disabled={loading || uploadingAnexo || !!exportingDocument}
+                className="p-2 sm:w-auto sm:inline-flex sm:items-center sm:justify-center sm:gap-2 sm:px-4 sm:py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed shadow-sm border border-transparent"
+                title="Exportar documento"
+              >
+                {exportingDocument ? (
+                  <Loader className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                <span className="hidden sm:inline">
+                  {exportingDocument === 'pdf'
+                    ? 'Gerando PDF...'
+                    : exportingDocument === 'word'
+                      ? 'Gerando Word...'
+                      : 'Exportar'}
+                </span>
+                {!exportingDocument && <ChevronDown className="h-4 w-4 hidden sm:inline" />}
+              </button>
+
+              {isExportMenuOpen && !exportingDocument && (
+                <div className="absolute right-0 mt-2 w-52 bg-white rounded-lg shadow-lg border border-gray-200 z-30 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => handleExportDocumento('pdf')}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 transition-colors flex items-center gap-2"
+                  >
+                    <FileText className="h-4 w-4 text-blue-600" />
+                    Exportar em PDF
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExportDocumento('word')}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 transition-colors flex items-center gap-2 border-t border-gray-100"
+                  >
+                    <FileText className="h-4 w-4 text-indigo-600" />
+                    Exportar em Word (.docx)
+                  </button>
+                </div>
+              )}
+            </div>
 
             <button
               type="button"
@@ -1437,11 +1606,11 @@ const ComunicacaoDaeFormPage: React.FC = () => {
           </div>
 
           {/* Rodapé com botões de ação CENTRALIZADOS */}
-          <div className="flex items-center justify-center space-x-4 pt-6 border-t border-gray-200 mt-8 mb-8">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 pt-6 border-t border-gray-200 mt-8 mb-8">
             <button
               type="submit"
               disabled={loading || uploadingAnexo}
-              className="inline-flex items-center px-6 py-2.5 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px] justify-center"
+              className="inline-flex items-center px-6 py-2.5 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px] justify-center w-full sm:w-auto"
             >
               {loading || uploadingAnexo ? (
                  <>
@@ -1459,7 +1628,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
             <button
               type="button"
               onClick={handleClearForm}
-              className="inline-flex items-center px-6 py-2.5 border border-transparent text-base font-medium rounded-md text-white bg-gray-500 hover:bg-gray-600 shadow-sm min-w-[120px] justify-center"
+              className="inline-flex items-center px-6 py-2.5 border border-transparent text-base font-medium rounded-md text-white bg-gray-500 hover:bg-gray-600 shadow-sm min-w-[120px] justify-center w-full sm:w-auto"
             >
               <Trash2 className="w-5 h-5 mr-2" />
               Limpar
@@ -1468,7 +1637,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate('/private/comunicacao-dae')}
-              className="inline-flex items-center px-6 py-2.5 border border-gray-300 shadow-sm text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 min-w-[120px] justify-center"
+              className="inline-flex items-center px-6 py-2.5 border border-gray-300 shadow-sm text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 min-w-[120px] justify-center w-full sm:w-auto"
             >
               <X className="w-5 h-5 mr-2" />
               Cancelar
