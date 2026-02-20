@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   Save, 
@@ -32,6 +32,7 @@ import { OfflineComunicacaoDaeServiceProxy } from '@/services/OfflineComunicacao
 import ConnectionStatus from '@/components/ConnectionStatus';
 import indexedDBService from '@/services/indexedDB';
 import { getLocalDateTime, convertUTCToLocalDateTime } from '@/utils/timezoneUtils';
+import { useAuth } from '@/keycloak/AuthProvider';
 
 // Função para normalizar texto (remover acentos e converter para maiúsculas)
 const normalizeText = (text: string): string => {
@@ -47,6 +48,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
+  const { user, loading: authLoading } = useAuth();
 
   // ✅ Hook do sistema offline
   const {
@@ -96,6 +98,10 @@ const ComunicacaoDaeFormPage: React.FC = () => {
   const [nhes, setNhes] = useState<Nhe[]>([]);
   const [cievsList, setCievsList] = useState<Cievs[]>([]);
   const [crsList, setCrsList] = useState<Crs[]>([]);
+  const [allowedOrigemTipos, setAllowedOrigemTipos] = useState<OrigemTipo[]>(['CRS', 'NHE', 'CIEVS']);
+  const [lockOrigemSelection, setLockOrigemSelection] = useState(false);
+  const [origemPreSelecionadaNome, setOrigemPreSelecionadaNome] = useState<string | null>(null);
+  const [isOriginScopeInitialized, setIsOriginScopeInitialized] = useState(false);
 
   // Estados para UF e município
   const [ufOcorrencia, setUfOcorrencia] = useState<string>('15'); // Pará por padrão
@@ -113,6 +119,11 @@ const ComunicacaoDaeFormPage: React.FC = () => {
   // Função para limpar o formulário
   const handleClearForm = () => {
     if (window.confirm('Deseja realmente limpar todos os campos do formulário?')) {
+      const shouldPreserveLockedOrigem = !isEditMode && lockOrigemSelection && formData.origem_id > 0;
+      const defaultOrigemTipo = !isEditMode && allowedOrigemTipos.length === 1
+        ? allowedOrigemTipos[0]
+        : ('CRS' as OrigemTipo);
+
       setFormData({
         data_comunicacao: getLocalDateTime(),
         nome_paciente: '',
@@ -121,8 +132,8 @@ const ComunicacaoDaeFormPage: React.FC = () => {
         telefone_digitador: '',
         id_municipio_ocorrencia: 0,
         id_municipio_residencia: 0,
-        origem_tipo: 'CRS' as OrigemTipo,
-        origem_id: 0,
+        origem_tipo: shouldPreserveLockedOrigem ? formData.origem_tipo : defaultOrigemTipo,
+        origem_id: shouldPreserveLockedOrigem ? formData.origem_id : 0,
         id_dae: 0,
       });
       setUfOcorrencia('15'); // Resetar para Pará
@@ -158,6 +169,112 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       loadComunicacao(Number(id));
     }
   }, [id]);
+
+  const isAdminUser = useMemo(() => {
+    const roles: string[] = user?.roles || [];
+    return roles.some((role) =>
+      role === 'admin' ||
+      role === 'administrator' ||
+      role.startsWith('admin.')
+    );
+  }, [user?.roles]);
+
+  const shouldLockOrigemFields = !isEditMode && lockOrigemSelection && formData.origem_id > 0;
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (isEditMode || isOriginScopeInitialized) return;
+    if (crsList.length === 0 && nhes.length === 0 && cievsList.length === 0) return;
+
+    const setupOrigemByUserScope = async () => {
+      try {
+        if (isAdminUser) {
+          setAllowedOrigemTipos(['CRS', 'NHE', 'CIEVS']);
+          return;
+        }
+
+        const userAccessFallback = Array.isArray(user?.usuario_acesso) ? user.usuario_acesso[0] : null;
+        let acesso: any = userAccessFallback;
+
+        try {
+          const response = await axios.get('/api/usuario-acesso/current', {
+            headers: { Accept: 'application/json' },
+            withCredentials: true
+          });
+          const payload = response.data?.data ?? response.data;
+          acesso = Array.isArray(payload) ? payload[0] : payload;
+        } catch (err) {
+          console.warn('Nao foi possivel buscar acesso atual da API, usando fallback local.');
+        }
+
+        if (!acesso) return;
+
+        const nivelAcesso = acesso?.nivel_acesso ?? acesso?.nivel;
+        const crsId = Number(acesso?.crs_id ?? acesso?.crsId ?? 0);
+
+        if (nivelAcesso === 'crs' && crsId > 0) {
+          const crsSelecionado = crsList.find(c => c.id_crs === crsId);
+          setAllowedOrigemTipos(['CRS']);
+          setLockOrigemSelection(true);
+          setOrigemPreSelecionadaNome(crsSelecionado?.nome || `CRS ${crsId}`);
+          setFormData(prev => ({
+            ...prev,
+            origem_tipo: 'CRS',
+            origem_id: crsSelecionado?.id_crs || crsId
+          }));
+          return;
+        }
+
+        const estabelecimentoId = Number(acesso?.estabelecimento_id ?? acesso?.estabelecimentoId ?? 0);
+        if (estabelecimentoId <= 0) return;
+
+        let cnes: string | null = null;
+        try {
+          const estResponse = await axios.get(`/api/estabelecimentos/${estabelecimentoId}`, {
+            headers: { Accept: 'application/json' },
+            withCredentials: true
+          });
+          const estPayload = estResponse.data?.data ?? estResponse.data;
+          if (estPayload?.cnes) {
+            cnes = String(estPayload.cnes).trim();
+          }
+        } catch (err) {
+          console.warn('Nao foi possivel buscar estabelecimento para pre-selecao de origem.');
+        }
+
+        if (!cnes) return;
+
+        const matchCrs = crsList.find(item => String(item.codigo || '').trim() === cnes);
+        const matchNhe = nhes.find(item => String(item.codigo || '').trim() === cnes);
+        const matchCievs = cievsList.find(item => String(item.codigo || '').trim() === cnes);
+
+        const matches: Array<{ tipo: OrigemTipo; id: number; nome: string }> = [];
+        if (matchCrs) matches.push({ tipo: 'CRS', id: matchCrs.id_crs, nome: matchCrs.nome });
+        if (matchNhe) matches.push({ tipo: 'NHE', id: matchNhe.id_nhe, nome: matchNhe.nome });
+        if (matchCievs) matches.push({ tipo: 'CIEVS', id: matchCievs.id_cievs, nome: matchCievs.nome });
+
+        if (matches.length === 0) return;
+
+        const allowed = matches.map(m => m.tipo);
+        const firstMatch = matches[0];
+        setAllowedOrigemTipos(allowed);
+        setOrigemPreSelecionadaNome(firstMatch.nome);
+        setFormData(prev => ({
+          ...prev,
+          origem_tipo: firstMatch.tipo,
+          origem_id: firstMatch.id
+        }));
+
+        if (matches.length === 1) {
+          setLockOrigemSelection(true);
+        }
+      } finally {
+        setIsOriginScopeInitialized(true);
+      }
+    };
+
+    setupOrigemByUserScope();
+  }, [authLoading, isEditMode, isOriginScopeInitialized, isAdminUser, user, crsList, nhes, cievsList]);
 
   const loadSelectOptions = async () => {
     try {
@@ -528,6 +645,10 @@ const ComunicacaoDaeFormPage: React.FC = () => {
   };
 
   const getOrigemOptions = () => {
+    if (!allowedOrigemTipos.includes(formData.origem_tipo)) {
+      return [];
+    }
+
     let options: any[] = [];
     switch (formData.origem_tipo) {
       case 'CRS': 
@@ -558,6 +679,12 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       return a.nome.localeCompare(b.nome, 'pt-BR');
     });
   };
+
+  const origemTipoOptions: Array<{ value: OrigemTipo; label: string }> = [
+    { value: 'CRS', label: 'CRS - Centro Regional de Saude' },
+    { value: 'NHE', label: 'NHE - Nucleo Hospitalar de Epidemiologia' },
+    { value: 'CIEVS', label: 'CIEVS - Centro de Informacoes Estrategicas em Vigilancia' }
+  ];
 
   if (loadingData) {
     return (
@@ -737,13 +864,22 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                     });
                   }}
                   className={selectClass}
+                  disabled={shouldLockOrigemFields}
                   required
                 >
-                  <option value="CRS">CRS - Centro Regional de Saúde</option>
-                  <option value="NHE">NHE - Núcleo Hospitalar de Epidemiologia</option>
-                  <option value="CIEVS">CIEVS - Centro de Informações Estratégicas em Vigilância</option>
+                  {origemTipoOptions
+                    .filter(option => allowedOrigemTipos.includes(option.value))
+                    .map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                 </select>
-                <p className="mt-1.5 text-xs text-gray-500">Selecione o tipo de unidade que originou a comunicação</p>
+                <p className="mt-1.5 text-xs text-gray-500">
+                  {shouldLockOrigemFields
+                    ? 'Tipo de origem definido automaticamente pelo seu perfil de acesso'
+                    : 'Selecione o tipo de unidade que originou a comunicação'}
+                </p>
               </div>
 
               {/* Unidade Específica */}
@@ -759,10 +895,15 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                   onChange={(value) => setFormData({ ...formData, origem_id: Number(value) })}
                   placeholder="Selecione a unidade..."
                   required
+                  disabled={shouldLockOrigemFields}
                   searchPlaceholder="Digite o nome ou código da unidade..."
                   emptyMessage="Nenhuma unidade encontrada"
                 />
-                <p className="mt-1.5 text-xs text-gray-500">Escolha a unidade específica {formData.origem_tipo}</p>
+                <p className="mt-1.5 text-xs text-gray-500">
+                  {shouldLockOrigemFields
+                    ? `Unidade pre-selecionada automaticamente: ${origemPreSelecionadaNome || 'unidade vinculada ao seu acesso'}`
+                    : `Escolha a unidade específica ${formData.origem_tipo}`}
+                </p>
               </div>
 
               {/* Data da comunicação */}
