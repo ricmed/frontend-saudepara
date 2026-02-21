@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { FormField } from '@/services/FormService';
 import CodeListService, { type CodeListItem } from '@/services/CodeListService';
 import DatabaseService from '@/services/DatabaseService';
+import { searchMatches } from '@/utils/searchUtils';
 
 interface SelectFieldProps {
   field: FormField;
@@ -73,6 +74,119 @@ export const SelectField: React.FC<SelectFieldProps> = ({
           </option>
         ))}
       </select>
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+    </div>
+  );
+};
+
+// Seleção única com busca - usa field.options ou banco (não codeList)
+export const SelectSearchField: React.FC<SelectFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+}) => {
+  const [options, setOptions] = useState(field.options || []);
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  useEffect(() => {
+    if (field.dataSource === 'database' && field.dataTable && field.dataValueColumn && field.dataLabelColumn) {
+      loadDatabaseOptions();
+    } else {
+      setOptions(field.options || []);
+    }
+  }, [field.dataSource, field.dataTable, field.dataValueColumn, field.dataLabelColumn, field.options]);
+
+  const loadDatabaseOptions = async () => {
+    if (!field.dataTable || !field.dataValueColumn || !field.dataLabelColumn) return;
+    try {
+      setLoading(true);
+      const data = await DatabaseService.getTableData(
+        field.dataTable,
+        field.dataValueColumn,
+        field.dataLabelColumn
+      );
+      setOptions(data);
+    } catch (err) {
+      console.error('Erro ao carregar opções do banco:', err);
+      setOptions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredOptions = options.filter(opt =>
+    searchMatches(opt.label, searchTerm) || searchMatches(opt.value, searchTerm)
+  );
+
+  const selectedOption = options.find(opt => opt.value === value);
+  const displayValue = showDropdown ? searchTerm : (selectedOption?.label ?? '');
+
+  const handleSelect = (option: { value: string; label: string }) => {
+    onChange(option.value);
+    setSearchTerm('');
+    setShowDropdown(false);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value;
+    setSearchTerm(v);
+    if (!v) onChange('');
+    setShowDropdown(true);
+  };
+
+  const handleFocus = () => {
+    if (selectedOption?.label) setSearchTerm(selectedOption.label);
+    setShowDropdown(true);
+  };
+
+  return (
+    <div className="mb-4 relative">
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <input
+        type="text"
+        value={displayValue}
+        onChange={handleInputChange}
+        onFocus={handleFocus}
+        placeholder={field.placeholder || 'Digite para buscar...'}
+        disabled={disabled || field.disabled || loading}
+        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+          error
+            ? 'border-red-500 focus:ring-red-500'
+            : 'border-gray-300 focus:ring-blue-500'
+        } ${disabled || field.disabled || loading ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+      />
+      {showDropdown && !disabled && !field.disabled && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setShowDropdown(false)} />
+          <div className="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+            {loading ? (
+              <div className="px-3 py-2 text-sm text-gray-500">Carregando...</div>
+            ) : filteredOptions.length === 0 ? (
+              <div className="px-3 py-2 text-sm text-gray-500">
+                Nenhuma opção encontrada
+              </div>
+            ) : (
+              filteredOptions.map((option) => (
+                <div
+                  key={option.value}
+                  onClick={() => handleSelect(option)}
+                  className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+                >
+                  {option.label}
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
       {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
     </div>
   );

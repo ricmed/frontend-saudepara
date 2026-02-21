@@ -33,16 +33,29 @@ export const FormAdminListPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Tem certeza que deseja excluir este formulário?')) return;
-    
+  const handleDelete = async (id: number, force = false) => {
+    if (!force && !confirm('Tem certeza que deseja excluir este formulário?')) return;
+    if (force && !confirm('Isso vai remover todas as notificações vinculadas a este formulário. Deseja continuar?')) return;
+
     try {
-      await FormService.deleteForm(id);
+      if (force) {
+        await FormService.deleteFormForce(id);
+      } else {
+        await FormService.deleteForm(id);
+      }
       loadForms();
     } catch (err: any) {
       console.error('Erro ao excluir:', err);
       const errorMsg = err?.response?.data?.message || err?.message || 'Erro desconhecido';
-      alert(`Erro ao excluir formulário: ${errorMsg}`);
+      const hasNotifications = typeof errorMsg === 'string' && errorMsg.includes('notificações');
+      if (hasNotifications) {
+        const forceDelete = confirm(
+          `${errorMsg}\n\nDeseja excluir mesmo assim? Todas as notificações deste formulário serão removidas.`
+        );
+        if (forceDelete) handleDelete(id, true);
+      } else {
+        alert(`Erro ao excluir formulário: ${errorMsg}`);
+      }
     }
   };
 

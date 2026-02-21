@@ -82,10 +82,15 @@ export interface FormField {
   dataLabelColumn?: string;
   // Configuração de campos de endereço
   addressFields?: string[];
+  // Upload de arquivo: tamanho máx total em bytes, máx de arquivos (1-10)
+  accept?: string;
+  maxSize?: number;
+  maxFiles?: number;
 }
 
 export interface FormRule {
-  id: string;
+  id?: string;
+  description?: string;
   when: {
     op: string;
     left: string;
@@ -233,12 +238,22 @@ class FormService {
     }
   }
 
-  // Excluir formulário
+  // Excluir formulário (falha se tiver notificações)
   async deleteForm(id: number): Promise<void> {
     try {
       await api.delete(`/forms/${id}`);
     } catch (error) {
       console.error('Erro ao excluir formulário:', error);
+      throw error;
+    }
+  }
+
+  // Excluir formulário e todas as notificações vinculadas
+  async deleteFormForce(id: number): Promise<void> {
+    try {
+      await api.delete(`/forms/${id}?force=true`);
+    } catch (error) {
+      console.error('Erro ao excluir formulário (force):', error);
       throw error;
     }
   }

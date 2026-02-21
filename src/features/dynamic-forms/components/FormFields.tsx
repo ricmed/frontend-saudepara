@@ -1,4 +1,5 @@
 import React from 'react';
+import { Check } from 'lucide-react';
 import type { FormField } from '@/services/FormService';
 
 interface TextFieldProps {
@@ -238,22 +239,39 @@ export const CheckboxField: React.FC<TextFieldProps> = ({
   required,
   disabled,
 }) => {
+  const isChecked = !!value;
   return (
     <div className="mb-4">
-      <label className="flex items-center cursor-pointer">
-        <input
-          type="checkbox"
-          checked={!!value}
-          onChange={(e) => onChange(e.target.checked)}
-          disabled={disabled || field.disabled}
-          className={`w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 ${
-            disabled || field.disabled ? 'cursor-not-allowed' : 'cursor-pointer'
-          }`}
-        />
-        <span className="ml-2 text-sm font-medium text-gray-700">
-          {field.label}
-          {required && <span className="text-red-500 ml-1">*</span>}
-        </span>
+      <label
+        className={`
+          flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200
+          ${disabled || field.disabled ? 'opacity-60 cursor-not-allowed' : ''}
+          ${isChecked
+            ? 'bg-blue-50 border-2 border-blue-500 shadow-md scale-[1.02]'
+            : 'bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-sm'
+          }
+        `}
+      >
+        <div className="flex items-center h-6 mt-0.5 flex-shrink-0">
+          <input
+            type="checkbox"
+            checked={isChecked}
+            onChange={(e) => onChange(e.target.checked)}
+            disabled={disabled || field.disabled}
+            className="w-6 h-6 rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer"
+          />
+        </div>
+        <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
+          <span className={`text-sm font-medium transition-colors leading-relaxed ${
+            isChecked ? 'text-blue-900' : 'text-gray-900'
+          }`}>
+            {field.label}
+            {required && <span className="text-red-500 ml-1">*</span>}
+          </span>
+          {isChecked && (
+            <Check className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          )}
+        </div>
       </label>
       {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
     </div>

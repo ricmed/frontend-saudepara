@@ -1,6 +1,7 @@
 // src/features/notificationForms/components/shared/SearchableCheckboxGroup.tsx
 import React, { useState } from 'react';
 import { Search, X } from 'lucide-react';
+import { searchMatches } from '@/utils/searchUtils';
 
 interface Option {
   id: string | number;
@@ -32,9 +33,9 @@ const SearchableCheckboxGroup: React.FC<SearchableCheckboxGroupProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Função de busca padrão
+  // Função de busca padrão (ignora maiúsculas, acentos, cedilhas)
   const defaultSearchFunction = (option: Option, searchTerm: string) => {
-    return option.label.toLowerCase().includes(searchTerm.toLowerCase());
+    return searchMatches(option.label, searchTerm);
   };
 
   // Usa função personalizada se fornecida, senão usa a padrão

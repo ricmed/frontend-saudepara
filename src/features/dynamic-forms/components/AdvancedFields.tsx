@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import type { FormField } from '@/services/FormService';
 import { getLocalDateTime, convertUTCToLocalDateTime } from '@/utils/timezoneUtils';
+import { searchMatches } from '@/utils/searchUtils';
 import DatabaseService from '@/services/DatabaseService';
-import { Search, X } from 'lucide-react';
+import { Search, X, Check } from 'lucide-react';
 import PhoneInput from '@/features/notificationForms/components/PhoneInput';
 
 interface AdvancedFieldProps {
@@ -83,25 +84,43 @@ export const CheckboxGroupField: React.FC<AdvancedFieldProps> = ({
       {field.helpText && (
         <p className="text-xs text-gray-500 mb-2">{field.helpText}</p>
       )}
-      <div className="space-y-2">
-        {options.map((option) => (
-          <label key={option.value} className="flex items-center cursor-pointer group">
-            <input
-              type="checkbox"
-              checked={selectedValues.includes(option.value)}
-              onChange={() => handleToggle(option.value)}
-              disabled={disabled || field.disabled}
-              className={`w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 ${
-                disabled || field.disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
-              }`}
-            />
-            <span className={`ml-2 text-sm text-gray-700 ${
-              disabled || field.disabled ? 'opacity-50' : 'group-hover:text-gray-900'
-            }`}>
-              {option.label}
-            </span>
-          </label>
-        ))}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {options.map((option) => {
+          const isSelected = selectedValues.includes(option.value);
+          return (
+            <label
+              key={option.value}
+              className={`
+                flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200
+                ${disabled || field.disabled ? 'opacity-60 cursor-not-allowed' : ''}
+                ${isSelected
+                  ? 'bg-blue-50 border-2 border-blue-500 shadow-md scale-[1.02]'
+                  : 'bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-sm'
+                }
+              `}
+            >
+              <div className="flex items-center h-6 mt-0.5 flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => handleToggle(option.value)}
+                  disabled={disabled || field.disabled}
+                  className="w-6 h-6 rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer"
+                />
+              </div>
+              <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
+                <span className={`text-sm font-medium transition-colors leading-relaxed ${
+                  isSelected ? 'text-blue-900' : 'text-gray-900'
+                }`}>
+                  {option.label}
+                </span>
+                {isSelected && (
+                  <Check className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                )}
+              </div>
+            </label>
+          );
+        })}
       </div>
       {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
     </div>
@@ -168,26 +187,44 @@ export const RadioGroupField: React.FC<AdvancedFieldProps> = ({
       {field.helpText && (
         <p className="text-xs text-gray-500 mb-2">{field.helpText}</p>
       )}
-      <div className="space-y-2">
-        {options.map((option) => (
-          <label key={option.value} className="flex items-center cursor-pointer group">
-            <input
-              type="radio"
-              name={field.key}
-              checked={value === option.value}
-              onChange={() => onChange(option.value)}
-              disabled={disabled || field.disabled}
-              className={`w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 ${
-                disabled || field.disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
-              }`}
-            />
-            <span className={`ml-2 text-sm text-gray-700 ${
-              disabled || field.disabled ? 'opacity-50' : 'group-hover:text-gray-900'
-            }`}>
-              {option.label}
-            </span>
-          </label>
-        ))}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {options.map((option) => {
+          const isSelected = value === option.value;
+          return (
+            <label
+              key={option.value}
+              className={`
+                flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200
+                ${disabled || field.disabled ? 'opacity-60 cursor-not-allowed' : ''}
+                ${isSelected
+                  ? 'bg-blue-50 border-2 border-blue-500 shadow-md scale-[1.02]'
+                  : 'bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-sm'
+                }
+              `}
+            >
+              <div className="flex items-center h-6 mt-0.5 flex-shrink-0">
+                <input
+                  type="radio"
+                  name={field.key}
+                  checked={isSelected}
+                  onChange={() => onChange(option.value)}
+                  disabled={disabled || field.disabled}
+                  className="w-6 h-6 rounded-full border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer"
+                />
+              </div>
+              <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
+                <span className={`text-sm font-medium transition-colors leading-relaxed ${
+                  isSelected ? 'text-blue-900' : 'text-gray-900'
+                }`}>
+                  {option.label}
+                </span>
+                {isSelected && (
+                  <Check className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                )}
+              </div>
+            </label>
+          );
+        })}
       </div>
       {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
     </div>
@@ -204,7 +241,6 @@ export const MultiSelectField: React.FC<AdvancedFieldProps> = ({
   disabled,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [showDropdown, setShowDropdown] = useState(false);
   const [options, setOptions] = useState(field.options || []);
   const [loading, setLoading] = useState(false);
   const selectedValues = Array.isArray(value) ? value : [];
@@ -237,7 +273,7 @@ export const MultiSelectField: React.FC<AdvancedFieldProps> = ({
   };
 
   const filteredOptions = options.filter(option =>
-    option.label.toLowerCase().includes(searchTerm.toLowerCase())
+    searchMatches(option.label, searchTerm)
   );
 
   const handleToggle = (optionValue: string) => {
@@ -248,96 +284,81 @@ export const MultiSelectField: React.FC<AdvancedFieldProps> = ({
     }
   };
 
-  const handleRemove = (optionValue: string) => {
-    onChange(selectedValues.filter(v => v !== optionValue));
-  };
-
-  const getSelectedLabels = () => {
-    return selectedValues
-      .map(val => options.find(opt => opt.value === val)?.label)
-      .filter(Boolean);
-  };
-
   return (
-    <div className="mb-4 relative">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        {field.label}
-        {required && <span className="text-red-500 ml-1">*</span>}
-      </label>
-      
-      {/* Valores selecionados */}
-      {selectedValues.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-2">
-          {getSelectedLabels().map((label, idx) => (
-            <span
-              key={idx}
-              className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
-            >
-              {label}
-              <button
-                type="button"
-                onClick={() => handleRemove(selectedValues[idx])}
-                disabled={disabled || field.disabled}
-                className="hover:bg-blue-200 rounded-full p-0.5"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          ))}
-        </div>
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-2">
+        <label className="block text-sm font-medium text-gray-700">
+          {field.label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+        {selectedValues.length > 0 && (
+          <span className="text-sm text-gray-500">
+            {selectedValues.length} selecionado{selectedValues.length !== 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
+      {field.helpText && (
+        <p className="text-xs text-gray-500 mb-2">{field.helpText}</p>
       )}
-
-      {/* Campo de busca */}
-      <div className="relative">
+      {/* Busca */}
+      <div className="relative mb-3">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
         <input
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          onFocus={() => setShowDropdown(true)}
           disabled={disabled || field.disabled}
-          placeholder={`Buscar... (${selectedValues.length} selecionado${selectedValues.length !== 1 ? 's' : ''})`}
-          className={`w-full pl-10 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-            error
-              ? 'border-red-500 focus:ring-red-500'
-              : 'border-gray-300 focus:ring-blue-500'
-          } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+          placeholder="Buscar opções..."
+          className={`w-full pl-10 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+            disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'
+          }`}
         />
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
       </div>
-
-      {/* Dropdown de opções */}
-      {showDropdown && !disabled && !field.disabled && (
-        <>
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setShowDropdown(false)}
-          />
-          <div className="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-            {filteredOptions.length === 0 ? (
-              <div className="px-3 py-2 text-sm text-gray-500">
-                Nenhuma opção encontrada
-              </div>
-            ) : (
-              filteredOptions.map((option) => (
-                <label
-                  key={option.value}
-                  className="flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                >
+      {/* Grid de cards (mesmo layout do checkbox group / radio) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+        {filteredOptions.length === 0 ? (
+          <div className="col-span-full py-4 text-center text-sm text-gray-500">
+            Nenhuma opção encontrada
+          </div>
+        ) : (
+          filteredOptions.map((option) => {
+            const isSelected = selectedValues.includes(option.value);
+            return (
+              <label
+                key={option.value}
+                className={`
+                  flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200
+                  ${disabled || field.disabled ? 'opacity-60 cursor-not-allowed' : ''}
+                  ${isSelected
+                    ? 'bg-blue-50 border-2 border-blue-500 shadow-md scale-[1.02]'
+                    : 'bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-sm'
+                  }
+                `}
+              >
+                <div className="flex items-center h-6 mt-0.5 flex-shrink-0">
                   <input
                     type="checkbox"
-                    checked={selectedValues.includes(option.value)}
+                    checked={isSelected}
                     onChange={() => handleToggle(option.value)}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    disabled={disabled || field.disabled}
+                    className="w-6 h-6 rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer"
                   />
-                  <span className="ml-2 text-sm text-gray-700">
+                </div>
+                <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
+                  <span className={`text-sm font-medium transition-colors leading-relaxed ${
+                    isSelected ? 'text-blue-900' : 'text-gray-900'
+                  }`}>
                     {option.label}
                   </span>
-                </label>
-              ))
-            )}
-          </div>
-        </>
-      )}
+                  {isSelected && (
+                    <Check className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  )}
+                </div>
+              </label>
+            );
+          })
+        )}
+      </div>
       {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
     </div>
   );

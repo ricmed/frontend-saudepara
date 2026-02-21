@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Search, X, Check, AlertCircle } from 'lucide-react';
 import { Dae } from '@/services/DaeService';
+import { searchMatches } from '@/utils/searchUtils';
 
 interface DaeCheckboxListProps {
   daes: Dae[];
@@ -34,12 +35,11 @@ const DaeCheckboxList: React.FC<DaeCheckboxListProps> = ({
   const filteredDaes = useMemo(() => {
     let result = [...daes]; // Criar cópia para não mutar o original
     
-    // Aplicar filtro de busca se houver
+    // Aplicar filtro de busca (ignora maiúsculas, acentos, cedilhas)
     if (searchTerm) {
-      const lowerSearch = searchTerm.toLowerCase();
-      result = result.filter(dae => 
-        dae.nome.toLowerCase().includes(lowerSearch) ||
-        dae.codigo?.toLowerCase().includes(lowerSearch)
+      result = result.filter(dae =>
+        searchMatches(dae.nome, searchTerm) ||
+        searchMatches(dae.codigo, searchTerm)
       );
     }
     

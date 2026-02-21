@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/keycloak/AuthProvider';
 import FormService, { type FormSchema, type FormSection, type FormField, type FormRule, type RuleCondition, type RuleAction } from '@/services/FormService';
 import DatabaseService, { type TableColumn } from '@/services/DatabaseService';
-import { Plus, Trash2, Save, Eye, Settings, GripVertical, X, Download, Upload, ChevronUp, ChevronDown, Code, FileEdit } from 'lucide-react';
+import { Plus, Trash2, Save, Eye, Settings, GripVertical, X, Download, Upload, ChevronUp, ChevronDown, Code, FileEdit, Check } from 'lucide-react';
 import { FormRenderer } from '../components/FormRenderer';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 
@@ -26,6 +26,8 @@ export const FormBuilderPage: React.FC = () => {
   const [showPreview, setShowPreview] = useState(false);
   const [activeTab, setActiveTab] = useState<'fields' | 'rules'>('fields');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dropTarget, setDropTarget] = useState<{ sectionIdx: number; fieldIdx: number } | null>(null);
+  const [sectionDropIdx, setSectionDropIdx] = useState<number | null>(null);
   
   // Estados para configuração de banco de dados
   const [availableTables, setAvailableTables] = useState<string[]>([]);
@@ -130,6 +132,18 @@ export const FormBuilderPage: React.FC = () => {
     setSchema({ ...schema, sections: newSections });
   };
 
+  const moveSectionTo = (fromIdx: number, toIdx: number) => {
+    if (fromIdx === toIdx) return;
+    const newSections = [...schema.sections];
+    const [moved] = newSections.splice(fromIdx, 1);
+    if (!moved) return;
+    const insertAt = fromIdx < toIdx ? toIdx - 1 : toIdx;
+    newSections.splice(insertAt, 0, moved);
+    newSections.forEach((section, i) => (section.order = i + 1));
+    setSchema({ ...schema, sections: newSections });
+    setActiveSection(insertAt);
+  };
+
   const moveFieldUp = (sectionIdx: number, fieldIdx: number) => {
     if (fieldIdx === 0) return;
     const newSections = [...schema.sections];
@@ -150,21 +164,33 @@ export const FormBuilderPage: React.FC = () => {
     setSchema({ ...schema, sections: newSections });
   };
 
-  const addField = (sectionIdx: number) => {
-    const newField: FormField = {
-      key: `field_${Date.now()}`,
-      type: 'text',
+  const createFieldByType = (type: string, order: number): FormField => {
+    const base = {
+      key: `field_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      type,
       label: 'Novo Campo',
       required: false,
-      order: schema.sections[sectionIdx].fields.length + 1,
-      maxLength: 255,
-      addressFields: ['cep', 'state', 'city', 'street', 'neighborhood', 'number', 'complement', 'reference']
+      order,
+      addressFields: ['cep', 'state', 'city', 'street', 'neighborhood', 'number', 'complement', 'reference'] as const,
     };
-    
+    if (type === 'text') return { ...base, maxLength: 255 };
+    if (type === 'textarea') return { ...base, maxLength: 1500 };
+    return base as FormField;
+  };
+
+  const addField = (sectionIdx: number, fieldType?: string, atIndex?: number) => {
+    const section = schema.sections[sectionIdx];
+    const order = atIndex != null ? atIndex + 1 : section.fields.length + 1;
+    const newField = createFieldByType(fieldType || 'text', order);
+
     const newSections = [...schema.sections];
-    newSections[sectionIdx].fields.push(newField);
+    const fields = [...newSections[sectionIdx].fields];
+    const insertAt = atIndex != null ? Math.min(atIndex, fields.length) : fields.length;
+    fields.splice(insertAt, 0, newField);
+    fields.forEach((f, i) => (f.order = i + 1));
+    newSections[sectionIdx] = { ...newSections[sectionIdx], fields };
     setSchema({ ...schema, sections: newSections });
-    setActiveField({ sectionIdx, fieldIdx: newSections[sectionIdx].fields.length - 1 });
+    setActiveField({ sectionIdx, fieldIdx: insertAt });
   };
 
   const updateField = (sectionIdx: number, fieldIdx: number, updates: Partial<FormField>) => {
@@ -183,6 +209,20 @@ export const FormBuilderPage: React.FC = () => {
     if (activeField?.sectionIdx === sectionIdx && activeField?.fieldIdx === fieldIdx) {
       setActiveField(null);
     }
+  };
+
+  const moveFieldTo = (fromSectionIdx: number, fromFieldIdx: number, toSectionIdx: number, toIndex: number) => {
+    const newSections = schema.sections.map(s => ({ ...s, fields: [...s.fields] }));
+    const [moved] = newSections[fromSectionIdx].fields.splice(fromFieldIdx, 1);
+    if (!moved) return;
+    const targetFields = newSections[toSectionIdx].fields;
+    const insertAt = Math.min(toIndex, targetFields.length);
+    targetFields.splice(insertAt, 0, moved);
+    newSections.forEach((section, si) => {
+      section.fields.forEach((f, i) => (f.order = i + 1));
+    });
+    setSchema({ ...schema, sections: newSections });
+    setActiveField({ sectionIdx: toSectionIdx, fieldIdx: insertAt });
   };
 
   const handleSave = async () => {
@@ -304,6 +344,8 @@ export const FormBuilderPage: React.FC = () => {
   
   const addRule = () => {
     const newRule: FormRule = {
+      id: `rule_${Date.now()}`,
+      description: '',
       when: {
         op: 'eq',
         left: '',
@@ -359,7 +401,7 @@ export const FormBuilderPage: React.FC = () => {
     setSchema({ ...schema, rules: newRules });
   };
 
-  // Obter lista de todos os campos disponíveis para usar nas regras
+  // Obter lista de todos os campos (key) para usar nas regras
   const getAllFieldKeys = (): string[] => {
     const keys: string[] = [];
     schema.sections?.forEach(section => {
@@ -368,6 +410,33 @@ export const FormBuilderPage: React.FC = () => {
       });
     });
     return keys;
+  };
+
+  // Lista de campos com key, label e tipo/opções (para regras: dropdown com nome legível)
+  const getFieldsForRules = (): Array<{ key: string; label: string; type?: string; options?: Array<{ value: string; label: string }> }> => {
+    const list: Array<{ key: string; label: string; type?: string; options?: Array<{ value: string; label: string }> }> = [];
+    schema.sections?.forEach(section => {
+      section.fields?.forEach(field => {
+        if (field.key) {
+          list.push({
+            key: field.key,
+            label: field.label || field.key,
+            type: field.type,
+            options: field.options
+          });
+        }
+      });
+    });
+    return list;
+  };
+
+  // Dado o key do campo da condição (left), retorna o campo do schema para pegar opções
+  const getConditionField = (fieldKey: string): FormField | undefined => {
+    for (const section of schema.sections || []) {
+      const found = section.fields?.find(f => f.key === fieldKey);
+      if (found) return found;
+    }
+    return undefined;
   };
 
   const fieldTypes = [
@@ -517,6 +586,31 @@ export const FormBuilderPage: React.FC = () => {
                   <Plus className="h-4 w-4" />
                   Adicionar Seção
                 </button>
+
+                <div className="border-t border-gray-200 pt-4 mt-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                    <GripVertical className="h-4 w-4 text-gray-500" />
+                    Paleta de campos
+                  </h3>
+                  <p className="text-xs text-gray-500 mb-3">Arraste um tipo para uma seção ou solte entre os campos para reordenar.</p>
+                  <div className="flex flex-wrap gap-2 max-h-64 overflow-y-auto">
+                    {fieldTypes.map((ft) => (
+                      <div
+                        key={ft.value}
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData('application/json', JSON.stringify({ source: 'palette', type: ft.value }));
+                          e.dataTransfer.effectAllowed = 'copy';
+                          e.currentTarget.classList.add('opacity-60');
+                        }}
+                        onDragEnd={(e) => e.currentTarget.classList.remove('opacity-60')}
+                        className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm cursor-grab active:cursor-grabbing hover:border-blue-400 hover:bg-blue-50/50 shadow-sm select-none"
+                      >
+                        {ft.label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -568,12 +662,47 @@ export const FormBuilderPage: React.FC = () => {
                 </button>
               </div>
             ) : (
-              schema.sections.map((section, sectionIdx) => (
-                <div key={section.id} className="bg-white rounded-lg shadow">
+              <>
+                {schema.sections.map((section, sectionIdx) => (
+                  <React.Fragment key={section.id}>
+                    <div
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        setSectionDropIdx(sectionIdx);
+                      }}
+                      onDragLeave={() => setSectionDropIdx(prev => (prev === sectionIdx ? null : prev))}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setSectionDropIdx(null);
+                        try {
+                          const data = JSON.parse(e.dataTransfer.getData('application/json') || '{}');
+                          if (data.source === 'section' && data.sectionIdx !== undefined) {
+                            const fromIdx = data.sectionIdx as number;
+                            if (fromIdx !== sectionIdx) moveSectionTo(fromIdx, sectionIdx);
+                          }
+                        } catch (_) {}
+                      }}
+                      className={`h-2 rounded-sm transition-colors flex-shrink-0 ${
+                        sectionDropIdx === sectionIdx ? 'bg-blue-400' : 'bg-transparent hover:bg-gray-200'
+                      }`}
+                      title="Arraste a seção para cima ou para baixo"
+                    />
+                    <div
+                      key={section.id}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('application/json', JSON.stringify({ source: 'section', sectionIdx }));
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.currentTarget.classList.add('opacity-70');
+                      }}
+                      onDragEnd={(e) => e.currentTarget.classList.remove('opacity-70')}
+                      className="bg-white rounded-lg shadow cursor-grab active:cursor-grabbing section-card-draggable"
+                    >
                   {/* Cabeçalho da Seção */}
                   <div className="bg-blue-50 px-4 py-3 border-b border-blue-100 flex items-center justify-between">
                     <div className="flex items-center gap-2 flex-1">
-                      <GripVertical className="h-5 w-5 text-gray-400" />
+                      <GripVertical className="h-5 w-5 text-gray-400 flex-shrink-0" />
                       {activeSection === sectionIdx ? (
                         <input
                           type="text"
@@ -624,23 +753,83 @@ export const FormBuilderPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Campos da Seção */}
-                  <div className="p-4 space-y-3">
+                  {/* Campos da Seção (com zonas de drop e arrastar) */}
+                  <div className="p-4 space-y-1">
                     {section.fields.length === 0 ? (
-                      <p className="text-gray-400 text-sm italic">
-                        Nenhum campo nesta seção
-                      </p>
+                      <div
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = 'copy';
+                          setDropTarget({ sectionIdx, fieldIdx: 0 });
+                        }}
+                        onDragLeave={() => setDropTarget(prev => (prev?.sectionIdx === sectionIdx && prev?.fieldIdx === 0 ? null : prev))}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setDropTarget(null);
+                          try {
+                            const data = JSON.parse(e.dataTransfer.getData('application/json') || '{}');
+                            if (data.source === 'palette') {
+                              addField(sectionIdx, data.type, 0);
+                            } else if (data.source === 'field' && data.sectionIdx !== undefined && data.fieldIdx !== undefined) {
+                              moveFieldTo(data.sectionIdx, data.fieldIdx, sectionIdx, 0);
+                            }
+                          } catch (_) {}
+                        }}
+                        className={`min-h-[56px] rounded-lg border-2 border-dashed flex items-center justify-center transition-colors ${
+                          dropTarget?.sectionIdx === sectionIdx && dropTarget?.fieldIdx === 0
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-200 text-gray-400 hover:border-gray-300'
+                        }`}
+                      >
+                        <span className="text-sm">Solte aqui para adicionar o primeiro campo</span>
+                      </div>
                     ) : (
-                      section.fields.map((field, fieldIdx) => (
-                        <div
-                          key={field.key}
-                          className={`border rounded p-3 ${
-                            activeField?.sectionIdx === sectionIdx && activeField?.fieldIdx === fieldIdx
-                              ? 'border-blue-500 bg-blue-50'
-                              : 'border-gray-200'
-                          }`}
-                          onClick={() => setActiveField({ sectionIdx, fieldIdx })}
-                        >
+                      <>
+                        {section.fields.map((field, fieldIdx) => (
+                          <React.Fragment key={field.key}>
+                            <div
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = 'copy';
+                                setDropTarget({ sectionIdx, fieldIdx });
+                              }}
+                              onDragLeave={() => setDropTarget(prev => (prev?.sectionIdx === sectionIdx && prev?.fieldIdx === fieldIdx ? null : prev))}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                setDropTarget(null);
+                                try {
+                                  const data = JSON.parse(e.dataTransfer.getData('application/json') || '{}');
+                                  if (data.source === 'palette') {
+                                    addField(sectionIdx, data.type, fieldIdx);
+                                  } else if (data.source === 'field' && data.sectionIdx !== undefined && data.fieldIdx !== undefined) {
+                                    const fromS = data.sectionIdx as number;
+                                    const fromF = data.fieldIdx as number;
+                                    if (fromS === sectionIdx && fromF === fieldIdx) return;
+                                    const toIndex = fromS === sectionIdx && fromF < fieldIdx ? fieldIdx - 1 : fieldIdx;
+                                    moveFieldTo(fromS, fromF, sectionIdx, toIndex);
+                                  }
+                                } catch (_) {}
+                              }}
+                              className={`h-2 rounded-sm transition-colors flex-shrink-0 ${
+                                dropTarget?.sectionIdx === sectionIdx && dropTarget?.fieldIdx === fieldIdx ? 'bg-blue-400' : 'bg-transparent hover:bg-gray-200'
+                              }`}
+                              title="Inserir campo aqui"
+                            />
+                            <div
+                              draggable
+                              onDragStart={(e) => {
+                                e.dataTransfer.setData('application/json', JSON.stringify({ source: 'field', sectionIdx, fieldIdx }));
+                                e.dataTransfer.effectAllowed = 'move';
+                                (e.target as HTMLElement).closest('.field-card-draggable')?.classList.add('opacity-60');
+                              }}
+                              onDragEnd={(e) => (e.target as HTMLElement).closest('.field-card-draggable')?.classList.remove('opacity-60')}
+                              className={`field-card-draggable border rounded-lg p-3 cursor-grab active:cursor-grabbing ${
+                                activeField?.sectionIdx === sectionIdx && activeField?.fieldIdx === fieldIdx
+                                  ? 'border-blue-500 bg-blue-50'
+                                  : 'border-gray-200'
+                              }`}
+                              onClick={() => setActiveField({ sectionIdx, fieldIdx })}
+                            >
                           <div className="grid grid-cols-12 gap-3">
                             <div className="col-span-4">
                               <label className="text-xs text-gray-600">Label</label>
@@ -771,6 +960,34 @@ export const FormBuilderPage: React.FC = () => {
                                 </div>
                               </div>
                             )}
+                            {field.type === 'file' && (
+                              <div className="flex items-center gap-4 flex-wrap">
+                                <div className="flex items-center gap-1">
+                                  <label className="text-xs text-gray-600 whitespace-nowrap">Tamanho máx. total:</label>
+                                  <select
+                                    value={field.maxSize != null ? field.maxSize / (1024 * 1024) : 10}
+                                    onChange={(e) => updateField(sectionIdx, fieldIdx, { maxSize: Number(e.target.value) * 1024 * 1024 })}
+                                    className="px-2 py-1 text-xs border border-gray-300 rounded"
+                                  >
+                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(mb => (
+                                      <option key={mb} value={mb}>{mb} MB</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <label className="text-xs text-gray-600 whitespace-nowrap">Máx. arquivos:</label>
+                                  <select
+                                    value={field.maxFiles ?? 10}
+                                    onChange={(e) => updateField(sectionIdx, fieldIdx, { maxFiles: Number(e.target.value) })}
+                                    className="px-2 py-1 text-xs border border-gray-300 rounded"
+                                  >
+                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                                      <option key={n} value={n}>{n}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+                            )}
                             {(field.type === 'checkbox-group' || field.type === 'radio' || field.type === 'select' || field.type === 'select-search' || field.type === 'multi-select') && (
                               <div className="mt-3 p-3 border border-gray-200 rounded-lg bg-gray-50">
                                 {/* Seletor de Origem dos Dados */}
@@ -778,35 +995,46 @@ export const FormBuilderPage: React.FC = () => {
                                   <label className="block text-xs font-medium text-gray-700 mb-2">
                                     Origem dos Dados:
                                   </label>
-                                  <div className="flex gap-4">
-                                    <label className="flex items-center cursor-pointer">
-                                      <input
-                                        type="radio"
-                                        name={`dataSource_${sectionIdx}_${fieldIdx}`}
-                                        checked={!field.dataSource || field.dataSource === 'manual'}
-                                        onChange={() => updateField(sectionIdx, fieldIdx, { 
-                                          dataSource: 'manual',
-                                          dataTable: undefined,
-                                          dataValueColumn: undefined,
-                                          dataLabelColumn: undefined
-                                        })}
-                                        className="w-3 h-3 text-blue-600"
-                                      />
-                                      <span className="ml-2 text-xs text-gray-700">Manual</span>
-                                    </label>
-                                    <label className="flex items-center cursor-pointer">
-                                      <input
-                                        type="radio"
-                                        name={`dataSource_${sectionIdx}_${fieldIdx}`}
-                                        checked={field.dataSource === 'database'}
-                                        onChange={() => updateField(sectionIdx, fieldIdx, { 
-                                          dataSource: 'database',
-                                          options: undefined
-                                        })}
-                                        className="w-3 h-3 text-blue-600"
-                                      />
-                                      <span className="ml-2 text-xs text-gray-700">Banco de Dados</span>
-                                    </label>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {[
+                                      { value: 'manual' as const, label: 'Manual' },
+                                      { value: 'database' as const, label: 'Banco de Dados' },
+                                    ].map(({ value, label }) => {
+                                      const isSelected = value === 'manual'
+                                        ? !field.dataSource || field.dataSource === 'manual'
+                                        : field.dataSource === 'database';
+                                      return (
+                                        <label
+                                          key={value}
+                                          className={`
+                                            flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200
+                                            ${isSelected
+                                              ? 'bg-blue-50 border-2 border-blue-500 shadow-md scale-[1.02]'
+                                              : 'bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-sm'
+                                            }
+                                          `}
+                                        >
+                                          <div className="flex items-center h-5 mt-0.5 flex-shrink-0">
+                                            <input
+                                              type="radio"
+                                              name={`dataSource_${sectionIdx}_${fieldIdx}`}
+                                              checked={isSelected}
+                                              onChange={() => updateField(sectionIdx, fieldIdx, value === 'manual'
+                                                ? { dataSource: 'manual', dataTable: undefined, dataValueColumn: undefined, dataLabelColumn: undefined }
+                                                : { dataSource: 'database', options: undefined }
+                                              )}
+                                              className="w-5 h-5 rounded-full border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer"
+                                            />
+                                          </div>
+                                          <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+                                            <span className={`text-sm font-medium transition-colors ${isSelected ? 'text-blue-900' : 'text-gray-900'}`}>
+                                              {label}
+                                            </span>
+                                            {isSelected && <Check className="h-5 w-5 text-blue-600 flex-shrink-0" />}
+                                          </div>
+                                        </label>
+                                      );
+                                    })}
                                   </div>
                                 </div>
 
@@ -991,13 +1219,71 @@ export const FormBuilderPage: React.FC = () => {
                             )}
                           </div>
                         </div>
-                      ))
+                            </React.Fragment>
+                        ))}
+                        <div
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'copy';
+                            setDropTarget({ sectionIdx, fieldIdx: section.fields.length });
+                          }}
+                          onDragLeave={() => setDropTarget(prev => (prev?.sectionIdx === sectionIdx && prev?.fieldIdx === section.fields.length ? null : prev))}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            setDropTarget(null);
+                            try {
+                              const data = JSON.parse(e.dataTransfer.getData('application/json') || '{}');
+                              if (data.source === 'palette') {
+                                addField(sectionIdx, data.type, section.fields.length);
+                              } else if (data.source === 'field' && data.sectionIdx !== undefined && data.fieldIdx !== undefined) {
+                                const fromS = data.sectionIdx as number;
+                                const fromF = data.fieldIdx as number;
+                                if (fromS === sectionIdx && fromF === section.fields.length - 1) return;
+                                const toIndex = fromS === sectionIdx && fromF < section.fields.length ? section.fields.length - 1 : section.fields.length;
+                                moveFieldTo(fromS, fromF, sectionIdx, toIndex);
+                              }
+                            } catch (_) {}
+                          }}
+                          className={`min-h-[32px] rounded-lg border-2 border-dashed flex items-center justify-center transition-colors ${
+                            dropTarget?.sectionIdx === sectionIdx && dropTarget?.fieldIdx === section.fields.length
+                              ? 'border-blue-500 bg-blue-50 text-blue-700'
+                              : 'border-gray-200 text-gray-400 hover:border-gray-300'
+                          }`}
+                        >
+                          <span className="text-xs font-medium">Solte aqui</span>
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>
-              ))
-            )}
+                  </React.Fragment>
+                ))}
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    setSectionDropIdx(schema.sections.length);
+                  }}
+                  onDragLeave={() => setSectionDropIdx(prev => (prev === schema.sections.length ? null : prev))}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setSectionDropIdx(null);
+                    try {
+                      const data = JSON.parse(e.dataTransfer.getData('application/json') || '{}');
+                      if (data.source === 'section' && data.sectionIdx !== undefined) {
+                        const fromIdx = data.sectionIdx as number;
+                        moveSectionTo(fromIdx, schema.sections.length);
+                      }
+                    } catch (_) {}
+                  }}
+                  className={`h-2 rounded-sm transition-colors flex-shrink-0 ${
+                    sectionDropIdx === schema.sections.length ? 'bg-blue-400' : 'bg-transparent hover:bg-gray-200'
+                  }`}
+                  title="Arraste a seção para o final"
+                />
               </>
+            )}
+            </>
             )}
 
             {/* Conteúdo da Aba de Regras */}
@@ -1040,7 +1326,9 @@ export const FormBuilderPage: React.FC = () => {
                   </div>
                 ) : (
                   (schema.rules || []).map((rule, ruleIdx) => {
-                    const availableFields = getAllFieldKeys();
+                    const fieldsForRules = getFieldsForRules();
+                    const conditionField = getConditionField(rule.when?.left || '');
+                    const needsNoValue = ['isEmpty', 'isNotEmpty'].includes(rule.when?.op || '');
                     
                     return (
                       <div key={ruleIdx} className="bg-white rounded-lg shadow">
@@ -1086,12 +1374,12 @@ export const FormBuilderPage: React.FC = () => {
                                 <label className="block text-xs text-gray-600 mb-1">Campo</label>
                                 <select
                                   value={rule.when.left || ''}
-                                  onChange={(e) => updateRuleCondition(ruleIdx, { left: e.target.value })}
+                                  onChange={(e) => updateRuleCondition(ruleIdx, { left: e.target.value, right: '' })}
                                   className="w-full px-2 py-2 border border-gray-300 rounded text-sm"
                                 >
-                                  <option value="">Selecione...</option>
-                                  {availableFields.map(key => (
-                                    <option key={key} value={key}>{key}</option>
+                                  <option value="">Selecione o campo...</option>
+                                  {fieldsForRules.map(f => (
+                                    <option key={f.key} value={f.key}>{f.label} ({f.key})</option>
                                   ))}
                                 </select>
                               </div>
@@ -1120,25 +1408,50 @@ export const FormBuilderPage: React.FC = () => {
                               <div className="col-span-5">
                                 <label className="block text-xs text-gray-600 mb-1">
                                   Valor {['in', 'notIn'].includes(rule.when.op) && '(separado por vírgula)'}
+                                  {needsNoValue && <span className="text-gray-400 font-normal"> — não precisa preencher</span>}
                                 </label>
-                                <input
-                                  type="text"
-                                  value={
-                                    Array.isArray(rule.when.right)
-                                      ? rule.when.right.join(', ')
-                                      : (rule.when.right || '')
-                                  }
-                                  onChange={(e) => {
-                                    const value = e.target.value;
-                                    const newValue = ['in', 'notIn'].includes(rule.when.op)
-                                      ? value.split(',').map(v => v.trim()).filter(v => v)
-                                      : value;
-                                    updateRuleCondition(ruleIdx, { right: newValue });
-                                  }}
-                                  className="w-full px-2 py-2 border border-gray-300 rounded text-sm"
-                                  placeholder={['isEmpty', 'isNotEmpty'].includes(rule.when.op) ? '(sem valor)' : 'valor...'}
-                                  disabled={['isEmpty', 'isNotEmpty'].includes(rule.when.op)}
-                                />
+                                {needsNoValue ? (
+                                  <input type="text" readOnly className="w-full px-2 py-2 border border-gray-200 rounded text-sm bg-gray-50 text-gray-500" value="—" />
+                                ) : conditionField?.type === 'checkbox' ? (
+                                  <select
+                                    value={rule.when.right === true || rule.when.right === 'true' ? 'true' : rule.when.right === false || rule.when.right === 'false' ? 'false' : ''}
+                                    onChange={(e) => updateRuleCondition(ruleIdx, { right: e.target.value === 'true' ? true : e.target.value === 'false' ? false : '' })}
+                                    className="w-full px-2 py-2 border border-gray-300 rounded text-sm"
+                                  >
+                                    <option value="">Selecione...</option>
+                                    <option value="true">Sim (marcado)</option>
+                                    <option value="false">Não (desmarcado)</option>
+                                  </select>
+                                ) : conditionField?.options?.length ? (
+                                  <select
+                                    value={Array.isArray(rule.when.right) ? '' : (rule.when.right ?? '')}
+                                    onChange={(e) => updateRuleCondition(ruleIdx, { right: e.target.value })}
+                                    className="w-full px-2 py-2 border border-gray-300 rounded text-sm"
+                                  >
+                                    <option value="">Selecione...</option>
+                                    {conditionField.options.map(opt => (
+                                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    value={
+                                      Array.isArray(rule.when.right)
+                                        ? rule.when.right.join(', ')
+                                        : (rule.when.right ?? '')
+                                    }
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      const newValue = ['in', 'notIn'].includes(rule.when.op)
+                                        ? value.split(',').map(v => v.trim()).filter(v => v)
+                                        : value;
+                                      updateRuleCondition(ruleIdx, { right: newValue });
+                                    }}
+                                    className="w-full px-2 py-2 border border-gray-300 rounded text-sm"
+                                    placeholder={['in', 'notIn'].includes(rule.when.op) ? 'a, b, c' : 'valor...'}
+                                  />
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1185,8 +1498,8 @@ export const FormBuilderPage: React.FC = () => {
                                       className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
                                     >
                                       <option value="">Selecione campo...</option>
-                                      {availableFields.map(key => (
-                                        <option key={key} value={key}>{key}</option>
+                                      {fieldsForRules.map(f => (
+                                        <option key={f.key} value={f.key}>{f.label} ({f.key})</option>
                                       ))}
                                     </select>
 
@@ -1254,8 +1567,8 @@ export const FormBuilderPage: React.FC = () => {
                                       className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
                                     >
                                       <option value="">Selecione campo...</option>
-                                      {availableFields.map(key => (
-                                        <option key={key} value={key}>{key}</option>
+                                      {fieldsForRules.map(f => (
+                                        <option key={f.key} value={f.key}>{f.label} ({f.key})</option>
                                       ))}
                                     </select>
 

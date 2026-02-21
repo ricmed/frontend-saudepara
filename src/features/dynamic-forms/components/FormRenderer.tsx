@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import type { FormSchema } from '@/services/FormService';
 import { useFormRenderer } from '../hooks/useFormRenderer';
 import { TextField, DateField, NumberField, TextareaField, CheckboxField } from './FormFields';
-import { SelectField, CodeListSelectField, CodeListSearchField } from './SelectFields';
+import { SelectField, SelectSearchField, CodeListSelectField, CodeListSearchField } from './SelectFields';
 import { 
   CheckboxGroupField, 
   RadioGroupField, 
@@ -68,6 +68,44 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     onDataChange,
   });
 
+  const [uploadingCount, setUploadingCount] = useState(0);
+  const handleUploadingChange = useCallback((uploading: boolean) => {
+    setUploadingCount(c => Math.max(0, c + (uploading ? 1 : -1)));
+  }, []);
+  const isUploading = uploadingCount > 0;
+
+  // Retorno da assinatura Gov.br: preencher campo ou exibir erro e limpar hash/query
+  useEffect(() => {
+    const params = new URLSearchParams(
+      window.location.hash?.slice(1) || window.location.search?.slice(1) || ''
+    );
+    const signature = params.get('signature');
+    const cert = params.get('cert');
+    const fieldKey = params.get('fieldKey');
+    const govbrError = params.get('govbr_error');
+    if (govbrError) {
+      try {
+        const message = decodeURIComponent(govbrError);
+        alert(`Assinatura Gov.br: ${message}`);
+      } catch {
+        alert('Erro ao processar assinatura Gov.br.');
+      }
+      const newUrl = window.location.pathname + window.location.search;
+      window.history.replaceState(null, '', newUrl);
+      return;
+    }
+    if (signature && fieldKey) {
+      setValue(fieldKey, {
+        type: 'govbr',
+        signatureBase64: signature,
+        certificatePem: cert || undefined,
+        signedAt: new Date().toISOString(),
+      });
+      const newUrl = window.location.pathname + window.location.search;
+      window.history.replaceState(null, '', newUrl);
+    }
+  }, [setValue]);
+
   // Função para converter campos datetime-local para UTC antes de enviar
   const convertDateTimeFieldsToUTC = (data: Record<string, any>, schema: FormSchema): Record<string, any> => {
     const result = { ...data };
@@ -94,7 +132,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (readOnly) return;
+    if (readOnly || isUploading) return;
 
     if (validateAll()) {
       // Converter datetime fields antes de enviar
@@ -106,12 +144,30 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   const handleSaveDraft = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (readOnly) return;
+    if (readOnly || isUploading) return;
 
     // Converter datetime fields antes de salvar rascunho também
     const dataToSave = convertDateTimeFieldsToUTC(formData, schema);
     onSaveDraft?.(dataToSave);
   };
+
+  // Tipos que devem ocupar a linha inteira (não ficar na metade do grid)
+  const fullWidthTypes = new Set([
+    'textarea',
+    'file',
+    'signature',
+    'geolocation',
+    'checkbox-group',
+    'radio',
+    'multi-select',
+    'address',
+    'google-address',
+    'slider',
+    'rating',
+    'color',
+    'autocomplete',
+  ]);
+  const isFullWidth = (type: string) => fullWidthTypes.has(type);
 
   const renderField = (field: any) => {
     const value = getValue(field.key);
@@ -156,7 +212,10 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
         }
         return <SelectField {...commonProps} />;
       case 'select-search':
-        return <CodeListSearchField {...commonProps} />;
+        if (field.codeList) {
+          return <CodeListSearchField {...commonProps} />;
+        }
+        return <SelectSearchField {...commonProps} />;
       case 'multi-select':
         return <MultiSelectField {...commonProps} />;
       case 'radio':
@@ -172,7 +231,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       case 'cep':
         return <CEPField {...commonProps} />;
       case 'file':
-        return <FileUploadField {...commonProps} />;
+        return <FileUploadField {...commonProps} onUploadingChange={handleUploadingChange} />;
       case 'signature':
         return <SignatureField {...commonProps} />;
       case 'geolocation':
@@ -217,7 +276,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                 .map((field) => (
                   <div
                     key={field.key}
-                    className={field.type === 'textarea' ? 'md:col-span-2' : ''}
+                    className={isFullWidth(field.type) ? 'md:col-span-2' : ''}
                   >
                     {renderField(field)}
                   </div>
@@ -228,11 +287,18 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
 
       {!readOnly && (
         <div className="flex gap-4 justify-end mt-6 pt-6 border-t">
+          {isUploading && (
+            <p className="mr-auto text-sm text-amber-700 flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              Processando arquivo… Aguarde antes de enviar ou sair da página.
+            </p>
+          )}
           {onCancel && (
             <button
               type="button"
               onClick={onCancel}
-              className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500"
+              disabled={isUploading}
+              className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {cancelLabel}
             </button>
@@ -241,16 +307,18 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             <button
               type="button"
               onClick={handleSaveDraft}
-              className="px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
+              disabled={isUploading}
+              className="px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saveDraftLabel}
             </button>
           )}
           <button
             type="submit"
-            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={isUploading}
+            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {submitLabel}
+            {isUploading ? 'Aguarde...' : submitLabel}
           </button>
         </div>
       )}

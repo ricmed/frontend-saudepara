@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { FormField } from '@/services/FormService';
-import { Upload, X, Download, MapPin, Loader2, Star } from 'lucide-react';
+import { searchMatches } from '@/utils/searchUtils';
+import imageCompression from 'browser-image-compression';
+import { Upload, X, Download, MapPin, Loader2, Star, FileText, Eye, Trash2 } from 'lucide-react';
+import MiniMapa from '@/features/maps/leaflet/components/MiniMapa';
 
 interface SpecialFieldProps {
   field: FormField;
@@ -9,9 +12,21 @@ interface SpecialFieldProps {
   error?: string;
   required?: boolean;
   disabled?: boolean;
+  /** Chamado quando o processamento/upload do arquivo inicia ou termina (para desabilitar envio do formulário). */
+  onUploadingChange?: (uploading: boolean) => void;
 }
 
-// ========== FILE UPLOAD (imagens, PDFs, documentos) ==========
+// ========== FILE UPLOAD (múltiplos arquivos, barra de progresso, download/visualizar – estilo DAE) ==========
+const maxSizeMBCompress = 2;
+type FileValueItem = { name: string; type: string; size: number; base64: string; uploadedAt?: string };
+
+function normalizeFileValue(value: any): FileValueItem[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.filter((v): v is FileValueItem => v && typeof v.base64 === 'string');
+  if (value.base64) return [value as FileValueItem];
+  return [];
+}
+
 export const FileUploadField: React.FC<SpecialFieldProps> = ({
   field,
   value,
@@ -19,70 +34,151 @@ export const FileUploadField: React.FC<SpecialFieldProps> = ({
   error,
   required,
   disabled,
+  onUploadingChange,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
-  // Aceitar tipos de arquivo conforme configurado ou padrão
   const acceptedTypes = field.accept || 'image/*,.pdf,.doc,.docx';
-  const maxSize = field.maxSize || 5 * 1024 * 1024; // 5MB padrão
+  const maxSizeBytes = field.maxSize ?? 10 * 1024 * 1024;
+  const maxFiles = Math.min(Math.max(field.maxFiles ?? 10, 1), 10);
+
+  const list = normalizeFileValue(value);
+  const totalBytes = list.reduce((s, f) => s + (f.size || 0), 0);
+  const percentage = maxSizeBytes > 0 ? Math.min((totalBytes / maxSizeBytes) * 100, 100) : 0;
 
   useEffect(() => {
-    if (value?.base64) {
-      setPreview(value.base64);
+    if (!uploading) return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [uploading]);
+
+  const shouldCompress = (file: File): boolean => {
+    const imageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/heic', 'image/heif'];
+    return imageTypes.includes(file.type.toLowerCase());
+  };
+
+  const compressImage = async (file: File): Promise<File> => {
+    try {
+      const options = {
+        maxSizeMB: maxSizeMBCompress,
+        maxWidthOrHeight: 1920,
+        useWebWorker: true,
+        fileType: file.type === 'image/heic' ? 'image/jpeg' : undefined,
+      };
+      const compressed = await imageCompression(file, options);
+      return new File([compressed], file.name, { type: compressed.type, lastModified: Date.now() });
+    } catch {
+      return file;
     }
-  }, [value]);
+  };
+
+  const fileToItem = (file: File, base64: string): FileValueItem => ({
+    name: file.name,
+    type: file.type,
+    size: file.size,
+    base64,
+    uploadedAt: new Date().toISOString(),
+  });
+
+  const processFile = async (file: File) => {
+    if (list.length >= maxFiles) {
+      alert(`Máximo de ${maxFiles} arquivo(s) permitido(s).`);
+      return;
+    }
+    if (file.size > maxSizeBytes) {
+      alert(`Arquivo muito grande! Tamanho máximo total: ${(maxSizeBytes / 1024 / 1024).toFixed(0)}MB`);
+      return;
+    }
+    const newTotal = totalBytes + file.size;
+    if (newTotal > maxSizeBytes) {
+      alert(`O tamanho total dos anexos não pode passar ${(maxSizeBytes / 1024 / 1024).toFixed(0)}MB. Atual: ${(totalBytes / 1024 / 1024).toFixed(2)}MB.`);
+      return;
+    }
+    try {
+      setUploading(true);
+      onUploadingChange?.(true);
+      let toRead = file;
+      if (shouldCompress(file)) toRead = await compressImage(file);
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(toRead);
+      });
+      onChange([...list, fileToItem(toRead, base64)]);
+    } catch (err) {
+      console.error('Erro ao processar arquivo:', err);
+      alert('Erro ao processar o arquivo');
+    } finally {
+      setUploading(false);
+      onUploadingChange?.(false);
+    }
+  };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (file) await processFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
-    // Validar tamanho
-    if (file.size > maxSize) {
-      alert(`Arquivo muito grande! Máximo: ${(maxSize / 1024 / 1024).toFixed(2)}MB`);
-      return;
-    }
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!disabled && !uploading) setIsDragging(true);
+  };
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (disabled || uploading) return;
+    const file = e.dataTransfer.files?.[0];
+    if (file) await processFile(file);
+  };
 
+  const handleRemove = (index: number) => {
+    const next = list.filter((_, i) => i !== index);
+    onChange(next.length ? next : null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleDownload = (item: FileValueItem) => {
     try {
-      setUploading(true);
-
-      // Converter para base64
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64 = event.target?.result as string;
-        
-        onChange({
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          base64: base64,
-          uploadedAt: new Date().toISOString()
-        });
-
-        // Preview para imagens
-        if (file.type.startsWith('image/')) {
-          setPreview(base64);
-        }
-      };
-      reader.readAsDataURL(file);
-    } catch (err) {
-      console.error('Erro ao fazer upload:', err);
-      alert('Erro ao fazer upload do arquivo');
-    } finally {
-      setUploading(false);
+      const link = document.createElement('a');
+      link.href = item.base64;
+      link.download = item.name || 'arquivo';
+      link.click();
+    } catch {
+      window.open(item.base64, '_blank');
     }
   };
 
-  const handleRemove = () => {
-    onChange(null);
-    setPreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+  const handleView = (item: FileValueItem) => {
+    if (item.type?.startsWith('image/')) {
+      window.open(item.base64, '_blank');
+    } else {
+      handleDownload(item);
     }
   };
 
-  const isImage = value?.type?.startsWith('image/');
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+  };
+
+  const maxSizeMB = maxSizeBytes / (1024 * 1024);
 
   return (
     <div className="mb-4">
@@ -94,75 +190,132 @@ export const FileUploadField: React.FC<SpecialFieldProps> = ({
         <p className="text-xs text-gray-500 mb-2">{field.helpText}</p>
       )}
 
-      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
-        {!value ? (
-          <div className="text-center">
-            <Upload className="h-12 w-12 mx-auto text-gray-400 mb-2" />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={disabled || uploading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-            >
-              {uploading ? 'Enviando...' : 'Selecionar Arquivo'}
-            </button>
-            <p className="text-xs text-gray-500 mt-2">
-              Tipos aceitos: {acceptedTypes.replace(/\*/g, 'todos')}
-              <br />
-              Tamanho máximo: {(maxSize / 1024 / 1024).toFixed(0)}MB
-            </p>
-          </div>
-        ) : (
-          <div>
-            {isImage && preview ? (
-              <div className="mb-3">
-                <img 
-                  src={preview} 
-                  alt={value.name}
-                  className="max-w-full h-auto max-h-64 mx-auto rounded border"
-                />
-              </div>
-            ) : (
-              <div className="flex items-center justify-center p-4 bg-gray-50 rounded mb-3">
-                <Download className="h-8 w-8 text-gray-400" />
-                <span className="ml-2 text-sm text-gray-600">{value.type}</span>
-              </div>
-            )}
-            
-            <div className="flex items-center justify-between bg-gray-50 rounded p-2">
-              <div className="flex-1 truncate">
-                <p className="text-sm font-medium text-gray-900 truncate">{value.name}</p>
-                <p className="text-xs text-gray-500">
-                  {(value.size / 1024).toFixed(2)} KB
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleRemove}
-                disabled={disabled}
-                className="ml-2 p-1 text-red-600 hover:bg-red-50 rounded"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-        )}
+      {/* Barra de progresso (estilo DAE) */}
+      <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm text-blue-900 font-medium">
+            📎 Anexos: {list.length}/{maxFiles}
+          </p>
+          <p className="text-sm text-blue-900 font-medium">
+            {(totalBytes / 1024 / 1024).toFixed(2)}MB / {maxSizeMB.toFixed(0)}MB
+          </p>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+          <div
+            className={`h-full transition-all duration-300 rounded-full ${
+              percentage < 50 ? 'bg-green-500' : percentage < 80 ? 'bg-yellow-500' : 'bg-red-500'
+            }`}
+            style={{ width: `${percentage}%` }}
+          />
+        </div>
+        <p className="text-xs text-blue-700 mt-2">
+          💡 Máximo de {maxFiles} arquivo(s), tamanho total até {maxSizeMB.toFixed(0)}MB
+        </p>
       </div>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept={acceptedTypes}
-        onChange={handleFileSelect}
-        className="hidden"
-      />
-      
+      {/* Lista de arquivos com Download / Visualizar / Remover */}
+      {list.length > 0 && (
+        <div className="space-y-2 mb-3">
+          {list.map((item, index) => (
+            <div
+              key={`${item.name}-${index}`}
+              className="flex items-center justify-between bg-white p-3 rounded-xl border-2 border-gray-200 hover:border-blue-200 shadow-sm"
+            >
+              <div className="flex items-center gap-3 truncate min-w-0">
+                <div className="bg-blue-100 p-2 rounded-lg text-blue-600 flex-shrink-0">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div className="truncate min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                  <p className="text-xs text-gray-500">{formatFileSize(item.size)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleView(item)}
+                  className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                  title={item.type?.startsWith('image/') ? 'Visualizar' : 'Baixar'}
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDownload(item)}
+                  className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                  title="Baixar"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleRemove(index)}
+                  disabled={disabled}
+                  className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                  title="Remover"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Zona de adicionar (só se ainda pode adicionar) */}
+      {list.length < maxFiles && totalBytes < maxSizeBytes && (
+        <label
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+          className={`
+            flex flex-col items-center justify-center gap-2 p-6 rounded-xl border-2 border-dashed
+            transition-all duration-200 cursor-pointer
+            ${disabled || uploading ? 'opacity-60 cursor-not-allowed' : ''}
+            ${isDragging ? 'border-blue-500 bg-blue-50 scale-[1.01]' : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'}
+          `}
+        >
+          <Upload className={`w-10 h-10 ${isDragging ? 'text-blue-500' : 'text-gray-400'}`} />
+          <div className="text-center">
+            <span className="text-sm font-medium text-gray-700">
+              {uploading ? 'Processando...' : isDragging ? 'Solte o arquivo aqui' : 'Clique ou arraste para adicionar'}
+            </span>
+            <p className="text-xs text-gray-500 mt-1">
+              Tipos: {acceptedTypes.replace(/\*/g, 'todos')} · Máx. {maxSizeMB.toFixed(0)}MB total · até {maxFiles} arquivo(s)
+            </p>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={acceptedTypes}
+            onChange={handleFileSelect}
+            disabled={disabled || uploading}
+            className="hidden"
+          />
+        </label>
+      )}
+
+      {list.length < maxFiles && (
+        <p className="text-xs text-gray-500 mt-2">
+          ℹ️ Imagens podem ser comprimidas automaticamente
+        </p>
+      )}
+
       {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
     </div>
   );
 };
 
-// ========== ASSINATURA DIGITAL (canvas) ==========
+// ========== ASSINATURA DIGITAL (Dispositivo = canvas + toque | Gov.br = API) ==========
+export type SignatureValue =
+  | string
+  | { type: 'govbr'; signatureBase64: string; certificatePem?: string; signedAt?: string };
+
+function isGovBrSignature(value: any): value is { type: 'govbr'; signatureBase64: string; certificatePem?: string; signedAt?: string } {
+  return value && typeof value === 'object' && value.type === 'govbr' && typeof value.signatureBase64 === 'string';
+}
+
 export const SignatureField: React.FC<SpecialFieldProps> = ({
   field,
   value,
@@ -173,9 +326,14 @@ export const SignatureField: React.FC<SpecialFieldProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [signingMode, setSigningMode] = useState<'device' | 'govbr'>(() =>
+    isGovBrSignature(value) ? 'govbr' : 'device'
+  );
+  const [govBrLoading, setGovBrLoading] = useState(false);
+  const [govBrError, setGovBrError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (value && canvasRef.current) {
+    if (value && canvasRef.current && typeof value === 'string') {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
       if (ctx) {
@@ -188,25 +346,37 @@ export const SignatureField: React.FC<SpecialFieldProps> = ({
     }
   }, []);
 
+  const getCoords = (canvas: HTMLCanvasElement, clientX: number, clientY: number) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+    };
+  };
+
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (disabled) return;
+    if (disabled || signingMode !== 'device') return;
+    e.preventDefault();
     setIsDrawing(true);
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (ctx && canvas) {
-      const rect = canvas.getBoundingClientRect();
+      const { x, y } = getCoords(canvas, e.clientX, e.clientY);
       ctx.beginPath();
-      ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+      ctx.moveTo(x, y);
     }
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawing || disabled) return;
+    e.preventDefault();
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (ctx && canvas) {
-      const rect = canvas.getBoundingClientRect();
-      ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+      const { x, y } = getCoords(canvas, e.clientX, e.clientY);
+      ctx.lineTo(x, y);
       ctx.strokeStyle = '#000';
       ctx.lineWidth = 2;
       ctx.lineCap = 'round';
@@ -223,7 +393,51 @@ export const SignatureField: React.FC<SpecialFieldProps> = ({
     }
   };
 
+  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (disabled || signingMode !== 'device') return;
+    e.preventDefault();
+    setIsDrawing(true);
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    const touch = e.touches[0];
+    if (ctx && canvas && touch) {
+      const { x, y } = getCoords(canvas, touch.clientX, touch.clientY);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || disabled) return;
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    const touch = e.touches[0];
+    if (ctx && canvas && touch) {
+      const { x, y } = getCoords(canvas, touch.clientX, touch.clientY);
+      ctx.lineTo(x, y);
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    if (!isDrawing) return;
+    setIsDrawing(false);
+    const canvas = canvasRef.current;
+    if (canvas) {
+      onChange(canvas.toDataURL());
+    }
+  };
+
   const clearSignature = () => {
+    if (signingMode === 'govbr') {
+      onChange(null);
+      return;
+    }
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (ctx && canvas) {
@@ -232,41 +446,150 @@ export const SignatureField: React.FC<SpecialFieldProps> = ({
     }
   };
 
+  const startGovBrSign = async () => {
+    if (disabled) return;
+    setGovBrError(null);
+    setGovBrLoading(true);
+    try {
+      const server = import.meta.env.VITE_API_SERVER;
+      const port = import.meta.env.VITE_API_PORT;
+      const baseUrl = `${server}:${port}`;
+      const redirectUri = encodeURIComponent(window.location.origin + window.location.pathname + window.location.search);
+      const state = encodeURIComponent(JSON.stringify({ fieldKey: field.key, redirectUri: window.location.href }));
+      const url = `${baseUrl}/api/forms/govbr-signature/authorize?redirect_uri=${redirectUri}&state=${state}`;
+      window.location.href = url;
+    } catch (err: any) {
+      setGovBrError(err?.message || 'Erro ao iniciar assinatura Gov.br');
+      setGovBrLoading(false);
+    }
+  };
+
+  const hasValue = value != null && (typeof value === 'string' ? value.length > 0 : isGovBrSignature(value));
+
   return (
     <div className="mb-4">
       <label className="block text-sm font-medium text-gray-700 mb-1">
         {field.label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
-      <div className="border-2 border-gray-300 rounded-lg overflow-hidden">
-        <canvas
-          ref={canvasRef}
-          width={600}
-          height={200}
-          onMouseDown={startDrawing}
-          onMouseMove={draw}
-          onMouseUp={stopDrawing}
-          onMouseLeave={stopDrawing}
-          className="w-full bg-white cursor-crosshair"
-          style={{ touchAction: 'none' }}
-        />
-      </div>
-      <div className="flex gap-2 mt-2">
+
+      {/* Escolha do método: Dispositivo ou Gov.br (cards estilo DAE) */}
+      <div className="grid grid-cols-2 gap-3 mb-3">
         <button
           type="button"
-          onClick={clearSignature}
+          onClick={() => { setSigningMode('device'); setGovBrError(null); if (isGovBrSignature(value)) onChange(null); }}
           disabled={disabled}
-          className="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50"
+          className={`rounded-xl border-2 p-3 text-left transition flex items-center gap-2 ${
+            signingMode === 'device'
+              ? 'border-blue-600 bg-blue-50 text-blue-800'
+              : 'border-gray-200 bg-white hover:border-gray-300'
+          } ${disabled ? 'opacity-60' : ''}`}
         >
-          Limpar
+          <span className="text-xl">📱</span>
+          <span className="font-medium">Dispositivo</span>
+          <span className="text-xs text-gray-500 ml-auto">Desenhar na tela</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => { setSigningMode('govbr'); setGovBrError(null); if (typeof value === 'string') onChange(null); }}
+          disabled={disabled}
+          className={`rounded-xl border-2 p-3 text-left transition flex items-center gap-2 ${
+            signingMode === 'govbr'
+              ? 'border-blue-600 bg-blue-50 text-blue-800'
+              : 'border-gray-200 bg-white hover:border-gray-300'
+          } ${disabled ? 'opacity-60' : ''}`}
+        >
+          <span className="text-xl">🏛️</span>
+          <span className="font-medium">Gov.br</span>
+          <span className="text-xs text-gray-500 ml-auto">Certificado digital</span>
         </button>
       </div>
+
+      {signingMode === 'device' && (
+        <>
+          <div className="border-2 border-gray-300 rounded-lg overflow-hidden">
+            <canvas
+              ref={canvasRef}
+              width={600}
+              height={200}
+              onMouseDown={startDrawing}
+              onMouseMove={draw}
+              onMouseUp={stopDrawing}
+              onMouseLeave={stopDrawing}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              onTouchCancel={handleTouchEnd}
+              className="w-full bg-white cursor-crosshair touch-none"
+              style={{ touchAction: 'none' }}
+            />
+          </div>
+          <div className="flex gap-2 mt-2">
+            <button
+              type="button"
+              onClick={clearSignature}
+              disabled={disabled}
+              className="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50"
+            >
+              Limpar
+            </button>
+          </div>
+        </>
+      )}
+
+      {signingMode === 'govbr' && (
+        <div className="space-y-2">
+          {hasValue && isGovBrSignature(value) && (
+            <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+              ✓ Assinado com Gov.br
+              {value.signedAt && (
+                <span className="block text-xs text-green-600 mt-1">
+                  Em {new Date(value.signedAt).toLocaleString('pt-BR')}
+                </span>
+              )}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={startGovBrSign}
+            disabled={disabled || govBrLoading}
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-[#1351b4] text-white hover:bg-[#0d3d8a] disabled:opacity-50 flex items-center gap-2"
+          >
+            {govBrLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Redirecionando…
+              </>
+            ) : (
+              <>Assinar com Gov.br</>
+            )}
+          </button>
+          {govBrError && <p className="text-red-500 text-sm">{govBrError}</p>}
+          <p className="text-xs text-gray-500">
+            Requer identidade Gov.br Prata ou Ouro. Você será redirecionado para autenticar.
+          </p>
+        </div>
+      )}
+
+      {signingMode === 'govbr' && hasValue && (
+        <div className="flex gap-2 mt-2">
+          <button
+            type="button"
+            onClick={clearSignature}
+            disabled={disabled}
+            className="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50"
+          >
+            Limpar assinatura
+          </button>
+        </div>
+      )}
+
       {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
     </div>
   );
 };
 
-// ========== GEOLOCALIZAÇÃO (lat/long) ==========
+// ========== GEOLOCALIZAÇÃO (lat/long + minimapa – padrão qualificação estabelecimentos) ==========
 export const GeoLocationField: React.FC<SpecialFieldProps> = ({
   field,
   value,
@@ -277,23 +600,37 @@ export const GeoLocationField: React.FC<SpecialFieldProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [latInput, setLatInput] = useState(() =>
+    value?.latitude != null ? String(value.latitude) : ''
+  );
+  const [lngInput, setLngInput] = useState(() =>
+    value?.longitude != null ? String(value.longitude) : ''
+  );
+
+  useEffect(() => {
+    if (value?.latitude != null && value?.longitude != null) {
+      setLatInput(String(value.latitude));
+      setLngInput(String(value.longitude));
+    } else {
+      setLatInput('');
+      setLngInput('');
+    }
+  }, [value?.latitude, value?.longitude]);
 
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
       setLocationError('Geolocalização não suportada pelo navegador');
       return;
     }
-
     setLoading(true);
     setLocationError(null);
-
     navigator.geolocation.getCurrentPosition(
       (position) => {
         onChange({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
           accuracy: position.coords.accuracy,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
         setLoading(false);
       },
@@ -301,83 +638,129 @@ export const GeoLocationField: React.FC<SpecialFieldProps> = ({
         setLocationError(err.message);
         setLoading(false);
       },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-      }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 
-  const googleMapsUrl = value
+  const handleLocationSelect = (lat: number, lng: number) => {
+    onChange({
+      latitude: lat,
+      longitude: lng,
+      timestamp: new Date().toISOString(),
+    });
+  };
+
+  const commitInputs = () => {
+    const lat = parseFloat(latInput.replace(/,/g, '.'));
+    const lng = parseFloat(lngInput.replace(/,/g, '.'));
+    if (latInput === '' && lngInput === '') {
+      onChange(null);
+      return;
+    }
+    if (!isNaN(lat) && !isNaN(lng)) {
+      onChange({ latitude: lat, longitude: lng, timestamp: new Date().toISOString() });
+    }
+  };
+
+  const hasValidCoords = value?.latitude != null && value?.longitude != null;
+  const googleMapsUrl = hasValidCoords
     ? `https://www.google.com/maps?q=${value.latitude},${value.longitude}`
     : null;
 
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label className="block text-sm font-medium text-gray-700 mb-2">
         {field.label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
 
-      {!value ? (
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-          <MapPin className="h-12 w-12 mx-auto text-gray-400 mb-2" />
-          <button
-            type="button"
-            onClick={getCurrentLocation}
-            disabled={disabled || loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 mx-auto"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Obtendo localização...
-              </>
-            ) : (
-              <>
-                <MapPin className="h-4 w-4" />
-                Obter Localização Atual
-              </>
-            )}
-          </button>
-          {locationError && (
-            <p className="text-red-500 text-sm mt-2">{locationError}</p>
-          )}
-        </div>
-      ) : (
-        <div className="border border-gray-300 rounded-lg p-4">
-          <div className="grid grid-cols-2 gap-4 mb-3">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 border border-gray-300 rounded-xl p-4 bg-white shadow-sm">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-gray-600">Latitude</label>
-              <p className="text-sm font-medium">{value.latitude.toFixed(6)}</p>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Latitude</label>
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder="Ex.: -1.4558"
+                value={latInput}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/,/g, '.');
+                  if (v === '' || /^-?\d*\.?\d*$/.test(v)) setLatInput(v);
+                }}
+                onBlur={commitInputs}
+                disabled={disabled}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
             </div>
             <div>
-              <label className="text-xs text-gray-600">Longitude</label>
-              <p className="text-sm font-medium">{value.longitude.toFixed(6)}</p>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Longitude</label>
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder="Ex.: -48.4902"
+                value={lngInput}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/,/g, '.');
+                  if (v === '' || /^-?\d*\.?\d*$/.test(v)) setLngInput(v);
+                }}
+                onBlur={commitInputs}
+                disabled={disabled}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
             </div>
           </div>
-          <div className="flex gap-2">
-            <a
-              href={googleMapsUrl!}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 px-3 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 text-center"
-            >
-              Ver no Google Maps
-            </a>
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => onChange(null)}
-              disabled={disabled}
-              className="px-3 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+              onClick={getCurrentLocation}
+              disabled={disabled || loading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 text-sm"
             >
-              Remover
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Obtendo localização...
+                </>
+              ) : (
+                <>
+                  <MapPin className="h-4 w-4" />
+                  Obter minha localização
+                </>
+              )}
             </button>
+            {googleMapsUrl && (
+              <>
+                <a
+                  href={googleMapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 inline-flex items-center gap-1"
+                >
+                  Ver no Google Maps
+                </a>
+                <button
+                  type="button"
+                  onClick={() => onChange(null)}
+                  disabled={disabled}
+                  className="px-4 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                >
+                  Remover
+                </button>
+              </>
+            )}
           </div>
+          {locationError && <p className="text-red-500 text-sm">{locationError}</p>}
         </div>
-      )}
-      
+        <div className="min-h-[300px] rounded-lg overflow-hidden border border-gray-200">
+          <MiniMapa
+            initialLat={value?.latitude != null ? String(value.latitude) : undefined}
+            initialLng={value?.longitude != null ? String(value.longitude) : undefined}
+            onLocationSelect={handleLocationSelect}
+            className="h-full min-h-[300px] w-full"
+          />
+        </div>
+      </div>
       {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
     </div>
   );
@@ -415,9 +798,9 @@ export const AutocompleteField: React.FC<SpecialFieldProps> = ({
         const data = await response.json();
         setSuggestions(data);
       } else {
-        // Filtrar nas opções locais
+        // Filtrar nas opções locais (ignora maiúsculas, acentos, cedilhas)
         const filtered = (field.options || [])
-          .filter(opt => opt.label.toLowerCase().includes(term.toLowerCase()))
+          .filter(opt => searchMatches(opt.label, term))
           .map(opt => opt.label)
           .slice(0, 10);
         setSuggestions(filtered);
