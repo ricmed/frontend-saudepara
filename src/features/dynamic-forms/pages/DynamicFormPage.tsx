@@ -37,10 +37,13 @@ export const DynamicFormPage: React.FC = () => {
       const version = await FormService.getActiveVersion(agravo);
       setFormVersion(version);
 
-      // Se tiver ID, carregar dados existentes
       if (id) {
         const submission = await FormSubmissionService.getSubmissionById(Number(id));
         setInitialData(submission.data_json);
+      } else {
+        // Nova notificação: pré-preencher data da notificação com a data atual
+        const hoje = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+        setInitialData({ notificacao: { dt_notificacao: hoje } });
       }
     } catch (err: any) {
       console.error('Erro ao carregar formulário:', err);

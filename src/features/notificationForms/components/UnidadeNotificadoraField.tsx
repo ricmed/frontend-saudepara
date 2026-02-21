@@ -41,6 +41,8 @@ interface UnidadeNotificadoraFieldProps {
   restrictToAllowed?: boolean;
   /** Mensagem de erro quando tentar escolher unidade fora do permitido */
   denyOutsideMessage?: string;
+  /** Formulário dinâmico: buscar entre todos os estabelecimentos (~11k), sem filtro por permissão */
+  allowAllEstablishments?: boolean;
 }
 
 const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
@@ -59,6 +61,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   allowedOptions,
   restrictToAllowed = false,
   denyOutsideMessage = "Unidade não permitida para o seu perfil",
+  allowAllEstablishments = false,
 }) => {
   const [unidadesNotificadoras, setUnidadesNotificadoras] = useState<Estabelecimento[]>([]);
   const [loadingUnidades, setLoadingUnidades] = useState(false);
@@ -258,8 +261,30 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
           throw new Error('Nenhum estabelecimento encontrado offline. Baixe os dados primeiro.');
         }
       } else {
-        // ✅ MODO ONLINE: PRIORIZAR CACHE FILTRADO para respeitar hierarquia
+        // ✅ MODO ONLINE: PRIORIZAR CACHE FILTRADO para respeitar hierarquia (ou API com scope=all)
         try {
+          // allowAllEstablishments (formulário dinâmico): buscar todos via API com scope=all
+          if (allowAllEstablishments) {
+            // Formulário dinâmico: todos os estabelecimentos (ativos e inativos), sem filtro ativo
+            const params: any = {
+              limit: 500,
+              orderBy: 'nome',
+              orderDir: 'asc',
+              scope: 'all',
+              includeInactive: '1',
+            };
+            if (searchTerm) {
+              params.search = searchTerm;
+              params.searchField = 'nome';
+            }
+            const apiUrl = `${API_BASE_URL}/estabelecimentos`;
+            const response = await axios.get(apiUrl, { params, headers: { Accept: 'application/json' } });
+            if (response?.data?.data) {
+              estabelecimentosAtivos = response.data.data;
+            } else if (Array.isArray(response?.data)) {
+              estabelecimentosAtivos = response.data as any[];
+            }
+          } else {
           // 🔑 IMPORTANTE: Se for para encaminhamento, NÃO usar cache hierárquico
           let cachedEstabelecimentos = null;
           
@@ -362,6 +387,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
               
               await indexedDBService.saveOpcoes('estabelecimentos', mergedEstabelecimentos);
             }
+          }
           }
           
         } catch (apiError: any) {

@@ -87,7 +87,13 @@ const FixedColumnsConfigPage: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Erro ao carregar campos fixos:', err);
-      setError(err.response?.data?.message || 'Erro ao carregar campos fixos');
+      const msg = err.response?.data?.message || 'Erro ao carregar campos fixos';
+      const is404 = err.response?.status === 404;
+      setError(
+        is404
+          ? `${msg} Verifique se este formulário/versão existe no banco de dados em uso (ex.: banco local vs. homologação).`
+          : msg
+      );
     } finally {
       setLoading(false);
     }
@@ -216,6 +222,7 @@ const FixedColumnsConfigPage: React.FC = () => {
   const hasChanges = data.fields.some(
     f => f.isMarked !== selectedFields.has(f.key)
   );
+  const canSave = data.fields.length > 0 && !saving;
 
   return (
     <AppPageLayout
@@ -236,7 +243,7 @@ const FixedColumnsConfigPage: React.FC = () => {
           </button>
           <button
             onClick={handleSave}
-            disabled={saving || !hasChanges}
+            disabled={!canSave}
             className="px-4 py-2 bg-white text-blue-600 rounded-md hover:bg-blue-50 flex items-center gap-2 font-medium disabled:opacity-50"
           >
             <Save className="h-4 w-4" />
@@ -301,7 +308,7 @@ const FixedColumnsConfigPage: React.FC = () => {
             </button>
             <button
               onClick={handleSave}
-              disabled={!hasChanges || saving}
+              disabled={!canSave}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm font-medium transition-colors"
             >
               <Save className="h-4 w-4" />
@@ -397,7 +404,7 @@ const FixedColumnsConfigPage: React.FC = () => {
         <div className="flex-1">
           <p className="text-sm text-blue-800">
             <strong>Dica:</strong> Use "Marcar Automaticamente" para marcar todos os campos
-            que possuem colunas fixas disponíveis no banco de dados (61 campos SINAN).
+            que possuem colunas fixas disponíveis no banco (Ficha: Notificação, Paciente e Residência).
           </p>
         </div>
       </div>
@@ -413,7 +420,7 @@ const FixedColumnsConfigPage: React.FC = () => {
               </p>
               <p className="text-sm text-yellow-800 mb-3">
                 O modelo híbrido SINAN permite marcar campos para serem salvos em colunas fixas do banco de dados, 
-                mas este formulário não possui campos que correspondem aos 61 campos SINAN pré-definidos.
+                mas este formulário não possui campos que correspondem aos campos fixos da Ficha (Notificação, Paciente e Residência).
               </p>
               
               <div className="bg-yellow-100 rounded-md p-3 mb-3">
@@ -429,7 +436,7 @@ const FixedColumnsConfigPage: React.FC = () => {
 
               <details className="text-sm">
                 <summary className="cursor-pointer font-medium text-yellow-900 hover:text-yellow-800">
-                  📋 Ver exemplos de chaves válidas (61 campos SINAN)
+                  📋 Ver exemplos de chaves válidas (Ficha de Notificação)
                 </summary>
                 <div className="mt-2 bg-white rounded-md p-3 space-y-2 text-xs">
                   <div>

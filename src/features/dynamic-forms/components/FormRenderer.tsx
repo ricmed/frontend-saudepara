@@ -26,7 +26,20 @@ import {
   GoogleMapsAddressField,
   AddressField
 } from './SpecialFields';
+import { EstadoMunicipioNotificacao } from './EstadoMunicipioNotificacao';
+import { EstabelecimentoNotificacao } from './EstabelecimentoNotificacao';
 import { convertLocalDateTimeToUTC } from '@/utils/timezoneUtils';
+
+const NOTIFICATION_LOCATION_KEYS = new Set([
+  'notificacao.uf_notificacao',
+  'notificacao.municipio_notificacao_ibge',
+  'notificacao.municipio_id',
+]);
+
+const NOTIFICATION_ESTABELECIMENTO_KEYS = new Set([
+  'notificacao.estabelecimento_cnes',
+  'notificacao.unidade_id',
+]);
 
 interface FormRendererProps {
   schema: FormSchema;
@@ -265,25 +278,62 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
 
       {schema.sections
         .sort((a, b) => a.order - b.order)
-        .map((section) => (
-          <div key={section.id} className="mb-8">
-            <h2 className="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">
-              {section.title}
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {section.fields
-                .sort((a, b) => a.order - b.order)
-                .map((field) => (
-                  <div
-                    key={field.key}
-                    className={isFullWidth(field.type) ? 'md:col-span-2' : ''}
-                  >
-                    {renderField(field)}
-                  </div>
-                ))}
+        .map((section) => {
+          const sortedFields = [...section.fields].sort((a, b) => a.order - b.order);
+          const firstNotificationLocationKey = sortedFields.find((f) =>
+            NOTIFICATION_LOCATION_KEYS.has(f.key)
+          )?.key;
+          const firstEstabelecimentoKey = sortedFields.find((f) =>
+            NOTIFICATION_ESTABELECIMENTO_KEYS.has(f.key)
+          )?.key;
+          return (
+            <div key={section.id} className="mb-8">
+              <h2 className="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">
+                {section.title}
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {sortedFields.map((field) => {
+                  if (NOTIFICATION_LOCATION_KEYS.has(field.key)) {
+                    if (field.key !== firstNotificationLocationKey) return null;
+                    return (
+                      <div key={field.key} className="md:col-span-2">
+                        <EstadoMunicipioNotificacao
+                          getValue={getValue}
+                          setValue={setValue}
+                          disabled={readOnly}
+                          error={getError('notificacao.municipio_id') || getError('notificacao.uf_notificacao')}
+                          required={isFieldRequired('notificacao.uf_notificacao') || isFieldRequired('notificacao.municipio_id')}
+                        />
+                      </div>
+                    );
+                  }
+                  if (NOTIFICATION_ESTABELECIMENTO_KEYS.has(field.key)) {
+                    if (field.key !== firstEstabelecimentoKey) return null;
+                    return (
+                      <div key={field.key} className="md:col-span-2">
+                        <EstabelecimentoNotificacao
+                          getValue={getValue}
+                          setValue={setValue}
+                          disabled={readOnly}
+                          error={getError('notificacao.unidade_id') || getError('notificacao.estabelecimento_cnes')}
+                          required={isFieldRequired('notificacao.unidade_id') || isFieldRequired('notificacao.estabelecimento_cnes')}
+                        />
+                      </div>
+                    );
+                  }
+                  return (
+                    <div
+                      key={field.key}
+                      className={isFullWidth(field.type) ? 'md:col-span-2' : ''}
+                    >
+                      {renderField(field)}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
       {!readOnly && (
         <div className="flex gap-4 justify-end mt-6 pt-6 border-t">
