@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import type { FormSchema } from '@/services/FormService';
 import { useFormRenderer } from '../hooks/useFormRenderer';
 import { TextField, DateField, NumberField, TextareaField, CheckboxField } from './FormFields';
-import { SelectField, SelectSearchField, CodeListSelectField, CodeListSearchField } from './SelectFields';
+import { SelectField, SelectSearchField, CodeListSelectField, CodeListSearchField, ApiSelectField, ApiSelectSearchField } from './SelectFields';
 import { 
   CheckboxGroupField, 
   RadioGroupField, 
@@ -13,6 +13,9 @@ import {
   PhoneField, 
   CPFField, 
   CEPField,
+  CNSField,
+  PassaporteField,
+  IdadeField,
   InternationalPhoneField
 } from './AdvancedFields';
 import {
@@ -38,6 +41,7 @@ const NOTIFICATION_LOCATION_KEYS = new Set([
 
 const NOTIFICATION_ESTABELECIMENTO_KEYS = new Set([
   'notificacao.estabelecimento_cnes',
+  'notificacao.estabelecimento',
   'notificacao.unidade_id',
 ]);
 
@@ -54,6 +58,9 @@ interface FormRendererProps {
   readOnly?: boolean;
 }
 
+/** ID do Brasil em tipo_pais (pré-seleção em País de Nascimento). Valor string para bater com as opções do select. */
+const BRASIL_PAIS_NASCIMENTO_ID = '105';
+
 export const FormRenderer: React.FC<FormRendererProps> = ({
   schema,
   initialData = {},
@@ -66,6 +73,47 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   cancelLabel = 'Cancelar',
   readOnly = false,
 }) => {
+  const initialDataWithDefaults = React.useMemo(() => {
+    const pac = initialData?.paciente ?? {};
+    const dataNasc = pac.data_nascimento;
+    const idadeAtual = pac.idade;
+    const hasIdade = idadeAtual !== undefined && idadeAtual !== null && idadeAtual !== '';
+    let idadeMeses: number | undefined;
+    if (dataNasc && !hasIdade) {
+      try {
+        const birth = new Date(dataNasc);
+        const today = new Date();
+        let anos = today.getFullYear() - birth.getFullYear();
+        let meses = today.getMonth() - birth.getMonth();
+        if (meses < 0 || (meses === 0 && today.getDate() < birth.getDate())) {
+          anos--;
+          meses += 12;
+        }
+        if (today.getDate() < birth.getDate()) meses--;
+        idadeMeses = anos * 12 + meses;
+        if (idadeMeses < 0) idadeMeses = undefined;
+      } catch {
+        idadeMeses = undefined;
+      }
+    } else if (hasIdade) {
+      const n = Number(idadeAtual);
+      if (!Number.isNaN(n)) {
+        if (n > 150) idadeMeses = n;
+        else idadeMeses = n * 12;
+      }
+    }
+    const paisId = pac.pais_nascimento_id;
+    const needPaisDefault = paisId === undefined || paisId === null || paisId === '';
+    return {
+      ...initialData,
+      paciente: {
+        ...pac,
+        pais_nascimento_id: needPaisDefault ? BRASIL_PAIS_NASCIMENTO_ID : paisId,
+        ...(idadeMeses !== undefined ? { idade: idadeMeses } : {}),
+      },
+    };
+  }, [initialData]);
+
   const {
     setValue,
     getValue,
@@ -73,11 +121,14 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     isFieldRequired,
     isFieldDisabled,
     getError,
+    setError,
+    clearError,
     validateAll,
+    validateField,
     formData,
   } = useFormRenderer({
     schema,
-    initialData,
+    initialData: initialDataWithDefaults,
     onDataChange,
   });
 
@@ -182,37 +233,118 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   ]);
   const isFullWidth = (type: string) => fullWidthTypes.has(type);
 
+  // Mapeamento por key: garante tipo/opções corretos mesmo quando o schema vem com type "text" do banco
+  const getResolvedField = (field: any) => {
+    const keyMap: Record<string, { type: string; options?: Array<{ value: string; label: string }>; apiSelectEndpoint?: string; maxLength?: number }> = {
+      'paciente.nome': { type: 'text', maxLength: 100 },
+      'paciente.cpf': { type: 'cpf' },
+      'paciente.cns': { type: 'cns' },
+      'paciente.nome_social': { type: 'text', maxLength: 100 },
+      'paciente.e_estrangeiro': { type: 'select', options: [{ value: '1', label: 'SIM' }, { value: '2', label: 'NÃO' }] },
+      'paciente.passaporte': { type: 'passaporte' },
+      'paciente.pais_nascimento_id': { type: 'select', apiSelectEndpoint: 'tipo-pais/select' },
+      'paciente.data_nascimento': { type: 'date' },
+      'paciente.idade': { type: 'idade' },
+      'paciente.nome_mae': { type: 'text', maxLength: 100 },
+    };
+    const over = keyMap[field.key];
+    if (!over) return field;
+    return { ...field, type: over.type, options: over.options ?? field.options, apiSelectEndpoint: over.apiSelectEndpoint ?? field.apiSelectEndpoint, maxLength: over.maxLength ?? field.maxLength };
+  };
+
   const renderField = (field: any) => {
-    const value = getValue(field.key);
-    const error = getError(field.key);
-    const required = isFieldRequired(field.key);
-    const visible = isFieldVisible(field.key);
-    const disabled = isFieldDisabled(field.key) || readOnly;
+    const resolved = getResolvedField(field);
+    // Não exibir paciente.pais_nascimento (texto); só o select paciente.pais_nascimento_id é usado
+    if (resolved.key === 'paciente.pais_nascimento') {
+      return null;
+    }
+    const value = getValue(resolved.key);
+    const error = getError(resolved.key);
+    const required = isFieldRequired(resolved.key);
+    const visible = isFieldVisible(resolved.key);
+    const disabled = isFieldDisabled(resolved.key) || readOnly;
 
     if (!visible) {
       return null;
     }
 
     const commonProps = {
-      field,
+      field: resolved,
       value,
-      onChange: (val: any) => setValue(field.key, val),
+      onChange: (val: any) => setValue(resolved.key, val),
       error,
       required,
       disabled,
     };
 
-    switch (field.type) {
+    const normalizeNomeMaiusculo = (v: any) => {
+      if (v == null || v === '') return v;
+      return String(v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+    };
+    const isNomeOuNomeSocialOuNomeMae =
+      resolved.key === 'paciente.nome' || resolved.key === 'paciente.nome_social' || resolved.key === 'paciente.nome_mae';
+    const textProps = isNomeOuNomeSocialOuNomeMae
+      ? { ...commonProps, onChange: (val: any) => setValue(resolved.key, normalizeNomeMaiusculo(val)) }
+      : commonProps;
+
+    const isDataNascimento = resolved.key === 'paciente.data_nascimento';
+    const MAX_IDADE_MESES = 120 * 12;
+    const dateProps = isDataNascimento
+      ? {
+          ...commonProps,
+          onChange: (val: any) => {
+            setValue(resolved.key, val);
+            if (val) {
+              const birth = new Date(val);
+              const today = new Date();
+              let anos = today.getFullYear() - birth.getFullYear();
+              let meses = today.getMonth() - birth.getMonth();
+              if (meses < 0 || (meses === 0 && today.getDate() < birth.getDate())) {
+                anos--;
+                meses += 12;
+              }
+              if (today.getDate() < birth.getDate()) meses--;
+              const totalMeses = anos * 12 + meses;
+              if (totalMeses < 0) {
+                clearError('paciente.data_nascimento');
+                setValue('paciente.idade', undefined);
+              } else if (totalMeses > MAX_IDADE_MESES) {
+                setError('paciente.data_nascimento', 'A idade calculada não pode ser superior a 120 anos.');
+                setValue('paciente.idade', undefined);
+              } else {
+                clearError('paciente.data_nascimento');
+                setValue('paciente.idade', totalMeses);
+              }
+            } else {
+              clearError('paciente.data_nascimento');
+              setValue('paciente.idade', undefined);
+            }
+          },
+        }
+      : commonProps;
+
+    const hasDataNascimento = !!getValue('paciente.data_nascimento');
+
+    switch (resolved.type) {
       case 'text':
-        return <TextField {...commonProps} />;
+        return <TextField {...textProps} />;
       case 'date':
-        return <DateField {...commonProps} />;
+        return <DateField {...dateProps} />;
       case 'datetime':
         return <DateTimeField {...commonProps} />;
       case 'time':
         return <TimeField {...commonProps} />;
       case 'number':
         return <NumberField {...commonProps} />;
+      case 'idade':
+        return (
+          <IdadeField
+            {...commonProps}
+            onBlur={() => validateField(resolved)}
+            calculadaPorDataNascimento={hasDataNascimento}
+            disabled={disabled || hasDataNascimento}
+          />
+        );
       case 'textarea':
         return <TextareaField {...commonProps} />;
       case 'checkbox':
@@ -220,8 +352,14 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       case 'checkbox-group':
         return <CheckboxGroupField {...commonProps} />;
       case 'select':
-        if (field.codeList) {
+        if (resolved.codeList) {
           return <CodeListSelectField {...commonProps} />;
+        }
+        if ((resolved as { apiSelectEndpoint?: string }).apiSelectEndpoint) {
+          if (resolved.key === 'paciente.pais_nascimento_id') {
+            return <ApiSelectSearchField {...commonProps} />;
+          }
+          return <ApiSelectField {...commonProps} />;
         }
         return <SelectField {...commonProps} />;
       case 'select-search':
@@ -240,7 +378,11 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       case 'international-phone':
         return <InternationalPhoneField {...commonProps} />;
       case 'cpf':
-        return <CPFField {...commonProps} />;
+        return <CPFField {...commonProps} onBlur={() => validateField(resolved)} />;
+      case 'cns':
+        return <CNSField {...commonProps} onBlur={() => validateField(resolved)} />;
+      case 'passaporte':
+        return <PassaporteField {...commonProps} onBlur={() => validateField(resolved)} />;
       case 'cep':
         return <CEPField {...commonProps} />;
       case 'file':
@@ -265,7 +407,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
         return (
           <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
             <p className="text-sm text-yellow-800">
-              Tipo de campo não suportado: <strong>{field.type}</strong>
+              Tipo de campo não suportado: <strong>{resolved.type}</strong>
             </p>
           </div>
         );
@@ -321,12 +463,16 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                       </div>
                     );
                   }
+                  // Não renderizar nem o wrapper: campo duplicado (só exibimos paciente.pais_nascimento_id)
+                  if (field.key === 'paciente.pais_nascimento') return null;
+                  const content = renderField(field);
+                  if (content == null) return null;
                   return (
                     <div
                       key={field.key}
                       className={isFullWidth(field.type) ? 'md:col-span-2' : ''}
                     >
-                      {renderField(field)}
+                      {content}
                     </div>
                   );
                 })}

@@ -5,6 +5,9 @@ import { searchMatches } from '@/utils/searchUtils';
 import DatabaseService from '@/services/DatabaseService';
 import { Search, X, Check } from 'lucide-react';
 import PhoneInput from '@/features/notificationForms/components/PhoneInput';
+import { validateCPF } from '@/utils/cpfValidator';
+import { validateCNS } from '@/utils/cnsValidator';
+import { validatePassaporte, normalizePassaporte } from '@/utils/passaporteValidator';
 
 interface AdvancedFieldProps {
   field: FormField;
@@ -13,6 +16,7 @@ interface AdvancedFieldProps {
   error?: string;
   required?: boolean;
   disabled?: boolean;
+  onBlur?: () => void;
 }
 
 // ========== CHECKBOX GROUP (múltiplos checkboxes) ==========
@@ -605,6 +609,7 @@ export const CPFField: React.FC<AdvancedFieldProps> = ({
   error,
   required,
   disabled,
+  onBlur,
 }) => {
   const formatCPF = (val: string) => {
     const cleaned = val.replace(/\D/g, '');
@@ -616,6 +621,9 @@ export const CPFField: React.FC<AdvancedFieldProps> = ({
     onChange(formatted);
   };
 
+  const digits = (value || '').replace(/\D/g, '');
+  const isValidCpf = digits.length === 11 && validateCPF(value || '');
+
   return (
     <div className="mb-4">
       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -626,17 +634,260 @@ export const CPFField: React.FC<AdvancedFieldProps> = ({
         type="text"
         value={value || ''}
         onChange={handleChange}
+        onBlur={onBlur}
         placeholder={field.placeholder || '000.000.000-00'}
         disabled={disabled || field.disabled}
         maxLength={14}
         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
           error
             ? 'border-red-500 focus:ring-red-500'
-            : 'border-gray-300 focus:ring-blue-500'
+            : isValidCpf
+              ? 'border-green-500 focus:ring-green-500'
+              : 'border-gray-300 focus:ring-blue-500'
         } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
       />
       {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
       {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+      {isValidCpf && !error && <p className="text-green-600 text-sm mt-1">CPF válido</p>}
+    </div>
+  );
+};
+
+// ========== CNS (Cartão Nacional de Saúde): 15 dígitos, formato 11 4 1 ==========
+export const CNSField: React.FC<AdvancedFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+  onBlur,
+}) => {
+  const formatCNS = (val: string) => {
+    const digits = val.replace(/\D/g, '').slice(0, 15);
+    if (digits.length <= 11) return digits.replace(/(\d{0,11})/, '$1');
+    if (digits.length <= 15) return digits.replace(/(\d{11})(\d{0,4})(\d{0,1})/, '$1 $2 $3').trim();
+    return digits.slice(0, 15).replace(/(\d{11})(\d{4})(\d{1})/, '$1 $2 $3');
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatCNS(e.target.value);
+    onChange(formatted);
+  };
+
+  const displayValue = value != null ? formatCNS(String(value).replace(/\D/g, '')) : '';
+  const digits = (value != null ? String(value).replace(/\D/g, '') : '').slice(0, 15);
+  const isValidCns = digits.length === 15 && validateCNS(value != null ? String(value) : '');
+
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <input
+        type="text"
+        value={displayValue}
+        onChange={handleChange}
+        onBlur={onBlur}
+        placeholder={field.placeholder || '000 0000 0000 0'}
+        disabled={disabled || field.disabled}
+        maxLength={18}
+        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+          error
+            ? 'border-red-500 focus:ring-red-500'
+            : isValidCns
+              ? 'border-green-500 focus:ring-green-500'
+              : 'border-gray-300 focus:ring-blue-500'
+        } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+      />
+      {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+      {isValidCns && !error && <p className="text-green-600 text-sm mt-1">CNS válido</p>}
+    </div>
+  );
+};
+
+// ========== IDADE (anos ou meses, salva em meses; máx. 120 anos) ==========
+const IDADE_MAX_ANOS = 120;
+
+export interface IdadeFieldProps extends AdvancedFieldProps {
+  /** Quando true, valor é calculado a partir da data de nascimento e o campo fica bloqueado */
+  calculadaPorDataNascimento?: boolean;
+}
+
+export const IdadeField: React.FC<IdadeFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+  onBlur,
+  calculadaPorDataNascimento = false,
+}) => {
+  const meses = value != null && value !== '' ? Number(value) : undefined;
+  const isAnos = (m: number) => m >= 12;
+  const [unidade, setUnidade] = useState<'anos' | 'meses'>(() =>
+    meses !== undefined ? (isAnos(meses) ? 'anos' : 'meses') : 'anos'
+  );
+  const [erroMaxIdade, setErroMaxIdade] = useState(false);
+  const [erroMaxMeses, setErroMaxMeses] = useState(false);
+  const displayAnos = meses !== undefined ? Math.floor(meses / 12) : '';
+  const displayMeses = meses !== undefined ? meses % 12 : '';
+  const inputValue = unidade === 'anos' ? (displayAnos !== '' ? String(displayAnos) : '') : (displayMeses !== '' ? String(displayMeses) : '');
+
+  const handleUnidadeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setErroMaxIdade(false);
+    setErroMaxMeses(false);
+    const u = e.target.value as 'anos' | 'meses';
+    setUnidade(u);
+    if (meses !== undefined) {
+      if (u === 'anos') onChange(Math.floor(meses / 12) * 12);
+      else onChange(meses % 12);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setErroMaxIdade(false);
+    setErroMaxMeses(false);
+    const raw = e.target.value.replace(/\D/g, '');
+    if (raw === '') {
+      onChange(undefined);
+      return;
+    }
+    const num = parseInt(raw, 10);
+    if (unidade === 'anos') {
+      if (num > IDADE_MAX_ANOS) {
+        setErroMaxIdade(true);
+        return;
+      }
+      onChange(num * 12);
+    } else {
+      if (num > 11) {
+        setErroMaxMeses(true);
+        return;
+      }
+      onChange(num);
+    }
+  };
+
+  const locked = disabled || field.disabled || calculadaPorDataNascimento;
+
+  const labelSuffix = calculadaPorDataNascimento ? (
+    <span className="text-xs text-gray-500 ml-2">(calculada automaticamente)</span>
+  ) : null;
+
+  if (locked && meses !== undefined && meses !== '') {
+    const anos = Math.floor(Number(meses) / 12);
+    const mes = Number(meses) % 12;
+    const texto = Number(meses) < 12
+      ? `${meses} ${Number(meses) === 1 ? 'mês' : 'meses'}`
+      : `${anos} ${anos === 1 ? 'ano' : 'anos'}`;
+    return (
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          {field.label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+          {labelSuffix}
+        </label>
+        <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm">
+          <span className="font-medium">{texto}</span>
+        </div>
+        {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
+        {calculadaPorDataNascimento && (
+          <p className="text-xs text-gray-500 mt-1">Calculada automaticamente a partir da data de nascimento.</p>
+        )}
+        {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <div className="flex items-center gap-2">
+        <select
+          value={unidade}
+          onChange={handleUnidadeChange}
+          disabled={disabled || field.disabled}
+          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+        >
+          <option value="anos">Anos</option>
+          <option value="meses">Meses</option>
+        </select>
+        <input
+          type="number"
+          value={inputValue}
+          onChange={handleInputChange}
+          onBlur={onBlur}
+          placeholder={unidade === 'anos' ? 'Anos' : 'Meses'}
+          min={0}
+          max={unidade === 'anos' ? IDADE_MAX_ANOS : 11}
+          disabled={disabled || field.disabled}
+          className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+            error ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+          } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+        />
+      </div>
+      {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
+      {(error || erroMaxIdade || erroMaxMeses) && (
+        <p className="text-red-500 text-sm mt-1">
+          {erroMaxIdade && 'A idade não pode ser superior a 120 anos.'}
+          {erroMaxMeses && 'Quando a unidade é meses, o valor não pode ser superior a 11.'}
+          {!erroMaxIdade && !erroMaxMeses && error}
+        </p>
+      )}
+    </div>
+  );
+};
+
+// ========== PASSAPORTE: 2 letras + 6 dígitos (ex.: AB123456) ==========
+export const PassaporteField: React.FC<AdvancedFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+  onBlur,
+}) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const normalized = normalizePassaporte(e.target.value);
+    onChange(normalized);
+  };
+
+  const raw = (value || '').trim().replace(/\s/g, '').toUpperCase();
+  const isValidPassaporte = raw.length === 8 && validatePassaporte(value || '');
+
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <input
+        type="text"
+        value={value || ''}
+        onChange={handleChange}
+        onBlur={onBlur}
+        placeholder={field.placeholder || 'AB123456'}
+        disabled={disabled || field.disabled}
+        maxLength={8}
+        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 uppercase ${
+          error
+            ? 'border-red-500 focus:ring-red-500'
+            : isValidPassaporte
+              ? 'border-green-500 focus:ring-green-500'
+              : 'border-gray-300 focus:ring-blue-500'
+        } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+      />
+      {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+      {isValidPassaporte && !error && <p className="text-green-600 text-sm mt-1">Passaporte válido</p>}
     </div>
   );
 };

@@ -1,8 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import type { FormField } from '@/services/FormService';
 import CodeListService, { type CodeListItem } from '@/services/CodeListService';
 import DatabaseService from '@/services/DatabaseService';
 import { searchMatches } from '@/utils/searchUtils';
+
+const server = import.meta.env.VITE_API_SERVER;
+const port = import.meta.env.VITE_API_PORT;
+const API_BASE = `${server}:${port}/api`;
+
+function normalizeMaiusculoSemAcento(s: string): string {
+  if (!s) return s;
+  return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+}
 
 interface SelectFieldProps {
   field: FormField;
@@ -12,6 +22,188 @@ interface SelectFieldProps {
   required?: boolean;
   disabled?: boolean;
 }
+
+/** Select que carrega opções de um endpoint (ex: tipo-pais/select). Resposta: array com idtipo_pais e descricao ou value/label. */
+export const ApiSelectField: React.FC<SelectFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+}) => {
+  const [options, setOptions] = useState<Array<{ value: string; label: string }>>(field.options || []);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const endpoint = (field as FormField & { apiSelectEndpoint?: string }).apiSelectEndpoint;
+    if (!endpoint) {
+      setOptions(field.options || []);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const url = `${API_BASE}/${endpoint}`;
+        const { data } = await axios.get<any[]>(url, { withCredentials: true });
+        if (cancelled) return;
+        const list = Array.isArray(data) ? data : [];
+        const opts = list.map((item: any) => {
+          if (item.value != null && item.label != null) {
+            return { value: String(item.value), label: String(item.label) };
+          }
+          if (item.idtipo_pais != null && item.descricao != null) {
+            return { value: String(item.idtipo_pais), label: String(item.descricao) };
+          }
+          return { value: String(item.id), label: String(item.descricao ?? item.nome ?? item.label ?? item.id) };
+        });
+        setOptions(opts);
+      } catch (e) {
+        if (!cancelled) setOptions([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [(field as FormField & { apiSelectEndpoint?: string }).apiSelectEndpoint]);
+
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <select
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value || undefined)}
+        disabled={disabled || field.disabled || loading}
+        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+          error ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+        } ${disabled || field.disabled || loading ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+      >
+        <option value="">{loading ? 'Carregando...' : 'Selecione...'}</option>
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+    </div>
+  );
+};
+
+/** Select com pesquisa: carrega opções de um endpoint (ex: tipo-pais/select) e filtra ao digitar. */
+export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+}) => {
+  const [options, setOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const apiEndpoint = (field as FormField & { apiSelectEndpoint?: string }).apiSelectEndpoint;
+  const isPaisNascimento = (field as FormField & { key?: string }).key === 'paciente.pais_nascimento_id';
+
+  // País de nascimento: carregar como no notification forms (endpoint index com limit alto para todos os países)
+  const fetchUrl = isPaisNascimento
+    ? `${API_BASE}/tipo-pais?limit=500`
+    : apiEndpoint
+      ? `${API_BASE}/${apiEndpoint}`
+      : null;
+
+  useEffect(() => {
+    if (!fetchUrl) {
+      setOptions(field.options || []);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await axios.get<any>(fetchUrl, { withCredentials: true });
+        if (cancelled) return;
+        const list = Array.isArray(data)
+          ? data
+          : (data?.data && Array.isArray(data.data))
+            ? data.data
+            : [];
+        const opts = list.map((item: any) => {
+          if (item.value != null && item.label != null) {
+            return { value: String(item.value), label: String(item.label) };
+          }
+          if (item.idtipo_pais != null && item.descricao != null) {
+            return { value: String(item.idtipo_pais), label: String(item.descricao) };
+          }
+          return { value: String(item.id), label: String(item.descricao ?? item.nome ?? item.label ?? item.id) };
+        });
+        setOptions(opts);
+      } catch (e) {
+        if (!cancelled) setOptions([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [fetchUrl]);
+
+  const normalizedSearch = (searchTerm || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const filteredOptions = options.filter(
+    (opt) => !normalizedSearch || opt.label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(normalizedSearch)
+  );
+  const selectedLabel = value ? options.find((o) => o.value === value)?.label : '';
+  const displayValue = showDropdown
+    ? searchTerm
+    : (loading && value ? 'Carregando...' : (isPaisNascimento && selectedLabel ? normalizeMaiusculoSemAcento(selectedLabel) : selectedLabel));
+
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <div className="relative">
+        <input
+          type="text"
+          value={displayValue}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setShowDropdown(true);
+            if (!e.target.value) onChange(undefined);
+          }}
+          onFocus={() => setShowDropdown(true)}
+          onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+          disabled={disabled || field.disabled || loading}
+          placeholder={loading ? 'Carregando...' : 'Digite para buscar ou selecione...'}
+          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+            error ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+          } ${disabled || field.disabled || loading ? 'bg-gray-100' : ''}`}
+        />
+        {showDropdown && filteredOptions.length > 0 && (
+          <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+            {(isPaisNascimento ? filteredOptions : filteredOptions.slice(0, 100)).map((opt) => (
+              <div
+                key={opt.value}
+                onMouseDown={() => {
+                  onChange(opt.value);
+                  setSearchTerm('');
+                  setShowDropdown(false);
+                }}
+                className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+              >
+                {isPaisNascimento ? normalizeMaiusculoSemAcento(opt.label) : opt.label}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+    </div>
+  );
+};
 
 export const SelectField: React.FC<SelectFieldProps> = ({
   field,
@@ -25,6 +217,10 @@ export const SelectField: React.FC<SelectFieldProps> = ({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    const apiEndpoint = (field as FormField & { apiSelectEndpoint?: string }).apiSelectEndpoint;
+    if (apiEndpoint) {
+      return; // ApiSelectField handles this
+    }
     if (field.dataSource === 'database' && field.dataTable && field.dataValueColumn && field.dataLabelColumn) {
       loadDatabaseOptions();
     } else {

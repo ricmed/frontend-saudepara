@@ -1,7 +1,8 @@
 /**
  * UF e Município da Notificação — usa o mesmo LocationInput do Notification Forms
  * (pesquisa, dropdown, cache). Preenche automaticamente:
- * - notificacao.uf_notificacao (sigla)
+ * - notificacao.uf_notificacao = código da UF (tipo_estado.codigo), enviado ao backend
+ * - notificacao.estado_id = id do estado (para o dropdown); no frontend exibe o nome (descricao)
  * - notificacao.municipio_id (ID tipo_municipio)
  * - notificacao.municipio_notificacao_ibge (código IBGE)
  */
@@ -81,7 +82,7 @@ export const EstadoMunicipioNotificacao: React.FC<EstadoMunicipioNotificacaoProp
       const id = value ? Number(value) : undefined;
       const estado = estados.find((e) => e.id === id);
       setValue('notificacao.estado_id', id);
-      setValue('notificacao.uf_notificacao', estado?.sigla ?? '');
+      setValue('notificacao.uf_notificacao', estado?.sigla ?? ''); // sigla = codigo UF (backend armazena código; front exibe nome)
       setValue('notificacao.municipio_id', undefined);
       setValue('notificacao.municipio_notificacao_ibge', '');
     },

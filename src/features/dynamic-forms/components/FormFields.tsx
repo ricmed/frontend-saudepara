@@ -173,6 +173,7 @@ export const NumberField: React.FC<TextFieldProps> = ({
             : 'border-gray-300 focus:ring-blue-500'
         } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
       />
+      {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
       <div className="flex justify-between items-center mt-1">
         {error && <p className="text-red-500 text-sm">{error}</p>}
         {(min !== undefined || max !== undefined) && (

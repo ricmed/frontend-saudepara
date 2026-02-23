@@ -64,6 +64,8 @@ export interface FormField {
   required?: boolean;
   order: number;
   codeList?: string;
+  /** Endpoint para carregar opções (ex: 'tipo-pais/select'). Resposta esperada: array com idtipo_pais e descricao ou value/label. */
+  apiSelectEndpoint?: string;
   options?: Array<{ value: string; label: string }>;
   placeholder?: string;
   mask?: string;

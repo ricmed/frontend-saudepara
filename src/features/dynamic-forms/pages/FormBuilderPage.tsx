@@ -1632,8 +1632,8 @@ export const FormBuilderPage: React.FC = () => {
                 ) : (
                   <FormRenderer
                     schema={schema}
-                    data={{}}
-                    onChange={() => {}}
+                    initialData={{}}
+                    onDataChange={() => {}}
                     readOnly={true}
                   />
                 )}

@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { FormSchema, FormField } from '@/services/FormService';
 import { get, set } from 'lodash';
 import { evaluateRules, createDefaultFieldStates } from '@/utils/rulesEngine';
+import { validateCPF } from '@/utils/cpfValidator';
+import { validateCNS } from '@/utils/cnsValidator';
+import { validatePassaporte } from '@/utils/passaporteValidator';
 
 interface UseFormRendererProps {
   schema: FormSchema;
@@ -87,9 +90,13 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
 
   const isFieldVisible = useCallback(
     (key: string) => {
+      // Passaporte só aparece quando É Estrangeiro = SIM (1)
+      if (key === 'paciente.passaporte') {
+        return getValue('paciente.e_estrangeiro') === '1';
+      }
       return fieldVisibility[key] !== false;
     },
-    [fieldVisibility]
+    [fieldVisibility, getValue]
   );
 
   const isFieldRequired = useCallback(
@@ -156,6 +163,61 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
         return false;
       }
 
+      // Validação de CPF por dígitos verificadores (impede CPF digitado ao acaso)
+      if (field.type === 'cpf' && value) {
+        const digits = String(value).replace(/\D/g, '');
+        if (digits.length === 11 && !validateCPF(String(value))) {
+          setError(field.key, 'CPF inválido. Verifique os números.');
+          return false;
+        }
+      }
+
+      // Validação de CNS por algoritmo oficial (impede CNS digitado ao acaso)
+      if (field.type === 'cns' && value) {
+        const digits = String(value).replace(/\D/g, '');
+        if (digits.length === 15 && !validateCNS(String(value))) {
+          setError(field.key, 'CNS inválido. Verifique os números.');
+          return false;
+        }
+      }
+
+      // Validação de passaporte (2 letras + 6 dígitos, ex.: AB123456)
+      if (field.key === 'paciente.passaporte' && value) {
+        const trimmed = String(value).trim();
+        if (trimmed.length > 0 && !validatePassaporte(trimmed)) {
+          setError(field.key, 'Use 2 letras e 6 dígitos (ex.: AB123456).');
+          return false;
+        }
+      }
+
+      // Idade em meses: máximo 120 anos (1440 meses)
+      if (field.key === 'paciente.idade' && value != null && value !== '') {
+        const meses = Number(value);
+        if (!Number.isNaN(meses) && meses > 120 * 12) {
+          setError(field.key, 'A idade não pode ser superior a 120 anos.');
+          return false;
+        }
+      }
+
+      // Data de nascimento: idade calculada não pode ser superior a 120 anos
+      if (field.key === 'paciente.data_nascimento' && value) {
+        try {
+          const birth = new Date(value);
+          const today = new Date();
+          let anos = today.getFullYear() - birth.getFullYear();
+          let meses = today.getMonth() - birth.getMonth();
+          if (meses < 0 || (meses === 0 && today.getDate() < birth.getDate())) anos--;
+          if (today.getDate() < birth.getDate()) meses--;
+          const totalMeses = anos * 12 + meses;
+          if (totalMeses > 120 * 12) {
+            setError(field.key, 'A idade calculada não pode ser superior a 120 anos.');
+            return false;
+          }
+        } catch {
+          // ignore invalid date
+        }
+      }
+
       clearError(field.key);
       return true;
     },
@@ -190,6 +252,8 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
     isFieldDisabled,
     errors,
     getError,
+    setError,
+    clearError,
     validateField,
     validateAll,
     reset,
