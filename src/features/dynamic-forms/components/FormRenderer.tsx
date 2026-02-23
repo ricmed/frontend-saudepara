@@ -45,6 +45,15 @@ const NOTIFICATION_ESTABELECIMENTO_KEYS = new Set([
   'notificacao.unidade_id',
 ]);
 
+/** Bloco Nome + É estrangeiro? + CPF/CNS ou Passaporte: nome e estrangeiro na mesma linha; doc (e CNS ao lado do CPF) logo abaixo */
+const NOME_ESTRANGEIRO_DOC_KEYS = new Set([
+  'paciente.nome',
+  'paciente.e_estrangeiro',
+  'paciente.cpf',
+  'paciente.passaporte',
+  'paciente.cns',
+]);
+
 interface FormRendererProps {
   schema: FormSchema;
   initialData?: Record<string, any>;
@@ -104,11 +113,16 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     }
     const paisId = pac.pais_nascimento_id;
     const needPaisDefault = paisId === undefined || paisId === null || paisId === '';
+    const estrangeiroSim = pac.e_estrangeiro === '1';
+    // Brasil só como padrão quando não for estrangeiro; se estrangeiro = Sim, não preencher país
+    const paisInicial = needPaisDefault
+      ? (estrangeiroSim ? undefined : BRASIL_PAIS_NASCIMENTO_ID)
+      : paisId;
     return {
       ...initialData,
       paciente: {
         ...pac,
-        pais_nascimento_id: needPaisDefault ? BRASIL_PAIS_NASCIMENTO_ID : paisId,
+        pais_nascimento_id: paisInicial,
         ...(idadeMeses !== undefined ? { idade: idadeMeses } : {}),
       },
     };
@@ -361,6 +375,25 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           }
           return <ApiSelectField {...commonProps} />;
         }
+        // É estrangeiro?: ao mudar, limpar documento que não se aplica e ajustar país de nascimento
+        if (resolved.key === 'paciente.e_estrangeiro') {
+          return (
+            <SelectField
+              {...commonProps}
+              onChange={(val: any) => {
+                setValue(resolved.key, val);
+                if (val === '1') {
+                  setValue('paciente.cpf', undefined);
+                  setValue('paciente.pais_nascimento_id', undefined); // estrangeiro: não é Brasil automaticamente
+                }
+                if (val === '2') {
+                  setValue('paciente.passaporte', undefined);
+                  setValue('paciente.pais_nascimento_id', BRASIL_PAIS_NASCIMENTO_ID); // não estrangeiro: Brasil
+                }
+              }}
+            />
+          );
+        }
         return <SelectField {...commonProps} />;
       case 'select-search':
         if (field.codeList) {
@@ -428,6 +461,16 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           const firstEstabelecimentoKey = sortedFields.find((f) =>
             NOTIFICATION_ESTABELECIMENTO_KEYS.has(f.key)
           )?.key;
+          const firstNotificationField = sortedFields.find(
+            (f) =>
+              NOTIFICATION_LOCATION_KEYS.has(f.key) ||
+              NOTIFICATION_ESTABELECIMENTO_KEYS.has(f.key)
+          );
+          const nomeField = sortedFields.find((f) => f.key === 'paciente.nome');
+          const estrangeiroField = sortedFields.find((f) => f.key === 'paciente.e_estrangeiro');
+          const cpfField = sortedFields.find((f) => f.key === 'paciente.cpf');
+          const passaporteField = sortedFields.find((f) => f.key === 'paciente.passaporte');
+          const cnsField = sortedFields.find((f) => f.key === 'paciente.cns');
           return (
             <div key={section.id} className="mb-8">
               <h2 className="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">
@@ -435,33 +478,69 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {sortedFields.map((field) => {
-                  if (NOTIFICATION_LOCATION_KEYS.has(field.key)) {
-                    if (field.key !== firstNotificationLocationKey) return null;
+                  // Bloco único: Estabelecimento de saúde de notificação (UF, Município, Estabelecimento). Data da notificação fica em Dados do paciente.
+                  if (firstNotificationField && field.key === firstNotificationField.key) {
                     return (
-                      <div key={field.key} className="md:col-span-2">
-                        <EstadoMunicipioNotificacao
-                          getValue={getValue}
-                          setValue={setValue}
-                          disabled={readOnly}
-                          error={getError('notificacao.municipio_id') || getError('notificacao.uf_notificacao')}
-                          required={isFieldRequired('notificacao.uf_notificacao') || isFieldRequired('notificacao.municipio_id')}
-                        />
+                      <div key="notificacao-estabelecimento-block" className="md:col-span-2">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-3">Estabelecimento de saúde de notificação</h3>
+                        <div className="space-y-4">
+                          <EstadoMunicipioNotificacao
+                            getValue={getValue}
+                            setValue={setValue}
+                            disabled={readOnly}
+                            error={getError('notificacao.municipio_id') || getError('notificacao.uf_notificacao')}
+                            required={isFieldRequired('notificacao.uf_notificacao') || isFieldRequired('notificacao.municipio_id')}
+                          />
+                          <EstabelecimentoNotificacao
+                            getValue={getValue}
+                            setValue={setValue}
+                            disabled={readOnly}
+                            error={getError('notificacao.unidade_id') || getError('notificacao.estabelecimento_cnes')}
+                            required={isFieldRequired('notificacao.unidade_id') || isFieldRequired('notificacao.estabelecimento_cnes')}
+                          />
+                        </div>
                       </div>
                     );
                   }
-                  if (NOTIFICATION_ESTABELECIMENTO_KEYS.has(field.key)) {
-                    if (field.key !== firstEstabelecimentoKey) return null;
+                  if (NOTIFICATION_LOCATION_KEYS.has(field.key) || NOTIFICATION_ESTABELECIMENTO_KEYS.has(field.key)) {
+                    return null;
+                  }
+                  // Bloco Nome + É estrangeiro? (ao lado) + CPF+CNS ou Passaporte (logo abaixo)
+                  if (nomeField && estrangeiroField && field.key === 'paciente.nome') {
+                    const nomeContent = renderField(nomeField);
+                    const estrangeiroContent = renderField(estrangeiroField);
+                    const estrangeiroSim = getValue('paciente.e_estrangeiro') === '1';
+                    const estrangeiroNao = getValue('paciente.e_estrangeiro') === '2';
+                    const passaporteContent = estrangeiroSim && passaporteField ? renderField(passaporteField) : null;
+                    const cpfContent = estrangeiroNao && cpfField ? renderField(cpfField) : null;
+                    const cnsContent = (estrangeiroSim || estrangeiroNao) && cnsField ? renderField(cnsField) : null;
                     return (
-                      <div key={field.key} className="md:col-span-2">
-                        <EstabelecimentoNotificacao
-                          getValue={getValue}
-                          setValue={setValue}
-                          disabled={readOnly}
-                          error={getError('notificacao.unidade_id') || getError('notificacao.estabelecimento_cnes')}
-                          required={isFieldRequired('notificacao.unidade_id') || isFieldRequired('notificacao.estabelecimento_cnes')}
-                        />
+                      <div key="nome-estrangeiro-doc-block" className="md:col-span-2 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="min-w-0">{nomeContent}</div>
+                          <div className="md:flex-shrink-0">{estrangeiroContent}</div>
+                        </div>
+                        {passaporteContent != null && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>{passaporteContent}</div>
+                            <div>{cnsContent}</div>
+                          </div>
+                        )}
+                        {cpfContent != null && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>{cpfContent}</div>
+                            <div>{cnsContent}</div>
+                          </div>
+                        )}
                       </div>
                     );
+                  }
+                  if (field.key === 'paciente.e_estrangeiro' || field.key === 'paciente.cpf' || field.key === 'paciente.passaporte') {
+                    return null;
+                  }
+                  // CNS já aparece no bloco (ao lado do Passaporte ou do CPF); não duplicar
+                  if (field.key === 'paciente.cns') {
+                    return null;
                   }
                   // Não renderizar nem o wrapper: campo duplicado (só exibimos paciente.pais_nascimento_id)
                   if (field.key === 'paciente.pais_nascimento') return null;

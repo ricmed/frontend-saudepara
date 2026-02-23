@@ -90,9 +90,18 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
 
   const isFieldVisible = useCallback(
     (key: string) => {
-      // Passaporte só aparece quando É Estrangeiro = SIM (1)
+      const estrangeiro = getValue('paciente.e_estrangeiro');
+      // CPF: só aparece quando É Estrangeiro = NÃO (2); fica oculto se Sim ou ainda não escolheu
+      if (key === 'paciente.cpf') {
+        return estrangeiro === '2';
+      }
+      // CNS (Cartão Nacional de Saúde): aparece ao lado do Passaporte (Sim) ou do CPF (Não)
+      if (key === 'paciente.cns') {
+        return estrangeiro === '1' || estrangeiro === '2';
+      }
+      // Passaporte: só aparece quando É Estrangeiro = SIM (1)
       if (key === 'paciente.passaporte') {
-        return getValue('paciente.e_estrangeiro') === '1';
+        return estrangeiro === '1';
       }
       return fieldVisibility[key] !== false;
     },
@@ -101,9 +110,18 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
 
   const isFieldRequired = useCallback(
     (key: string) => {
+      const estrangeiro = getValue('paciente.e_estrangeiro');
+      // CPF obrigatório quando visível (É Estrangeiro = NÃO)
+      if (key === 'paciente.cpf') {
+        return estrangeiro === '2';
+      }
+      // Passaporte obrigatório quando visível (É Estrangeiro = SIM)
+      if (key === 'paciente.passaporte') {
+        return estrangeiro === '1';
+      }
       return fieldRequired[key] === true;
     },
-    [fieldRequired]
+    [fieldRequired, getValue]
   );
 
   const isFieldDisabled = useCallback(

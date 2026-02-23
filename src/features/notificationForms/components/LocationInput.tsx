@@ -17,6 +17,14 @@ function normalizeText(text: string): string {
 interface LocationOption {
   [key: string]: any;
   descricao: string;
+  codigo?: string;
+}
+
+function optionLabel(opt: LocationOption): string {
+  if (opt.codigo != null && String(opt.codigo).trim() !== '') {
+    return `${opt.codigo} - ${opt.descricao || ''}`;
+  }
+  return opt.descricao || '';
 }
 
 interface LocationInputProps {
@@ -337,12 +345,16 @@ const LocationInput: React.FC<LocationInputProps> = ({
         if (cachedOptions && cachedOptions.length > 0) {
           options = cachedOptions;
           
-          // Filtrar por query se necessário
+          // Filtrar por query (código ou nome)
           if (query) {
             const normalizedQuery = normalizeText(query);
-            options = options.filter((option: any) => 
-              normalizeText(option.descricao || option.nome || '').includes(normalizedQuery)
-            );
+            const queryDigits = query.replace(/\D/g, '');
+            options = options.filter((option: any) => {
+              const byDesc = normalizeText(option.descricao || option.nome || '').includes(normalizedQuery);
+              const byCod = option.codigo != null && option.codigo !== '' &&
+                (String(option.codigo).includes(normalizedQuery) || (queryDigits && String(option.codigo).includes(queryDigits)));
+              return byDesc || byCod;
+            });
           }
           
           console.log(`✅ [${name}] ${options.length} registros encontrados em cache`);
@@ -390,12 +402,16 @@ const LocationInput: React.FC<LocationInputProps> = ({
           if (cachedOptions && cachedOptions.length > 0) {
             options = cachedOptions;
             
-            // Filtrar por query se necessário
+            // Filtrar por query (código ou nome)
             if (query) {
               const normalizedQuery = normalizeText(query);
-              options = options.filter((option: any) => 
-                normalizeText(option.descricao || option.nome || '').includes(normalizedQuery)
-              );
+              const queryDigits = query.replace(/\D/g, '');
+              options = options.filter((option: any) => {
+                const byDesc = normalizeText(option.descricao || option.nome || '').includes(normalizedQuery);
+                const byCod = option.codigo != null && option.codigo !== '' &&
+                  (String(option.codigo).includes(normalizedQuery) || (queryDigits && String(option.codigo).includes(queryDigits)));
+                return byDesc || byCod;
+              });
             }
             
             console.log(`✅ [${name}] Usando cache offline: ${options.length} registros`);
@@ -522,9 +538,15 @@ const LocationInput: React.FC<LocationInputProps> = ({
     // Se não há termo de busca, mostrar todas as opções (já filtradas)
     if (!searchQuery) return optionsToFilter;
     
-    // Normalizar o termo de pesquisa
+    // Normalizar o termo de pesquisa: busca por código ou por nome (descricao)
     const normalizedSearch = normalizeText(searchQuery);
-    return optionsToFilter.filter(option => option.descricao.includes(normalizedSearch));
+    const searchDigits = searchQuery.replace(/\D/g, '');
+    return optionsToFilter.filter(option => {
+      const descMatch = (option.descricao || '').includes(normalizedSearch);
+      const codMatch = option.codigo != null && option.codigo !== '' &&
+        (String(option.codigo).includes(normalizedSearch) || (searchDigits && String(option.codigo).includes(searchDigits)));
+      return descMatch || codMatch;
+    });
   }, [localOptions, searchQuery, excludeValues, idField]);
 
   // Load selected option if there's a value - with manual editing check
@@ -542,7 +564,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
         if (foundOption) {
           debugLog(`Option found locally: ${foundOption.descricao}`);
           setSelectedOption(foundOption);
-          setDisplayValue(foundOption.descricao);
+          setDisplayValue(optionLabel(foundOption));
         } else if (apiEndpoint) {
           // If not found locally, fetch from API
           debugLog(`Fetching option by ID from API: ${value}`);
@@ -550,7 +572,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
           
           if (option) {
             setSelectedOption(option);
-            setDisplayValue(option.descricao);
+            setDisplayValue(optionLabel(option));
           } else {
             // If also failed on API, clear selection
             setSelectedOption(null);
@@ -697,7 +719,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
     debugLog(`Option selected: ${option.descricao} (${option[idField]})`);
     
     setSelectedOption(option);
-    setDisplayValue(option.descricao);
+    setDisplayValue(optionLabel(option));
     setSearchQuery("");
     setIsManuallyEditing(false); // Exit manual editing mode
     onChange(option[idField].toString());
@@ -770,7 +792,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
                   }`}
                   onClick={() => handleOptionSelect(option)}
                 >
-                  {option.descricao}
+                  {optionLabel(option)}
                 </button>
               ))}
             </>

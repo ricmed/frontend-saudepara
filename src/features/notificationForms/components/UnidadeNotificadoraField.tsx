@@ -70,6 +70,9 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   const [displayValue, setDisplayValue] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedEstabelecimento, setSelectedEstabelecimento] = useState<Estabelecimento | null>(null);
+
+  const estabelecimentoDisplayLabel = (est: Estabelecimento | null) =>
+    est?.cnes && est?.nome ? `${est.cnes} - ${est.nome}` : (est?.nome ?? est?.cnes ?? "");
   const [isManuallyEditing, setIsManuallyEditing] = useState<boolean>(false);
   
   const inputRef = useRef<HTMLInputElement>(null);
@@ -232,15 +235,18 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
             }
           }
           
-          // ✅ FILTRAR LOCALMENTE PELOS PARÂMETROS DE BUSCA
+          // ✅ FILTRAR LOCALMENTE PELOS PARÂMETROS DE BUSCA (por código CNES ou por nome)
           estabelecimentosAtivos = estabelecimentosParaFiltrar.filter((est: any) => {
             let matches = true;
             
-            // Filtrar por busca de texto
             if (searchTerm) {
-              const searchLower = searchTerm.toLowerCase();
+              const searchLower = searchTerm.toLowerCase().trim();
+              const searchDigits = searchTerm.replace(/\D/g, '');
               const nome = (est.nome || '').toLowerCase();
-              matches = matches && nome.includes(searchLower);
+              const cnes = String(est.cnes || '');
+              const byName = nome.includes(searchLower);
+              const byCnes = searchDigits && cnes.includes(searchDigits);
+              matches = matches && (byName || byCnes);
             }
             
             // Filtrar por ativo
@@ -275,7 +281,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
             };
             if (searchTerm) {
               params.search = searchTerm;
-              params.searchField = 'nome';
+              params.searchField = 'all';
             }
             const apiUrl = `${API_BASE_URL}/estabelecimentos`;
             const response = await axios.get(apiUrl, { params, headers: { Accept: 'application/json' } });
@@ -299,15 +305,18 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
           if (cachedEstabelecimentos && cachedEstabelecimentos.length > 0) {
             console.log(`✅ Cache filtrado encontrado: ${cachedEstabelecimentos.length} estabelecimentos permitidos`);
             
-            // ✅ FILTRAR LOCALMENTE pelos parâmetros de busca
+            // ✅ FILTRAR LOCALMENTE pelos parâmetros de busca (por código CNES ou por nome)
             estabelecimentosAtivos = cachedEstabelecimentos.filter((est: any) => {
               let matches = true;
               
-              // Filtrar por busca de texto
               if (searchTerm) {
-                const searchLower = searchTerm.toLowerCase();
+                const searchLower = searchTerm.toLowerCase().trim();
+                const searchDigits = searchTerm.replace(/\D/g, '');
                 const nome = (est.nome || '').toLowerCase();
-                matches = matches && nome.includes(searchLower);
+                const cnes = String(est.cnes || '');
+                const byName = nome.includes(searchLower);
+                const byCnes = searchDigits && cnes.includes(searchDigits);
+                matches = matches && (byName || byCnes);
               }
               
               // Filtrar por ativo
@@ -336,10 +345,10 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
               ativo: 'S'
             };
             
-            // Se houver um termo de busca, adicionar aos parâmetros
+            // Se houver um termo de busca, adicionar aos parâmetros (busca por nome ou CNES)
             if (searchTerm) {
               params.search = searchTerm;
-              params.searchField = 'nome';
+              params.searchField = 'all';
             }
             
             console.log('Buscando estabelecimentos com params:', params);
@@ -399,8 +408,11 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
               let matches = true;
               
               if (searchTerm) {
-                const searchLower = searchTerm.toLowerCase();
-                matches = matches && (est.nome || '').toLowerCase().includes(searchLower);
+                const searchLower = searchTerm.toLowerCase().trim();
+                const searchDigits = searchTerm.replace(/\D/g, '');
+                const byName = (est.nome || '').toLowerCase().includes(searchLower);
+                const byCnes = searchDigits && String(est.cnes || '').includes(searchDigits);
+                matches = matches && (byName || byCnes);
               }
               
               matches = matches && est.ativo === 'S';
@@ -481,7 +493,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
           return;
         }
         setSelectedEstabelecimento(found);
-        setDisplayValue(found.nome);
+        setDisplayValue(estabelecimentoDisplayLabel(found));
         return;
       }
     } catch (e) {
@@ -504,7 +516,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
           return;
         }
         setSelectedEstabelecimento(response.data);
-        setDisplayValue(response.data.nome);
+        setDisplayValue(estabelecimentoDisplayLabel(response.data));
         console.log(`Estabelecimento encontrado: ${response.data.nome} (ID: ${response.data.idestabelecimento})`);
       } else {
         console.log(`Estabelecimento não encontrado para ID: ${id}`);
@@ -729,7 +741,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
       // Se encontramos um único estabelecimento, selecionar automaticamente
       if (singleEstablishment) {
         console.log('✅ AUTO-SELECIONANDO estabelecimento único:', singleEstablishment.nome);
-        setDisplayValue(singleEstablishment.nome);
+        setDisplayValue(estabelecimentoDisplayLabel(singleEstablishment));
         setSelectedEstabelecimento(singleEstablishment);
         onChange(singleEstablishment.idestabelecimento.toString());
       }
@@ -792,7 +804,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
     }
     
     // Definir valor local e notificar imediatamente
-    setDisplayValue(estabelecimento.nome);
+    setDisplayValue(estabelecimentoDisplayLabel(estabelecimento));
     onChange(estabelecimento.idestabelecimento.toString());
     setSelectedEstabelecimento(estabelecimento);
     setSearchQuery("");
@@ -908,7 +920,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
                   }`}
                   onClick={() => handleEstabelecimentoSelect(estabelecimento)}
                 >
-                  <div className="font-medium">{estabelecimento.nome}</div>
+                  <div className="font-medium">{estabelecimentoDisplayLabel(estabelecimento)}</div>
                   {estabelecimento.cidade && (
                     <div className="text-xs text-gray-500">
                       {estabelecimento.cidade}{estabelecimento.bairro ? `, ${estabelecimento.bairro}` : ''}
