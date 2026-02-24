@@ -58,7 +58,7 @@ export const EstabelecimentoNotificacao: React.FC<EstabelecimentoNotificacaoProp
         value={value}
         onChange={handleChange}
         label={required ? 'Estabelecimento *' : 'Estabelecimento'}
-        placeholder="Pesquise por nome (mín. 3 caracteres)..."
+        placeholder="Pesquise por código (CNES) ou nome (mín. 3 caracteres)"
         disabled={disabled}
         allowAllEstablishments
         hasError={!!error}

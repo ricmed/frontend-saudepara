@@ -91,17 +91,38 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
   const isFieldVisible = useCallback(
     (key: string) => {
       const estrangeiro = getValue('paciente.e_estrangeiro');
-      // CPF: só aparece quando É Estrangeiro = NÃO (2); fica oculto se Sim ou ainda não escolheu
+      const estrangeiroSim = estrangeiro === '1';
+      const orientacaoSexual = getValue('paciente.orientacao_sexual');
+      const orientacaoOutra = orientacaoSexual === '4';
+      const povoTradicionalSim = getValue('paciente.povo_tradicional') === '1';
+      const qualPovoOutros = getValue('paciente.qual_povo_tradicional') === '39';
+      // CPF: sempre visível (obrigatório só quando É Estrangeiro = NÃO)
       if (key === 'paciente.cpf') {
-        return estrangeiro === '2';
+        return true;
       }
-      // CNS (Cartão Nacional de Saúde): aparece ao lado do Passaporte (Sim) ou do CPF (Não)
+      // CNS: sempre visível
       if (key === 'paciente.cns') {
-        return estrangeiro === '1' || estrangeiro === '2';
+        return true;
       }
-      // Passaporte: só aparece quando É Estrangeiro = SIM (1)
+      // Passaporte: só quando É Estrangeiro = SIM (1)
       if (key === 'paciente.passaporte') {
-        return estrangeiro === '1';
+        return estrangeiroSim;
+      }
+      // País de nascimento: só quando É Estrangeiro = SIM (1); oculto quando NÃO
+      if (key === 'paciente.pais_nascimento_id') {
+        return estrangeiroSim;
+      }
+      // Outra orientação sexual, especifique: só quando Orientação sexual = 4 (OUTRA)
+      if (key === 'paciente.outra_orientacao_sexual') {
+        return orientacaoOutra;
+      }
+      // Qual povo ou comunidade tradicional: só quando É membro = SIM (1)
+      if (key === 'paciente.qual_povo_tradicional') {
+        return povoTradicionalSim;
+      }
+      // Especifique (outro povo): só quando Qual povo = 39 (OUTROS)
+      if (key === 'paciente.outro_povo_tradicional') {
+        return qualPovoOutros;
       }
       return fieldVisibility[key] !== false;
     },
@@ -111,13 +132,27 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
   const isFieldRequired = useCallback(
     (key: string) => {
       const estrangeiro = getValue('paciente.e_estrangeiro');
-      // CPF obrigatório quando visível (É Estrangeiro = NÃO)
+      const orientacaoSexual = getValue('paciente.orientacao_sexual');
+      const povoTradicional = getValue('paciente.povo_tradicional');
+      // CPF obrigatório só quando É Estrangeiro = NÃO; quando Sim continua visível mas não obrigatório
       if (key === 'paciente.cpf') {
         return estrangeiro === '2';
       }
       // Passaporte obrigatório quando visível (É Estrangeiro = SIM)
       if (key === 'paciente.passaporte') {
         return estrangeiro === '1';
+      }
+      // Outra orientação sexual obrigatório quando visível (Orientação sexual = 4 OUTRA)
+      if (key === 'paciente.outra_orientacao_sexual') {
+        return orientacaoSexual === '4';
+      }
+      // Qual povo ou comunidade tradicional obrigatório quando visível (É membro = SIM)
+      if (key === 'paciente.qual_povo_tradicional') {
+        return povoTradicional === '1';
+      }
+      // Especifique (outro povo) obrigatório quando visível (Qual povo = 39 OUTROS)
+      if (key === 'paciente.outro_povo_tradicional') {
+        return getValue('paciente.qual_povo_tradicional') === '39';
       }
       return fieldRequired[key] === true;
     },

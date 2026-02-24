@@ -48,6 +48,12 @@ export interface FormSchema {
   sections: FormSection[];
   rules?: FormRule[];
   validations?: FormValidation[];
+  /** Quando ativo, o formulário exibe apenas os campos marcados como coluna fixa */
+  fixedColumnsConfig?: {
+    enabled?: boolean;
+    autoExtract?: boolean;
+    columns?: string[];
+  };
 }
 
 export interface FormSection {
@@ -82,6 +88,10 @@ export interface FormField {
   dataTable?: string;
   dataValueColumn?: string;
   dataLabelColumn?: string;
+  /** Usado na tela "Configurar Colunas Fixas": quando true, campo é exibido no formulário e persistido em coluna fixa */
+  isFixedColumn?: boolean;
+  /** Nome da coluna no banco (quando isFixedColumn) */
+  fixedColumnName?: string;
   // Configuração de campos de endereço
   addressFields?: string[];
   // Upload de arquivo: tamanho máx total em bytes, máx de arquivos (1-10)

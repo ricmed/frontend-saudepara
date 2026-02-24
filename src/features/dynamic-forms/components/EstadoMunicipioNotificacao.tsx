@@ -116,7 +116,7 @@ export const EstadoMunicipioNotificacao: React.FC<EstadoMunicipioNotificacaoProp
           label={required ? 'UF da Notificação *' : 'UF da Notificação'}
           value={estadoValue}
           onChange={handleUfChange}
-          placeholder="Selecione a UF"
+          placeholder="Pesquise por código ou nome (ex.: 15, PA)"
           disabled={disabled}
           apiEndpoint="api/tipo-estado"
           idField="idtipo_estado"
@@ -132,7 +132,7 @@ export const EstadoMunicipioNotificacao: React.FC<EstadoMunicipioNotificacaoProp
           onChange={handleMunicipioChange}
           placeholder={
             estadoValue
-              ? 'Pesquise ou selecione o município'
+              ? 'Pesquise por código ou nome (ex.: 150140, Belém)'
               : 'Selecione primeiro a UF'
           }
           disabled={disabled || !estadoValue}

@@ -45,13 +45,19 @@ const NOTIFICATION_ESTABELECIMENTO_KEYS = new Set([
   'notificacao.unidade_id',
 ]);
 
-/** Bloco Nome + É estrangeiro? + CPF/CNS ou Passaporte: nome e estrangeiro na mesma linha; doc (e CNS ao lado do CPF) logo abaixo */
-const NOME_ESTRANGEIRO_DOC_KEYS = new Set([
-  'paciente.nome',
-  'paciente.e_estrangeiro',
+/** Campos do bloco Identificação renderizados em layout customizado; os demais (sexo ao nascimento, orientação sexual, etc.) renderizam no grid após o bloco */
+const IDENTIFICACAO_BLOCK_KEYS = new Set([
+  'notificacao.dt_notificacao',
   'paciente.cpf',
-  'paciente.passaporte',
   'paciente.cns',
+  'paciente.e_estrangeiro',
+  'paciente.nome',
+  'paciente.nome_social',
+  'paciente.nome_mae',
+  'paciente.data_nascimento',
+  'paciente.idade',
+  'paciente.passaporte',
+  'paciente.pais_nascimento_id',
 ]);
 
 interface FormRendererProps {
@@ -66,9 +72,6 @@ interface FormRendererProps {
   cancelLabel?: string;
   readOnly?: boolean;
 }
-
-/** ID do Brasil em tipo_pais (pré-seleção em País de Nascimento). Valor string para bater com as opções do select. */
-const BRASIL_PAIS_NASCIMENTO_ID = '105';
 
 export const FormRenderer: React.FC<FormRendererProps> = ({
   schema,
@@ -111,18 +114,14 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
         else idadeMeses = n * 12;
       }
     }
-    const paisId = pac.pais_nascimento_id;
-    const needPaisDefault = paisId === undefined || paisId === null || paisId === '';
-    const estrangeiroSim = pac.e_estrangeiro === '1';
-    // Brasil só como padrão quando não for estrangeiro; se estrangeiro = Sim, não preencher país
-    const paisInicial = needPaisDefault
-      ? (estrangeiroSim ? undefined : BRASIL_PAIS_NASCIMENTO_ID)
-      : paisId;
+    const estrangeiroVal = pac.e_estrangeiro;
+    const eEstrangeiroDefault = (estrangeiroVal === undefined || estrangeiroVal === null || estrangeiroVal === '') ? '2' : estrangeiroVal;
+    // País de nascimento não vem mais pré-selecionado como Brasil; só preenche se já vier nos dados
     return {
       ...initialData,
       paciente: {
         ...pac,
-        pais_nascimento_id: paisInicial,
+        e_estrangeiro: eEstrangeiroDefault,
         ...(idadeMeses !== undefined ? { idade: idadeMeses } : {}),
       },
     };
@@ -151,6 +150,19 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     setUploadingCount(c => Math.max(0, c + (uploading ? 1 : -1)));
   }, []);
   const isUploading = uploadingCount > 0;
+
+  // Quando "Configurar Colunas Fixas" está ativo, exibir apenas os campos marcados como coluna fixa
+  const sectionsToRender = React.useMemo(() => {
+    const useFixedOnly = !!schema.fixedColumnsConfig?.enabled;
+    if (!useFixedOnly) return schema.sections;
+    return schema.sections
+      .map((section) => ({
+        ...section,
+        fields: section.fields.filter((f) => f.isFixedColumn === true),
+      }))
+      .filter((section) => section.fields.length > 0)
+      .sort((a, b) => a.order - b.order);
+  }, [schema]);
 
   // Retorno da assinatura Gov.br: preencher campo ou exibir erro e limpar hash/query
   useEffect(() => {
@@ -255,6 +267,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       'paciente.cns': { type: 'cns' },
       'paciente.nome_social': { type: 'text', maxLength: 100 },
       'paciente.e_estrangeiro': { type: 'select', options: [{ value: '1', label: 'SIM' }, { value: '2', label: 'NÃO' }] },
+      'paciente.povo_tradicional': { type: 'select', options: [{ value: '1', label: 'SIM' }, { value: '2', label: 'NAO' }, { value: '9', label: 'IGNORADO' }] },
       'paciente.passaporte': { type: 'passaporte' },
       'paciente.pais_nascimento_id': { type: 'select', apiSelectEndpoint: 'tipo-pais/select' },
       'paciente.data_nascimento': { type: 'date' },
@@ -373,6 +386,28 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           if (resolved.key === 'paciente.pais_nascimento_id') {
             return <ApiSelectSearchField {...commonProps} />;
           }
+          if (resolved.key === 'paciente.qual_povo_tradicional') {
+            return (
+              <ApiSelectSearchField
+                {...commonProps}
+                onChange={(val: any) => {
+                  setValue(resolved.key, val);
+                  if (val !== '39') setValue('paciente.outro_povo_tradicional', undefined);
+                }}
+              />
+            );
+          }
+          if (resolved.key === 'paciente.orientacao_sexual') {
+            return (
+              <ApiSelectField
+                {...commonProps}
+                onChange={(val: any) => {
+                  setValue(resolved.key, val);
+                  if (val !== '4') setValue('paciente.outra_orientacao_sexual', undefined);
+                }}
+              />
+            );
+          }
           return <ApiSelectField {...commonProps} />;
         }
         // É estrangeiro?: ao mudar, limpar documento que não se aplica e ajustar país de nascimento
@@ -388,7 +423,22 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                 }
                 if (val === '2') {
                   setValue('paciente.passaporte', undefined);
-                  setValue('paciente.pais_nascimento_id', BRASIL_PAIS_NASCIMENTO_ID); // não estrangeiro: Brasil
+                  setValue('paciente.pais_nascimento_id', undefined); // não estrangeiro: país fica oculto, não pré-selecionar Brasil
+                }
+              }}
+            />
+          );
+        }
+        // É membro de povo ou comunidade tradicional?: ao mudar para Não/Ignorado, limpar Qual povo e Outro povo
+        if (resolved.key === 'paciente.povo_tradicional') {
+          return (
+            <SelectField
+              {...commonProps}
+              onChange={(val: any) => {
+                setValue(resolved.key, val);
+                if (val !== '1') {
+                  setValue('paciente.qual_povo_tradicional', undefined);
+                  setValue('paciente.outro_povo_tradicional', undefined);
                 }
               }}
             />
@@ -451,9 +501,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     <form onSubmit={handleSubmit} className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow">
       <h1 className="text-2xl font-bold mb-6 text-gray-800">{schema.agravo}</h1>
 
-      {schema.sections
-        .sort((a, b) => a.order - b.order)
-        .map((section) => {
+      {sectionsToRender.map((section) => {
           const sortedFields = [...section.fields].sort((a, b) => a.order - b.order);
           const firstNotificationLocationKey = sortedFields.find((f) =>
             NOTIFICATION_LOCATION_KEYS.has(f.key)
@@ -466,11 +514,17 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
               NOTIFICATION_LOCATION_KEYS.has(f.key) ||
               NOTIFICATION_ESTABELECIMENTO_KEYS.has(f.key)
           );
-          const nomeField = sortedFields.find((f) => f.key === 'paciente.nome');
-          const estrangeiroField = sortedFields.find((f) => f.key === 'paciente.e_estrangeiro');
+          const dtNotificacaoField = sortedFields.find((f) => f.key === 'notificacao.dt_notificacao');
           const cpfField = sortedFields.find((f) => f.key === 'paciente.cpf');
-          const passaporteField = sortedFields.find((f) => f.key === 'paciente.passaporte');
           const cnsField = sortedFields.find((f) => f.key === 'paciente.cns');
+          const estrangeiroField = sortedFields.find((f) => f.key === 'paciente.e_estrangeiro');
+          const nomeField = sortedFields.find((f) => f.key === 'paciente.nome');
+          const nomeSocialField = sortedFields.find((f) => f.key === 'paciente.nome_social');
+          const nomeMaeField = sortedFields.find((f) => f.key === 'paciente.nome_mae');
+          const dataNascimentoField = sortedFields.find((f) => f.key === 'paciente.data_nascimento');
+          const idadeField = sortedFields.find((f) => f.key === 'paciente.idade');
+          const passaporteField = sortedFields.find((f) => f.key === 'paciente.passaporte');
+          const paisField = sortedFields.find((f) => f.key === 'paciente.pais_nascimento_id');
           return (
             <div key={section.id} className="mb-8">
               <h2 className="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">
@@ -505,44 +559,28 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                   if (NOTIFICATION_LOCATION_KEYS.has(field.key) || NOTIFICATION_ESTABELECIMENTO_KEYS.has(field.key)) {
                     return null;
                   }
-                  // Bloco Nome + É estrangeiro? (ao lado) + CPF+CNS ou Passaporte (logo abaixo)
-                  if (nomeField && estrangeiroField && field.key === 'paciente.nome') {
-                    const nomeContent = renderField(nomeField);
-                    const estrangeiroContent = renderField(estrangeiroField);
+                  // Bloco Paciente - Identificação: quando Sim, Passaporte e País (ao lado) surgem embaixo de CNS/É estrangeiro e empurram Nome/Nome social pra baixo. País oculto quando Não; sem pré-seleção Brasil.
+                  if (dtNotificacaoField && field.key === 'notificacao.dt_notificacao') {
                     const estrangeiroSim = getValue('paciente.e_estrangeiro') === '1';
-                    const estrangeiroNao = getValue('paciente.e_estrangeiro') === '2';
-                    const passaporteContent = estrangeiroSim && passaporteField ? renderField(passaporteField) : null;
-                    const cpfContent = estrangeiroNao && cpfField ? renderField(cpfField) : null;
-                    const cnsContent = (estrangeiroSim || estrangeiroNao) && cnsField ? renderField(cnsField) : null;
                     return (
-                      <div key="nome-estrangeiro-doc-block" className="md:col-span-2 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="min-w-0">{nomeContent}</div>
-                          <div className="md:flex-shrink-0">{estrangeiroContent}</div>
+                      <div key="identificacao-block" className="md:col-span-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5 items-start">
+                          {dtNotificacaoField && <div className="min-w-0">{renderField(dtNotificacaoField)}</div>}
+                          {cpfField && <div className="min-w-0">{renderField(cpfField)}</div>}
+                          {cnsField && <div className="min-w-0">{renderField(cnsField)}</div>}
+                          {estrangeiroField && <div className="min-w-0">{renderField(estrangeiroField)}</div>}
+                          {estrangeiroSim && passaporteField && <div className="min-w-0">{renderField(passaporteField)}</div>}
+                          {estrangeiroSim && paisField && <div className="min-w-0">{renderField(paisField)}</div>}
+                          {nomeField && <div className="min-w-0">{renderField(nomeField)}</div>}
+                          {nomeSocialField && <div className="min-w-0">{renderField(nomeSocialField)}</div>}
+                          {nomeMaeField && <div className="min-w-0">{renderField(nomeMaeField)}</div>}
+                          {dataNascimentoField && <div className="min-w-0">{renderField(dataNascimentoField)}</div>}
+                          {idadeField && <div className="min-w-0">{renderField(idadeField)}</div>}
                         </div>
-                        {passaporteContent != null && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>{passaporteContent}</div>
-                            <div>{cnsContent}</div>
-                          </div>
-                        )}
-                        {cpfContent != null && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>{cpfContent}</div>
-                            <div>{cnsContent}</div>
-                          </div>
-                        )}
                       </div>
                     );
                   }
-                  if (field.key === 'paciente.e_estrangeiro' || field.key === 'paciente.cpf' || field.key === 'paciente.passaporte') {
-                    return null;
-                  }
-                  // CNS já aparece no bloco (ao lado do Passaporte ou do CPF); não duplicar
-                  if (field.key === 'paciente.cns') {
-                    return null;
-                  }
-                  // Não renderizar nem o wrapper: campo duplicado (só exibimos paciente.pais_nascimento_id)
+                  if (IDENTIFICACAO_BLOCK_KEYS.has(field.key)) return null;
                   if (field.key === 'paciente.pais_nascimento') return null;
                   const content = renderField(field);
                   if (content == null) return null;
