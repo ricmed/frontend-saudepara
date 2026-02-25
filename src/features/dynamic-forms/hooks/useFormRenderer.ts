@@ -124,6 +124,18 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
       if (key === 'paciente.outro_povo_tradicional') {
         return qualPovoOutros;
       }
+      // Qual etnia?: só quando Raça/Cor = 5 (INDÍGENA); aceita valor string ou número
+      if (key === 'paciente.etnia') {
+        return String(getValue('paciente.raca_cor') ?? '') === '5';
+      }
+      // Vive aldeado?: só quando Raça/Cor = 5 (INDÍGENA)
+      if (key === 'paciente.vive_aldeado') {
+        return String(getValue('paciente.raca_cor') ?? '') === '5';
+      }
+      // DSEI, Polo Base, Aldeia: só quando Vive aldeado? = Sim (1)
+      if (key === 'paciente.distrito_sanitario' || key === 'paciente.polo_base' || key === 'paciente.aldeia') {
+        return getValue('paciente.vive_aldeado') === '1';
+      }
       return fieldVisibility[key] !== false;
     },
     [fieldVisibility, getValue]
@@ -153,6 +165,14 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
       // Especifique (outro povo) obrigatório quando visível (Qual povo = 39 OUTROS)
       if (key === 'paciente.outro_povo_tradicional') {
         return getValue('paciente.qual_povo_tradicional') === '39';
+      }
+      // Qual etnia? obrigatório quando visível (Raça/Cor = 5 INDÍGENA); aceita valor string ou número
+      if (key === 'paciente.etnia') {
+        return String(getValue('paciente.raca_cor') ?? '') === '5';
+      }
+      // DSEI, Polo Base, Aldeia obrigatórios quando visíveis (Vive aldeado? = Sim)
+      if (key === 'paciente.distrito_sanitario' || key === 'paciente.polo_base' || key === 'paciente.aldeia') {
+        return getValue('paciente.vive_aldeado') === '1';
       }
       return fieldRequired[key] === true;
     },

@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import type { FormSchema } from '@/services/FormService';
 import { useFormRenderer } from '../hooks/useFormRenderer';
 import { TextField, DateField, NumberField, TextareaField, CheckboxField } from './FormFields';
-import { SelectField, SelectSearchField, CodeListSelectField, CodeListSearchField, ApiSelectField, ApiSelectSearchField } from './SelectFields';
+import { SelectField, SelectSearchField, CodeListSelectField, CodeListSearchField, ApiSelectField, ApiSelectSearchField, DseiPoloAldeiaFields } from './SelectFields';
 import { 
   CheckboxGroupField, 
   RadioGroupField, 
@@ -45,7 +45,7 @@ const NOTIFICATION_ESTABELECIMENTO_KEYS = new Set([
   'notificacao.unidade_id',
 ]);
 
-/** Campos do bloco Identificação renderizados em layout customizado; os demais (sexo ao nascimento, orientação sexual, etc.) renderizam no grid após o bloco */
+/** Campos do bloco Identificação renderizados em layout customizado; Sexo ao nascimento fica ao lado de Idade; os demais (orientação sexual, etc.) renderizam no grid após o bloco */
 const IDENTIFICACAO_BLOCK_KEYS = new Set([
   'notificacao.dt_notificacao',
   'paciente.cpf',
@@ -56,6 +56,7 @@ const IDENTIFICACAO_BLOCK_KEYS = new Set([
   'paciente.nome_mae',
   'paciente.data_nascimento',
   'paciente.idade',
+  'paciente.sexo',
   'paciente.passaporte',
   'paciente.pais_nascimento_id',
 ]);
@@ -354,6 +355,21 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
 
     switch (resolved.type) {
       case 'text':
+        // DSEI, Polo Base, Aldeia: selects em cascata (só visíveis quando Vive aldeado? = Sim)
+        if (resolved.key === 'paciente.distrito_sanitario') {
+          return (
+            <DseiPoloAldeiaFields
+              getValue={getValue}
+              setValue={setValue}
+              getError={getError}
+              isFieldRequired={isFieldRequired}
+              disabled={disabled}
+            />
+          );
+        }
+        if (resolved.key === 'paciente.polo_base' || resolved.key === 'paciente.aldeia') {
+          return null;
+        }
         return <TextField {...textProps} />;
       case 'date':
         return <DateField {...dateProps} />;
@@ -379,6 +395,21 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       case 'checkbox-group':
         return <CheckboxGroupField {...commonProps} />;
       case 'select':
+        // Vive aldeado?: ao mudar para Não/Ignorado, limpar DSEI, Polo Base e Aldeia
+        if (resolved.key === 'paciente.vive_aldeado') {
+          const viveAldeadoOnChange = (val: any) => {
+            setValue(resolved.key, val);
+            if (val !== '1') {
+              setValue('paciente.distrito_sanitario', undefined);
+              setValue('paciente.polo_base', undefined);
+              setValue('paciente.aldeia', undefined);
+            }
+          };
+          if (resolved.codeList) {
+            return <CodeListSelectField {...commonProps} onChange={viveAldeadoOnChange} />;
+          }
+          return <SelectField {...commonProps} onChange={viveAldeadoOnChange} />;
+        }
         if (resolved.codeList) {
           return <CodeListSelectField {...commonProps} />;
         }
@@ -393,6 +424,26 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                 onChange={(val: any) => {
                   setValue(resolved.key, val);
                   if (val !== '39') setValue('paciente.outro_povo_tradicional', undefined);
+                }}
+              />
+            );
+          }
+          if (resolved.key === 'paciente.etnia') {
+            return <ApiSelectSearchField {...commonProps} />;
+          }
+          if (resolved.key === 'paciente.raca_cor') {
+            return (
+              <ApiSelectField
+                {...commonProps}
+                onChange={(val: any) => {
+                  setValue(resolved.key, val);
+                  if (String(val ?? '') !== '5') {
+                    setValue('paciente.etnia', undefined);
+                    setValue('paciente.vive_aldeado', undefined);
+                    setValue('paciente.distrito_sanitario', undefined);
+                    setValue('paciente.polo_base', undefined);
+                    setValue('paciente.aldeia', undefined);
+                  }
                 }}
               />
             );
@@ -523,6 +574,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           const nomeMaeField = sortedFields.find((f) => f.key === 'paciente.nome_mae');
           const dataNascimentoField = sortedFields.find((f) => f.key === 'paciente.data_nascimento');
           const idadeField = sortedFields.find((f) => f.key === 'paciente.idade');
+          const sexoField = sortedFields.find((f) => f.key === 'paciente.sexo');
           const passaporteField = sortedFields.find((f) => f.key === 'paciente.passaporte');
           const paisField = sortedFields.find((f) => f.key === 'paciente.pais_nascimento_id');
           return (
@@ -576,6 +628,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                           {nomeMaeField && <div className="min-w-0">{renderField(nomeMaeField)}</div>}
                           {dataNascimentoField && <div className="min-w-0">{renderField(dataNascimentoField)}</div>}
                           {idadeField && <div className="min-w-0">{renderField(idadeField)}</div>}
+                          {sexoField && <div className="min-w-0">{renderField(sexoField)}</div>}
                         </div>
                       </div>
                     );

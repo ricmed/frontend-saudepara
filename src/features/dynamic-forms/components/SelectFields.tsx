@@ -184,7 +184,7 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
         />
         {showDropdown && filteredOptions.length > 0 && (
           <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-            {(isPaisNascimento ? filteredOptions : filteredOptions.slice(0, 100)).map((opt) => (
+            {filteredOptions.map((opt) => (
               <div
                 key={opt.value}
                 onMouseDown={() => {
@@ -384,6 +384,238 @@ export const SelectSearchField: React.FC<SelectFieldProps> = ({
         </>
       )}
       {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+    </div>
+  );
+};
+
+/** Normaliza para busca (sem acentos, minúsculo) */
+function normalizeForSearch(s: string): string {
+  return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+/** Campo pesquisável: input + dropdown com filtro por texto (lista todas as opções, filtra ao digitar). */
+function SearchableSelect({
+  label,
+  required,
+  value,
+  options,
+  loading,
+  disabled,
+  placeholder,
+  emptyMessage,
+  error,
+  onSelect,
+  onClear,
+}: {
+  label: string;
+  required: boolean;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  loading: boolean;
+  disabled: boolean;
+  placeholder: string;
+  emptyMessage: string;
+  error?: string;
+  onSelect: (value: string) => void;
+  onClear: () => void;
+}) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const normalizedSearch = normalizeForSearch(searchTerm);
+  const filteredOptions = options.filter(
+    (opt) => !normalizedSearch || normalizeForSearch(opt.label).includes(normalizedSearch)
+  );
+  const selectedLabel = value ? options.find((o) => o.value === value)?.label : '';
+  const displayValue = showDropdown ? searchTerm : (loading && value ? 'Carregando...' : selectedLabel);
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <div className="relative">
+        <input
+          type="text"
+          value={displayValue}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setShowDropdown(true);
+            if (!e.target.value && value) onClear();
+          }}
+          onFocus={() => setShowDropdown(true)}
+          onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+          disabled={disabled || loading}
+          placeholder={loading ? 'Carregando...' : placeholder}
+          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+            error ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+          } ${disabled || loading ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+        />
+        {showDropdown && !disabled && !loading && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setShowDropdown(false)} />
+            <div className="absolute z-20 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+              {filteredOptions.length === 0 ? (
+                <div className="px-3 py-2 text-sm text-gray-500">{emptyMessage}</div>
+              ) : (
+                filteredOptions.map((opt) => (
+                  <div
+                    key={opt.value}
+                    onMouseDown={() => {
+                      onSelect(opt.value);
+                      setSearchTerm('');
+                      setShowDropdown(false);
+                    }}
+                    className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+                  >
+                    {opt.label}
+                  </div>
+                ))
+              )}
+            </div>
+          </>
+        )}
+      </div>
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+    </div>
+  );
+}
+
+/** Três campos em cascata com pesquisa: DSEI → Polo Base → Aldeia (quando Vive aldeado? = Sim). Lista todas as opções; digitar filtra. */
+export interface DseiPoloAldeiaFieldsProps {
+  getValue: (key: string) => any;
+  setValue: (key: string, value: any) => void;
+  getError: (key: string) => string | undefined;
+  isFieldRequired: (key: string) => boolean;
+  disabled?: boolean;
+}
+
+export const DseiPoloAldeiaFields: React.FC<DseiPoloAldeiaFieldsProps> = ({
+  getValue,
+  setValue,
+  getError,
+  isFieldRequired,
+  disabled,
+}) => {
+  const dsei = getValue('paciente.distrito_sanitario') ?? '';
+  const poloBase = getValue('paciente.polo_base') ?? '';
+  const aldeia = getValue('paciente.aldeia') ?? '';
+  const [dseiOptions, setDseiOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [poloOptions, setPoloOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [aldeiaOptions, setAldeiaOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [loadingDsei, setLoadingDsei] = useState(true);
+  const [loadingPolo, setLoadingPolo] = useState(true);
+  const [loadingAldeia, setLoadingAldeia] = useState(true);
+
+  // Busca os 3 com filtros opcionais: pode escolher DSEI, Polo ou Aldeia em qualquer ordem; os outros se adequam.
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingDsei(true);
+    setLoadingPolo(true);
+    setLoadingAldeia(true);
+    const toOpt = (item: any) => ({ value: String(item.value ?? ''), label: String(item.label ?? item.value ?? '') });
+    (async () => {
+      try {
+        const paramsDsei: Record<string, string> = {};
+        if (poloBase) paramsDsei.polo_base = poloBase;
+        if (aldeia) paramsDsei.aldeia = aldeia;
+        const paramsPolo: Record<string, string> = {};
+        if (dsei) paramsPolo.dsei = dsei;
+        if (aldeia) paramsPolo.aldeia = aldeia;
+        const paramsAldeia: Record<string, string> = {};
+        if (dsei) paramsAldeia.dsei = dsei;
+        if (poloBase) paramsAldeia.polo_base = poloBase;
+        const [resDsei, resPolo, resAldeia] = await Promise.all([
+          axios.get<any[]>(`${API_BASE}/dsei-polo-aldeia/dseis`, { params: paramsDsei, withCredentials: true }),
+          axios.get<any[]>(`${API_BASE}/dsei-polo-aldeia/polos`, { params: paramsPolo, withCredentials: true }),
+          axios.get<any[]>(`${API_BASE}/dsei-polo-aldeia/aldeias`, { params: paramsAldeia, withCredentials: true }),
+        ]);
+        if (cancelled) return;
+        const listD = Array.isArray(resDsei.data) ? resDsei.data : [];
+        const listP = Array.isArray(resPolo.data) ? resPolo.data : [];
+        const listA = Array.isArray(resAldeia.data) ? resAldeia.data : [];
+        const optsD = listD.map(toOpt);
+        const optsP = listP.map(toOpt);
+        const optsA = listA.map(toOpt);
+        setDseiOptions(optsD);
+        setPoloOptions(optsP);
+        setAldeiaOptions(optsA);
+        if (!cancelled) {
+          if (optsD.length === 1 && !dsei) setValue('paciente.distrito_sanitario', optsD[0].value);
+          if (optsP.length === 1 && !poloBase) setValue('paciente.polo_base', optsP[0].value);
+          if (optsA.length === 1 && !aldeia) setValue('paciente.aldeia', optsA[0].value);
+          if (dsei && optsD.length > 0 && !optsD.some((o) => o.value === dsei)) setValue('paciente.distrito_sanitario', undefined);
+          if (poloBase && optsP.length > 0 && !optsP.some((o) => o.value === poloBase)) setValue('paciente.polo_base', undefined);
+          if (aldeia && optsA.length > 0 && !optsA.some((o) => o.value === aldeia)) setValue('paciente.aldeia', undefined);
+        }
+      } catch {
+        if (!cancelled) {
+          setDseiOptions([]);
+          setPoloOptions([]);
+          setAldeiaOptions([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingDsei(false);
+          setLoadingPolo(false);
+          setLoadingAldeia(false);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [dsei, poloBase, aldeia]);
+
+  const req = (key: string) => isFieldRequired(key);
+  const err = (key: string) => getError(key);
+
+  return (
+    <div className="space-y-4">
+      <SearchableSelect
+        label="Nome do distrito sanitário especial"
+        required={req('paciente.distrito_sanitario')}
+        value={dsei}
+        options={dseiOptions}
+        loading={loadingDsei}
+        disabled={!!disabled}
+        placeholder="Digite para pesquisar ou selecione (pode escolher em qualquer ordem)..."
+        emptyMessage="Nenhum DSEI encontrado"
+        error={err('paciente.distrito_sanitario')}
+        onSelect={(v) => setValue('paciente.distrito_sanitario', v)}
+        onClear={() => {
+          setValue('paciente.distrito_sanitario', undefined);
+          setValue('paciente.polo_base', undefined);
+          setValue('paciente.aldeia', undefined);
+        }}
+      />
+      <SearchableSelect
+        label="Nome do polo base"
+        required={req('paciente.polo_base')}
+        value={poloBase}
+        options={poloOptions}
+        loading={loadingPolo}
+        disabled={!!disabled}
+        placeholder="Digite para pesquisar ou selecione (pode escolher em qualquer ordem)..."
+        emptyMessage="Nenhum polo base encontrado"
+        error={err('paciente.polo_base')}
+        onSelect={(v) => setValue('paciente.polo_base', v)}
+        onClear={() => {
+          setValue('paciente.polo_base', undefined);
+          setValue('paciente.aldeia', undefined);
+        }}
+      />
+      <SearchableSelect
+        label="Nome da aldeia"
+        required={req('paciente.aldeia')}
+        value={aldeia}
+        options={aldeiaOptions}
+        loading={loadingAldeia}
+        disabled={!!disabled}
+        placeholder="Digite para pesquisar ou selecione (pode escolher em qualquer ordem)..."
+        emptyMessage="Nenhuma aldeia encontrada"
+        error={err('paciente.aldeia')}
+        onSelect={(v) => setValue('paciente.aldeia', v)}
+        onClear={() => setValue('paciente.aldeia', undefined)}
+      />
     </div>
   );
 };
