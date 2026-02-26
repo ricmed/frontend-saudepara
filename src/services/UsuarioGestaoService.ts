@@ -723,7 +723,8 @@ class UsuarioGestaoService {
       console.log(`✅ Carregados ${data.length} municípios para estado ${estadoId}`);
       return data.map((mun: any) => ({
         id: mun.id || mun.idtipo_municipio,
-        descricao: mun.descricao
+        descricao: mun.descricao,
+        codigo: mun.codigo,
       }));
     } catch (error) {
       console.error('Erro ao buscar municípios por estado:', error);

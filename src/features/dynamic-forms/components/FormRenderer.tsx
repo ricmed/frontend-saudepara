@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import type { FormSchema } from '@/services/FormService';
 import { useFormRenderer } from '../hooks/useFormRenderer';
 import { TextField, DateField, NumberField, TextareaField, CheckboxField } from './FormFields';
-import { SelectField, SelectSearchField, CodeListSelectField, CodeListSearchField, ApiSelectField, ApiSelectSearchField, DseiPoloAldeiaFields } from './SelectFields';
+import { SelectField, SelectSearchField, CodeListSelectField, CodeListSearchField, ApiSelectField, ApiSelectSearchField, CboSearchField, CnaeSearchField, DseiPoloAldeiaFields } from './SelectFields';
 import { 
   CheckboxGroupField, 
   RadioGroupField, 
@@ -18,6 +18,7 @@ import {
   IdadeField,
   InternationalPhoneField
 } from './AdvancedFields';
+import type { CepFoundDetail } from './AdvancedFields';
 import {
   FileUploadField,
   SignatureField,
@@ -31,6 +32,7 @@ import {
 } from './SpecialFields';
 import { EstadoMunicipioNotificacao } from './EstadoMunicipioNotificacao';
 import { EstabelecimentoNotificacao } from './EstabelecimentoNotificacao';
+import { EstadoMunicipioResidencia } from './EstadoMunicipioResidencia';
 import { convertLocalDateTimeToUTC } from '@/utils/timezoneUtils';
 
 const NOTIFICATION_LOCATION_KEYS = new Set([
@@ -43,6 +45,18 @@ const NOTIFICATION_ESTABELECIMENTO_KEYS = new Set([
   'notificacao.estabelecimento_cnes',
   'notificacao.estabelecimento',
   'notificacao.unidade_id',
+]);
+
+const RESIDENCIA_BLOCK_KEYS = new Set([
+  'residencia.cep',
+  'residencia.uf',
+  'residencia.municipio_ibge',
+  'residencia.bairro',
+  'residencia.logradouro',
+  'residencia.zona',
+  'residencia.numero',
+  'residencia.complemento',
+  'residencia.telefone',
 ]);
 
 /** Campos do bloco Identificação renderizados em layout customizado; Sexo ao nascimento fica ao lado de Idade; os demais (orientação sexual, etc.) renderizam no grid após o bloco */
@@ -260,6 +274,29 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   ]);
   const isFullWidth = (type: string) => fullWidthTypes.has(type);
 
+  const normalizeMaiusculo = (v: any) => {
+    if (v == null || v === '') return v;
+    return String(v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  };
+  const normalizeNumeroSN = (v: any) => {
+    if (v == null || v === '') return v;
+    const s = String(v).toUpperCase();
+    if (/[0-9]/.test(s)) return s.replace(/\D/g, ''); // só números: qualquer outro caractere removido
+    let result = '';
+    for (const c of s) {
+      if (c === 'S' && result === '') result = 'S';
+      else if (c === 'N' && result === 'S') result = 'SN';
+    }
+    return result;
+  };
+
+  const residenciaPlaceholders: Record<string, string> = {
+    'residencia.bairro': 'Ex.: NAZARÉ, JURUNAS',
+    'residencia.logradouro': 'Ex.: AV. CONSELHEIRO FURTADO, RUA 15 DE NOVEMBRO',
+    'residencia.numero': 'Ex.: 100, SN (sem número)',
+    'residencia.complemento': 'Ex.: APTO 101, CASA 2, FUNDOS',
+  };
+
   // Mapeamento por key: garante tipo/opções corretos mesmo quando o schema vem com type "text" do banco
   const getResolvedField = (field: any) => {
     const keyMap: Record<string, { type: string; options?: Array<{ value: string; label: string }>; apiSelectEndpoint?: string; maxLength?: number }> = {
@@ -276,8 +313,12 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       'paciente.nome_mae': { type: 'text', maxLength: 100 },
     };
     const over = keyMap[field.key];
-    if (!over) return field;
-    return { ...field, type: over.type, options: over.options ?? field.options, apiSelectEndpoint: over.apiSelectEndpoint ?? field.apiSelectEndpoint, maxLength: over.maxLength ?? field.maxLength };
+    const base = over
+      ? { ...field, type: over.type, options: over.options ?? field.options, apiSelectEndpoint: over.apiSelectEndpoint ?? field.apiSelectEndpoint, maxLength: over.maxLength ?? field.maxLength }
+      : field;
+    const placeholder = residenciaPlaceholders[base.key];
+    if (placeholder != null) return { ...base, placeholder: base.placeholder ?? placeholder };
+    return base;
   };
 
   const renderField = (field: any) => {
@@ -305,15 +346,17 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       disabled,
     };
 
-    const normalizeNomeMaiusculo = (v: any) => {
-      if (v == null || v === '') return v;
-      return String(v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-    };
     const isNomeOuNomeSocialOuNomeMae =
       resolved.key === 'paciente.nome' || resolved.key === 'paciente.nome_social' || resolved.key === 'paciente.nome_mae';
-    const textProps = isNomeOuNomeSocialOuNomeMae
-      ? { ...commonProps, onChange: (val: any) => setValue(resolved.key, normalizeNomeMaiusculo(val)) }
-      : commonProps;
+    const isResidenciaMaiusculo =
+      resolved.key === 'residencia.bairro' || resolved.key === 'residencia.logradouro' || resolved.key === 'residencia.complemento';
+    const isResidenciaNumero = resolved.key === 'residencia.numero';
+    let textProps = commonProps;
+    if (isNomeOuNomeSocialOuNomeMae || isResidenciaMaiusculo) {
+      textProps = { ...commonProps, onChange: (val: any) => setValue(resolved.key, normalizeMaiusculo(val)) };
+    } else if (isResidenciaNumero) {
+      textProps = { ...commonProps, onChange: (val: any) => setValue(resolved.key, normalizeNumeroSN(val)) };
+    }
 
     const isDataNascimento = resolved.key === 'paciente.data_nascimento';
     const MAX_IDADE_MESES = 120 * 12;
@@ -414,6 +457,12 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           return <CodeListSelectField {...commonProps} />;
         }
         if ((resolved as { apiSelectEndpoint?: string }).apiSelectEndpoint) {
+          if (resolved.key === 'paciente.ocupacao_cbo') {
+            return <CboSearchField {...commonProps} />;
+          }
+          if (resolved.key === 'paciente.atividade_cnae') {
+            return <CnaeSearchField {...commonProps} />;
+          }
           if (resolved.key === 'paciente.pais_nascimento_id') {
             return <ApiSelectSearchField {...commonProps} />;
           }
@@ -611,6 +660,80 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                   if (NOTIFICATION_LOCATION_KEYS.has(field.key) || NOTIFICATION_ESTABELECIMENTO_KEYS.has(field.key)) {
                     return null;
                   }
+                  const firstResidenciaField = sortedFields.find((f) => RESIDENCIA_BLOCK_KEYS.has(f.key));
+                  if (firstResidenciaField && field.key === firstResidenciaField.key) {
+                    const cepField = sortedFields.find((f) => f.key === 'residencia.cep');
+                    const bairroField = sortedFields.find((f) => f.key === 'residencia.bairro');
+                    const logradouroField = sortedFields.find((f) => f.key === 'residencia.logradouro');
+                    const zonaField = sortedFields.find((f) => f.key === 'residencia.zona');
+                    const numeroField = sortedFields.find((f) => f.key === 'residencia.numero');
+                    const complementoField = sortedFields.find((f) => f.key === 'residencia.complemento');
+                    const telefoneField = sortedFields.find((f) => f.key === 'residencia.telefone');
+                    const handleCepFound = (detail: CepFoundDetail) => {
+                      setValue('residencia.uf', detail.uf ?? '');
+                      setValue('residencia.municipio_ibge', detail.ibge ?? '');
+                      setValue('residencia.logradouro', normalizeMaiusculo(detail.logradouro ?? ''));
+                      setValue('residencia.bairro', normalizeMaiusculo(detail.bairro ?? ''));
+                    };
+                    return (
+                      <div key="residencia-block" className="md:col-span-2">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-3">Endereço de residência</h3>
+                        <div className="space-y-4">
+                          {cepField && (
+                            <CEPField
+                              field={getResolvedField(cepField)}
+                              value={getValue(cepField.key)}
+                              onChange={(v) => setValue(cepField.key, v)}
+                              error={getError(cepField.key)}
+                              required={isFieldRequired(cepField.key)}
+                              disabled={readOnly}
+                              onCepFound={handleCepFound}
+                            />
+                          )}
+                          <EstadoMunicipioResidencia
+                            getValue={getValue}
+                            setValue={setValue}
+                            disabled={readOnly}
+                            error={getError('residencia.uf') || getError('residencia.municipio_ibge')}
+                            required={isFieldRequired('residencia.uf') || isFieldRequired('residencia.municipio_ibge')}
+                          />
+                          {bairroField && (
+                            <div className="min-w-0">
+                              {renderField(getResolvedField(bairroField))}
+                            </div>
+                          )}
+                          {logradouroField && (
+                            <div className="min-w-0">
+                              {renderField(getResolvedField(logradouroField))}
+                            </div>
+                          )}
+                          {zonaField && (
+                            <div className="min-w-0">
+                              {renderField(getResolvedField(zonaField))}
+                            </div>
+                          )}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {numeroField && (
+                              <div className="min-w-0">
+                                {renderField(getResolvedField(numeroField))}
+                              </div>
+                            )}
+                            {complementoField && (
+                              <div className="min-w-0">
+                                {renderField(getResolvedField(complementoField))}
+                              </div>
+                            )}
+                          </div>
+                          {telefoneField && (
+                            <div className="min-w-0">
+                              {renderField(getResolvedField(telefoneField))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+                  if (RESIDENCIA_BLOCK_KEYS.has(field.key)) return null;
                   // Bloco Paciente - Identificação: quando Sim, Passaporte e País (ao lado) surgem embaixo de CNS/É estrangeiro e empurram Nome/Nome social pra baixo. País oculto quando Não; sem pré-seleção Brasil.
                   if (dtNotificacaoField && field.key === 'notificacao.dt_notificacao') {
                     const estrangeiroSim = getValue('paciente.e_estrangeiro') === '1';

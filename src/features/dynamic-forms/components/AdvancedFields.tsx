@@ -892,14 +892,24 @@ export const PassaporteField: React.FC<AdvancedFieldProps> = ({
   );
 };
 
-// ========== CEP FIELD (formatação + busca automática) ==========
-export const CEPField: React.FC<AdvancedFieldProps> = ({
+// ========== CEP FIELD (formatação + busca automática ViaCEP) ==========
+export type CepFoundDetail = {
+  cep: string;
+  logradouro?: string;
+  bairro?: string;
+  localidade?: string;
+  uf?: string;
+  ibge?: string;
+};
+
+export const CEPField: React.FC<AdvancedFieldProps & { onCepFound?: (detail: CepFoundDetail) => void }> = ({
   field,
   value,
   onChange,
   error,
   required,
   disabled,
+  onCepFound,
 }) => {
   const [loading, setLoading] = useState(false);
 
@@ -912,7 +922,6 @@ export const CEPField: React.FC<AdvancedFieldProps> = ({
     const formatted = formatCEP(e.target.value);
     onChange(formatted);
 
-    // Buscar endereço quando CEP estiver completo
     const cleanedCEP = formatted.replace(/\D/g, '');
     if (cleanedCEP.length === 8) {
       fetchAddress(cleanedCEP);
@@ -926,17 +935,16 @@ export const CEPField: React.FC<AdvancedFieldProps> = ({
       const data = await response.json();
       
       if (!data.erro) {
-        // Disparar evento customizado com dados do endereço
-        const event = new CustomEvent('cep-found', { 
-          detail: { 
-            cep,
-            logradouro: data.logradouro,
-            bairro: data.bairro,
-            cidade: data.localidade,
-            uf: data.uf
-          } 
-        });
-        window.dispatchEvent(event);
+        const detail: CepFoundDetail = {
+          cep,
+          logradouro: data.logradouro || '',
+          bairro: data.bairro || '',
+          localidade: data.localidade || '',
+          uf: data.uf || '',
+          ibge: data.ibge || '',
+        };
+        if (onCepFound) onCepFound(detail);
+        window.dispatchEvent(new CustomEvent('cep-found', { detail }));
       }
     } catch (err) {
       console.error('Erro ao buscar CEP:', err);

@@ -448,8 +448,8 @@ const FixedColumnsConfigPage: React.FC = () => {
                     <p className="text-gray-600 ml-2">paciente.nome, paciente.cpf, paciente.cns, paciente.data_nascimento, paciente.nome_mae</p>
                   </div>
                   <div>
-                    <strong className="text-yellow-900">Paciente - Sociodemográfico:</strong>
-                    <p className="text-gray-600 ml-2">paciente.sexo, paciente.raca_cor, paciente.escolaridade, paciente.ocupacao_cbo, paciente.gestante</p>
+                    <strong className="text-yellow-900">Dados do indivíduo:</strong>
+                    <p className="text-gray-600 ml-2">paciente.escolaridade, paciente.ocupacao_cbo, paciente.atividade_cnae, paciente.situacao_rua, paciente.profissional_saude, paciente.privado_liberdade, paciente.com_deficiencia, paciente.gestante</p>
                   </div>
                   <div>
                     <strong className="text-yellow-900">Endereço:</strong>

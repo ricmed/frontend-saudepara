@@ -9,9 +9,14 @@ const server = import.meta.env.VITE_API_SERVER;
 const port = import.meta.env.VITE_API_PORT;
 const API_BASE = `${server}:${port}/api`;
 
+/** Maiúsculas, sem acento e sem cedilha (ç/Ç → C). Usado em etnia, país nascimento, CBO. */
 function normalizeMaiusculoSemAcento(s: string): string {
   if (!s) return s;
-  return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  return String(s)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\u00E7/gi, 'C')
+    .toUpperCase();
 }
 
 interface SelectFieldProps {
@@ -106,7 +111,10 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const apiEndpoint = (field as FormField & { apiSelectEndpoint?: string }).apiSelectEndpoint;
-  const isPaisNascimento = (field as FormField & { key?: string }).key === 'paciente.pais_nascimento_id';
+  const fieldKey = (field as FormField & { key?: string }).key;
+  const isPaisNascimento = fieldKey === 'paciente.pais_nascimento_id';
+  const isEtnia = fieldKey === 'paciente.etnia';
+  const useMaiusculoSemAcento = isPaisNascimento || isEtnia;
 
   // País de nascimento: carregar como no notification forms (endpoint index com limit alto para todos os países)
   const fetchUrl = isPaisNascimento
@@ -157,7 +165,7 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
   const selectedLabel = value ? options.find((o) => o.value === value)?.label : '';
   const displayValue = showDropdown
     ? searchTerm
-    : (loading && value ? 'Carregando...' : (isPaisNascimento && selectedLabel ? normalizeMaiusculoSemAcento(selectedLabel) : selectedLabel));
+    : (loading && value ? 'Carregando...' : (useMaiusculoSemAcento && selectedLabel ? normalizeMaiusculoSemAcento(selectedLabel) : selectedLabel));
 
   return (
     <div className="mb-4">
@@ -194,9 +202,261 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
                 }}
                 className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
               >
-                {isPaisNascimento ? normalizeMaiusculoSemAcento(opt.label) : opt.label}
+                {useMaiusculoSemAcento ? normalizeMaiusculoSemAcento(opt.label) : opt.label}
               </div>
             ))}
+          </div>
+        )}
+      </div>
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+    </div>
+  );
+};
+
+/** Ocupação (CBO): pesquisa por código ou nome, exibe "codigo - profissão", valor salvo = código. Mesma lógica do notification forms. */
+export const CboSearchField: React.FC<SelectFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+}) => {
+  const [options, setOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [displayLabel, setDisplayLabel] = useState('');
+
+  // Resolver label quando value (codigo) está preenchido (ex.: formulário carregado)
+  useEffect(() => {
+    const codigo = value != null && value !== '' ? String(value).trim() : '';
+    if (!codigo) {
+      setDisplayLabel('');
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await axios.get(`${API_BASE}/tipo-cbo/codigo/${encodeURIComponent(codigo)}`, { withCredentials: true });
+        if (cancelled || !data) return;
+        const label = data.codigo && data.descricao ? `${data.codigo} - ${data.descricao}` : data.descricao || codigo;
+        setDisplayLabel(normalizeMaiusculoSemAcento(label));
+      } catch {
+        if (!cancelled) setDisplayLabel(codigo);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [value]);
+
+  // Busca ao digitar (mín. 3 caracteres)
+  useEffect(() => {
+    const term = (searchTerm || '').trim();
+    if (term.length < 3 || !showDropdown) {
+      setOptions([]);
+      return;
+    }
+    const t = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const { data } = await axios.get(`${API_BASE}/tipo-cbo/search`, {
+          params: { query: term, limit: 10000 },
+          withCredentials: true,
+        });
+        const list = (data?.data && Array.isArray(data.data)) ? data.data : [];
+        const opts = list.map((item: { codigo?: string; descricao?: string }) => {
+          const cod = item.codigo ?? '';
+          const desc = item.descricao ?? '';
+          return { value: cod, label: desc ? `${cod} - ${desc}` : cod };
+        });
+        setOptions(opts);
+      } catch {
+        setOptions([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchTerm, showDropdown]);
+
+  const selectedLabel = value ? options.find((o) => o.value === value)?.label : '';
+  const displayValue = showDropdown
+    ? searchTerm
+    : (normalizeMaiusculoSemAcento(displayLabel || selectedLabel) || (loading && value ? 'Carregando...' : ''));
+
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <div className="relative">
+        <input
+          type="text"
+          value={displayValue}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setShowDropdown(true);
+            if (!e.target.value) {
+              onChange(undefined);
+              setDisplayLabel('');
+            }
+          }}
+          onFocus={() => setShowDropdown(true)}
+          onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+          disabled={disabled || field.disabled}
+          placeholder="Digite o código ou nome da profissão (mín. 3 caracteres)..."
+          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+            error ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+          } ${disabled || field.disabled ? 'bg-gray-100' : ''}`}
+        />
+        {showDropdown && (searchTerm || '').trim().length >= 3 && (
+          <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+            {loading ? (
+              <div className="px-3 py-2 text-sm text-gray-500">Carregando...</div>
+            ) : options.length === 0 ? (
+              <div className="px-3 py-2 text-sm text-gray-500">Nenhuma profissão encontrada.</div>
+            ) : (
+              options.map((opt) => (
+                <div
+                  key={opt.value}
+                  onMouseDown={() => {
+                    onChange(opt.value);
+                    setDisplayLabel(normalizeMaiusculoSemAcento(opt.label));
+                    setSearchTerm('');
+                    setShowDropdown(false);
+                  }}
+                  className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+                >
+                  {normalizeMaiusculoSemAcento(opt.label)}
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+    </div>
+  );
+};
+
+/** Atividade econômica (CNAE): pesquisa por código ou nome, exibe "codigo - denominacao", valor = código. Maiúscula sem acento/cedilha. */
+export const CnaeSearchField: React.FC<SelectFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+}) => {
+  const [options, setOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [displayLabel, setDisplayLabel] = useState('');
+
+  useEffect(() => {
+    const codigo = value != null && value !== '' ? String(value).trim() : '';
+    if (!codigo) {
+      setDisplayLabel('');
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await axios.get(`${API_BASE}/tipo-cnae/codigo/${encodeURIComponent(codigo)}`, { withCredentials: true });
+        if (cancelled || !data) return;
+        const label = data.codigo && data.descricao ? `${data.codigo} - ${data.descricao}` : data.descricao || codigo;
+        setDisplayLabel(normalizeMaiusculoSemAcento(label));
+      } catch {
+        if (!cancelled) setDisplayLabel(normalizeMaiusculoSemAcento(codigo));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [value]);
+
+  useEffect(() => {
+    const term = (searchTerm || '').trim();
+    if (term.length < 2 || !showDropdown) {
+      setOptions([]);
+      return;
+    }
+    const t = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const { data } = await axios.get(`${API_BASE}/tipo-cnae/search`, {
+          params: { query: term, limit: 10000 },
+          withCredentials: true,
+        });
+        const list = (data?.data && Array.isArray(data.data)) ? data.data : [];
+        const opts = list.map((item: { codigo?: string; descricao?: string }) => {
+          const cod = item.codigo ?? '';
+          const desc = item.descricao ?? '';
+          return { value: cod, label: desc ? `${cod} - ${desc}` : cod };
+        });
+        setOptions(opts);
+      } catch {
+        setOptions([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchTerm, showDropdown]);
+
+  const selectedLabel = value ? options.find((o) => o.value === value)?.label : '';
+  const displayValue = showDropdown
+    ? searchTerm
+    : (normalizeMaiusculoSemAcento(displayLabel || selectedLabel) || (loading && value ? 'Carregando...' : ''));
+
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <div className="relative">
+        <input
+          type="text"
+          value={displayValue}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setShowDropdown(true);
+            if (!e.target.value) {
+              onChange(undefined);
+              setDisplayLabel('');
+            }
+          }}
+          onFocus={() => setShowDropdown(true)}
+          onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+          disabled={disabled || field.disabled}
+          placeholder="Digite o código ou a atividade econômica (mín. 2 caracteres)..."
+          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+            error ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+          } ${disabled || field.disabled ? 'bg-gray-100' : ''}`}
+        />
+        {showDropdown && (searchTerm || '').trim().length >= 2 && (
+          <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+            {loading ? (
+              <div className="px-3 py-2 text-sm text-gray-500">Carregando...</div>
+            ) : options.length === 0 ? (
+              <div className="px-3 py-2 text-sm text-gray-500">Nenhuma atividade encontrada.</div>
+            ) : (
+              options.map((opt) => (
+                <div
+                  key={opt.value}
+                  onMouseDown={() => {
+                    onChange(opt.value);
+                    setDisplayLabel(normalizeMaiusculoSemAcento(opt.label));
+                    setSearchTerm('');
+                    setShowDropdown(false);
+                  }}
+                  className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+                >
+                  {normalizeMaiusculoSemAcento(opt.label)}
+                </div>
+              ))
+            )}
           </div>
         )}
       </div>
