@@ -98,6 +98,45 @@ export interface FormField {
   accept?: string;
   maxSize?: number;
   maxFiles?: number;
+  /** Tipo tabela/grid: definição das colunas e valor = array de objetos */
+  tableColumns?: TableColumnDef[];
+  /** Rótulo do botão "Adicionar linha" (tipo table) */
+  addRowLabel?: string;
+  /** Número mínimo de linhas (tipo table). Opcional. */
+  minRows?: number;
+  /** Número máximo de linhas (tipo table). Opcional. */
+  maxRows?: number;
+  /** Exibir linha de totais no rodapé da tabela (soma das colunas numéricas). */
+  tableShowTotalRow?: boolean;
+  /** Rótulo da linha de totais (ex.: "TOTAL MÊS"). */
+  tableTotalRowLabel?: string;
+  /** Regras de validação da tabela (ex.: total ~100% na Frequência Relativa). */
+  tableValidations?: {
+    /** Chave da coluna a validar (ex.: "total"). */
+    totalColumnKey?: string;
+    totalMin?: number;
+    totalMax?: number;
+    message?: string;
+  };
+}
+
+/** Definição de uma coluna em um campo tipo table */
+export interface TableColumnDef {
+  key: string;
+  label: string;
+  type: 'text' | 'number' | 'select' | 'computed' | 'computedPct';
+  required?: boolean;
+  options?: Array<{ value: string; label: string }>;
+  apiSelectEndpoint?: string;
+  placeholder?: string;
+  min?: number;
+  max?: number;
+  /** Para type 'computed': chaves das colunas a somar na mesma linha (ex.: ["larv_aeg","pupa_aeg","exuv_aeg"]). */
+  sumKeys?: string[];
+  /** Para type 'computedPct': percentual = (numerador / soma(denominador)) * 100 (ex.: freq. relativa por tipo de recipiente). */
+  computedPct?: { numeratorKey: string; denominatorKeys: string[] };
+  /** Chaves do formulário para enviar como query params na API (ex.: ["crs_id"] → só municípios da CRS). */
+  apiSelectEndpointParams?: string[];
 }
 
 export interface FormRule {

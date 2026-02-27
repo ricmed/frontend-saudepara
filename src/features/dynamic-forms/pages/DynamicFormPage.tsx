@@ -5,7 +5,7 @@ import FormService, { type FormVersion } from '@/services/FormService';
 import FormSubmissionService from '@/services/FormSubmissionService';
 import { useAuth } from '@/keycloak/AuthProvider';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
-import { FileEdit, Eye } from 'lucide-react';
+import { FileEdit, Eye, FileSpreadsheet, FileText } from 'lucide-react';
 
 export const DynamicFormPage: React.FC = () => {
   const { agravo, id } = useParams<{ agravo: string; id?: string }>();
@@ -191,6 +191,51 @@ export const DynamicFormPage: React.FC = () => {
     );
   }
 
+  const handleExport = async (format: 'xlsx' | 'pdf') => {
+    if (!id) return;
+    try {
+      const { blob, filename } = await FormSubmissionService.downloadExport(Number(id), format);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      const data = err.response?.data;
+      let msg = 'Erro ao exportar.';
+      if (data instanceof Blob) {
+        try {
+          const j = JSON.parse(await data.text());
+          msg = j.message || j.error || msg;
+        } catch { /* ignore */ }
+      } else if (data?.message) msg = data.message;
+      alert(msg);
+    }
+  };
+
+  const isEntomologia = agravo === 'ENTOMOLOGIA_LARVAS';
+  const exportActions = isEntomologia && isViewMode && id ? (
+    <div className="flex gap-2">
+      <button
+        type="button"
+        onClick={() => handleExport('xlsx')}
+        className="px-3 py-2 bg-white text-emerald-600 rounded-md hover:bg-emerald-50 flex items-center gap-2 text-sm font-medium border border-emerald-200"
+      >
+        <FileSpreadsheet className="h-4 w-4" />
+        Exportar Excel
+      </button>
+      <button
+        type="button"
+        onClick={() => handleExport('pdf')}
+        className="px-3 py-2 bg-white text-gray-600 rounded-md hover:bg-gray-50 flex items-center gap-2 text-sm font-medium border border-gray-200"
+      >
+        <FileText className="h-4 w-4" />
+        Exportar PDF
+      </button>
+    </div>
+  ) : undefined;
+
   return (
     <AppPageLayout
       title={isViewMode ? 'Visualizar Notificação' : (isEditMode ? 'Editar Notificação' : 'Nova Notificação')}
@@ -198,6 +243,7 @@ export const DynamicFormPage: React.FC = () => {
       icon={isViewMode ? <Eye className="h-8 w-8" /> : <FileEdit className="h-8 w-8" />}
       variant="desktop"
       showBottomNav={false}
+      headerActions={exportActions}
     >
         {saving && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

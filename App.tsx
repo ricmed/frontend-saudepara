@@ -140,6 +140,7 @@ import { FormsListPage } from '@/features/dynamic-forms/pages/FormsListPage';
 import { FormBuilderPage } from '@/features/dynamic-forms/pages/FormBuilderPage';
 import { FormAdminListPage } from '@/features/dynamic-forms/pages/FormAdminListPage';
 import { FormSubmissionsListPage } from '@/features/dynamic-forms/pages/FormSubmissionsListPage';
+import { EntomologiaLarvasDashboardPage } from '@/features/dynamic-forms/pages/EntomologiaLarvasDashboardPage';
 import FixedColumnsConfigPage from '@/features/dynamic-forms/pages/FixedColumnsConfigPage';
 // Componente de layout protegido
 const ProtectedLayout = () => {
@@ -286,6 +287,7 @@ function App() {
               
               {/* ✅ NOVO: Rotas de Formulários Dinâmicos (SINAN/e-SUS style) */}
               <Route path="/private/formularios" element={<FormsListPage />} />
+              <Route path="/private/entomologia-larvas" element={<EntomologiaLarvasDashboardPage />} />
               <Route path="/private/formularios/:agravo" element={<FormSubmissionsListPage />} />
               <Route path="/private/formularios/:agravo/nova" element={<DynamicFormPage />} />
               <Route path="/private/formularios/:agravo/editar/:id" element={<DynamicFormPage />} />

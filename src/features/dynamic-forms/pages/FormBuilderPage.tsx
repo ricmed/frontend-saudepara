@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/keycloak/AuthProvider';
-import FormService, { type FormSchema, type FormSection, type FormField, type FormRule, type RuleCondition, type RuleAction } from '@/services/FormService';
+import FormService, { type FormSchema, type FormSection, type FormField, type FormRule, type RuleCondition, type RuleAction, type TableColumnDef } from '@/services/FormService';
 import DatabaseService, { type TableColumn } from '@/services/DatabaseService';
 import { Plus, Trash2, Save, Eye, Settings, GripVertical, X, Download, Upload, ChevronUp, ChevronDown, Code, FileEdit, Check } from 'lucide-react';
 import { FormRenderer } from '../components/FormRenderer';
@@ -175,6 +175,17 @@ export const FormBuilderPage: React.FC = () => {
     };
     if (type === 'text') return { ...base, maxLength: 255 };
     if (type === 'textarea') return { ...base, maxLength: 1500 };
+    if (type === 'table') {
+      return {
+        ...base,
+        label: 'Nova Tabela',
+        tableColumns: [
+          { key: 'coluna_1', label: 'Coluna 1', type: 'text' },
+          { key: 'coluna_2', label: 'Coluna 2', type: 'number' },
+        ],
+        addRowLabel: 'Adicionar linha',
+      } as FormField;
+    }
     return base as FormField;
   };
 
@@ -443,6 +454,7 @@ export const FormBuilderPage: React.FC = () => {
     { value: 'text', label: '📝 Texto' },
     { value: 'number', label: '🔢 Número' },
     { value: 'date', label: '📅 Data' },
+    { value: 'month', label: '📅 Mês/Ano' },
     { value: 'datetime', label: '🕐 Data e Hora' },
     { value: 'time', label: '⏰ Hora' },
     { value: 'email', label: '📧 Email' },
@@ -464,7 +476,8 @@ export const FormBuilderPage: React.FC = () => {
     { value: 'color', label: '🎨 Seletor de Cor' },
     { value: 'slider', label: '🎚️ Slider' },
     { value: 'rating', label: '⭐ Avaliação (Estrelas)' },
-    { value: 'google-address', label: '🗺️ Endereço (Google Maps)' }
+    { value: 'google-address', label: '🗺️ Endereço (Google Maps)' },
+    { value: 'table', label: '📊 Tabela / Grid' }
   ];
 
   return (
@@ -985,6 +998,177 @@ export const FormBuilderPage: React.FC = () => {
                                       <option key={n} value={n}>{n}</option>
                                     ))}
                                   </select>
+                                </div>
+                              </div>
+                            )}
+                            {field.type === 'table' && (
+                              <div className="mt-3 p-3 border border-gray-200 rounded-lg bg-gray-50 w-full">
+                                <div className="flex items-center justify-between mb-2">
+                                  <label className="text-xs font-medium text-gray-700">Colunas da tabela</label>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const cols = field.tableColumns ?? [];
+                                      const newCol: TableColumnDef = {
+                                        key: `col_${Date.now()}`,
+                                        label: `Coluna ${cols.length + 1}`,
+                                        type: 'text',
+                                      };
+                                      updateField(sectionIdx, fieldIdx, { tableColumns: [...cols, newCol] });
+                                    }}
+                                    className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                                  >
+                                    <Plus className="h-3 w-3 inline mr-1" />
+                                    Adicionar coluna
+                                  </button>
+                                </div>
+                                <div className="space-y-2 max-h-48 overflow-y-auto">
+                                  {(field.tableColumns ?? []).map((col, colIdx) => (
+                                    <div key={colIdx} className="flex flex-wrap items-center gap-2 p-2 bg-white border rounded">
+                                      <input
+                                        type="text"
+                                        value={col.key}
+                                        onChange={(e) => {
+                                          const next = [...(field.tableColumns ?? [])];
+                                          next[colIdx] = { ...next[colIdx], key: e.target.value };
+                                          updateField(sectionIdx, fieldIdx, { tableColumns: next });
+                                        }}
+                                        placeholder="Chave (ex: tubos_com_larvas)"
+                                        className="w-32 px-2 py-1 text-xs border border-gray-300 rounded"
+                                      />
+                                      <input
+                                        type="text"
+                                        value={col.label}
+                                        onChange={(e) => {
+                                          const next = [...(field.tableColumns ?? [])];
+                                          next[colIdx] = { ...next[colIdx], label: e.target.value };
+                                          updateField(sectionIdx, fieldIdx, { tableColumns: next });
+                                        }}
+                                        placeholder="Rótulo"
+                                        className="w-28 px-2 py-1 text-xs border border-gray-300 rounded"
+                                      />
+                                      <select
+                                        value={col.type}
+                                        onChange={(e) => {
+                                          const next = [...(field.tableColumns ?? [])];
+                                          next[colIdx] = { ...next[colIdx], type: e.target.value as 'text' | 'number' | 'select' | 'computed' | 'computedPct' };
+                                          updateField(sectionIdx, fieldIdx, { tableColumns: next });
+                                        }}
+                                        className="px-2 py-1 text-xs border border-gray-300 rounded"
+                                      >
+                                        <option value="text">Texto</option>
+                                        <option value="number">Número</option>
+                                        <option value="select">Seleção</option>
+                                        <option value="computed">Calculada (soma)</option>
+                                        <option value="computedPct">Calculada (%)</option>
+                                      </select>
+                                      {col.type === 'select' && (
+                                        <input
+                                          type="text"
+                                          value={col.apiSelectEndpoint ?? ''}
+                                          onChange={(e) => {
+                                            const next = [...(field.tableColumns ?? [])];
+                                            next[colIdx] = { ...next[colIdx], apiSelectEndpoint: e.target.value || undefined };
+                                            updateField(sectionIdx, fieldIdx, { tableColumns: next });
+                                          }}
+                                          placeholder="API (ex: crs/select)"
+                                          className="w-28 px-2 py-1 text-xs border border-gray-300 rounded"
+                                        />
+                                      )}
+                                      {col.type === 'computed' && (
+                                        <input
+                                          type="text"
+                                          value={(col.sumKeys ?? []).join(', ')}
+                                          onChange={(e) => {
+                                            const next = [...(field.tableColumns ?? [])];
+                                            const sumKeys = e.target.value.split(',').map((s) => s.trim()).filter(Boolean);
+                                            next[colIdx] = { ...next[colIdx], sumKeys };
+                                            updateField(sectionIdx, fieldIdx, { tableColumns: next });
+                                          }}
+                                          placeholder="Chaves a somar (ex: larv_aeg, pupa_aeg, exuv_aeg)"
+                                          className="w-48 px-2 py-1 text-xs border border-gray-300 rounded"
+                                        />
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const next = (field.tableColumns ?? []).filter((_, i) => i !== colIdx);
+                                          updateField(sectionIdx, fieldIdx, { tableColumns: next });
+                                        }}
+                                        className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                        title="Remover coluna"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                  <input
+                                    type="text"
+                                    value={field.addRowLabel ?? ''}
+                                    onChange={(e) => updateField(sectionIdx, fieldIdx, { addRowLabel: e.target.value })}
+                                    placeholder="Texto do botão (ex: Adicionar linha)"
+                                    className="flex-1 min-w-[120px] px-2 py-1 text-xs border border-gray-300 rounded"
+                                  />
+                                  <span className="text-xs text-gray-500">Máx. linhas:</span>
+                                  <input
+                                    type="number"
+                                    value={field.maxRows ?? ''}
+                                    onChange={(e) => updateField(sectionIdx, fieldIdx, { maxRows: e.target.value ? Number(e.target.value) : undefined })}
+                                    className="w-20 px-2 py-1 text-xs border border-gray-300 rounded"
+                                    placeholder="500"
+                                  />
+                                </div>
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                  <label className="flex items-center gap-1 text-xs">
+                                    <input
+                                      type="checkbox"
+                                      checked={field.tableShowTotalRow ?? false}
+                                      onChange={(e) => updateField(sectionIdx, fieldIdx, { tableShowTotalRow: e.target.checked })}
+                                      className="rounded"
+                                    />
+                                    Linha TOTAL
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={field.tableTotalRowLabel ?? ''}
+                                    onChange={(e) => updateField(sectionIdx, fieldIdx, { tableTotalRowLabel: e.target.value })}
+                                    placeholder="Rótulo (ex: TOTAL MÊS)"
+                                    className="w-32 px-2 py-1 text-xs border border-gray-300 rounded"
+                                  />
+                                </div>
+                                <div className="mt-2 p-2 bg-white border rounded text-xs">
+                                  <span className="font-medium text-gray-700">Validação (total %):</span>
+                                  <div className="flex flex-wrap gap-2 mt-1">
+                                    <input
+                                      type="text"
+                                      value={field.tableValidations?.totalColumnKey ?? ''}
+                                      onChange={(e) => updateField(sectionIdx, fieldIdx, {
+                                        tableValidations: { ...field.tableValidations, totalColumnKey: e.target.value || undefined },
+                                      })}
+                                      placeholder="Coluna (ex: total)"
+                                      className="w-20 px-2 py-1 border border-gray-300 rounded"
+                                    />
+                                    <input
+                                      type="number"
+                                      value={field.tableValidations?.totalMin ?? ''}
+                                      onChange={(e) => updateField(sectionIdx, fieldIdx, {
+                                        tableValidations: { ...field.tableValidations, totalMin: e.target.value ? Number(e.target.value) : undefined },
+                                      })}
+                                      placeholder="Mín %"
+                                      className="w-16 px-2 py-1 border border-gray-300 rounded"
+                                    />
+                                    <input
+                                      type="number"
+                                      value={field.tableValidations?.totalMax ?? ''}
+                                      onChange={(e) => updateField(sectionIdx, fieldIdx, {
+                                        tableValidations: { ...field.tableValidations, totalMax: e.target.value ? Number(e.target.value) : undefined },
+                                      })}
+                                      placeholder="Máx %"
+                                      className="w-16 px-2 py-1 border border-gray-300 rounded"
+                                    />
+                                  </div>
                                 </div>
                               </div>
                             )}

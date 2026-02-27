@@ -291,6 +291,24 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
         }
       }
 
+      // Tabela: validação de coluna total (ex.: Frequência Relativa ~100%)
+      const tableVal = field.tableValidations;
+      if (field.type === 'table' && tableVal?.totalColumnKey && Array.isArray(value) && value.length > 0) {
+        const { totalColumnKey, totalMin = 99, totalMax = 101, message } = tableVal;
+        const badRow = value.findIndex((row: Record<string, any>) => {
+          const v = Number(row?.[totalColumnKey]);
+          if (Number.isNaN(v)) return true; // vazio ou inválido conta como erro
+          return v < totalMin || v > totalMax;
+        });
+        if (badRow !== -1) {
+          setError(
+            field.key,
+            message ?? `Na linha ${badRow + 1}: o total deve estar entre ${totalMin}% e ${totalMax}%.`
+          );
+          return false;
+        }
+      }
+
       clearError(field.key);
       return true;
     },

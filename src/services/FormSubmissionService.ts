@@ -60,6 +60,10 @@ export interface FormSubmissionFilters {
   municipio_id?: number;
   unidade_id?: number;
   created_by?: string;
+  /** Filtro por CRS (data_json.crs_id – ex.: entomologia) */
+  crs_id?: number;
+  /** Filtro por competência mês/ano (data_json.competencia – ex.: "2026-01") */
+  competencia?: string;
   page?: number;
   limit?: number;
 }
@@ -191,6 +195,22 @@ class FormSubmissionService {
       console.error('Erro ao deletar submission:', error);
       throw error;
     }
+  }
+
+  /**
+   * Download da exportação (Excel ou PDF) para formulário Entomologia – Controle de Qualidade de Larvas.
+   * Retorna o blob e o nome do arquivo para disparar o download no cliente.
+   */
+  async downloadExport(id: number, format: 'xlsx' | 'pdf'): Promise<{ blob: Blob; filename: string }> {
+    const response = await api.get(`/submissions/${id}/export`, {
+      params: { format },
+      responseType: 'blob',
+    });
+    const blob = response.data as Blob;
+    const disp = response.headers['content-disposition'];
+    const match = typeof disp === 'string' ? /filename="?([^"]+)"?/.exec(disp) : null;
+    const filename = match?.[1] ?? `entomologia-larvas-${id}.${format}`;
+    return { blob, filename };
   }
 }
 

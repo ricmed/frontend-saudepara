@@ -33,6 +33,7 @@ import {
 import { EstadoMunicipioNotificacao } from './EstadoMunicipioNotificacao';
 import { EstabelecimentoNotificacao } from './EstabelecimentoNotificacao';
 import { EstadoMunicipioResidencia } from './EstadoMunicipioResidencia';
+import { TableField } from './TableField';
 import { convertLocalDateTimeToUTC } from '@/utils/timezoneUtils';
 
 const NOTIFICATION_LOCATION_KEYS = new Set([
@@ -271,6 +272,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     'rating',
     'color',
     'autocomplete',
+    'table',
   ]);
   const isFullWidth = (type: string) => fullWidthTypes.has(type);
 
@@ -416,6 +418,23 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
         return <TextField {...textProps} />;
       case 'date':
         return <DateField {...dateProps} />;
+      case 'month':
+        return (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {resolved.label}
+              {required && <span className="text-red-500 ml-1">*</span>}
+            </label>
+            <input
+              type="month"
+              value={value ?? ''}
+              onChange={(e) => setValue(resolved.key, e.target.value || undefined)}
+              disabled={disabled}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${error ? 'border-red-500' : 'border-gray-300'}`}
+            />
+            {error && <p className="mt-1 text-sm text-red-500">{error}</p>}
+          </div>
+        );
       case 'datetime':
         return <DateTimeField {...commonProps} />;
       case 'time':
@@ -549,6 +568,9 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
         if (field.codeList) {
           return <CodeListSearchField {...commonProps} />;
         }
+        if ((field as { apiSelectEndpoint?: string }).apiSelectEndpoint) {
+          return <ApiSelectSearchField {...commonProps} />;
+        }
         return <SelectSearchField {...commonProps} />;
       case 'multi-select':
         return <MultiSelectField {...commonProps} />;
@@ -586,6 +608,8 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
         return <GoogleMapsAddressField {...commonProps} />;
       case 'address':
         return <AddressField {...commonProps} />;
+      case 'table':
+        return <TableField {...commonProps} getValue={getValue} />;
       default:
         return (
           <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
