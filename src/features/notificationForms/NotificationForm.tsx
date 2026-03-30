@@ -220,6 +220,7 @@ const NotificationForm: React.FC = () => {
               <button
                 type="submit"
                 form="notification-form"
+                data-testid="notification-save-submit"
                 disabled={isSaving}
                 className="p-2 sm:w-auto sm:inline-flex sm:items-center sm:justify-center sm:gap-2 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                 title="Salvar"

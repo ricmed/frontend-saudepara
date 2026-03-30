@@ -190,6 +190,7 @@ const LoginPage = () => {
                 <input
                   type="text"
                   required
+                  data-testid="login-username"
                   className="appearance-none rounded-t-md relative block w-full px-10 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-600 focus:border-blue-600 focus:z-10"
                   placeholder={t('login.username.placeholder')}
                   value={username}
@@ -204,6 +205,7 @@ const LoginPage = () => {
                 <input
                   type="password"
                   required
+                  data-testid="login-password"
                   className="appearance-none rounded-b-md relative block w-full px-10 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-600 focus:border-blue-600 focus:z-10"
                   placeholder={t('login.password.placeholder')}
                   value={password}
@@ -237,6 +239,7 @@ const LoginPage = () => {
             <div>
               <button
                 type="submit"
+                data-testid="login-submit"
                 disabled={!isOnline}
                 className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 transition duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
               >
