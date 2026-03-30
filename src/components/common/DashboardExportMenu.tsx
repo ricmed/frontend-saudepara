@@ -188,7 +188,6 @@ const DashboardExportMenu: React.FC<DashboardExportMenuProps> = ({
         serieTemporalDataLength: serieTemporalData?.length || 0
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showMenu, hasData, totalRecords, municipioData.length, crsData.length, nheData.length, cievsData.length, daeData.length, serieTemporalData?.length]);
 
   return (

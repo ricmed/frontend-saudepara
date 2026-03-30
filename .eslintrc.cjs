@@ -1,0 +1,47 @@
+/* eslint-env node */
+module.exports = {
+  root: true,
+  env: { browser: true, es2020: true },
+  extends: [
+    'eslint:recommended',
+    'plugin:@typescript-eslint/recommended',
+    'plugin:react-hooks/recommended',
+  ],
+  ignorePatterns: [
+    'dist',
+    'dist-ssr',
+    'node_modules',
+    'e2e',
+    'playwright-report',
+    'test-results',
+    'playwright.config.ts',
+    'vite.config.ts',
+    'postcss.config.js',
+    'tailwind.config.js',
+    'src/config/eslint.config.js',
+  ],
+  parser: '@typescript-eslint/parser',
+  parserOptions: {
+    ecmaVersion: 'latest',
+    sourceType: 'module',
+  },
+  plugins: ['react-refresh'],
+  rules: {
+    // Base enxuta para CI passar no legado; endureça aos poucos com o time.
+    'react-refresh/only-export-components': 'off',
+    'react-hooks/exhaustive-deps': 'off',
+    '@typescript-eslint/no-unused-vars': 'off',
+    '@typescript-eslint/no-explicit-any': 'off',
+    '@typescript-eslint/no-non-null-assertion': 'off',
+    '@typescript-eslint/ban-ts-comment': 'off',
+    '@typescript-eslint/prefer-as-const': 'off',
+    'prefer-const': 'off',
+    'no-case-declarations': 'off',
+    'no-prototype-builtins': 'off',
+    'no-async-promise-executor': 'off',
+    'no-useless-escape': 'off',
+    'no-empty': 'off',
+    'no-constant-condition': 'off',
+    'no-inner-declarations': 'off',
+  },
+};

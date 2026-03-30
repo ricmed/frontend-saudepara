@@ -30,7 +30,6 @@ const ListaNotificacoes: React.FC = () => {
     if (selectedTipoAtendimento && notifications.allNotificacoes.length === 0) {
       notifications.fetchAllData();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTipoAtendimento]);
   
   // Refs para CSVLink
