@@ -8,7 +8,8 @@
     "build": "tsc && vite build",
     "lint": "eslint \"src/**/*.{ts,tsx}\" --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:unit": "vitest run"
   },
   "dependencies": {
     "@google-cloud/text-to-speech": "^5.6.0",
@@ -60,6 +61,8 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.2",
     "@types/dom-to-image": "^2.6.7",
     "@types/file-saver": "^2.0.7",
     "@types/google.maps": "^3.58.1",
@@ -78,6 +81,7 @@
     "eslint": "8.56.0",
     "eslint-plugin-react-hooks": "4.6.0",
     "eslint-plugin-react-refresh": "0.4.5",
+    "jsdom": "^25.0.1",
     "node-fetch": "^2.7.0",
     "postcss": "8.4.32",
     "prettier": "^3.4.2",
@@ -85,6 +89,7 @@
     "typescript": "^5.3.3",
     "vite": "^5.4.15",
     "vite-plugin-pwa": "^1.0.0",
+    "vitest": "^2.1.8",
     "workbox-window": "^7.3.0"
   }
 }

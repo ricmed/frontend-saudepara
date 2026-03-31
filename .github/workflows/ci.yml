@@ -25,6 +25,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Unit tests (Vitest)
+        run: npm run test:unit
+
       - name: Install Playwright (Chromium only)
         run: npx playwright install chromium --with-deps
 
