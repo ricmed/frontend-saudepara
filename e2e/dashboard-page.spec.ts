@@ -197,6 +197,14 @@ test.describe('Dashboard (Cirio) page', () => {
     await page.getByRole('button', { name: 'Aplicar' }).click();
 
     await expect(totalValue).toContainText('1', { timeout: 60_000 });
+
+    // Desativar pelo toggle e garantir que volta ao total completo
+    await page.getByTitle('Desativar filtro de período').click();
+    await expect(totalValue).toContainText('2', { timeout: 60_000 });
+
+    // Resetar deve limpar config salva e manter filtro desabilitado
+    await page.getByTitle('Resetar e limpar configuração salva').click();
+    await expect(page.getByText('Mostrando todas as notificações')).toBeVisible();
   });
 });
 
