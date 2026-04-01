@@ -109,7 +109,7 @@ export const DynamicFormPage: React.FC = () => {
           console.log('Resultado submitSubmission:', result);
         } else {
           // Se salvou como rascunho, redirecionar para edição
-          navigate(`/private/formularios-dinamicos/editar/${submission.id}`, { replace: true });
+          navigate(`/private/formularios/${agravo}/editar/${submission.id}`, { replace: true });
         }
       }
 
