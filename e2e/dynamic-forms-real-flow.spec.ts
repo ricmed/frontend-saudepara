@@ -17,11 +17,30 @@ const runReal = process.env.E2E_REAL_FORMS === '1';
 const hasAdminCreds = Boolean(adminUser && adminPass);
 
 async function login(page: Page, username: string, password: string) {
-  await page.goto('/login');
-  await page.getByTestId('login-username').fill(username);
-  await page.getByTestId('login-password').fill(password);
-  await page.getByTestId('login-submit').click();
-  await page.waitForURL((url) => !url.pathname.endsWith('/login'), { timeout: 90_000 });
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+
+  const usernameInput = page.getByTestId('login-username');
+  const passwordInput = page.getByTestId('login-password');
+  const submitButton = page.getByTestId('login-submit');
+
+  // Em ambientes implantados, /login pode redirecionar de imediato se a sessão ainda for válida.
+  const landing = await Promise.race([
+    usernameInput
+      .waitFor({ state: 'visible', timeout: 30_000 })
+      .then(() => 'form' as const)
+      .catch(() => 'timeout' as const),
+    page
+      .waitForURL((url) => !/^\/login\/?$/.test(url.pathname), { timeout: 30_000, waitUntil: 'domcontentloaded' })
+      .then(() => 'redirect' as const)
+      .catch(() => 'timeout' as const),
+  ]);
+
+  if (landing === 'redirect') return;
+
+  await usernameInput.fill(username);
+  await passwordInput.fill(password);
+  await submitButton.click();
+  await page.waitForURL((url) => !/^\/login\/?$/.test(url.pathname), { timeout: 90_000, waitUntil: 'domcontentloaded' });
 
   // PIN opcional
   const pinLater = page.getByTestId('setup-pin-later');
@@ -108,11 +127,31 @@ test.describe('Formulários dinâmicos — fluxo REAL (seed + submit)', () => {
       expect(toggleActive.ok()).toBeTruthy();
 
       // 4) UI: lista → abre → nova → envia
-      await page.goto('/private/formularios');
-      await expect(page.getByRole('heading', { name: 'Formulários de Notificação' })).toBeVisible({ timeout: 60_000 });
+      // Em ambientes deploy, pode haver atraso até o seed aparecer na listagem (cache/indexação).
+      // Preferimos abrir diretamente pelo `agravo` e, se necessário, recarregar a lista algumas vezes.
+      const openByAgravo = async () => {
+        await page.goto(`/private/formularios/${agravo}`, { waitUntil: 'domcontentloaded' });
+        await expect(page).toHaveURL(new RegExp(`/private/formularios/${agravo}/?$`), { timeout: 60_000 });
+        await expect(page.getByRole('button', { name: /Nova Notificação/i })).toBeVisible({ timeout: 90_000 });
+      };
 
-      await expect(page.getByRole('heading', { name: formName })).toBeVisible({ timeout: 90_000 });
-      await page.getByRole('heading', { name: formName }).click();
+      try {
+        await openByAgravo();
+      } catch {
+        await page.goto('/private/formularios', { waitUntil: 'domcontentloaded' });
+        await expect(page.getByRole('heading', { name: 'Formulários de Notificação' })).toBeVisible({ timeout: 90_000 });
+
+        const item = page.getByRole('heading', { name: formName });
+        const maxAttempts = 6;
+        for (let i = 0; i < maxAttempts; i++) {
+          if (await item.isVisible().catch(() => false)) break;
+          await page.reload({ waitUntil: 'domcontentloaded' });
+          await page.waitForTimeout(2_000);
+        }
+        await expect(item).toBeVisible({ timeout: 90_000 });
+        await item.click();
+        await expect(page.getByRole('button', { name: /Nova Notificação/i })).toBeVisible({ timeout: 90_000 });
+      }
 
       await expect(page).toHaveURL(new RegExp(`/private/formularios/${agravo}/?$`), { timeout: 60_000 });
       await page.getByRole('button', { name: /Nova Notificação/i }).click();
