@@ -93,7 +93,10 @@ async function logout(page: Page) {
   await confirm.click();
 
   // Alguns ambientes redirecionam para /login/ (barra final) ou apenas trocam rota SPA.
-  // Esperar por URL de login OU pelos campos da tela de login aparecerem.
+  // Em HML, após logout pode cair em "/" (página pública). Então consideramos sucesso se:
+  // - URL ficar /login ou /login/
+  // - UI de login aparecer
+  // - endpoint protegido /api-auth/protected/profile deixar de responder 2xx
   const usernameInput = page.getByTestId('login-username');
   const result = await Promise.race([
     page
@@ -103,6 +106,17 @@ async function logout(page: Page) {
     usernameInput
       .waitFor({ state: 'visible', timeout: 90_000 })
       .then(() => 'ui' as const)
+      .catch(() => 'timeout' as const),
+    expect
+      .poll(
+        async () => {
+          const res = await page.request.get('/api-auth/protected/profile');
+          return res.ok();
+        },
+        { timeout: 90_000 },
+      )
+      .toBe(false)
+      .then(() => 'profile' as const)
       .catch(() => 'timeout' as const),
   ]);
 
