@@ -61,7 +61,13 @@ test.describe('Formulários — editar e enviar (update + submit)', () => {
   test('edita campo, clica Atualizar e Enviar, chama PUT e POST submit', async ({ page }) => {
     await offlineNotificador(page);
 
-    page.on('dialog', (d) => d.accept());
+    page.on('dialog', async (d) => {
+      try {
+        await d.accept();
+      } catch {
+        // Pode disparar no fim do teste; não deve falhar o spec por isso.
+      }
+    });
 
     let updateBody: any = null;
     let submitBody: any = null;
