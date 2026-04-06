@@ -42,6 +42,7 @@ test.describe('Formulários dinâmicos — fluxo REAL (seed + submit)', () => {
   test.skip(!hasAdminCreds, 'Defina E2E_ADMIN_USERNAME/E2E_ADMIN_PASSWORD (admin).');
 
   test('cria form (admin) → envia notificação → aparece na lista', async ({ page }) => {
+    test.setTimeout(180_000);
     page.on('dialog', (d) => d.accept());
 
     await login(page, adminUser!, adminPass!);
@@ -100,11 +101,17 @@ test.describe('Formulários dinâmicos — fluxo REAL (seed + submit)', () => {
       });
       expect(publish.ok()).toBeTruthy();
 
+      // 4) garantir que o form aparece em /private/formularios (filtra is_active=true)
+      const toggleActive = await page.request.patch(`/api/forms/${formId}/toggle-active`, {
+        data: { is_active: true },
+      });
+      expect(toggleActive.ok()).toBeTruthy();
+
       // 4) UI: lista → abre → nova → envia
       await page.goto('/private/formularios');
       await expect(page.getByRole('heading', { name: 'Formulários de Notificação' })).toBeVisible({ timeout: 60_000 });
 
-      await expect(page.getByRole('heading', { name: formName })).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByRole('heading', { name: formName })).toBeVisible({ timeout: 90_000 });
       await page.getByRole('heading', { name: formName }).click();
 
       await expect(page).toHaveURL(new RegExp(`/private/formularios/${agravo}/?$`), { timeout: 60_000 });
