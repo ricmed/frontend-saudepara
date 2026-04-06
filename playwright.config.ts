@@ -19,7 +19,11 @@ export default defineConfig({
   webServer: useDeployedEnv
     ? undefined
     : {
-        command: 'npm run build && npm run preview -- --host 127.0.0.1 --port 4173 --strictPort',
+        // Em ambiente local, preferimos build em "development" para respeitar `.env.local`
+        // (o build padrão usa mode=production e `.env.production` pode apontar para HML/PRD).
+        command: process.env.CI
+          ? 'npm run build && npm run preview -- --host 127.0.0.1 --port 4173 --strictPort'
+          : 'npm run build -- --mode development && npm run preview -- --host 127.0.0.1 --port 4173 --strictPort',
         url: 'http://127.0.0.1:4173',
         reuseExistingServer: !process.env.CI,
         timeout: 180_000,

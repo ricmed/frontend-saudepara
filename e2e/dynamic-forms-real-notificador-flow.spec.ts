@@ -24,7 +24,37 @@ async function login(page: Page, username: string, password: string) {
   await page.getByTestId('login-username').fill(username);
   await page.getByTestId('login-password').fill(password);
   await page.getByTestId('login-submit').click();
-  await page.waitForURL((url) => !url.pathname.endsWith('/login'), { timeout: 90_000 });
+
+  const errorBox = page.locator('.bg-red-100.border-red-400');
+  const offlineWarning = page.getByText('Sem Conexão', { exact: true });
+
+  // Em alguns ambientes a navegação SPA não chega a disparar "load".
+  // Esperar sair de /login (domcontentloaded) OU aparecer erro.
+  const result = await Promise.race([
+    page
+      .waitForURL((url) => !url.pathname.endsWith('/login'), { timeout: 90_000, waitUntil: 'domcontentloaded' })
+      .then(() => 'ok' as const)
+      .catch(() => 'timeout' as const),
+    errorBox
+      .waitFor({ state: 'visible', timeout: 90_000 })
+      .then(() => 'error' as const)
+      .catch(() => 'timeout' as const),
+    offlineWarning
+      .waitFor({ state: 'visible', timeout: 90_000 })
+      .then(() => 'offline' as const)
+      .catch(() => 'timeout' as const),
+  ]);
+
+  if (result === 'error') {
+    const msg = (await errorBox.textContent().catch(() => ''))?.trim() || 'erro no login';
+    throw new Error(`Falha no login (mensagem): ${msg}`);
+  }
+  if (result === 'offline') {
+    throw new Error('Login detectou estado offline na tela (/login).');
+  }
+  if (result === 'timeout') {
+    throw new Error('Timeout no login: não saiu de /login e não apareceu erro visível.');
+  }
 
   const pinLater = page.getByTestId('setup-pin-later');
   if (await pinLater.isVisible().catch(() => false)) {
@@ -34,13 +64,31 @@ async function login(page: Page, username: string, password: string) {
 }
 
 async function logout(page: Page) {
-  // usa a tela de confirmação interna para garantir que o AuthProvider faça o logout real
-  await page.goto('/logout');
-  const confirm = page.getByRole('button', { name: /confirmar|confirm/i });
-  if (await confirm.isVisible().catch(() => false)) {
-    await confirm.click();
+  // Tela protegida: LogoutConfirmation (pt-BR: botão "Sim, sair", não "Confirmar")
+  await page.goto('/logout', { waitUntil: 'domcontentloaded' });
+  const confirm = page.getByRole('button', {
+    name: /^(Sim, sair|Yes, log out|Sí, salir|Oui, se déconnecter|Confirmar|Confirm)$/i,
+  });
+  await expect(confirm).toBeVisible({ timeout: 60_000 });
+  await confirm.click();
+
+  // Alguns ambientes redirecionam para /login/ (barra final) ou apenas trocam rota SPA.
+  // Esperar por URL de login OU pelos campos da tela de login aparecerem.
+  const usernameInput = page.getByTestId('login-username');
+  const result = await Promise.race([
+    page
+      .waitForURL((url) => /^\/login\/?$/.test(url.pathname), { timeout: 90_000, waitUntil: 'domcontentloaded' })
+      .then(() => 'url' as const)
+      .catch(() => 'timeout' as const),
+    usernameInput
+      .waitFor({ state: 'visible', timeout: 90_000 })
+      .then(() => 'ui' as const)
+      .catch(() => 'timeout' as const),
+  ]);
+
+  if (result === 'timeout') {
+    throw new Error(`Timeout no logout: não chegou em /login (url atual: ${page.url()})`);
   }
-  await page.waitForURL((url) => url.pathname.endsWith('/login'), { timeout: 90_000 });
 }
 
 async function getProfile(page: Page): Promise<any> {
