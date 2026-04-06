@@ -31,7 +31,7 @@ jobs:
       - name: Install Playwright (Chromium only)
         run: npx playwright install chromium --with-deps
 
-      - name: E2E (smoke + fluxo opcional com secrets)
+      - name: E2E (Playwright — toda a pasta e2e/; notification-flow opcional com secrets)
         env:
           E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
