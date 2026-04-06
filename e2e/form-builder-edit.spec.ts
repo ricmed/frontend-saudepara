@@ -109,10 +109,8 @@ test.describe('Form builder — editar formulário (admin)', () => {
       timeout: 30_000,
     });
 
-    await expect(page.getByRole('textbox', { name: 'Ex: Dengue', exact: true })).toHaveValue(
-      'Formulário Edição E2E',
-    );
-    await expect(page.getByRole('textbox', { name: 'Ex: DENGUE', exact: true })).toHaveValue('EDIT_IT');
+    await expect(page.getByLabel('Nome do Formulário *')).toHaveValue('Formulário Edição E2E');
+    await expect(page.getByLabel('Código do Agravo *')).toHaveValue('EDIT_IT');
 
     await expect(page.getByRole('heading', { name: 'Seção E2E' })).toBeVisible();
 

@@ -2,6 +2,11 @@ import React from 'react';
 import { Check } from 'lucide-react';
 import type { FormField } from '@/services/FormService';
 
+function getFieldInputId(field: FormField) {
+  const key = (field.key || field.label || 'field').toString();
+  return `df-${key}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
 interface TextFieldProps {
   field: FormField;
   value: any;
@@ -21,14 +26,16 @@ export const TextField: React.FC<TextFieldProps> = ({
 }) => {
   const maxLength = field.maxLength || 1500;
   const currentLength = (value || '').length;
+  const inputId = getFieldInputId(field);
   
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
         {field.label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
       <input
+        id={inputId}
         type="text"
         value={value || ''}
         onChange={(e) => onChange(e.target.value)}
@@ -99,10 +106,11 @@ export const DateField: React.FC<TextFieldProps> = ({
 
   // Desabilita o botão + apenas se já estiver na data máxima
   const isPlusDisabled = disabled || field.disabled || (!!value && value >= maxDate);
+  const inputId = getFieldInputId(field);
 
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
         {field.label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
@@ -116,6 +124,7 @@ export const DateField: React.FC<TextFieldProps> = ({
           −
         </button>
         <input
+          id={inputId}
           type="date"
           value={value || ''}
           onChange={(e) => onChange(e.target.value)}
@@ -152,14 +161,16 @@ export const NumberField: React.FC<TextFieldProps> = ({
 }) => {
   const min = field.min;
   const max = field.max;
+  const inputId = getFieldInputId(field);
   
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
         {field.label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
       <input
+        id={inputId}
         type="number"
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value ? Number(e.target.value) : '')}
@@ -200,14 +211,16 @@ export const TextareaField: React.FC<TextFieldProps> = ({
 }) => {
   const maxLength = field.maxLength || 1500;
   const currentLength = (value || '').length;
+  const inputId = getFieldInputId(field);
   
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
         {field.label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
       <textarea
+        id={inputId}
         value={value || ''}
         onChange={(e) => onChange(e.target.value)}
         placeholder={field.placeholder}

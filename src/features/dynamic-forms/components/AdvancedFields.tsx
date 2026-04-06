@@ -9,6 +9,11 @@ import { validateCPF } from '@/utils/cpfValidator';
 import { validateCNS } from '@/utils/cnsValidator';
 import { validatePassaporte, normalizePassaporte } from '@/utils/passaporteValidator';
 
+function getFieldInputId(field: FormField) {
+  const key = (field.key || field.label || 'field').toString();
+  return `df-${key}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
 interface AdvancedFieldProps {
   field: FormField;
   value: any;
@@ -31,6 +36,7 @@ export const CheckboxGroupField: React.FC<AdvancedFieldProps> = ({
   const selectedValues = Array.isArray(value) ? value : [];
   const [options, setOptions] = useState(field.options || []);
   const [loading, setLoading] = useState(false);
+  const inputId = getFieldInputId(field);
 
   useEffect(() => {
     if (field.dataSource === 'database' && field.dataTable && field.dataValueColumn && field.dataLabelColumn) {
@@ -70,7 +76,7 @@ export const CheckboxGroupField: React.FC<AdvancedFieldProps> = ({
   if (loading) {
     return (
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-2">
           {field.label}
           {required && <span className="text-red-500 ml-1">*</span>}
         </label>
@@ -81,7 +87,7 @@ export const CheckboxGroupField: React.FC<AdvancedFieldProps> = ({
 
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium text-gray-700 mb-2">
+      <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-2">
         {field.label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
@@ -142,6 +148,7 @@ export const RadioGroupField: React.FC<AdvancedFieldProps> = ({
 }) => {
   const [options, setOptions] = useState(field.options || []);
   const [loading, setLoading] = useState(false);
+  const inputId = getFieldInputId(field);
 
   useEffect(() => {
     if (field.dataSource === 'database' && field.dataTable && field.dataValueColumn && field.dataLabelColumn) {
@@ -173,7 +180,7 @@ export const RadioGroupField: React.FC<AdvancedFieldProps> = ({
   if (loading) {
     return (
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-2">
           {field.label}
           {required && <span className="text-red-500 ml-1">*</span>}
         </label>
@@ -184,7 +191,7 @@ export const RadioGroupField: React.FC<AdvancedFieldProps> = ({
 
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium text-gray-700 mb-2">
+      <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-2">
         {field.label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>

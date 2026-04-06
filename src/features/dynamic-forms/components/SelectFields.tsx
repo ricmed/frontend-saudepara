@@ -5,6 +5,11 @@ import CodeListService, { type CodeListItem } from '@/services/CodeListService';
 import DatabaseService from '@/services/DatabaseService';
 import { searchMatches } from '@/utils/searchUtils';
 
+function getFieldInputId(field: FormField) {
+  const key = (field.key || field.label || 'field').toString();
+  return `df-${key}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
 const server = import.meta.env.VITE_API_SERVER;
 const port = import.meta.env.VITE_API_PORT;
 const API_BASE = `${server}:${port}/api`;
@@ -39,6 +44,7 @@ export const ApiSelectField: React.FC<SelectFieldProps> = ({
 }) => {
   const [options, setOptions] = useState<Array<{ value: string; label: string }>>(field.options || []);
   const [loading, setLoading] = useState(true);
+  const inputId = getFieldInputId(field);
 
   useEffect(() => {
     const endpoint = (field as FormField & { apiSelectEndpoint?: string }).apiSelectEndpoint;
@@ -75,11 +81,12 @@ export const ApiSelectField: React.FC<SelectFieldProps> = ({
 
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
         {field.label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
       <select
+        id={inputId}
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value || undefined)}
         disabled={disabled || field.disabled || loading}
@@ -115,6 +122,7 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
   const isPaisNascimento = fieldKey === 'paciente.pais_nascimento_id';
   const isEtnia = fieldKey === 'paciente.etnia';
   const useMaiusculoSemAcento = isPaisNascimento || isEtnia;
+  const inputId = getFieldInputId(field);
 
   // País de nascimento: carregar como no notification forms (endpoint index com limit alto para todos os países)
   const fetchUrl = isPaisNascimento
@@ -169,12 +177,13 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
 
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
         {field.label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
       <div className="relative">
         <input
+          id={inputId}
           type="text"
           value={displayValue}
           onChange={(e) => {
@@ -227,6 +236,7 @@ export const CboSearchField: React.FC<SelectFieldProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [displayLabel, setDisplayLabel] = useState('');
+  const inputId = getFieldInputId(field);
 
   // Resolver label quando value (codigo) está preenchido (ex.: formulário carregado)
   useEffect(() => {
@@ -286,12 +296,13 @@ export const CboSearchField: React.FC<SelectFieldProps> = ({
 
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
         {field.label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
       <div className="relative">
         <input
+          id={inputId}
           type="text"
           value={displayValue}
           onChange={(e) => {
@@ -354,6 +365,7 @@ export const CnaeSearchField: React.FC<SelectFieldProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [displayLabel, setDisplayLabel] = useState('');
+  const inputId = getFieldInputId(field);
 
   useEffect(() => {
     const codigo = value != null && value !== '' ? String(value).trim() : '';
@@ -411,12 +423,13 @@ export const CnaeSearchField: React.FC<SelectFieldProps> = ({
 
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
         {field.label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
       <div className="relative">
         <input
+          id={inputId}
           type="text"
           value={displayValue}
           onChange={(e) => {
