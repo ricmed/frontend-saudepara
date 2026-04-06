@@ -9,7 +9,6 @@ on:
         type: choice
         options:
           - homologacao
-          - treinamento
           - producao
 
 jobs:
@@ -31,7 +30,7 @@ jobs:
       - name: Install Playwright (Chromium only)
         run: npx playwright install chromium --with-deps
 
-      - name: Run E2E REAL (homologacao)
+      - name: Run E2E REAL (homologacao) — admin seed + submit
         if: ${{ inputs.environment == 'homologacao' }}
         env:
           PLAYWRIGHT_BASE_URL: ${{ secrets.HML_BASE_URL }}
@@ -40,18 +39,30 @@ jobs:
           E2E_ADMIN_PASSWORD: ${{ secrets.HML_E2E_ADMIN_PASSWORD }}
         run: npx playwright test e2e/dynamic-forms-real-flow.spec.ts
 
-      - name: Run E2E REAL (treinamento)
-        if: ${{ inputs.environment == 'treinamento' }}
+      - name: Run E2E REAL (homologacao) — admin seed + notificador envia
+        if: ${{ inputs.environment == 'homologacao' }}
         env:
-          PLAYWRIGHT_BASE_URL: ${{ secrets.TRN_BASE_URL }}
+          PLAYWRIGHT_BASE_URL: ${{ secrets.HML_BASE_URL }}
           E2E_REAL_FORMS: '1'
-          E2E_ADMIN_USERNAME: ${{ secrets.TRN_E2E_ADMIN_USERNAME }}
-          E2E_ADMIN_PASSWORD: ${{ secrets.TRN_E2E_ADMIN_PASSWORD }}
-        run: npx playwright test e2e/dynamic-forms-real-flow.spec.ts
+          E2E_ADMIN_USERNAME: ${{ secrets.HML_E2E_ADMIN_USERNAME }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.HML_E2E_ADMIN_PASSWORD }}
+          E2E_NOTIFICADOR_USERNAME: ${{ secrets.HML_E2E_NOTIFICADOR_USERNAME }}
+          E2E_NOTIFICADOR_PASSWORD: ${{ secrets.HML_E2E_NOTIFICADOR_PASSWORD }}
+        run: npx playwright test e2e/dynamic-forms-real-notificador-flow.spec.ts
 
       - name: Run PRODUCTION smoke (read-only)
         if: ${{ inputs.environment == 'producao' }}
         env:
           PLAYWRIGHT_BASE_URL: ${{ secrets.PRD_BASE_URL }}
         run: npx playwright test e2e/smoke.spec.ts
+
+      - name: Upload Playwright artifacts (on failure)
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts-${{ inputs.environment }}
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
 

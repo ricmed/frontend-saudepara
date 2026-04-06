@@ -36,3 +36,13 @@ jobs:
           E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
         run: npm run test:e2e
+
+      - name: Upload Playwright artifacts (on failure)
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts-ci
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
