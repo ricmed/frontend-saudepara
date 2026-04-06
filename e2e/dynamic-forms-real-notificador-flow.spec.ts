@@ -20,10 +20,30 @@ const notifPass = process.env.E2E_NOTIFICADOR_PASSWORD?.trim();
 const hasNotifCreds = Boolean(notifUser && notifPass);
 
 async function login(page: Page, username: string, password: string) {
-  await page.goto('/login');
-  await page.getByTestId('login-username').fill(username);
-  await page.getByTestId('login-password').fill(password);
-  await page.getByTestId('login-submit').click();
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+
+  const usernameInput = page.getByTestId('login-username');
+  const passwordInput = page.getByTestId('login-password');
+  const submitButton = page.getByTestId('login-submit');
+
+  // Em alguns ambientes (ex.: sessão ainda válida), /login pode redirecionar de imediato
+  // e a tela de login não aparece. Nesse caso, consideramos o usuário já autenticado.
+  const landing = await Promise.race([
+    usernameInput
+      .waitFor({ state: 'visible', timeout: 30_000 })
+      .then(() => 'form' as const)
+      .catch(() => 'timeout' as const),
+    page
+      .waitForURL((url) => !/^\/login\/?$/.test(url.pathname), { timeout: 30_000, waitUntil: 'domcontentloaded' })
+      .then(() => 'redirect' as const)
+      .catch(() => 'timeout' as const),
+  ]);
+
+  if (landing === 'redirect') return;
+
+  await usernameInput.fill(username);
+  await passwordInput.fill(password);
+  await submitButton.click();
 
   const errorBox = page.locator('.bg-red-100.border-red-400');
   const offlineWarning = page.getByText('Sem Conexão', { exact: true });
