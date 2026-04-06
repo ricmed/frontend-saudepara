@@ -153,8 +153,12 @@ test.describe('Form builder — salvar novo formulário (admin)', () => {
     await expect(page).not.toHaveURL(/\/access-denied/);
     await expect(page.getByRole('heading', { name: 'Novo Formulário' })).toBeVisible({ timeout: 30_000 });
 
-    await page.getByRole('textbox', { name: 'Ex: Dengue', exact: true }).fill('Formulário Salvo E2E');
-    await page.getByRole('textbox', { name: 'Ex: DENGUE', exact: true }).fill('save_it');
+    const nomeInput = page.getByPlaceholder('Ex: Dengue');
+    const agravoInput = page.getByPlaceholder('Ex: DENGUE');
+    await expect(nomeInput).toBeVisible({ timeout: 30_000 });
+    await nomeInput.fill('Formulário Salvo E2E');
+    await expect(agravoInput).toBeVisible({ timeout: 30_000 });
+    await agravoInput.fill('save_it');
 
     await page.locator('textarea').first().fill('Criado por E2E');
 

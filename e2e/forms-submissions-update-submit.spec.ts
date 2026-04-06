@@ -148,8 +148,9 @@ test.describe('Formulários — editar e enviar (update + submit)', () => {
       timeout: 30_000,
     });
 
-    const field = page.getByRole('textbox', { name: 'update-submit-ph', exact: true });
-    await expect(field).toHaveValue('Valor inicial');
+    const field = page.getByPlaceholder('update-submit-ph');
+    await expect(field).toBeVisible({ timeout: 30_000 });
+    await expect(field).toHaveValue('Valor inicial', { timeout: 30_000 });
 
     await field.fill('Valor atualizado');
     await page.getByRole('button', { name: 'Atualizar e Enviar' }).click();

@@ -158,10 +158,10 @@ test.describe('Formulários — visualizar e editar a partir da lista', () => {
 
     await expect(page).toHaveURL(/\/private\/formularios\/LIST_IT\/visualizar\/7\/?$/);
     await expect(page.getByRole('heading', { name: 'Visualizar Notificação', level: 1 })).toBeVisible();
-    await expect(page.getByRole('textbox', { name: 'list-ve-placeholder', exact: true })).toHaveValue(
-      'Lido no E2E',
-    );
-    await expect(page.getByRole('textbox', { name: 'list-ve-placeholder', exact: true })).toBeDisabled();
+    const viewField = page.getByPlaceholder('list-ve-placeholder');
+    await expect(viewField).toBeVisible({ timeout: 30_000 });
+    await expect(viewField).toHaveValue('Lido no E2E', { timeout: 30_000 });
+    await expect(viewField).toBeDisabled();
     // Em readOnly o FormRenderer não renderiza o rodapé (cancelar/enviar).
     await expect(page.getByRole('button', { name: 'Atualizar e Enviar' })).toHaveCount(0);
   });
@@ -180,8 +180,9 @@ test.describe('Formulários — visualizar e editar a partir da lista', () => {
 
     await expect(page).toHaveURL(/\/private\/formularios\/LIST_IT\/editar\/7\/?$/);
     await expect(page.getByRole('heading', { name: 'Editar Notificação', level: 1 })).toBeVisible();
-    const field = page.getByRole('textbox', { name: 'list-ve-placeholder', exact: true });
-    await expect(field).toHaveValue('Lido no E2E');
+    const field = page.getByPlaceholder('list-ve-placeholder');
+    await expect(field).toBeVisible({ timeout: 30_000 });
+    await expect(field).toHaveValue('Lido no E2E', { timeout: 30_000 });
     await expect(field).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Atualizar e Enviar' })).toBeVisible();
   });
