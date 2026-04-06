@@ -212,7 +212,9 @@ test.describe('Formulários dinâmicos — fluxo REAL (admin seed → notificado
       await page.getByRole('button', { name: /Nova Notificação/i }).click();
 
       await expect(page).toHaveURL(new RegExp(`/private/formularios/${agravo}/nova/?$`), { timeout: 90_000 });
-      await page.getByRole('textbox', { name: 'e2e-real-notif-ph', exact: true }).fill('enviado pelo notificador (e2e real)');
+      const field = page.getByPlaceholder('e2e-real-notif-ph', { exact: true });
+      await expect(field).toBeVisible({ timeout: 90_000 });
+      await field.fill('enviado pelo notificador (e2e real)');
       await page.getByRole('button', { name: 'Enviar' }).click();
 
       await expect(page).toHaveURL(new RegExp(`/private/formularios/${agravo}/?$`), { timeout: 90_000 });
