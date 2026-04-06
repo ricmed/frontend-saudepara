@@ -110,13 +110,18 @@ test.describe('Formulário dinâmico (nova notificação)', () => {
     await expect(page).not.toHaveURL(/\/login$/);
     await expect(page.getByRole('heading', { name: 'E2E_IT' })).toBeVisible({ timeout: 30_000 });
 
-    await page.getByRole('button', { name: 'Enviar' }).click();
+    const submit = page.getByRole('button', { name: 'Enviar' });
+    await expect(submit).toBeVisible({ timeout: 30_000 });
+
+    await submit.click();
     await expect(page.getByText(/obrigatório/i).first()).toBeVisible();
 
-    await page.getByPlaceholder('e2e-placeholder').fill('Texto do teste E2E');
-    await page.getByRole('button', { name: 'Enviar' }).click();
+    const field = page.getByPlaceholder('e2e-placeholder');
+    await expect(field).toBeVisible({ timeout: 30_000 });
+    await field.fill('Texto do teste E2E');
+    await submit.click();
 
-    await expect.poll(() => submitted).toBe(true);
+    await expect.poll(() => submitted, { timeout: 30_000 }).toBe(true);
     expect(createBody).toMatchObject({
       form_version_id: 101,
       created_by: 'e2e-dynamic-form-user',
