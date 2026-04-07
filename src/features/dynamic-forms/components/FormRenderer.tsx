@@ -87,6 +87,8 @@ interface FormRendererProps {
   saveDraftLabel?: string;
   cancelLabel?: string;
   readOnly?: boolean;
+  /** Oculta a barra de ações (Enviar / Salvar rascunho / Cancelar) mantendo o formulário interativo. */
+  showActions?: boolean;
 }
 
 export const FormRenderer: React.FC<FormRendererProps> = ({
@@ -100,6 +102,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   saveDraftLabel = 'Salvar Rascunho',
   cancelLabel = 'Cancelar',
   readOnly = false,
+  showActions = true,
 }) => {
   const initialDataWithDefaults = React.useMemo(() => {
     const pac = initialData?.paciente ?? {};
@@ -798,7 +801,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           );
         })}
 
-      {!readOnly && (
+      {!readOnly && showActions && (
         <div className="flex gap-4 justify-end mt-6 pt-6 border-t">
           {isUploading && (
             <p className="mr-auto text-sm text-amber-700 flex items-center gap-2">

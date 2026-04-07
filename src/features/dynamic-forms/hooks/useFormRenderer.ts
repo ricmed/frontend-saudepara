@@ -18,6 +18,7 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
   const [fieldRequired, setFieldRequired] = useState<Record<string, boolean>>({});
   const [fieldDisabled, setFieldDisabled] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const didInitRef = useRef(false);
 
   // Inicializar estados padrão dos campos
   useEffect(() => {
@@ -37,6 +38,17 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
     setFieldRequired(required);
     setFieldDisabled(disabled);
   }, [schema]);
+
+  // Sempre notificar mudanças de dados (útil para preview/sandbox e debug)
+  useEffect(() => {
+    if (!onDataChange) return;
+    if (!didInitRef.current) {
+      didInitRef.current = true;
+      onDataChange(formData);
+      return;
+    }
+    onDataChange(formData);
+  }, [formData, onDataChange]);
 
   // Avaliar regras quando dados mudarem
   useEffect(() => {
@@ -69,7 +81,6 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
 
     if (dataChanged) {
       setFormData(updatedData);
-      onDataChange?.(updatedData);
     }
   }, [formData, schema]);
 

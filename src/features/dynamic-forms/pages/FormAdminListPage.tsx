@@ -97,8 +97,9 @@ export const FormAdminListPage: React.FC = () => {
       // Criar novo formulário com "(Cópia)" no nome
       const newForm = await FormService.createForm({
         nome: `${form.nome} (Cópia)`,
-        agravo_key: `${form.agravo_key}_COPIA_${Date.now()}`.substring(0, 50),
+        form_key: `${form.form_key}_COPIA_${Date.now()}`.substring(0, 50),
         descricao: form.descricao || '',
+        categoria: form.categoria || 'notificacao',
         created_by: userId
       });
 
@@ -194,7 +195,7 @@ export const FormAdminListPage: React.FC = () => {
                   {form.nome}
                 </h3>
                 <p className="text-blue-100 text-xs sm:text-sm mt-1">
-                  {form.agravo_key}
+                  {form.form_key}
                 </p>
               </div>
               
@@ -246,7 +247,7 @@ export const FormAdminListPage: React.FC = () => {
                       <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
                     </button>
                     <button
-                      onClick={() => navigate(`/private/formularios/${form.agravo_key}`)}
+                      onClick={() => navigate(`/private/formularios/${form.form_key}`)}
                       className="px-2 sm:px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
                       title="Visualizar notificações"
                     >

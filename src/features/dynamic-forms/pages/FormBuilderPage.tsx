@@ -14,7 +14,7 @@ export const FormBuilderPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
-  const [agravoKey, setAgravoKey] = useState('');
+  const [formKey, setFormKey] = useState('');
   const [categoria, setCategoria] = useState('notificacao');
   const [schema, setSchema] = useState<FormSchema>({
     agravo: '',
@@ -25,6 +25,9 @@ export const FormBuilderPage: React.FC = () => {
   const [activeField, setActiveField] = useState<{ sectionIdx: number; fieldIdx: number } | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [activeTab, setActiveTab] = useState<'fields' | 'rules'>('fields');
+  const [previewMode, setPreviewMode] = useState<'interactive' | 'readonly'>('interactive');
+  const [previewData, setPreviewData] = useState<Record<string, any>>({});
+  const [previewPanel, setPreviewPanel] = useState<'form' | 'json'>('form');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dropTarget, setDropTarget] = useState<{ sectionIdx: number; fieldIdx: number } | null>(null);
   const [sectionDropIdx, setSectionDropIdx] = useState<number | null>(null);
@@ -47,7 +50,7 @@ export const FormBuilderPage: React.FC = () => {
       const form = await FormService.getFormById(parseInt(id!));
       setFormName(form.nome);
       setFormDescription(form.descricao || '');
-      setAgravoKey(form.agravo_key);
+      setFormKey(form.form_key);
       setCategoria(form.categoria || 'notificacao');
       
       // Buscar versão ativa e carregar o schema
@@ -206,10 +209,36 @@ export const FormBuilderPage: React.FC = () => {
 
   const updateField = (sectionIdx: number, fieldIdx: number, updates: Partial<FormField>) => {
     const newSections = [...schema.sections];
-    newSections[sectionIdx].fields[fieldIdx] = {
-      ...newSections[sectionIdx].fields[fieldIdx],
-      ...updates
+    const current = newSections[sectionIdx].fields[fieldIdx];
+    const next: FormField = {
+      ...current,
+      ...updates,
     };
+
+    // Campos fixos (modelo híbrido): permitir customização sem o backend "voltar pro canônico".
+    // A UI continua usando label/type normais, mas persistimos também os overrides.
+    if (current?.isFixedColumn) {
+      if (Object.prototype.hasOwnProperty.call(updates, 'label')) {
+        next.customLabel = (updates as any).label ?? null;
+      }
+      if (Object.prototype.hasOwnProperty.call(updates, 'type')) {
+        next.customType = (updates as any).type ?? null;
+      }
+      if (Object.prototype.hasOwnProperty.call(updates, 'apiSelectEndpoint')) {
+        next.customApiSelectEndpoint = (updates as any).apiSelectEndpoint ?? null;
+      }
+      if (Object.prototype.hasOwnProperty.call(updates, 'codeList')) {
+        next.customCodeList = (updates as any).codeList ?? null;
+      }
+      if (Object.prototype.hasOwnProperty.call(updates, 'maxLength')) {
+        next.customMaxLength = (updates as any).maxLength ?? null;
+      }
+      if (Object.prototype.hasOwnProperty.call(updates, 'options')) {
+        next.customOptions = (updates as any).options ?? null;
+      }
+    }
+
+    newSections[sectionIdx].fields[fieldIdx] = next;
     setSchema({ ...schema, sections: newSections });
   };
 
@@ -249,8 +278,9 @@ export const FormBuilderPage: React.FC = () => {
 
       const formData = {
         nome: formName,
-        agravo_key: agravoKey,
+        form_key: formKey,
         descricao: formDescription,
+        categoria,
         created_by: userId
       };
 
@@ -266,7 +296,7 @@ export const FormBuilderPage: React.FC = () => {
       // Criar versão e publicar automaticamente
       const schemaToSave = {
         ...schema,
-        agravo: agravoKey
+        agravo: formKey
       };
 
       const version = await FormService.createVersion(formId, {
@@ -294,7 +324,7 @@ export const FormBuilderPage: React.FC = () => {
     const exportData = {
       metadata: {
         formName,
-        agravoKey,
+        formKey,
         formDescription,
         categoria,
         exportedAt: new Date().toISOString(),
@@ -307,7 +337,7 @@ export const FormBuilderPage: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `formulario_${agravoKey || 'novo'}_${Date.now()}.json`;
+    link.download = `formulario_${formKey || 'novo'}_${Date.now()}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -332,7 +362,7 @@ export const FormBuilderPage: React.FC = () => {
 
         // Carregar dados
         setFormName(importedData.metadata.formName || '');
-        setAgravoKey(importedData.metadata.agravoKey || '');
+        setFormKey(importedData.metadata.formKey || importedData.metadata.agravoKey || '');
         setFormDescription(importedData.metadata.formDescription || '');
         setCategoria(importedData.metadata.categoria || 'notificacao');
         setSchema(importedData.schema);
@@ -555,13 +585,13 @@ export const FormBuilderPage: React.FC = () => {
 
                 <div>
                   <label htmlFor="form-builder-agravo" className="block text-sm font-medium text-gray-700 mb-1">
-                    Código do Agravo *
+                    Código do Formulário *
                   </label>
                   <input
                     id="form-builder-agravo"
                     type="text"
-                    value={agravoKey}
-                    onChange={(e) => setAgravoKey(e.target.value.toUpperCase())}
+                    value={formKey}
+                    onChange={(e) => setFormKey(e.target.value.toUpperCase())}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                     placeholder="Ex: DENGUE"
                   />
@@ -1818,12 +1848,70 @@ export const FormBuilderPage: React.FC = () => {
                     <p>Adicione seções e campos para visualizar o formulário</p>
                   </div>
                 ) : (
-                  <FormRenderer
-                    schema={schema}
-                    initialData={{}}
-                    onDataChange={() => {}}
-                    readOnly={true}
-                  />
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewPanel('form')}
+                          className={`px-3 py-1.5 rounded-md text-sm border ${
+                            previewPanel === 'form'
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          Formulário
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewPanel('json')}
+                          className={`px-3 py-1.5 rounded-md text-sm border ${
+                            previewPanel === 'json'
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          JSON
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="text-sm text-gray-700">
+                          <span className="mr-2">Modo:</span>
+                          <select
+                            value={previewMode}
+                            onChange={(e) => setPreviewMode(e.target.value as 'interactive' | 'readonly')}
+                            className="px-2 py-1 border border-gray-300 rounded text-sm"
+                          >
+                            <option value="interactive">Interativo</option>
+                            <option value="readonly">Somente leitura</option>
+                          </select>
+                        </label>
+
+                        <button
+                          type="button"
+                          onClick={() => setPreviewData({})}
+                          className="px-3 py-1.5 rounded-md text-sm border border-gray-300 text-gray-700 hover:bg-gray-50"
+                        >
+                          Limpar
+                        </button>
+                      </div>
+                    </div>
+
+                    {previewPanel === 'json' ? (
+                      <pre className="text-xs bg-gray-50 border border-gray-200 rounded-md p-4 overflow-auto max-h-[60vh]">
+                        {JSON.stringify(previewData, null, 2)}
+                      </pre>
+                    ) : (
+                      <FormRenderer
+                        schema={schema}
+                        initialData={previewData}
+                        onDataChange={setPreviewData}
+                        readOnly={previewMode === 'readonly'}
+                        showActions={false}
+                      />
+                    )}
+                  </div>
                 )}
               </div>
             </div>

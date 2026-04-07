@@ -28,7 +28,7 @@ export const EntomologiaLarvasDashboardPage: React.FC = () => {
   const [filterCompetencia, setFilterCompetencia] = useState<string>('');
 
   const loadForm = useCallback(async () => {
-    const formData = await FormService.getFormByAgravo(AGRAVO);
+    const formData = await FormService.getFormByKey(AGRAVO);
     setForm(formData);
     return formData;
   }, []);

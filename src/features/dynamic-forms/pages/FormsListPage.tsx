@@ -29,8 +29,8 @@ export const FormsListPage: React.FC = () => {
     }
   };
 
-  const handleFormClick = (agravo: string) => {
-    navigate(`/private/formularios/${agravo}`);
+  const handleFormClick = (formKey: string) => {
+    navigate(`/private/formularios/${formKey}`);
   };
 
   if (loading) {
@@ -87,7 +87,7 @@ export const FormsListPage: React.FC = () => {
           {forms.map((form) => (
             <div
               key={form.id}
-              onClick={() => handleFormClick(form.agravo_key)}
+              onClick={() => handleFormClick(form.form_key)}
               className="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow cursor-pointer border border-gray-200 overflow-hidden"
             >
               <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-4">
@@ -98,7 +98,7 @@ export const FormsListPage: React.FC = () => {
               <div className="p-6">
                 <div className="mb-4">
                   <span className="inline-block bg-blue-100 text-blue-800 text-xs font-semibold px-3 py-1 rounded-full">
-                    {form.agravo_key}
+                    {form.form_key}
                   </span>
                 </div>
                 {form.descricao && (

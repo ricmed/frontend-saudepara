@@ -3,7 +3,7 @@
 export interface Form {
   id: number;
   nome: string;
-  agravo_key: string;
+  form_key: string;
   descricao?: string;
   categoria?: string;
   is_active: boolean;
@@ -98,7 +98,7 @@ export interface FormRuleAction {
 export interface FormSubmission {
   id: number;
   form_version_id: number;
-  agravo_key: string;
+  form_key: string;
   data_json: any;
   status: 'draft' | 'submitted' | 'synced';
   nome_paciente?: string;

@@ -17,12 +17,13 @@ const api = axios.create({
 // Types
 export interface Form {
   id: number;
-  agravo_key: string;
+  form_key: string;
   nome: string;
   descricao?: string;
   status: string;
   is_active: boolean;
   active_version_id?: number;
+  categoria?: string;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -67,6 +68,13 @@ export interface FormField {
   key: string;
   type: string;
   label: string;
+  /** Overrides de customização para campos fixos (persistidos no schema). */
+  customLabel?: string | null;
+  customType?: string | null;
+  customApiSelectEndpoint?: string | null;
+  customCodeList?: string | null;
+  customMaxLength?: number | null;
+  customOptions?: Array<{ value: string; label: string }> | null;
   required?: boolean;
   order: number;
   codeList?: string;
@@ -190,21 +198,21 @@ class FormService {
     }
   }
 
-  // Buscar formulário por agravo
-  async getFormByAgravo(agravo: string): Promise<Form> {
+  // Buscar formulário por key (form_key)
+  async getFormByKey(formKey: string): Promise<Form> {
     try {
-      const response = await api.get(`/forms/agravo/${agravo.toUpperCase()}`);
+      const response = await api.get(`/forms/key/${formKey.toUpperCase()}`);
       return response.data;
     } catch (error) {
-      console.error('Erro ao buscar formulário por agravo:', error);
+      console.error('Erro ao buscar formulário por key:', error);
       throw error;
     }
   }
 
   // Buscar versão ativa do formulário (para renderizar)
-  async getActiveVersion(agravo: string): Promise<FormVersion> {
+  async getActiveVersion(formKey: string): Promise<FormVersion> {
     try {
-      const response = await api.get(`/forms/agravo/${agravo.toUpperCase()}/active`);
+      const response = await api.get(`/forms/key/${formKey.toUpperCase()}/active`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar versão ativa:', error);
@@ -214,9 +222,10 @@ class FormService {
 
   // Criar novo formulário
   async createForm(data: {
-    agravo_key: string;
+    form_key: string;
     nome: string;
     descricao?: string;
+    categoria?: string;
     created_by: string;
   }): Promise<Form> {
     try {

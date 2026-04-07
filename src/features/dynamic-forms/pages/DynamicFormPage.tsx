@@ -8,7 +8,7 @@ import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 import { FileEdit, Eye, FileSpreadsheet, FileText } from 'lucide-react';
 
 export const DynamicFormPage: React.FC = () => {
-  const { agravo, id } = useParams<{ agravo: string; id?: string }>();
+  const { agravo, id } = useParams<{ agravo: string; id?: string }>(); // param name kept for route compatibility
   const navigate = useNavigate();
   const { user } = useAuth();
   

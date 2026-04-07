@@ -26,7 +26,7 @@ export const FormSubmissionsListPage: React.FC = () => {
       setError(null);
 
       // Carregar formulário
-      const formData = await FormService.getFormByAgravo(agravo);
+      const formData = await FormService.getFormByKey(agravo);
       setForm(formData);
       console.log('📋 Formulário carregado:', formData);
 
