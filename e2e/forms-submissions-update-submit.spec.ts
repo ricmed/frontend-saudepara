@@ -25,7 +25,7 @@ const activeVersionBody = {
     ],
   },
   published_at: '2026-01-01T00:00:00.000Z',
-  form: { nome: 'Formulário Lista E2E', agravo_key: 'LIST_IT' },
+  form: { nome: 'Formulário Lista E2E', form_key: 'LIST_IT' },
 };
 
 const submission7 = {
@@ -84,7 +84,7 @@ test.describe('Formulários — editar e enviar (update + submit)', () => {
         pathname = '';
       }
 
-      if (method === 'GET' && pathname === '/api/forms/agravo/LIST_IT/active') {
+      if (method === 'GET' && pathname === '/api/forms/key/LIST_IT/active') {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',

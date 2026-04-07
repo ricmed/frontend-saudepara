@@ -55,7 +55,7 @@ test.describe('Form builder — salvar novo formulário (admin)', () => {
           body: JSON.stringify({
             id: 1001,
             nome: createdFormBody?.nome ?? 'N/A',
-            agravo_key: createdFormBody?.agravo_key ?? 'N/A',
+            form_key: createdFormBody?.form_key ?? 'N/A',
             descricao: createdFormBody?.descricao ?? '',
             status: 'draft',
             is_active: false,
@@ -121,7 +121,7 @@ test.describe('Form builder — salvar novo formulário (admin)', () => {
                   {
                     id: 1001,
                     nome: 'Formulário Salvo E2E',
-                    agravo_key: 'SAVE_IT',
+                    form_key: 'SAVE_IT',
                     descricao: 'Criado por E2E',
                     status: 'published',
                     is_active: true,
@@ -176,7 +176,7 @@ test.describe('Form builder — salvar novo formulário (admin)', () => {
 
     expect(createdFormBody).toMatchObject({
       nome: 'Formulário Salvo E2E',
-      agravo_key: 'SAVE_IT',
+      form_key: 'SAVE_IT',
       descricao: 'Criado por E2E',
       created_by: 'e2e-form-save',
     });

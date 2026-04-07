@@ -10,7 +10,7 @@ const emptySubmissionsBody = {
 
 const formEmptyIt = {
   id: 2,
-  agravo_key: 'EMPTY_IT',
+  form_key: 'EMPTY_IT',
   nome: 'Agravo sem notificações',
   status: 'published',
   is_active: true,
@@ -45,7 +45,7 @@ const activeVersionEmptyIt = {
     ],
   },
   published_at: '2026-01-01T00:00:00.000Z',
-  form: { nome: 'Agravo sem notificações', agravo_key: 'EMPTY_IT' },
+  form: { nome: 'Agravo sem notificações', form_key: 'EMPTY_IT' },
 };
 
 async function offlineLogin(page: Page, roles: string[]) {
@@ -135,7 +135,7 @@ test.describe('Formulários — admin e estado vazio', () => {
         pathname = '';
       }
 
-      if (method === 'GET' && pathname === '/api/forms/agravo/EMPTY_IT') {
+      if (method === 'GET' && pathname === '/api/forms/key/EMPTY_IT') {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -143,7 +143,7 @@ test.describe('Formulários — admin e estado vazio', () => {
         });
       }
 
-      if (method === 'GET' && pathname === '/api/forms/agravo/EMPTY_IT/active') {
+      if (method === 'GET' && pathname === '/api/forms/key/EMPTY_IT/active') {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',

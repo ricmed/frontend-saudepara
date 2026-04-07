@@ -27,7 +27,7 @@ const activeVersionBody = {
   version: 1,
   schema_json: schemaJson,
   published_at: '2026-01-01T00:00:00.000Z',
-  form: { id: 55, nome: 'Formulário E2E', agravo_key: 'E2E_IT' },
+  form: { id: 55, nome: 'Formulário E2E', form_key: 'E2E_IT' },
 };
 
 test.describe('Formulário dinâmico (nova notificação)', () => {
@@ -55,7 +55,7 @@ test.describe('Formulário dinâmico (nova notificação)', () => {
       const url = route.request().url();
       const method = route.request().method();
 
-      if (url.includes('/api/forms/agravo/E2E_IT/active')) {
+      if (url.includes('/api/forms/key/E2E_IT/active')) {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',

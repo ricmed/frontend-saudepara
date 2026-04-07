@@ -17,7 +17,7 @@ async function offlineAdmin(page: Page) {
 
 const formEditBody = {
   id: 77,
-  agravo_key: 'EDIT_IT',
+  form_key: 'EDIT_IT',
   nome: 'Formulário Edição E2E',
   descricao: 'Mock admin editar',
   status: 'published',
@@ -110,7 +110,7 @@ test.describe('Form builder — editar formulário (admin)', () => {
     });
 
     await expect(page.getByLabel('Nome do Formulário *')).toHaveValue('Formulário Edição E2E');
-    await expect(page.getByLabel('Código do Agravo *')).toHaveValue('EDIT_IT');
+    await expect(page.getByLabel('Código do Formulário *')).toHaveValue('EDIT_IT');
 
     await expect(page.getByRole('heading', { name: 'Seção E2E' })).toBeVisible();
 

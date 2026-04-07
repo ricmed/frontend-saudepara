@@ -41,18 +41,18 @@ async function login(page: Page, username: string, password: string) {
 
 type FormRow = {
   id: number;
-  agravo_key?: string;
+  form_key?: string;
   nome?: string;
 };
 
 function isE2EForm(f: FormRow): boolean {
-  const agravo = (f.agravo_key ?? '').toUpperCase();
+  const key = (f.form_key ?? '').toUpperCase();
   const nome = (f.nome ?? '').toUpperCase();
 
   // Prefixos usados nos specs reais e it/mocks
-  if (agravo.startsWith('E2E_REAL_')) return true;
-  if (agravo.startsWith('E2E_REAL_NOTIF_')) return true;
-  if (agravo.startsWith('E2E_')) return true;
+  if (key.startsWith('E2E_REAL_')) return true;
+  if (key.startsWith('E2E_REAL_NOTIF_')) return true;
+  if (key.startsWith('E2E_')) return true;
 
   // Fallback pelo nome (caso o agravo mude)
   if (nome.includes('E2E')) return true;

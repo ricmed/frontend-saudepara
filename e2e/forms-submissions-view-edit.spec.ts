@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 const formListItem = {
   id: 1,
-  agravo_key: 'LIST_IT',
+  form_key: 'LIST_IT',
   nome: 'Formulário Lista E2E',
   descricao: 'Form mockado para E2E',
   status: 'published',
@@ -40,7 +40,7 @@ const activeVersionBody = {
     ],
   },
   published_at: '2026-01-01T00:00:00.000Z',
-  form: { nome: 'Formulário Lista E2E', agravo_key: 'LIST_IT' },
+  form: { nome: 'Formulário Lista E2E', form_key: 'LIST_IT' },
 };
 
 const submission7 = {
@@ -96,7 +96,7 @@ async function registerFormListMocks(page: Page) {
       });
     }
 
-    if (method === 'GET' && pathname === '/api/forms/agravo/LIST_IT/active') {
+    if (method === 'GET' && pathname === '/api/forms/key/LIST_IT/active') {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -104,7 +104,7 @@ async function registerFormListMocks(page: Page) {
       });
     }
 
-    if (method === 'GET' && pathname === '/api/forms/agravo/LIST_IT') {
+    if (method === 'GET' && pathname === '/api/forms/key/LIST_IT') {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',

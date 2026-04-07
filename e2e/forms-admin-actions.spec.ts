@@ -18,7 +18,7 @@ async function offlineAdmin(page: Page) {
 
 const baseForm = {
   id: 10,
-  agravo_key: 'ADMIN_IT',
+  form_key: 'ADMIN_IT',
   nome: 'Form Admin IT',
   descricao: 'E2E admin actions',
   status: 'published',
@@ -153,7 +153,7 @@ test.describe('Admin formulários — duplicar / toggle / delete', () => {
           body: JSON.stringify({
             id: 99,
             nome: createdFormBody?.nome ?? 'N/A',
-            agravo_key: createdFormBody?.agravo_key ?? 'N/A',
+            form_key: createdFormBody?.form_key ?? 'N/A',
             descricao: createdFormBody?.descricao ?? '',
             status: 'draft',
             is_active: false,

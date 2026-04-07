@@ -100,7 +100,7 @@ test.describe('Formulários dinâmicos — fluxo REAL (seed + submit)', () => {
     try {
       // 1) create form
       const createForm = await page.request.post('/api/forms', {
-        data: { agravo_key: agravo, nome: formName, descricao: 'Criado pelo Playwright', created_by: userId },
+        data: { form_key: agravo, nome: formName, descricao: 'Criado pelo Playwright', created_by: userId },
       });
       expect(createForm.ok()).toBeTruthy();
       const created = await createForm.json();

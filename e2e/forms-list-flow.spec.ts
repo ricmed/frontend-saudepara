@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 const formListItem = {
   id: 1,
-  agravo_key: 'LIST_IT',
+  form_key: 'LIST_IT',
   nome: 'Formulário Lista E2E',
   descricao: 'Form mockado para E2E',
   status: 'published',
@@ -70,7 +70,7 @@ test.describe('Formulários dinâmicos — lista e submissões', () => {
         });
       }
 
-      if (method === 'GET' && pathname === '/api/forms/agravo/LIST_IT') {
+      if (method === 'GET' && pathname === '/api/forms/key/LIST_IT') {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',

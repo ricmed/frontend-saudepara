@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 const formByAgravoBody = {
   id: 1,
-  agravo_key: 'LIST_IT',
+  form_key: 'LIST_IT',
   nome: 'Formulário Lista E2E',
   status: 'published',
   is_active: true,
@@ -70,7 +70,7 @@ test.describe('Formulários — excluir submissão (lista)', () => {
         pathname = '';
       }
 
-      if (method === 'GET' && pathname === '/api/forms/agravo/LIST_IT') {
+      if (method === 'GET' && pathname === '/api/forms/key/LIST_IT') {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
