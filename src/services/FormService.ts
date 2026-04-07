@@ -60,6 +60,8 @@ export interface FormSchema {
 export interface FormSection {
   id: string;
   title: string;
+  /** Nome do ícone (lucide) para o cabeçalho da seção. Ex.: 'clipboard-list' */
+  icon?: string;
   order: number;
   fields: FormField[];
 }
@@ -80,6 +82,8 @@ export interface FormField {
   codeList?: string;
   /** Endpoint para carregar opções (ex: 'tipo-pais/select'). Resposta esperada: array com idtipo_pais e descricao ou value/label. */
   apiSelectEndpoint?: string;
+  /** Chaves do formulário para enviar como query params na API (ex.: ["crs_id"] ou ["cabecalho.crs_id"]). */
+  apiSelectEndpointParams?: string[];
   options?: Array<{ value: string; label: string }>;
   placeholder?: string;
   mask?: string;

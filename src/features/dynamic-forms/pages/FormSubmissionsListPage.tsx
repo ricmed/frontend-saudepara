@@ -14,6 +14,45 @@ export const FormSubmissionsListPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const totalAcumulado = React.useMemo(() => {
+    if (agravo !== 'MONITOR_OPER_REGIONAL') return null;
+    if (!submissions || submissions.length === 0) return null;
+
+    const rows = submissions
+      .map((s) => s.data_json as any)
+      .filter((d) => d && d.cabecalho && d.acao);
+
+    if (rows.length === 0) return null;
+
+    const keySet = new Set(rows.map((d) => `${d.cabecalho?.crs_id ?? ''}|${d.cabecalho?.ano ?? ''}|${d.cabecalho?.mes ?? ''}`));
+    if (keySet.size !== 1) {
+      return { mixed: true };
+    }
+
+    const sum = (arr: any[], path: string) =>
+      arr.reduce((acc, d) => acc + (Number(d?.acao?.[path]) || 0), 0);
+
+    const programadas = sum(rows, 'qtd_programadas_qdqq');
+    // Observação: esses campos podem vir como string ('0'/'1') por serem selects; Number() resolve.
+    const realizadasFlag = sum(rows, 'qtd_realizadas_conforme_programacao'); // 0/1 por ação
+    const naoProgramadasFlag = sum(rows, 'qtd_nao_programadas_qdqq'); // 0/1 por ação
+    const total = programadas + naoProgramadasFlag;
+    const perc = programadas > 0 ? (realizadasFlag / programadas) * 100 : undefined;
+
+    const sample = rows[0]?.cabecalho ?? {};
+    return {
+      mixed: false,
+      crs_id: sample.crs_id,
+      ano: sample.ano,
+      mes: sample.mes,
+      programadas,
+      realizadasFlag,
+      naoProgramadasFlag,
+      total,
+      perc,
+    };
+  }, [agravo, submissions]);
+
   useEffect(() => {
     loadData();
   }, [agravo]);
@@ -149,6 +188,51 @@ export const FormSubmissionsListPage: React.FC = () => {
         </button>
       }
     >
+        {totalAcumulado && (
+          <div className="mb-4">
+            {totalAcumulado.mixed ? (
+              <div className="bg-white rounded-lg shadow p-4 border border-amber-200">
+                <p className="text-sm text-amber-700 font-medium">
+                  Total acumulado não exibido: a lista atual mistura mais de um CRS/ano/mês. Use filtros (quando disponíveis) para ver o consolidado.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-lg shadow p-4 border border-gray-200">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-800">Total acumulado (mês)</h3>
+                    <p className="text-xs text-gray-500">
+                      Baseado nas ações listadas para {String(totalAcumulado.mes ?? '')}/{String(totalAcumulado.ano ?? '')}
+                    </p>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    % realização: <span className="font-semibold text-gray-800">
+                      {totalAcumulado.perc === undefined ? '—' : totalAcumulado.perc.toFixed(1)}
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                    <div className="text-xs text-gray-500">Programadas (N)</div>
+                    <div className="text-lg font-semibold text-gray-900">{totalAcumulado.programadas}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                    <div className="text-xs text-gray-500">Realizadas (Σ 0/1)</div>
+                    <div className="text-lg font-semibold text-gray-900">{totalAcumulado.realizadasFlag}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                    <div className="text-xs text-gray-500">Não programadas (Σ 0/1)</div>
+                    <div className="text-lg font-semibold text-gray-900">{totalAcumulado.naoProgramadasFlag}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                    <div className="text-xs text-gray-500">Total</div>
+                    <div className="text-lg font-semibold text-gray-900">{totalAcumulado.total}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         {submissions.length === 0 ? (
           <div className="bg-white rounded-lg shadow p-12 text-center">
             <p className="text-gray-500 mb-4">Nenhuma notificação cadastrada ainda</p>

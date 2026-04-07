@@ -8,6 +8,11 @@ import PhoneInput from '@/features/notificationForms/components/PhoneInput';
 import { validateCPF } from '@/utils/cpfValidator';
 import { validateCNS } from '@/utils/cnsValidator';
 import { validatePassaporte, normalizePassaporte } from '@/utils/passaporteValidator';
+import axios from 'axios';
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost';
+const API_PORT = import.meta.env.VITE_API_PORT || '3000';
+const API_URL = `${API_BASE}:${API_PORT}`;
 
 function getFieldInputId(field: FormField) {
   const key = (field.key || field.label || 'field').toString();
@@ -22,6 +27,8 @@ interface AdvancedFieldProps {
   required?: boolean;
   disabled?: boolean;
   onBlur?: () => void;
+  /** Lê valores de outros campos do formulário (para filtros/params). */
+  getValue?: (key: string) => any;
 }
 
 // ========== CHECKBOX GROUP (múltiplos checkboxes) ==========
@@ -250,6 +257,7 @@ export const MultiSelectField: React.FC<AdvancedFieldProps> = ({
   error,
   required,
   disabled,
+  getValue,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [options, setOptions] = useState(field.options || []);
@@ -257,12 +265,59 @@ export const MultiSelectField: React.FC<AdvancedFieldProps> = ({
   const selectedValues = Array.isArray(value) ? value : [];
 
   useEffect(() => {
+    if (field.apiSelectEndpoint) {
+      loadApiOptions();
+      return;
+    }
+
     if (field.dataSource === 'database' && field.dataTable && field.dataValueColumn && field.dataLabelColumn) {
       loadDatabaseOptions();
-    } else {
-      setOptions(field.options || []);
+      return;
     }
-  }, [field.dataSource, field.dataTable, field.dataValueColumn, field.dataLabelColumn, field.options]);
+
+    setOptions(field.options || []);
+  }, [
+    field.apiSelectEndpoint,
+    JSON.stringify(field.apiSelectEndpointParams || []),
+    ...(field.apiSelectEndpointParams || []).map((k) => getValue?.(k)),
+    field.dataSource,
+    field.dataTable,
+    field.dataValueColumn,
+    field.dataLabelColumn,
+    field.options,
+  ]);
+
+  const loadApiOptions = async () => {
+    if (!field.apiSelectEndpoint) return;
+
+    try {
+      setLoading(true);
+
+      const params: Record<string, any> = {};
+      for (const k of field.apiSelectEndpointParams || []) {
+        const v = getValue?.(k);
+        if (v !== undefined && v !== null && v !== '') params[k] = v;
+      }
+
+      const response = await axios.get(`${API_URL}/api/${field.apiSelectEndpoint}`, {
+        params,
+        withCredentials: true,
+      });
+
+      const data = Array.isArray(response.data) ? response.data : [];
+      const mapped = data.map((item: any) => ({
+        value: String(item.value ?? item.idtipo_municipio ?? item.id ?? item.codigo ?? ''),
+        label: String(item.label ?? item.descricao ?? item.nome ?? item.name ?? item.text ?? item.value ?? ''),
+      })).filter((o: any) => o.value && o.label);
+
+      setOptions(mapped);
+    } catch (error) {
+      console.error('Erro ao carregar opções da API:', error);
+      setOptions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadDatabaseOptions = async () => {
     if (!field.dataTable || !field.dataValueColumn || !field.dataLabelColumn) return;
@@ -327,7 +382,11 @@ export const MultiSelectField: React.FC<AdvancedFieldProps> = ({
       </div>
       {/* Grid de cards (mesmo layout do checkbox group / radio) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-        {filteredOptions.length === 0 ? (
+        {loading ? (
+          <div className="col-span-full py-4 text-center text-sm text-gray-500">
+            Carregando opções...
+          </div>
+        ) : filteredOptions.length === 0 ? (
           <div className="col-span-full py-4 text-center text-sm text-gray-500">
             Nenhuma opção encontrada
           </div>

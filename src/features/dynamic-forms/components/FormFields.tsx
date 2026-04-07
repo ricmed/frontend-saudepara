@@ -159,9 +159,37 @@ export const NumberField: React.FC<TextFieldProps> = ({
   required,
   disabled,
 }) => {
-  const min = field.min;
-  const max = field.max;
+  const nowYear = new Date().getFullYear();
+  const isAnoReferencia = field.key === 'cabecalho.ano';
+  const min = isAnoReferencia ? nowYear : field.min;
+  const max = isAnoReferencia ? nowYear + 10 : field.max;
   const inputId = getFieldInputId(field);
+  const step = typeof (field as any).step === 'number' && Number.isFinite((field as any).step) ? (field as any).step : 1;
+
+  // UX: para campos numéricos com faixa (min/max) faz sentido usar stepper consistente com DateField.
+  const showStepper = isAnoReferencia || min !== undefined || max !== undefined;
+  const numericValue = value === '' || value === null || value === undefined ? undefined : Number(value);
+  const canDecrement = !disabled && !field.disabled && (numericValue === undefined ? true : (min === undefined ? true : numericValue > min));
+  const canIncrement = !disabled && !field.disabled && (numericValue === undefined ? true : (max === undefined ? true : numericValue < max));
+
+  const clamp = (n: number) => {
+    let v = n;
+    if (min !== undefined) v = Math.max(min, v);
+    if (max !== undefined) v = Math.min(max, v);
+    return v;
+  };
+
+  const handleDecrement = () => {
+    if (!canDecrement) return;
+    const base = numericValue ?? (min ?? 0);
+    onChange(clamp(base - step));
+  };
+
+  const handleIncrement = () => {
+    if (!canIncrement) return;
+    const base = numericValue ?? (min ?? 0);
+    onChange(clamp(base + step));
+  };
   
   return (
     <div className="mb-4">
@@ -169,21 +197,65 @@ export const NumberField: React.FC<TextFieldProps> = ({
         {field.label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
-      <input
-        id={inputId}
-        type="number"
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value ? Number(e.target.value) : '')}
-        placeholder={field.placeholder}
-        disabled={disabled || field.disabled}
-        min={min}
-        max={max}
-        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-          error
-            ? 'border-red-500 focus:ring-red-500'
-            : 'border-gray-300 focus:ring-blue-500'
-        } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-      />
+      {showStepper ? (
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleDecrement}
+            disabled={!canDecrement}
+            className="px-3 py-2 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:cursor-not-allowed rounded-md text-gray-700 font-bold"
+            aria-label={`Diminuir ${field.label}`}
+            title={`Diminuir ${field.label}`}
+          >
+            −
+          </button>
+          <input
+            id={inputId}
+            type="number"
+            value={value ?? ''}
+            onChange={(e) => onChange(e.target.value ? Number(e.target.value) : '')}
+            placeholder={field.placeholder}
+            disabled={disabled || field.disabled}
+            min={min}
+            max={max}
+            step={step}
+            inputMode="numeric"
+            className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+              error
+                ? 'border-red-500 focus:ring-red-500'
+                : 'border-gray-300 focus:ring-blue-500'
+            } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+          />
+          <button
+            type="button"
+            onClick={handleIncrement}
+            disabled={!canIncrement}
+            className="px-3 py-2 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:cursor-not-allowed rounded-md text-gray-700 font-bold"
+            aria-label={`Aumentar ${field.label}`}
+            title={`Aumentar ${field.label}`}
+          >
+            +
+          </button>
+        </div>
+      ) : (
+        <input
+          id={inputId}
+          type="number"
+          value={value ?? ''}
+          onChange={(e) => onChange(e.target.value ? Number(e.target.value) : '')}
+          placeholder={field.placeholder}
+          disabled={disabled || field.disabled}
+          min={min}
+          max={max}
+          step={step}
+          inputMode="numeric"
+          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+            error
+              ? 'border-red-500 focus:ring-red-500'
+              : 'border-gray-300 focus:ring-blue-500'
+          } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+        />
+      )}
       {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
       <div className="flex justify-between items-center mt-1">
         {error && <p className="text-red-500 text-sm">{error}</p>}

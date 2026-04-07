@@ -22,6 +22,19 @@ export const DynamicFormPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const getCurrentMonthCode = () => {
+    const m = new Date().getMonth(); // 0..11
+    const map = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+    return map[m] || 'JAN';
+  };
+
+  const getCurrentQuadrimestre = () => {
+    const m = new Date().getMonth(); // 0..11
+    if (m <= 3) return 'Q1'; // Jan-Abr
+    if (m <= 7) return 'Q2'; // Mai-Ago
+    return 'Q3'; // Set-Dez
+  };
+
   useEffect(() => {
     loadForm();
   }, [agravo, id]);
@@ -43,7 +56,32 @@ export const DynamicFormPage: React.FC = () => {
       } else {
         // Nova notificação: pré-preencher data da notificação com a data atual
         const hoje = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-        setInitialData({ notificacao: { dt_notificacao: hoje } });
+        const now = new Date();
+        const base: Record<string, any> = { notificacao: { dt_notificacao: hoje } };
+
+        // Defaults de cabeçalho para formulários de monitoramento (editável pelo usuário)
+        if (agravo === 'MONITOR_OPER_REGIONAL' || agravo === 'MONITOR_TEC_PQAVS') {
+          base.cabecalho = {
+            ...(base.cabecalho || {}),
+            ano: now.getFullYear(),
+          };
+        }
+        // No operacional, mês/quadrimestre aparecem após escolher competência; já deixamos valores default.
+        if (agravo === 'MONITOR_OPER_REGIONAL') {
+          base.cabecalho = {
+            ...(base.cabecalho || {}),
+            mes: getCurrentMonthCode(),
+          };
+        }
+        // No técnico, quadrimestre é sempre obrigatório; pré-selecionar o atual.
+        if (agravo === 'MONITOR_TEC_PQAVS') {
+          base.cabecalho = {
+            ...(base.cabecalho || {}),
+            quadrimestre: getCurrentQuadrimestre(),
+          };
+        }
+
+        setInitialData(base);
       }
     } catch (err: any) {
       console.error('Erro ao carregar formulário:', err);

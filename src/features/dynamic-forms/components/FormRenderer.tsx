@@ -34,6 +34,7 @@ import { EstadoMunicipioNotificacao } from './EstadoMunicipioNotificacao';
 import { EstabelecimentoNotificacao } from './EstabelecimentoNotificacao';
 import { EstadoMunicipioResidencia } from './EstadoMunicipioResidencia';
 import { TableField } from './TableField';
+import { ClipboardList, Calendar, DollarSign, Target, Activity, Shield, Leaf, BarChart3, Wrench, Users } from 'lucide-react';
 import { convertLocalDateTimeToUTC } from '@/utils/timezoneUtils';
 
 const NOTIFICATION_LOCATION_KEYS = new Set([
@@ -104,6 +105,22 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   readOnly = false,
   showActions = true,
 }) => {
+  const sectionIconMap: Record<string, React.ComponentType<{ className?: string }>> = React.useMemo(
+    () => ({
+      'clipboard-list': ClipboardList,
+      'calendar': Calendar,
+      'dollar-sign': DollarSign,
+      'target': Target,
+      'activity': Activity,
+      'bar-chart-3': BarChart3,
+      'shield': Shield,
+      'leaf': Leaf,
+      'wrench': Wrench,
+      'users': Users,
+    }),
+    []
+  );
+
   const initialDataWithDefaults = React.useMemo(() => {
     const pac = initialData?.paciente ?? {};
     const dataNasc = pac.data_nascimento;
@@ -172,7 +189,12 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
 
   // Quando "Configurar Colunas Fixas" está ativo, exibir apenas os campos marcados como coluna fixa
   const sectionsToRender = React.useMemo(() => {
-    const useFixedOnly = !!schema.fixedColumnsConfig?.enabled;
+    // `fixedColumnsConfig.enabled` foi pensado para a tela de configuração de colunas fixas.
+    // Para evitar formulários “vazios” quando ninguém marcou `isFixedColumn`,
+    // só aplicamos o filtro se existir pelo menos 1 campo marcado como fixo.
+    const enabled = !!schema.fixedColumnsConfig?.enabled;
+    const hasAnyFixedField = schema.sections?.some((s) => s.fields?.some((f) => f.isFixedColumn === true));
+    const useFixedOnly = enabled && hasAnyFixedField;
     if (!useFixedOnly) return schema.sections;
     return schema.sections
       .map((section) => ({
@@ -576,7 +598,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
         }
         return <SelectSearchField {...commonProps} />;
       case 'multi-select':
-        return <MultiSelectField {...commonProps} />;
+        return <MultiSelectField {...commonProps} getValue={getValue} />;
       case 'radio':
         return <RadioGroupField {...commonProps} />;
       case 'email':
@@ -654,11 +676,23 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           const passaporteField = sortedFields.find((f) => f.key === 'paciente.passaporte');
           const paisField = sortedFields.find((f) => f.key === 'paciente.pais_nascimento_id');
           return (
-            <div key={section.id} className="mb-8">
-              <h2 className="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">
-                {section.title}
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div key={section.id} className="mb-6">
+              {/* Card da seção (header azul só no topo, com curva) */}
+              <div className="rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm">
+                <div className="bg-blue-600 px-4 py-3 flex items-center gap-3">
+                  {(section as any).icon && sectionIconMap[(section as any).icon] ? (
+                    React.createElement(sectionIconMap[(section as any).icon], {
+                      className: 'h-5 w-5 text-white/95 flex-shrink-0',
+                    })
+                  ) : (
+                    <div className="h-5 w-5 flex-shrink-0" />
+                  )}
+                  <h2 className="text-base sm:text-lg font-semibold text-white leading-tight">
+                    {section.title}
+                  </h2>
+                </div>
+                <div className="p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {sortedFields.map((field) => {
                   // Bloco único: Estabelecimento de saúde de notificação (UF, Município, Estabelecimento). Data da notificação fica em Dados do paciente.
                   if (firstNotificationField && field.key === firstNotificationField.key) {
@@ -796,6 +830,8 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                     </div>
                   );
                 })}
+                  </div>
+                </div>
               </div>
             </div>
           );

@@ -4,6 +4,7 @@ import { useAuth } from '@/keycloak/AuthProvider';
 import FormService, { type FormSchema, type FormSection, type FormField, type FormRule, type RuleCondition, type RuleAction, type TableColumnDef } from '@/services/FormService';
 import DatabaseService, { type TableColumn } from '@/services/DatabaseService';
 import { Plus, Trash2, Save, Eye, Settings, GripVertical, X, Download, Upload, ChevronUp, ChevronDown, Code, FileEdit, Check } from 'lucide-react';
+import { ClipboardList, Calendar, DollarSign, Target, Activity, Shield, Leaf, BarChart3, Wrench, Users } from 'lucide-react';
 import { FormRenderer } from '../components/FormRenderer';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 
@@ -527,6 +528,33 @@ export const FormBuilderPage: React.FC = () => {
     { value: 'table', label: '📊 Tabela / Grid' }
   ];
 
+  const sectionIconOptions = [
+    { value: '', label: 'Sem ícone' },
+    { value: 'clipboard-list', label: 'Lista (Clipboard)' },
+    { value: 'calendar', label: 'Calendário' },
+    { value: 'dollar-sign', label: 'Custo (R$)' },
+    { value: 'target', label: 'Meta/Alvo' },
+    { value: 'activity', label: 'Atividade' },
+    { value: 'bar-chart-3', label: 'Gráfico' },
+    { value: 'shield', label: 'Vigilância/Segurança' },
+    { value: 'leaf', label: 'Ambiental' },
+    { value: 'wrench', label: 'Operacional' },
+    { value: 'users', label: 'Equipe/Pessoas' },
+  ];
+
+  const iconPreviewMap: Record<string, React.ComponentType<{ className?: string }>> = {
+    'clipboard-list': ClipboardList,
+    'calendar': Calendar,
+    'dollar-sign': DollarSign,
+    'target': Target,
+    'activity': Activity,
+    'bar-chart-3': BarChart3,
+    'shield': Shield,
+    'leaf': Leaf,
+    'wrench': Wrench,
+    'users': Users,
+  };
+
   return (
     <AppPageLayout
       title={id ? 'Editar Formulário' : 'Novo Formulário'}
@@ -773,13 +801,35 @@ export const FormBuilderPage: React.FC = () => {
                     <div className="flex items-center gap-2 flex-1">
                       <GripVertical className="h-5 w-5 text-gray-400 flex-shrink-0" />
                       {activeSection === sectionIdx ? (
-                        <input
-                          type="text"
-                          value={section.title}
-                          onChange={(e) => updateSection(sectionIdx, { title: e.target.value })}
-                          className="flex-1 px-2 py-1 border border-blue-300 rounded"
-                          autoFocus
-                        />
+                        <div className="flex items-center gap-2 flex-1">
+                          <input
+                            type="text"
+                            value={section.title}
+                            onChange={(e) => updateSection(sectionIdx, { title: e.target.value })}
+                            className="flex-1 px-2 py-1 border border-blue-300 rounded"
+                            autoFocus
+                          />
+                          <div className="flex items-center gap-2">
+                            {/* Preview do ícone */}
+                            {(section as any).icon && iconPreviewMap[(section as any).icon] ? (
+                              React.createElement(iconPreviewMap[(section as any).icon], { className: 'h-4 w-4 text-blue-700' })
+                            ) : (
+                              <span className="h-4 w-4 inline-block" />
+                            )}
+                            <select
+                              value={(section as any).icon ?? ''}
+                              onChange={(e) => updateSection(sectionIdx, { icon: e.target.value || undefined } as any)}
+                              className="px-2 py-1 border border-blue-300 rounded text-sm bg-white"
+                              title="Ícone do cabeçalho da seção"
+                            >
+                              {sectionIconOptions.map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
                       ) : (
                         <h3 
                           className="font-semibold text-gray-900 cursor-pointer flex-1"

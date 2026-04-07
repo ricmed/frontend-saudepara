@@ -75,6 +75,19 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
       }
     });
 
+    // Default para mês (monitoramento operacional mensal): se vier vazio, preencher mês atual.
+    // (No técnico PQAVS, quadrimestre continua sendo pré-preenchido no DynamicFormPage.)
+    const mes = get(updatedData, 'cabecalho.mes');
+    if (!mes && schema?.agravo?.includes('Monitoramento operacional')) {
+      const mesAtual = (() => {
+        const m = new Date().getMonth(); // 0..11
+        const map = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+        return map[m] || 'JAN';
+      })();
+      set(updatedData, 'cabecalho.mes', mesAtual);
+      dataChanged = true;
+    }
+
     setFieldVisibility(newVisibility);
     setFieldRequired(newRequired);
     setFieldDisabled(newDisabled);
