@@ -176,6 +176,15 @@ export interface FormValidation {
 
 // Service
 class FormService {
+  async getCategories(): Promise<Array<{ key: string; label: string }>> {
+    const response = await api.get('/forms/categories');
+    const data = response.data;
+    if (!Array.isArray(data)) return [];
+    return data
+      .map((c: any) => ({ key: String(c.key ?? ''), label: String(c.label ?? '') }))
+      .filter((c) => c.key && c.label);
+  }
+
   // Listar todos os formulários
   async getAllForms(): Promise<Form[]> {
     try {

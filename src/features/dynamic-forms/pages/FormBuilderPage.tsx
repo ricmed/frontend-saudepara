@@ -16,6 +16,7 @@ export const FormBuilderPage: React.FC = () => {
   const [formDescription, setFormDescription] = useState('');
   const [formKey, setFormKey] = useState('');
   const [categoria, setCategoria] = useState('notificacao');
+  const [categoriasDisponiveis, setCategoriasDisponiveis] = useState<Array<{ key: string; label: string }>>([]);
   const [schema, setSchema] = useState<FormSchema>({
     agravo: '',
     sections: []
@@ -42,7 +43,23 @@ export const FormBuilderPage: React.FC = () => {
       loadForm();
     }
     loadTables();
+    loadCategorias();
   }, [id]);
+
+  const loadCategorias = async () => {
+    try {
+      const cats = await FormService.getCategories();
+      setCategoriasDisponiveis(cats);
+      // Se categoria atual não existe mais, zera para forçar seleção válida (sem fallback)
+      if (cats.length > 0 && !cats.some((c) => c.key === categoria)) {
+        setCategoria('');
+      }
+    } catch (err) {
+      console.error('Erro ao carregar categorias:', err);
+      setCategoriasDisponiveis([]);
+      setCategoria('');
+    }
+  };
 
   const loadForm = async () => {
     try {
@@ -620,9 +637,14 @@ export const FormBuilderPage: React.FC = () => {
                     onChange={(e) => setCategoria(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   >
-                    <option value="notificacao">Notificação</option>
-                    <option value="investigacao">Investigação</option>
-                    <option value="encerramento">Encerramento</option>
+                    <option value="" disabled>
+                      Selecione...
+                    </option>
+                    {categoriasDisponiveis.map((c) => (
+                      <option key={c.key} value={c.key}>
+                        {c.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
