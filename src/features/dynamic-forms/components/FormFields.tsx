@@ -361,7 +361,7 @@ const MoneyFieldBase: React.FC<TextFieldProps & { variant: MoneyFieldVariant }> 
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(Math.abs(n));
-    // "R$ 50,00" -> "50,00" (prefixo fica no addon do input)
+    // "R$ 50,00" -> "50,00" (prefixo fica no addon do input)
     return formatted.replace(/^R\$\s?/, '').trim();
   };
 
