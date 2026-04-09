@@ -501,8 +501,11 @@ export const FormBuilderPage: React.FC = () => {
   const fieldTypes = [
     { value: 'text', label: '📝 Texto' },
     { value: 'number', label: '🔢 Número' },
+    { value: 'currency', label: '💰 Moeda (R$)' },
+    { value: 'accounting', label: '🧾 Contábil (R$)' },
     { value: 'date', label: '📅 Data' },
     { value: 'month', label: '📅 Mês/Ano' },
+    { value: 'month-year', label: '📅 Mês/Ano (select + ano)' },
     { value: 'datetime', label: '🕐 Data e Hora' },
     { value: 'time', label: '⏰ Hora' },
     { value: 'email', label: '📧 Email' },

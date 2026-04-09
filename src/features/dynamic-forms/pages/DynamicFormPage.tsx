@@ -28,6 +28,13 @@ export const DynamicFormPage: React.FC = () => {
     return map[m] || 'JAN';
   };
 
+  const getCurrentCompetenciaMesAno = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`; // YYYY-MM (input type="month")
+  };
+
   const getCurrentQuadrimestre = () => {
     const m = new Date().getMonth(); // 0..11
     if (m <= 3) return 'Q1'; // Jan-Abr
@@ -70,6 +77,8 @@ export const DynamicFormPage: React.FC = () => {
         if (agravo === 'MONITOR_OPER_REGIONAL') {
           base.cabecalho = {
             ...(base.cabecalho || {}),
+            competencia_mes_ano: getCurrentCompetenciaMesAno(),
+            ano: now.getFullYear(),
             mes: getCurrentMonthCode(),
           };
         }

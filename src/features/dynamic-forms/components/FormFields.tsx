@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check } from 'lucide-react';
+import { Check, HelpCircle, X } from 'lucide-react';
 import type { FormField } from '@/services/FormService';
 
 function getFieldInputId(field: FormField) {
@@ -16,6 +16,39 @@ interface TextFieldProps {
   disabled?: boolean;
 }
 
+const FieldHelp: React.FC<{ helpText: string; label: string }> = ({ helpText, label }) => {
+  const [open, setOpen] = React.useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="text-gray-500 hover:text-blue-600 transition-colors focus:outline-none"
+        aria-label={`Ajuda sobre ${label}`}
+        title={`Ajuda sobre ${label}`}
+      >
+        <HelpCircle className="h-4 w-4" />
+      </button>
+
+      {open && (
+        <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-gray-700 relative">
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+            aria-label="Fechar ajuda"
+            title="Fechar ajuda"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          {helpText}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const TextField: React.FC<TextFieldProps> = ({
   field,
   value,
@@ -30,10 +63,13 @@ export const TextField: React.FC<TextFieldProps> = ({
   
   return (
     <div className="mb-4">
-      <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
-        {field.label}
-        {required && <span className="text-red-500 ml-1">*</span>}
-      </label>
+      <div className="flex items-center gap-2 mb-1">
+        <label htmlFor={inputId} className="block text-sm font-medium text-gray-700">
+          {field.label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+        {field.helpText && <FieldHelp helpText={field.helpText} label={field.label} />}
+      </div>
       <input
         id={inputId}
         type="text"
@@ -161,13 +197,19 @@ export const NumberField: React.FC<TextFieldProps> = ({
 }) => {
   const nowYear = new Date().getFullYear();
   const isAnoReferencia = field.key === 'cabecalho.ano';
+  const isCurrency = String(field.key || '').startsWith('custo.');
   const min = isAnoReferencia ? nowYear : field.min;
   const max = isAnoReferencia ? nowYear + 10 : field.max;
   const inputId = getFieldInputId(field);
-  const step = typeof (field as any).step === 'number' && Number.isFinite((field as any).step) ? (field as any).step : 1;
+  const step =
+    typeof (field as any).step === 'number' && Number.isFinite((field as any).step)
+      ? (field as any).step
+      : isCurrency
+      ? 0.01
+      : 1;
 
   // UX: para campos numéricos com faixa (min/max) faz sentido usar stepper consistente com DateField.
-  const showStepper = isAnoReferencia || min !== undefined || max !== undefined;
+  const showStepper = !isCurrency && (isAnoReferencia || min !== undefined || max !== undefined);
   const numericValue = value === '' || value === null || value === undefined ? undefined : Number(value);
   const canDecrement = !disabled && !field.disabled && (numericValue === undefined ? true : (min === undefined ? true : numericValue > min));
   const canIncrement = !disabled && !field.disabled && (numericValue === undefined ? true : (max === undefined ? true : numericValue < max));
@@ -189,6 +231,14 @@ export const NumberField: React.FC<TextFieldProps> = ({
     if (!canIncrement) return;
     const base = numericValue ?? (min ?? 0);
     onChange(clamp(base + step));
+  };
+
+  const parseNumericInput = (raw: string) => {
+    if (!raw) return '';
+    // Aceitar vírgula como decimal (pt-BR)
+    const normalized = raw.replace(',', '.');
+    const n = Number(normalized);
+    return Number.isFinite(n) ? n : '';
   };
   
   return (
@@ -213,7 +263,7 @@ export const NumberField: React.FC<TextFieldProps> = ({
             id={inputId}
             type="number"
             value={value ?? ''}
-            onChange={(e) => onChange(e.target.value ? Number(e.target.value) : '')}
+            onChange={(e) => onChange(parseNumericInput(e.target.value))}
             placeholder={field.placeholder}
             disabled={disabled || field.disabled}
             min={min}
@@ -238,28 +288,39 @@ export const NumberField: React.FC<TextFieldProps> = ({
           </button>
         </div>
       ) : (
-        <input
-          id={inputId}
-          type="number"
-          value={value ?? ''}
-          onChange={(e) => onChange(e.target.value ? Number(e.target.value) : '')}
-          placeholder={field.placeholder}
-          disabled={disabled || field.disabled}
-          min={min}
-          max={max}
-          step={step}
-          inputMode="numeric"
-          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-            error
-              ? 'border-red-500 focus:ring-red-500'
-              : 'border-gray-300 focus:ring-blue-500'
-          } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-        />
+        <div className={isCurrency ? 'flex items-stretch' : ''}>
+          {isCurrency && (
+            <span className="inline-flex items-center px-3 rounded-l-md border border-gray-300 bg-gray-50 text-gray-700 text-sm">
+              R$
+            </span>
+          )}
+          <input
+            id={inputId}
+            type="number"
+            value={value ?? ''}
+            onChange={(e) => onChange(parseNumericInput(e.target.value))}
+            placeholder={field.placeholder}
+            disabled={disabled || field.disabled}
+            min={min}
+            max={max}
+            step={step}
+            inputMode="decimal"
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+              error
+                ? 'border-red-500 focus:ring-red-500'
+                : 'border-gray-300 focus:ring-blue-500'
+            } ${
+              disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''
+            } [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+              isCurrency ? 'rounded-l-none' : ''
+            }`}
+          />
+        </div>
       )}
       {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
       <div className="flex justify-between items-center mt-1">
         {error && <p className="text-red-500 text-sm">{error}</p>}
-        {(min !== undefined || max !== undefined) && (
+        {((min !== undefined && min !== 0) || max !== undefined) && (
           <p className="text-xs text-gray-500 ml-auto">
             {min !== undefined && max !== undefined
               ? `Valor entre ${min} e ${max}`
@@ -272,6 +333,143 @@ export const NumberField: React.FC<TextFieldProps> = ({
     </div>
   );
 };
+
+type MoneyFieldVariant = 'currency' | 'accounting';
+
+const MoneyFieldBase: React.FC<TextFieldProps & { variant: MoneyFieldVariant }> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+  variant,
+}) => {
+  const inputId = getFieldInputId(field);
+  const numericValue =
+    value === '' || value === null || value === undefined ? undefined : Number(value);
+  const isNegative =
+    typeof numericValue === 'number' && Number.isFinite(numericValue) && numericValue < 0;
+
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [text, setText] = React.useState('');
+
+  const formatBRLNumber = (n: number) => {
+    const formatted = new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Math.abs(n));
+    // "R$ 50,00" -> "50,00" (prefixo fica no addon do input)
+    return formatted.replace(/^R\$\s?/, '').trim();
+  };
+
+  const toDisplayFormatted = (n?: number) => {
+    if (n === undefined || n === null || !Number.isFinite(n)) return '';
+    const base = formatBRLNumber(n);
+    if (variant === 'accounting' && n < 0) return `(${base})`;
+    return base;
+  };
+
+  const toEditingText = (n?: number) => {
+    if (n === undefined || n === null || !Number.isFinite(n)) return '';
+    // Em edição: sem parênteses, sem "R$"; usa vírgula pra decimal
+    return String(n).replace('.', ',');
+  };
+
+  // Sincroniza texto quando não está editando
+  React.useEffect(() => {
+    if (isEditing) return;
+    setText(toDisplayFormatted(numericValue));
+  }, [isEditing, numericValue, variant]);
+
+  const parseDisplayToNumber = (raw: string): number | '' => {
+    const trimmed = (raw ?? '').toString().trim();
+    if (!trimmed) return '';
+
+    // Permite "(50,00)" para contábil
+    const hasParens = trimmed.startsWith('(') && trimmed.endsWith(')');
+    const cleaned = trimmed
+      .replace(/[R$\s]/g, '')
+      .replace(/[()]/g, '')
+      .replace(/\./g, '') // milhares
+      .replace(',', '.'); // decimal
+
+    // Permitir apenas números, ponto e sinal
+    const normalized = cleaned.replace(/[^0-9.\-]/g, '');
+    const n = Number(normalized);
+    if (!Number.isFinite(n)) return '';
+    return hasParens ? -Math.abs(n) : n;
+  };
+
+  return (
+    <div className="mb-4">
+      <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <div className="flex items-stretch">
+        <span className="inline-flex items-center px-3 rounded-l-md border border-gray-300 bg-gray-50 text-gray-700 text-sm">
+          R$
+        </span>
+        <input
+          id={inputId}
+          type="text"
+          value={text}
+          onFocus={() => {
+            setIsEditing(true);
+            setText(toEditingText(numericValue));
+          }}
+          onBlur={() => {
+            setIsEditing(false);
+            const parsed = parseDisplayToNumber(text);
+            if (parsed === '') {
+              onChange('');
+              setText('');
+              return;
+            }
+            onChange(parsed);
+            setText(toDisplayFormatted(parsed));
+          }}
+          onChange={(e) => {
+            const raw = e.target.value;
+            setText(raw);
+            const parsed = parseDisplayToNumber(raw);
+            // Atualiza valor quando parsear, mas sem forçar formatação enquanto digita
+            if (parsed === '') {
+              onChange('');
+            } else {
+              onChange(parsed);
+            }
+          }}
+          placeholder={field.placeholder}
+          disabled={disabled || field.disabled}
+          min={field.min}
+          max={field.max}
+          inputMode="decimal"
+          className={`w-full px-3 py-2 border rounded-md rounded-l-none focus:outline-none focus:ring-2 ${
+            error
+              ? 'border-red-500 focus:ring-red-500'
+              : isNegative && variant === 'accounting'
+              ? 'border-amber-400 focus:ring-amber-500'
+              : 'border-gray-300 focus:ring-blue-500'
+          } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+        />
+      </div>
+      {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+    </div>
+  );
+};
+
+export const CurrencyField: React.FC<TextFieldProps> = (props) => (
+  <MoneyFieldBase {...props} variant="currency" />
+);
+
+export const AccountingField: React.FC<TextFieldProps> = (props) => (
+  <MoneyFieldBase {...props} variant="accounting" />
+);
 
 export const TextareaField: React.FC<TextFieldProps> = ({
   field,
@@ -287,10 +485,13 @@ export const TextareaField: React.FC<TextFieldProps> = ({
   
   return (
     <div className="mb-4">
-      <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
-        {field.label}
-        {required && <span className="text-red-500 ml-1">*</span>}
-      </label>
+      <div className="flex items-center gap-2 mb-1">
+        <label htmlFor={inputId} className="block text-sm font-medium text-gray-700">
+          {field.label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+        {field.helpText && <FieldHelp helpText={field.helpText} label={field.label} />}
+      </div>
       <textarea
         id={inputId}
         value={value || ''}
@@ -325,7 +526,8 @@ export const CheckboxField: React.FC<TextFieldProps> = ({
   required,
   disabled,
 }) => {
-  const isChecked = !!value;
+  const storeAs01 = (field as any).storeAs01 === true;
+  const isChecked = storeAs01 ? String(value ?? '') === '1' : !!value;
   return (
     <div className="mb-4">
       <label
@@ -342,7 +544,10 @@ export const CheckboxField: React.FC<TextFieldProps> = ({
           <input
             type="checkbox"
             checked={isChecked}
-            onChange={(e) => onChange(e.target.checked)}
+            onChange={(e) => {
+              if (storeAs01) onChange(e.target.checked ? '1' : '0');
+              else onChange(e.target.checked);
+            }}
             disabled={disabled || field.disabled}
             className="w-6 h-6 rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer"
           />

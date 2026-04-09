@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import type { FormSchema } from '@/services/FormService';
 import { useFormRenderer } from '../hooks/useFormRenderer';
-import { TextField, DateField, NumberField, TextareaField, CheckboxField } from './FormFields';
+import { TextField, DateField, NumberField, TextareaField, CheckboxField, CurrencyField, AccountingField } from './FormFields';
 import { SelectField, SelectSearchField, CodeListSelectField, CodeListSearchField, ApiSelectField, ApiSelectSearchField, CboSearchField, CnaeSearchField, DseiPoloAldeiaFields } from './SelectFields';
 import { 
   CheckboxGroupField, 
@@ -300,6 +300,13 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     'table',
   ]);
   const isFullWidth = (type: string) => fullWidthTypes.has(type);
+  const isHalfWidthDescription = (field: any) => {
+    const key = String(field?.key || '');
+    // Em vários instrumentos a "descrição" funciona melhor em meia coluna,
+    // para permitir o próximo campo ao lado.
+    if (key === 'detalhamento.avaliacao_como') return false; // manter cheio
+    return key.includes('descricao') || key === 'detalhamento.capacitacao_como';
+  };
 
   const normalizeMaiusculo = (v: any) => {
     if (v == null || v === '') return v;
@@ -460,12 +467,80 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             {error && <p className="mt-1 text-sm text-red-500">{error}</p>}
           </div>
         );
+      case 'month-year': {
+        const comp = typeof value === 'string' ? value : '';
+        const m = comp.match(/^(\d{4})-(\d{2})$/);
+        const year = m ? m[1] : '';
+        const month = m ? m[2] : '';
+        const months = [
+          { value: '01', label: 'Janeiro' },
+          { value: '02', label: 'Fevereiro' },
+          { value: '03', label: 'Março' },
+          { value: '04', label: 'Abril' },
+          { value: '05', label: 'Maio' },
+          { value: '06', label: 'Junho' },
+          { value: '07', label: 'Julho' },
+          { value: '08', label: 'Agosto' },
+          { value: '09', label: 'Setembro' },
+          { value: '10', label: 'Outubro' },
+          { value: '11', label: 'Novembro' },
+          { value: '12', label: 'Dezembro' },
+        ];
+
+        const setComp = (y: string, mm: string) => {
+          if (y && mm) setValue(resolved.key, `${y}-${mm}`);
+          else setValue(resolved.key, undefined);
+        };
+
+        return (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {resolved.label}
+              {required && <span className="text-red-500 ml-1">*</span>}
+            </label>
+            {resolved.helpText && <p className="text-xs text-gray-500 mb-2">{resolved.helpText}</p>}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <select
+                value={month}
+                onChange={(e) => setComp(year, e.target.value)}
+                disabled={disabled}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  error ? 'border-red-500' : 'border-gray-300'
+                } ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+              >
+                <option value="">Selecione o mês</option>
+                {months.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={year}
+                onChange={(e) => setComp(e.target.value ? String(e.target.value) : '', month)}
+                disabled={disabled}
+                placeholder="Ano"
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  error ? 'border-red-500' : 'border-gray-300'
+                } ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+              />
+            </div>
+            {error && <p className="mt-1 text-sm text-red-500">{error}</p>}
+          </div>
+        );
+      }
       case 'datetime':
         return <DateTimeField {...commonProps} />;
       case 'time':
         return <TimeField {...commonProps} />;
       case 'number':
         return <NumberField {...commonProps} />;
+      case 'currency':
+        return <CurrencyField {...commonProps} />;
+      case 'accounting':
+        return <AccountingField {...commonProps} />;
       case 'idade':
         return (
           <IdadeField
@@ -824,7 +899,11 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                   return (
                     <div
                       key={field.key}
-                      className={isFullWidth(field.type) ? 'md:col-span-2' : ''}
+                      className={
+                        isFullWidth(field.type) && !isHalfWidthDescription(field)
+                          ? 'md:col-span-2'
+                          : ''
+                      }
                     >
                       {content}
                     </div>

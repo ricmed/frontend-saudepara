@@ -57,6 +57,14 @@ function evaluateCondition(when: FormRule['when'], formData: Record<string, any>
   const leftValue = getNestedValue(formData, left);
 
   switch (op) {
+    case 'and': {
+      const conditions = Array.isArray(right) ? right : [];
+      return conditions.every((c) => evaluateCondition(c as any, formData));
+    }
+    case 'or': {
+      const conditions = Array.isArray(right) ? right : [];
+      return conditions.some((c) => evaluateCondition(c as any, formData));
+    }
     case 'eq': // equals
     case '==':
       return leftValue == right;

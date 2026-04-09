@@ -95,6 +95,8 @@ export interface FormField {
   disabled?: boolean;
   hidden?: boolean;
   helpText?: string;
+  /** Para checkbox: salva como '1'/'0' em vez de boolean */
+  storeAs01?: boolean;
   // Configuração de origem de dados
   dataSource?: 'manual' | 'database';
   dataTable?: string;

@@ -75,17 +75,35 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
       }
     });
 
-    // Default para mês (monitoramento operacional mensal): se vier vazio, preencher mês atual.
-    // (No técnico PQAVS, quadrimestre continua sendo pré-preenchido no DynamicFormPage.)
-    const mes = get(updatedData, 'cabecalho.mes');
-    if (!mes && schema?.agravo?.includes('Monitoramento operacional')) {
-      const mesAtual = (() => {
-        const m = new Date().getMonth(); // 0..11
+    // Monitoramento operacional: sincronizar competência (YYYY-MM) -> ano e mês (ocultos)
+    if (schema?.agravo?.includes('Monitoramento operacional')) {
+      const comp = get(updatedData, 'cabecalho.competencia_mes_ano');
+      if (typeof comp === 'string' && /^\d{4}-\d{2}$/.test(comp)) {
+        const [yStr, mStr] = comp.split('-');
+        const y = Number(yStr);
+        const m = Number(mStr); // 1..12
         const map = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
-        return map[m] || 'JAN';
-      })();
-      set(updatedData, 'cabecalho.mes', mesAtual);
-      dataChanged = true;
+        const mesCode = map[m - 1];
+        if (Number.isFinite(y) && mesCode) {
+          if (get(updatedData, 'cabecalho.ano') !== y) {
+            set(updatedData, 'cabecalho.ano', y);
+            dataChanged = true;
+          }
+          if (get(updatedData, 'cabecalho.mes') !== mesCode) {
+            set(updatedData, 'cabecalho.mes', mesCode);
+            dataChanged = true;
+          }
+        }
+      } else {
+        // Default: se competência vier vazia, preencher com mês/ano atual
+        if (!comp) {
+          const now = new Date();
+          const y = now.getFullYear();
+          const mm = String(now.getMonth() + 1).padStart(2, '0');
+          set(updatedData, 'cabecalho.competencia_mes_ano', `${y}-${mm}`);
+          dataChanged = true;
+        }
+      }
     }
 
     setFieldVisibility(newVisibility);
