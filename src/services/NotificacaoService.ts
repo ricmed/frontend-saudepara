@@ -1,5 +1,6 @@
 // NotificacaoService.ts - VERSÃO ATUALIZADA com funções de arquivo
 import axios from 'axios';
+import { getApiOrigin } from '@/config/apiOrigin';
 import type { FormData } from '@/features/notificationForms/types/index2';
 import { formatFromBackend, formatToBackend, formatListResponse } from '@/utils/notificacaoAdapter';
 import indexedDBService from '@/services/indexedDB';
@@ -97,29 +98,28 @@ export interface PaginatedResponse<T> {
   };
 }
 
-const server = import.meta.env.VITE_API_SERVER;
-const port = import.meta.env.VITE_API_PORT;
+const API_ORIGIN = getApiOrigin();
 // URL base para o backend
-const API_BASE_URL = `${server}:${port}/api/notificacao`;
+const API_BASE_URL = `${API_ORIGIN}/api/notificacao`;
 
 // Endpoints corretos para buscar tipos - usando o padrão de nomenclatura do backend
 const TIPO_ENDPOINTS = {
-  EVENTO: `${server}:${port}/api/tipo-evento`,
-  PUBLICO: `${server}:${port}/api/tipo-publico`,
-  PAIS: `${server}:${port}/api/tipo-pais`,
-  ESTADO: `${server}:${port}/api/tipo-estado`,
-  MUNICIPIO: `${server}:${port}/api/tipo-municipio`,
-  BAIRRO: `${server}:${port}/api/tipo-bairro`,
-  GENERO: `${server}:${port}/api/tipo-genero`,
-  RACA: `${server}:${port}/api/tipo-raca`,
-  ESCOLARIDADE: `${server}:${port}/api/tipo-escolaridade`,
-  CBO: `${server}:${port}/api/tipo-cbo`,
-  ATENDIMENTO: `${server}:${port}/api/tipo-atendimento`,
-  SINTOMA: `${server}:${port}/api/tipo-sintoma`,
-  HIPOTESE_DIAG: `${server}:${port}/api/tipo-hipotese-diag`,
-  TRAUMA: `${server}:${port}/api/tipo-trauma`,
-  ESTABELECIMENTO: `${server}:${port}/api/estabelecimentos`, // Nota o uso do plural, conforme o backend
-  ENCERRAMENTO: `${server}:${port}/api/tipo-encerramento`,
+  EVENTO: `${API_ORIGIN}/api/tipo-evento`,
+  PUBLICO: `${API_ORIGIN}/api/tipo-publico`,
+  PAIS: `${API_ORIGIN}/api/tipo-pais`,
+  ESTADO: `${API_ORIGIN}/api/tipo-estado`,
+  MUNICIPIO: `${API_ORIGIN}/api/tipo-municipio`,
+  BAIRRO: `${API_ORIGIN}/api/tipo-bairro`,
+  GENERO: `${API_ORIGIN}/api/tipo-genero`,
+  RACA: `${API_ORIGIN}/api/tipo-raca`,
+  ESCOLARIDADE: `${API_ORIGIN}/api/tipo-escolaridade`,
+  CBO: `${API_ORIGIN}/api/tipo-cbo`,
+  ATENDIMENTO: `${API_ORIGIN}/api/tipo-atendimento`,
+  SINTOMA: `${API_ORIGIN}/api/tipo-sintoma`,
+  HIPOTESE_DIAG: `${API_ORIGIN}/api/tipo-hipotese-diag`,
+  TRAUMA: `${API_ORIGIN}/api/tipo-trauma`,
+  ESTABELECIMENTO: `${API_ORIGIN}/api/estabelecimentos`, // Nota o uso do plural, conforme o backend
+  ENCERRAMENTO: `${API_ORIGIN}/api/tipo-encerramento`,
 };
 
 // Instância do axios

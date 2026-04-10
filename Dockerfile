@@ -14,8 +14,10 @@ COPY . .
 RUN npm ci && \
     npm rebuild esbuild
 
-# Compila o aplicativo
-RUN npm run build
+# Compila o aplicativo (produção: app.saude.pa.gov.br — não usar npm run build, que embute HML)
+# Para imagem de homologação: docker build --build-arg NPM_BUILD_SCRIPT=build
+ARG NPM_BUILD_SCRIPT=build:producao
+RUN npm run ${NPM_BUILD_SCRIPT}
 
 # Stage 2: Servidor de produção
 FROM nginx:alpine
