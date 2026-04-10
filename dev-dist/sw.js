@@ -79,7 +79,7 @@ define(['./workbox-26eaab98'], (function (workbox) { 'use strict';
    */
   workbox.precacheAndRoute([{
     "url": "/index.html",
-    "revision": "0.v4b3cstkhs"
+    "revision": "0.oqv8v3q8h2"
   }], {});
   workbox.cleanupOutdatedCaches();
   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("/index.html"), {
@@ -120,6 +120,22 @@ define(['./workbox-26eaab98'], (function (workbox) { 'use strict';
   }), 'GET');
   workbox.registerRoute(/^https:\/\/app\.hml\.saude\.pa\.gov\.br\/.*$/i, new workbox.NetworkFirst({
     "cacheName": "app-hml-cache",
+    "networkTimeoutSeconds": 5,
+    plugins: [new workbox.ExpirationPlugin({
+      maxEntries: 200,
+      maxAgeSeconds: 2592000
+    })]
+  }), 'GET');
+  workbox.registerRoute(/^https:\/\/app\.saude\.pa\.gov\.br\/api\/.*$/i, new workbox.NetworkFirst({
+    "cacheName": "api-prod-cache",
+    "networkTimeoutSeconds": 5,
+    plugins: [new workbox.ExpirationPlugin({
+      maxEntries: 100,
+      maxAgeSeconds: 604800
+    })]
+  }), 'GET');
+  workbox.registerRoute(/^https:\/\/app\.saude\.pa\.gov\.br\/.*$/i, new workbox.NetworkFirst({
+    "cacheName": "app-prod-cache",
     "networkTimeoutSeconds": 5,
     plugins: [new workbox.ExpirationPlugin({
       maxEntries: 200,
