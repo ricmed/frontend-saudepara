@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Menu, ArrowLeft, Contact, Ear } from 'lucide-react';
 import { useTranslation } from "@/i18n/useTranslations";
 import { useLanguage } from '@/contexts/LanguageContext';
-import SideMenu from "@/features/home/components/SideMenu"; // Supondo que o caminho do SideMenu esteja correto
+import { SideMenu } from "@/features/home/components/SideMenu"; // Supondo que o caminho do SideMenu esteja correto
 
 type ContactOption = {
   icon: JSX.Element;

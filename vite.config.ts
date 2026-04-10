@@ -343,7 +343,23 @@ export default defineConfig({
   
   preview: {
     port: 4173,
-    host: true
+    host: true,
+    // 🧪 IMPORTANTE: o Playwright usa `vite preview` (4173).
+    // Precisamos do mesmo proxy do `server` para autenticação/API local funcionar.
+    proxy: {
+      '/api-auth': {
+        target: API_AUTH_URL,
+        changeOrigin: true,
+        secure: false,
+        timeout: 10000,
+      },
+      '/api': {
+        target: API_BACKEND_URL,
+        changeOrigin: true,
+        secure: false,
+        timeout: 10000,
+      },
+    },
   },
   
   optimizeDeps: {

@@ -17,6 +17,14 @@ function normalizeText(text: string): string {
 interface LocationOption {
   [key: string]: any;
   descricao: string;
+  codigo?: string;
+}
+
+function optionLabel(opt: LocationOption): string {
+  if (opt.codigo != null && String(opt.codigo).trim() !== '') {
+    return `${opt.codigo} - ${opt.descricao || ''}`;
+  }
+  return opt.descricao || '';
 }
 
 interface LocationInputProps {
@@ -85,6 +93,27 @@ const LocationInput: React.FC<LocationInputProps> = ({
     }
   };
 
+  // Detectar tipo do campo pela combinação de name + endpoint
+  const endpoint = (apiEndpoint || "").toLowerCase();
+  const isMunicipioInput =
+    endpoint.includes("tipo-municipio") ||
+    name === "municipio" ||
+    name.startsWith("municipio");
+  const isEstadoInput =
+    endpoint.includes("tipo-estado") ||
+    name === "uf" ||
+    name.startsWith("uf");
+  const isPaisInput =
+    endpoint.includes("tipo-pais") ||
+    name === "paisProcedencia" ||
+    name.startsWith("pais");
+
+  const getCacheKey = (): "estados" | "paises" | "municipios" => {
+    if (isEstadoInput) return "estados";
+    if (isPaisInput) return "paises";
+    return "municipios";
+  };
+
   // Função para normalizar as opções recebidas, removendo acentos e cedilhas
   const normalizeOptions = (options: LocationOption[]): LocationOption[] => {
     return options.map(option => ({
@@ -105,7 +134,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
 
   // Reset selection when parent value changes (for municipalities)
   useEffect(() => {
-    if (name === "municipio" && parentValue !== undefined) {
+    if (isMunicipioInput && parentValue !== undefined) {
       debugLog(`State value changed to: ${parentValue}`);
       
       // Avoid processing if parent value hasn't changed
@@ -135,7 +164,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
         fetchMunicipiosByEstado(parentValue);
       }
     }
-  }, [parentValue, name]);
+  }, [parentValue, isMunicipioInput]);
 
   // Função para atualizar a posição do dropdown
   const updateDropdownPosition = () => {
@@ -310,20 +339,22 @@ const LocationInput: React.FC<LocationInputProps> = ({
       if (!navigator.onLine) {
         console.log(`📱 [${name}] Modo offline: buscando em cache...`);
         
-        const cacheKey = name === 'uf' ? 'estados' : 
-                        name === 'paisProcedencia' ? 'paises' :
-                        'municipios';
+        const cacheKey = getCacheKey();
         const cachedOptions = await indexedDBService.getOpcoes(cacheKey);
         
         if (cachedOptions && cachedOptions.length > 0) {
           options = cachedOptions;
           
-          // Filtrar por query se necessário
+          // Filtrar por query (código ou nome)
           if (query) {
             const normalizedQuery = normalizeText(query);
-            options = options.filter((option: any) => 
-              normalizeText(option.descricao || option.nome || '').includes(normalizedQuery)
-            );
+            const queryDigits = query.replace(/\D/g, '');
+            options = options.filter((option: any) => {
+              const byDesc = normalizeText(option.descricao || option.nome || '').includes(normalizedQuery);
+              const byCod = option.codigo != null && option.codigo !== '' &&
+                (String(option.codigo).includes(normalizedQuery) || (queryDigits && String(option.codigo).includes(queryDigits)));
+              return byDesc || byCod;
+            });
           }
           
           console.log(`✅ [${name}] ${options.length} registros encontrados em cache`);
@@ -338,7 +369,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
           const baseUrl = server && port ? `${server}:${port}/` : "/";
           
           let url = `${baseUrl}${apiEndpoint}`;
-          const limit = name === "paisProcedencia" ? 300 : 1000;
+          const limit = isPaisInput ? 300 : 1000;
           
           if (query) {
             const normalizedQuery = normalizeText(query);
@@ -358,29 +389,29 @@ const LocationInput: React.FC<LocationInputProps> = ({
           
           // ✅ SALVAR NO CACHE PARA USO FUTURO
           if (!query) { // Só salva busca geral, não buscas específicas
-            const cacheKey = name === 'uf' ? 'estados' : 
-                            name === 'paisProcedencia' ? 'paises' :
-                            'municipios';
+            const cacheKey = getCacheKey();
             await indexedDBService.saveOpcoes(cacheKey, options);
           }
           
         } catch (apiError) {
           console.warn(`⚠️ [${name}] API falhou, tentando cache...`);
           
-          const cacheKey = name === 'uf' ? 'estados' : 
-                          name === 'paisProcedencia' ? 'paises' :
-                          'municipios';
+          const cacheKey = getCacheKey();
           const cachedOptions = await indexedDBService.getOpcoes(cacheKey);
           
           if (cachedOptions && cachedOptions.length > 0) {
             options = cachedOptions;
             
-            // Filtrar por query se necessário
+            // Filtrar por query (código ou nome)
             if (query) {
               const normalizedQuery = normalizeText(query);
-              options = options.filter((option: any) => 
-                normalizeText(option.descricao || option.nome || '').includes(normalizedQuery)
-              );
+              const queryDigits = query.replace(/\D/g, '');
+              options = options.filter((option: any) => {
+                const byDesc = normalizeText(option.descricao || option.nome || '').includes(normalizedQuery);
+                const byCod = option.codigo != null && option.codigo !== '' &&
+                  (String(option.codigo).includes(normalizedQuery) || (queryDigits && String(option.codigo).includes(queryDigits)));
+                return byDesc || byCod;
+              });
             }
             
             console.log(`✅ [${name}] Usando cache offline: ${options.length} registros`);
@@ -412,32 +443,80 @@ const LocationInput: React.FC<LocationInputProps> = ({
     }
   };
 
-  // Fetch specific item by ID
+  // Fetch specific item by ID with offline support
   const fetchById = async (id: string) => {
     try {
       setIsLoading(true);
-      const server = import.meta.env.VITE_API_SERVER || "";
-      const port = import.meta.env.VITE_API_PORT || "";
-      const baseUrl = server && port ? `${server}:${port}/` : "/";
+      debugLog(`Fetching item by ID: ${id}`);
       
-      const url = `${baseUrl}${apiEndpoint}/${id}`;
-      debugLog(`Fetching item by ID: ${url}`);
+      const cacheKey = apiEndpoint ? getCacheKey() : null;
       
-      const response = await axios.get(url);
-      
-      if (response.data && response.data[idField]) {
-        // Normalizar a descrição do item
-        if (response.data.descricao) {
-          response.data.descricao = normalizeText(response.data.descricao);
+      // ✅ SE ESTIVER ONLINE: TENTAR API PRIMEIRO, CACHE COMO FALLBACK
+      if (navigator.onLine) {
+        try {
+          const server = import.meta.env.VITE_API_SERVER || "";
+          const port = import.meta.env.VITE_API_PORT || "";
+          const baseUrl = server && port ? `${server}:${port}/` : "/";
+          
+          const url = `${baseUrl}${apiEndpoint}/${id}`;
+          debugLog(`Fetching from API: ${url}`);
+          
+          const response = await axios.get(url);
+          
+          if (response.data && response.data[idField]) {
+            // Normalizar a descrição do item
+            if (response.data.descricao) {
+              response.data.descricao = normalizeText(response.data.descricao);
+            }
+            debugLog(`✅ Item found in API: ${response.data.descricao}`);
+            return response.data;
+          }
+        } catch (apiError) {
+          console.warn(`⚠️ API falhou ao buscar item ${id}, tentando cache...`, apiError);
+          
+          // ✅ FALLBACK: Buscar no cache se a API falhar
+          if (cacheKey) {
+            const cachedOptions = await indexedDBService.getOpcoes(cacheKey);
+            if (cachedOptions && cachedOptions.length > 0) {
+              const foundInCache = cachedOptions.find((option: any) => 
+                String(option[idField]) === String(id)
+              );
+              
+              if (foundInCache) {
+                if (foundInCache.descricao) {
+                  foundInCache.descricao = normalizeText(foundInCache.descricao);
+                }
+                debugLog(`✅ Item found in cache as fallback: ${foundInCache.descricao}`);
+                return foundInCache;
+              }
+            }
+          }
         }
-        debugLog(`Item found: ${response.data.descricao}`);
-        return response.data;
+      } else {
+        // ✅ SE ESTIVER OFFLINE: USAR APENAS O CACHE
+        debugLog(`📱 Modo offline: buscando apenas no cache`);
+        if (cacheKey) {
+          const cachedOptions = await indexedDBService.getOpcoes(cacheKey);
+          if (cachedOptions && cachedOptions.length > 0) {
+            const foundInCache = cachedOptions.find((option: any) => 
+              String(option[idField]) === String(id)
+            );
+            
+            if (foundInCache) {
+              if (foundInCache.descricao) {
+                foundInCache.descricao = normalizeText(foundInCache.descricao);
+              }
+              debugLog(`✅ Item found in cache (offline): ${foundInCache.descricao}`);
+              return foundInCache;
+            }
+          }
+        }
       }
       
-      debugLog(`Item with ID ${id} not found`);
+      debugLog(`❌ Item with ID ${id} not found`);
       return null;
     } catch (error: unknown) {
-      debugLog(`Error fetching by ID: ${id}`, error);
+      debugLog(`❌ Error fetching by ID: ${id}`, error);
       return null;
     } finally {
       setIsLoading(false);
@@ -459,9 +538,15 @@ const LocationInput: React.FC<LocationInputProps> = ({
     // Se não há termo de busca, mostrar todas as opções (já filtradas)
     if (!searchQuery) return optionsToFilter;
     
-    // Normalizar o termo de pesquisa
+    // Normalizar o termo de pesquisa: busca por código ou por nome (descricao)
     const normalizedSearch = normalizeText(searchQuery);
-    return optionsToFilter.filter(option => option.descricao.includes(normalizedSearch));
+    const searchDigits = searchQuery.replace(/\D/g, '');
+    return optionsToFilter.filter(option => {
+      const descMatch = (option.descricao || '').includes(normalizedSearch);
+      const codMatch = option.codigo != null && option.codigo !== '' &&
+        (String(option.codigo).includes(normalizedSearch) || (searchDigits && String(option.codigo).includes(searchDigits)));
+      return descMatch || codMatch;
+    });
   }, [localOptions, searchQuery, excludeValues, idField]);
 
   // Load selected option if there's a value - with manual editing check
@@ -479,7 +564,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
         if (foundOption) {
           debugLog(`Option found locally: ${foundOption.descricao}`);
           setSelectedOption(foundOption);
-          setDisplayValue(foundOption.descricao);
+          setDisplayValue(optionLabel(foundOption));
         } else if (apiEndpoint) {
           // If not found locally, fetch from API
           debugLog(`Fetching option by ID from API: ${value}`);
@@ -487,7 +572,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
           
           if (option) {
             setSelectedOption(option);
-            setDisplayValue(option.descricao);
+            setDisplayValue(optionLabel(option));
           } else {
             // If also failed on API, clear selection
             setSelectedOption(null);
@@ -546,7 +631,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
       updateDropdownPosition();
       
       // Load options when dropdown is opened
-      if (name === "municipio") {
+      if (isMunicipioInput) {
         // For municipalities, we need the state value
         if (parentValue && localOptions.length === 0) {
           fetchMunicipiosByEstado(parentValue);
@@ -568,13 +653,13 @@ const LocationInput: React.FC<LocationInputProps> = ({
         window.removeEventListener('scroll', updateDropdownPosition);
       };
     }
-  }, [isDropdownOpen, name, parentValue, localOptions.length, searchQuery]);
+  }, [isDropdownOpen, isMunicipioInput, parentValue, localOptions.length, searchQuery]);
   
   // Text search with debounce
   useEffect(() => {
     if (isDropdownOpen && searchQuery.length >= 2) {
       const timer = setTimeout(() => {
-        if (name === "municipio" && parentValue) {
+        if (isMunicipioInput && parentValue) {
           // For municipalities, we filter locally already loaded options
           // We don't need to make another API call
         } else {
@@ -585,7 +670,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
       
       return () => clearTimeout(timer);
     }
-  }, [searchQuery, isDropdownOpen, name, parentValue]);
+  }, [searchQuery, isDropdownOpen, isMunicipioInput, parentValue]);
 
   // Cancel pending requests when unmounting component
   useEffect(() => {
@@ -634,7 +719,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
     debugLog(`Option selected: ${option.descricao} (${option[idField]})`);
     
     setSelectedOption(option);
-    setDisplayValue(option.descricao);
+    setDisplayValue(optionLabel(option));
     setSearchQuery("");
     setIsManuallyEditing(false); // Exit manual editing mode
     onChange(option[idField].toString());
@@ -707,7 +792,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
                   }`}
                   onClick={() => handleOptionSelect(option)}
                 >
-                  {option.descricao}
+                  {optionLabel(option)}
                 </button>
               ))}
             </>
@@ -715,7 +800,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
             <div className="px-4 py-2 text-sm text-gray-500">
               {searchQuery.length > 0 
                 ? 'Nenhum resultado encontrado' 
-                : name === "municipio" && !parentValue 
+                : isMunicipioInput && !parentValue 
                   ? 'Selecione uma UF primeiro'
                   : 'Nenhuma opção disponível'}
             </div>

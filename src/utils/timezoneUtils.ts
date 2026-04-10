@@ -12,8 +12,6 @@ export const getTimezoneInfo = () => {
     const now = new Date();
     const timezone_offset_minutos = -now.getTimezoneOffset();
     
-    console.log(`🌍 Timezone detectado: ${timezone_name} (UTC${timezone_offset_minutos >= 0 ? '+' : ''}${timezone_offset_minutos / 60})`);
-    
     return {
       timezone_name,
       timezone_offset_minutos
@@ -96,7 +94,6 @@ export const convertLocalDateToUTC = (localDateString: string): string => {
     const offsetString = `${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
     
     const result = `${isoString}${offsetString}`;
-    console.log(`📤 Convertendo para backend: ${localDateString} -> ${result}`);
     
     return result;
   } catch (error) {
@@ -179,4 +176,107 @@ export const getCurrentDateForDisplay = (): string => {
     month: '2-digit',
     year: 'numeric'
   });
+};
+
+/**
+ * 🕐 DATETIME-LOCAL UTILS
+ * Funções específicas para inputs do tipo datetime-local
+ */
+
+/**
+ * Obtém data/hora atual no fuso horário local formatada para input datetime-local
+ * @returns String no formato YYYY-MM-DDTHH:MM
+ */
+export const getLocalDateTime = (date: Date = new Date()): string => {
+  const { timezone_name } = getTimezoneInfo();
+  
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone_name,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).formatToParts(date);
+
+  const getPart = (type: string) => parts.find(p => p.type === type)?.value || '';
+  
+  const year = getPart('year');
+  const month = getPart('month');
+  const day = getPart('day');
+  const hour = getPart('hour');
+  const minute = getPart('minute');
+  
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+};
+
+/**
+ * Converte data UTC (do backend) para fuso local e formata para datetime-local input
+ * @param utcDateString - String de data em UTC (ex: "2026-02-05T14:00:00Z")
+ * @returns String formatada para datetime-local (ex: "2026-02-05T11:00")
+ */
+export const convertUTCToLocalDateTime = (utcDateString: string | null | undefined): string => {
+  if (!utcDateString) return getLocalDateTime();
+  
+  try {
+    // Garante que a string seja interpretada como UTC
+    let dateStr = utcDateString.trim();
+    
+    // Se for apenas uma data sem horário nem timezone, adiciona horário
+    if (!dateStr.includes('T')) {
+      dateStr = dateStr + 'T00:00:00Z';
+    } 
+    // Se tem horário mas não tem timezone, adiciona Z (UTC)
+    else if (!dateStr.endsWith('Z') && !dateStr.includes('+') && !dateStr.includes('-', 10)) {
+      dateStr = dateStr + 'Z';
+    }
+    
+    const date = new Date(dateStr);
+    
+    // Verifica se a data é válida
+    if (isNaN(date.getTime())) {
+      return getLocalDateTime();
+    }
+    
+    const result = getLocalDateTime(date);
+    
+    return result;
+  } catch (error) {
+    console.error('❌ Erro ao converter UTC para datetime-local:', error);
+    return getLocalDateTime();
+  }
+};
+
+/**
+ * Converte datetime-local (YYYY-MM-DDTHH:MM) para UTC ISO string
+ * @param localDateTimeString - String do input datetime-local (ex: "2026-02-05T11:00")
+ * @returns String ISO UTC (ex: "2026-02-05T14:00:00.000Z")
+ */
+export const convertLocalDateTimeToUTC = (localDateTimeString: string): string => {
+  if (!localDateTimeString) return new Date().toISOString();
+  
+  try {
+    // Parse da string local
+    const parts = localDateTimeString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    
+    if (!parts) {
+      return new Date().toISOString();
+    }
+    
+    const [, year, month, day, hour, minute] = parts;
+    
+    // Criar string de data completa com segundos (sem timezone)
+    const dateString = `${year}-${month}-${day}T${hour}:${minute}:00`;
+    
+    // ✅ CORREÇÃO: new Date() sem timezone interpreta como horário LOCAL do navegador
+    // e toISOString() já converte automaticamente para UTC!
+    const localDate = new Date(dateString);
+    const utcString = localDate.toISOString();
+    
+    return utcString;
+  } catch (error) {
+    console.error('❌ Erro ao converter datetime-local para UTC:', error);
+    return new Date().toISOString();
+  }
 };

@@ -280,6 +280,7 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
                 <input
                   type="text"
                   name="cpf"
+                  data-testid="notif-field-cpf"
                   placeholder="000.000.000-00"
                   className={`w-full p-3 border ${
                     errors.cpf
@@ -296,7 +297,9 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
                 {/* ✅ REMOVIDO: Ícone de validação de CPF */}
               </div>
               {errors.cpf && (
-                <p className="mt-1 text-sm text-red-500">{errors.cpf}</p>
+                <p className="mt-1 text-sm text-red-500" data-testid="notif-cpf-error">
+                  {errors.cpf}
+                </p>
               )}
               {/* ✅ REMOVIDO: Mensagem "CPF válido e disponível para cadastro" */}
             </div>

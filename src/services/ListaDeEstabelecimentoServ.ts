@@ -280,5 +280,48 @@ export const ListaDeEstabelecimentoService = {  // Listagem paginada com busca
       console.error("Erro ao exportar dados:", error);
       throw new Error("Não foi possível exportar os dados. Tente novamente mais tarde.");
     }
+  },
+
+  /**
+   * Ativa/desativa estabelecimentos em lote
+   * @param estabelecimentoIds - Array de IDs dos estabelecimentos que devem ficar ativos
+   * @returns Resultado da operação com contadores
+   */
+  async bulkActivation(estabelecimentoIds: number[]): Promise<{
+    ativados: number;
+    desativados: number;
+    total: number;
+  }> {
+    // ✅ BULK ACTIVATION só funciona online
+    if (!navigator.onLine) {
+      throw new Error('Ativação em lote requer conexão com a internet');
+    }
+
+    try {
+      console.log(`🔄 Enviando bulk activation para ${estabelecimentoIds.length} estabelecimentos`);
+      
+      const response = await axios.patch(
+        `${API_URL}/bulk-activation`,
+        { estabelecimentoIds },
+        {
+          timeout: 30000, // 30 segundos para operações em lote
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log('✅ Bulk activation concluído:', response.data);
+      
+      return response.data.data;
+    } catch (error) {
+      console.error("❌ Erro ao executar bulk activation:", error);
+      
+      if (axios.isAxiosError(error)) {
+        handleApiError(error as AxiosError<APIError>);
+      }
+      
+      throw new Error("Não foi possível atualizar a ativação dos estabelecimentos. Tente novamente.");
+    }
   }
 };

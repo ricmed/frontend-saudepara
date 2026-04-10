@@ -1,7 +1,7 @@
 // src/features/notificationForms/ListaNotificacoes.tsx
 import React, { useRef, useState, useMemo, useEffect } from "react";
 import { CSVLink } from "react-csv";
-import SideMenu from "@/features/home/components/SideMenu";
+import { SideMenu } from "@/features/home/components/SideMenu";
 import TableHeader from "./components/TableHeader";
 import NotificationTable from "./components/NotificationTable";
 import Pagination from "./components/Pagination";
@@ -30,7 +30,6 @@ const ListaNotificacoes: React.FC = () => {
     if (selectedTipoAtendimento && notifications.allNotificacoes.length === 0) {
       notifications.fetchAllData();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTipoAtendimento]);
   
   // Refs para CSVLink

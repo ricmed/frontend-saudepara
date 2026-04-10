@@ -37,6 +37,8 @@ export type TranslationRecord = {
   'menu.materials': string;
   'menu.reportCase': string;
   'menu.reportCaseDesc': string;
+  'menu.reportDAE': string;
+  'menu.reportDAEDesc': string;
   
   // Localize Aqui
   'localize.title': string;
@@ -78,6 +80,7 @@ export type TranslationRecord = {
   'menu.qualify_establishments': string;
   'menu.notification': string;
   'menu.notify_case': string;
+  'menu.dynamic_forms': string;
   'menu.dashboard': string;
   'menu.offline_management': string;
   'menu.educational': string;

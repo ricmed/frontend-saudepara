@@ -211,6 +211,112 @@ export const exportChartAsPNG = async (chartId: string, title: string): Promise<
   }
 };
 
+// 📋 EXPORTAÇÃO PARA JSON (Dados Estruturados)
+export const exportChartAsJSON = (data: ChartDataItem[], title: string): void => {
+  try {
+    // Preparar dados JSON com metadados
+    const jsonData = {
+      title,
+      exportDate: new Date().toISOString(),
+      exportDateFormatted: new Date().toLocaleString('pt-BR'),
+      totalItems: data.length,
+      totalValue: data.reduce((sum, item) => sum + item.value, 0),
+      data: data.map(item => ({
+        name: item.name,
+        value: item.value,
+        fill: item.fill || null,
+        isAlarmante: item.isAlarmante || false
+      }))
+    };
+
+    // Criar string JSON formatada
+    const jsonString = JSON.stringify(jsonData, null, 2);
+    
+    // Criar blob e download
+    const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    
+    console.log(`✅ JSON exportado: ${link.download}`);
+  } catch (error) {
+    console.error('❌ Erro ao exportar JSON:', error);
+    alert('Erro ao exportar JSON');
+  }
+};
+
+// 🎨 EXPORTAÇÃO PARA SVG (Vetorial - Alta Qualidade)
+export const exportChartAsSVG = async (chartId: string, title: string): Promise<void> => {
+  try {
+    const element = document.getElementById(chartId);
+    if (!element) {
+      alert('Elemento do gráfico não encontrado!');
+      return;
+    }
+
+    // Procurar pelo elemento SVG dentro do container
+    const svgElement = element.querySelector('svg');
+    if (!svgElement) {
+      alert('Gráfico SVG não encontrado! Este formato só funciona para gráficos baseados em SVG.');
+      return;
+    }
+
+    // Clonar o SVG para não alterar o original
+    const clonedSvg = svgElement.cloneNode(true) as SVGElement;
+    
+    // Obter dimensões do SVG
+    const bbox = svgElement.getBBox();
+    const width = bbox.width || svgElement.clientWidth || 800;
+    const height = bbox.height || svgElement.clientHeight || 600;
+    
+    // Configurar atributos do SVG clonado
+    clonedSvg.setAttribute('width', width.toString());
+    clonedSvg.setAttribute('height', height.toString());
+    clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    
+    // Adicionar estilos inline ao SVG
+    const styles = Array.from(document.styleSheets)
+      .map(sheet => {
+        try {
+          return Array.from(sheet.cssRules)
+            .map(rule => rule.cssText)
+            .join('\n');
+        } catch (e) {
+          return '';
+        }
+      })
+      .join('\n');
+    
+    // Criar elemento de estilo
+    const styleElement = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+    styleElement.textContent = styles;
+    clonedSvg.insertBefore(styleElement, clonedSvg.firstChild);
+    
+    // Serializar o SVG
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(clonedSvg);
+    
+    // Criar blob e download
+    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.svg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    
+    console.log(`✅ SVG exportado: ${link.download}`);
+  } catch (error) {
+    console.error('❌ Erro ao exportar SVG:', error);
+    alert('Erro ao exportar SVG. Este formato funciona apenas para gráficos baseados em SVG.');
+  }
+};
+
 // 📄 EXPORTAÇÃO PARA PDF
 export const exportChartAsPDF = async (chartId: string, title: string): Promise<void> => {
   try {
@@ -461,28 +567,85 @@ export const exportChartAsWord = async (chartId: string, data: ChartDataItem[], 
           <xml>
             <w:WordDocument>
               <w:View>Print</w:View>
-              <w:Zoom>90</w:Zoom>
+              <w:Zoom>100</w:Zoom>
               <w:DoNotPromptForConvert/>
               <w:DoNotShowRevisions/>
               <w:DoNotPrintRevisions/>
             </w:WordDocument>
+            <w:PageSetup>
+              <w:PageWidth>11906</w:PageWidth>
+              <w:PageHeight>16838</w:PageHeight>
+              <w:MarginLeft>1134</w:MarginLeft>
+              <w:MarginRight>1134</w:MarginRight>
+              <w:MarginTop>1134</w:MarginTop>
+              <w:MarginBottom>1134</w:MarginBottom>
+            </w:PageSetup>
           </xml>
           <![endif]-->
           <style>
-            body { font-family: Arial, sans-serif; margin: 40px; }
-            h1 { color: #333; border-bottom: 2px solid #007acc; padding-bottom: 10px; }
-            table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f2f2f2; font-weight: bold; }
-            .metadata { margin-top: 30px; font-size: 12px; color: #666; }
-            .chart-image { margin: 20px 0; text-align: center; }
+            @page {
+              size: A4;
+              margin: 2cm;
+            }
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 2cm;
+              max-width: 21cm;
+            }
+            h1 { 
+              color: #333; 
+              border-bottom: 2px solid #007acc; 
+              padding-bottom: 10px;
+              font-size: 18pt;
+              margin-bottom: 20px;
+            }
+            h2 {
+              color: #555;
+              font-size: 14pt;
+              margin-top: 30px;
+              margin-bottom: 15px;
+            }
+            table { 
+              border-collapse: collapse; 
+              width: 100%; 
+              margin-top: 20px;
+              page-break-inside: avoid;
+            }
+            th, td { 
+              border: 1px solid #ddd; 
+              padding: 8px; 
+              text-align: left;
+              font-size: 10pt;
+            }
+            th { 
+              background-color: #f2f2f2; 
+              font-weight: bold; 
+            }
+            .metadata { 
+              margin-top: 30px; 
+              font-size: 10pt; 
+              color: #666;
+              page-break-inside: avoid;
+            }
+            .chart-image { 
+              margin: 20px 0; 
+              text-align: center;
+              page-break-inside: avoid;
+            }
+            .chart-image img {
+              max-width: 100% !important;
+              width: 100% !important;
+              height: auto !important;
+              display: block;
+              margin: 0 auto;
+            }
           </style>
         </head>
         <body>
           <h1>${title}</h1>
           
           <div class="chart-image">
-            <img src="${imgData}" alt="Gráfico ${title}" style="max-width: 100%; height: auto;">
+            <img src="${imgData}" alt="Gráfico ${title}">
           </div>
           
           <h2>Dados Detalhados</h2>
@@ -718,13 +881,296 @@ const exportDashboardAsCSV = async (data: DashboardData, filename: string): Prom
   console.log(`✅ Dashboard CSV exportado: ${filename}.csv`);
 };
 
+interface DashboardCaptureImage {
+  title: string;
+  panels: Array<{
+    imageData: string;
+    width: number;
+    height: number;
+  }>;
+}
+
+interface DashboardCaptureBlock {
+  top: number;
+  height: number;
+}
+
+const isVisibleElement = (element: HTMLElement): boolean => {
+  const computedStyle = window.getComputedStyle(element);
+  return (
+    computedStyle.display !== 'none' &&
+    computedStyle.visibility !== 'hidden' &&
+    element.offsetWidth > 0 &&
+    element.offsetHeight > 0
+  );
+};
+
+const buildDashboardCaptureBlocks = (dashboardElement: HTMLElement): DashboardCaptureBlock[] => {
+  const blocks: DashboardCaptureBlock[] = [];
+  const rootChildren = Array.from(dashboardElement.children).filter(
+    (node) => node instanceof HTMLElement && isVisibleElement(node as HTMLElement)
+  ) as HTMLElement[];
+
+  rootChildren.forEach((child) => {
+    if (child.classList.contains('grid')) {
+      const gridItems = Array.from(child.children).filter(
+        (node) => node instanceof HTMLElement && isVisibleElement(node as HTMLElement)
+      ) as HTMLElement[];
+
+      if (gridItems.length === 0) {
+        blocks.push({ top: child.offsetTop, height: child.offsetHeight });
+        return;
+      }
+
+      const sortedItems = [...gridItems].sort((a, b) => a.offsetTop - b.offsetTop);
+      const rowThreshold = 18;
+      let currentRow: HTMLElement[] = [];
+      let currentRowTop: number | null = null;
+
+      const flushRow = () => {
+        if (currentRow.length === 0) return;
+
+        const rowTop = Math.min(...currentRow.map((item) => item.offsetTop));
+        const rowBottom = Math.max(...currentRow.map((item) => item.offsetTop + item.offsetHeight));
+        const padding = 6;
+
+        blocks.push({
+          top: Math.max(0, child.offsetTop + rowTop - padding),
+          height: rowBottom - rowTop + padding * 2,
+        });
+
+        currentRow = [];
+        currentRowTop = null;
+      };
+
+      sortedItems.forEach((item) => {
+        if (currentRowTop === null) {
+          currentRow = [item];
+          currentRowTop = item.offsetTop;
+          return;
+        }
+
+        if (Math.abs(item.offsetTop - currentRowTop) <= rowThreshold) {
+          currentRow.push(item);
+          return;
+        }
+
+        flushRow();
+        currentRow = [item];
+        currentRowTop = item.offsetTop;
+      });
+
+      flushRow();
+      return;
+    }
+
+    blocks.push({ top: child.offsetTop, height: child.offsetHeight });
+  });
+
+  if (blocks.length === 0) {
+    blocks.push({
+      top: 0,
+      height: Math.max(dashboardElement.scrollHeight, dashboardElement.offsetHeight, 1),
+    });
+  }
+
+  const normalized = blocks
+    .filter((block) => block.height > 0)
+    .sort((a, b) => a.top - b.top);
+
+  const merged: DashboardCaptureBlock[] = [];
+  normalized.forEach((block) => {
+    const last = merged[merged.length - 1];
+    if (!last) {
+      merged.push(block);
+      return;
+    }
+
+    const lastBottom = last.top + last.height;
+    const currentBottom = block.top + block.height;
+
+    if (block.top <= lastBottom + 4) {
+      last.height = Math.max(lastBottom, currentBottom) - last.top;
+      return;
+    }
+
+    merged.push(block);
+  });
+
+  return merged;
+};
+
+const captureHtmlElement = async (
+  element: HTMLElement,
+  scale: number,
+  forcedSize?: { width: number; height: number },
+  options?: { allowTaint?: boolean }
+): Promise<HTMLCanvasElement> => {
+  const elementRect = element.getBoundingClientRect();
+  const captureWidth = Math.max(Math.ceil(forcedSize?.width ?? elementRect.width), 1);
+  const captureHeight = Math.max(Math.ceil(forcedSize?.height ?? element.scrollHeight ?? elementRect.height), 1);
+  const viewportWidth = Math.max(captureWidth, 1);
+
+  return html2canvas(element, {
+    backgroundColor: '#ffffff',
+    scale,
+    useCORS: true,
+    allowTaint: options?.allowTaint ?? false,
+    logging: false,
+    width: captureWidth,
+    height: captureHeight,
+    windowWidth: viewportWidth,
+    windowHeight: captureHeight,
+    scrollX: 0,
+    scrollY: 0,
+  });
+};
+
+/** Captura apenas o bloco do mapa (Leaflet) com allowTaint para tiles aparecerem. */
+const captureMapBlockFromDashboard = async (dashboardElement: HTMLElement): Promise<string | null> => {
+  const mapWrapper = dashboardElement.querySelector('.leaflet-container')?.closest('.relative') as HTMLElement | null;
+  if (!mapWrapper || mapWrapper.offsetWidth < 10 || mapWrapper.offsetHeight < 10) return null;
+
+  try {
+    const w = Math.max(mapWrapper.offsetWidth, 1);
+    const h = Math.max(mapWrapper.offsetHeight, 1);
+    const canvas = await html2canvas(mapWrapper, {
+      backgroundColor: '#ffffff',
+      scale: 1.5,
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      width: w,
+      height: h,
+      windowWidth: w,
+      windowHeight: h,
+      scrollX: 0,
+      scrollY: 0,
+    });
+    return canvas.toDataURL('image/png', 1.0);
+  } catch {
+    return null;
+  }
+};
+
+/** No clone do dashboard, substitui o container do mapa por uma imagem estática ou placeholder. */
+const replaceMapWithImageInClone = (clonedDashboard: HTMLElement, mapImageDataUrl: string | null): void => {
+  const mapWrapper = clonedDashboard.querySelector('.leaflet-container')?.closest('.relative') as HTMLElement | null;
+  if (!mapWrapper) return;
+
+  mapWrapper.innerHTML = '';
+
+  if (mapImageDataUrl) {
+    const img = document.createElement('img');
+    img.src = mapImageDataUrl;
+    img.alt = 'Mapa de Localizações';
+    img.setAttribute('style', 'width:100%;height:100%;object-fit:cover;display:block;border:0;');
+    mapWrapper.appendChild(img);
+  } else {
+    const placeholder = document.createElement('div');
+    placeholder.setAttribute(
+      'style',
+      'width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#f1f5f9;color:#64748b;font-size:14px;gap:8px;'
+    );
+    placeholder.innerHTML =
+      '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg><span>Mapa de localizações (não reproduzido no export)</span>';
+    mapWrapper.appendChild(placeholder);
+  }
+};
+
+const captureDashboardVisuals = async (): Promise<DashboardCaptureImage | null> => {
+  const dashboardElement = document.querySelector('[data-dashboard="main"]') as HTMLElement | null;
+  if (!dashboardElement) {
+    return null;
+  }
+
+  document.body.click();
+  await new Promise((resolve) => setTimeout(resolve, 300));
+
+  try {
+    const elementRect = dashboardElement.getBoundingClientRect();
+    const captureWidth = Math.max(Math.ceil(elementRect.width), 1);
+    const scale = 1.8;
+
+    const mapImageDataUrl = await captureMapBlockFromDashboard(dashboardElement);
+
+    const offscreenWrapper = document.createElement('div');
+    offscreenWrapper.style.position = 'fixed';
+    offscreenWrapper.style.left = '-100000px';
+    offscreenWrapper.style.top = '0';
+    offscreenWrapper.style.width = `${captureWidth}px`;
+    offscreenWrapper.style.background = '#ffffff';
+    offscreenWrapper.style.overflow = 'hidden';
+    offscreenWrapper.style.zIndex = '-1';
+
+    const clonedDashboard = dashboardElement.cloneNode(true) as HTMLElement;
+    clonedDashboard.style.width = `${captureWidth}px`;
+    clonedDashboard.style.maxWidth = 'none';
+    clonedDashboard.style.margin = '0';
+    clonedDashboard.style.transform = 'translateY(0)';
+
+    replaceMapWithImageInClone(clonedDashboard, mapImageDataUrl);
+
+    const selectorsToHide =
+      '[data-export-menu], .export-menu, [role="menu"], iframe, .leaflet-container, .leaflet-control-container, .leaflet-pane img, .leaflet-pane canvas';
+    clonedDashboard.querySelectorAll(selectorsToHide).forEach((node) => {
+      (node as HTMLElement).style.display = 'none';
+    });
+
+    offscreenWrapper.appendChild(clonedDashboard);
+    document.body.appendChild(offscreenWrapper);
+
+    const panels: Array<{ imageData: string; width: number; height: number }> = [];
+
+    try {
+      const dashboardHeight = Math.max(clonedDashboard.scrollHeight, clonedDashboard.offsetHeight, 1);
+      const captureBlocks = buildDashboardCaptureBlocks(clonedDashboard);
+
+      for (const block of captureBlocks) {
+        const boundedTop = Math.max(0, Math.min(block.top, dashboardHeight - 1));
+        const boundedHeight = Math.max(1, Math.min(block.height, dashboardHeight - boundedTop));
+
+        offscreenWrapper.style.height = `${boundedHeight}px`;
+        clonedDashboard.style.transform = `translateY(-${boundedTop}px)`;
+
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+
+        const canvas = await captureHtmlElement(offscreenWrapper, scale, {
+          width: captureWidth,
+          height: boundedHeight,
+        });
+
+        panels.push({
+          imageData: canvas.toDataURL('image/png', 1.0),
+          width: canvas.width,
+          height: canvas.height,
+        });
+      }
+    } finally {
+      document.body.removeChild(offscreenWrapper);
+    }
+
+    if (panels.length === 0) {
+      return null;
+    }
+
+    return {
+      title: 'Dashboard Visual',
+      panels,
+    };
+  } catch (error) {
+    console.warn('⚠️ Não foi possível capturar painel visual do dashboard:', error);
+    return null;
+  }
+};
+
 const exportDashboardAsPDF = async (data: DashboardData, filename: string): Promise<void> => {
   const pdf = new jsPDF('p', 'mm', 'a4');
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const margin = 15;
   let yPosition = margin;
-  
+
   // Função auxiliar para adicionar nova página se necessário
   const checkAddPage = (requiredSpace: number) => {
     if (yPosition + requiredSpace > pageHeight - margin) {
@@ -732,194 +1178,72 @@ const exportDashboardAsPDF = async (data: DashboardData, filename: string): Prom
       yPosition = margin;
     }
   };
-  
-  // Cabeçalho do documento
+
+  // 🖼️ CAPTURA VISUAL DO DASHBOARD — na primeira página
+  const visualCapture = await captureDashboardVisuals();
+
+  if (visualCapture) {
+    pdf.setFontSize(14);
+    pdf.setTextColor(0, 122, 204);
+    pdf.text('Dashboard Visual', margin, yPosition);
+    yPosition += 10;
+
+    const imgWidth = pageWidth - (2 * margin);
+    visualCapture.panels.forEach((panel, index) => {
+      let renderWidth = imgWidth;
+      let renderHeight = (panel.height * renderWidth) / panel.width;
+
+      if (yPosition + renderHeight > pageHeight - margin) {
+        pdf.addPage();
+        yPosition = margin;
+      }
+
+      const maxHeightForPanel = pageHeight - margin - yPosition;
+      if (renderHeight > maxHeightForPanel) {
+        renderHeight = maxHeightForPanel;
+        renderWidth = (panel.width * renderHeight) / panel.height;
+      }
+
+      const xPosition = margin + (imgWidth - renderWidth) / 2;
+      pdf.addImage(panel.imageData, 'PNG', xPosition, yPosition, renderWidth, renderHeight);
+      yPosition += renderHeight + (index < visualCapture.panels.length - 1 ? 4 : 0);
+    });
+
+    pdf.addPage();
+    yPosition = margin;
+  }
+
+  // Cabeçalho do documento (após o dashboard visual)
   pdf.setFontSize(18);
-  pdf.setTextColor(0, 122, 204); // Azul
+  pdf.setTextColor(0, 122, 204);
   pdf.text('Comunicação de Eventos', margin, yPosition);
   yPosition += 10;
-  
+
   pdf.setFontSize(14);
   pdf.setTextColor(80, 80, 80);
   pdf.text('Dashboard Completo', margin, yPosition);
   yPosition += 12;
-  
-  // Informações do resumo
+
   pdf.setFontSize(10);
   pdf.setTextColor(100, 100, 100);
   pdf.text(`Total de Registros: ${data.metadata?.totalRecords || 0}`, margin, yPosition);
   yPosition += 6;
   pdf.text(`Data de Geração: ${data.metadata?.dateGenerated || new Date().toLocaleString('pt-BR')}`, margin, yPosition);
   yPosition += 12;
-  
-  // Linha separadora
+
   pdf.setDrawColor(200, 200, 200);
   pdf.line(margin, yPosition, pageWidth - margin, yPosition);
   yPosition += 8;
-  
-  // 🖼️ CAPTURAR IMAGEM DO DASHBOARD (se disponível)
-  const dashboardElement = document.querySelector('[data-dashboard="main"]') as HTMLElement;
-  
-  if (dashboardElement) {
-    try {
-      // 🚫 FECHAR TODOS OS DROPDOWNS E MENUS ANTES DE CAPTURAR
-      // Clicar em um elemento neutro para fechar dropdowns
-      const bodyElement = document.body;
-      bodyElement.click();
-      
-      // Aguardar um momento para que os menus fechem
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Esconder temporariamente elementos que não devem aparecer na captura
-      const elementsToHide = dashboardElement.querySelectorAll('[data-export-menu], .export-menu, [role="menu"]');
-      const originalDisplays: string[] = [];
-      
-      elementsToHide.forEach((el) => {
-        const htmlEl = el as HTMLElement;
-        originalDisplays.push(htmlEl.style.display);
-        htmlEl.style.display = 'none';
-      });
-      
-      pdf.setFontSize(12);
-      pdf.setTextColor(0, 0, 0);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Visualização do Dashboard', margin, yPosition);
-      yPosition += 8;
-      pdf.setFont('helvetica', 'normal');
-      
-      // Capturar a imagem do dashboard com melhor qualidade e sem cortes
-      // Usar scale 2.5 para alta qualidade de impressão
-      const canvas = await html2canvas(dashboardElement, {
-        backgroundColor: '#ffffff',
-        scale: 2.5,
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        width: dashboardElement.scrollWidth,
-        height: dashboardElement.scrollHeight,
-        windowWidth: dashboardElement.scrollWidth,
-        windowHeight: dashboardElement.scrollHeight,
-        scrollX: 0,
-        scrollY: 0,
-        x: 0,
-        y: 0
-      });
-      
-      // Restaurar elementos escondidos
-      elementsToHide.forEach((el, index) => {
-        const htmlEl = el as HTMLElement;
-        htmlEl.style.display = originalDisplays[index];
-      });
 
-      const imgData = canvas.toDataURL('image/png', 1.0);
-      
-      // Calcular dimensões mantendo proporção
-      const imgWidth = pageWidth - (2 * margin);
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
-      // Sempre adicionar em nova página para o dashboard visual
-      pdf.addPage();
-      yPosition = margin;
-      
-      // Adicionar título na página do dashboard visual
-      pdf.setFontSize(14);
-      pdf.setTextColor(0, 122, 204);
-      pdf.text('Dashboard Visual', margin, yPosition);
-      yPosition += 10;
-      
-      // Se a imagem couber em uma página, renderizar completa
-      if (imgHeight <= pageHeight - yPosition - margin) {
-        pdf.addImage(imgData, 'PNG', margin, yPosition, imgWidth, imgHeight);
-      } else {
-        // Imagem muito grande - dividir em múltiplas páginas de forma correta
-        let currentSourceY = 0;
-        const availableHeight = pageHeight - yPosition - margin;
-        
-        // Calcular quantos pixels do canvas cabem na primeira página
-        let canvasHeightForFirstPage = (availableHeight * canvas.width) / imgWidth;
-        
-        // Primeira página
-        const firstPageCanvas = document.createElement('canvas');
-        firstPageCanvas.width = canvas.width;
-        firstPageCanvas.height = Math.min(canvasHeightForFirstPage, canvas.height);
-        const firstPageCtx = firstPageCanvas.getContext('2d');
-        
-        if (firstPageCtx) {
-          firstPageCtx.drawImage(
-            canvas,
-            0, 0,
-            canvas.width, firstPageCanvas.height,
-            0, 0,
-            canvas.width, firstPageCanvas.height
-          );
-          const firstPageImgData = firstPageCanvas.toDataURL('image/png', 1.0);
-          const firstPageHeight = (firstPageCanvas.height * imgWidth) / canvas.width;
-          pdf.addImage(firstPageImgData, 'PNG', margin, yPosition, imgWidth, firstPageHeight);
-        }
-        
-        currentSourceY = firstPageCanvas.height;
-        
-        // Páginas subsequentes
-        while (currentSourceY < canvas.height) {
-          pdf.addPage();
-          yPosition = margin;
-          
-          const remainingCanvasHeight = canvas.height - currentSourceY;
-          const pageContentHeight = pageHeight - (2 * margin);
-          const canvasHeightForPage = (pageContentHeight * canvas.width) / imgWidth;
-          const heightToRender = Math.min(canvasHeightForPage, remainingCanvasHeight);
-          
-          const pageCanvas = document.createElement('canvas');
-          pageCanvas.width = canvas.width;
-          pageCanvas.height = heightToRender;
-          const pageCtx = pageCanvas.getContext('2d');
-          
-          if (pageCtx) {
-            pageCtx.drawImage(
-              canvas,
-              0, currentSourceY,
-              canvas.width, heightToRender,
-              0, 0,
-              canvas.width, heightToRender
-            );
-            const pageImgData = pageCanvas.toDataURL('image/png', 1.0);
-            const pageImgHeight = (heightToRender * imgWidth) / canvas.width;
-            pdf.addImage(pageImgData, 'PNG', margin, yPosition, imgWidth, pageImgHeight);
-          }
-          
-          currentSourceY += heightToRender;
-        }
-      }
-      
-      // 📋 SEMPRE COMEÇAR AS TABELAS EM UMA NOVA PÁGINA LIMPA
-      pdf.addPage();
-      yPosition = margin;
-      
-      // Cabeçalho da seção de dados detalhados
-      pdf.setFontSize(14);
-      pdf.setTextColor(0, 122, 204);
-      pdf.text('Dados Detalhados por Seção', margin, yPosition);
-      yPosition += 10;
-      
-      pdf.setDrawColor(200, 200, 200);
-      pdf.line(margin, yPosition, pageWidth - margin, yPosition);
-      yPosition += 8;
-      pdf.setFont('helvetica', 'normal');
-      
-    } catch (error) {
-      console.warn('⚠️ Não foi possível capturar imagem do dashboard:', error);
-      // Continuar com as tabelas mesmo se a captura falhar
-      // Se falhar, garantir que estamos em uma nova página limpa
-      if (pdf.getCurrentPageInfo().pageNumber > 1) {
-        pdf.addPage();
-        yPosition = margin;
-      }
-    }
-  } else {
-    // Se não encontrou o elemento do dashboard, começar direto nas tabelas
-    yPosition += 8;
-  }
-  
+  pdf.setFontSize(14);
+  pdf.setTextColor(0, 122, 204);
+  pdf.text('Dados Detalhados por Seção', margin, yPosition);
+  yPosition += 10;
+  pdf.setDrawColor(200, 200, 200);
+  pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+  yPosition += 8;
+  pdf.setFont('helvetica', 'normal');
+
   // Processar cada seção
   data.sections.forEach((section, sectionIndex) => {
     // Verificar se precisa de nova página para a seção
@@ -1037,38 +1361,130 @@ const exportDashboardAsPDF = async (data: DashboardData, filename: string): Prom
 };
 
 const exportDashboardAsWord = async (data: DashboardData, filename: string): Promise<void> => {
-  // Capturar dashboard inteiro
-  const dashboardElement = document.querySelector('[data-dashboard="main"]') as HTMLElement;
-  
-  if (!dashboardElement) {
-    alert('Elemento principal do dashboard não encontrado!');
-    return;
-  }
+  const escapeHtml = (value: string): string =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
 
-  const canvas = await html2canvas(dashboardElement, {
-    backgroundColor: '#ffffff',
-    scale: 3, // Alta qualidade para impressão
-    useCORS: true,
-    allowTaint: true
-  });
+  try {
+    const visualCapture = await captureDashboardVisuals();
 
-  const imgData = canvas.toDataURL('image/png', 1.0);
+    const visualSectionHtml = visualCapture
+      ? `
+        <div class="dashboard-image">
+          <h2>Painel Visual do Dashboard</h2>
+          ${visualCapture.panels
+            .map(
+              (panel) => `
+            <div class="dashboard-panel">
+              <img src="${panel.imageData}" alt="Painel Visual do Dashboard">
+            </div>
+          `
+            )
+            .join('')}
+        </div>
+      `
+      : `
+          <div class="summary">
+            <p><strong>Nota:</strong> Não foi possível capturar os painéis visuais do dashboard. Os dados detalhados seguem normalmente no documento.</p>
+          </div>
+        `;
 
-  // HTML completo para Word
-  const htmlContent = `
+    // HTML completo para Word
+    const htmlContent = `
     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">
       <head>
         <meta charset="UTF-8">
         <title>${data.title}</title>
+        <!--[if gte mso 9]>
+        <xml>
+          <w:WordDocument>
+            <w:View>Print</w:View>
+            <w:Zoom>100</w:Zoom>
+            <w:DoNotPromptForConvert/>
+            <w:DoNotShowRevisions/>
+            <w:DoNotPrintRevisions/>
+          </w:WordDocument>
+          <w:PageSetup>
+            <w:PageWidth>11906</w:PageWidth>
+            <w:PageHeight>16838</w:PageHeight>
+            <w:MarginLeft>1134</w:MarginLeft>
+            <w:MarginRight>1134</w:MarginRight>
+            <w:MarginTop>1134</w:MarginTop>
+            <w:MarginBottom>1134</w:MarginBottom>
+          </w:PageSetup>
+        </xml>
+        <![endif]-->
         <style>
-          body { font-family: Arial, sans-serif; margin: 40px; }
-          h1 { color: #333; border-bottom: 3px solid #007acc; padding-bottom: 15px; }
-          h2 { color: #555; margin-top: 30px; }
-          .dashboard-image { margin: 20px 0; text-align: center; }
-          table { border-collapse: collapse; width: 100%; margin: 15px 0; }
-          th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-          th { background-color: #f8f9fa; font-weight: bold; }
-          .summary { background-color: #e3f2fd; padding: 20px; border-radius: 8px; margin: 20px 0; }
+          @page {
+            size: A4;
+            margin: 2cm;
+          }
+          body { 
+            font-family: Arial, sans-serif; 
+            margin: 2cm;
+            max-width: 21cm;
+          }
+          h1 { 
+            color: #333; 
+            border-bottom: 3px solid #007acc; 
+            padding-bottom: 15px;
+            font-size: 20pt;
+            margin-bottom: 20px;
+            page-break-after: avoid;
+          }
+          h2 { 
+            color: #555; 
+            margin-top: 30px;
+            font-size: 14pt;
+            page-break-after: avoid;
+          }
+          .dashboard-image { 
+            margin: 20px 0; 
+            text-align: center;
+            page-break-inside: avoid;
+          }
+          .dashboard-panel {
+            margin-bottom: 8px;
+            page-break-inside: avoid;
+          }
+          .dashboard-image img {
+            max-width: 100% !important;
+            width: 100% !important;
+            height: auto !important;
+            display: block;
+            margin: 0 auto;
+          }
+          table { 
+            border-collapse: collapse; 
+            width: 100%; 
+            margin: 15px 0;
+            font-size: 10pt;
+            page-break-inside: avoid;
+          }
+          th, td { 
+            border: 1px solid #ddd; 
+            padding: 8px; 
+            text-align: left; 
+          }
+          th { 
+            background-color: #f8f9fa; 
+            font-weight: bold; 
+          }
+          .summary { 
+            background-color: #e3f2fd; 
+            padding: 20px; 
+            border-radius: 8px; 
+            margin: 20px 0;
+            page-break-inside: avoid;
+          }
+          .summary p {
+            margin: 8px 0;
+            font-size: 11pt;
+          }
         </style>
       </head>
       <body>
@@ -1078,16 +1494,15 @@ const exportDashboardAsWord = async (data: DashboardData, filename: string): Pro
           <h2>Resumo Executivo</h2>
           <p><strong>Total de Registros:</strong> ${data.metadata?.totalRecords || 0}</p>
           <p><strong>Data de Geração:</strong> ${data.metadata?.dateGenerated || new Date().toLocaleString('pt-BR')}</p>
+          <p><strong>Seções Incluídas:</strong> ${data.sections.length}</p>
         </div>
         
-        <div class="dashboard-image">
-          <img src="${imgData}" alt="Dashboard Completo" style="max-width: 100%; height: auto;">
-        </div>
+        ${visualSectionHtml}
         
         ${data.sections.map(section => {
           const total = section.data.reduce((sum, item) => sum + item.value, 0);
           return `
-            <h2>${section.name}</h2>
+            <h2>${escapeHtml(section.name)}</h2>
             <table>
               <thead>
                 <tr>
@@ -1101,7 +1516,7 @@ const exportDashboardAsWord = async (data: DashboardData, filename: string): Pro
                   const percentage = total > 0 ? ((item.value / total) * 100).toFixed(1) : '0';
                   return `
                     <tr>
-                      <td>${item.name}</td>
+                      <td>${escapeHtml(item.name)}</td>
                       <td>${item.value}</td>
                       <td>${percentage}%</td>
                     </tr>
@@ -1112,7 +1527,7 @@ const exportDashboardAsWord = async (data: DashboardData, filename: string): Pro
           `;
         }).join('')}
         
-        <div style="margin-top: 40px; font-size: 12px; color: #666; text-align: center;">
+        <div style="margin-top: 40px; font-size: 12px; color: #666; text-align: center; page-break-inside: avoid;">
           <p>Documento gerado automaticamente pelo App Saúde Pará</p>
           <p>Comunicação de Eventos - ${new Date().toLocaleString('pt-BR')}</p>
         </div>
@@ -1120,16 +1535,20 @@ const exportDashboardAsWord = async (data: DashboardData, filename: string): Pro
     </html>
   `;
 
-  const blob = new Blob([htmlContent], { type: 'application/msword' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = `${filename}.doc`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(link.href);
-  
-  console.log(`✅ Dashboard Word exportado: ${filename}.doc`);
+    const blob = new Blob([htmlContent], { type: 'application/msword;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${filename}.doc`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    
+    console.log(`✅ Dashboard Word exportado: ${filename}.doc`);
+  } catch (error) {
+    console.error('❌ Erro ao exportar dashboard para Word:', error);
+    alert('Erro ao exportar dashboard para Word. Verifique se a biblioteca html2canvas está instalada.');
+  }
 };
 
 // 🎯 FUNÇÃO UTILITÁRIA PARA PREPARAR DADOS DO DASHBOARD

@@ -28,7 +28,14 @@ const createDirectApiFetch = (endpoint: string, limit?: number) => {
       ? `${server}:${port}/api/${endpoint}?limit=${limit}`
       : `${server}:${port}/api/${endpoint}`;
     
-    const response = await fetch(url);
+    // ✅ CORRIGIDO: Adicionar credenciais para autenticação
+    const response = await fetch(url, {
+      credentials: 'include', // Incluir cookies de autenticação
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     return data?.data || data || [];
@@ -210,6 +217,40 @@ class OfflineDataManager {
       fetchFn: createDirectApiFetch('tipo-turno', 100), 
       priority: 2, 
       estimatedSize: 10,
+      category: 'administrative'
+    },
+
+    // ===== DADOS DO FORMULÁRIO DAE (Prioridade 2) =====
+    { 
+      key: 'daes', 
+      name: 'DAE - Diretorias de Atenção Especializada', 
+      fetchFn: createDirectApiFetch('dae', 100), 
+      priority: 2, 
+      estimatedSize: 50,
+      category: 'administrative'
+    },
+    { 
+      key: 'crs', 
+      name: 'CRS - Centros Regionais de Saúde', 
+      fetchFn: createDirectApiFetch('crs', 100), 
+      priority: 2, 
+      estimatedSize: 30,
+      category: 'administrative'
+    },
+    { 
+      key: 'nhes', 
+      name: 'NHE - Núcleos Hospitalares de Epidemiologia', 
+      fetchFn: createDirectApiFetch('nhe', 100), 
+      priority: 2, 
+      estimatedSize: 80,
+      category: 'administrative'
+    },
+    { 
+      key: 'cievs', 
+      name: 'CIEVS - Centros de Informação em Vigilância', 
+      fetchFn: createDirectApiFetch('cievs', 100), 
+      priority: 2, 
+      estimatedSize: 20,
       category: 'administrative'
     },
 

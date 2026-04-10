@@ -82,9 +82,65 @@ interface NotificacaoDatabase extends DBSchema {
       source: 'download' | 'api';
     };
   };
+  // ✅ NOVO: Store para comunicações DAE criadas/editadas offline
+  comunicacoes_dae: {
+    key: string; // offlineId como chave
+    value: {
+      id?: number; // ID do servidor (se já foi sincronizado)
+      offlineId: string; // ID único offline
+      deviceId: string; // ID do dispositivo
+      formData: any; // Dados do formulário
+      syncStatus: 'pending' | 'syncing' | 'synced' | 'error';
+      timestamp: number;
+      createdOffline: boolean;
+      sincronizado: boolean;
+      syncedAt?: number;
+      isEdit?: boolean;
+      syncStartedAt?: number;
+      errorInfo?: {
+        message: string;
+        timestamp: number;
+        retryCount?: number;
+        lastError?: string;
+      };
+    };
+    indexes: {
+      'by-sync-status': string;
+      'by-device-id': string;
+      'by-offline-id': string;
+      'by-sincronizado': string;
+    };
+  };
+  // ✅ NOVO: Store para anexos pendentes de upload
+  anexos_pendentes: {
+    key: string; // anexoId único
+    value: {
+      anexoId: string; // ID único do anexo
+      comunicacaoOfflineId?: string; // ID offline da comunicação (se criada offline)
+      comunicacaoId?: number; // ID da comunicação no servidor (se já sincronizada)
+      file: Blob; // Arquivo em formato Blob
+      fileName: string; // Nome original do arquivo
+      fileSize: number; // Tamanho em bytes
+      mimeType: string; // Tipo MIME
+      tipo_anexo: string; // Tipo do anexo
+      syncStatus: 'pending' | 'syncing' | 'synced' | 'error';
+      timestamp: number;
+      syncedAt?: number;
+      errorInfo?: {
+        message: string;
+        timestamp: number;
+        retryCount?: number;
+      };
+    };
+    indexes: {
+      'by-comunicacao-offline': string;
+      'by-comunicacao-id': number;
+      'by-sync-status': string;
+    };
+  };
 }
 
-const DB_VERSION = 5; // ✅ VERSÃO 5: Nova estrutura com offlineId, deviceId, sincronizado
+const DB_VERSION = 7; // ✅ VERSÃO 7: Adiciona store para anexos_pendentes
 const DB_NAME = 'NotificacaoOfflineDB';
 const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 dias
 
@@ -237,6 +293,29 @@ export class IndexedDBService {
             db.createObjectStore('estabelecimentos_cache', {
               keyPath: 'cnes'
             });
+          }
+
+          // ✅ NOVO V6: Store para comunicações DAE offline
+          if (!db.objectStoreNames.contains('comunicacoes_dae')) {
+            console.log('🆕 Criando store: comunicacoes_dae');
+            const comunicacoesDaeStore = db.createObjectStore('comunicacoes_dae', {
+              keyPath: 'offlineId'
+            });
+            comunicacoesDaeStore.createIndex('by-sync-status', 'syncStatus');
+            comunicacoesDaeStore.createIndex('by-device-id', 'deviceId');
+            comunicacoesDaeStore.createIndex('by-offline-id', 'offlineId');
+            comunicacoesDaeStore.createIndex('by-sincronizado', 'sincronizado');
+          }
+
+          // ✅ VERSÃO 7: Criar store para anexos pendentes
+          if (oldVersion < 7 && !db.objectStoreNames.contains('anexos_pendentes')) {
+            console.log('📦 Criando store: anexos_pendentes');
+            const anexosStore = db.createObjectStore('anexos_pendentes', {
+              keyPath: 'anexoId'
+            });
+            anexosStore.createIndex('by-comunicacao-offline', 'comunicacaoOfflineId');
+            anexosStore.createIndex('by-comunicacao-id', 'comunicacaoId');
+            anexosStore.createIndex('by-sync-status', 'syncStatus');
           }
         },
         
@@ -444,6 +523,291 @@ export class IndexedDBService {
     }
   }
 
+  // ===== COMUNICAÇÕES DAE =====
+  async saveComunicacaoDae(formData: any, isEdit: boolean = false, id?: number): Promise<string> {
+    await this.init();
+    
+    try {
+      const formDataCopy = JSON.parse(JSON.stringify(formData));
+      const deviceId = await deviceIdService.getDeviceId();
+      
+      let offlineId: string;
+      let existingComunicacao: any = null;
+      
+      if ((formDataCopy as any).offline_id || (formDataCopy as any).offlineId) {
+        offlineId = (formDataCopy as any).offline_id || (formDataCopy as any).offlineId;
+        existingComunicacao = await this.db!.get('comunicacoes_dae', offlineId);
+        
+        if (existingComunicacao && !isEdit) {
+          console.warn(`⚠️ Comunicação DAE com offlineId ${offlineId} já existe! Atualizando.`);
+        }
+      } else {
+        offlineId = await deviceIdService.generateOfflineId();
+        (formDataCopy as any).offline_id = offlineId;
+      }
+      
+      let comunicacao;
+      
+      if (isEdit && id) {
+        if (existingComunicacao) {
+          comunicacao = {
+            ...existingComunicacao,
+            formData: formDataCopy,
+            timestamp: Date.now(),
+            syncStatus: 'pending' as const,
+            sincronizado: false
+          };
+        } else {
+          comunicacao = {
+            id,
+            offlineId,
+            deviceId,
+            formData: formDataCopy,
+            syncStatus: 'pending' as const,
+            timestamp: Date.now(),
+            createdOffline: false,
+            sincronizado: false,
+            isEdit: true
+          };
+        }
+        
+        console.log(`✏️ Editando comunicação DAE offline: ${offlineId}`);
+      } else {
+        comunicacao = {
+          offlineId,
+          deviceId,
+          formData: formDataCopy,
+          syncStatus: 'pending' as const,
+          timestamp: Date.now(),
+          createdOffline: true,
+          sincronizado: false,
+          isEdit: false
+        };
+        
+        console.log(`💾 Salvando nova comunicação DAE offline: ${offlineId}`);
+      }
+      
+      await this.db!.put('comunicacoes_dae', comunicacao);
+      console.log(`✅ Comunicação DAE salva offline: ${offlineId}`);
+      
+      return offlineId;
+    } catch (error) {
+      console.error('❌ Erro ao salvar comunicação DAE:', error);
+      throw error;
+    }
+  }
+
+  async getPendingComunicacoesDae(): Promise<any[]> {
+    await this.init();
+    try {
+      return await this.db!.getAllFromIndex('comunicacoes_dae', 'by-sync-status', 'pending');
+    } catch (error) {
+      console.error('Erro ao buscar comunicações DAE pendentes:', error);
+      return [];
+    }
+  }
+
+  async getErrorComunicacoesDae(): Promise<any[]> {
+    await this.init();
+    try {
+      return await this.db!.getAllFromIndex('comunicacoes_dae', 'by-sync-status', 'error');
+    } catch (error) {
+      console.error('Erro ao buscar comunicações DAE com erro:', error);
+      return [];
+    }
+  }
+
+  async updateComunicacaoDaeSyncStatus(offlineId: string, status: 'pending' | 'syncing' | 'synced' | 'error', errorInfo?: any): Promise<void> {
+    await this.init();
+    try {
+      const comunicacao = await this.db!.get('comunicacoes_dae', offlineId);
+      if (comunicacao) {
+        comunicacao.syncStatus = status;
+        if (status === 'synced') {
+          comunicacao.sincronizado = true;
+          comunicacao.syncedAt = Date.now();
+        }
+        if (status === 'error' && errorInfo) {
+          comunicacao.errorInfo = errorInfo;
+        }
+        await this.db!.put('comunicacoes_dae', comunicacao);
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar status de sincronização:', error);
+    }
+  }
+
+  async deleteComunicacaoDae(offlineId: string): Promise<void> {
+    await this.init();
+    try {
+      await this.db!.delete('comunicacoes_dae', offlineId);
+      console.log(`🗑️ Comunicação DAE removida: ${offlineId}`);
+    } catch (error) {
+      console.error('Erro ao deletar comunicação DAE:', error);
+    }
+  }
+
+  async retryComunicacaoDae(offlineId: string): Promise<void> {
+    await this.init();
+    try {
+      const comunicacao = await this.db!.get('comunicacoes_dae', offlineId);
+      if (comunicacao) {
+        comunicacao.syncStatus = 'pending';
+        if (comunicacao.errorInfo) {
+          comunicacao.errorInfo.retryCount = (comunicacao.errorInfo.retryCount || 0) + 1;
+        }
+        await this.db!.put('comunicacoes_dae', comunicacao);
+        console.log(`🔄 Comunicação DAE marcada para retry: ${offlineId}`);
+      }
+    } catch (error) {
+      console.error('Erro ao marcar comunicação DAE para retry:', error);
+    }
+  }
+
+  // ===== ANEXOS PENDENTES =====
+
+  /**
+   * Salvar anexo para upload posterior
+   */
+  async saveAnexoPendente(
+    file: File,
+    tipo_anexo: string,
+    comunicacaoOfflineId?: string,
+    comunicacaoId?: number
+  ): Promise<string> {
+    await this.init();
+    
+    try {
+      const anexoId = `anexo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      const anexo = {
+        anexoId,
+        comunicacaoOfflineId,
+        comunicacaoId,
+        file: file as Blob, // Armazenar como Blob
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type,
+        tipo_anexo,
+        syncStatus: 'pending' as const,
+        timestamp: Date.now()
+      };
+      
+      await this.db!.put('anexos_pendentes', anexo);
+      
+      console.log(`💾 Anexo salvo para sincronização posterior: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`);
+      
+      return anexoId;
+    } catch (error) {
+      console.error('❌ Erro ao salvar anexo pendente:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obter anexos pendentes de uma comunicação
+   */
+  async getAnexosPendentesByComunicacao(comunicacaoOfflineId?: string, comunicacaoId?: number): Promise<any[]> {
+    await this.init();
+    
+    try {
+      if (comunicacaoOfflineId) {
+        return await this.db!.getAllFromIndex('anexos_pendentes', 'by-comunicacao-offline', comunicacaoOfflineId);
+      } else if (comunicacaoId) {
+        return await this.db!.getAllFromIndex('anexos_pendentes', 'by-comunicacao-id', comunicacaoId);
+      }
+      return [];
+    } catch (error) {
+      console.error('❌ Erro ao buscar anexos pendentes:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Obter todos os anexos pendentes de sincronização
+   */
+  async getAllAnexosPendentes(): Promise<any[]> {
+    await this.init();
+    
+    try {
+      return await this.db!.getAllFromIndex('anexos_pendentes', 'by-sync-status', 'pending');
+    } catch (error) {
+      console.error('❌ Erro ao buscar anexos pendentes:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Atualizar status de sincronização do anexo
+   */
+  async updateAnexoSyncStatus(
+    anexoId: string,
+    status: 'pending' | 'syncing' | 'synced' | 'error',
+    errorMessage?: string
+  ): Promise<void> {
+    await this.init();
+    
+    try {
+      const anexo = await this.db!.get('anexos_pendentes', anexoId);
+      if (anexo) {
+        anexo.syncStatus = status;
+        
+        if (status === 'synced') {
+          anexo.syncedAt = Date.now();
+        }
+        
+        if (status === 'error' && errorMessage) {
+          anexo.errorInfo = {
+            message: errorMessage,
+            timestamp: Date.now(),
+            retryCount: (anexo.errorInfo?.retryCount || 0) + 1
+          };
+        }
+        
+        await this.db!.put('anexos_pendentes', anexo);
+        console.log(`✅ Status do anexo atualizado: ${anexoId} -> ${status}`);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao atualizar status do anexo:', error);
+    }
+  }
+
+  /**
+   * Deletar anexo após sincronização bem-sucedida
+   */
+  async deleteAnexo(anexoId: string): Promise<void> {
+    await this.init();
+    
+    try {
+      await this.db!.delete('anexos_pendentes', anexoId);
+      console.log(`🗑️ Anexo removido: ${anexoId}`);
+    } catch (error) {
+      console.error('❌ Erro ao deletar anexo:', error);
+    }
+  }
+
+  /**
+   * Atualizar comunicacaoId dos anexos quando a comunicação for sincronizada
+   */
+  async updateAnexosComunicacaoId(comunicacaoOfflineId: string, comunicacaoId: number): Promise<void> {
+    await this.init();
+    
+    try {
+      const anexos = await this.getAnexosPendentesByComunicacao(comunicacaoOfflineId);
+      
+      for (const anexo of anexos) {
+        anexo.comunicacaoId = comunicacaoId;
+        // Remover referência offline após ter o ID do servidor
+        delete anexo.comunicacaoOfflineId;
+        await this.db!.put('anexos_pendentes', anexo);
+      }
+      
+      console.log(`✅ ${anexos.length} anexos atualizados com comunicacaoId: ${comunicacaoId}`);
+    } catch (error) {
+      console.error('❌ Erro ao atualizar anexos com comunicacaoId:', error);
+    }
+  }
+
   // ===== PACIENTES MELHORADO =====
 
   // ✅ NOVO: Salvar pacientes baixados apenas para cache (não sincronizar)
@@ -553,7 +917,7 @@ export class IndexedDBService {
     }
   }
   // ✅ CORRIGIDO: Contar apenas pacientes criados localmente
-  async getPendingCount(): Promise<{ notificacoes: number; pacientes: number; estabelecimentos: number; errors: number }> {
+  async getPendingCount(): Promise<{ notificacoes: number; pacientes: number; estabelecimentos: number; comunicacoes_dae: number; anexos: number; errors: number }> {
     await this.init();
     
     try {
@@ -597,18 +961,37 @@ export class IndexedDBService {
         );
       }
       
-      console.log(`📊 Pendentes: ${pendingNotificacoes.length} notificações, ${errorNotificacoes.length} com erro, ${unsyncedPacientes.length} pacientes locais, ${unsyncedEstabelecimentos.length} estabelecimentos`);
+      // ✅ NOVO V6: Comunicações DAE
+      let unsyncedComunicacoesDae: any[] = [];
+      try {
+        const allPendingComunicacoes = await this.db!.getAllFromIndex('comunicacoes_dae', 'by-sync-status', 'pending');
+        unsyncedComunicacoesDae = allPendingComunicacoes;
+      } catch (error) {
+        console.warn('Erro ao buscar comunicações DAE pendentes:', error);
+      }
+
+      // ✅ NOVO V7: Anexos pendentes
+      let unsyncedAnexos: any[] = [];
+      try {
+        unsyncedAnexos = await this.getAllAnexosPendentes();
+      } catch (error) {
+        console.warn('Erro ao buscar anexos pendentes:', error);
+      }
+
+      console.log(`📊 Pendentes: ${pendingNotificacoes.length} notificações, ${errorNotificacoes.length} com erro, ${unsyncedPacientes.length} pacientes locais, ${unsyncedEstabelecimentos.length} estabelecimentos, ${unsyncedComunicacoesDae.length} comunicações DAE, ${unsyncedAnexos.length} anexos`);
       
       return {
         notificacoes: pendingNotificacoes.length,
         pacientes: unsyncedPacientes.length,
         estabelecimentos: unsyncedEstabelecimentos.length,
+        comunicacoes_dae: unsyncedComunicacoesDae.length,
+        anexos: unsyncedAnexos.length,
         errors: errorNotificacoes.length
       };
       
     } catch (error) {
       console.error('Erro ao obter contadores:', error);
-      return { notificacoes: 0, pacientes: 0, estabelecimentos: 0, errors: 0 };
+      return { notificacoes: 0, pacientes: 0, estabelecimentos: 0, comunicacoes_dae: 0, anexos: 0, errors: 0 };
     }
   }
 

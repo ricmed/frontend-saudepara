@@ -17,23 +17,16 @@ import {
   LogOut,
   Building2,
   ChevronRight,
-  FileSpreadsheet,
-  FileCheck,
-  Clock,
-  Leaf,
-  UserSquare,
   GraduationCap,
-  MapPin,
-  Map,
-  CheckCircle,
   Users,
-  Calendar,
   HeartPulse,
-  Stethoscope,
-  Thermometer,
   UserCog,
   Home,
   Database,
+  Hospital,
+  ClipboardList,
+  Settings,
+  Bug,
 } from "lucide-react";
 
 interface SideMenuProps {
@@ -63,6 +56,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       role === 'admin' || 
       role === 'admin.unidade' || 
       role === 'admin.municipio' || 
+      role === 'admin.crs' || 
       role === 'admin.estado'
     );
   };
@@ -73,124 +67,28 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     return user.roles?.includes('admin');
   };
 
-  // List of auxiliary apps - FILTRADOS POR NÍVEL DE PERMISSÃO
+  // Função para verificar se é admin.crs
+  const isAdminCrs = () => {
+    if (!user) return false;
+    return user.roles?.includes('admin.crs');
+  };
+
+  // ✅ NOVO: Submenu simplificado de Apps Auxiliares - apenas duas categorias principais
   const appsMenuItems = [
-    // ✅ APPS PARA TODOS OS NÍVEIS (estabelecimento, município, estado, admin)
-    ...(user ? [{
-      icon: <Calendar className="h-6 w-6 text-white" />,
-      nome: t("apps.event_types"),
-      link: "/private/evento", // USUÁRIO DE ESTABELECIMENTO: verá apenas seus eventos
-    }] : []),
-
-    // ⚠️ APPS RESTRITOS: NÃO disponíveis para usuários de estabelecimento
-    // Apenas município, estado e admin têm acesso a estes recursos
-    ...(!permissions.isEstabelecimento && user ? [
-      {
-        icon: <Building2 className="h-6 w-6 text-white" />,
-        nome: t("apps.components"),
-        link: "/private/componente",
-      },
-      {
-        icon: <FileSpreadsheet className="h-6 w-6 text-white" />,
-        nome: t("apps.establishments"),
-        link: "/private/tipo-estabelecimentos/lista", // Lista todos os estabelecimentos
-      },
-      {
-        icon: <Award className="h-6 w-6 text-white" />,
-        nome: t("apps.qualifications"),
-        link: "/relatorio-qualificacao",
-      },
-      {
-        icon: <FileCheck className="h-6 w-6 text-white" />,
-        nome: t("apps.enablings"),
-        link: "/private/habilitacao",
-      },
-      {
-        icon: <CheckCircle className="h-6 w-6 text-white" />,
-        nome: t("apps.closure_types"),
-        link: "/private/encerramento",
-      },
-      {
-        icon: <Users className="h-6 w-6 text-white" />,
-        nome: t("apps.public_types"),
-        link: "/private/publico",
-      },
-      {
-        icon: <AlertTriangle className="h-6 w-6 text-white" />,
-        nome: t("apps.trauma_types"),
-        link: "/private/trauma",
-      },
-      {
-        icon: <HeartPulse className="h-6 w-6 text-white" />,
-        nome: t("apps.care_types"),
-        link: "/private/atendimento",
-      },
-      {
-        icon: <Stethoscope className="h-6 w-6 text-white" />,
-        nome: t("apps.diagnostic_hypothesis_types"),
-        link: "/private/hipotese-diagnostica",
-      },
-      {
-        icon: <Thermometer className="h-6 w-6 text-white" />,
-        nome: t("apps.symptom_types"),
-        link: "/private/sintoma",
-      },
-    ] : []),
-
-    // Apps disponíveis apenas para administradores
-    ...(permissions.isAdmin ? [
-      {
-        icon: <Clock className="h-6 w-6 text-white" />,
-        nome: t("apps.shift"),
-        link: "/private/turnos",
-      },
-      {
-        icon: <Leaf className="h-6 w-6 text-white" />,
-        nome: t("apps.nature"),
-        link: "/private/naturezas",
-      },
-      {
-        icon: <UserSquare className="h-6 w-6 text-white" />,
-        nome: t("apps.race"),
-        link: "/private/raca",
-      },
-      {
-        icon: <GraduationCap className="h-6 w-6 text-white" />,
-        nome: t("apps.education"),
-        link: "/private/escolaridade",
-      },
-      {
-        icon: <Building2 className="h-6 w-6 text-white" />,
-        nome: t("apps.cbo"),
-        link: "/private/cbo",
-      },
-      {
-        icon: <MapPin className="h-6 w-6 text-white" />,
-        nome: t("apps.countries"),
-        link: "/private/pais",
-      },
-      {
-        icon: <Map className="h-6 w-6 text-white" />,
-        nome: t("apps.states"),
-        link: "/private/estado",
-      },
-      {
-        icon: <MapPin className="h-6 w-6 text-white" />,
-        nome: t("apps.cities"),
-        link: "/private/municipio",
-      },
-      {
-        icon: <MapPin className="h-6 w-6 text-white" />,
-        nome: t("apps.gender"),
-        link: "/private/genero",
-      },
-      {
-        icon: <MapPin className="h-6 w-6 text-white" />,
-        nome: t("apps.sexual_orientation"),
-        link: "/orientacao-sexual/lista",
-      },
-    ] : []),
+    {
+      icon: <FileText className="h-6 w-6 text-white" />,
+      nome: "Ficha de Comunicação",
+      link: "/private/apps-auxiliares",
+    },
+    {
+      icon: <Hospital className="h-6 w-6 text-white" />,
+      nome: "Formulário DAE",
+      link: "/private/apps-auxiliares-dae",
+    },
   ];
+
+  // ✅ REMOVIDO: Submenu de Comunicação DAE - agora acessa diretamente a lista
+  // Os apps auxiliares (DAE, NHE, CIEVS, CRS) são acessados via Apps Auxiliares > Formulário DAE
 
   // ✅ NOVO: Main menu items reorganizados com Home e Gerenciamento Offline
   const menuItems = [
@@ -201,25 +99,51 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       onClick: () => navigate("/"), // ou "/private/dashboard" ou "/"
     },
     
-    // Menu Qualificar Estabelecimentos - apenas para qualificadores
-    ...(permissions.isQualificador ? [{
+    // Menu Qualificar Estabelecimentos - apenas para qualificadores (OCULTAR para admin.crs)
+    ...(!isAdminCrs() && permissions.isQualificador ? [{
       icon: <Award />,
       label: t("menu.qualify_establishments"),
       onClick: () => navigate("/private/relatorio-estabelecimentos"),
     }] : []),
     
-    // Menu Notificação - apenas para notificadores
-    ...(permissions.isNotificador ? [{
+    // Menu Notificação - apenas para notificadores (OCULTAR para admin.crs)
+    ...(!isAdminCrs() && permissions.isNotificador ? [{
       icon: <FileText />,
       label: t("menu.notification"),
       onClick: () => navigate("/private/comunicacao-de-caso"),
     }] : []),
     
-    // Menu Dashboard - para notificadores OU usuários com role dashboard
-    ...(permissions.isNotificador || permissions.isDashboard ? [{
+    //✅ NOVO: Formulários Dinâmicos - apenas para notificadores
+    ...(permissions.isNotificador ? [{
+    icon: <ClipboardList />,
+    label: t("menu.dynamic_forms"),
+    onClick: () => navigate("/private/formularios"),
+    }] : []),
+
+    // Controle de Qualidade de Larvas (Entomologia)
+    ...(permissions.isNotificador ? [{
+      icon: <Bug className="h-6 w-6" />,
+      label: "Controle de Qualidade de Larvas",
+      onClick: () => navigate("/private/entomologia-larvas"),
+    }] : []),
+    
+    // Menu Dashboard - para notificadores OU usuários com role dashboard (OCULTAR para admin.crs)
+    ...(!isAdminCrs() && (permissions.isNotificador || permissions.isDashboard) ? [{
       icon: <ChartSpline />,
       label: t("menu.dashboard"),
       onClick: () => navigate("/dashboard-page"),
+    }] : []),
+
+    // ✅ MOVIDO E CORRIGIDO: Menu de Comunicação DAE - Acesso direto à lista
+    ...(user && (
+      user.roles?.includes('comunicacao.dae') ||
+      user.roles?.includes('admin') ||
+      user.roles?.includes('admin.estado') ||
+      user.roles?.includes('admin.crs')
+    ) ? [{
+      icon: <FileText />,
+      label: "Comunicação DAE",
+      onClick: () => navigate("/private/comunicacao-dae"),
     }] : []),
     
     // ✅ NOVO: Gerenciamento Offline - disponível para todos os usuários logados
@@ -249,16 +173,26 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       },
     },
     
-    // Menu de Apps Auxiliares - apenas para admin master
-    ...(user && isAdminMaster() ? [{
+    // Menu de Apps Auxiliares - apenas para admin master (OCULTAR para admin.crs)
+    ...(user && isAdminMaster() && !isAdminCrs() ? [{
       icon: <Building2 />,
       label: t("menu.apps"),
       submenu: true,
       onClick: () => {},
     }] : []),
     
-    // ✅ NOVO: Menu de Lista de Pacientes - apenas para admin master
+    // ✅ NOVO: Gerenciar Formulários - apenas para admin master
     ...(user && isAdminMaster() ? [{
+    icon: <Settings />,
+    label: "Gerenciar Formulários",
+    onClick: () => {
+    navigate("/private/formularios-admin");
+    onClose();
+    },
+    }] : []),
+    
+    // ✅ NOVO: Menu de Lista de Pacientes - apenas para admin master (OCULTAR para admin.crs)
+    ...(user && isAdminMaster() && !isAdminCrs() ? [{
       icon: <Users />,
       label: t("menu.patients_list") || "Lista de Pacientes",
       onClick: () => {
@@ -296,7 +230,20 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     ...(user && isAdmin() ? [{
       icon: <UserCog />,
       label: t("menu.manage_users"),
-      onClick: () => navigate("/admin"),
+      onClick: () => {
+        // Redirecionar baseado na role
+        if (user.roles?.includes('admin.crs')) {
+          navigate("/admin/crs");
+        } else if (user.roles?.includes('admin.estado')) {
+          navigate("/admin/estado");
+        } else if (user.roles?.includes('admin.municipio')) {
+          navigate("/admin/municipio");
+        } else if (user.roles?.includes('admin.unidade')) {
+          navigate("/admin/unidade");
+        } else {
+          navigate("/admin");
+        }
+      },
     }] : []),
     
     // Menu de Logout - apenas para usuários logados
@@ -343,25 +290,23 @@ export const SideMenu: React.FC<SideMenuProps> = ({
             {menuItems.map((item, i) => (
               <div
                 key={i}
-                className="relative"
+                className="relative group"
                 onMouseEnter={() => {
                   if (item.submenu) {
                     setShowAppsSubmenu(true);
-                  } else {
-                    setShowAppsSubmenu(false);
                   }
                 }}
-                onMouseLeave={() => {
-                  if (item.submenu) {
-                    setShowAppsSubmenu(false);
-                  }
-                }}
+                // ❌ REMOVIDO onMouseLeave do item pai - deixar o submenu controlar
               >
                 <div
-                  className="flex items-center gap-3 text-white py-3 px-2 hover:bg-blue-800 rounded-lg cursor-pointer relative"
+                  className="flex items-center gap-3 text-white py-3 px-2 hover:bg-blue-800 rounded-lg cursor-pointer relative z-10"
                   onClick={() => {
                     if (item.submenu) {
-                      navigate("/private/apps-auxiliares");
+                      if (item.label === "Comunicação DAE") {
+                        navigate("/private/comunicacao-dae");
+                      } else {
+                        navigate("/private/escolha-apps-auxiliares");
+                      }
                     } else {
                       item.onClick();
                       onClose();
@@ -382,12 +327,16 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                 </div>
 
                 {/* Apps Submenu */}
-                {item.submenu && showAppsSubmenu && (
+                {item.submenu && showAppsSubmenu && item.label !== "Comunicação DAE" && (
                   <div
                     className="fixed top-0 left-64 w-64 h-full bg-blue-900 z-[1110] overflow-y-auto"
+                    style={{ marginLeft: "-10px", paddingLeft: "10px" }}
                     onMouseEnter={() => setShowAppsSubmenu(true)}
                     onMouseLeave={() => setShowAppsSubmenu(false)}
                   >
+                    {/* Ponte invisível expandida para garantir transição suave */}
+                    <div className="absolute top-0 -left-16 w-16 h-full bg-transparent z-50" />
+                    
                     <div className="p-4 flex items-center h-[70px] border-b border-blue-800">
                       <h2 className="text-xl font-bold text-white">
                         Aplicativos Auxiliares
@@ -409,6 +358,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                     </div>
                   </div>
                 )}
+
               </div>
             ))}
           </div>

@@ -61,6 +61,8 @@ export const de = {
   "menu.dashboard": "Dashboard",
   "menu.reportCase": "Fall melden",
   "menu.reportCaseDesc": "Schnell einen neuen Fall registrieren",
+  "menu.reportDAE": "DAE melden",
+  "menu.reportDAEDesc": "Schnell eine DAE-Kommunikation registrieren",
   "menu.offline_management": "Offline-Daten",
   "menu.educational": "Bildungsmaterialien",
   "menu.apps": "Hilfsanwendungen",

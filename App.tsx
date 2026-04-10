@@ -39,6 +39,8 @@ import SyphilisPage from "@/features/educational-materials/pages/details/Syphili
 // Features - Componentes
 import ListaComponentes from "@/features/apps/list/ListaComponentes";
 import PaginaAppsAuxiliares from "@/features/apps/components/PaginaAppsAuxiliares";
+import PaginaEscolhaAppsAuxiliares from "@/features/apps/components/PaginaEscolhaAppsAuxiliares";
+import PaginaAppsAuxiliaresDae from "@/features/apps/components/PaginaAppsAuxiliaresDae";
 import CadastroComponente from "@/features/apps/components/CadastroComponente";
 // Features - Tipos de Encerramento
 import ListaTiposEncerramento from "@/features/apps/list/ListaTipoEncerramento";
@@ -118,12 +120,28 @@ import HomePage from "@/features/home/HomePage";
 import DashboardPage from '@/features/dashboard/DashboardPage';
 import DashboardPageCirio from '@/features/dashboard/DashboardPageCirio'; // 🎉 Dashboard Círio de Nazaré com Modo TV
 import OfflineManagementPage from '@/features/offlinePage/pages/OfflineManagementPage';
+// Features - Comunicação DAE
+import ComunicacaoDaePage from '@/features/comunicacao-dae/ComunicacaoDaePage';
+import ComunicacaoDaeFormPage from '@/features/comunicacao-dae/ComunicacaoDaeFormPage';
+import ComunicacaoDaeDashboard from '@/features/comunicacao-dae/ComunicacaoDaeDashboard';
+import DaePage from '@/features/comunicacao-dae/DaePage';
+import NhePage from '@/features/comunicacao-dae/NhePage';
+import CievsPage from '@/features/comunicacao-dae/CievsPage';
+import CrsPage from '@/features/comunicacao-dae/CrsPage';
 // Contact pages
 import FaleConoscoPage from '@/features/contact/FaleConoscoPage';
 import AscomPage from '@/features/contact/AscomPage';
 import OuvidoriaPage from '@/features/contact/OuvidoriaPage';
 // Version page
 import VersionPage from '@/pages/VersionPage';
+// Dynamic Forms System
+import { DynamicFormPage } from '@/features/dynamic-forms/pages/DynamicFormPage';
+import { FormsListPage } from '@/features/dynamic-forms/pages/FormsListPage';
+import { FormBuilderPage } from '@/features/dynamic-forms/pages/FormBuilderPage';
+import { FormAdminListPage } from '@/features/dynamic-forms/pages/FormAdminListPage';
+import { FormSubmissionsListPage } from '@/features/dynamic-forms/pages/FormSubmissionsListPage';
+import { EntomologiaLarvasDashboardPage } from '@/features/dynamic-forms/pages/EntomologiaLarvasDashboardPage';
+import FixedColumnsConfigPage from '@/features/dynamic-forms/pages/FixedColumnsConfigPage';
 // Componente de layout protegido
 const ProtectedLayout = () => {
   return (
@@ -158,7 +176,9 @@ function App() {
     <LanguageProvider>
       <Router>
         <Routes>          <Route path="/private" element={<ProtectedLayout />}>
+            <Route path="/private/escolha-apps-auxiliares" element={<PaginaEscolhaAppsAuxiliares />} />
             <Route path="/private/apps-auxiliares" element={<PaginaAppsAuxiliares />} />
+            <Route path="/private/apps-auxiliares-dae" element={<PaginaAppsAuxiliaresDae />} />
             <Route path="/private/offline-management" element={<OfflineManagementPage />} />
             {/* Rotas de Qualificações */}
             <Route path="/private/qualificacao" element={<RelatorioQualificacao />} />
@@ -264,11 +284,48 @@ function App() {
               <Route path="/private/comunicacao-de-caso" element={<ListaNotificacoes />} />
               <Route path="/private/comunicacao-de-caso/nova" element={<NotificationForm />} />
               <Route path="/private/comunicacao-de-caso/editar/:id" element={<NotificationForm />} />
+              
+              {/* ✅ NOVO: Rotas de Formulários Dinâmicos (SINAN/e-SUS style) */}
+              <Route path="/private/formularios" element={<FormsListPage />} />
+              <Route path="/private/entomologia-larvas" element={<EntomologiaLarvasDashboardPage />} />
+              <Route path="/private/formularios/:agravo" element={<FormSubmissionsListPage />} />
+              <Route path="/private/formularios/:agravo/nova" element={<DynamicFormPage />} />
+              <Route path="/private/formularios/:agravo/editar/:id" element={<DynamicFormPage />} />
+              <Route path="/private/formularios/:agravo/visualizar/:id" element={<DynamicFormPage />} />
+            </Route>
+
+            {/* ✅ NOVO: Rotas de Administração de Formulários - Apenas Admin */}
+            <Route element={<ProtectedRoute requiredRoles={['admin']}><Outlet /></ProtectedRoute>}>
+              <Route path="/private/formularios-admin" element={<FormAdminListPage />} />
+              <Route path="/private/formularios-admin/novo" element={<FormBuilderPage />} />
+              <Route path="/private/formularios-admin/editar/:id" element={<FormBuilderPage />} />
+              <Route path="/private/formularios-admin/:formId/versoes/:versionId/campos-fixos" element={<FixedColumnsConfigPage />} />
             </Route>
             
             {/* ✅ NOVO: Rota de Lista de Pacientes - Protegida apenas para Admin Master */}
             <Route element={<ProtectedRoute requiredRoles={['admin']}><Outlet /></ProtectedRoute>}>
               <Route path="/private/pacientes" element={<ListaPacientes />} />
+            </Route>
+
+            {/* ✅ Rotas de Comunicação DAE (lista/form/dashboard) */}
+            <Route element={<ProtectedRoute requiredRoles={['comunicacao.dae', 'admin', 'admin.estado', 'admin.crs']}><Outlet /></ProtectedRoute>}>
+              <Route path="/private/comunicacao-dae" element={<ComunicacaoDaePage />} />
+              <Route path="/private/comunicacao-dae/dashboard" element={<ComunicacaoDaeDashboard />} />
+              <Route path="/private/comunicacao-dae/nova" element={<ComunicacaoDaeFormPage />} />
+              <Route path="/private/comunicacao-dae/:id" element={<ComunicacaoDaeFormPage />} />
+              <Route path="/private/comunicacao-dae/editar/:id" element={<ComunicacaoDaeFormPage />} />
+            </Route>
+
+            {/* Gerenciamento de entidades auxiliares da Comunicação DAE */}
+            <Route element={<ProtectedRoute requiredRoles={['admin', 'admin.estado', 'admin.crs']}><Outlet /></ProtectedRoute>}>
+              <Route path="/private/apps/comunicacao-dae/dae" element={<DaePage />} />
+              <Route path="/private/apps/comunicacao-dae/dae/:id" element={<DaePage />} />
+              <Route path="/private/apps/comunicacao-dae/nhe" element={<NhePage />} />
+              <Route path="/private/apps/comunicacao-dae/nhe/:id" element={<NhePage />} />
+              <Route path="/private/apps/comunicacao-dae/cievs" element={<CievsPage />} />
+              <Route path="/private/apps/comunicacao-dae/cievs/:id" element={<CievsPage />} />
+              <Route path="/private/apps/comunicacao-dae/crs" element={<CrsPage />} />
+              <Route path="/private/apps/comunicacao-dae/crs/:id" element={<CrsPage />} />
             </Route>
           </Route>
           <Route path="/perfil" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />

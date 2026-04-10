@@ -39,3 +39,9 @@ firebaserc
 # Ignorar arquivos do Windows
 desktop.ini
 Thumbs.db
+
+# Playwright
+/playwright-report/
+/test-results/
+/blob-report/
+/playwright/.cache/

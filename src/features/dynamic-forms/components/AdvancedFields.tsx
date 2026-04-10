@@ -1,0 +1,1077 @@
+import React, { useState, useEffect } from 'react';
+import type { FormField } from '@/services/FormService';
+import { getLocalDateTime, convertUTCToLocalDateTime } from '@/utils/timezoneUtils';
+import { searchMatches } from '@/utils/searchUtils';
+import DatabaseService from '@/services/DatabaseService';
+import { Search, X, Check } from 'lucide-react';
+import PhoneInput from '@/features/notificationForms/components/PhoneInput';
+import { validateCPF } from '@/utils/cpfValidator';
+import { validateCNS } from '@/utils/cnsValidator';
+import { validatePassaporte, normalizePassaporte } from '@/utils/passaporteValidator';
+import axios from 'axios';
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost';
+const API_PORT = import.meta.env.VITE_API_PORT || '3000';
+const API_URL = `${API_BASE}:${API_PORT}`;
+
+function getFieldInputId(field: FormField) {
+  const key = (field.key || field.label || 'field').toString();
+  return `df-${key}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+interface AdvancedFieldProps {
+  field: FormField;
+  value: any;
+  onChange: (value: any) => void;
+  error?: string;
+  required?: boolean;
+  disabled?: boolean;
+  onBlur?: () => void;
+  /** Lê valores de outros campos do formulário (para filtros/params). */
+  getValue?: (key: string) => any;
+}
+
+// ========== CHECKBOX GROUP (múltiplos checkboxes) ==========
+export const CheckboxGroupField: React.FC<AdvancedFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+}) => {
+  const selectedValues = Array.isArray(value) ? value : [];
+  const [options, setOptions] = useState(field.options || []);
+  const [loading, setLoading] = useState(false);
+  const inputId = getFieldInputId(field);
+
+  useEffect(() => {
+    if (field.dataSource === 'database' && field.dataTable && field.dataValueColumn && field.dataLabelColumn) {
+      loadDatabaseOptions();
+    } else {
+      setOptions(field.options || []);
+    }
+  }, [field.dataSource, field.dataTable, field.dataValueColumn, field.dataLabelColumn, field.options]);
+
+  const loadDatabaseOptions = async () => {
+    if (!field.dataTable || !field.dataValueColumn || !field.dataLabelColumn) return;
+    
+    try {
+      setLoading(true);
+      const data = await DatabaseService.getTableData(
+        field.dataTable,
+        field.dataValueColumn,
+        field.dataLabelColumn
+      );
+      setOptions(data);
+    } catch (error) {
+      console.error('Erro ao carregar opções do banco:', error);
+      setOptions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggle = (optionValue: string) => {
+    if (selectedValues.includes(optionValue)) {
+      onChange(selectedValues.filter(v => v !== optionValue));
+    } else {
+      onChange([...selectedValues, optionValue]);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="mb-4">
+        <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-2">
+          {field.label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+        <p className="text-sm text-gray-500">Carregando opções...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-4">
+      <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-2">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      {field.helpText && (
+        <p className="text-xs text-gray-500 mb-2">{field.helpText}</p>
+      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {options.map((option) => {
+          const isSelected = selectedValues.includes(option.value);
+          return (
+            <label
+              key={option.value}
+              className={`
+                flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200
+                ${disabled || field.disabled ? 'opacity-60 cursor-not-allowed' : ''}
+                ${isSelected
+                  ? 'bg-blue-50 border-2 border-blue-500 shadow-md scale-[1.02]'
+                  : 'bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-sm'
+                }
+              `}
+            >
+              <div className="flex items-center h-6 mt-0.5 flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => handleToggle(option.value)}
+                  disabled={disabled || field.disabled}
+                  className="w-6 h-6 rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer"
+                />
+              </div>
+              <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
+                <span className={`text-sm font-medium transition-colors leading-relaxed ${
+                  isSelected ? 'text-blue-900' : 'text-gray-900'
+                }`}>
+                  {option.label}
+                </span>
+                {isSelected && (
+                  <Check className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                )}
+              </div>
+            </label>
+          );
+        })}
+      </div>
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+    </div>
+  );
+};
+
+// ========== RADIO GROUP (grupo de radio buttons) ==========
+export const RadioGroupField: React.FC<AdvancedFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+}) => {
+  const [options, setOptions] = useState(field.options || []);
+  const [loading, setLoading] = useState(false);
+  const inputId = getFieldInputId(field);
+
+  useEffect(() => {
+    if (field.dataSource === 'database' && field.dataTable && field.dataValueColumn && field.dataLabelColumn) {
+      loadDatabaseOptions();
+    } else {
+      setOptions(field.options || []);
+    }
+  }, [field.dataSource, field.dataTable, field.dataValueColumn, field.dataLabelColumn, field.options]);
+
+  const loadDatabaseOptions = async () => {
+    if (!field.dataTable || !field.dataValueColumn || !field.dataLabelColumn) return;
+    
+    try {
+      setLoading(true);
+      const data = await DatabaseService.getTableData(
+        field.dataTable,
+        field.dataValueColumn,
+        field.dataLabelColumn
+      );
+      setOptions(data);
+    } catch (error) {
+      console.error('Erro ao carregar opções do banco:', error);
+      setOptions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="mb-4">
+        <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-2">
+          {field.label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+        <p className="text-sm text-gray-500">Carregando opções...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-4">
+      <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-2">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      {field.helpText && (
+        <p className="text-xs text-gray-500 mb-2">{field.helpText}</p>
+      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {options.map((option) => {
+          const isSelected = value === option.value;
+          return (
+            <label
+              key={option.value}
+              className={`
+                flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200
+                ${disabled || field.disabled ? 'opacity-60 cursor-not-allowed' : ''}
+                ${isSelected
+                  ? 'bg-blue-50 border-2 border-blue-500 shadow-md scale-[1.02]'
+                  : 'bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-sm'
+                }
+              `}
+            >
+              <div className="flex items-center h-6 mt-0.5 flex-shrink-0">
+                <input
+                  type="radio"
+                  name={field.key}
+                  checked={isSelected}
+                  onChange={() => onChange(option.value)}
+                  disabled={disabled || field.disabled}
+                  className="w-6 h-6 rounded-full border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer"
+                />
+              </div>
+              <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
+                <span className={`text-sm font-medium transition-colors leading-relaxed ${
+                  isSelected ? 'text-blue-900' : 'text-gray-900'
+                }`}>
+                  {option.label}
+                </span>
+                {isSelected && (
+                  <Check className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                )}
+              </div>
+            </label>
+          );
+        })}
+      </div>
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+    </div>
+  );
+};
+
+// ========== MULTI SELECT (seleção múltipla com busca) ==========
+export const MultiSelectField: React.FC<AdvancedFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+  getValue,
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [options, setOptions] = useState(field.options || []);
+  const [loading, setLoading] = useState(false);
+  const selectedValues = Array.isArray(value) ? value : [];
+
+  useEffect(() => {
+    if (field.apiSelectEndpoint) {
+      loadApiOptions();
+      return;
+    }
+
+    if (field.dataSource === 'database' && field.dataTable && field.dataValueColumn && field.dataLabelColumn) {
+      loadDatabaseOptions();
+      return;
+    }
+
+    setOptions(field.options || []);
+  }, [
+    field.apiSelectEndpoint,
+    JSON.stringify(field.apiSelectEndpointParams || []),
+    ...(field.apiSelectEndpointParams || []).map((k) => getValue?.(k)),
+    field.dataSource,
+    field.dataTable,
+    field.dataValueColumn,
+    field.dataLabelColumn,
+    field.options,
+  ]);
+
+  const loadApiOptions = async () => {
+    if (!field.apiSelectEndpoint) return;
+
+    try {
+      setLoading(true);
+
+      const params: Record<string, any> = {};
+      for (const k of field.apiSelectEndpointParams || []) {
+        const v = getValue?.(k);
+        if (v !== undefined && v !== null && v !== '') params[k] = v;
+      }
+
+      const response = await axios.get(`${API_URL}/api/${field.apiSelectEndpoint}`, {
+        params,
+        withCredentials: true,
+      });
+
+      const data = Array.isArray(response.data) ? response.data : [];
+      const mapped = data.map((item: any) => ({
+        value: String(item.value ?? item.idtipo_municipio ?? item.id ?? item.codigo ?? ''),
+        label: String(item.label ?? item.descricao ?? item.nome ?? item.name ?? item.text ?? item.value ?? ''),
+      })).filter((o: any) => o.value && o.label);
+
+      setOptions(mapped);
+    } catch (error) {
+      console.error('Erro ao carregar opções da API:', error);
+      setOptions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadDatabaseOptions = async () => {
+    if (!field.dataTable || !field.dataValueColumn || !field.dataLabelColumn) return;
+    
+    try {
+      setLoading(true);
+      const data = await DatabaseService.getTableData(
+        field.dataTable,
+        field.dataValueColumn,
+        field.dataLabelColumn
+      );
+      setOptions(data);
+    } catch (error) {
+      console.error('Erro ao carregar opções do banco:', error);
+      setOptions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredOptions = options.filter(option =>
+    searchMatches(option.label, searchTerm)
+  );
+
+  const handleToggle = (optionValue: string) => {
+    if (selectedValues.includes(optionValue)) {
+      onChange(selectedValues.filter(v => v !== optionValue));
+    } else {
+      onChange([...selectedValues, optionValue]);
+    }
+  };
+
+  return (
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-2">
+        <label className="block text-sm font-medium text-gray-700">
+          {field.label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+        {selectedValues.length > 0 && (
+          <span className="text-sm text-gray-500">
+            {selectedValues.length} selecionado{selectedValues.length !== 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
+      {field.helpText && (
+        <p className="text-xs text-gray-500 mb-2">{field.helpText}</p>
+      )}
+      {/* Busca */}
+      <div className="relative mb-3">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          disabled={disabled || field.disabled}
+          placeholder="Buscar opções..."
+          className={`w-full pl-10 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+            disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'
+          }`}
+        />
+      </div>
+      {/* Grid de cards (mesmo layout do checkbox group / radio) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+        {loading ? (
+          <div className="col-span-full py-4 text-center text-sm text-gray-500">
+            Carregando opções...
+          </div>
+        ) : filteredOptions.length === 0 ? (
+          <div className="col-span-full py-4 text-center text-sm text-gray-500">
+            Nenhuma opção encontrada
+          </div>
+        ) : (
+          filteredOptions.map((option) => {
+            const isSelected = selectedValues.includes(option.value);
+            return (
+              <label
+                key={option.value}
+                className={`
+                  flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200
+                  ${disabled || field.disabled ? 'opacity-60 cursor-not-allowed' : ''}
+                  ${isSelected
+                    ? 'bg-blue-50 border-2 border-blue-500 shadow-md scale-[1.02]'
+                    : 'bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-sm'
+                  }
+                `}
+              >
+                <div className="flex items-center h-6 mt-0.5 flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => handleToggle(option.value)}
+                    disabled={disabled || field.disabled}
+                    className="w-6 h-6 rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer"
+                  />
+                </div>
+                <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
+                  <span className={`text-sm font-medium transition-colors leading-relaxed ${
+                    isSelected ? 'text-blue-900' : 'text-gray-900'
+                  }`}>
+                    {option.label}
+                  </span>
+                  {isSelected && (
+                    <Check className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  )}
+                </div>
+              </label>
+            );
+          })
+        )}
+      </div>
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+    </div>
+  );
+};
+
+// ========== TIME FIELD (só hora) ==========
+export const TimeField: React.FC<AdvancedFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+}) => {
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <input
+        type="time"
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled || field.disabled}
+        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+          error
+            ? 'border-red-500 focus:ring-red-500'
+            : 'border-gray-300 focus:ring-blue-500'
+        } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+      />
+      {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+    </div>
+  );
+};
+
+// ========== DATETIME FIELD (data + hora) ==========
+export const DateTimeField: React.FC<AdvancedFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+}) => {
+  // Normaliza o valor vindo do backend (se for UTC, converte para local)
+  const normalizedValue = React.useMemo(() => {
+    if (!value) return '';
+    
+    // Se o valor já está no formato datetime-local (YYYY-MM-DDTHH:MM), usar direto
+    if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+      return value;
+    }
+    
+    // Se parece com UTC ou ISO, converter
+    if (typeof value === 'string' && (value.includes('Z') || value.includes('+') || value.length > 16)) {
+      return convertUTCToLocalDateTime(value);
+    }
+    
+    return value;
+  }, [value]);
+
+  const now = getLocalDateTime();
+  // Usa field.max apenas se for uma string válida, caso contrário usa agora como máximo
+  const maxDateTime = (typeof field.max === 'string' && field.max.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/)) ? field.max : now;
+
+  const incrementDateTime = () => {
+    // Se não houver valor, define como agora
+    if (!normalizedValue) {
+      onChange(now);
+      return;
+    }
+    
+    // Se houver valor, incrementa 1 dia
+    const currentDateTime = new Date(normalizedValue);
+    const maxDateTimeObj = new Date(maxDateTime);
+    
+    // Só incrementa se a data/hora atual for menor que a máxima
+    if (currentDateTime < maxDateTimeObj) {
+      currentDateTime.setDate(currentDateTime.getDate() + 1);
+      const year = currentDateTime.getFullYear();
+      const month = String(currentDateTime.getMonth() + 1).padStart(2, '0');
+      const day = String(currentDateTime.getDate()).padStart(2, '0');
+      const hours = String(currentDateTime.getHours()).padStart(2, '0');
+      const minutes = String(currentDateTime.getMinutes()).padStart(2, '0');
+      onChange(`${year}-${month}-${day}T${hours}:${minutes}`);
+    }
+  };
+
+  const decrementDateTime = () => {
+    // Se não houver valor, define como agora
+    if (!normalizedValue) {
+      onChange(now);
+      return;
+    }
+    
+    // Se houver valor, decrementa 1 dia
+    const currentDateTime = new Date(normalizedValue);
+    currentDateTime.setDate(currentDateTime.getDate() - 1);
+    const year = currentDateTime.getFullYear();
+    const month = String(currentDateTime.getMonth() + 1).padStart(2, '0');
+    const day = String(currentDateTime.getDate()).padStart(2, '0');
+    const hours = String(currentDateTime.getHours()).padStart(2, '0');
+    const minutes = String(currentDateTime.getMinutes()).padStart(2, '0');
+    onChange(`${year}-${month}-${day}T${hours}:${minutes}`);
+  };
+
+  // Desabilita o botão + apenas se já estiver na data/hora máxima
+  const isPlusDisabled = disabled || field.disabled || (!!normalizedValue && normalizedValue >= maxDateTime);
+
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={decrementDateTime}
+          disabled={disabled || field.disabled}
+          className="px-3 py-2 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:cursor-not-allowed rounded-md text-gray-700 font-bold"
+        >
+          −
+        </button>
+        <input
+          type="datetime-local"
+          value={normalizedValue}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled || field.disabled}
+          min={field.min}
+          max={maxDateTime}
+          className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+            error
+              ? 'border-red-500 focus:ring-red-500'
+              : 'border-gray-300 focus:ring-blue-500'
+          } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+        />
+        <button
+          type="button"
+          onClick={incrementDateTime}
+          disabled={isPlusDisabled}
+          className="px-3 py-2 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:cursor-not-allowed rounded-md text-gray-700 font-bold"
+        >
+          +
+        </button>
+      </div>
+      {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+    </div>
+  );
+};
+
+// ========== EMAIL FIELD ==========
+export const EmailField: React.FC<AdvancedFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+}) => {
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <input
+        type="email"
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={field.placeholder || 'exemplo@email.com'}
+        disabled={disabled || field.disabled}
+        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+          error
+            ? 'border-red-500 focus:ring-red-500'
+            : 'border-gray-300 focus:ring-blue-500'
+        } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+      />
+      {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+    </div>
+  );
+};
+
+// ========== PHONE FIELD (formatação automática) ==========
+export const PhoneField: React.FC<AdvancedFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+}) => {
+  const formatPhone = (val: string) => {
+    const cleaned = val.replace(/\D/g, '');
+    
+    if (cleaned.length <= 10) {
+      // (XX) XXXX-XXXX
+      return cleaned.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+    } else {
+      // (XX) XXXXX-XXXX
+      return cleaned.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhone(e.target.value);
+    onChange(formatted);
+  };
+
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <input
+        type="tel"
+        value={value || ''}
+        onChange={handleChange}
+        placeholder={field.placeholder || '(91) 98765-4321'}
+        disabled={disabled || field.disabled}
+        maxLength={15}
+        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+          error
+            ? 'border-red-500 focus:ring-red-500'
+            : 'border-gray-300 focus:ring-blue-500'
+        } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+      />
+      {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+    </div>
+  );
+};
+
+// ========== CPF FIELD (formatação automática) ==========
+export const CPFField: React.FC<AdvancedFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+  onBlur,
+}) => {
+  const formatCPF = (val: string) => {
+    const cleaned = val.replace(/\D/g, '');
+    return cleaned.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/, '$1.$2.$3-$4');
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatCPF(e.target.value);
+    onChange(formatted);
+  };
+
+  const digits = (value || '').replace(/\D/g, '');
+  const isValidCpf = digits.length === 11 && validateCPF(value || '');
+
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <input
+        type="text"
+        value={value || ''}
+        onChange={handleChange}
+        onBlur={onBlur}
+        placeholder={field.placeholder || '000.000.000-00'}
+        disabled={disabled || field.disabled}
+        maxLength={14}
+        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+          error
+            ? 'border-red-500 focus:ring-red-500'
+            : isValidCpf
+              ? 'border-green-500 focus:ring-green-500'
+              : 'border-gray-300 focus:ring-blue-500'
+        } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+      />
+      {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+      {isValidCpf && !error && <p className="text-green-600 text-sm mt-1">CPF válido</p>}
+    </div>
+  );
+};
+
+// ========== CNS (Cartão Nacional de Saúde): 15 dígitos, formato 11 4 1 ==========
+export const CNSField: React.FC<AdvancedFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+  onBlur,
+}) => {
+  const formatCNS = (val: string) => {
+    const digits = val.replace(/\D/g, '').slice(0, 15);
+    if (digits.length <= 11) return digits.replace(/(\d{0,11})/, '$1');
+    if (digits.length <= 15) return digits.replace(/(\d{11})(\d{0,4})(\d{0,1})/, '$1 $2 $3').trim();
+    return digits.slice(0, 15).replace(/(\d{11})(\d{4})(\d{1})/, '$1 $2 $3');
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatCNS(e.target.value);
+    onChange(formatted);
+  };
+
+  const displayValue = value != null ? formatCNS(String(value).replace(/\D/g, '')) : '';
+  const digits = (value != null ? String(value).replace(/\D/g, '') : '').slice(0, 15);
+  const isValidCns = digits.length === 15 && validateCNS(value != null ? String(value) : '');
+
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <input
+        type="text"
+        value={displayValue}
+        onChange={handleChange}
+        onBlur={onBlur}
+        placeholder={field.placeholder || '000 0000 0000 0'}
+        disabled={disabled || field.disabled}
+        maxLength={18}
+        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+          error
+            ? 'border-red-500 focus:ring-red-500'
+            : isValidCns
+              ? 'border-green-500 focus:ring-green-500'
+              : 'border-gray-300 focus:ring-blue-500'
+        } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+      />
+      {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+      {isValidCns && !error && <p className="text-green-600 text-sm mt-1">CNS válido</p>}
+    </div>
+  );
+};
+
+// ========== IDADE (anos ou meses, salva em meses; máx. 120 anos) ==========
+const IDADE_MAX_ANOS = 120;
+
+export interface IdadeFieldProps extends AdvancedFieldProps {
+  /** Quando true, valor é calculado a partir da data de nascimento e o campo fica bloqueado */
+  calculadaPorDataNascimento?: boolean;
+}
+
+export const IdadeField: React.FC<IdadeFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+  onBlur,
+  calculadaPorDataNascimento = false,
+}) => {
+  const meses = value != null && value !== '' ? Number(value) : undefined;
+  const isAnos = (m: number) => m >= 12;
+  const [unidade, setUnidade] = useState<'anos' | 'meses'>(() =>
+    meses !== undefined ? (isAnos(meses) ? 'anos' : 'meses') : 'anos'
+  );
+  const [erroMaxIdade, setErroMaxIdade] = useState(false);
+  const [erroMaxMeses, setErroMaxMeses] = useState(false);
+  const displayAnos = meses !== undefined ? Math.floor(meses / 12) : '';
+  const displayMeses = meses !== undefined ? meses % 12 : '';
+  const inputValue = unidade === 'anos' ? (displayAnos !== '' ? String(displayAnos) : '') : (displayMeses !== '' ? String(displayMeses) : '');
+
+  const handleUnidadeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setErroMaxIdade(false);
+    setErroMaxMeses(false);
+    const u = e.target.value as 'anos' | 'meses';
+    setUnidade(u);
+    if (meses !== undefined) {
+      if (u === 'anos') onChange(Math.floor(meses / 12) * 12);
+      else onChange(meses % 12);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setErroMaxIdade(false);
+    setErroMaxMeses(false);
+    const raw = e.target.value.replace(/\D/g, '');
+    if (raw === '') {
+      onChange(undefined);
+      return;
+    }
+    const num = parseInt(raw, 10);
+    if (unidade === 'anos') {
+      if (num > IDADE_MAX_ANOS) {
+        setErroMaxIdade(true);
+        return;
+      }
+      onChange(num * 12);
+    } else {
+      if (num > 11) {
+        setErroMaxMeses(true);
+        return;
+      }
+      onChange(num);
+    }
+  };
+
+  const locked = disabled || field.disabled || calculadaPorDataNascimento;
+
+  const labelSuffix = calculadaPorDataNascimento ? (
+    <span className="text-xs text-gray-500 ml-2">(calculada automaticamente)</span>
+  ) : null;
+
+  if (locked && meses !== undefined && meses !== '') {
+    const anos = Math.floor(Number(meses) / 12);
+    const mes = Number(meses) % 12;
+    const texto = Number(meses) < 12
+      ? `${meses} ${Number(meses) === 1 ? 'mês' : 'meses'}`
+      : `${anos} ${anos === 1 ? 'ano' : 'anos'}`;
+    return (
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          {field.label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+          {labelSuffix}
+        </label>
+        <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm">
+          <span className="font-medium">{texto}</span>
+        </div>
+        {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
+        {calculadaPorDataNascimento && (
+          <p className="text-xs text-gray-500 mt-1">Calculada automaticamente a partir da data de nascimento.</p>
+        )}
+        {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <div className="flex items-center gap-2">
+        <select
+          value={unidade}
+          onChange={handleUnidadeChange}
+          disabled={disabled || field.disabled}
+          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+        >
+          <option value="anos">Anos</option>
+          <option value="meses">Meses</option>
+        </select>
+        <input
+          type="number"
+          value={inputValue}
+          onChange={handleInputChange}
+          onBlur={onBlur}
+          placeholder={unidade === 'anos' ? 'Anos' : 'Meses'}
+          min={0}
+          max={unidade === 'anos' ? IDADE_MAX_ANOS : 11}
+          disabled={disabled || field.disabled}
+          className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+            error ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+          } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+        />
+      </div>
+      {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
+      {(error || erroMaxIdade || erroMaxMeses) && (
+        <p className="text-red-500 text-sm mt-1">
+          {erroMaxIdade && 'A idade não pode ser superior a 120 anos.'}
+          {erroMaxMeses && 'Quando a unidade é meses, o valor não pode ser superior a 11.'}
+          {!erroMaxIdade && !erroMaxMeses && error}
+        </p>
+      )}
+    </div>
+  );
+};
+
+// ========== PASSAPORTE: 2 letras + 6 dígitos (ex.: AB123456) ==========
+export const PassaporteField: React.FC<AdvancedFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+  onBlur,
+}) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const normalized = normalizePassaporte(e.target.value);
+    onChange(normalized);
+  };
+
+  const raw = (value || '').trim().replace(/\s/g, '').toUpperCase();
+  const isValidPassaporte = raw.length === 8 && validatePassaporte(value || '');
+
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <input
+        type="text"
+        value={value || ''}
+        onChange={handleChange}
+        onBlur={onBlur}
+        placeholder={field.placeholder || 'AB123456'}
+        disabled={disabled || field.disabled}
+        maxLength={8}
+        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 uppercase ${
+          error
+            ? 'border-red-500 focus:ring-red-500'
+            : isValidPassaporte
+              ? 'border-green-500 focus:ring-green-500'
+              : 'border-gray-300 focus:ring-blue-500'
+        } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+      />
+      {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+      {isValidPassaporte && !error && <p className="text-green-600 text-sm mt-1">Passaporte válido</p>}
+    </div>
+  );
+};
+
+// ========== CEP FIELD (formatação + busca automática ViaCEP) ==========
+export type CepFoundDetail = {
+  cep: string;
+  logradouro?: string;
+  bairro?: string;
+  localidade?: string;
+  uf?: string;
+  ibge?: string;
+};
+
+export const CEPField: React.FC<AdvancedFieldProps & { onCepFound?: (detail: CepFoundDetail) => void }> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+  onCepFound,
+}) => {
+  const [loading, setLoading] = useState(false);
+
+  const formatCEP = (val: string) => {
+    const cleaned = val.replace(/\D/g, '');
+    return cleaned.replace(/(\d{5})(\d{0,3})/, '$1-$2');
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatCEP(e.target.value);
+    onChange(formatted);
+
+    const cleanedCEP = formatted.replace(/\D/g, '');
+    if (cleanedCEP.length === 8) {
+      fetchAddress(cleanedCEP);
+    }
+  };
+
+  const fetchAddress = async (cep: string) => {
+    try {
+      setLoading(true);
+      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const data = await response.json();
+      
+      if (!data.erro) {
+        const detail: CepFoundDetail = {
+          cep,
+          logradouro: data.logradouro || '',
+          bairro: data.bairro || '',
+          localidade: data.localidade || '',
+          uf: data.uf || '',
+          ibge: data.ibge || '',
+        };
+        if (onCepFound) onCepFound(detail);
+        window.dispatchEvent(new CustomEvent('cep-found', { detail }));
+      }
+    } catch (err) {
+      console.error('Erro ao buscar CEP:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <div className="relative">
+        <input
+          type="text"
+          value={value || ''}
+          onChange={handleChange}
+          placeholder={field.placeholder || '00000-000'}
+          disabled={disabled || field.disabled || loading}
+          maxLength={9}
+          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+            error
+              ? 'border-red-500 focus:ring-red-500'
+              : 'border-gray-300 focus:ring-blue-500'
+          } ${disabled || field.disabled || loading ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+        />
+        {loading && (
+          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+            <div className="animate-spin h-4 w-4 border-2 border-blue-500 rounded-full border-t-transparent"></div>
+          </div>
+        )}
+      </div>
+      {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+    </div>
+  );
+};
+
+// ========== INTERNATIONAL PHONE FIELD (telefone internacional com DDI) ==========
+export const InternationalPhoneField: React.FC<AdvancedFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+}) => {
+  return (
+    <div className="mb-4">
+      <PhoneInput
+        value={value || ''}
+        onChange={onChange}
+        name={field.key}
+        label={field.label}
+        placeholder={field.placeholder || 'Digite o telefone'}
+        className={error ? 'border-red-500' : ''}
+      />
+      {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+    </div>
+  );
+};

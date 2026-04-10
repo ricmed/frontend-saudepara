@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Download, FileSpreadsheet, FileText, Image, File, FileIcon } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, Image, File, FileIcon, Layers, FileJson } from 'lucide-react';
 import { 
   exportChartAsExcel, 
-  exportChartAsCSV, 
+  exportChartAsCSV,
+  exportChartAsJSON,
   exportChartAsPNG, 
+  exportChartAsSVG,
   exportChartAsPDF, 
   exportChartAsWord
 } from '../../utils/exportUtils';
@@ -54,8 +56,14 @@ const ChartExportMenu: React.FC<ChartExportMenuProps> = ({
         case 'csv':
           await exportChartAsCSV(chartData, chartTitle);
           break;
+        case 'json':
+          await exportChartAsJSON(chartData, chartTitle);
+          break;
         case 'png':
           await exportChartAsPNG(chartId, chartTitle);
+          break;
+        case 'svg':
+          await exportChartAsSVG(chartId, chartTitle);
           break;
         case 'pdf':
           await exportChartAsPDF(chartId, chartTitle);
@@ -121,7 +129,7 @@ const ChartExportMenu: React.FC<ChartExportMenuProps> = ({
   };
 
   return (
-    <div className="relative inline-block">
+    <div className="relative inline-block" data-export-menu>
       {renderTriggerButton()}
       
       {showMenu && (
@@ -164,6 +172,19 @@ const ChartExportMenu: React.FC<ChartExportMenuProps> = ({
               </div>
             </button>
             
+            {/* Opção JSON */}
+            <button 
+              className="flex items-center gap-3 w-full px-4 py-3 text-left text-sm hover:bg-gray-50 transition-colors"
+              onClick={() => handleExport('json')}
+              disabled={isExporting}
+            >
+              <FileJson className="h-4 w-4 text-orange-600" />
+              <div>
+                <div className="font-medium">JSON (.json)</div>
+                <div className="text-xs text-gray-500">Dados estruturados com metadados</div>
+              </div>
+            </button>
+            
             {/* Opção PNG */}
             <button 
               className="flex items-center gap-3 w-full px-4 py-3 text-left text-sm hover:bg-gray-50 transition-colors"
@@ -172,8 +193,21 @@ const ChartExportMenu: React.FC<ChartExportMenuProps> = ({
             >
               <Image className="h-4 w-4 text-purple-600" />
               <div>
-                <div className="font-medium">Imagem (.png)</div>
-                <div className="text-xs text-gray-500">Captura visual do gráfico</div>
+                <div className="font-medium">PNG (.png)</div>
+                <div className="text-xs text-gray-500">Imagem de alta qualidade (bitmap)</div>
+              </div>
+            </button>
+            
+            {/* Opção SVG */}
+            <button 
+              className="flex items-center gap-3 w-full px-4 py-3 text-left text-sm hover:bg-gray-50 transition-colors"
+              onClick={() => handleExport('svg')}
+              disabled={isExporting}
+            >
+              <Layers className="h-4 w-4 text-indigo-600" />
+              <div>
+                <div className="font-medium">SVG (.svg)</div>
+                <div className="text-xs text-gray-500">Vetor escalável (máxima qualidade)</div>
               </div>
             </button>
             

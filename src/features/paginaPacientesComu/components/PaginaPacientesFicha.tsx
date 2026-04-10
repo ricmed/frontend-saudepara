@@ -8,7 +8,7 @@ import {
   import { useTranslation } from "../../../i18n/useTranslations";
   import { useLanguage } from "../../../contexts/LanguageContext";
   // Importando o novo SideMenu
-  import SideMenu from "@/features/home/components/SideMenu";
+  import { SideMenu } from "@/features/home/components/SideMenu";
   
   type AppConfig = {
     icon: JSX.Element;

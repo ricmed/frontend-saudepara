@@ -1,5 +1,4 @@
 import axios from 'axios';
-import useFilteredRequests from '@/hooks/useFilteredRequests';
 
 // Configurações das APIs
 const KEYCLOAK_API_URL = '/api-auth'; // Usar proxy do Vite
@@ -20,9 +19,10 @@ export interface Usuario {
 export interface UsuarioAcesso {
   id: number;
   user_id: string;
-  nivel_acesso: 'unidade' | 'municipio' | 'estado';
+  nivel_acesso: 'unidade' | 'municipio' | 'crs' | 'estado';
   estabelecimento_id?: number;
   tipo_municipio_id?: number;
+  crs_id?: number;
   tipo_estado_id?: number;
   permissoes: number;
   ativo: 'S' | 'N';
@@ -37,6 +37,11 @@ export interface UsuarioAcesso {
   tipo_municipio?: {
     idtipo_municipio: number;
     descricao: string;
+  };
+  crs?: {
+    id_crs: number;
+    nome: string;
+    codigo?: string;
   };
   tipo_estado?: {
     idtipo_estado: number;
@@ -55,20 +60,31 @@ export interface CreateUsuarioRequest {
 
 export interface CreateUsuarioAcessoRequest {
   userId: string;
-  nivel_acesso: 'unidade' | 'municipio' | 'estado';
+  nivel_acesso: 'unidade' | 'municipio' | 'crs' | 'estado';
   estabelecimentoId?: number;
   municipioId?: number;
+  crsId?: number;
   estadoId?: number;
   permissoes?: number;
 }
 
 export interface UpdateUsuarioAcessoRequest {
-  nivel_acesso?: 'unidade' | 'municipio' | 'estado';
+  nivel_acesso?: 'unidade' | 'municipio' | 'crs' | 'estado';
   estabelecimentoId?: number;
   municipioId?: number;
+  crsId?: number;
   estadoId?: number;
   permissoes?: number;
   ativo?: 'S' | 'N';
+}
+
+// Interface para CRS (Centro Regional de Saúde)
+export interface Crs {
+  id_crs: number;
+  nome: string;
+  codigo?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // Constantes de Permissões (sistema octal)
@@ -452,6 +468,32 @@ class UsuarioGestaoService {
   }
 
   /**
+   * Criar acesso para CRS (Centro Regional de Saúde)
+   */
+  async createAcessoCrs(userId: string, crsId: number, permissoes: number = PERMISSOES.READ_WRITE): Promise<UsuarioAcesso> {
+    try {
+      console.log('🔧 UsuarioGestaoService.createAcessoCrs chamado com:', {
+        userId,
+        crsId,
+        permissoes
+      });
+      
+      const response = await this.backendApi.post('/usuario-acesso/crs', {
+        userId,
+        crsId,
+        permissoes
+      });
+      
+      console.log('✅ Acesso de CRS criado com sucesso:', response.data);
+      return response.data.data;
+    } catch (error: any) {
+      console.error('❌ Erro ao criar acesso ao CRS:', error);
+      console.error('  - Dados enviados:', { userId, crsId, permissoes });
+      throw new Error(this.getErrorMessage(error, 'Erro ao criar acesso ao CRS'));
+    }
+  }
+
+  /**
    * Criar acesso para estado
    */
   async createAcessoEstado(userId: string, estadoId: number, permissoes: number = PERMISSOES.ALL): Promise<UsuarioAcesso> {
@@ -681,7 +723,8 @@ class UsuarioGestaoService {
       console.log(`✅ Carregados ${data.length} municípios para estado ${estadoId}`);
       return data.map((mun: any) => ({
         id: mun.id || mun.idtipo_municipio,
-        descricao: mun.descricao
+        descricao: mun.descricao,
+        codigo: mun.codigo,
       }));
     } catch (error) {
       console.error('Erro ao buscar municípios por estado:', error);
@@ -1184,6 +1227,49 @@ class UsuarioGestaoService {
         };
       }
       throw new Error(this.getErrorMessage(error, 'Erro ao carregar contagens gerais de usuários'));
+    }
+  }
+
+  // ================================
+  // 🏥 MÉTODOS CRS (Centros Regionais de Saúde)
+  // ================================
+
+  /**
+   * Buscar todas as CRS (Centros Regionais de Saúde)
+   */
+  async getCrs(): Promise<Crs[]> {
+    try {
+      const response = await this.backendApi.get('/crs');
+      return response.data?.data || response.data || [];
+    } catch (error: any) {
+      console.error('Erro ao buscar CRS:', error);
+      throw new Error(this.getErrorMessage(error, 'Erro ao carregar Centros Regionais de Saúde'));
+    }
+  }
+
+  /**
+   * Buscar CRS por ID
+   */
+  async getCrsById(id: number): Promise<Crs> {
+    try {
+      const response = await this.backendApi.get(`/crs/${id}`);
+      return response.data?.data || response.data;
+    } catch (error: any) {
+      console.error('Erro ao buscar CRS:', error);
+      throw new Error(this.getErrorMessage(error, 'Erro ao carregar CRS'));
+    }
+  }
+
+  /**
+   * Buscar municípios vinculados a um CRS
+   */
+  async getMunicipiosByCrs(crsId: number): Promise<Array<{id: number; descricao: string}>> {
+    try {
+      const response = await this.backendApi.get(`/crs/${crsId}/municipios`);
+      return response.data?.data || response.data || [];
+    } catch (error: any) {
+      console.error('Erro ao buscar municípios do CRS:', error);
+      throw new Error(this.getErrorMessage(error, 'Erro ao carregar municípios do CRS'));
     }
   }
 }

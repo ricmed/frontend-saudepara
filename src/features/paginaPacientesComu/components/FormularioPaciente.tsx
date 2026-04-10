@@ -25,7 +25,7 @@ import {
   OptionItem,
 } from "@/services/PacienteService";
 import { toast } from "react-toastify";
-import SideMenu from "@/features/home/components/SideMenu";
+import { SideMenu } from "@/features/home/components/SideMenu";
 import { useOfflineSystem } from '@/hooks/useOfflineSystem';
 import ConnectionStatus from '@/components/ConnectionStatus';
 import indexedDBService from '@/services/indexedDB';

@@ -18,6 +18,8 @@ export const zh: TranslationRecord = {
   "menu.servicos": "服务",
   "menu.reportCase": "报告病例",
   "menu.reportCaseDesc": "快速登记新病例",
+  "menu.reportDAE": "报告DAE",
+  "menu.reportDAEDesc": "快速登记DAE通信",
   
   // Logout Confirmation
   "logout.confirmation.title": "您想要退出吗？",

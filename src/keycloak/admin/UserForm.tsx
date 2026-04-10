@@ -47,9 +47,10 @@ interface UserFormData {
   confirmPassword?: string;
   temporaryPassword: boolean;
   // Campos de controle de acesso
-  nivelAcesso: 'unidade' | 'municipio' | 'estado';
+  nivelAcesso: 'unidade' | 'municipio' | 'crs' | 'estado';
   estabelecimentoId?: number;
   municipioId?: number;
+  crsId?: number;
   estadoId?: number;
   permissoes: number;
 }
@@ -78,6 +79,7 @@ const UserForm: React.FC = () => {
   // Estados para opções de dropdown
   const [estabelecimentos, setEstabelecimentos] = useState<EstabelecimentoOption[]>([]);
   const [municipios, setMunicipios] = useState<Array<{id: number; descricao: string; estadoId?: number}>>([]);
+  const [crsLista, setCrsLista] = useState<Array<{id: number; nome: string}>>([]);
   const [estados, setEstados] = useState<Array<{id: number; descricao: string}>>([]);
 
   // Bases para reuso/reset
@@ -86,11 +88,13 @@ const UserForm: React.FC = () => {
   // Estados para pesquisa nos dropdowns
   const [searchEstabelecimento, setSearchEstabelecimento] = useState('');
   const [searchMunicipio, setSearchMunicipio] = useState('');
+  const [searchCrs, setSearchCrs] = useState('');
   const [searchEstado, setSearchEstado] = useState('');
 
   // Estados filtrados para exibição
   const [estabelecimentosFiltrados, setEstabelecimentosFiltrados] = useState<EstabelecimentoOption[]>([]);
   const [municipiosFiltrados, setMunicipiosFiltrados] = useState<Array<{id: number; descricao: string}>>([]);
+  const [crsFiltrados, setCrsFiltrados] = useState<Array<{id: number; nome: string}>>([]);
   const [estadosFiltrados, setEstadosFiltrados] = useState<Array<{id: number; descricao: string}>>([]);
 
   const isEditMode = !!id;
@@ -141,6 +145,14 @@ const UserForm: React.FC = () => {
       );
     }
   }, [municipiosDisponiveis, searchMunicipio]);
+
+  // CRS: acento-insensitive
+  useEffect(() => {
+    const q = norm(searchCrs);
+    setCrsFiltrados(
+      q ? crsLista.filter(crs => norm(crs.nome).includes(q)) : crsLista
+    );
+  }, [crsLista, searchCrs]);
 
   // Estados: acento-insensitive
   useEffect(() => {
@@ -199,7 +211,6 @@ const UserForm: React.FC = () => {
         setMunicipiosFiltrados(municipiosFormatados);
         
         console.log('✅ Dados carregados com relacionamentos mapeados!');
-        return;
         
       } catch (hierarquiaError) {
         console.warn('⚠️ Método otimizado não disponível, usando método tradicional...');
@@ -225,6 +236,22 @@ const UserForm: React.FC = () => {
         setMunicipiosFiltrados(municipiosData);
         
         console.log('✅ Dados carregados via método tradicional');
+      }
+      
+      // 🏥 Carregar CRS (Centros Regionais de Saúde) - sempre
+      try {
+        const crsData = await usuarioGestaoService.getCrs();
+        const crsFormatados = crsData.map(crs => ({
+          id: crs.id_crs,
+          nome: crs.nome
+        }));
+        setCrsLista(crsFormatados);
+        setCrsFiltrados(crsFormatados);
+        console.log('✅ CRS carregados:', crsFormatados.length);
+      } catch (crsError) {
+        console.warn('⚠️ Erro ao carregar CRS:', crsError);
+        setCrsLista([]);
+        setCrsFiltrados([]);
       }
       
     } catch (error) {
@@ -483,6 +510,10 @@ const UserForm: React.FC = () => {
           formDataUpdate.nivelAcesso = 'municipio';
           formDataUpdate.municipioId = acessosData.tipo_municipio_id;
           console.log('🏛️ Definido acesso de município:', acessosData.tipo_municipio_id);
+        } else if (acessosData.crs_id) {
+          formDataUpdate.nivelAcesso = 'crs';
+          formDataUpdate.crsId = acessosData.crs_id;
+          console.log('🏥 Definido acesso de CRS:', acessosData.crs_id);
         } else if (acessosData.tipo_estado_id) {
           formDataUpdate.nivelAcesso = 'estado';
           formDataUpdate.estadoId = acessosData.tipo_estado_id;
@@ -584,6 +615,10 @@ const UserForm: React.FC = () => {
       newErrors.municipioId = 'Município é obrigatório para acesso municipal';
     }
 
+    if (formData.nivelAcesso === 'crs' && !formData.crsId) {
+      newErrors.crsId = 'Regional de Saúde (CRS) é obrigatória para acesso regional';
+    }
+
     if (formData.nivelAcesso === 'estado' && !formData.estadoId) {
       newErrors.estadoId = 'Estado é obrigatório para acesso estadual';
     }
@@ -632,6 +667,13 @@ const UserForm: React.FC = () => {
         await usuarioGestaoService.createAcessoMunicipio(
           userId,
           formData.municipioId,
+          formData.permissoes
+        );
+      } else if (formData.nivelAcesso === 'crs' && formData.crsId) {
+        console.log('🏥 Criando novo acesso de CRS...');
+        await usuarioGestaoService.createAcessoCrs(
+          userId,
+          formData.crsId,
           formData.permissoes
         );
       } else if (formData.nivelAcesso === 'estado' && formData.estadoId) {
@@ -846,6 +888,14 @@ const UserForm: React.FC = () => {
             formData.permissoes
           );
           console.log('✅ Acesso de município criado');
+        } else if (formData.nivelAcesso === 'crs' && formData.crsId) {
+          console.log('🏥 Criando acesso de CRS...');
+          await usuarioGestaoService.createAcessoCrs(
+            userId,
+            formData.crsId,
+            formData.permissoes
+          );
+          console.log('✅ Acesso de CRS criado');
         } else if (formData.nivelAcesso === 'estado' && formData.estadoId) {
           console.log('🗺️ Criando acesso de estado...');
           await usuarioGestaoService.createAcessoEstado(
@@ -1239,14 +1289,16 @@ const UserForm: React.FC = () => {
                     id="nivelAcesso"
                     value={formData.nivelAcesso}
                     onChange={(e) => {
-                      const novoNivel = e.target.value as 'unidade' | 'municipio' | 'estado';
+                      const novoNivel = e.target.value as 'unidade' | 'municipio' | 'crs' | 'estado';
                       setFormData(prev => ({ 
                         ...prev, 
                         nivelAcesso: novoNivel,
                         // Limpar campos relacionados ao mudar nível
                         estabelecimentoId: undefined,
                         municipioId: undefined,
-                        estadoId: undefined
+                        crsId: undefined,
+                        // ✅ Se CRS, vincular ao Pará (ID 15), senão limpar
+                        estadoId: novoNivel === 'crs' ? 15 : undefined
                       }));
                     }}
                     className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
@@ -1257,6 +1309,7 @@ const UserForm: React.FC = () => {
                     <option value="">Selecione o nível de acesso</option>
                     <option value="unidade">Unidade</option>
                     <option value="municipio">Município</option>
+                    <option value="crs">Regional de Saúde (CRS)</option>
                     <option value="estado">Estado</option>
                   </select>
                   {errors.nivelAcesso && (
@@ -1388,7 +1441,52 @@ const UserForm: React.FC = () => {
                   </div>
                 )}
 
-                {/* Estado - Sempre mostrar */}
+                {/* CRS - Mostrar apenas se nível for 'crs' */}
+                {formData.nivelAcesso === 'crs' && (
+                  <div>
+                    <label htmlFor="crsId" className="block text-sm font-medium text-gray-700 mb-2">
+                      <Building className="h-4 w-4 inline mr-1" />
+                      Regional de Saúde (CRS) *
+                    </label>
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        placeholder="Pesquisar regional..."
+                        value={searchCrs}
+                        onChange={(e) => setSearchCrs(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <select
+                        id="crsId"
+                        value={formData.crsId || ''}
+                        onChange={(e) => {
+                          const value = e.target.value ? parseInt(e.target.value) : undefined;
+                          // ✅ Vincular automaticamente ao estado do Pará (ID 15)
+                          setFormData(prev => ({ ...prev, crsId: value, estadoId: 15 }));
+                        }}
+                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          errors.crsId ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                        required={formData.nivelAcesso === 'crs'}
+                        size={Math.min(crsFiltrados.length + 1, 8)}
+                      >
+                        <option value="">Selecionar Regional de Saúde</option>
+                        {crsFiltrados.map(crs => (
+                          <option key={crs.id} value={crs.id}>{crs.nome}</option>
+                        ))}
+                      </select>
+                      {errors.crsId && (
+                        <p className="mt-1 text-sm text-red-600">{errors.crsId}</p>
+                      )}
+                      {crsFiltrados.length === 0 && searchCrs && (
+                        <p className="text-sm text-gray-500">Nenhuma regional encontrada</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Estado - Mostrar apenas se não for CRS */}
+                {formData.nivelAcesso !== 'crs' && (
                 <div>
                   <label htmlFor="estadoId" className="block text-sm font-medium text-gray-700 mb-2">
                     <Globe className="h-4 w-4 inline mr-1" />
@@ -1433,6 +1531,7 @@ const UserForm: React.FC = () => {
                     )}
                   </div>
                 </div>
+                )}
               </div>
             </div>
 

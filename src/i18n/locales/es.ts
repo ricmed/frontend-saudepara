@@ -20,6 +20,8 @@ export const es: TranslationRecord = {
   "menu.servicos": "Servicios",
   "menu.reportCase": "Informar Caso",
   "menu.reportCaseDesc": "Registre un nuevo caso rápidamente",
+  "menu.reportDAE": "Informar DAE",
+  "menu.reportDAEDesc": "Registre una comunicación DAE rápidamente",
   
   // Logout Confirmation
   "logout.confirmation.title": "¿Desea salir?",
@@ -63,6 +65,7 @@ export const es: TranslationRecord = {
   "menu.qualify_establishments": "Calificar Establecimientos",
   "menu.notification": "Módulo de Comunicación de Caso",
   "menu.notify_case": "Reportar Caso",
+  "menu.dynamic_forms": "Formularios de Notificación",
   "menu.dashboard": "Dashboard",
   "menu.offline_management": "Datos Sin Conexión",
   "menu.educational": "Materiales Educativos",

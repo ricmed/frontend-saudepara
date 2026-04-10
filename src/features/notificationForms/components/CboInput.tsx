@@ -99,7 +99,7 @@ const CboInput: React.FC<CboInputProps> = ({
           descricao: normalizeText(response.data.descricao)
         };
         setSelectedCbo(normalizedCbo);
-        setDisplayValue(normalizedCbo.descricao);
+        setDisplayValue(normalizedCbo.codigo && normalizedCbo.descricao ? `${normalizedCbo.codigo} - ${normalizedCbo.descricao}` : normalizedCbo.descricao);
 
         // E salva no cache para uso futuro
         try {
@@ -203,7 +203,7 @@ const CboInput: React.FC<CboInputProps> = ({
         try {
           const server = import.meta.env.VITE_API_SERVER;
           const port = import.meta.env.VITE_API_PORT;
-          const endpoint = `${server}:${port}/api/tipo-cbo/search?descricao=${encodeURIComponent(searchTerm)}&limit=10000`;
+          const endpoint = `${server}:${port}/api/tipo-cbo/search?query=${encodeURIComponent(searchTerm)}&limit=10000`;
           const response = await axios.get(endpoint);
 
           if (response.data && response.data.data && Array.isArray(response.data.data)) {
@@ -288,7 +288,7 @@ const CboInput: React.FC<CboInputProps> = ({
   // ===========
   const handleCboSelect = (cbo: TipoCboOption) => {
     setSelectedCbo(cbo);
-    setDisplayValue(cbo.descricao);
+    setDisplayValue(cbo.codigo && cbo.descricao ? `${cbo.codigo} - ${cbo.descricao}` : cbo.descricao);
     setSearchQuery("");
     setIsManuallyEditing(false);
     onChange(cbo.idtipo_cbo.toString());
@@ -482,7 +482,7 @@ const CboInput: React.FC<CboInputProps> = ({
                   }`}
                   onClick={() => handleCboSelect(cbo)}
                 >
-                  {cbo.descricao}
+                  {cbo.codigo && cbo.descricao ? `${cbo.codigo} - ${cbo.descricao}` : cbo.descricao}
                 </button>
               ))}
             </>

@@ -60,6 +60,8 @@ export const ru: TranslationRecord = {
   "menu.dashboard": "Панель управления",
   "menu.reportCase": "Сообщить о случае",
   "menu.reportCaseDesc": "Быстро зарегистрировать новый случай",
+  "menu.reportDAE": "Сообщить DAE",
+  "menu.reportDAEDesc": "Быстро зарегистрировать сообщение DAE",
   "menu.offline_management": "Автономные данные",
   "menu.educational": "Образовательные материалы",
   "menu.apps": "Вспомогательные приложения",

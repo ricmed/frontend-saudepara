@@ -13,6 +13,7 @@ import {
   LogOut,
   Building2,
   ChevronRight,
+  ClipboardList,
 } from "lucide-react";
 
 interface SideMenuProps {
@@ -37,6 +38,11 @@ export const SideMenu: React.FC<SideMenuProps> = ({ isOpen, onClose }) => {
       onClick: () => navigate("/pagina-departamento"),
     },
     {
+      icon: <ClipboardList />,
+      label: t("menu.dynamic_forms"),
+      onClick: () => navigate("/private/formularios"),
+    },
+    {
       icon: <ChartSpline />,
       label: t("menu.dashboard"),
       onClick: () => navigate("/dashboard"),
@@ -49,7 +55,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({ isOpen, onClose }) => {
     {
       icon: <Building2 />,
       label: t("menu.apps"),
-      onClick: () => navigate("/private/apps-auxiliares"),
+      onClick: () => navigate("/private/escolha-apps-auxiliares"),
     },
     {
       icon: <Lock />,

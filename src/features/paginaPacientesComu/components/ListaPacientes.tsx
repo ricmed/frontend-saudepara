@@ -21,7 +21,7 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 // Atualizando a importação do SideMenu
-import SideMenu from "@/features/home/components/SideMenu";
+import { SideMenu } from "@/features/home/components/SideMenu";
 // import ModalBuscaPaciente from "@/features/paginaPacientesComu/components/ModalBuscaPaciente";
 // import { useLanguage } from "@/contexts/LanguageContext";
 

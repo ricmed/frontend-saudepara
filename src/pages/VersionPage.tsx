@@ -1,7 +1,7 @@
 import React from "react";
 import { AdminHeader } from "@/keycloak/admin/components/AdminHeader";
 import Footer from "@/features/desktop/components/Footer";
-import SideMenu from "@/features/home/components/SideMenu";
+import { SideMenu } from "@/features/home/components/SideMenu";
 import { useNavigate } from "react-router-dom";
 import { Language } from "@/i18n/types";
 import { Info, Calendar, Code, Users, Shield, ArrowLeft } from "lucide-react";

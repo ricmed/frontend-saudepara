@@ -18,6 +18,8 @@ export const fr: TranslationRecord = {
   "menu.servicos": "Services",
   "menu.reportCase": "Signaler un Cas",
   "menu.reportCaseDesc": "Enregistrez rapidement un nouveau cas",
+  "menu.reportDAE": "Signaler DAE",
+  "menu.reportDAEDesc": "Enregistrez rapidement une communication DAE",
   
   "logout.confirmation.title": "Voulez-vous vous déconnecter ?",
   "logout.confirmation.confirm": "Oui, se déconnecter",
@@ -57,6 +59,7 @@ export const fr: TranslationRecord = {
   "menu.qualify_establishments": "Qualifier les Établissements",
   "menu.notification": "Module de Communication de Cas",
   "menu.notify_case": "Signaler un Cas",
+  "menu.dynamic_forms": "Formulaires de Notification",
   "menu.dashboard": "Tableau de Bord",
   "menu.offline_management": "Données Hors Ligne",
   "menu.educational": "Matériaux Éducatifs",

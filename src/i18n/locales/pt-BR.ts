@@ -18,6 +18,8 @@ export const ptBR = {
   "menu.faq": "Perguntas Frequentes",
   "menu.reportCase": "Comunicar Caso",
   "menu.reportCaseDesc": "Registre um novo caso rapidamente",
+  "menu.reportDAE": "Comunicar DAE",
+  "menu.reportDAEDesc": "Registre uma comunicação DAE rapidamente",
 
   // Logout Confirmation
   "logout.confirmation.title": "Deseja sair?",
@@ -60,6 +62,7 @@ export const ptBR = {
   "menu.qualify_establishments": "Qualificar Estabelecimentos",
   "menu.notification": "Módulo Comunicação de Caso",
   "menu.notify_case": "Comunicar Caso",
+  "menu.dynamic_forms": "Formulários de Notificação",
   "menu.dashboard": "Dashboard",
   "menu.offline_management": "Dados Offline",
   "menu.educational": "Materiais Educativos",

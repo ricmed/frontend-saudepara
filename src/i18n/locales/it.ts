@@ -60,6 +60,8 @@ export const it: TranslationRecord = {
   "menu.dashboard": "Dashboard",
   "menu.reportCase": "Segnala Caso",
   "menu.reportCaseDesc": "Registra rapidamente un nuovo caso",
+  "menu.reportDAE": "Segnala DAE",
+  "menu.reportDAEDesc": "Registra rapidamente una comunicazione DAE",
   "menu.offline_management": "Dati Offline",
   "menu.educational": "Materiali Educativi",
   "menu.apps": "App Ausiliarie",

@@ -47,7 +47,7 @@
     "tailwind.config.js",
     "App.tsx"
   ],
-  "exclude": ["node_modules", "dist", "build", "coverage"],
+  "exclude": ["node_modules", "dist", "build", "coverage", "**/*.test.ts", "**/*.test.tsx", "src/test/**"],
   "references": [
     {
       "path": "./tsconfig.node.json"

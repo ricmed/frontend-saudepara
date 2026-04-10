@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Download, FileSpreadsheet, FileText, FileIcon, File, Database } from 'lucide-react';
-import { exportFullDashboard, prepareDashboardData } from '../../utils/exportUtils';
+import { exportFullDashboard } from '../../utils/exportUtils';
 
 // Interface para dados de gráfico
 interface ChartDataItem {
@@ -27,6 +27,12 @@ interface DashboardExportMenuProps {
   sintomasData?: ChartDataItem[];
   traumaData?: ChartDataItem[];
   hipotesesData?: ChartDataItem[];
+  // Dados específicos do Dashboard DAE
+  crsData?: ChartDataItem[];
+  nheData?: ChartDataItem[];
+  cievsData?: ChartDataItem[];
+  daeData?: ChartDataItem[];
+  serieTemporalData?: ChartDataItem[];
   // Metadados
   totalRecords: number;
   activeFilters?: Record<string, any>;
@@ -49,6 +55,11 @@ const DashboardExportMenu: React.FC<DashboardExportMenuProps> = ({
   sintomasData = [],
   traumaData = [],
   hipotesesData = [],
+  crsData = [],
+  nheData = [],
+  cievsData = [],
+  daeData = [],
+  serieTemporalData = [],
   totalRecords,
   activeFilters = {},
   className = '',
@@ -82,8 +93,17 @@ const DashboardExportMenu: React.FC<DashboardExportMenuProps> = ({
     if (traumaData.length > 0) sections.push({ name: 'Tipos de Trauma', data: traumaData });
     if (hipotesesData.length > 0) sections.push({ name: 'Hipóteses Diagnósticas', data: hipotesesData });
 
+    // Seção específica do Dashboard DAE
+    if (serieTemporalData && serieTemporalData.length > 0) {
+      sections.unshift({ name: 'Série Temporal - Evolução Diária', data: serieTemporalData });
+    }
+    if (crsData.length > 0) sections.push({ name: 'CRS - Centros Regionais de Saúde', data: crsData });
+    if (nheData.length > 0) sections.push({ name: 'NHE - Núcleos Hospitalares de Epidemiologia', data: nheData });
+    if (cievsData.length > 0) sections.push({ name: 'CIEVS - Centros de Informações Estratégicas em Vigilância', data: cievsData });
+    if (daeData.length > 0) sections.push({ name: 'DAE - Doenças, Agravos e Eventos', data: daeData });
+
     return {
-      title: 'Comunicação de Eventos - Dados Completos',
+      title: title || 'Comunicação de Eventos - Dados Completos',
       sections,
       metadata: {
         totalRecords,
@@ -152,8 +172,26 @@ const DashboardExportMenu: React.FC<DashboardExportMenuProps> = ({
   const dashboardStats = prepareDashboardCompleteData();
   const hasData = dashboardStats.sections.length > 0;
 
+  // Debug: Log dados para verificar
+  useEffect(() => {
+    if (showMenu) {
+      console.log('📊 Dashboard Export Menu - Stats:', {
+        hasData,
+        sectionsCount: dashboardStats.sections.length,
+        sections: dashboardStats.sections.map(s => ({ name: s.name, items: s.data.length })),
+        totalRecords,
+        municipioDataLength: municipioData.length,
+        crsDataLength: crsData.length,
+        nheDataLength: nheData.length,
+        cievsDataLength: cievsData.length,
+        daeDataLength: daeData.length,
+        serieTemporalDataLength: serieTemporalData?.length || 0
+      });
+    }
+  }, [showMenu, hasData, totalRecords, municipioData.length, crsData.length, nheData.length, cievsData.length, daeData.length, serieTemporalData?.length]);
+
   return (
-    <div className="relative inline-block">
+    <div className="relative inline-block" data-export-menu>
       {renderTriggerButton()}
       
       {showMenu && (
@@ -165,7 +203,7 @@ const DashboardExportMenu: React.FC<DashboardExportMenuProps> = ({
           />
           
           {/* Menu de opções */}
-          <div className="absolute right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-[9999] min-w-64">
+          <div className="absolute right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-[9999] min-w-80 max-w-96">
             <div className="px-4 py-3 border-b border-gray-100">
               <h3 className="font-semibold text-gray-800">Exportar Dashboard Completo</h3>
               <p className="text-xs text-gray-500 mt-1">
@@ -183,53 +221,53 @@ const DashboardExportMenu: React.FC<DashboardExportMenuProps> = ({
               <>
                 {/* Opção Excel */}
                 <button 
-                  className="flex items-center gap-3 w-full px-4 py-3 text-left text-sm hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors disabled:opacity-50"
                   onClick={() => handleExport('excel')}
                   disabled={isExporting}
                 >
-                  <FileSpreadsheet className="h-4 w-4 text-green-600" />
-                  <div>
-                    <div className="font-medium">Excel Completo (.xlsx)</div>
-                    <div className="text-xs text-gray-500">Múltiplas abas com todos os dados</div>
+                  <FileSpreadsheet className="h-5 w-5 text-green-600 flex-shrink-0" />
+                  <div className="flex-1">
+                    <div className="font-semibold text-gray-900 text-sm">Excel Completo (.xlsx)</div>
+                    <div className="text-xs text-gray-500 mt-0.5">Múltiplas abas com todos os dados</div>
                   </div>
                 </button>
                 
                 {/* Opção CSV */}
                 <button 
-                  className="flex items-center gap-3 w-full px-4 py-3 text-left text-sm hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors disabled:opacity-50"
                   onClick={() => handleExport('csv')}
                   disabled={isExporting}
                 >
-                  <FileText className="h-4 w-4 text-blue-600" />
-                  <div>
-                    <div className="font-medium">CSV Consolidado (.csv)</div>
-                    <div className="text-xs text-gray-500">Todos os dados em um arquivo</div>
+                  <FileText className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                  <div className="flex-1">
+                    <div className="font-semibold text-gray-900 text-sm">CSV Consolidado (.csv)</div>
+                    <div className="text-xs text-gray-500 mt-0.5">Todos os dados em um arquivo</div>
                   </div>
                 </button>
                 
                 {/* Opção PDF */}
                 <button 
-                  className="flex items-center gap-3 w-full px-4 py-3 text-left text-sm hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors disabled:opacity-50"
                   onClick={() => handleExport('pdf')}
                   disabled={isExporting}
                 >
-                  <FileIcon className="h-4 w-4 text-red-600" />
-                  <div>
-                    <div className="font-medium">Relatório PDF (.pdf)</div>
-                    <div className="text-xs text-gray-500">Dashboard completo visual</div>
+                  <FileIcon className="h-5 w-5 text-red-600 flex-shrink-0" />
+                  <div className="flex-1">
+                    <div className="font-semibold text-gray-900 text-sm">Relatório PDF (.pdf)</div>
+                    <div className="text-xs text-gray-500 mt-0.5">Dashboard completo visual</div>
                   </div>
                 </button>
                 
                 {/* Opção Word */}
                 <button 
-                  className="flex items-center gap-3 w-full px-4 py-3 text-left text-sm hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors disabled:opacity-50"
                   onClick={() => handleExport('word')}
                   disabled={isExporting}
                 >
-                  <File className="h-4 w-4 text-blue-700" />
-                  <div>
-                    <div className="font-medium">Documento Word (.doc)</div>
-                    <div className="text-xs text-gray-500">Relatório executivo completo</div>
+                  <File className="h-5 w-5 text-blue-700 flex-shrink-0" />
+                  <div className="flex-1">
+                    <div className="font-semibold text-gray-900 text-sm">Documento Word (.doc)</div>
+                    <div className="text-xs text-gray-500 mt-0.5">Relatório executivo completo</div>
                   </div>
                 </button>
               </>

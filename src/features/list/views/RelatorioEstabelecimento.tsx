@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDebounce } from "@/hooks/useDebounce";
 import { ListaDeEstabelecimentoService } from "@/services/ListaDeEstabelecimentoServ";
-import { ArrowLeft, Plus, ChevronDown, ChevronUp, Menu } from "lucide-react";
+import { ArrowLeft, Plus, ChevronDown, ChevronUp, Menu, Power } from "lucide-react";
 import { CSVLink } from "react-csv";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
@@ -15,7 +15,8 @@ import TableBody from "../components/RelatorioEstabelecimento/TableBody";
 import PaginationControls from "../components/RelatorioEstabelecimento/PaginationControls";
 import SearchBar from "../components/RelatorioEstabelecimento/SearchBar";
 import ColumnsMenu from "../components/RelatorioEstabelecimento/ColumnsMenu";
-import SideMenu from "@/features/home/components/SideMenu";
+import GerenciarAtivacaoModal from "../components/RelatorioEstabelecimento/GerenciarAtivacaoModal";
+import { SideMenu } from "@/features/home/components/SideMenu";
 
 // Importando tipos e utilitários
 import {
@@ -33,8 +34,16 @@ export function RelatorioEstabelecimento() {
   const [csvLinkRef, setCsvLinkRef] = useState<any>(null);
   const csvLinkAllRef = useRef<any>(null);  // Estado para controlar o SideMenu
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isModalAtivacaoOpen, setIsModalAtivacaoOpen] = useState(false);
   // Estados para o SideMenu
   const [selectedLanguage, setSelectedLanguage] = useState<Language>("pt-BR");
+
+  // Estado para gerenciar estabelecimentos ativos
+  const [estabelecimentosAtivos, setEstabelecimentosAtivos] = useState<number[]>([]);
+  
+  // Estado para todos os estabelecimentos (para o modal)
+  const [todosEstabelecimentos, setTodosEstabelecimentos] = useState<Estabelecimento[]>([]);
+  const [isLoadingTodos, setIsLoadingTodos] = useState(false);
 
   const resetToFirstPage = () => {
     setCurrentPage(1);
@@ -183,6 +192,107 @@ export function RelatorioEstabelecimento() {
           "Não foi possível excluir. Verifique dependências ou tente novamente."
         );
       }
+    }
+  };
+
+  // Função para buscar TODOS os estabelecimentos
+  const handleOpenModalAtivacao = async () => {
+    try {
+      setIsLoadingTodos(true);
+      // ❌ NÃO abrir o modal ainda - aguardar os dados!
+      
+      console.log('🔍 Buscando todos os estabelecimentos...');
+      
+      // Buscar TODOS os estabelecimentos (sem paginação)
+      const response = await ListaDeEstabelecimentoService.getAllPaginated(
+        1,
+        Number.MAX_SAFE_INTEGER, // Busca todos
+        { term: '', field: 'all' }, // Sem filtro
+        'nome',
+        'asc'
+      );
+      
+      if (response && response.data) {
+        console.log(`✅ ${response.data.length} estabelecimentos carregados`);
+        
+        // 🔍 DEBUG: Verificar o que vem no campo ativo
+        console.log('🔍 DEBUG - Primeiros 5 estabelecimentos:');
+        response.data.slice(0, 5).forEach((est, idx) => {
+          console.log(`  ${idx + 1}. ID: ${est.idestabelecimento}, Nome: ${est.nome}, Ativo: "${est.ativo}" (tipo: ${typeof est.ativo})`);
+        });
+        
+        // 🔍 DEBUG: Verificar todos os valores únicos de ativo
+        const valoresAtivo = [...new Set(response.data.map(est => est.ativo))];
+        console.log('🔍 Valores únicos do campo "ativo":', valoresAtivo);
+        
+        // Carregar os IDs dos estabelecimentos que estão com ativo = "Sim"
+        // IMPORTANTE: O backend retorna "Sim" ou "Não", não "S" ou "N"
+        const ativosIds = response.data
+          .filter(est => {
+            const isAtivo = est.ativo === "Sim";
+            if (isAtivo) {
+              console.log(`  ✓ Ativo encontrado: ${est.nome} (ID: ${est.idestabelecimento})`);
+            }
+            return isAtivo;
+          })
+          .map(est => est.idestabelecimento);
+        
+        console.log(`🟢 ${ativosIds.length} estabelecimentos ativos (ativo = "Sim")`);
+        console.log(`⚫ ${response.data.length - ativosIds.length} estabelecimentos inativos (ativo = "Não")`);
+        
+        // ✅ ATUALIZAR OS ESTADOS PRIMEIRO
+        setTodosEstabelecimentos(response.data);
+        setEstabelecimentosAtivos(ativosIds);
+        
+        // ✅ SÓ AGORA abrir o modal (depois dos dados estarem prontos)
+        setIsModalAtivacaoOpen(true);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao buscar estabelecimentos:', error);
+      setError('Erro ao carregar estabelecimentos. Tente novamente.');
+      setIsModalAtivacaoOpen(false);
+    } finally {
+      setIsLoadingTodos(false);
+    }
+  };
+
+  // Função para salvar ativação/desativação
+  const handleSaveAtivacao = async (ativosIds: number[]) => {
+    try {
+      console.log('💾 Salvando estabelecimentos ativos:', ativosIds);
+      console.log('📊 Total de estabelecimentos:', todosEstabelecimentos.length);
+      console.log('🟢 Serão ativados (ativo = "Sim"):', ativosIds.length);
+      console.log('⚫ Serão desativados (ativo = "Não"):', todosEstabelecimentos.length - ativosIds.length);
+      
+      // ✅ Implementação completa de bulk activation
+      console.log('🔄 Iniciando bulk activation...');
+      
+      // Chamar endpoint de bulk activation
+      const result = await ListaDeEstabelecimentoService.bulkActivation(ativosIds);
+      
+      console.log('✅ Bulk activation concluído:', result);
+      
+      // Atualizar estado local
+      setEstabelecimentosAtivos(ativosIds);
+      
+      // Recarregar a lista principal
+      const response = await ListaDeEstabelecimentoService.getAllPaginated(
+        currentPage,
+        itemsPerPage,
+        debouncedSearchParams,
+        sortKey,
+        sortOrder
+      );
+      
+      if (response && response.data) {
+        setEstabelecimentos(response.data);
+        setPaginationMeta(response.meta);
+      }
+      
+      alert(`✅ Ativação atualizada com sucesso!\n\n🟢 ${result.ativados} ativado(s)\n⚫ ${result.desativados} desativado(s)\n📊 Total: ${result.total} estabelecimentos`);
+    } catch (error) {
+      console.error('❌ Erro ao salvar:', error);
+      throw error;
     }
   };
 
@@ -531,6 +641,36 @@ export function RelatorioEstabelecimento() {
 
       {/* Conteúdo principal */}
       <main className="max-w-7xl mx-auto px-4 py-8">
+        {/* Painel de Gerenciamento de Ativação */}
+        <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 shadow-sm">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <Power className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Gerenciar Ativação de Estabelecimentos
+                </h3>
+                <p className="text-sm text-gray-600 mt-0.5">
+                  {estabelecimentosAtivos.length > 0 
+                    ? `${estabelecimentosAtivos.length} estabelecimento(s) ativo(s)`
+                    : 'Nenhum estabelecimento ativado'
+                  }
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleOpenModalAtivacao}
+              disabled={isLoadingTodos}
+              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md hover:shadow-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Power className="h-4 w-4" />
+              {isLoadingTodos ? 'Carregando...' : 'Gerenciar Ativação'}
+            </button>
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <div className="bg-white rounded-xl shadow-md overflow-x-auto">
             {error && (
@@ -597,6 +737,19 @@ export function RelatorioEstabelecimento() {
         filename="estabelecimentos_completo.csv"
         style={{ display: "none" }}
         ref={csvLinkAllRef}
+      />
+
+      {/* Modal de Gerenciamento de Ativação */}
+      <GerenciarAtivacaoModal
+        isOpen={isModalAtivacaoOpen}
+        onClose={() => {
+          setIsModalAtivacaoOpen(false);
+          setTodosEstabelecimentos([]); // Limpar após fechar
+        }}
+        estabelecimentos={todosEstabelecimentos}
+        estabelecimentosAtivos={estabelecimentosAtivos}
+        onSave={handleSaveAtivacao}
+        isLoadingEstabelecimentos={isLoadingTodos}
       />
     </div>
   );

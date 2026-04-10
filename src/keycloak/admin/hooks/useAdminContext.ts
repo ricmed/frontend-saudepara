@@ -1,6 +1,6 @@
 import { useAuth } from '@/keycloak/AuthProvider';
 
-export type AdminLevel = 'master' | 'unidade' | 'municipio' | 'estado' | null;
+export type AdminLevel = 'master' | 'unidade' | 'municipio' | 'crs' | 'estado' | null;
 
 export interface AdminContext {
   level: AdminLevel;
@@ -8,6 +8,8 @@ export interface AdminContext {
   unidadeNome?: string;
   municipioId?: string;
   municipioNome?: string;
+  crsId?: string;
+  crsNome?: string;
   estadoId?: string;
   estadoNome?: string;
   canManageUsers: boolean;
@@ -39,6 +41,10 @@ export const useAdminContext = (): AdminContext => {
       return 'municipio';
     }
     
+    if (roles.includes('admin.crs')) {
+      return 'crs';
+    }
+    
     if (roles.includes('admin.estado')) {
       return 'estado';
     }
@@ -59,6 +65,8 @@ export const useAdminContext = (): AdminContext => {
       unidadeNome: user?.unidadeNome || user?.estabelecimentoNome || undefined,
       municipioId: user?.municipioId || undefined,
       municipioNome: user?.municipioNome || undefined,
+      crsId: user?.crsId || undefined,
+      crsNome: user?.crsNome || undefined,
       estadoId: user?.estadoId || undefined,
       estadoNome: user?.estadoNome || undefined,
     };
@@ -77,6 +85,13 @@ export const useAdminContext = (): AdminContext => {
           ...context,
           municipioId: context.municipioId || 'MUNICIPIO_001',
           municipioNome: context.municipioNome || 'Município do Administrador'
+        };
+      
+      case 'crs':
+        return {
+          ...context,
+          crsId: context.crsId || 'CRS_001',
+          crsNome: context.crsNome || 'Regional do Administrador'
         };
       
       case 'estado':
@@ -102,6 +117,7 @@ export const useAdminContext = (): AdminContext => {
         };
       
       case 'estado':
+      case 'crs':
       case 'municipio':
       case 'unidade':
         return {
@@ -172,6 +188,8 @@ export const useAdminUrls = () => {
         return '/admin/unidade';
       case 'municipio':
         return '/admin/municipio';
+      case 'crs':
+        return '/admin/crs';
       case 'estado':
         return '/admin/estado';
       case 'master':
