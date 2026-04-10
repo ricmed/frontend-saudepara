@@ -1,30 +1,29 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { VitePWA } from 'vite-plugin-pwa';
 
-// 🔧 DETECÇÃO AUTOMÁTICA DE AMBIENTE
-const isHomologacao = process.env.NODE_ENV === 'production' && 
-                      !process.env.VITE_DEV_MODE && // Flag para forçar dev
-                      (process.env.VITE_ENV === 'homologacao' ||
-                       process.cwd().includes('homol') ||
-                       process.cwd().includes('hml'));
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  const isHomologacao = env.VITE_ENV === 'homologacao';
+  const isProducao = env.VITE_ENV === 'producao';
+  const API_AUTH_URL = isHomologacao
+    ? 'https://app.hml.saude.pa.gov.br/'
+    : isProducao
+      ? 'https://app.saude.pa.gov.br/'
+      : 'http://localhost:4000';
+  const API_BACKEND_URL = isHomologacao
+    ? 'https://app.hml.saude.pa.gov.br/'
+    : isProducao
+      ? 'https://app.saude.pa.gov.br/'
+      : 'http://localhost:3000';
 
-// 🌐 URLs baseadas no ambiente
-const API_AUTH_URL = isHomologacao 
-  ? 'https://app.hml.saude.pa.gov.br/'  // Homologação: usar app.hml (não api-app.hml)
-  : 'http://localhost:4000';
+  console.log('🚀 Configuração Vite (mode=%s):', mode);
+  console.log('📍', isHomologacao ? 'HOMOLOGAÇÃO' : isProducao ? 'PRODUÇÃO' : 'DESENVOLVIMENTO');
+  console.log('🔐 API Auth proxy:', API_AUTH_URL);
+  console.log('⚡ API Backend proxy:', API_BACKEND_URL);
 
-const API_BACKEND_URL = isHomologacao 
-  ? 'https://app.hml.saude.pa.gov.br/'  // Homologação: domínio unificado
-  : 'http://localhost:3000';
-
-console.log('🚀 Configuração Vite:');
-console.log('📍 Ambiente:', isHomologacao ? 'HOMOLOGAÇÃO' : 'DESENVOLVIMENTO');
-console.log('🔐 API Auth:', API_AUTH_URL);
-console.log('⚡ API Backend:', API_BACKEND_URL);
-
-export default defineConfig({
+  return {
   plugins: [
     react(),
     VitePWA({
@@ -189,6 +188,32 @@ export default defineConfig({
             handler: 'NetworkFirst',
             options: {
               cacheName: 'app-hml-cache',
+              expiration: {
+                maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24 * 30
+              },
+              networkTimeoutSeconds: 5
+            }
+          },
+
+          {
+            urlPattern: /^https:\/\/app\.saude\.pa\.gov\.br\/api\/.*$/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'api-prod-cache',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 7
+              },
+              networkTimeoutSeconds: 5
+            }
+          },
+
+          {
+            urlPattern: /^https:\/\/app\.saude\.pa\.gov\.br\/.*$/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'app-prod-cache',
               expiration: {
                 maxEntries: 200,
                 maxAgeSeconds: 60 * 60 * 24 * 30
@@ -378,4 +403,5 @@ export default defineConfig({
     __OFFLINE_DEBUG__: process.env.NODE_ENV === 'development',
     __PWA_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0')
   }
+  };
 });
