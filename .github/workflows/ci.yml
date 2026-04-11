@@ -2,9 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: [main, master, develop, producao]
   pull_request:
-    branches: [main, master, develop]
+    branches: [main, master, develop, producao]
+  workflow_dispatch:
 
 jobs:
   lint-build-e2e:
@@ -27,6 +28,10 @@ jobs:
 
       - name: Unit tests (Vitest)
         run: npm run test:unit
+
+      # Garante que o bundle de produção (app.saude.pa.gov.br) compila — evita deploy com HML embutido por engano
+      - name: Build produção (Vite mode producao)
+        run: npm run build:producao
 
       - name: Install Playwright (Chromium only)
         run: npx playwright install chromium --with-deps
