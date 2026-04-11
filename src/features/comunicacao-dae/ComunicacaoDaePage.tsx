@@ -15,6 +15,7 @@ import {
   exportarComunicacoesDaeListaPDF,
   exportarComunicacoesDaeListaWord,
 } from './components/listDocumentExporters';
+import { formatComunicacaoDaeAgravoNomes } from '@/features/comunicacao-dae/comunicacaoDaeAgravoUtils';
 
 // Tipos para pesquisa
 type SearchField = 'all' | 'nome_paciente' | 'origem' | 'dae' | 'municipio';
@@ -109,7 +110,7 @@ const ComunicacaoDaePage: React.FC = () => {
         case 'origem':
           return com.origem_tipo?.toLowerCase().includes(searchTerm);
         case 'dae':
-          return com.dae?.nome?.toLowerCase().includes(searchTerm);
+          return formatComunicacaoDaeAgravoNomes(com).toLowerCase().includes(searchTerm);
         case 'municipio':
           return com.tipo_municipio?.descricao?.toLowerCase().includes(searchTerm);
         case 'all':
@@ -117,7 +118,7 @@ const ComunicacaoDaePage: React.FC = () => {
           return (
             com.nome_paciente?.toLowerCase().includes(searchTerm) ||
             com.origem_tipo?.toLowerCase().includes(searchTerm) ||
-            com.dae?.nome?.toLowerCase().includes(searchTerm) ||
+            formatComunicacaoDaeAgravoNomes(com).toLowerCase().includes(searchTerm) ||
             com.tipo_municipio?.descricao?.toLowerCase().includes(searchTerm)
           );
       }
@@ -719,7 +720,7 @@ const ComunicacaoDaePage: React.FC = () => {
                           {formatDate(comunicacao.data_comunicacao)}
                         </p>
                         <p className="text-xs text-gray-700 mt-2">
-                          <span className="font-medium">DAE:</span> {comunicacao.dae?.nome || '-'}
+                          <span className="font-medium">DAE:</span> {formatComunicacaoDaeAgravoNomes(comunicacao)}
                         </p>
                         <p className="text-xs text-gray-700">
                           <span className="font-medium">Município:</span> {comunicacao.tipo_municipio?.descricao || '-'}
@@ -850,7 +851,7 @@ const ComunicacaoDaePage: React.FC = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {comunicacao.dae?.nome || '-'}
+                          {formatComunicacaoDaeAgravoNomes(comunicacao)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                           <div className="flex items-center">

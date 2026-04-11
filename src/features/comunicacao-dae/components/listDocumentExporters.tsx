@@ -13,6 +13,10 @@ import {
   WidthType,
 } from 'docx';
 import { ComunicacaoDae } from '@/services/ComunicacaoDaeService';
+import {
+  formatComunicacaoDaeAgravoCodigos,
+  formatComunicacaoDaeAgravoNomes,
+} from '@/features/comunicacao-dae/comunicacaoDaeAgravoUtils';
 
 const fallbackValue = (value?: string | number | null): string => {
   if (value === undefined || value === null) return '-';
@@ -245,7 +249,7 @@ const ComunicacoesDaeListPdfDocument = ({ comunicacoes }: { comunicacoes: Comuni
             <PdfCell text={formatDateTime(item.data_comunicacao)} width={columnWidths.data} borderedRight />
             <PdfCell text={fallbackValue(item.nome_paciente)} width={columnWidths.paciente} borderedRight />
             <PdfCell text={fallbackValue(item.origem_tipo)} width={columnWidths.origem} borderedRight />
-            <PdfCell text={fallbackValue(item.dae?.nome)} width={columnWidths.dae} borderedRight />
+            <PdfCell text={fallbackValue(formatComunicacaoDaeAgravoNomes(item))} width={columnWidths.dae} borderedRight />
             <PdfCell text={fallbackValue(item.tipo_municipio?.descricao)} width={columnWidths.municipio} borderedRight />
             <PdfCell text={String(item.comunicacao_dae_anexo?.length || 0)} width={columnWidths.anexos} />
           </View>
@@ -318,7 +322,7 @@ const buildListWordDocument = (comunicacoes: ComunicacaoDae[]): WordDocument =>
                       formatDateTime(item.data_comunicacao),
                       fallbackValue(item.nome_paciente),
                       fallbackValue(item.origem_tipo),
-                      fallbackValue(item.dae?.nome),
+                      fallbackValue(formatComunicacaoDaeAgravoNomes(item)),
                       fallbackValue(item.tipo_municipio?.descricao),
                       String(item.comunicacao_dae_anexo?.length || 0),
                     ].map(
@@ -343,8 +347,8 @@ const ComunicacaoDaeDetalhadaPdfDocument = ({ comunicacao }: { comunicacao: Comu
     { label: 'Nome do paciente', value: fallbackValue(comunicacao.nome_paciente) },
     { label: 'Tipo de origem', value: fallbackValue(comunicacao.origem_tipo) },
     { label: 'Codigo da origem', value: fallbackValue(comunicacao.origem_id) },
-    { label: 'DAE', value: fallbackValue(comunicacao.dae?.nome) },
-    { label: 'Codigo DAE', value: fallbackValue(comunicacao.dae?.codigo) },
+    { label: 'DAE', value: fallbackValue(formatComunicacaoDaeAgravoNomes(comunicacao)) },
+    { label: 'Codigo DAE', value: fallbackValue(formatComunicacaoDaeAgravoCodigos(comunicacao)) },
     { label: 'Municipio de ocorrencia', value: fallbackValue(comunicacao.tipo_municipio?.descricao) },
     { label: 'Municipio de residencia', value: fallbackValue(comunicacao.tipo_municipio_residencia?.descricao) },
     { label: 'Digitador', value: fallbackValue(comunicacao.digitador) },
@@ -417,8 +421,8 @@ const buildDetalhadoWordDocument = (comunicacao: ComunicacaoDae): WordDocument =
     { label: 'Nome do paciente', value: fallbackValue(comunicacao.nome_paciente) },
     { label: 'Tipo de origem', value: fallbackValue(comunicacao.origem_tipo) },
     { label: 'Codigo da origem', value: fallbackValue(comunicacao.origem_id) },
-    { label: 'DAE', value: fallbackValue(comunicacao.dae?.nome) },
-    { label: 'Codigo DAE', value: fallbackValue(comunicacao.dae?.codigo) },
+    { label: 'DAE', value: fallbackValue(formatComunicacaoDaeAgravoNomes(comunicacao)) },
+    { label: 'Codigo DAE', value: fallbackValue(formatComunicacaoDaeAgravoCodigos(comunicacao)) },
     { label: 'Municipio de ocorrencia', value: fallbackValue(comunicacao.tipo_municipio?.descricao) },
     { label: 'Municipio de residencia', value: fallbackValue(comunicacao.tipo_municipio_residencia?.descricao) },
     { label: 'Digitador', value: fallbackValue(comunicacao.digitador) },
