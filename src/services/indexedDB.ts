@@ -1416,6 +1416,39 @@ export class IndexedDBService {
     console.log('🗑️ Cache de pacientes limpo');
   }
 
+  /**
+   * Limpa só stores re-fetcháveis (catálogos / cache de API local).
+   * NÃO mexe em notificações, comunicações DAE, anexos pendentes, pacientes/estabelecimentos em fila offline.
+   * Usar após nova versão do app (PWA) para evitar dados de formulário antigos em opções em cache.
+   */
+  async clearRefetchableCachesOnly(): Promise<void> {
+    const storeNames = [
+      'opcoes',
+      'pacientes_cache',
+      'cpfs_cache',
+      'estabelecimentos_cache',
+    ] as const;
+
+    try {
+      await this.init();
+    } catch {
+      console.warn('[IndexedDB] init falhou; skip clearRefetchableCachesOnly');
+      return;
+    }
+
+    for (const name of storeNames) {
+      try {
+        if (!this.db!.objectStoreNames.contains(name)) continue;
+        const tx = this.db!.transaction(name, 'readwrite');
+        await tx.store.clear();
+        await tx.done;
+        console.log(`🗑️ [app-update] Store "${name}" limpo (cache refetchável)`);
+      } catch (err) {
+        console.warn(`[app-update] Falha ao limpar store "${name}":`, err);
+      }
+    }
+  }
+
   // ✅ NOVO: Limpar notificações pendentes duplicadas (manter apenas a mais recente de cada grupo)
   async cleanDuplicatePendingNotifications(): Promise<{ removed: number; kept: number }> {
     await this.init();

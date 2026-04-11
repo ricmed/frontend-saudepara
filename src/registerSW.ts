@@ -2,6 +2,15 @@ import { registerSW } from 'virtual:pwa-register';
 import { toast } from 'react-toastify';
 import React from 'react';
 
+async function clearRefetchableIndexedDbBeforeReload(): Promise<void> {
+  try {
+    const { default: indexedDBService } = await import('@/services/indexedDB');
+    await indexedDBService.clearRefetchableCachesOnly();
+  } catch (e) {
+    console.warn('[PWA] Limpeza de caches refetcháveis antes do reload:', e);
+  }
+}
+
 export function registerServiceWorker() {
   // Verificar se o browser suporta Service Worker
   if (!('serviceWorker' in navigator)) {
@@ -29,8 +38,11 @@ export function registerServiceWorker() {
           React.createElement('div', { className: 'flex space-x-2 pt-2' },
             React.createElement('button', {
               onClick: () => {
-                updateSW(true);
-                toast.dismiss(toastId);
+                void (async () => {
+                  await clearRefetchableIndexedDbBeforeReload();
+                  await updateSW(true);
+                  toast.dismiss(toastId);
+                })();
               },
               className: 'flex-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700'
             }, 'Atualizar'),
