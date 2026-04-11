@@ -2,6 +2,8 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import "./index.css";
 import App from "../App.tsx";
 import { registerServiceWorker } from "./registerSW";
@@ -24,6 +26,17 @@ function AppWithNotifications() {
         delay={retryState.delay}
       />
       <ReactQueryDevtools initialIsOpen={false} />
+      <ToastContainer
+        position="bottom-center"
+        autoClose={5000}
+        limit={6}
+        newestOnTop
+        closeOnClick
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </>
   );
 }
