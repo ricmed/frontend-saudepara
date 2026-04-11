@@ -1,15 +1,7 @@
 import { registerSW } from 'virtual:pwa-register';
 import { toast } from 'react-toastify';
 import React from 'react';
-
-async function clearRefetchableIndexedDbBeforeReload(): Promise<void> {
-  try {
-    const { default: indexedDBService } = await import('@/services/indexedDB');
-    await indexedDBService.clearRefetchableCachesOnly();
-  } catch (e) {
-    console.warn('[PWA] Limpeza de caches refetcháveis antes do reload:', e);
-  }
-}
+import { clearRefetchableClientCaches } from '@/services/appBuildCachePolicy';
 
 export function registerServiceWorker() {
   // Verificar se o browser suporta Service Worker
@@ -39,7 +31,7 @@ export function registerServiceWorker() {
             React.createElement('button', {
               onClick: () => {
                 void (async () => {
-                  await clearRefetchableIndexedDbBeforeReload();
+                  await clearRefetchableClientCaches();
                   await updateSW(true);
                   toast.dismiss(toastId);
                 })();
