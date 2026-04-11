@@ -1,10 +1,19 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { readFileSync } from 'fs';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  const pkgJson = JSON.parse(
+    readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf-8'),
+  ) as { version: string };
+  const viteAppBuildId =
+    env.VITE_APP_BUILD_ID ||
+    (mode === 'development'
+      ? `${pkgJson.version}-dev`
+      : `${pkgJson.version}-${mode}-${Date.now()}`);
   const isHomologacao = env.VITE_ENV === 'homologacao';
   const isProducao = env.VITE_ENV === 'producao';
   const API_AUTH_URL = isHomologacao
@@ -401,7 +410,8 @@ export default defineConfig(({ mode }) => {
   
   define: {
     __OFFLINE_DEBUG__: process.env.NODE_ENV === 'development',
-    __PWA_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0')
-  }
+    __PWA_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),
+    'import.meta.env.VITE_APP_BUILD_ID': JSON.stringify(viteAppBuildId),
+  },
   };
 });

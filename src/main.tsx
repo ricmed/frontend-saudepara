@@ -5,6 +5,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import "./index.css";
 import App from "../App.tsx";
 import { registerServiceWorker } from "./registerSW";
+import { runIndexedDbCachePolicyIfNewBuild } from "./services/appBuildCachePolicy";
 import { AuthProvider } from './keycloak/AuthProvider';
 import { RetryNotification } from './components/RetryNotification';
 import { useRetryNotification } from './hooks/useRetryNotification';
@@ -47,5 +48,5 @@ createRoot(document.getElementById("root")!).render(
   </AuthProvider>
 );
 
-// Registra o service worker
+void runIndexedDbCachePolicyIfNewBuild();
 registerServiceWorker();

@@ -4,6 +4,8 @@
 interface ImportMetaEnv {
   readonly VITE_OPENAI_API_KEY: string
   readonly VITE_GOOGLE_MAPS_API_KEY: string
+  /** Identificador do build (CI pode sobrescrever via VITE_APP_BUILD_ID). */
+  readonly VITE_APP_BUILD_ID: string
   // mais variáveis de ambiente...
 }
 
