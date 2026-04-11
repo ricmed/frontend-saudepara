@@ -8,6 +8,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { usuarioGestaoService } from '@/services/UsuarioGestaoService';
 import LocationInput from '@/features/notificationForms/components/LocationInput';
 
+/** idtipo_pais de Brasil em `tipo_pais` (mesmo valor usado em notificacaoService). */
+const TIPO_PAIS_BRASIL_ID = '105';
+
 /** Sigla (2 letras) -> código IBGE do estado (string). ViaCEP retorna uf "PA"; backend pode retornar sigla "15". */
 const UF_SIGLA_TO_IBGE: Record<string, string> = {
   AC: '12', AL: '27', AP: '16', AM: '13', BA: '29', CE: '23', DF: '53', ES: '32', GO: '52',
@@ -96,6 +99,12 @@ export const EstadoMunicipioResidencia: React.FC<EstadoMunicipioResidenciaProps>
       setValue('residencia.estado_id', estado.id);
     }
   }, [uf, estados, getValue, setValue]);
+
+  // UF brasileira implica país de residência Brasil (lista de estados = UFs do Brasil)
+  useEffect(() => {
+    if (estadoId == null || estadoId === '') return;
+    setValue('residencia.pais', TIPO_PAIS_BRASIL_ID);
+  }, [estadoId, setValue]);
 
   useEffect(() => {
     if (!municipioIbge || !estadoValue) return;

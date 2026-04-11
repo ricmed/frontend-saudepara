@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import type { FormField } from '@/services/FormService';
 import CodeListService, { type CodeListItem } from '@/services/CodeListService';
@@ -24,6 +25,69 @@ function normalizeMaiusculoSemAcento(s: string): string {
     .toUpperCase();
 }
 
+function normalizeSearchHaystack(s: string): string {
+  return String(s)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+type SelectOptionSearchable = { value: string; label: string; searchHaystack: string };
+
+/** Exibe código numérico sem zeros à esquerda (001 → 1); outros formatos mantém como no cadastro. */
+function displayCodigoPais(codRaw: string): string {
+  const t = codRaw.trim().replace(/\s/g, '');
+  if (/^\d+$/.test(t)) return String(parseInt(t, 10));
+  return codRaw.trim();
+}
+
+/**
+ * País: lista "código - nome" (ex.: 1 - Brasil). Busca por código (com ou sem zeros à esquerda) e nome — não pelo id interno.
+ */
+function mapTipoPaisToOption(item: {
+  idtipo_pais: number | string;
+  descricao: string;
+  codigo_pais?: string | null;
+  codigo_iso?: string | null;
+}): SelectOptionSearchable {
+  const id = String(item.idtipo_pais);
+  const desc = String(item.descricao ?? '').trim();
+  const codRaw = item.codigo_pais != null ? String(item.codigo_pais).trim() : '';
+  const codNorm = codRaw.replace(/\s/g, '');
+  const codShown = codRaw ? displayCodigoPais(codRaw) : '';
+  const label = codShown && desc ? `${codShown} - ${desc}` : desc || id;
+  const codSemZeros =
+    codNorm && /^\d+$/.test(codNorm) ? (codNorm.replace(/^0+/, '') || '0') : '';
+  const searchHaystack = normalizeSearchHaystack(
+    [codRaw, codNorm, codSemZeros, codShown, desc].filter(Boolean).join(' ')
+  );
+  return { value: id, label, searchHaystack };
+}
+
+function mapApiItemToSearchableOption(item: any): SelectOptionSearchable {
+  if (item.value != null && item.label != null) {
+    const value = String(item.value);
+    const label = String(item.label);
+    return {
+      value,
+      label,
+      searchHaystack: normalizeSearchHaystack(`${label} ${value}`),
+    };
+  }
+  if (item.idtipo_pais != null && item.descricao != null) {
+    return mapTipoPaisToOption(item);
+  }
+  const value = String(item.id ?? item.value ?? '');
+  const label = String(item.descricao ?? item.nome ?? item.label ?? value);
+  return {
+    value,
+    label,
+    searchHaystack: normalizeSearchHaystack(`${label} ${value}`),
+  };
+}
+
 interface SelectFieldProps {
   field: FormField;
   value: any;
@@ -31,6 +95,42 @@ interface SelectFieldProps {
   error?: string;
   required?: boolean;
   disabled?: boolean;
+}
+
+/** Posiciona menu flutuante em coordenadas da viewport (evita recorte por overflow em cards/seções). */
+function useFixedMenuPlacement(anchorRef: React.RefObject<HTMLElement | null>, visible: boolean) {
+  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
+
+  const sync = useCallback(() => {
+    if (!visible) {
+      setRect(null);
+      return;
+    }
+    const el = anchorRef.current;
+    if (!el) {
+      setRect(null);
+      return;
+    }
+    const r = el.getBoundingClientRect();
+    setRect({ top: r.bottom + 4, left: r.left, width: r.width });
+  }, [visible]);
+
+  useLayoutEffect(() => {
+    sync();
+  }, [sync]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const onMove = () => sync();
+    window.addEventListener('resize', onMove);
+    window.addEventListener('scroll', onMove, true);
+    return () => {
+      window.removeEventListener('resize', onMove);
+      window.removeEventListener('scroll', onMove, true);
+    };
+  }, [visible, sync]);
+
+  return rect;
 }
 
 /** Select que carrega opções de um endpoint (ex: tipo-pais/select). Resposta: array com idtipo_pais e descricao ou value/label. */
@@ -61,13 +161,8 @@ export const ApiSelectField: React.FC<SelectFieldProps> = ({
         if (cancelled) return;
         const list = Array.isArray(data) ? data : [];
         const opts = list.map((item: any) => {
-          if (item.value != null && item.label != null) {
-            return { value: String(item.value), label: String(item.label) };
-          }
-          if (item.idtipo_pais != null && item.descricao != null) {
-            return { value: String(item.idtipo_pais), label: String(item.descricao) };
-          }
-          return { value: String(item.id), label: String(item.descricao ?? item.nome ?? item.label ?? item.id) };
+          const o = mapApiItemToSearchableOption(item);
+          return { value: o.value, label: o.label };
         });
         setOptions(opts);
       } catch (e) {
@@ -113,19 +208,20 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
   required,
   disabled,
 }) => {
-  const [options, setOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [options, setOptions] = useState<SelectOptionSearchable[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const apiEndpoint = (field as FormField & { apiSelectEndpoint?: string }).apiSelectEndpoint;
   const fieldKey = (field as FormField & { key?: string }).key;
-  const isPaisNascimento = fieldKey === 'paciente.pais_nascimento_id';
+  const isTipoPaisSearchList =
+    fieldKey === 'paciente.pais_nascimento_id' || fieldKey === 'residencia.pais';
   const isEtnia = fieldKey === 'paciente.etnia';
-  const useMaiusculoSemAcento = isPaisNascimento || isEtnia;
+  const useMaiusculoSemAcento = isTipoPaisSearchList || isEtnia;
   const inputId = getFieldInputId(field);
 
-  // País de nascimento: carregar como no notification forms (endpoint index com limit alto para todos os países)
-  const fetchUrl = isPaisNascimento
+  // País (nascimento / residência): lista completa via index com limit alto
+  const fetchUrl = isTipoPaisSearchList
     ? `${API_BASE}/tipo-pais?limit=500`
     : apiEndpoint
       ? `${API_BASE}/${apiEndpoint}`
@@ -133,7 +229,13 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
 
   useEffect(() => {
     if (!fetchUrl) {
-      setOptions(field.options || []);
+      setOptions(
+        (field.options || []).map((o: { value: string; label: string }) => ({
+          value: String(o.value),
+          label: String(o.label),
+          searchHaystack: normalizeSearchHaystack(`${o.label} ${o.value}`),
+        }))
+      );
       setLoading(false);
       return;
     }
@@ -147,16 +249,7 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
           : (data?.data && Array.isArray(data.data))
             ? data.data
             : [];
-        const opts = list.map((item: any) => {
-          if (item.value != null && item.label != null) {
-            return { value: String(item.value), label: String(item.label) };
-          }
-          if (item.idtipo_pais != null && item.descricao != null) {
-            return { value: String(item.idtipo_pais), label: String(item.descricao) };
-          }
-          return { value: String(item.id), label: String(item.descricao ?? item.nome ?? item.label ?? item.id) };
-        });
-        setOptions(opts);
+        setOptions(list.map((item: any) => mapApiItemToSearchableOption(item)));
       } catch (e) {
         if (!cancelled) setOptions([]);
       } finally {
@@ -166,14 +259,53 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
     return () => { cancelled = true; };
   }, [fetchUrl]);
 
-  const normalizedSearch = (searchTerm || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const normalizedSearch = normalizeSearchHaystack(searchTerm || '');
   const filteredOptions = options.filter(
-    (opt) => !normalizedSearch || opt.label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(normalizedSearch)
+    (opt) => !normalizedSearch || opt.searchHaystack.includes(normalizedSearch)
   );
-  const selectedLabel = value ? options.find((o) => o.value === value)?.label : '';
+  const selectedLabel = value ? options.find((o) => o.value === String(value))?.label : '';
+  const legacyTextValue =
+    value != null &&
+    String(value).trim() !== '' &&
+    !loading &&
+    options.length > 0 &&
+    !options.some((o) => o.value === String(value)) &&
+    !/^\d+$/.test(String(value).trim())
+      ? String(value).trim()
+      : '';
   const displayValue = showDropdown
     ? searchTerm
-    : (loading && value ? 'Carregando...' : (useMaiusculoSemAcento && selectedLabel ? normalizeMaiusculoSemAcento(selectedLabel) : selectedLabel));
+    : loading && value
+      ? 'Carregando...'
+      : legacyTextValue
+        ? useMaiusculoSemAcento
+          ? normalizeMaiusculoSemAcento(legacyTextValue)
+          : legacyTextValue
+        : useMaiusculoSemAcento && selectedLabel
+          ? normalizeMaiusculoSemAcento(selectedLabel)
+          : selectedLabel;
+
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const menuOpen = showDropdown && filteredOptions.length > 0;
+  const menuRect = useFixedMenuPlacement(anchorRef, menuOpen);
+
+  const dropdownList = (
+    <>
+      {filteredOptions.map((opt) => (
+        <div
+          key={opt.value}
+          onMouseDown={() => {
+            onChange(opt.value);
+            setSearchTerm('');
+            setShowDropdown(false);
+          }}
+          className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+        >
+          {useMaiusculoSemAcento ? normalizeMaiusculoSemAcento(opt.label) : opt.label}
+        </div>
+      ))}
+    </>
+  );
 
   return (
     <div className="mb-4">
@@ -181,7 +313,7 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
         {field.label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
-      <div className="relative">
+      <div className="relative" ref={anchorRef}>
         <input
           id={inputId}
           type="text"
@@ -194,28 +326,28 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
           onFocus={() => setShowDropdown(true)}
           onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
           disabled={disabled || field.disabled || loading}
-          placeholder={loading ? 'Carregando...' : 'Digite para buscar ou selecione...'}
+          placeholder={
+            loading
+              ? 'Carregando...'
+              : isTipoPaisSearchList
+                ? 'Código ou nome do país...'
+                : 'Digite para buscar ou selecione...'
+          }
           className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
             error ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
           } ${disabled || field.disabled || loading ? 'bg-gray-100' : ''}`}
         />
-        {showDropdown && filteredOptions.length > 0 && (
-          <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-            {filteredOptions.map((opt) => (
-              <div
-                key={opt.value}
-                onMouseDown={() => {
-                  onChange(opt.value);
-                  setSearchTerm('');
-                  setShowDropdown(false);
-                }}
-                className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
-              >
-                {useMaiusculoSemAcento ? normalizeMaiusculoSemAcento(opt.label) : opt.label}
-              </div>
-            ))}
-          </div>
-        )}
+        {menuOpen &&
+          menuRect &&
+          createPortal(
+            <div
+              className="fixed z-[10000] bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto min-w-[min(100vw-1rem,28rem)]"
+              style={{ top: menuRect.top, left: menuRect.left, width: Math.max(menuRect.width, 280) }}
+            >
+              {dropdownList}
+            </div>,
+            document.body
+          )}
       </div>
       {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
     </div>
