@@ -342,6 +342,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       'paciente.povo_tradicional': { type: 'select', options: [{ value: '1', label: 'SIM' }, { value: '2', label: 'NAO' }, { value: '9', label: 'IGNORADO' }] },
       'paciente.passaporte': { type: 'passaporte' },
       'paciente.pais_nascimento_id': { type: 'select', apiSelectEndpoint: 'tipo-pais/select' },
+      'residencia.pais': { type: 'select', apiSelectEndpoint: 'tipo-pais/select' },
       'paciente.data_nascimento': { type: 'date' },
       'paciente.idade': { type: 'idade' },
       'paciente.nome_mae': { type: 'text', maxLength: 100 },
@@ -582,7 +583,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           if (resolved.key === 'paciente.atividade_cnae') {
             return <CnaeSearchField {...commonProps} />;
           }
-          if (resolved.key === 'paciente.pais_nascimento_id') {
+          if (resolved.key === 'paciente.pais_nascimento_id' || resolved.key === 'residencia.pais') {
             return <ApiSelectSearchField {...commonProps} />;
           }
           if (resolved.key === 'paciente.qual_povo_tradicional') {
@@ -753,8 +754,8 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           return (
             <div key={section.id} className="mb-6">
               {/* Card da seção (header azul só no topo, com curva) */}
-              <div className="rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm">
-                <div className="bg-blue-600 px-4 py-3 flex items-center gap-3">
+              <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div className="bg-blue-600 px-4 py-3 flex items-center gap-3 rounded-t-xl">
                   {(section as any).icon && sectionIconMap[(section as any).icon] ? (
                     React.createElement(sectionIconMap[(section as any).icon], {
                       className: 'h-5 w-5 text-white/95 flex-shrink-0',
@@ -766,7 +767,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                     {section.title}
                   </h2>
                 </div>
-                <div className="p-4">
+                <div className="p-4 rounded-b-xl">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {sortedFields.map((field) => {
                   // Bloco único: Estabelecimento de saúde de notificação (UF, Município, Estabelecimento). Data da notificação fica em Dados do paciente.

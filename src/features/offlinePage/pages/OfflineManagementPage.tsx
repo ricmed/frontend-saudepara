@@ -26,6 +26,7 @@ import { offlineDataManager } from '@/services/offlineDataManager';
 import syncService from '@/services/syncService';
 import PacienteService from '@/services/PacienteService';
 import indexedDBService from '@/services/indexedDB';
+import { clearWorkboxRuntimeCaches } from '@/services/appBuildCachePolicy';
 import { offlineAuthService } from '@/services/offlineAuthService';
 import SetupPinModal from '@/features/auth/components/SetupPinModal';
 
@@ -283,6 +284,29 @@ const OfflineManagementPage: React.FC = () => {
       } catch (error) {
         toast.error('Erro ao limpar dados');
       }
+    }
+  };
+
+  /**
+   * Apaga o IndexedDB pelo próprio app (deleteDatabase + recria vazio).
+   * Útil quando o navegador (ex.: Opera GX) não libera o armazenamento em "Limpar dados do site".
+   */
+  const handleWipeIndexedDbAndReload = async () => {
+    const msg =
+      'Isso apaga TODO o banco local (notificações e DAE pendentes, caches, pacientes/estabelecimentos offline, etc.). ' +
+      'Sincronize antes se houver pendências.\n\n' +
+      'Use se "Limpar dados do site" não zerou o IndexedDB.\n\nContinuar?';
+    if (!window.confirm(msg)) return;
+    try {
+      await indexedDBService.resetDatabase();
+      await clearWorkboxRuntimeCaches();
+      toast.success('Banco local recriado. Recarregando…');
+      setTimeout(() => window.location.reload(), 600);
+    } catch (error) {
+      console.error('Erro ao recriar IndexedDB:', error);
+      toast.error(
+        'Não foi possível apagar o banco. Feche todas as abas deste site e tente de novo.'
+      );
     }
   };
 
@@ -789,7 +813,22 @@ const OfflineManagementPage: React.FC = () => {
                   <Trash2 className="h-5 w-5" />
                   Limpar Dados
                 </button>
+
+                <button
+                  type="button"
+                  onClick={handleWipeIndexedDbAndReload}
+                  disabled={isDownloading}
+                  title="Quando o navegador não libera o IndexedDB (ex.: Opera GX)"
+                  className="flex items-center gap-2 px-6 py-3 border-2 border-red-300 text-red-800 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Database className="h-5 w-5" />
+                  Recriar banco local
+                </button>
               </div>
+              <p className="mt-3 text-sm text-gray-500">
+                Se o armazenamento IndexedDB não sumir ao limpar dados do site, use{' '}
+                <strong>Recriar banco local</strong> com todas as abas do sistema fechadas, exceto esta.
+              </p>
             </div>
           </div>
         )}
@@ -1268,6 +1307,22 @@ const OfflineManagementPage: React.FC = () => {
                   </span>
                 )}
               </p>
+
+              <div className="mb-6 p-4 rounded-xl border border-amber-200 bg-amber-50 text-sm text-amber-950">
+                <p className="font-medium mb-1">IndexedDB não limpa no Opera GX?</p>
+                <p className="text-amber-900/90 mb-3">
+                  Feche outras abas do app, use o botão abaixo ou, no DevTools (F12) → Aplicativo → Armazenamento → Limpar dados do site.
+                  Se ainda aparecer ~2 MB, desinstale o atalho PWA (se existir) e, em Configurações → Privacidade, remova dados armazenados só para o domínio do sistema.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleWipeIndexedDbAndReload}
+                  className="flex items-center gap-2 px-4 py-2 bg-amber-800 text-white rounded-lg hover:bg-amber-900 text-sm transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Apagar banco local e recarregar
+                </button>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-orange-50 p-6 rounded-xl border border-orange-200">
