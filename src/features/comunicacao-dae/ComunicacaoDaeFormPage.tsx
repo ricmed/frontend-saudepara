@@ -92,7 +92,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
     id_municipio_residencia: 0,
     origem_tipo: 'CRS' as OrigemTipo,
     origem_id: 0,
-    id_dae: 0,
+    id_daes: [],
   });
 
   // Dados adicionais para exibição
@@ -142,7 +142,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
         id_municipio_residencia: 0,
         origem_tipo: shouldPreserveLockedOrigem ? formData.origem_tipo : defaultOrigemTipo,
         origem_id: shouldPreserveLockedOrigem ? formData.origem_id : 0,
-        id_dae: 0,
+        id_daes: [],
       });
       setUfOcorrencia('15'); // Resetar para Pará
       setMunicipioOcorrencia('');
@@ -341,6 +341,9 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       
       const dataConvertida = convertUTCToLocalDateTime(data.data_comunicacao);
       
+      const agravoIds =
+        data.id_daes?.length ? [...new Set(data.id_daes)] : data.id_dae ? [data.id_dae] : [];
+
       setFormData({
         data_comunicacao: dataConvertida,
         nome_paciente: normalizeText(data.nome_paciente),
@@ -351,7 +354,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
         id_municipio_residencia: data.id_municipio_residencia || 0,
         origem_tipo: data.origem_tipo,
         origem_id: data.origem_id,
-        id_dae: data.id_dae,
+        id_daes: agravoIds,
       });
 
       const carregarUfEMunicipio = async (
@@ -443,10 +446,17 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       setError('Origem da comunicação é obrigatória');
       return;
     }
-    if (!formData.id_dae) {
-      setError('DAE é obrigatório');
+    const agravoIds = [...new Set(formData.id_daes || [])].filter((x) => x > 0);
+    if (agravoIds.length === 0) {
+      setError('Selecione ao menos um agravo (DAE)');
       return;
     }
+
+    const formPayload: CreateComunicacaoDaeData = {
+      ...formData,
+      id_daes: agravoIds,
+      id_dae: agravoIds[0],
+    };
 
     try {
       setLoading(true);
@@ -459,7 +469,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       if (isEditMode && id) {
         // Atualizar comunicação existente
         console.log('🔄 Atualizando comunicação existente...');
-        const formDataWithId = { ...formData, id: Number(id), id_comunicacao: Number(id) };
+        const formDataWithId = { ...formPayload, id: Number(id), id_comunicacao: Number(id) };
         const result = await syncService.saveComunicacaoDae(formDataWithId, true);
         console.log('✅ Comunicação atualizada!');
         
@@ -480,7 +490,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       } else {
         // Criar nova comunicação
         console.log('➕ Criando nova comunicação...');
-        const result = await syncService.saveComunicacaoDae(formData, false);
+        const result = await syncService.saveComunicacaoDae(formPayload, false);
         console.log('✅ Comunicação criada!');
         
         // Salvar anexos se houver
@@ -701,7 +711,22 @@ const ComunicacaoDaeFormPage: React.FC = () => {
 
   const buildExportData = async (): Promise<ComunicacaoDaeFormExportData> => {
     const origemSelecionada = getOrigemSelecionada();
-    const daeSelecionado = daes.find((item) => item.id_dae === Number(formData.id_dae));
+    const agravoIds = formData.id_daes?.length
+      ? formData.id_daes
+      : formData.id_dae
+        ? [formData.id_dae]
+        : [];
+    const daeNomesList = agravoIds
+      .map((i) => daes.find((item) => item.id_dae === Number(i))?.nome)
+      .filter(Boolean) as string[];
+    const daeNomeJoined =
+      daeNomesList.join(', ') ||
+      comunicacaoCompleta?.daes?.map((d) => d.nome).join(', ') ||
+      comunicacaoCompleta?.dae?.nome ||
+      '-';
+    const primeiroDae = daes.find((item) => item.id_dae === Number(agravoIds[0]));
+    const daeCodigo =
+      primeiroDae?.codigo || comunicacaoCompleta?.daes?.[0]?.codigo || comunicacaoCompleta?.dae?.codigo || '-';
 
     const [municipioOcorrenciaNome, municipioResidenciaNome] = await Promise.all([
       resolveMunicipioNome(formData.id_municipio_ocorrencia, comunicacaoCompleta?.tipo_municipio?.descricao),
@@ -736,8 +761,8 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       nomePaciente: formData.nome_paciente || comunicacaoCompleta?.nome_paciente,
       origemTipo: formData.origem_tipo || comunicacaoCompleta?.origem_tipo,
       origemNome: origemSelecionada?.nome || origemPreSelecionadaNome || '-',
-      daeNome: daeSelecionado?.nome || comunicacaoCompleta?.dae?.nome || '-',
-      daeCodigo: daeSelecionado?.codigo || comunicacaoCompleta?.dae?.codigo || '-',
+      daeNome: daeNomeJoined,
+      daeCodigo,
       municipioOcorrencia: municipioOcorrenciaNome,
       municipioResidencia: municipioResidenciaNome,
       digitador: formData.digitador || comunicacaoCompleta?.digitador || '-',
@@ -1233,12 +1258,13 @@ const ComunicacaoDaeFormPage: React.FC = () => {
               <div className="md:col-span-2">
                 <DaeCheckboxList
                   daes={daes}
-                  selectedDaeId={formData.id_dae}
-                  onChange={(daeId) => {
-                    setFormData({ ...formData, id_dae: daeId });
-                    setError(null); // Limpar erro ao selecionar
+                  selectedDaeIds={formData.id_daes || []}
+                  pinSelectedToTop={isEditMode}
+                  onChange={(daeIds) => {
+                    setFormData({ ...formData, id_daes: daeIds });
+                    setError(null);
                   }}
-                  error={error && !formData.id_dae ? 'Selecione um DAE' : undefined}
+                  error={error && !(formData.id_daes?.length ?? 0) ? 'Selecione ao menos um agravo (DAE)' : undefined}
                 />
               </div>
 
@@ -1255,12 +1281,12 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                   className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-all hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none resize-none"
                   rows={5}
                   placeholder="DESCREVA DETALHADAMENTE: SINTOMAS, EVOLUCAO DO CASO, MEDIDAS TOMADAS, CONTEXTO EPIDEMIOLOGICO, ETC."
-                  maxLength={1500}
+                  maxLength={4000}
                 />
                 <div className="mt-1.5 flex justify-between items-center">
                   <p className="text-xs text-gray-500">Informações complementares (será convertido para MAIÚSCULAS sem acentos)</p>
-                  <p className={`text-xs font-medium ${(formData.observacao_descricao?.length || 0) > 1200 ? 'text-orange-600' : 'text-gray-500'}`}>
-                    {formData.observacao_descricao?.length || 0}/1500
+                  <p className={`text-xs font-medium ${(formData.observacao_descricao?.length || 0) > 3400 ? 'text-orange-600' : 'text-gray-500'}`}>
+                    {formData.observacao_descricao?.length || 0}/4000
                   </p>
                 </div>
               </div>
@@ -1424,7 +1450,8 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                   </div>
                   
                   <p className="text-xs text-blue-700 mt-2">
-                    💡 Máximo de 10 arquivos, tamanho total até 10MB
+                    💡 É possível anexar várias fichas de notificação (ex.: 3 ou mais), além de relatórios. Máximo de 10
+                    arquivos no total, somando até 10MB
                   </p>
                 </div>
 

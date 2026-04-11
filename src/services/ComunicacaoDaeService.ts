@@ -29,6 +29,9 @@ export interface ComunicacaoDae {
   origem_tipo: OrigemTipo;
   origem_id: number;
   id_dae: number;
+  /** Todos os agravos vinculados (quando a API retorna múltiplos). */
+  id_daes?: number[];
+  daes?: { id_dae: number; nome: string; codigo?: string }[];
   created_at: string;
   updated_at: string;
   dae?: {
@@ -78,7 +81,10 @@ export interface CreateComunicacaoDaeData {
   id_municipio_residencia: number;
   origem_tipo: OrigemTipo;
   origem_id: number;
-  id_dae: number;
+  /** Primeiro agravo — preenchido automaticamente a partir de `id_daes` quando usado. */
+  id_dae?: number;
+  /** Um ou mais agravos (DAE). */
+  id_daes?: number[];
 }
 
 export interface UpdateComunicacaoDaeData {
@@ -92,6 +98,7 @@ export interface UpdateComunicacaoDaeData {
   origem_tipo?: OrigemTipo;
   origem_id?: number;
   id_dae?: number;
+  id_daes?: number[];
 }
 
 class ComunicacaoDaeService {

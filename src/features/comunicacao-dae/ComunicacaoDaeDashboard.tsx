@@ -43,6 +43,10 @@ import ChartExportMenu from '@/components/common/ChartExportMenu';
 import DashboardExportMenu from '@/components/common/DashboardExportMenu';
 import MapaDashboardDAE, { LocalizacaoMapa, LocalizacaoTipo } from '@/features/dashboard/components/MapaDashboardDAE';
 import { MapProviderProvider } from '@/features/maps/leaflet/contexts/MapProviderContext';
+import {
+  getComunicacaoDaeAgravoIds,
+  matchesDaeDashboardFilter,
+} from '@/features/comunicacao-dae/comunicacaoDaeAgravoUtils';
 
 interface ChartDataItem {
   name: string;
@@ -465,7 +469,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
       filtered = filtered.filter(c => matchesFilter(c.origem_id, activeFilters.origem_id));
     }
     if (activeFilters.dae_id) {
-      filtered = filtered.filter(c => matchesFilter(c.id_dae, activeFilters.dae_id));
+      filtered = filtered.filter((c) => matchesDaeDashboardFilter(c, activeFilters.dae_id));
     }
     if (activeFilters.municipio_id) {
       filtered = filtered.filter(c => matchesFilter(c.id_municipio_ocorrencia, activeFilters.municipio_id));
@@ -551,7 +555,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
       ? comunicacoesFiltradas.filter(c => 
           (!activeFilters.origem_tipo || c.origem_tipo === activeFilters.origem_tipo) &&
           (!activeFilters.origem_id || c.origem_id === activeFilters.origem_id) &&
-          (!activeFilters.dae_id || c.id_dae === activeFilters.dae_id) &&
+          matchesDaeDashboardFilter(c, activeFilters.dae_id) &&
           (!activeFilters.municipio_residencia_id || c.id_municipio_residencia === activeFilters.municipio_residencia_id)
         )
       : dadosFiltrados;
@@ -576,7 +580,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
       ? comunicacoesFiltradas.filter(c =>
           (!activeFilters.origem_tipo || c.origem_tipo === activeFilters.origem_tipo) &&
           (!activeFilters.origem_id || c.origem_id === activeFilters.origem_id) &&
-          (!activeFilters.dae_id || c.id_dae === activeFilters.dae_id) &&
+          matchesDaeDashboardFilter(c, activeFilters.dae_id) &&
           (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id)
         )
       : dadosFiltrados;
@@ -607,12 +611,18 @@ const ComunicacaoDaeDashboard: React.FC = () => {
       : dadosFiltrados;
 
     const counts = excludingDae.reduce((acc, com) => {
-      const dae = com.dae?.nome || 'Não informado';
-      const id = com.id_dae;
-      if (!acc[dae]) {
-        acc[dae] = { name: dae, value: 0, id };
+      const ids = getComunicacaoDaeAgravoIds(com);
+      for (const agravoId of ids) {
+        const nome =
+          com.daes?.find((d) => d.id_dae === agravoId)?.nome ||
+          (agravoId === com.id_dae ? com.dae?.nome : undefined) ||
+          'Não informado';
+        const key = `dae_${agravoId}`;
+        if (!acc[key]) {
+          acc[key] = { name: nome, value: 0, id: agravoId };
+        }
+        acc[key].value++;
       }
-      acc[dae].value++;
       return acc;
     }, {} as Record<string, ChartDataItem>);
 
@@ -660,7 +670,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
     const excludingOrigemId = activeFilters.origem_id
       ? comunicacoesFiltradas.filter(c => 
           c.origem_tipo === 'CRS' &&
-          (!activeFilters.dae_id || c.id_dae === activeFilters.dae_id) &&
+          matchesDaeDashboardFilter(c, activeFilters.dae_id) &&
           (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id) &&
           (!activeFilters.municipio_residencia_id || c.id_municipio_residencia === activeFilters.municipio_residencia_id)
         )
@@ -700,7 +710,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
     const excludingOrigemId = activeFilters.origem_id
       ? comunicacoesFiltradas.filter(c => 
           c.origem_tipo === 'NHE' &&
-          (!activeFilters.dae_id || c.id_dae === activeFilters.dae_id) &&
+          matchesDaeDashboardFilter(c, activeFilters.dae_id) &&
           (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id) &&
           (!activeFilters.municipio_residencia_id || c.id_municipio_residencia === activeFilters.municipio_residencia_id)
         )
@@ -740,7 +750,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
     const excludingOrigemId = activeFilters.origem_id
       ? comunicacoesFiltradas.filter(c => 
           c.origem_tipo === 'CIEVS' &&
-          (!activeFilters.dae_id || c.id_dae === activeFilters.dae_id) &&
+          matchesDaeDashboardFilter(c, activeFilters.dae_id) &&
           (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id) &&
           (!activeFilters.municipio_residencia_id || c.id_municipio_residencia === activeFilters.municipio_residencia_id)
         )

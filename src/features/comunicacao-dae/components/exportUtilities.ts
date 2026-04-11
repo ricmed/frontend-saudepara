@@ -1,6 +1,10 @@
 import * as XLSX from "xlsx";
 import { ComunicacaoDae } from "@/services/ComunicacaoDaeService";
 import {
+  formatComunicacaoDaeAgravoCodigos,
+  formatComunicacaoDaeAgravoNomes,
+} from "@/features/comunicacao-dae/comunicacaoDaeAgravoUtils";
+import {
   exportarComunicacaoDaeDetalhadaPDF as exportarComunicacaoDaeDetalhadaPDFV2,
   exportarComunicacaoDaeDetalhadaWord as exportarComunicacaoDaeDetalhadaWordV2,
   exportarComunicacoesDaeListaPDF as exportarComunicacoesDaeListaPDFV2,
@@ -79,8 +83,8 @@ export const exportarComunicacoesDaeCSV = (
         formatarData(com.data_comunicacao),
         `"${(com.nome_paciente || '').replace(/"/g, '""')}"`,
         com.origem_tipo,
-        `"${(com.dae?.nome || '-').replace(/"/g, '""')}"`,
-        com.dae?.codigo || '-',
+        `"${formatComunicacaoDaeAgravoNomes(com).replace(/"/g, '""')}"`,
+        `"${formatComunicacaoDaeAgravoCodigos(com).replace(/"/g, '""')}"`,
         `"${(com.tipo_municipio?.descricao || '-').replace(/"/g, '""')}"`,
         `"${(com.observacao_descricao || '-').replace(/"/g, '""')}"`,
         com.comunicacao_dae_anexo?.length || 0,
@@ -143,8 +147,8 @@ export const exportarComunicacoesDaeExcel = (
         formatarData(com.data_comunicacao),
         com.nome_paciente,
         com.origem_tipo,
-        com.dae?.nome || '-',
-        com.dae?.codigo || '-',
+        formatComunicacaoDaeAgravoNomes(com),
+        formatComunicacaoDaeAgravoCodigos(com),
         com.tipo_municipio?.descricao || '-',
         com.observacao_descricao || '-',
         com.comunicacao_dae_anexo?.length || 0,
