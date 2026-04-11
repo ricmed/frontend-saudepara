@@ -1278,7 +1278,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                   id="observacao_descricao"
                   value={formData.observacao_descricao}
                   onChange={(e) => setFormData({ ...formData, observacao_descricao: normalizeText(e.target.value) })}
-                  className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-all hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none resize-none"
+                  className="w-full min-h-[120px] p-3 border border-gray-200 rounded-lg text-sm bg-white transition-all hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none resize-y"
                   rows={5}
                   placeholder="DESCREVA DETALHADAMENTE: SINTOMAS, EVOLUCAO DO CASO, MEDIDAS TOMADAS, CONTEXTO EPIDEMIOLOGICO, ETC."
                   maxLength={4000}
