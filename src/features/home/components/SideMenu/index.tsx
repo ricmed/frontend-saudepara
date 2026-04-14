@@ -119,13 +119,6 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     label: t("menu.dynamic_forms"),
     onClick: () => navigate("/private/formularios"),
     }] : []),
-
-    // Controle de Qualidade de Larvas (Entomologia)
-    ...(permissions.isNotificador ? [{
-      icon: <Bug className="h-6 w-6" />,
-      label: "Controle de Qualidade de Larvas",
-      onClick: () => navigate("/private/entomologia-larvas"),
-    }] : []),
     
     // Menu Dashboard - para notificadores OU usuários com role dashboard (OCULTAR para admin.crs)
     ...(!isAdminCrs() && (permissions.isNotificador || permissions.isDashboard) ? [{

@@ -45,3 +45,6 @@ Thumbs.db
 /test-results/
 /blob-report/
 /playwright/.cache/
+desktop.ini
+**/desktop.ini
+
