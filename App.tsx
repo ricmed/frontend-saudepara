@@ -188,7 +188,7 @@ function App() {
   useEffect(() => {
     if (!isHomologacao) return;
     try {
-      const alreadyAck = window.localStorage.getItem('hml_warning_ack_v1') === '1';
+      const alreadyAck = window.sessionStorage.getItem('hml_warning_ack_v1') === '1';
       if (!alreadyAck) setShowHomologacaoWarning(true);
     } catch {
       setShowHomologacaoWarning(true);
@@ -233,7 +233,7 @@ function App() {
                 className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-800 hover:bg-gray-50"
                 onClick={() => {
                   try {
-                    window.localStorage.setItem('hml_warning_ack_v1', '1');
+                    window.sessionStorage.setItem('hml_warning_ack_v1', '1');
                   } catch {
                     // ignore
                   }
