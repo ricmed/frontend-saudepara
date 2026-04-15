@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/keycloak/AuthProvider';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
+import { useRoles } from './hooks/useAdminApi';
 import { AdminHeader } from './components/AdminHeader';
 import Footer from '@/features/desktop/components/Footer';
 import { SideMenu } from '@/features/home/components/SideMenu';
@@ -176,13 +177,14 @@ interface UserFormData {
   nivelAcesso: 'unidade' | 'municipio' | 'estado';
   estabelecimentoId?: number;
   municipioId?: number;
+  roles: Array<'notificador' | 'comunicacao.dae'>;
 }
 
 const UserFormEstado: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { selectedLanguage } = useLanguage();
-  const { user } = useAuth();
+  useAuth();
   const userPermissions = useUserPermissions();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -191,6 +193,8 @@ const UserFormEstado: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const { listRoles, addUserRoles } = useRoles();
+  const [availableRoleReps, setAvailableRoleReps] = useState<any[]>([]);
   
   // Estados para dados de dropdowns
   const [estabelecimentos, setEstabelecimentos] = useState<Array<{id: number; nome: string; cnes?: string; municipio?: string}>>([]);
@@ -211,12 +215,28 @@ const UserFormEstado: React.FC = () => {
     temporaryPassword: true,
     nivelAcesso: 'estado', // Padrão para estado (pré-selecionado)
     estabelecimentoId: undefined,
-    municipioId: undefined
+    municipioId: undefined,
+    roles: []
   });
 
   // Obter informações do estado do admin logado usando userPermissions
   const adminEstadoId = userPermissions.estadoId;
   const adminEstadoNome = 'Estado do Administrador'; // TODO: buscar nome real do estado
+
+  useEffect(() => {
+    // Carregar representações das roles para poder atribuir via API (/users/:id/roles)
+    (async () => {
+      try {
+        const all = await listRoles();
+        const allow = new Set(['notificador', 'comunicacao.dae']);
+        const reps = (Array.isArray(all) ? all : []).filter((r: any) => allow.has(r?.name));
+        setAvailableRoleReps(reps);
+      } catch (e) {
+        console.warn('⚠️ Não foi possível carregar roles disponíveis', e);
+        setAvailableRoleReps([]);
+      }
+    })();
+  }, [listRoles]);
 
   useEffect(() => {
     if (isEditMode && id) {
@@ -313,7 +333,8 @@ const UserFormEstado: React.FC = () => {
         temporaryPassword: true,
         nivelAcesso: nivelAcesso,
         estabelecimentoId: estabelecimentoId,
-        municipioId: municipioId
+        municipioId: municipioId,
+        roles: [],
       });
 
     } catch (error) {
@@ -594,9 +615,19 @@ const UserFormEstado: React.FC = () => {
           await usuarioGestaoService.createAcessoUnidade(novoUsuarioId, formData.estabelecimentoId);
         }
 
+        // 3. Atribuir roles escolhidas (admin estadual não atribui role automática)
+        if (!formData.roles || formData.roles.length === 0) {
+          throw new Error('Selecione ao menos uma role para o usuário (notificador e/ou comunicacao.dae)');
+        }
+        const repsToAssign = availableRoleReps.filter((r: any) => formData.roles.includes(r?.name));
+        if (repsToAssign.length !== formData.roles.length) {
+          throw new Error('Não foi possível resolver todas as roles selecionadas. Recarregue a página e tente novamente.');
+        }
+        await addUserRoles(novoUsuarioId, repsToAssign);
+
         console.log('✅ Usuário e acesso criados com sucesso');
         setNotification({
-          message: 'Usuário criado com sucesso! Role "notificador" atribuída automaticamente.',
+          message: `Usuário criado com sucesso! Roles atribuídas: ${formData.roles.join(', ')}`,
           type: 'success'
         });
       }
@@ -655,6 +686,17 @@ const UserFormEstado: React.FC = () => {
     }
   };
 
+  const toggleRole = (role: 'notificador' | 'comunicacao.dae') => {
+    setFormData(prev => {
+      const has = prev.roles.includes(role);
+      const next = has ? prev.roles.filter(r => r !== role) : [...prev.roles, role];
+      return { ...prev, roles: next };
+    });
+    if (errors.roles) {
+      setErrors(prev => ({ ...prev, roles: '' }));
+    }
+  };
+
   // Auto-hide notification
   useEffect(() => {
     if (notification) {
@@ -707,7 +749,7 @@ const UserFormEstado: React.FC = () => {
               <p className="text-gray-600">
                 {isEditMode 
                   ? 'Atualize as informações do usuário do seu estado'
-                  : 'Adicione um novo usuário notificador ao seu estado'
+                  : 'Adicione um novo usuário ao seu estado'
                 }
               </p>
             </div>
@@ -741,7 +783,7 @@ const UserFormEstado: React.FC = () => {
                   Criando usuário para: <strong>{adminEstadoNome}</strong>
                 </p>
                 <p className="text-xs text-blue-600 mt-1">
-                  • Role automaticamente definida: <strong>notificador</strong><br/>
+                  • Selecione as roles do usuário abaixo<br/>
                   • Usuário será vinculado ao seu estado automaticamente
                 </p>
               </div>
@@ -750,6 +792,50 @@ const UserFormEstado: React.FC = () => {
 
           {/* Formulário */}
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Roles */}
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <div className="flex items-center mb-4">
+                <MapPin className="h-5 w-5 text-gray-600 mr-2" />
+                <h2 className="text-lg font-semibold text-gray-900">Roles do Usuário</h2>
+              </div>
+
+              <p className="text-sm text-gray-600 mb-4">
+                Selecione uma ou mais roles para este usuário.
+              </p>
+
+              <div className="space-y-3">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.roles.includes('notificador')}
+                    onChange={() => toggleRole('notificador')}
+                    className="mt-1"
+                  />
+                  <div>
+                    <div className="font-medium text-gray-900">notificador</div>
+                    <div className="text-sm text-gray-600">Acesso às notificações e rotinas de notificação.</div>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.roles.includes('comunicacao.dae')}
+                    onChange={() => toggleRole('comunicacao.dae')}
+                    className="mt-1"
+                  />
+                  <div>
+                    <div className="font-medium text-gray-900">comunicacao.dae</div>
+                    <div className="text-sm text-gray-600">Acesso ao módulo de Comunicação DAE.</div>
+                  </div>
+                </label>
+              </div>
+
+              {errors.roles && (
+                <p className="mt-2 text-sm text-red-600">{errors.roles}</p>
+              )}
+            </div>
+
             {/* Informações Básicas */}
             <div className="bg-white rounded-lg shadow-sm border p-6">
               <div className="flex items-center mb-4">
