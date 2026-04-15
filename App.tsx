@@ -123,7 +123,6 @@ import OfflineManagementPage from '@/features/offlinePage/pages/OfflineManagemen
 // Features - Comunicação DAE
 import ComunicacaoDaePage from '@/features/comunicacao-dae/ComunicacaoDaePage';
 import ComunicacaoDaeFormPage from '@/features/comunicacao-dae/ComunicacaoDaeFormPage';
-import ComunicacaoDaeDashboard from '@/features/comunicacao-dae/ComunicacaoDaeDashboard';
 import DaePage from '@/features/comunicacao-dae/DaePage';
 import NhePage from '@/features/comunicacao-dae/NhePage';
 import CievsPage from '@/features/comunicacao-dae/CievsPage';
@@ -140,8 +139,6 @@ import { FormsListPage } from '@/features/dynamic-forms/pages/FormsListPage';
 import { FormBuilderPage } from '@/features/dynamic-forms/pages/FormBuilderPage';
 import { FormAdminListPage } from '@/features/dynamic-forms/pages/FormAdminListPage';
 import { FormSubmissionsListPage } from '@/features/dynamic-forms/pages/FormSubmissionsListPage';
-import { EntomologiaLarvasDashboardPage } from '@/features/dynamic-forms/pages/EntomologiaLarvasDashboardPage';
-import FixedColumnsConfigPage from '@/features/dynamic-forms/pages/FixedColumnsConfigPage';
 // Componente de layout protegido
 const ProtectedLayout = () => {
   return (
@@ -157,6 +154,7 @@ function App() {
     const host = window.location.hostname.toLowerCase();
     const viteEnv = (import.meta as any)?.env?.VITE_ENV as string | undefined;
     const apiServer = (import.meta as any)?.env?.VITE_API_SERVER as string | undefined;
+
     return (
       host.includes('.hml.') ||
       host.includes('app.hml.saude.pa.gov.br') ||
@@ -193,7 +191,6 @@ function App() {
       const alreadyAck = window.localStorage.getItem('hml_warning_ack_v1') === '1';
       if (!alreadyAck) setShowHomologacaoWarning(true);
     } catch {
-      // ignore
       setShowHomologacaoWarning(true);
     }
   }, [isHomologacao]);
@@ -370,7 +367,6 @@ function App() {
               
               {/* ✅ NOVO: Rotas de Formulários Dinâmicos (SINAN/e-SUS style) */}
               <Route path="/private/formularios" element={<FormsListPage />} />
-              <Route path="/private/entomologia-larvas" element={<EntomologiaLarvasDashboardPage />} />
               <Route path="/private/formularios/:agravo" element={<FormSubmissionsListPage />} />
               <Route path="/private/formularios/:agravo/nova" element={<DynamicFormPage />} />
               <Route path="/private/formularios/:agravo/editar/:id" element={<DynamicFormPage />} />
@@ -382,7 +378,6 @@ function App() {
               <Route path="/private/formularios-admin" element={<FormAdminListPage />} />
               <Route path="/private/formularios-admin/novo" element={<FormBuilderPage />} />
               <Route path="/private/formularios-admin/editar/:id" element={<FormBuilderPage />} />
-              <Route path="/private/formularios-admin/:formId/versoes/:versionId/campos-fixos" element={<FixedColumnsConfigPage />} />
             </Route>
             
             {/* ✅ NOVO: Rota de Lista de Pacientes - Protegida apenas para Admin Master */}
@@ -390,17 +385,15 @@ function App() {
               <Route path="/private/pacientes" element={<ListaPacientes />} />
             </Route>
 
-            {/* ✅ Rotas de Comunicação DAE (lista/form/dashboard) */}
-            <Route element={<ProtectedRoute requiredRoles={['comunicacao.dae', 'admin', 'admin.estado', 'admin.crs']}><Outlet /></ProtectedRoute>}>
+            {/* ✅ NOVO: Rotas de Comunicação DAE - Protegidas para Admin e Admin.Estado */}
+            <Route element={<ProtectedRoute requiredRoles={['admin', 'admin.estado']}><Outlet /></ProtectedRoute>}>
+              {/* Listagem e formulário principal */}
               <Route path="/private/comunicacao-dae" element={<ComunicacaoDaePage />} />
-              <Route path="/private/comunicacao-dae/dashboard" element={<ComunicacaoDaeDashboard />} />
               <Route path="/private/comunicacao-dae/nova" element={<ComunicacaoDaeFormPage />} />
               <Route path="/private/comunicacao-dae/:id" element={<ComunicacaoDaeFormPage />} />
               <Route path="/private/comunicacao-dae/editar/:id" element={<ComunicacaoDaeFormPage />} />
-            </Route>
-
-            {/* Gerenciamento de entidades auxiliares da Comunicação DAE */}
-            <Route element={<ProtectedRoute requiredRoles={['admin', 'admin.estado', 'admin.crs']}><Outlet /></ProtectedRoute>}>
+              
+              {/* Gerenciamento de entidades auxiliares */}
               <Route path="/private/apps/comunicacao-dae/dae" element={<DaePage />} />
               <Route path="/private/apps/comunicacao-dae/dae/:id" element={<DaePage />} />
               <Route path="/private/apps/comunicacao-dae/nhe" element={<NhePage />} />
