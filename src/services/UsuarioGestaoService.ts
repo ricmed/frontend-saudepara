@@ -16,6 +16,12 @@ export interface Usuario {
   attributes?: Record<string, string[]>;
 }
 
+export interface UsuarioListItem extends Usuario {
+  roles?: string[];
+  acessos?: UsuarioAcesso[];
+  emailVerified?: boolean;
+}
+
 export interface UsuarioAcesso {
   id: number;
   user_id: string;
@@ -120,20 +126,72 @@ class UsuarioGestaoService {
   /**
    * Listar todos os usuários do Keycloak
    */
-  async getUsuarios(): Promise<Usuario[]> {
+  async getUsuarios(params?: {
+    first?: number;
+    max?: number;
+    search?: string;
+    username?: string;
+    email?: string;
+    exact?: boolean;
+  }): Promise<Usuario[]> {
     try {
-      console.log('🔄 Fazendo requisição para /admin/users...');
-      const response = await this.keycloakApi.get('/admin/users');
-      console.log('📡 Resposta recebida:', {
-        status: response.status,
-        dataLength: Array.isArray(response.data) ? response.data.length : 'não é array',
-        data: response.data
-      });
+      const response = await this.keycloakApi.get('/admin/users', { params });
       return response.data;
     } catch (error: any) {
-      console.error('Erro ao buscar usuários:', error);
       throw new Error(this.getErrorMessage(error, 'Erro ao carregar usuários'));
     }
+  }
+
+  /**
+   * Contagem de usuários (para paginação)
+   */
+  async getUsuariosCount(params?: {
+    search?: string;
+    username?: string;
+    email?: string;
+    exact?: boolean;
+  }): Promise<number> {
+    try {
+      const response = await this.keycloakApi.get('/admin/users/count', { params });
+      // Keycloak costuma retornar { count: number }
+      if (typeof response.data === 'number') return response.data;
+      if (response.data && typeof response.data.count === 'number') return response.data.count;
+      return Number(response.data?.count ?? 0);
+    } catch (error: any) {
+      throw new Error(this.getErrorMessage(error, 'Erro ao contar usuários'));
+    }
+  }
+
+  /**
+   * ✅ NOVO: Listagem agregada (Keycloak + roles + acessos) com paginação e busca server-side
+   */
+  async getUsuariosList(params?: {
+    first?: number;
+    max?: number;
+    search?: string;
+    scope?: 'unidade' | 'municipio' | 'estado';
+    scopeId?: number;
+  }): Promise<{ items: UsuarioListItem[]; total: number; first: number; max: number }> {
+    try {
+      const response = await this.keycloakApi.get('/admin/users/list', { params });
+      return response.data;
+    } catch (error: any) {
+      throw new Error(this.getErrorMessage(error, 'Erro ao carregar usuários'));
+    }
+  }
+
+  // Compatibilidade com telas novas (UserListCrs etc.)
+  // Retorna apenas usuários do Keycloak (sem "acessos").
+  async getUsers(params?: { first?: number; max?: number; search?: string }) {
+    return this.getUsuarios(params);
+  }
+
+  async deleteUser(userId: string): Promise<void> {
+    await this.excluirUsuario(userId);
+  }
+
+  async hardDeleteAllUserAccess(userId: string): Promise<void> {
+    await this.hardDeleteTodosAcessosUsuario(userId);
   }
 
   /**

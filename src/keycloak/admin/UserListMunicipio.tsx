@@ -241,13 +241,27 @@ const UserListMunicipio: React.FC = () => {
       
       console.log('🔑 Permissões do admin carregadas:', userPermissions);
       
-      // 1. Buscar todos os usuários do Keycloak
-      const usersData = await usuarioGestaoService.getUsuarios();
+      // 1. Buscar lista agregada paginada (server-side)
+      const page = await usuarioGestaoService.getUsuariosList({
+        first: pagination.first,
+        max: pagination.max,
+        search: filters.search || undefined,
+        scope: isAdminMunicipio ? 'municipio' : undefined,
+        scopeId: isAdminMunicipio ? userPermissions.municipioId : undefined,
+      });
+      const usersData = page.items as any[];
       console.log('📝 Dados recebidos da API:', usersData);
       
       if (!Array.isArray(usersData)) {
         console.error('❌ Dados inválidos recebidos da API:', usersData);
         throw new Error('Dados inválidos recebidos da API de usuários');
+      }
+
+      // Para admin.municipio (não master): o backend já devolve filtrado com total correto
+      if (isAdminMunicipio && !isAdminMaster) {
+        setUsers(usersData as any);
+        setPagination(prev => ({ ...prev, total: page.total || 0 }));
+        return;
       }
       
       // 2. Para admin master, mostrar todos. Para admin.municipio, filtrar pelo município
