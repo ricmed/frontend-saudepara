@@ -249,7 +249,28 @@ const UserListEstado: React.FC = () => {
 
       // Para admin.estado (não master): o backend já devolve filtrado com total correto
       if (isAdminEstado && !isAdminMaster) {
-        setUsers(usersData as any);
+        const enrichedUsers: UserWithAccess[] = usersData.map((userData: any, index: number) => {
+          const baseUser: UserWithAccess = {
+            id: userData.id || `user-${index}`,
+            username: userData.username || `user-${index}`,
+            firstName: userData.firstName || '',
+            lastName: userData.lastName || '',
+            email: userData.email || '',
+            enabled: userData.enabled !== false,
+            emailVerified: userData.emailVerified === true,
+            createdTimestamp: userData.createdTimestamp || Date.now(),
+            acessos: Array.isArray(userData.acessos) ? userData.acessos : [],
+            roles: Array.isArray(userData.roles) ? userData.roles : [],
+          };
+
+          return {
+            ...baseUser,
+            userLevel: getUserLevel(baseUser),
+            canBeDeleted: canUserBeDeleted(baseUser, 'admin.estado'),
+          };
+        });
+
+        setUsers(enrichedUsers);
         setPagination(prev => ({ ...prev, total: page.total || 0 }));
         return;
       }
@@ -506,9 +527,9 @@ const UserListEstado: React.FC = () => {
     return matchesSearch && matchesEnabled;
   });
 
-  const paginatedUsers = filteredUsers.slice(pagination.first, pagination.first + pagination.max);
+  const paginatedUsers = filteredUsers;
 
-  const totalPages = Math.ceil(filteredUsers.length / pagination.max);
+  const totalPages = Math.max(1, Math.ceil(pagination.total / pagination.max));
   const currentPage = Math.floor(pagination.first / pagination.max) + 1;
 
   return (
@@ -688,11 +709,6 @@ const UserListEstado: React.FC = () => {
                                     Notificador
                                   </span>
                                 )}
-                                {isNotificadorUnidade(user) && user.userLevel !== 'notificador' && (
-                                  <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                    Notificador (legacy)
-                                  </span>
-                                )}
                               </div>
                               <div className="text-sm text-gray-500">
                                 @{user.username}
@@ -789,7 +805,7 @@ const UserListEstado: React.FC = () => {
             </div>
 
             {/* Paginação - igual ao UserListUnidade */}
-            {!loading && filteredUsers.length > 0 && (
+            {!loading && paginatedUsers.length > 0 && (
               <div className="bg-gray-50 px-6 py-3 flex items-center justify-between border-t border-gray-200">
                 <div className="flex-1 flex justify-between sm:hidden">
                   <button
@@ -801,7 +817,7 @@ const UserListEstado: React.FC = () => {
                   </button>
                   <button
                     onClick={() => setPagination(prev => ({ ...prev, first: prev.first + prev.max }))}
-                    disabled={pagination.first + pagination.max >= filteredUsers.length}
+                    disabled={pagination.first + pagination.max >= pagination.total}
                     className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
                   >
                     Próxima
@@ -814,10 +830,10 @@ const UserListEstado: React.FC = () => {
                       <span className="font-medium">{pagination.first + 1}</span>
                       {' '}a{' '}
                       <span className="font-medium">
-                        {Math.min(pagination.first + pagination.max, filteredUsers.length)}
+                        {Math.min(pagination.first + pagination.max, pagination.total)}
                       </span>
                       {' '}de{' '}
-                      <span className="font-medium">{filteredUsers.length}</span>
+                      <span className="font-medium">{pagination.total}</span>
                       {' '}resultados
                     </p>
                   </div>
@@ -835,7 +851,7 @@ const UserListEstado: React.FC = () => {
                       </span>
                       <button
                         onClick={() => setPagination(prev => ({ ...prev, first: prev.first + prev.max }))}
-                        disabled={pagination.first + pagination.max >= filteredUsers.length}
+                        disabled={pagination.first + pagination.max >= pagination.total}
                         className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                       >
                         <ChevronRight className="h-5 w-5" />
