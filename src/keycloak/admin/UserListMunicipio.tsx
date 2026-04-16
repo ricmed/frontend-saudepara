@@ -196,11 +196,20 @@ const UserListMunicipio: React.FC = () => {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    // Aguardar que userPermissions seja carregado antes de carregar usuários
-    if (userPermissions.municipioId !== undefined) {
-      loadUsers();
+    if (userPermissions.loading) return;
+    const isAdminMunicipio = user?.roles?.includes('admin.municipio');
+    const isAdminMaster = user?.roles?.includes('admin');
+    if (isAdminMunicipio && !isAdminMaster) {
+      const id = userPermissions.municipioId;
+      if (id == null || Number(id) <= 0) {
+        setLoading(false);
+        setUsers([]);
+        setPagination((p) => ({ ...p, total: 0 }));
+        return;
+      }
     }
-  }, [pagination.first, pagination.max, userPermissions.municipioId]);
+    loadUsers();
+  }, [pagination.first, pagination.max, userPermissions.municipioId, userPermissions.loading, user?.roles]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -232,15 +241,20 @@ const UserListMunicipio: React.FC = () => {
         return;
       }
 
-      // Para admin.municipio, garantir que as permissões estejam carregadas
-      if (isAdminMunicipio && userPermissions.municipioId === undefined) {
-        console.log('⏳ Aguardando carregamento das permissões do usuário...');
+      if (userPermissions.loading) {
         setLoading(false);
         return;
       }
+      if (isAdminMunicipio && !isAdminMaster) {
+        const id = userPermissions.municipioId;
+        if (id == null || Number(id) <= 0) {
+          setUsers([]);
+          return;
+        }
+      }
 
       const municipioIdNum = Number(userPermissions.municipioId);
-      const hasMunicipioScope = isAdminMunicipio && Number.isFinite(municipioIdNum);
+      const hasMunicipioScope = isAdminMunicipio && Number.isFinite(municipioIdNum) && municipioIdNum > 0;
       
       console.log('🔑 Permissões do admin carregadas:', userPermissions);
       

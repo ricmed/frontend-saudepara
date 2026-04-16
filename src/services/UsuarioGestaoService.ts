@@ -176,7 +176,8 @@ class UsuarioGestaoService {
       const cleaned: typeof params = params ? { ...params } : undefined;
       if (cleaned?.scope) {
         const n = Number(cleaned.scopeId);
-        if (!Number.isFinite(n)) {
+        // null vira 0 em Number(null); IDs válidos começam em 1
+        if (!Number.isFinite(n) || n <= 0) {
           delete cleaned.scope;
           delete cleaned.scopeId;
         } else {
