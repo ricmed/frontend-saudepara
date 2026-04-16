@@ -108,11 +108,20 @@ const UserListUnidade: React.FC = () => {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    // Aguardar que userPermissions seja carregado antes de carregar usuários
-    if (userPermissions.estabelecimentoId !== undefined) {
-      loadUsers();
+    if (userPermissions.loading) return;
+    const isAdminUnidade = user?.roles?.includes('admin.unidade');
+    const isAdminMaster = user?.roles?.includes('admin');
+    if (isAdminUnidade && !isAdminMaster) {
+      const id = userPermissions.estabelecimentoId;
+      if (id == null || Number(id) <= 0) {
+        setLoading(false);
+        setUsers([]);
+        setPagination((p) => ({ ...p, total: 0 }));
+        return;
+      }
     }
-  }, [pagination.first, pagination.max, userPermissions.estabelecimentoId]);
+    loadUsers();
+  }, [pagination.first, pagination.max, userPermissions.estabelecimentoId, userPermissions.loading, user?.roles]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -144,15 +153,20 @@ const UserListUnidade: React.FC = () => {
         return;
       }
 
-      // Para admin.unidade, garantir que as permissões estejam carregadas
-      if (isAdminUnidade && userPermissions.estabelecimentoId === undefined) {
-        console.log('⏳ Aguardando carregamento das permissões do usuário...');
+      if (userPermissions.loading) {
         setLoading(false);
         return;
       }
+      if (isAdminUnidade && !isAdminMaster) {
+        const id = userPermissions.estabelecimentoId;
+        if (id == null || Number(id) <= 0) {
+          setUsers([]);
+          return;
+        }
+      }
 
       const estabelecimentoIdNum = Number(userPermissions.estabelecimentoId);
-      const hasUnidadeScope = isAdminUnidade && Number.isFinite(estabelecimentoIdNum);
+      const hasUnidadeScope = isAdminUnidade && Number.isFinite(estabelecimentoIdNum) && estabelecimentoIdNum > 0;
       
       console.log('🔑 Permissões do admin carregadas:', userPermissions);
       
