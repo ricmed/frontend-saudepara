@@ -228,6 +228,9 @@ const UserListEstado: React.FC = () => {
         setLoading(false);
         return;
       }
+
+      const estadoIdNum = Number(userPermissions.estadoId);
+      const hasEstadoScope = isAdminEstado && Number.isFinite(estadoIdNum);
       
       console.log('🔑 Permissões do admin carregadas:', userPermissions);
       
@@ -236,8 +239,9 @@ const UserListEstado: React.FC = () => {
         first: pagination.first,
         max: pagination.max,
         search: filters.search || undefined,
-        scope: isAdminEstado ? 'estado' : undefined,
-        scopeId: isAdminEstado ? userPermissions.estadoId : undefined,
+        // Importante: nunca enviar scope sem scopeId (isso quebra o filtro e muda o fluxo do backend)
+        scope: hasEstadoScope ? 'estado' : undefined,
+        scopeId: hasEstadoScope ? estadoIdNum : undefined,
       });
       const usersData = page.items as any[];
       console.log('📝 Dados recebidos da API:', usersData);
