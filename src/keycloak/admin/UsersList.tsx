@@ -100,7 +100,6 @@ const UsersList: React.FC = () => {
 
   useEffect(() => {
     loadUsers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagination.first, pagination.max]);
 
   useEffect(() => {
@@ -109,7 +108,6 @@ const UsersList: React.FC = () => {
       loadUsers();
     }, 400);
     return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm]);
 
   const handleUserAction = async (userId: string, action: string) => {
