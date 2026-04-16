@@ -238,6 +238,9 @@ const UserListMunicipio: React.FC = () => {
         setLoading(false);
         return;
       }
+
+      const municipioIdNum = Number(userPermissions.municipioId);
+      const hasMunicipioScope = isAdminMunicipio && Number.isFinite(municipioIdNum);
       
       console.log('🔑 Permissões do admin carregadas:', userPermissions);
       
@@ -246,8 +249,8 @@ const UserListMunicipio: React.FC = () => {
         first: pagination.first,
         max: pagination.max,
         search: filters.search || undefined,
-        scope: isAdminMunicipio ? 'municipio' : undefined,
-        scopeId: isAdminMunicipio ? userPermissions.municipioId : undefined,
+        scope: hasMunicipioScope ? 'municipio' : undefined,
+        scopeId: hasMunicipioScope ? municipioIdNum : undefined,
       });
       const usersData = page.items as any[];
       console.log('📝 Dados recebidos da API:', usersData);

@@ -150,6 +150,9 @@ const UserListUnidade: React.FC = () => {
         setLoading(false);
         return;
       }
+
+      const estabelecimentoIdNum = Number(userPermissions.estabelecimentoId);
+      const hasUnidadeScope = isAdminUnidade && Number.isFinite(estabelecimentoIdNum);
       
       console.log('🔑 Permissões do admin carregadas:', userPermissions);
       
@@ -158,8 +161,8 @@ const UserListUnidade: React.FC = () => {
         first: pagination.first,
         max: pagination.max,
         search: filters.search || undefined,
-        scope: isAdminUnidade ? 'unidade' : undefined,
-        scopeId: isAdminUnidade ? userPermissions.estabelecimentoId : undefined,
+        scope: hasUnidadeScope ? 'unidade' : undefined,
+        scopeId: hasUnidadeScope ? estabelecimentoIdNum : undefined,
       });
       const usersData = page.items as any[];
       console.log('📝 Dados recebidos da API:', usersData);

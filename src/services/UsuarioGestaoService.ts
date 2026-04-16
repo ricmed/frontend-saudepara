@@ -173,7 +173,17 @@ class UsuarioGestaoService {
     scopeId?: number;
   }): Promise<{ items: UsuarioListItem[]; total: number; first: number; max: number }> {
     try {
-      const response = await this.keycloakApi.get('/admin/users/list', { params });
+      const cleaned: typeof params = params ? { ...params } : undefined;
+      if (cleaned?.scope) {
+        const n = Number(cleaned.scopeId);
+        if (!Number.isFinite(n)) {
+          delete cleaned.scope;
+          delete cleaned.scopeId;
+        } else {
+          cleaned.scopeId = n;
+        }
+      }
+      const response = await this.keycloakApi.get('/admin/users/list', { params: cleaned });
       return response.data;
     } catch (error: any) {
       throw new Error(this.getErrorMessage(error, 'Erro ao carregar usuários'));
