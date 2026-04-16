@@ -102,6 +102,12 @@ export interface UpdateComunicacaoDaeData {
 }
 
 class ComunicacaoDaeService {
+  private assertValidId(id: unknown, label: string): asserts id is number {
+    const n = typeof id === 'number' ? id : Number(id);
+    if (!Number.isFinite(n) || n <= 0) {
+      throw new Error(`${label} inválido`);
+    }
+  }
   /**
    * Listar todas as comunicações DAE com filtros e paginação
    */
@@ -121,6 +127,7 @@ class ComunicacaoDaeService {
    * Buscar comunicação DAE por ID
    */
   async getById(id: number): Promise<ComunicacaoDae> {
+    this.assertValidId(id, 'ID da comunicação');
     const response = await axios.get(`${API_URL}/comunicacao-dae/${id}`, {
       withCredentials: true
     });
@@ -141,6 +148,7 @@ class ComunicacaoDaeService {
    * Atualizar comunicação DAE
    */
   async update(id: number, data: UpdateComunicacaoDaeData): Promise<ComunicacaoDae> {
+    this.assertValidId(id, 'ID da comunicação');
     const response = await axios.put(`${API_URL}/comunicacao-dae/${id}`, data, {
       withCredentials: true
     });
@@ -151,6 +159,7 @@ class ComunicacaoDaeService {
    * Deletar comunicação DAE
    */
   async delete(id: number): Promise<void> {
+    this.assertValidId(id, 'ID da comunicação');
     await axios.delete(`${API_URL}/comunicacao-dae/${id}`, {
       withCredentials: true
     });
@@ -160,6 +169,7 @@ class ComunicacaoDaeService {
    * Listar anexos de uma comunicação
    */
   async getAnexos(id_comunicacao: number): Promise<ComunicacaoDaeAnexo[]> {
+    this.assertValidId(id_comunicacao, 'ID da comunicação');
     const response = await axios.get(`${API_URL}/comunicacao-dae/${id_comunicacao}/anexos`, {
       withCredentials: true
     });
@@ -170,6 +180,7 @@ class ComunicacaoDaeService {
    * Adicionar anexo a uma comunicação DAE
    */
   async addAnexo(id_comunicacao: number, file: File, tipo_anexo: TipoAnexo): Promise<ComunicacaoDaeAnexo> {
+    this.assertValidId(id_comunicacao, 'ID da comunicação');
     const formData = new FormData();
     formData.append('file', file);
     formData.append('tipo_anexo', tipo_anexo);

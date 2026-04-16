@@ -122,6 +122,7 @@ import DashboardPageCirio from '@/features/dashboard/DashboardPageCirio'; // �
 import OfflineManagementPage from '@/features/offlinePage/pages/OfflineManagementPage';
 // Features - Comunicação DAE
 import ComunicacaoDaePage from '@/features/comunicacao-dae/ComunicacaoDaePage';
+import ComunicacaoDaeDashboard from '@/features/comunicacao-dae/ComunicacaoDaeDashboard';
 import ComunicacaoDaeFormPage from '@/features/comunicacao-dae/ComunicacaoDaeFormPage';
 import DaePage from '@/features/comunicacao-dae/DaePage';
 import NhePage from '@/features/comunicacao-dae/NhePage';
@@ -389,6 +390,7 @@ function App() {
             <Route element={<ProtectedRoute requiredRoles={['admin', 'admin.estado']}><Outlet /></ProtectedRoute>}>
               {/* Listagem e formulário principal */}
               <Route path="/private/comunicacao-dae" element={<ComunicacaoDaePage />} />
+              <Route path="/private/comunicacao-dae/dashboard" element={<ComunicacaoDaeDashboard />} />
               <Route path="/private/comunicacao-dae/nova" element={<ComunicacaoDaeFormPage />} />
               <Route path="/private/comunicacao-dae/:id" element={<ComunicacaoDaeFormPage />} />
               <Route path="/private/comunicacao-dae/editar/:id" element={<ComunicacaoDaeFormPage />} />

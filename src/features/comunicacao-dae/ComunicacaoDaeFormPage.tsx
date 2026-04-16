@@ -174,7 +174,12 @@ const ComunicacaoDaeFormPage: React.FC = () => {
   useEffect(() => {
     loadSelectOptions();
     if (isEditMode && id) {
-      loadComunicacao(Number(id));
+      const idNum = Number(id);
+      if (Number.isFinite(idNum) && idNum > 0) {
+        loadComunicacao(idNum);
+      } else {
+        setError('ID da comunicação inválido.');
+      }
     }
   }, [id]);
 
