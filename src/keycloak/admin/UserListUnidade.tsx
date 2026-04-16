@@ -70,21 +70,22 @@ function getUserLevelFromRoles(roles: string[]): 'admin' | 'admin.estado' | 'adm
 }
 
 // Função para determinar se usuário pode ser deletado baseado no tipo de admin
-function canUserBeDeleted(targetUser: UserWithAccess, adminType: string): boolean {
-  if (!targetUser.roles) return false;
-  
-  const targetLevel = getUserLevelFromRoles(targetUser.roles);
-  
-  // Admin master pode deletar qualquer um
-  if (adminType === 'admin') return true;
-  
-  // Admin.unidade só pode deletar notificadores e usuários comuns
-  if (adminType === 'admin.unidade') {
-    return ['notificador', 'user'].includes(targetLevel);
-  }
-  
-  return false;
-}
+// (mantida para referência; atualmente não usada na tela)
+// function canUserBeDeleted(targetUser: UserWithAccess, adminType: string): boolean {
+//   if (!targetUser.roles) return false;
+//   
+//   const targetLevel = getUserLevelFromRoles(targetUser.roles);
+//   
+//   // Admin master pode deletar qualquer um
+//   if (adminType === 'admin') return true;
+//   
+//   // Admin.unidade só pode deletar notificadores e usuários comuns
+//   if (adminType === 'admin.unidade') {
+//     return ['notificador', 'user'].includes(targetLevel);
+//   }
+//   
+//   return false;
+// }
 
 // Função para identificar se é notificador de unidade baseado nos roles
 function isNotificadorUnidade(user: UserWithAccess): boolean {
@@ -152,13 +153,27 @@ const UserListUnidade: React.FC = () => {
       
       console.log('🔑 Permissões do admin carregadas:', userPermissions);
       
-      // 1. Buscar todos os usuários do Keycloak
-      const usersData = await usuarioGestaoService.getUsuarios();
+      // 1. Buscar lista agregada paginada (server-side)
+      const page = await usuarioGestaoService.getUsuariosList({
+        first: pagination.first,
+        max: pagination.max,
+        search: filters.search || undefined,
+        scope: isAdminUnidade ? 'unidade' : undefined,
+        scopeId: isAdminUnidade ? userPermissions.estabelecimentoId : undefined,
+      });
+      const usersData = page.items as any[];
       console.log('📝 Dados recebidos da API:', usersData);
       
       if (!Array.isArray(usersData)) {
         console.error('❌ Dados inválidos recebidos da API:', usersData);
         throw new Error('Dados inválidos recebidos da API de usuários');
+      }
+
+      // Para admin.unidade (não master): o backend já devolve filtrado com total correto
+      if (isAdminUnidade && !isAdminMaster) {
+        setUsers(usersData as any);
+        setPagination(prev => ({ ...prev, total: page.total || 0 }));
+        return;
       }
       
       // 2. Para admin master, mostrar todos. Para admin.unidade, filtrar pela unidade
@@ -240,6 +255,8 @@ const UserListUnidade: React.FC = () => {
 
       console.log(`✅ ${usersWithAccess.length} usuários processados para ${isAdminMaster ? 'admin master' : 'admin.unidade'}`);
       setUsers(usersWithAccess);
+      // total vem do server; mas após filtrar por unidade no frontend, o "total" real muda.
+      // TODO: mover filtro por unidade pro backend para total correto.
       setPagination(prev => ({ ...prev, total: usersWithAccess.length }));
       
     } catch (error: any) {
@@ -486,7 +503,7 @@ const UserListUnidade: React.FC = () => {
                             
                             const userLevel = getUserLevelFromRoles(user.roles);
                             const isNotificador = isNotificadorUnidade(user);
-                            const canBeDeleted = canUserBeDeleted(user, user?.roles?.includes('admin') ? 'admin' : 'admin.unidade');
+                            // const canBeDeleted = canUserBeDeleted(user, user?.roles?.includes('admin') ? 'admin' : 'admin.unidade');
                             
                             const getBadgeConfig = (level: string) => {
                               switch (level) {

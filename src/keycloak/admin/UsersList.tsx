@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '@/i18n/useTranslations';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -23,13 +23,14 @@ import {
   ArrowLeft
 } from 'lucide-react';
 
-// Importar hook de filtragem hierárquica
-import { useHierarchicalFilter, UserWithAccess } from '@/hooks/useHierarchicalFilter';
+import type { UsuarioListItem } from '@/services/UsuarioGestaoService';
 
 // Importar service de gestão de usuários
 import {
   usuarioGestaoService
 } from '@/services/UsuarioGestaoService';
+
+type UserWithAccess = UsuarioListItem;
 
 // Função para obter o nível hierárquico a partir dos roles do Keycloak
 function getUserLevelFromRoles(roles: string[]): 'admin' | 'admin.estado' | 'admin.municipio' | 'admin.unidade' | 'notificador' | 'user' {
@@ -62,52 +63,58 @@ const UsersList: React.FC = () => {
   const { selectedLanguage } = useLanguage();
   const { t } = useTranslation(selectedLanguage);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  
-  // Usar hook de filtragem hierárquica
-  const {
-    filteredUsers,
-    loading,
-    error,
-    totalUsers,
-    shouldFilter,
-    adminLevel,
-    refreshUsers
-  } = useHierarchicalFilter();
-  
+
+  const [users, setUsers] = useState<UserWithAccess[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [total, setTotal] = useState(0);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [pagination, setPagination] = useState({ first: 0, max: 20 });
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState<string | null>(null);
 
-  // Filtro de busca local
-  const displayUsers = React.useMemo(() => {
-    if (!searchTerm) return filteredUsers;
-    
-    const search = searchTerm.toLowerCase();
-    return filteredUsers.filter(user => 
-      user.username.toLowerCase().includes(search) ||
-      user.email?.toLowerCase().includes(search) ||
-      user.firstName?.toLowerCase().includes(search) ||
-      user.lastName?.toLowerCase().includes(search)
-    );
-  }, [filteredUsers, searchTerm]);
-
-  // Paginação local
-  const paginatedUsers = React.useMemo(() => {
-    const start = pagination.first;
-    const end = start + pagination.max;
-    return displayUsers.slice(start, end);
-  }, [displayUsers, pagination]);
-
   const loadUsers = async () => {
-    // Função mantida para compatibilidade - agora chama refreshUsers
-    await refreshUsers();
+    try {
+      setLoading(true);
+      setError(null);
+
+      const page = await usuarioGestaoService.getUsuariosList({
+        first: pagination.first,
+        max: pagination.max,
+        search: searchTerm || undefined,
+      });
+
+      const items = (page.items || []) as unknown as UsuarioListItem[];
+      setUsers(items as any);
+      setTotal(page.total || 0);
+    } catch (e: any) {
+      setUsers([]);
+      setTotal(0);
+      setError(e?.message || 'Erro ao carregar usuários');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    loadUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.first, pagination.max]);
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setPagination((p) => ({ ...p, first: 0 }));
+      loadUsers();
+    }, 400);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
 
   const handleUserAction = async (userId: string, action: string) => {
     try {
-      const user = filteredUsers.find(u => u.id === userId);
+      const user = users.find(u => u.id === userId);
       if (!user) return;
 
       switch (action) {
@@ -129,7 +136,7 @@ const UsersList: React.FC = () => {
       }
 
       // Recarregar lista após ações que modificam dados
-      await refreshUsers();
+      await loadUsers();
       setActionMenuOpen(null);
     } catch (error) {
       console.error('Erro na ação:', error);
@@ -139,7 +146,7 @@ const UsersList: React.FC = () => {
 
   const handleViewUserAccess = async (userId: string) => {
     try {
-      const user = filteredUsers.find(u => u.id === userId);
+      const user = users.find(u => u.id === userId);
       if (!user) return;
 
       console.log(`🔍 Buscando acessos para usuário: ${user.username} (${userId})`);
@@ -213,10 +220,10 @@ const UsersList: React.FC = () => {
   };
 
   const handleSelectAll = () => {
-    if (selectedUsers.length === displayUsers.length) {
+    if (selectedUsers.length === users.length) {
       setSelectedUsers([]);
     } else {
-      setSelectedUsers(displayUsers.map(u => u.id));
+      setSelectedUsers(users.map(u => u.id));
     }
   };
 
@@ -229,7 +236,7 @@ const UsersList: React.FC = () => {
   };
 
   const nextPage = () => {
-    if (pagination.first + pagination.max < displayUsers.length) {
+    if (pagination.first + pagination.max < total) {
       setPagination(prev => ({ ...prev, first: prev.first + prev.max }));
     }
   };
@@ -315,15 +322,7 @@ const UsersList: React.FC = () => {
                     Recarregar
                   </button>
                   <div className="text-sm text-gray-600 p-2">
-                    {shouldFilter ? (
-                      <span className="text-blue-600">
-                        🔍 Filtro ativo ({adminLevel})
-                      </span>
-                    ) : (
-                      <span className="text-green-600">
-                        👑 Admin master - sem filtros
-                      </span>
-                    )}
+                    <span className="text-gray-600">Total: {total}</span>
                   </div>
                 </div>
               </div>
@@ -339,7 +338,7 @@ const UsersList: React.FC = () => {
                     <th className="px-6 py-3 text-left">
                       <input
                         type="checkbox"
-                        checked={selectedUsers.length === displayUsers.length && displayUsers.length > 0}
+                        checked={selectedUsers.length === users.length && users.length > 0}
                         onChange={handleSelectAll}
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
@@ -374,14 +373,14 @@ const UsersList: React.FC = () => {
                         {t('admin.users.loading')}
                       </td>
                     </tr>
-                  ) : displayUsers.length === 0 ? (
+                  ) : users.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
                         {error ? `Erro: ${error}` : t('admin.users.noUsers')}
                       </td>
                     </tr>
                   ) : (
-                    paginatedUsers.map((user) => (
+                    users.map((user) => (
                       <tr key={user.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4">
                           <input
@@ -484,7 +483,7 @@ const UsersList: React.FC = () => {
                           </button>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-500">
-                          {new Date(user.createdTimestamp).toLocaleDateString(selectedLanguage)}
+                          {new Date(user.createdTimestamp ?? Date.now()).toLocaleDateString(selectedLanguage)}
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="relative">
@@ -560,12 +559,7 @@ const UsersList: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <p className="text-sm text-gray-700">
-                    Mostrando {pagination.first + 1} - {Math.min(pagination.first + pagination.max, displayUsers.length)} de {displayUsers.length} usuários
-                    {shouldFilter && totalUsers > 0 && (
-                      <span className="text-blue-600 ml-2">
-                        (filtrados de {totalUsers} total)
-                      </span>
-                    )}
+                    Mostrando {pagination.first + 1} - {Math.min(pagination.first + pagination.max, total)} de {total} usuários
                   </p>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -578,7 +572,7 @@ const UsersList: React.FC = () => {
                   </button>
                   <button
                     onClick={nextPage}
-                    disabled={pagination.first + pagination.max >= displayUsers.length}
+                    disabled={pagination.first + pagination.max >= total}
                     className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <ChevronRight className="h-4 w-4" />
