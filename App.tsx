@@ -386,8 +386,9 @@ function App() {
               <Route path="/private/pacientes" element={<ListaPacientes />} />
             </Route>
 
-            {/* ✅ NOVO: Rotas de Comunicação DAE - Protegidas para Admin e Admin.Estado */}
-            <Route element={<ProtectedRoute requiredRoles={['admin', 'admin.estado']}><Outlet /></ProtectedRoute>}>
+            {/* ✅ Rotas de Comunicação DAE */}
+            {/* Permite acesso por role específica do módulo, além de admins. */}
+            <Route element={<ProtectedRoute requiredRoles={['comunicacao.dae', 'admin', 'admin.estado', 'admin.crs']}><Outlet /></ProtectedRoute>}>
               {/* Listagem e formulário principal */}
               <Route path="/private/comunicacao-dae" element={<ComunicacaoDaePage />} />
               <Route path="/private/comunicacao-dae/dashboard" element={<ComunicacaoDaeDashboard />} />
