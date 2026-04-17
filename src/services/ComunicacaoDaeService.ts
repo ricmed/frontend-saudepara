@@ -28,6 +28,12 @@ export interface ComunicacaoDae {
   id_municipio_residencia: number;
   origem_tipo: OrigemTipo;
   origem_id: number;
+  origem?: {
+    origem_tipo: OrigemTipo;
+    origem_id: number;
+    nome?: string | null;
+    codigo?: string | null;
+  } | null;
   id_dae: number;
   /** Todos os agravos vinculados (quando a API retorna múltiplos). */
   id_daes?: number[];

@@ -18,7 +18,7 @@ import {
 import { formatComunicacaoDaeAgravoNomes } from '@/features/comunicacao-dae/comunicacaoDaeAgravoUtils';
 
 // Tipos para pesquisa
-type SearchField = 'all' | 'nome_paciente' | 'origem' | 'dae' | 'municipio';
+type SearchField = 'all' | 'nome_paciente' | 'origem' | 'unidade_notificadora' | 'dae' | 'municipio';
 
 interface SearchParams {
   term: string;
@@ -26,7 +26,13 @@ interface SearchParams {
 }
 
 // Tipos para ordenação
-type SortableField = 'id_comunicacao' | 'data_comunicacao' | 'nome_paciente' | 'origem_tipo' | 'municipio';
+type SortableField =
+  | 'id_comunicacao'
+  | 'data_comunicacao'
+  | 'nome_paciente'
+  | 'origem_tipo'
+  | 'unidade_notificadora'
+  | 'municipio';
 
 interface SortConfig {
   key: SortableField | null;
@@ -37,6 +43,7 @@ const searchFields = [
   { value: 'all' as SearchField, label: 'Todos os campos' },
   { value: 'nome_paciente' as SearchField, label: 'Nome do Paciente' },
   { value: 'origem' as SearchField, label: 'Origem' },
+  { value: 'unidade_notificadora' as SearchField, label: 'Unidade notificadora' },
   { value: 'dae' as SearchField, label: 'DAE' },
   { value: 'municipio' as SearchField, label: 'Município' },
 ];
@@ -102,24 +109,39 @@ const ComunicacaoDaePage: React.FC = () => {
       return;
     }
 
-    const searchTerm = searchParams.term.toLowerCase();
+    const normalize = (s?: string) =>
+      String(s || '')
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .toLowerCase();
+
+    const searchTerm = normalize(searchParams.term);
     const filtered = comunicacoes.filter((com) => {
+      const origemNome = normalize(com.origem?.nome || '');
+      const origemTipo = normalize(com.origem_tipo || '');
+      const paciente = normalize(com.nome_paciente || '');
+      const municipio = normalize(com.tipo_municipio?.descricao || '');
+      const dae = normalize(formatComunicacaoDaeAgravoNomes(com) || '');
+
       switch (searchParams.field) {
         case 'nome_paciente':
-          return com.nome_paciente?.toLowerCase().includes(searchTerm);
+          return paciente.includes(searchTerm);
         case 'origem':
-          return com.origem_tipo?.toLowerCase().includes(searchTerm);
+          return origemTipo.includes(searchTerm) || origemNome.includes(searchTerm);
+        case 'unidade_notificadora':
+          return origemNome.includes(searchTerm);
         case 'dae':
-          return formatComunicacaoDaeAgravoNomes(com).toLowerCase().includes(searchTerm);
+          return dae.includes(searchTerm);
         case 'municipio':
-          return com.tipo_municipio?.descricao?.toLowerCase().includes(searchTerm);
+          return municipio.includes(searchTerm);
         case 'all':
         default:
           return (
-            com.nome_paciente?.toLowerCase().includes(searchTerm) ||
-            com.origem_tipo?.toLowerCase().includes(searchTerm) ||
-            formatComunicacaoDaeAgravoNomes(com).toLowerCase().includes(searchTerm) ||
-            com.tipo_municipio?.descricao?.toLowerCase().includes(searchTerm)
+            paciente.includes(searchTerm) ||
+            origemTipo.includes(searchTerm) ||
+            origemNome.includes(searchTerm) ||
+            dae.includes(searchTerm) ||
+            municipio.includes(searchTerm)
           );
       }
     });
@@ -154,6 +176,10 @@ const ComunicacaoDaePage: React.FC = () => {
         case 'origem_tipo':
           aValue = a.origem_tipo?.toLowerCase() || '';
           bValue = b.origem_tipo?.toLowerCase() || '';
+          break;
+        case 'unidade_notificadora':
+          aValue = (a.origem?.nome || '').toLowerCase();
+          bValue = (b.origem?.nome || '').toLowerCase();
           break;
         case 'municipio':
           aValue = a.tipo_municipio?.descricao?.toLowerCase() || '';
@@ -801,6 +827,15 @@ const ComunicacaoDaePage: React.FC = () => {
                           {renderSortIcon('origem_tipo')}
                         </div>
                       </th>
+                      <th 
+                        className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200/60 transition-colors"
+                        onClick={() => handleSort('unidade_notificadora')}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span>Unidade notificadora</span>
+                          {renderSortIcon('unidade_notificadora')}
+                        </div>
+                      </th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                         DAE
                       </th>
@@ -849,6 +884,9 @@ const ComunicacaoDaePage: React.FC = () => {
                           <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getOrigemBadgeColor(comunicacao.origem_tipo)}`}>
                             {comunicacao.origem_tipo}
                           </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                          {comunicacao.origem?.nome || '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                           {formatComunicacaoDaeAgravoNomes(comunicacao)}
