@@ -346,12 +346,19 @@ const UserListUnidade: React.FC = () => {
     setDeleteConfirm({ userId, userName });
   };
 
+  const norm = (s?: string) =>
+    (s || '')
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase();
+
   const filteredUsers = users.filter(user => {
+    const q = norm(filters.search);
     const matchesSearch = !filters.search || 
-      user.username.toLowerCase().includes(filters.search.toLowerCase()) ||
-      user.email?.toLowerCase().includes(filters.search.toLowerCase()) ||
-      user.firstName?.toLowerCase().includes(filters.search.toLowerCase()) ||
-      user.lastName?.toLowerCase().includes(filters.search.toLowerCase());
+      norm(user.username).includes(q) ||
+      norm(user.email).includes(q) ||
+      norm(user.firstName).includes(q) ||
+      norm(user.lastName).includes(q);
 
     const matchesEnabled = filters.enabled === undefined || user.enabled === filters.enabled;
 
