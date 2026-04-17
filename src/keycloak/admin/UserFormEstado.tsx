@@ -193,7 +193,7 @@ const UserFormEstado: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const { listRoles, addUserRoles } = useRoles();
+  const { listRoles, addUserRoles, removeUserRoles, getUserRoles } = useRoles();
   const [availableRoleReps, setAvailableRoleReps] = useState<any[]>([]);
   
   // Estados para dados de dropdowns
@@ -256,10 +256,8 @@ const UserFormEstado: React.FC = () => {
       console.log('🔄 Carregando dados do usuário para edição...');
       
       const response = await fetch(`/api-auth/admin/users/${userId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json'
-        }
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
       });
 
       if (!response.ok) {
@@ -268,6 +266,18 @@ const UserFormEstado: React.FC = () => {
 
       const userData = await response.json();
       console.log('📝 Dados do usuário carregados:', userData);
+
+      // ✅ Carregar roles atuais do usuário (Keycloak realm roles)
+      let selectedRoles: Array<'notificador' | 'comunicacao.dae'> = [];
+      try {
+        const roleMappings = await getUserRoles(userId);
+        const roleNames = Array.isArray(roleMappings) ? roleMappings.map((r: any) => r?.name).filter(Boolean) : [];
+        const allow = new Set(['notificador', 'comunicacao.dae']);
+        selectedRoles = roleNames.filter((n: string) => allow.has(n)) as any;
+      } catch (e) {
+        console.warn('⚠️ Não foi possível carregar roles do usuário', e);
+        selectedRoles = [];
+      }
 
       // Buscar acessos do usuário para determinar o nível correto
       console.log('🔍 Buscando acessos do usuário...');
@@ -334,7 +344,7 @@ const UserFormEstado: React.FC = () => {
         nivelAcesso: nivelAcesso,
         estabelecimentoId: estabelecimentoId,
         municipioId: municipioId,
-        roles: [],
+        roles: selectedRoles,
       });
 
     } catch (error) {
@@ -503,10 +513,8 @@ const UserFormEstado: React.FC = () => {
 
         const response = await fetch(`/api-auth/admin/users/${id}`, {
           method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-            'Content-Type': 'application/json'
-          },
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updateData)
         });
 
@@ -539,18 +547,19 @@ const UserFormEstado: React.FC = () => {
 
         // Se senha foi informada, atualizar também
         if (formData.password) {
-          await fetch(`/api-auth/admin/users/${id}/reset-password`, {
+          const resetRes = await fetch(`/api-auth/admin/users/${id}/reset-password`, {
             method: 'PUT',
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-              'Content-Type': 'application/json'
-            },
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              type: 'password',
-              value: formData.password,
+              password: formData.password,
               temporary: formData.temporaryPassword
             })
           });
+          if (!resetRes.ok) {
+            const errData = await resetRes.json().catch(() => ({}));
+            throw new Error(errData?.error || 'Erro ao redefinir senha');
+          }
         }
 
         // 🔥 HARD DELETE: Limpar todos os acessos existentes antes de criar novos
@@ -569,6 +578,27 @@ const UserFormEstado: React.FC = () => {
           await usuarioGestaoService.createAcessoMunicipio(id, formData.municipioId);
         } else if (formData.nivelAcesso === 'unidade' && formData.estabelecimentoId) {
           await usuarioGestaoService.createAcessoUnidade(id, formData.estabelecimentoId);
+        }
+
+        // ✅ Sincronizar roles (notificador / comunicacao.dae) no modo edição
+        try {
+          const currentMappings = await getUserRoles(id);
+          const currentNames = Array.isArray(currentMappings) ? currentMappings.map((r: any) => r?.name).filter(Boolean) : [];
+          const allow = new Set(['notificador', 'comunicacao.dae']);
+          const currentAllowed = currentNames.filter((n: string) => allow.has(n));
+          const desired = formData.roles || [];
+
+          const toAddNames = desired.filter((n) => !currentAllowed.includes(n));
+          const toRemoveNames = currentAllowed.filter((n) => !desired.includes(n as any));
+
+          const toAdd = availableRoleReps.filter((r: any) => toAddNames.includes(r?.name));
+          const toRemove = availableRoleReps.filter((r: any) => toRemoveNames.includes(r?.name));
+
+          if (toAdd.length > 0) await addUserRoles(id, toAdd);
+          if (toRemove.length > 0) await removeUserRoles(id, toRemove);
+        } catch (e) {
+          console.warn('⚠️ Falha ao sincronizar roles no modo edição', e);
+          throw new Error('Usuário atualizado, mas não foi possível atualizar as roles. Tente novamente.');
         }
 
         console.log('✅ Usuário atualizado com sucesso');
