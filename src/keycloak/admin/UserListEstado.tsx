@@ -246,7 +246,11 @@ const UserListEstado: React.FC = () => {
       }
 
       const estadoIdNum = Number(userPermissions.estadoId);
-      const hasEstadoScope = isAdminEstado && Number.isFinite(estadoIdNum) && estadoIdNum > 0;
+      // OBS: no ambiente atual, o admin estadual precisa enxergar todos os usuários do realm
+      // (estaduais, municipais e unidades), independentemente da role do alvo.
+      // Como nem todos os usuários possuem registros completos em usuario_acesso_*, usar a listagem
+      // sem scope evita "sumir" usuários (ex.: aparecer 83 em vez de ~440).
+      const hasEstadoScope = false;
       
       console.log('🔑 Permissões do admin carregadas:', userPermissions);
       
@@ -535,12 +539,19 @@ const UserListEstado: React.FC = () => {
     setDeleteConfirm({ userId, userName });
   };
 
+  const norm = (s?: string) =>
+    (s || '')
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase();
+
   const filteredUsers = users.filter(user => {
+    const q = norm(filters.search);
     const matchesSearch = !filters.search || 
-      user.username.toLowerCase().includes(filters.search.toLowerCase()) ||
-      user.email?.toLowerCase().includes(filters.search.toLowerCase()) ||
-      user.firstName?.toLowerCase().includes(filters.search.toLowerCase()) ||
-      user.lastName?.toLowerCase().includes(filters.search.toLowerCase());
+      norm(user.username).includes(q) ||
+      norm(user.email).includes(q) ||
+      norm(user.firstName).includes(q) ||
+      norm(user.lastName).includes(q);
 
     const matchesEnabled = filters.enabled === undefined || user.enabled === filters.enabled;
 
