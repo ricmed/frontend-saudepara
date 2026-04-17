@@ -32,6 +32,7 @@ type SortableField =
   | 'nome_paciente'
   | 'origem_tipo'
   | 'unidade_notificadora'
+  | 'dae'
   | 'municipio';
 
 interface SortConfig {
@@ -797,8 +798,14 @@ const ComunicacaoDaePage: React.FC = () => {
                           {renderSortIcon('unidade_notificadora')}
                         </div>
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                        DAE
+                      <th
+                        className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200/60 transition-colors"
+                        onClick={() => handleSort('dae')}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span>DAE</span>
+                          {renderSortIcon('dae')}
+                        </div>
                       </th>
                       <th 
                         className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200/60 transition-colors"
@@ -849,7 +856,7 @@ const ComunicacaoDaePage: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                           {comunicacao.origem?.nome || '-'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        <td className="px-6 py-4 text-sm text-gray-600 max-w-[320px] whitespace-normal break-words">
                           {formatComunicacaoDaeAgravoNomes(comunicacao)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
