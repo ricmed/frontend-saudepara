@@ -849,7 +849,7 @@ const ComunicacaoDaePage: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                           {comunicacao.origem?.nome || '-'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        <td className="px-6 py-4 text-sm text-gray-600 max-w-[320px] whitespace-normal break-words">
                           {formatComunicacaoDaeAgravoNomes(comunicacao)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
