@@ -149,57 +149,11 @@ const ComunicacaoDaePage: React.FC = () => {
     setFilteredComunicacoes(filtered);
   }, [searchParams, comunicacoes]);
 
-  // Aplicar ordenação nos dados filtrados
+  // Ordenação deve ser aplicada no backend (antes da paginação).
+  // Aqui mantemos apenas a lista filtrada (pesquisa local na página).
   useEffect(() => {
-    if (!sortConfig.key) {
-      setSortedComunicacoes(filteredComunicacoes);
-      return;
-    }
-
-    const sorted = [...filteredComunicacoes].sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
-
-      switch (sortConfig.key) {
-        case 'id_comunicacao':
-          aValue = a.id_comunicacao;
-          bValue = b.id_comunicacao;
-          break;
-        case 'data_comunicacao':
-          aValue = new Date(a.data_comunicacao).getTime();
-          bValue = new Date(b.data_comunicacao).getTime();
-          break;
-        case 'nome_paciente':
-          aValue = a.nome_paciente?.toLowerCase() || '';
-          bValue = b.nome_paciente?.toLowerCase() || '';
-          break;
-        case 'origem_tipo':
-          aValue = a.origem_tipo?.toLowerCase() || '';
-          bValue = b.origem_tipo?.toLowerCase() || '';
-          break;
-        case 'unidade_notificadora':
-          aValue = (a.origem?.nome || '').toLowerCase();
-          bValue = (b.origem?.nome || '').toLowerCase();
-          break;
-        case 'municipio':
-          aValue = a.tipo_municipio?.descricao?.toLowerCase() || '';
-          bValue = b.tipo_municipio?.descricao?.toLowerCase() || '';
-          break;
-        default:
-          return 0;
-      }
-
-      if (aValue < bValue) {
-        return sortConfig.direction === 'asc' ? -1 : 1;
-      }
-      if (aValue > bValue) {
-        return sortConfig.direction === 'asc' ? 1 : -1;
-      }
-      return 0;
-    });
-
-    setSortedComunicacoes(sorted);
-  }, [filteredComunicacoes, sortConfig]);
+    setSortedComunicacoes(filteredComunicacoes);
+  }, [filteredComunicacoes]);
 
   const loadComunicacoes = async () => {
     try {
@@ -265,6 +219,13 @@ const ComunicacaoDaePage: React.FC = () => {
       direction = 'desc';
     }
     setSortConfig({ key, direction });
+    // Ordenação precisa ser aplicada no backend (antes da paginação)
+    setFilters((prev) => ({
+      ...prev,
+      sortKey: key,
+      sortDir: direction,
+    }));
+    setCurrentPage(1);
   };
 
   const renderSortIcon = (columnKey: SortableField) => {

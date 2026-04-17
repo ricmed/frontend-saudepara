@@ -75,6 +75,8 @@ export interface ComunicacaoDaeFilters {
   data_inicio?: string;
   data_fim?: string;
   estabelecimento_id?: number;
+  sortKey?: string;
+  sortDir?: 'asc' | 'desc';
 }
 
 export interface CreateComunicacaoDaeData {
