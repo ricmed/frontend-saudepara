@@ -725,18 +725,21 @@ const UserForm: React.FC = () => {
 
         // Se há nova senha, resetar senha
         if (formData.password) {
-          await fetch(`/api-auth/admin/users/${id}/reset-password`, {
+          const resetRes = await fetch(`/api-auth/admin/users/${id}/reset-password`, {
             method: 'PUT',
             credentials: 'include',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              type: 'password',
-              value: formData.password,
+              password: formData.password,
               temporary: formData.temporaryPassword,
             }),
           });
+          if (!resetRes.ok) {
+            const errData = await resetRes.json().catch(() => ({}));
+            throw new Error(errData?.error || 'Erro ao redefinir senha');
+          }
         }
 
         // Atualizar acessos no modo de edição
@@ -754,13 +757,8 @@ const UserForm: React.FC = () => {
           },
           body: JSON.stringify({
             ...userData,
-            ...(formData.password && {
-              credentials: [{
-                type: 'password',
-                value: formData.password,
-                temporary: formData.temporaryPassword,
-              }]
-            })
+            ...(formData.password ? { password: formData.password } : {}),
+            temporaryPassword: formData.temporaryPassword,
           }),
         });
 
@@ -847,7 +845,7 @@ const UserForm: React.FC = () => {
         if (userRoles.length > 0) {
           console.log('🔑 Atribuindo roles ao usuário criado:', userRoles.map(r => r.name));
           try {
-            await fetch(`/api-auth/admin/users/${userId}/roles`, {
+            const roleRes = await fetch(`/api-auth/admin/users/${userId}/roles`, {
               method: 'POST',
               credentials: 'include',
               headers: {
@@ -855,10 +853,15 @@ const UserForm: React.FC = () => {
               },
               body: JSON.stringify(userRoles),
             });
+            if (!roleRes.ok) {
+              const roleErr = await roleRes.json().catch(() => ({}));
+              throw new Error(roleErr?.error || 'Erro ao atribuir roles ao usuário');
+            }
             console.log('✅ Roles atribuídas com sucesso');
           } catch (roleError) {
             console.error('❌ Erro ao atribuir roles:', roleError);
-            // Não interromper o fluxo se houver erro nas roles
+            // Interromper: se falhar, o usuário pode ficar sem permissão e parecer "não atualizou"
+            throw roleError;
           }
         }
 
@@ -973,7 +976,7 @@ const UserForm: React.FC = () => {
       
       if (hasRole) {
         // Remover role via API
-        await fetch(`/api-auth/admin/users/${id}/roles`, {
+        const delRes = await fetch(`/api-auth/admin/users/${id}/roles`, {
           method: 'DELETE',
           credentials: 'include',
           headers: {
@@ -981,11 +984,15 @@ const UserForm: React.FC = () => {
           },
           body: JSON.stringify([role]),
         });
+        if (!delRes.ok) {
+          const errData = await delRes.json().catch(() => ({}));
+          throw new Error(errData?.error || 'Erro ao remover role');
+        }
         setUserRoles(prev => prev.filter(ur => ur.id !== role.id));
         console.log('🔑 Role removida (modo edição):', role.name);
       } else {
         // Adicionar role via API
-        await fetch(`/api-auth/admin/users/${id}/roles`, {
+        const addRes = await fetch(`/api-auth/admin/users/${id}/roles`, {
           method: 'POST',
           credentials: 'include',
           headers: {
@@ -993,6 +1000,10 @@ const UserForm: React.FC = () => {
           },
           body: JSON.stringify([role]),
         });
+        if (!addRes.ok) {
+          const errData = await addRes.json().catch(() => ({}));
+          throw new Error(errData?.error || 'Erro ao adicionar role');
+        }
         setUserRoles(prev => [...prev, role]);
         console.log('🔑 Role adicionada (modo edição):', role.name);
       }
