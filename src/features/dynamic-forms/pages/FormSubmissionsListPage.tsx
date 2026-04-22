@@ -2,55 +2,31 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import FormService, { type Form } from '@/services/FormService';
 import FormSubmissionService, { type FormSubmission } from '@/services/FormSubmissionService';
-import { Plus, Edit, Eye, Trash2, Calendar, User, FileText } from 'lucide-react';
+import { Plus, Edit, Eye, Trash2, Calendar, User, FileText, BarChart3 } from 'lucide-react';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
+import {
+  MONITOR_OPER_REGIONAL_KEY,
+  computeTotalAcumuladoMes,
+  filterMonitorOperRows,
+} from '../utils/monitorOperRegionalReport';
+import { MonitorOperQdqqGroupedTotalsTable } from '../components/MonitorOperQdqqGroupedTotalsTable';
+import { useCrsLabelByIdMap } from '../hooks/useCrsLabelByIdMap';
 
 export const FormSubmissionsListPage: React.FC = () => {
   const { agravo } = useParams<{ agravo: string }>();
   const navigate = useNavigate();
-  
+  const crsLabels = useCrsLabelByIdMap(agravo?.toUpperCase() === MONITOR_OPER_REGIONAL_KEY);
+
   const [form, setForm] = useState<Form | null>(null);
   const [submissions, setSubmissions] = useState<FormSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const totalAcumulado = React.useMemo(() => {
-    if (agravo !== 'MONITOR_OPER_REGIONAL') return null;
-    if (!submissions || submissions.length === 0) return null;
-
-    const rows = submissions
-      .map((s) => s.data_json as any)
-      .filter((d) => d && d.cabecalho && d.acao);
-
+    if (agravo !== MONITOR_OPER_REGIONAL_KEY) return null;
+    const rows = filterMonitorOperRows(submissions);
     if (rows.length === 0) return null;
-
-    const keySet = new Set(rows.map((d) => `${d.cabecalho?.crs_id ?? ''}|${d.cabecalho?.ano ?? ''}|${d.cabecalho?.mes ?? ''}`));
-    if (keySet.size !== 1) {
-      return { mixed: true };
-    }
-
-    const sum = (arr: any[], path: string) =>
-      arr.reduce((acc, d) => acc + (Number(d?.acao?.[path]) || 0), 0);
-
-    const programadas = sum(rows, 'qtd_programadas_qdqq');
-    // Observação: esses campos podem vir como string ('0'/'1') por serem selects; Number() resolve.
-    const realizadasFlag = sum(rows, 'qtd_realizadas_conforme_programacao'); // 0/1 por ação
-    const naoProgramadasFlag = sum(rows, 'qtd_nao_programadas_qdqq'); // 0/1 por ação
-    const total = programadas + naoProgramadasFlag;
-    const perc = programadas > 0 ? (realizadasFlag / programadas) * 100 : undefined;
-
-    const sample = rows[0]?.cabecalho ?? {};
-    return {
-      mixed: false,
-      crs_id: sample.crs_id,
-      ano: sample.ano,
-      mes: sample.mes,
-      programadas,
-      realizadasFlag,
-      naoProgramadasFlag,
-      total,
-      perc,
-    };
+    return computeTotalAcumuladoMes(rows);
   }, [agravo, submissions]);
 
   useEffect(() => {
@@ -72,12 +48,20 @@ export const FormSubmissionsListPage: React.FC = () => {
       // Carregar submissions deste formulário
       if (formData.active_version_id) {
         console.log('🔍 Buscando submissions para version_id:', formData.active_version_id);
-        const submissionsData = await FormSubmissionService.getSubmissions({
-          form_version_id: formData.active_version_id,
-          limit: 100
-        });
-        console.log('📊 Submissions encontradas:', submissionsData);
-        setSubmissions(submissionsData.data);
+        if (agravo === MONITOR_OPER_REGIONAL_KEY) {
+          const all = await FormSubmissionService.getSubmissionsAllPagesWithFormPayload(
+            formData.active_version_id,
+          );
+          console.log('📊 Submissions (com data_json, todas as páginas):', all.length);
+          setSubmissions(all);
+        } else {
+          const submissionsData = await FormSubmissionService.getSubmissions({
+            form_version_id: formData.active_version_id,
+            limit: 100,
+          });
+          console.log('📊 Submissions encontradas:', submissionsData);
+          setSubmissions(submissionsData.data);
+        }
       } else {
         console.warn('⚠️ Formulário sem versão ativa!');
       }
@@ -179,30 +163,48 @@ export const FormSubmissionsListPage: React.FC = () => {
       variant="desktop"
       showBottomNav={false}
       headerActions={
-        <button
-          onClick={() => navigate(`/private/formularios/${agravo}/nova`)}
-          className="px-4 py-2 bg-white text-blue-600 rounded-md hover:bg-blue-50 flex items-center gap-2 font-medium"
-        >
-          <Plus className="h-4 w-4" />
-          Nova Notificação
-        </button>
+        <div className="flex flex-wrap gap-2 justify-end">
+          {agravo === MONITOR_OPER_REGIONAL_KEY && (
+            <button
+              type="button"
+              data-testid="monitor-oper-relatorios"
+              onClick={() => navigate(`/private/formularios/${agravo}/relatorio`)}
+              className="px-4 py-2 bg-white text-gray-800 rounded-md hover:bg-gray-50 flex items-center gap-2 font-medium border border-gray-200"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Relatórios consolidados
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => navigate(`/private/formularios/${agravo}/nova`)}
+            className="px-4 py-2 bg-white text-blue-600 rounded-md hover:bg-blue-50 flex items-center gap-2 font-medium"
+          >
+            <Plus className="h-4 w-4" />
+            Nova Notificação
+          </button>
+        </div>
       }
     >
         {totalAcumulado && (
           <div className="mb-4">
             {totalAcumulado.mixed ? (
-              <div className="bg-white rounded-lg shadow p-4 border border-amber-200">
-                <p className="text-sm text-amber-700 font-medium">
-                  Total acumulado não exibido: a lista atual mistura mais de um CRS/ano/mês. Use filtros (quando disponíveis) para ver o consolidado.
-                </p>
+              <div className="bg-white rounded-lg shadow p-4 border border-gray-200">
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
+                  <h3 className="text-sm font-semibold text-gray-800">Totais QDQQ por regional / ano / quadrimestre</h3>
+                </div>
+                <MonitorOperQdqqGroupedTotalsTable groups={totalAcumulado.groups} tone="list" crsLabels={crsLabels} />
               </div>
             ) : (
               <div className="bg-white rounded-lg shadow p-4 border border-gray-200">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-800">Total acumulado (mês)</h3>
+                    <h3 className="text-sm font-semibold text-gray-800">Total acumulado (QDQQ — quadrimestre)</h3>
                     <p className="text-xs text-gray-500">
-                      Baseado nas ações listadas para {String(totalAcumulado.mes ?? '')}/{String(totalAcumulado.ano ?? '')}
+                      {totalAcumulado.quadrimestre_label} · ano {String(totalAcumulado.ano ?? '—')}
+                      {totalAcumulado.competencia_mes_ano != null && totalAcumulado.competencia_mes_ano !== '' ? (
+                        <> · competência {String(totalAcumulado.competencia_mes_ano)}</>
+                      ) : null}
                     </p>
                   </div>
                   <div className="text-xs text-gray-500">

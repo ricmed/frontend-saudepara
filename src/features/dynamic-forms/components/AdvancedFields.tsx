@@ -4,6 +4,7 @@ import { getLocalDateTime, convertUTCToLocalDateTime } from '@/utils/timezoneUti
 import { searchMatches } from '@/utils/searchUtils';
 import DatabaseService from '@/services/DatabaseService';
 import { Search, X, Check } from 'lucide-react';
+import { getMunicipioBandeiraPathBase } from '@/utils/municipioBandeiraPa';
 import PhoneInput from '@/features/notificationForms/components/PhoneInput';
 import { validateCPF } from '@/utils/cpfValidator';
 import { validateCNS } from '@/utils/cnsValidator';
@@ -350,6 +351,9 @@ export const MultiSelectField: React.FC<AdvancedFieldProps> = ({
     }
   };
 
+  /** Só monitoramento QDQQ — mesmo padrão de arquivos do dashboard DAE (public/images/bandeiras_pa_mini). */
+  const showMunicipioBandeiraPa = field.key === 'acao.municipios_alcancados';
+
   return (
     <div className="mb-4">
       <div className="flex items-center justify-between mb-2">
@@ -393,6 +397,7 @@ export const MultiSelectField: React.FC<AdvancedFieldProps> = ({
         ) : (
           filteredOptions.map((option) => {
             const isSelected = selectedValues.includes(option.value);
+            const bandeiraBase = showMunicipioBandeiraPa ? getMunicipioBandeiraPathBase(option.label) : '';
             return (
               <label
                 key={option.value}
@@ -415,10 +420,27 @@ export const MultiSelectField: React.FC<AdvancedFieldProps> = ({
                   />
                 </div>
                 <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
-                  <span className={`text-sm font-medium transition-colors leading-relaxed ${
-                    isSelected ? 'text-blue-900' : 'text-gray-900'
-                  }`}>
-                    {option.label}
+                  <span
+                    className={`flex items-center gap-2 min-w-0 text-sm font-medium transition-colors leading-relaxed ${
+                      isSelected ? 'text-blue-900' : 'text-gray-900'
+                    }`}
+                  >
+                    {showMunicipioBandeiraPa && bandeiraBase ? (
+                      <img
+                        src={`${bandeiraBase}.jpg`}
+                        alt={`Bandeira de ${option.label}`}
+                        className="w-9 h-6 shrink-0 object-cover rounded border border-gray-200 shadow-sm"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          if (target.src.endsWith('.jpg')) {
+                            target.src = `${bandeiraBase}.png`;
+                          } else {
+                            target.style.display = 'none';
+                          }
+                        }}
+                      />
+                    ) : null}
+                    <span className="min-w-0 truncate">{option.label}</span>
                   </span>
                   {isSelected && (
                     <Check className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />

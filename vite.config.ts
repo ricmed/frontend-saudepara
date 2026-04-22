@@ -99,10 +99,12 @@ export default defineConfig(({ mode }) => {
       strategies: 'generateSW',
       injectRegister: 'auto',
       
+      // Em dev, SW + CacheFirst em *.jpg pode guardar o index.html (fallback SPA) como "imagem"
+      // quando o ficheiro ainda não existe em public — depois o browser mostra bandeira quebrada.
       devOptions: {
-        enabled: true,
+        enabled: false,
         type: 'module',
-        navigateFallback: 'index.html'
+        navigateFallback: 'index.html',
       },
       
       workbox: {
@@ -119,8 +121,10 @@ export default defineConfig(({ mode }) => {
           '**/*.{js,css}',
           // Assets que existem
           '**/*.{ico,png,svg,json}',
+          // Bandeiras e outros estáticos em public (quando existirem no dist)
+          '**/*.{jpg,jpeg}',
           // Fonts se existirem
-          '**/*.{woff,woff2,ttf}'
+          '**/*.{woff,woff2,ttf}',
         ],
         
         globIgnores: [
@@ -251,9 +255,20 @@ export default defineConfig(({ mode }) => {
               cacheName: 'images-cache',
               expiration: {
                 maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 365
-              }
-            }
+                maxAgeSeconds: 60 * 60 * 24 * 365,
+              },
+              plugins: [
+                {
+                  cacheWillUpdate: async ({ response }: { response: Response }) => {
+                    const ct = response.headers.get('content-type') || '';
+                    if (response.status === 200 && /^image\//i.test(ct)) {
+                      return response;
+                    }
+                    return null;
+                  },
+                },
+              ],
+            },
           },
           
           {

@@ -62,6 +62,8 @@ export interface FormSection {
   title: string;
   /** Nome do ícone (lucide) para o cabeçalho da seção. Ex.: 'clipboard-list' */
   icon?: string;
+  /** Texto de orientação abaixo do título (ex.: regras de exibição condicional) */
+  description?: string;
   order: number;
   fields: FormField[];
 }

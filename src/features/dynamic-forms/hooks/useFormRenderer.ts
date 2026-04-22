@@ -6,6 +6,28 @@ import { validateCPF } from '@/utils/cpfValidator';
 import { validateCNS } from '@/utils/cnsValidator';
 import { validatePassaporte } from '@/utils/passaporteValidator';
 
+/** Agrupa campos da seção detalhamento do monitor operacional por tipo de atividade. */
+function monitorOperImpactoGroup(key: string): 'epi' | 'san' | 'amb' | null {
+  if (key.startsWith('imp_epi.')) return 'epi';
+  if (key.startsWith('imp_san.')) return 'san';
+  if (key.startsWith('imp_amb.')) return 'amb';
+  return null;
+}
+
+function monitorOperDetalhamentoGroup(
+  key: string,
+): 'cap' | 'av' | 'comp' | 'aq' | 'dist' | 'fisc' | 'reg' | null {
+  if (!key.startsWith('detalhamento.')) return null;
+  if (key.startsWith('detalhamento.capacitacao')) return 'cap';
+  if (key.startsWith('detalhamento.avaliacao')) return 'av';
+  if (key.startsWith('detalhamento.complementar')) return 'comp';
+  if (key.startsWith('detalhamento.aquisicao')) return 'aq';
+  if (key.startsWith('detalhamento.distribuicao')) return 'dist';
+  if (key.startsWith('detalhamento.fiscalizacao')) return 'fisc';
+  if (key.startsWith('detalhamento.regulacao')) return 'reg';
+  return null;
+}
+
 interface UseFormRendererProps {
   schema: FormSchema;
   initialData?: Record<string, any>;
@@ -123,6 +145,32 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
     });
   }, []);
 
+  // Monitor operacional: total da seção Custo = soma automática dos elementos de despesa
+  useEffect(() => {
+    if (!schema?.agravo?.includes('Monitoramento operacional')) return;
+    const keys = [
+      'custo.el_339014',
+      'custo.el_339030',
+      'custo.el_339033',
+      'custo.el_339036',
+      'custo.el_339039',
+    ];
+    let sum = 0;
+    for (const k of keys) {
+      const v = get(formData, k);
+      if (v === '' || v === null || v === undefined) continue;
+      const n = Number(v);
+      if (Number.isFinite(n)) sum += n;
+    }
+    const rounded = Math.round(sum * 100) / 100;
+    const current = get(formData, 'custo.total');
+    const curNum = current === '' || current === null || current === undefined ? NaN : Number(current);
+    const curRounded = Number.isFinite(curNum) ? Math.round(curNum * 100) / 100 : null;
+    if (curRounded === null || curRounded !== rounded) {
+      setValue('custo.total', rounded);
+    }
+  }, [formData, schema?.agravo, setValue]);
+
   const getValue = useCallback(
     (key: string) => {
       return get(formData, key);
@@ -178,9 +226,47 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
       if (key === 'paciente.distrito_sanitario' || key === 'paciente.polo_base' || key === 'paciente.aldeia') {
         return getValue('paciente.vive_aldeado') === '1';
       }
+      // Monitoramento operacional: detalhamento condicionado à atividade e à área
+      if (schema?.agravo?.includes('Monitoramento operacional') && key.startsWith('detalhamento.')) {
+        const atividade = getValue('acao.atividade');
+        const area = getValue('acao.area');
+        const g = monitorOperDetalhamentoGroup(key);
+        if (g) {
+          if (!atividade) return false;
+          if (g === 'cap' && atividade !== 'capacitacao') return false;
+          if (g === 'av' && atividade !== 'avaliacao') return false;
+          if (g === 'comp' && atividade !== 'acao_complementar') return false;
+          if (g === 'aq' && atividade !== 'aquisicao') return false;
+          if (g === 'dist' && atividade !== 'distribuicao') return false;
+          if (g === 'fisc') {
+            const areaOk = area === 'vigilancia_sanitaria' || area === 'vigilancia_ambiental_trabalhador';
+            if (!areaOk || atividade !== 'fiscalizacao_inspecao') return false;
+          }
+          if (g === 'reg') {
+            if (area !== 'vigilancia_sanitaria' || atividade !== 'regulacao') return false;
+          }
+        }
+        if (key === 'detalhamento.complementar_detalhe') {
+          const v = getValue('detalhamento.complementar_descricao');
+          if (!(v === 'acoes_prevencao_saude' || v === 'acoes_diagnostico')) return false;
+        }
+      }
+      // Monitor operacional: impacto conforme área da vigilância
+      if (schema?.agravo?.includes('Monitoramento operacional') && monitorOperImpactoGroup(key)) {
+        const area = getValue('acao.area');
+        if (!area) return false;
+        const ig = monitorOperImpactoGroup(key);
+        if (ig === 'epi') {
+          if (area === 'vigilancia_sanitaria' || area === 'vigilancia_ambiental_trabalhador') return false;
+        } else if (ig === 'san') {
+          if (area !== 'vigilancia_sanitaria') return false;
+        } else if (ig === 'amb') {
+          if (area !== 'vigilancia_ambiental_trabalhador') return false;
+        }
+      }
       return fieldVisibility[key] !== false;
     },
-    [fieldVisibility, getValue]
+    [fieldVisibility, getValue, schema]
   );
 
   const isFieldRequired = useCallback(

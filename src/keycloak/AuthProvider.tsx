@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import axios from '../utils/axiosRetry'; // Usar axios com retry configurado
 
 const AuthContext = createContext<any>(null);
+const USE_INTERNAL_AUTH = (import.meta as any).env?.VITE_USE_INTERNAL_AUTH === 'true';
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState(null);
@@ -26,7 +27,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
     
     // Tentar login normal via API
-    axios.get('/api-auth/protected/profile', { withCredentials: true })
+    axios.get(USE_INTERNAL_AUTH ? '/api/auth/profile' : '/api-auth/protected/profile', { withCredentials: true })
       .then(res => {
         setUser(res.data);
         // Limpar modo offline se conseguir conectar
@@ -52,8 +53,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       setRetryMessage(null);
       
-      await axios.post('/api-auth/auth/login', { username, password }, { withCredentials: true });
-      const res = await axios.get('/api-auth/protected/profile', { withCredentials: true });
+      await axios.post(USE_INTERNAL_AUTH ? '/api/auth/login' : '/api-auth/auth/login', { username, password }, { withCredentials: true });
+      const res = await axios.get(USE_INTERNAL_AUTH ? '/api/auth/profile' : '/api-auth/protected/profile', { withCredentials: true });
       
       setUser(res.data);
     } catch (error: any) {
@@ -66,7 +67,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     try {
-      await axios.post('/api-auth/auth/logout', {}, { withCredentials: true });
+      await axios.post(USE_INTERNAL_AUTH ? '/api/auth/logout' : '/api-auth/auth/logout', {}, { withCredentials: true });
     } catch (error) {
       console.warn('Erro no logout, mas prosseguindo...', error);
     } finally {

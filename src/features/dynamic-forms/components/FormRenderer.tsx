@@ -32,6 +32,7 @@ import {
 } from './SpecialFields';
 import { EstadoMunicipioNotificacao } from './EstadoMunicipioNotificacao';
 import { EstabelecimentoNotificacao } from './EstabelecimentoNotificacao';
+import UnidadeNotificadoraField from '@/features/notificationForms/components/UnidadeNotificadoraField';
 import { EstadoMunicipioResidencia } from './EstadoMunicipioResidencia';
 import { TableField } from './TableField';
 import { ClipboardList, Calendar, DollarSign, Target, Activity, Shield, Leaf, BarChart3, Wrench, Users } from 'lucide-react';
@@ -205,6 +206,24 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       .sort((a, b) => a.order - b.order);
   }, [schema]);
 
+  const detalhamentoFieldKeys = React.useMemo(
+    () => schema.sections.find((s) => s.id === 'detalhamento')?.fields.map((f) => f.key) ?? [],
+    [schema],
+  );
+
+  const monitorOperImpactFieldKeys = React.useMemo(
+    () =>
+      schema.sections
+        .flatMap((s) => s.fields ?? [])
+        .map((f) => f.key)
+        .filter((k) => /^(imp_epi|imp_san|imp_amb)\./.test(k)),
+    [schema],
+  );
+
+  const clearDetalhamento = useCallback(() => {
+    detalhamentoFieldKeys.forEach((k) => setValue(k, undefined));
+  }, [detalhamentoFieldKeys, setValue]);
+
   // Retorno da assinatura Gov.br: preencher campo ou exibir erro e limpar hash/query
   useEffect(() => {
     const params = new URLSearchParams(
@@ -304,8 +323,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     const key = String(field?.key || '');
     // Em vários instrumentos a "descrição" funciona melhor em meia coluna,
     // para permitir o próximo campo ao lado.
-    if (key === 'detalhamento.avaliacao_como') return false; // manter cheio
-    return key.includes('descricao') || key === 'detalhamento.capacitacao_como';
+    return key.includes('descricao');
   };
 
   const normalizeMaiusculo = (v: any) => {
@@ -352,8 +370,30 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       ? { ...field, type: over.type, options: over.options ?? field.options, apiSelectEndpoint: over.apiSelectEndpoint ?? field.apiSelectEndpoint, maxLength: over.maxLength ?? field.maxLength }
       : field;
     const placeholder = residenciaPlaceholders[base.key];
-    if (placeholder != null) return { ...base, placeholder: base.placeholder ?? placeholder };
-    return base;
+    const withPlaceholder =
+      placeholder != null ? { ...base, placeholder: base.placeholder ?? placeholder } : base;
+
+    if (field.key === 'detalhamento.complementar_detalhe') {
+      const parent = getValue('detalhamento.complementar_descricao');
+      const optPrevencao = [
+        { value: 'imunizacao', label: 'Imunização' },
+        { value: 'controle_vetorial', label: 'Controle Vetorial' },
+        { value: 'controle_reservatorios', label: 'Controle de Reservatórios' },
+      ];
+      const optDiagnostico = [
+        { value: 'coleta_material', label: 'Coleta de Material' },
+        { value: 'realizacao_exames', label: 'Realização de Exames' },
+      ];
+      const options =
+        parent === 'acoes_prevencao_saude'
+          ? optPrevencao
+          : parent === 'acoes_diagnostico'
+            ? optDiagnostico
+            : [];
+      return { ...withPlaceholder, options };
+    }
+
+    return withPlaceholder;
   };
 
   const renderField = (field: any) => {
@@ -370,6 +410,25 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
 
     if (!visible) {
       return null;
+    }
+
+    if (resolved.type === 'estabelecimento-search') {
+      return (
+        <div className={`mb-4 ${disabled ? 'pointer-events-none opacity-60' : ''}`}>
+          <UnidadeNotificadoraField
+            value={value != null && value !== '' ? String(value) : ''}
+            onChange={(newValue) => {
+              const id = newValue ? Number(newValue) : NaN;
+              setValue(resolved.key, Number.isFinite(id) ? id : undefined);
+            }}
+            label={resolved.label + (required ? ' *' : '')}
+            placeholder="Pesquise por código (CNES) ou nome (mín. 3 caracteres)"
+            allowAllEstablishments
+            hasError={!!error}
+            errorMessage={error || ''}
+          />
+        </div>
+      );
     }
 
     const commonProps = {
@@ -584,7 +643,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             return <CnaeSearchField {...commonProps} />;
           }
           if (resolved.key === 'paciente.pais_nascimento_id' || resolved.key === 'residencia.pais') {
-            return <ApiSelectSearchField {...commonProps} />;
+            return <ApiSelectSearchField {...commonProps} getValue={getValue} />;
           }
           if (resolved.key === 'paciente.qual_povo_tradicional') {
             return (
@@ -598,7 +657,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             );
           }
           if (resolved.key === 'paciente.etnia') {
-            return <ApiSelectSearchField {...commonProps} />;
+            return <ApiSelectSearchField {...commonProps} getValue={getValue} />;
           }
           if (resolved.key === 'paciente.raca_cor') {
             return (
@@ -628,7 +687,38 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
               />
             );
           }
-          return <ApiSelectField {...commonProps} />;
+        if (resolved.key === 'acao.programa_alcancado') {
+          const semArea = !getValue('acao.area');
+          return <ApiSelectField {...commonProps} disabled={disabled || semArea} getValue={getValue} />;
+        }
+        if (resolved.key === 'acao.atividade') {
+          return (
+            <ApiSelectField
+              {...commonProps}
+              getValue={getValue}
+              onChange={(val: any) => {
+                setValue(resolved.key, val);
+                clearDetalhamento();
+              }}
+            />
+          );
+        }
+        return <ApiSelectField {...commonProps} getValue={getValue} />;
+        }
+        // Ao mudar Área da vigilância, limpar Atividade (seletor dependente)
+        if (resolved.key === 'acao.area') {
+          return (
+            <SelectField
+              {...commonProps}
+              onChange={(val: any) => {
+                setValue(resolved.key, val);
+                setValue('acao.atividade', undefined);
+                setValue('acao.programa_alcancado', undefined);
+                clearDetalhamento();
+                monitorOperImpactFieldKeys.forEach((k) => setValue(k, false));
+              }}
+            />
+          );
         }
         // É estrangeiro?: ao mudar, limpar documento que não se aplica e ajustar país de nascimento
         if (resolved.key === 'paciente.e_estrangeiro') {
@@ -660,6 +750,17 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                   setValue('paciente.qual_povo_tradicional', undefined);
                   setValue('paciente.outro_povo_tradicional', undefined);
                 }
+              }}
+            />
+          );
+        }
+        if (resolved.key === 'detalhamento.complementar_descricao') {
+          return (
+            <SelectField
+              {...commonProps}
+              onChange={(val: any) => {
+                setValue(resolved.key, val);
+                setValue('detalhamento.complementar_detalhe', undefined);
               }}
             />
           );
@@ -728,12 +829,6 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
 
       {sectionsToRender.map((section) => {
           const sortedFields = [...section.fields].sort((a, b) => a.order - b.order);
-          const firstNotificationLocationKey = sortedFields.find((f) =>
-            NOTIFICATION_LOCATION_KEYS.has(f.key)
-          )?.key;
-          const firstEstabelecimentoKey = sortedFields.find((f) =>
-            NOTIFICATION_ESTABELECIMENTO_KEYS.has(f.key)
-          )?.key;
           const firstNotificationField = sortedFields.find(
             (f) =>
               NOTIFICATION_LOCATION_KEYS.has(f.key) ||
@@ -769,6 +864,17 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                 </div>
                 <div className="p-4 rounded-b-xl">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {section.description ? (
+                    <div className="md:col-span-2 text-sm text-gray-600 mb-1">{section.description}</div>
+                  ) : null}
+                  {section.id === 'detalhamento' &&
+                  String(schema.agravo || '').includes('Monitoramento operacional') &&
+                  !getValue('acao.atividade') ? (
+                    <div className="md:col-span-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                      Selecione a <strong>Atividade</strong> na seção &quot;Ação realizada&quot; para exibir os campos de
+                      detalhamento correspondentes.
+                    </div>
+                  ) : null}
                 {sortedFields.map((field) => {
                   // Bloco único: Estabelecimento de saúde de notificação (UF, Município, Estabelecimento). Data da notificação fica em Dados do paciente.
                   if (firstNotificationField && field.key === firstNotificationField.key) {
@@ -895,15 +1001,91 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                   }
                   if (IDENTIFICACAO_BLOCK_KEYS.has(field.key)) return null;
                   if (field.key === 'paciente.pais_nascimento') return null;
+                  if (section.id === 'detalhamento' && field.key === 'detalhamento.complementar_descricao') {
+                    const parentVal = getValue('detalhamento.complementar_descricao');
+                    const subVisivel =
+                      parentVal === 'acoes_prevencao_saude' || parentVal === 'acoes_diagnostico';
+                    const detalheFieldDef = sortedFields.find((f) => f.key === 'detalhamento.complementar_detalhe');
+                    return (
+                      <div key="detalhamento-complementar-bloco" className="md:col-span-2">
+                        <div className={subVisivel ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : 'grid grid-cols-1'}>
+                          <div className="min-w-0">{renderField(field)}</div>
+                          {subVisivel && detalheFieldDef ? (
+                            <div className="min-w-0">{renderField(detalheFieldDef)}</div>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  }
+                  if (section.id === 'detalhamento' && field.key === 'detalhamento.complementar_detalhe') {
+                    return null;
+                  }
+                  if (section.id === 'detalhamento' && field.key === 'detalhamento.aquisicao_descricao') {
+                    const quantFieldDef = sortedFields.find((f) => f.key === 'detalhamento.aquisicao_quantificacao');
+                    return (
+                      <div key="detalhamento-aquisicao-bloco" className="md:col-span-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="min-w-0">{renderField(field)}</div>
+                          {quantFieldDef ? <div className="min-w-0">{renderField(quantFieldDef)}</div> : null}
+                        </div>
+                      </div>
+                    );
+                  }
+                  if (section.id === 'detalhamento' && field.key === 'detalhamento.aquisicao_quantificacao') {
+                    return null;
+                  }
+                  if (section.id === 'detalhamento' && field.key === 'detalhamento.distribuicao_descricao') {
+                    const quantDistFieldDef = sortedFields.find(
+                      (f) => f.key === 'detalhamento.distribuicao_quantificacao',
+                    );
+                    return (
+                      <div key="detalhamento-distribuicao-bloco" className="md:col-span-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="min-w-0">{renderField(field)}</div>
+                          {quantDistFieldDef ? (
+                            <div className="min-w-0">{renderField(quantDistFieldDef)}</div>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  }
+                  if (section.id === 'detalhamento' && field.key === 'detalhamento.distribuicao_quantificacao') {
+                    return null;
+                  }
+                  if (section.id === 'detalhamento' && field.key === 'detalhamento.fiscalizacao_descricao') {
+                    const estFieldDef = sortedFields.find((f) => f.key === 'detalhamento.fiscalizacao_estabelecimento_id');
+                    return (
+                      <div key="detalhamento-fiscalizacao-bloco" className="md:col-span-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="min-w-0">{renderField(field)}</div>
+                          {estFieldDef ? <div className="min-w-0">{renderField(estFieldDef)}</div> : null}
+                        </div>
+                      </div>
+                    );
+                  }
+                  if (section.id === 'detalhamento' && field.key === 'detalhamento.fiscalizacao_estabelecimento_id') {
+                    return null;
+                  }
+                  if (section.id === 'detalhamento' && field.key === 'detalhamento.regulacao_descricao') {
+                    return (
+                      <div key="detalhamento-regulacao-bloco" className="md:col-span-2">
+                        {renderField(field)}
+                      </div>
+                    );
+                  }
                   const content = renderField(field);
                   if (content == null) return null;
                   return (
                     <div
                       key={field.key}
                       className={
-                        isFullWidth(field.type) && !isHalfWidthDescription(field)
+                        field.key === 'detalhamento.avaliacao_como' ||
+                        field.key === 'detalhamento.complementar_pop_coberta' ||
+                        /^(imp_epi|imp_san|imp_amb)\./.test(field.key)
                           ? 'md:col-span-2'
-                          : ''
+                          : isFullWidth(field.type) && !isHalfWidthDescription(field)
+                            ? 'md:col-span-2'
+                            : ''
                       }
                     >
                       {content}

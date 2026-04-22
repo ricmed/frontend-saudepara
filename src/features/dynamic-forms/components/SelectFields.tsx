@@ -95,6 +95,8 @@ interface SelectFieldProps {
   error?: string;
   required?: boolean;
   disabled?: boolean;
+  /** Lê valores de outros campos do formulário (para filtros/params). */
+  getValue?: (key: string) => any;
 }
 
 /** Posiciona menu flutuante em coordenadas da viewport (evita recorte por overflow em cards/seções). */
@@ -141,6 +143,7 @@ export const ApiSelectField: React.FC<SelectFieldProps> = ({
   error,
   required,
   disabled,
+  getValue,
 }) => {
   const [options, setOptions] = useState<Array<{ value: string; label: string }>>(field.options || []);
   const [loading, setLoading] = useState(true);
@@ -157,7 +160,12 @@ export const ApiSelectField: React.FC<SelectFieldProps> = ({
     (async () => {
       try {
         const url = `${API_BASE}/${endpoint}`;
-        const { data } = await axios.get<any[]>(url, { withCredentials: true });
+        const params: Record<string, any> = {};
+        for (const k of (field as any).apiSelectEndpointParams || []) {
+          const v = getValue?.(k);
+          if (v !== undefined && v !== null && v !== '') params[k] = v;
+        }
+        const { data } = await axios.get<any[]>(url, { withCredentials: true, params });
         if (cancelled) return;
         const list = Array.isArray(data) ? data : [];
         const opts = list.map((item: any) => {
@@ -172,7 +180,11 @@ export const ApiSelectField: React.FC<SelectFieldProps> = ({
       }
     })();
     return () => { cancelled = true; };
-  }, [(field as FormField & { apiSelectEndpoint?: string }).apiSelectEndpoint]);
+  }, [
+    (field as FormField & { apiSelectEndpoint?: string }).apiSelectEndpoint,
+    JSON.stringify((field as any).apiSelectEndpointParams || []),
+    ...(((field as any).apiSelectEndpointParams || []) as string[]).map((k: string) => getValue?.(k)),
+  ]);
 
   return (
     <div className="mb-4">
@@ -424,7 +436,7 @@ export const CboSearchField: React.FC<SelectFieldProps> = ({
   const selectedLabel = value ? options.find((o) => o.value === value)?.label : '';
   const displayValue = showDropdown
     ? searchTerm
-    : (normalizeMaiusculoSemAcento(displayLabel || selectedLabel) || (loading && value ? 'Carregando...' : ''));
+    : (normalizeMaiusculoSemAcento((displayLabel || selectedLabel || '')) || (loading && value ? 'Carregando...' : ''));
 
   return (
     <div className="mb-4">
@@ -551,7 +563,7 @@ export const CnaeSearchField: React.FC<SelectFieldProps> = ({
   const selectedLabel = value ? options.find((o) => o.value === value)?.label : '';
   const displayValue = showDropdown
     ? searchTerm
-    : (normalizeMaiusculoSemAcento(displayLabel || selectedLabel) || (loading && value ? 'Carregando...' : ''));
+    : (normalizeMaiusculoSemAcento((displayLabel || selectedLabel || '')) || (loading && value ? 'Carregando...' : ''));
 
   return (
     <div className="mb-4">

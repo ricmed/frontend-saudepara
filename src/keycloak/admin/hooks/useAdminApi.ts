@@ -2,7 +2,8 @@
 import { useState, useCallback } from 'react';
 import type { UseApiOptions, UseApiReturn } from '../types/admin.types';
 
-const API_BASE = '/api-auth/admin';
+const USE_INTERNAL_AUTH = (import.meta as any).env?.VITE_USE_INTERNAL_AUTH === 'true';
+const API_BASE = USE_INTERNAL_AUTH ? '/api/auth/admin' : '/api-auth/admin';
 
 interface ApiRequestOptions extends RequestInit {
   endpoint: string;
