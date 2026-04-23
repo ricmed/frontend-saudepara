@@ -16,11 +16,14 @@ export default defineConfig(({ mode }) => {
       : `${pkgJson.version}-${mode}-${Date.now()}`);
   const isHomologacao = env.VITE_ENV === 'homologacao';
   const isProducao = env.VITE_ENV === 'producao';
+  const useInternalAuth = env.VITE_USE_INTERNAL_AUTH === 'true';
   const API_AUTH_URL = isHomologacao
     ? 'https://app.hml.saude.pa.gov.br/'
     : isProducao
       ? 'https://app.saude.pa.gov.br/'
-      : 'http://localhost:4000';
+      : useInternalAuth
+        ? 'http://localhost:3000'
+        : 'http://localhost:4000';
   const API_BACKEND_URL = isHomologacao
     ? 'https://app.hml.saude.pa.gov.br/'
     : isProducao
@@ -31,6 +34,7 @@ export default defineConfig(({ mode }) => {
   console.log('📍', isHomologacao ? 'HOMOLOGAÇÃO' : isProducao ? 'PRODUÇÃO' : 'DESENVOLVIMENTO');
   console.log('🔐 API Auth proxy:', API_AUTH_URL);
   console.log('⚡ API Backend proxy:', API_BACKEND_URL);
+  console.log('🧩 Internal auth:', useInternalAuth ? 'ON' : 'OFF');
 
   return {
   plugins: [
@@ -362,6 +366,11 @@ export default defineConfig(({ mode }) => {
         changeOrigin: true,
         secure: false,
         timeout: 10000,
+        rewrite: (p) =>
+          p
+            .replace(/^\/api-auth\/auth\//, '/api/auth/')
+            .replace(/^\/api-auth\/protected\/profile$/, '/api/auth/profile')
+            .replace(/^\/api-auth\/admin\//, '/api/auth/admin/'),
         configure: (proxy) => {
           proxy.on('error', (err) => {
             console.log('❌ Proxy error - usando fallback para produção:', (err as any).code || err.message);
@@ -401,6 +410,11 @@ export default defineConfig(({ mode }) => {
         changeOrigin: true,
         secure: false,
         timeout: 10000,
+        rewrite: (p) =>
+          p
+            .replace(/^\/api-auth\/auth\//, '/api/auth/')
+            .replace(/^\/api-auth\/protected\/profile$/, '/api/auth/profile')
+            .replace(/^\/api-auth\/admin\//, '/api/auth/admin/'),
       },
       '/api': {
         target: API_BACKEND_URL,
