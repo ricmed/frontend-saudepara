@@ -101,7 +101,9 @@ export default defineConfig(({ mode }) => {
       },
       
       strategies: 'generateSW',
-      injectRegister: 'auto',
+      // Já registramos manualmente em `src/registerSW.ts` (chamado em `src/main.tsx`).
+      // Evita script injetado duplicado que pode quebrar em alguns ambientes (ex.: "Unexpected token 'export'").
+      injectRegister: null,
       
       // Em dev, SW + CacheFirst em *.jpg pode guardar o index.html (fallback SPA) como "imagem"
       // quando o ficheiro ainda não existe em public — depois o browser mostra bandeira quebrada.

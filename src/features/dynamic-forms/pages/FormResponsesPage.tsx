@@ -194,7 +194,6 @@ export const FormResponsesPage: React.FC = () => {
     setSheetVisibleKeys(sheetColumns.map((c) => c.key));
     setShowSheetColumns(false);
     setSheetColQuery('');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showSheet, sheetColumns.length]);
 
   useEffect(() => {

@@ -29,7 +29,6 @@ export const FormResponsesSummaryPage: React.FC = () => {
   useEffect(() => {
     if (!Number.isFinite(formId)) return;
     load(status);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formId]);
 
   return (
