@@ -10,6 +10,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [retryMessage, setRetryMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    let alive = true;
+
     // 🆕 Verificar se há login offline ativo
     const offlineMode = localStorage.getItem('offline_mode');
     const userData = localStorage.getItem('user_data');
@@ -18,8 +20,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('🔄 Detectado login offline, carregando usuário...');
       try {
         const parsedUser = JSON.parse(userData);
-        setUser(parsedUser);
-        setLoading(false);
+        if (alive) {
+          setUser(parsedUser);
+          setLoading(false);
+        }
         return;
       } catch (error) {
         console.error('Erro ao carregar dados offline:', error);
@@ -27,15 +31,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
     
     // Tentar login normal via API
-    axios.get(USE_INTERNAL_AUTH ? '/api/auth/profile' : '/api-auth/protected/profile', { withCredentials: true })
-      .then(res => {
+    // Em homologação, SW/proxy às vezes pode deixar a request "pendurada".
+    // Para evitar loop infinito no login, forçamos timeout e um fallback de segurança.
+    const safetyTimer = window.setTimeout(() => {
+      if (!alive) return;
+      console.warn('⏳ Timeout ao verificar autenticação. Prosseguindo como não autenticado.');
+      setUser(null);
+      setLoading(false);
+    }, 12_000);
+
+    axios
+      .get(USE_INTERNAL_AUTH ? '/api/auth/profile' : '/api-auth/protected/profile', {
+        withCredentials: true,
+        timeout: 10_000,
+      })
+      .then((res) => {
+        if (!alive) return;
         setUser(res.data);
         // Limpar modo offline se conseguir conectar
         localStorage.removeItem('offline_mode');
         localStorage.removeItem('user_data');
       })
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (!alive) return;
+        setUser(null);
+        // não travar o app em homologação quando o backend responde 401/erro
+        console.warn('Falha ao verificar autenticação:', err);
+      })
+      .finally(() => {
+        window.clearTimeout(safetyTimer);
+        if (!alive) return;
+        setLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
   }, []);
 
   // 🆕 Listener para evento de login offline
