@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FormService, { type Form } from '@/services/FormService';
-import { Plus, Edit, Eye, Trash2, FileText, Copy, Settings, Power } from 'lucide-react';
+import { Plus, Edit, Eye, Trash2, FileText, Copy, Settings, Power, FileSpreadsheet } from 'lucide-react';
 import { useAuth } from '@/keycloak/AuthProvider';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 
@@ -11,21 +11,31 @@ export const FormAdminListPage: React.FC = () => {
   const [forms, setForms] = useState<Form[]>([]);
   const [loading, setLoading] = useState(true);
   const [duplicating, setDuplicating] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [scope, setScope] = useState<'all' | 'sinan' | 'general'>('all');
+  const [isActive, setIsActive] = useState<'all' | 'true' | 'false'>('all');
+  const [visibility, setVisibility] = useState<'all' | 'PRIVATE' | 'UNLISTED' | 'PUBLIC'>('all');
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
-    loadForms();
-  }, []);
+    loadForms(1);
+  }, [scope, isActive, visibility]);
 
-  const loadForms = async () => {
+  const loadForms = async (p = 1) => {
     try {
       setLoading(true);
-      const data = await FormService.getAllForms();
-      // Ordenar: ativos primeiro, depois inativos
-      const sortedData = data.sort((a, b) => {
-        if (a.is_active === b.is_active) return 0;
-        return a.is_active ? -1 : 1;
+      const res = await FormService.getAdminForms({
+        page: p,
+        limit: 30,
+        scope,
+        search: search.trim() ? search.trim() : undefined,
+        is_active: isActive === 'all' ? undefined : isActive === 'true',
+        visibility: visibility === 'all' ? undefined : (visibility as any),
       });
-      setForms(sortedData);
+      setForms(res.data);
+      setPage(res.page);
+      setTotalPages(res.totalPages);
     } catch (err) {
       console.error('Erro ao carregar formulários:', err);
     } finally {
@@ -150,7 +160,7 @@ export const FormAdminListPage: React.FC = () => {
   return (
     <AppPageLayout
       title="Gerenciar Formulários"
-      subtitle="Criar e editar formulários de notificação"
+      subtitle="Todos os formulários (SINAN + Gerais)"
       icon={<FileText className="h-8 w-8" />}
       variant="desktop"
       showBottomNav={false}
@@ -166,6 +176,89 @@ export const FormAdminListPage: React.FC = () => {
         </button>
       }
     >
+      <div className="bg-white rounded-lg shadow p-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="md:col-span-2">
+            <label className="block text-xs text-gray-600 mb-1">Buscar</label>
+            <div className="flex gap-2">
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Nome, código (form_key) ou slug…"
+                className="w-full border rounded px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => loadForms(1)}
+                className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+              >
+                Buscar
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">Escopo</label>
+            <select
+              value={scope}
+              onChange={(e) => setScope(e.target.value as any)}
+              className="w-full border rounded px-3 py-2 text-sm"
+            >
+              <option value="all">Todos</option>
+              <option value="sinan">SINAN (interno)</option>
+              <option value="general">Gerais (Meus formulários)</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">Ativo</label>
+            <select
+              value={isActive}
+              onChange={(e) => setIsActive(e.target.value as any)}
+              className="w-full border rounded px-3 py-2 text-sm"
+            >
+              <option value="all">Todos</option>
+              <option value="true">Somente ativos</option>
+              <option value="false">Somente inativos</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">Visibilidade</label>
+            <select
+              value={visibility}
+              onChange={(e) => setVisibility(e.target.value as any)}
+              className="w-full border rounded px-3 py-2 text-sm"
+            >
+              <option value="all">Todas</option>
+              <option value="PRIVATE">Privado</option>
+              <option value="UNLISTED">Não listado</option>
+              <option value="PUBLIC">Público</option>
+            </select>
+          </div>
+        </div>
+        <div className="flex items-center justify-between mt-3">
+          <span className="text-xs text-gray-600">
+            Página {page} de {totalPages}
+          </span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => loadForms(Math.max(1, page - 1))}
+              disabled={page <= 1}
+              className="px-3 py-1 rounded border text-sm disabled:opacity-50"
+            >
+              Anterior
+            </button>
+            <button
+              type="button"
+              onClick={() => loadForms(Math.min(totalPages, page + 1))}
+              disabled={page >= totalPages}
+              className="px-3 py-1 rounded border text-sm disabled:opacity-50"
+            >
+              Próxima
+            </button>
+          </div>
+        </div>
+      </div>
+
       {forms.length === 0 ? (
         <div className="bg-white rounded-lg shadow p-8 sm:p-12 text-center">
           <FileText className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-4" />
@@ -218,6 +311,21 @@ export const FormAdminListPage: React.FC = () => {
                     </span>
                   )}
                 </div>
+                <div className="flex flex-wrap gap-2 text-xs mb-3">
+                  <span className="px-2 py-1 rounded bg-slate-100 text-slate-700">
+                    {form.owner_user_id ? 'GERAL' : 'SINAN'}
+                  </span>
+                  {form.visibility ? (
+                    <span className="px-2 py-1 rounded bg-amber-50 text-amber-700">
+                      {form.visibility}
+                    </span>
+                  ) : null}
+                  {form.slug ? (
+                    <span className="px-2 py-1 rounded bg-emerald-50 text-emerald-700">
+                      /f/{form.slug}
+                    </span>
+                  ) : null}
+                </div>
 
                 <div className="space-y-2">
                   <div className="flex gap-2">
@@ -227,6 +335,13 @@ export const FormAdminListPage: React.FC = () => {
                     >
                       <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
                       <span className="hidden sm:inline">Editar</span>
+                    </button>
+                    <button
+                      onClick={() => navigate(`/private/formularios-admin/respostas/${form.id}`)}
+                      className="px-2 sm:px-4 py-2 bg-emerald-50 text-emerald-700 rounded hover:bg-emerald-100"
+                      title="Ver respostas / exportar"
+                    >
+                      <FileSpreadsheet className="h-3 w-3 sm:h-4 sm:w-4" />
                     </button>
                     <button
                       onClick={() => handleToggleActive(form)}

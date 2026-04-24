@@ -302,7 +302,10 @@ export const DynamicFormPage: React.FC = () => {
         )}
 
         <FormRenderer
-          schema={formVersion.schema_json}
+          schema={{
+            ...formVersion.schema_json,
+            title: formVersion.form?.nome || formVersion.schema_json.title,
+          }}
           initialData={initialData}
           onSubmit={handleSubmit}
           onSaveDraft={isViewMode ? undefined : handleSaveDraft}

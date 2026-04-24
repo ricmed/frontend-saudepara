@@ -61,6 +61,14 @@ interface Role {
   description?: string;
 }
 
+function normalizeRole(r: any): Role {
+  const name = String(r?.name ?? '').trim();
+  // No Keycloak, roles têm `id`. No auth interno, retornamos apenas `{ name }`.
+  // Para a UI funcionar igual, usamos `name` como identificador.
+  const id = String(r?.id ?? name).trim();
+  return { id, name, description: r?.description };
+}
+
 const UserForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -407,7 +415,7 @@ const UserForm: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         console.log('✅ Roles carregadas:', data);
-        setRoles(data);
+        setRoles((Array.isArray(data) ? data : []).map(normalizeRole));
       } else {
         console.error('❌ Erro ao carregar roles:', response.status, response.statusText);
         const errorText = await response.text();
@@ -558,7 +566,7 @@ const UserForm: React.FC = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        setUserRoles(data);
+        setUserRoles((Array.isArray(data) ? data : []).map(normalizeRole));
       }
     } catch (error) {
       console.error('Erro ao carregar roles do usuário:', error);
@@ -956,11 +964,11 @@ const UserForm: React.FC = () => {
   const handleRoleToggle = async (role: Role) => {
     // No modo de criação, apenas atualizar o estado local
     if (!id) {
-      const hasRole = userRoles.some(ur => ur.id === role.id);
+      const hasRole = userRoles.some(ur => ur.id === role.id || ur.name === role.name);
       
       if (hasRole) {
         // Remover role do estado local
-        setUserRoles(prev => prev.filter(ur => ur.id !== role.id));
+        setUserRoles(prev => prev.filter(ur => ur.id !== role.id && ur.name !== role.name));
         console.log('🔑 Role removida (modo criação):', role.name);
       } else {
         // Adicionar role ao estado local
@@ -972,7 +980,7 @@ const UserForm: React.FC = () => {
 
     // No modo de edição, atualizar via API
     try {
-      const hasRole = userRoles.some(ur => ur.id === role.id);
+      const hasRole = userRoles.some(ur => ur.id === role.id || ur.name === role.name);
       
       if (hasRole) {
         // Remover role via API
@@ -988,7 +996,7 @@ const UserForm: React.FC = () => {
           const errData = await delRes.json().catch(() => ({}));
           throw new Error(errData?.error || 'Erro ao remover role');
         }
-        setUserRoles(prev => prev.filter(ur => ur.id !== role.id));
+        setUserRoles(prev => prev.filter(ur => ur.id !== role.id && ur.name !== role.name));
         console.log('🔑 Role removida (modo edição):', role.name);
       } else {
         // Adicionar role via API
