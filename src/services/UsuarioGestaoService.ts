@@ -440,6 +440,16 @@ class UsuarioGestaoService {
   }
 
   /**
+   * ✅ Novo: lista paginada de userIds por CRS
+   */
+  async getUserIdsByCrs(crsId: number, first: number = 0, max: number = 20): Promise<{ items: string[]; total: number; first: number; max: number }> {
+    const response = await this.backendApi.get(`/usuario-acesso/user-ids/crs/${crsId}`, {
+      params: { first, max },
+    });
+    return response.data.data;
+  }
+
+  /**
    * Deletar todos os acessos de um usuário (para atualização)
    */
   async deleteUserAccess(userId: string): Promise<void> {

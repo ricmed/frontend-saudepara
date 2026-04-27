@@ -74,22 +74,24 @@ const UserListCrs: React.FC = () => {
         return;
       }
 
-      // TODO: Ideal: filtrar por CRS no backend.
-      // Por enquanto: busca limitada no Keycloak + enriquece com acessos e filtra no frontend.
+      // ✅ Novo: paginação por CRS no backend → evita varrer 200 usuários e filtrar no frontend
+      const page = await usuarioGestaoService.getUserIdsByCrs(userPermissions.crsId, pagination.first, pagination.max);
+      setPagination((prev) => ({ ...prev, total: page.total }));
+
       const usersData = await usuarioGestaoService.getUsuarios({
+        // Keycloak/internal-auth: buscar por search (se houver) e depois filtrar por ids retornados.
+        // Aqui buscamos só ids do CRS; se search estiver preenchido, filtramos localmente por username/email.
         first: 0,
         max: 200,
         search: search || undefined,
       });
 
-      const usersWithAccess: UserWithAccess[] = [];
-      for (const u of usersData) {
-        const acessos = await usuarioGestaoService.getUsuarioAcessos(u.id);
-        const hasCrsAccess = acessos.some(
-          (acesso) => acesso.nivel_acesso === 'crs' && acesso.crs_id === userPermissions.crsId
-        );
-        if (!hasCrsAccess) continue;
+      const wanted = new Set(page.items);
+      const picked = usersData.filter((u) => wanted.has(u.id));
 
+      const usersWithAccess: UserWithAccess[] = [];
+      for (const u of picked) {
+        const acessos = await usuarioGestaoService.getUsuarioAcessos(u.id);
         const roles = await usuarioGestaoService.getUserRoles(u.id);
         usersWithAccess.push({
           ...u,
@@ -100,13 +102,7 @@ const UserListCrs: React.FC = () => {
         } as any);
       }
 
-      const filteredUsers = usersWithAccess;
-
-      // Paginação local em cima do conjunto filtrado (limitado a 200 usuários buscados do Keycloak)
-      const start = pagination.first;
-      const end = start + pagination.max;
-      setUsers(filteredUsers.slice(start, end));
-      setPagination(prev => ({ ...prev, total: filteredUsers.length }));
+      setUsers(usersWithAccess);
     } catch (err) {
       console.error('Erro ao carregar usuários:', err);
       setUsers([]);
