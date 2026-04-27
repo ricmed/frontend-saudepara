@@ -23,9 +23,20 @@ export interface FormScopeAclItem {
   created_at: string;
 }
 
+export interface ScopeTargetPick {
+  id: number;
+  label: string;
+  meta?: any;
+}
+
 class FormScopeAclService {
   async list(formId: number): Promise<FormScopeAclItem[]> {
     const response = await api.get(`/forms/${formId}/scope-acl`);
+    return response.data;
+  }
+
+  async searchTargets(formId: number, params: { type: FormScopeType; q: string }): Promise<ScopeTargetPick[]> {
+    const response = await api.get(`/forms/${formId}/scope-acl/targets`, { params });
     return response.data;
   }
 

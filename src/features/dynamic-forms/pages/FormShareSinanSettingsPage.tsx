@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 import FormService, { type Form } from '@/services/FormService';
 import FormAclService, { type FormAclItem, type FormAclRole, type UserPick } from '@/services/FormAclService';
-import FormScopeAclService, { type FormScopeAclItem, type FormScopeType } from '@/services/FormScopeAclService';
+import FormScopeAclService, { type FormScopeAclItem, type FormScopeType, type ScopeTargetPick } from '@/services/FormScopeAclService';
 import { Shield, FileText, Plus, Trash2 } from 'lucide-react';
 
 export const FormShareSinanSettingsPage: React.FC = () => {
@@ -25,7 +25,9 @@ export const FormShareSinanSettingsPage: React.FC = () => {
 
   // scope ACL add
   const [scopeType, setScopeType] = useState<FormScopeType>('CRS');
-  const [scopeId, setScopeId] = useState<string>('');
+  const [scopeQuery, setScopeQuery] = useState<string>('');
+  const [scopeResults, setScopeResults] = useState<ScopeTargetPick[]>([]);
+  const [selectedScopeTarget, setSelectedScopeTarget] = useState<ScopeTargetPick | null>(null);
   const [scopeRole, setScopeRole] = useState<FormAclRole>('VIEWER');
   const [savingScope, setSavingScope] = useState(false);
 
@@ -103,11 +105,8 @@ export const FormShareSinanSettingsPage: React.FC = () => {
   };
 
   const addOrUpdateScope = async () => {
-    const idNum = Number(scopeId);
-    if (!Number.isFinite(idNum) || idNum <= 0) {
-      alert('scope_id inválido');
-      return;
-    }
+    const idNum = selectedScopeTarget?.id;
+    if (!idNum) return;
     try {
       setSavingScope(true);
       const item = await FormScopeAclService.upsert(formId, { scope_type: scopeType, scope_id: idNum, role: scopeRole });
@@ -117,7 +116,9 @@ export const FormShareSinanSettingsPage: React.FC = () => {
         );
         return [...other, item].sort((a, b) => `${a.scope_type}:${a.scope_id}`.localeCompare(`${b.scope_type}:${b.scope_id}`));
       });
-      setScopeId('');
+      setScopeQuery('');
+      setScopeResults([]);
+      setSelectedScopeTarget(null);
       setScopeRole('VIEWER');
       setScopeType('CRS');
     } catch (e: any) {
@@ -126,6 +127,25 @@ export const FormShareSinanSettingsPage: React.FC = () => {
       setSavingScope(false);
     }
   };
+
+  const searchScopeTargets = async (q: string) => {
+    const term = q.trim();
+    if (term.length < 2) {
+      setScopeResults([]);
+      return;
+    }
+    try {
+      const hits = await FormScopeAclService.searchTargets(formId, { type: scopeType, q: term });
+      setScopeResults(hits);
+    } catch {
+      setScopeResults([]);
+    }
+  };
+
+  useEffect(() => {
+    const t = setTimeout(() => searchScopeTargets(scopeQuery), 250);
+    return () => clearTimeout(t);
+  }, [scopeQuery, scopeType]);
 
   const removeScope = async (item: FormScopeAclItem) => {
     try {
@@ -271,13 +291,36 @@ export const FormShareSinanSettingsPage: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm text-gray-700 mb-1">ID</label>
+                <label className="block text-sm text-gray-700 mb-1">Buscar</label>
                 <input
-                  value={scopeId}
-                  onChange={(e) => setScopeId(e.target.value)}
-                  placeholder="ex.: 12"
+                  value={scopeQuery}
+                  onChange={(e) => {
+                    setScopeQuery(e.target.value);
+                    setSelectedScopeTarget(null);
+                  }}
+                  placeholder={scopeType === 'UNIDADE' ? 'Nome, CNES…' : 'Nome, código…'}
                   className="w-full border rounded px-3 py-2"
                 />
+
+                {scopeResults.length > 0 && (
+                  <div className="mt-2 border rounded bg-white max-h-56 overflow-auto">
+                    {scopeResults.map((t) => (
+                      <button
+                        key={`${t.id}`}
+                        type="button"
+                        onClick={() => {
+                          setSelectedScopeTarget(t);
+                          setScopeResults([]);
+                          setScopeQuery(t.label);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-50"
+                      >
+                        <div className="text-sm font-medium text-gray-900">{t.label}</div>
+                        <div className="text-xs text-gray-500">ID: {t.id}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm text-gray-700 mb-1">Papel</label>
