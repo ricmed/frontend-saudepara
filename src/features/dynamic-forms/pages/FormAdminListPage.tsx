@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FormService, { type Form } from '@/services/FormService';
-import { Plus, Edit, Eye, Trash2, FileText, Copy, Settings, Power, FileSpreadsheet } from 'lucide-react';
+import { Plus, Edit, Eye, Trash2, FileText, Copy, Settings, Power, FileSpreadsheet, Shield } from 'lucide-react';
 import { useAuth } from '@/keycloak/AuthProvider';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 
@@ -335,6 +335,13 @@ export const FormAdminListPage: React.FC = () => {
                     >
                       <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
                       <span className="hidden sm:inline">Editar</span>
+                    </button>
+                    <button
+                      onClick={() => navigate(`/private/formularios-admin/${form.id}/compartilhar`)}
+                      className="px-2 sm:px-4 py-2 bg-slate-50 text-slate-700 rounded hover:bg-slate-100"
+                      title="Compartilhar (permissões)"
+                    >
+                      <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
                     </button>
                     <button
                       onClick={() => navigate(`/private/formularios-admin/respostas/${form.id}`)}

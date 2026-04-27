@@ -146,6 +146,7 @@ import { FormResponsesPage } from '@/features/dynamic-forms/pages/FormResponsesP
 import { FormResponsesSummaryPage } from '@/features/dynamic-forms/pages/FormResponsesSummaryPage';
 import { MyFormsPage } from '@/features/dynamic-forms/pages/MyFormsPage';
 import { FormShareSettingsPage } from '@/features/dynamic-forms/pages/FormShareSettingsPage';
+import { FormShareSinanSettingsPage } from '@/features/dynamic-forms/pages/FormShareSinanSettingsPage';
 // Componente de layout protegido
 const ProtectedLayout = () => {
   return (
@@ -386,6 +387,7 @@ function App() {
               <Route path="/private/formularios-admin" element={<FormAdminListPage />} />
               <Route path="/private/formularios-admin/novo" element={<FormBuilderPage />} />
               <Route path="/private/formularios-admin/editar/:id" element={<FormBuilderPage />} />
+              <Route path="/private/formularios-admin/:id/compartilhar" element={<FormShareSinanSettingsPage />} />
               <Route path="/private/formularios-admin/respostas/:id" element={<FormResponsesPage />} />
               <Route path="/private/formularios-admin/respostas/:id/resumo" element={<FormResponsesSummaryPage />} />
             </Route>
