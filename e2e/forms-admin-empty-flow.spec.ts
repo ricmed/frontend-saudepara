@@ -185,7 +185,8 @@ test.describe('Formulários — admin e estado vazio', () => {
     await page.getByRole('button', { name: 'Cadastrar Primeira Notificação' }).click();
 
     await expect(page).toHaveURL(/\/private\/formularios\/EMPTY_IT\/nova\/?$/);
-    await expect(page.getByRole('heading', { name: 'EMPTY_IT' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('heading', { name: /Nova Notificação/i, level: 1 })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('EMPTY_IT')).toBeVisible();
     await expect(page.getByPlaceholder('empty-flow-ph')).toBeVisible();
   });
 });

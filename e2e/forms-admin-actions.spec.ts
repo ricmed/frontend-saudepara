@@ -105,7 +105,7 @@ test.describe('Admin formulários — duplicar / toggle / delete', () => {
 
     await expect(page).not.toHaveURL(/\/access-denied/);
     await expect(page.getByRole('heading', { name: 'Gerenciar Formulários' })).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText('Ativo', { exact: true })).toBeVisible();
+    await expect(page.locator('span').filter({ hasText: /^Ativo$/ }).first()).toBeVisible();
 
     await page.getByTitle('Desativar formulário').click();
 

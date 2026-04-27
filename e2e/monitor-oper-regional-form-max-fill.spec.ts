@@ -174,9 +174,10 @@ test.describe('Monitor operacional — preenchimento ampliado (UI)', () => {
 
     await page.goto('/private/formularios/MONITOR_OPER_REGIONAL/nova');
     await expect(page).not.toHaveURL(/\/login$/);
-    await expect(page.getByRole('heading', { name: /Monitoramento operacional/i, level: 1 })).toBeVisible({
+    await expect(page.getByRole('heading', { name: /Nova Notificação/i, level: 1 })).toBeVisible({
       timeout: 60_000,
     });
+    await expect(page.getByText(/Monitoramento operacional/i)).toBeVisible();
 
     const compBlock = page.locator('div.mb-4').filter({ hasText: 'Competência (mês/ano)' }).first();
     await compBlock.getByRole('combobox').selectOption('02');
