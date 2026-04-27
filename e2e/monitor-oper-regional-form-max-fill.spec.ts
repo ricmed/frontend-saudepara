@@ -177,7 +177,7 @@ test.describe('Monitor operacional — preenchimento ampliado (UI)', () => {
     await expect(page.getByRole('heading', { name: /Nova Notificação/i, level: 1 })).toBeVisible({
       timeout: 60_000,
     });
-    await expect(page.getByText(/Monitoramento operacional/i)).toBeVisible();
+    await expect(page.getByText(/Monitor operacional/i).first()).toBeVisible();
 
     const compBlock = page.locator('div.mb-4').filter({ hasText: 'Competência (mês/ano)' }).first();
     await compBlock.getByRole('combobox').selectOption('02');
