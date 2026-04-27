@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FormService, { type Form } from '@/services/FormService';
-import { FileText, ClipboardList } from 'lucide-react';
+import { ClipboardList, Shield } from 'lucide-react';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 
 export const FormsListPage: React.FC = () => {
@@ -105,6 +105,22 @@ export const FormsListPage: React.FC = () => {
                   <p className="text-gray-600 text-sm mb-4 line-clamp-3">
                     {form.descricao}
                   </p>
+                )}
+                {form.my_role === 'ADMIN' && (
+                  <div className="mb-4">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/private/formularios/${form.id}/permissoes`);
+                      }}
+                      className="inline-flex items-center gap-2 px-3 py-2 bg-slate-50 text-slate-800 rounded hover:bg-slate-100 border"
+                      title="Gerenciar permissões deste formulário (SINAN)"
+                    >
+                      <Shield className="h-4 w-4" />
+                      Permissões
+                    </button>
+                  </div>
                 )}
                 <div className="flex items-center justify-between text-sm text-gray-500 border-t pt-4">
                   <span>

@@ -32,6 +32,8 @@ export interface Form {
   descricao?: string;
   status: string;
   is_active: boolean;
+  /** Papel do usuário atual no formulário (somente em algumas listagens internas). */
+  my_role?: 'ADMIN' | 'EDITOR' | 'VIEWER' | null;
   active_version_id?: number;
   categoria?: string;
   visibility?: 'PRIVATE' | 'UNLISTED' | 'PUBLIC';

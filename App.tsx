@@ -375,6 +375,14 @@ function App() {
               
               {/* ✅ NOVO: Rotas de Formulários Dinâmicos (SINAN/e-SUS style) */}
               <Route path="/private/formularios" element={<FormsListPage />} />
+              <Route
+                path="/private/formularios/:id/permissoes"
+                element={
+                  <ProtectedRoute>
+                    <FormShareSinanSettingsPage />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/private/formularios/:agravo/relatorio" element={<MonitorOperRegionalReportPage />} />
               <Route path="/private/formularios/:agravo" element={<FormSubmissionsListPage />} />
               <Route path="/private/formularios/:agravo/nova" element={<DynamicFormPage />} />
