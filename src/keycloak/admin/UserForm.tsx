@@ -61,6 +61,18 @@ interface Role {
   description?: string;
 }
 
+function normalizeRole(r: any): Role {
+  const name = String(r?.name ?? '').trim();
+  // No Keycloak, roles têm `id`. No auth interno, retornamos apenas `{ name }`.
+  // Para a UI funcionar igual, usamos `name` como identificador.
+  const id = String(r?.id ?? name).trim();
+  return { id, name, description: r?.description };
+}
+
+const USE_INTERNAL_AUTH = (import.meta as any).env?.VITE_USE_INTERNAL_AUTH === 'true';
+const ADMIN_API_BASE = USE_INTERNAL_AUTH ? '/api/auth/admin' : '/api-auth/admin';
+const adminUrl = (p: string) => `${ADMIN_API_BASE}${p.startsWith('/') ? '' : '/'}${p}`;
+
 const UserForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -394,7 +406,7 @@ const UserForm: React.FC = () => {
   const loadRoles = async () => {
     try {
       console.log('🔑 Carregando roles do Keycloak...');
-      const response = await fetch('/api-auth/admin/roles', {
+      const response = await fetch(adminUrl('/roles'), {
         credentials: 'include',
         headers: {
           'Accept': 'application/json',
@@ -407,7 +419,7 @@ const UserForm: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         console.log('✅ Roles carregadas:', data);
-        setRoles(data);
+        setRoles((Array.isArray(data) ? data : []).map(normalizeRole));
       } else {
         console.error('❌ Erro ao carregar roles:', response.status, response.statusText);
         const errorText = await response.text();
@@ -426,7 +438,7 @@ const UserForm: React.FC = () => {
       console.log('📥 Carregando dados do usuário:', id);
       
       // Carregar dados básicos do Keycloak
-      const response = await fetch(`/api-auth/admin/users/${id}`, {
+      const response = await fetch(adminUrl(`/users/${id}`), {
         credentials: 'include',
       });
 
@@ -553,12 +565,12 @@ const UserForm: React.FC = () => {
     if (!id) return;
 
     try {
-      const response = await fetch(`/api-auth/admin/users/${id}/roles`, {
+      const response = await fetch(adminUrl(`/users/${id}/roles`), {
         credentials: 'include',
       });
       if (response.ok) {
         const data = await response.json();
-        setUserRoles(data);
+        setUserRoles((Array.isArray(data) ? data : []).map(normalizeRole));
       }
     } catch (error) {
       console.error('Erro ao carregar roles do usuário:', error);
@@ -714,7 +726,7 @@ const UserForm: React.FC = () => {
       let response;
       if (isEditMode) {
         // Atualizar usuário
-        response = await fetch(`/api-auth/admin/users/${id}`, {
+        response = await fetch(adminUrl(`/users/${id}`), {
           method: 'PUT',
           credentials: 'include',
           headers: {
@@ -725,7 +737,7 @@ const UserForm: React.FC = () => {
 
         // Se há nova senha, resetar senha
         if (formData.password) {
-          const resetRes = await fetch(`/api-auth/admin/users/${id}/reset-password`, {
+          const resetRes = await fetch(adminUrl(`/users/${id}/reset-password`), {
             method: 'PUT',
             credentials: 'include',
             headers: {
@@ -749,7 +761,7 @@ const UserForm: React.FC = () => {
       } else {
         // Criar usuário
         console.log('🚀 Iniciando criação de usuário...');
-        response = await fetch('/api-auth/admin/users', {
+        response = await fetch(adminUrl('/users'), {
           method: 'POST',
           credentials: 'include',
           headers: {
@@ -800,7 +812,7 @@ const UserForm: React.FC = () => {
           // Se não tiver ID na resposta, buscar o usuário pelo username
           if (!userId) {
             console.log('🔍 Buscando ID do usuário criado pelo username:', formData.username);
-            const searchResponse = await fetch(`/api-auth/admin/users?username=${encodeURIComponent(formData.username)}`, {
+            const searchResponse = await fetch(adminUrl(`/users?username=${encodeURIComponent(formData.username)}`), {
               credentials: 'include',
             });
             
@@ -820,7 +832,7 @@ const UserForm: React.FC = () => {
           console.error('❌ Erro ao processar resposta de criação:', parseError);
           // Como último recurso, tentar buscar por username
           console.log('🔍 Tentativa final: buscando usuário pelo username');
-          const searchResponse = await fetch(`/api-auth/admin/users?username=${encodeURIComponent(formData.username)}`, {
+          const searchResponse = await fetch(adminUrl(`/users?username=${encodeURIComponent(formData.username)}`), {
             credentials: 'include',
           });
           
@@ -845,7 +857,7 @@ const UserForm: React.FC = () => {
         if (userRoles.length > 0) {
           console.log('🔑 Atribuindo roles ao usuário criado:', userRoles.map(r => r.name));
           try {
-            const roleRes = await fetch(`/api-auth/admin/users/${userId}/roles`, {
+            const roleRes = await fetch(adminUrl(`/users/${userId}/roles`), {
               method: 'POST',
               credentials: 'include',
               headers: {
@@ -956,11 +968,11 @@ const UserForm: React.FC = () => {
   const handleRoleToggle = async (role: Role) => {
     // No modo de criação, apenas atualizar o estado local
     if (!id) {
-      const hasRole = userRoles.some(ur => ur.id === role.id);
+      const hasRole = userRoles.some(ur => ur.id === role.id || ur.name === role.name);
       
       if (hasRole) {
         // Remover role do estado local
-        setUserRoles(prev => prev.filter(ur => ur.id !== role.id));
+        setUserRoles(prev => prev.filter(ur => ur.id !== role.id && ur.name !== role.name));
         console.log('🔑 Role removida (modo criação):', role.name);
       } else {
         // Adicionar role ao estado local
@@ -972,11 +984,11 @@ const UserForm: React.FC = () => {
 
     // No modo de edição, atualizar via API
     try {
-      const hasRole = userRoles.some(ur => ur.id === role.id);
+      const hasRole = userRoles.some(ur => ur.id === role.id || ur.name === role.name);
       
       if (hasRole) {
         // Remover role via API
-        const delRes = await fetch(`/api-auth/admin/users/${id}/roles`, {
+        const delRes = await fetch(adminUrl(`/users/${id}/roles`), {
           method: 'DELETE',
           credentials: 'include',
           headers: {
@@ -988,11 +1000,11 @@ const UserForm: React.FC = () => {
           const errData = await delRes.json().catch(() => ({}));
           throw new Error(errData?.error || 'Erro ao remover role');
         }
-        setUserRoles(prev => prev.filter(ur => ur.id !== role.id));
+        setUserRoles(prev => prev.filter(ur => ur.id !== role.id && ur.name !== role.name));
         console.log('🔑 Role removida (modo edição):', role.name);
       } else {
         // Adicionar role via API
-        const addRes = await fetch(`/api-auth/admin/users/${id}/roles`, {
+        const addRes = await fetch(adminUrl(`/users/${id}/roles`), {
           method: 'POST',
           credentials: 'include',
           headers: {

@@ -108,7 +108,8 @@ test.describe('Formulário dinâmico (nova notificação)', () => {
     await page.goto('/private/formularios/e2e_it/nova');
 
     await expect(page).not.toHaveURL(/\/login$/);
-    await expect(page.getByRole('heading', { name: 'E2E_IT' })).toBeVisible({ timeout: 30_000 });
+    // O renderer exibe o nome do formulário quando disponível.
+    await expect(page.getByRole('heading', { name: 'Formulário E2E' })).toBeVisible({ timeout: 30_000 });
 
     const submit = page.getByRole('button', { name: 'Enviar' });
     await expect(submit).toBeVisible({ timeout: 30_000 });

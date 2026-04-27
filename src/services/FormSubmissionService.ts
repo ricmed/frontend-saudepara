@@ -66,6 +66,8 @@ export interface FormSubmissionFilters {
   competencia?: string;
   page?: number;
   limit?: number;
+  /** `1` = incluir `data_json` (monitoramento / relatórios; combine com paginação). */
+  with_form_payload?: '1';
 }
 
 export interface FormSubmissionListResponse {
@@ -94,6 +96,32 @@ class FormSubmissionService {
       console.error('Erro ao buscar submissions:', error);
       throw error;
     }
+  }
+
+  /**
+   * Busca todas as páginas com `data_json` (até `maxPages` páginas × `pageSize` itens).
+   * Uso: consolidados QDQQ / relatório operacional regional.
+   */
+  async getSubmissionsAllPagesWithFormPayload(
+    form_version_id: number,
+    opts?: { pageSize?: number; maxPages?: number },
+  ): Promise<FormSubmission[]> {
+    const pageSize = opts?.pageSize ?? 500;
+    const maxPages = opts?.maxPages ?? 200;
+    const out: FormSubmission[] = [];
+    let page = 1;
+    while (page <= maxPages) {
+      const res = await this.getSubmissions({
+        form_version_id,
+        limit: pageSize,
+        page,
+        with_form_payload: '1',
+      });
+      out.push(...res.data);
+      if (page >= res.totalPages || res.data.length === 0) break;
+      page += 1;
+    }
+    return out;
   }
 
   // Buscar submission por ID

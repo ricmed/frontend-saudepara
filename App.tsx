@@ -137,9 +137,16 @@ import VersionPage from '@/pages/VersionPage';
 // Dynamic Forms System
 import { DynamicFormPage } from '@/features/dynamic-forms/pages/DynamicFormPage';
 import { FormsListPage } from '@/features/dynamic-forms/pages/FormsListPage';
-import { FormBuilderPage } from '@/features/dynamic-forms/pages/FormBuilderPage';
+import FormBuilderPage from '@/features/dynamic-forms/pages/FormBuilderPage';
 import { FormAdminListPage } from '@/features/dynamic-forms/pages/FormAdminListPage';
 import { FormSubmissionsListPage } from '@/features/dynamic-forms/pages/FormSubmissionsListPage';
+import { MonitorOperRegionalReportPage } from '@/features/dynamic-forms/pages/MonitorOperRegionalReportPage';
+import { PublicDynamicFormPage } from '@/features/dynamic-forms/pages/PublicDynamicFormPage';
+import { FormResponsesPage } from '@/features/dynamic-forms/pages/FormResponsesPage';
+import { FormResponsesSummaryPage } from '@/features/dynamic-forms/pages/FormResponsesSummaryPage';
+import { MyFormsPage } from '@/features/dynamic-forms/pages/MyFormsPage';
+import { FormShareSettingsPage } from '@/features/dynamic-forms/pages/FormShareSettingsPage';
+import { FormShareSinanSettingsPage } from '@/features/dynamic-forms/pages/FormShareSinanSettingsPage';
 // Componente de layout protegido
 const ProtectedLayout = () => {
   return (
@@ -368,6 +375,15 @@ function App() {
               
               {/* ✅ NOVO: Rotas de Formulários Dinâmicos (SINAN/e-SUS style) */}
               <Route path="/private/formularios" element={<FormsListPage />} />
+              <Route
+                path="/private/formularios/:id/permissoes"
+                element={
+                  <ProtectedRoute>
+                    <FormShareSinanSettingsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="/private/formularios/:agravo/relatorio" element={<MonitorOperRegionalReportPage />} />
               <Route path="/private/formularios/:agravo" element={<FormSubmissionsListPage />} />
               <Route path="/private/formularios/:agravo/nova" element={<DynamicFormPage />} />
               <Route path="/private/formularios/:agravo/editar/:id" element={<DynamicFormPage />} />
@@ -379,7 +395,16 @@ function App() {
               <Route path="/private/formularios-admin" element={<FormAdminListPage />} />
               <Route path="/private/formularios-admin/novo" element={<FormBuilderPage />} />
               <Route path="/private/formularios-admin/editar/:id" element={<FormBuilderPage />} />
+              <Route path="/private/formularios-admin/:id/compartilhar" element={<FormShareSinanSettingsPage />} />
+              <Route path="/private/formularios-admin/respostas/:id" element={<FormResponsesPage />} />
+              <Route path="/private/formularios-admin/respostas/:id/resumo" element={<FormResponsesSummaryPage />} />
             </Route>
+
+            {/* ✅ Google-Forms-like: Meus formulários (criadores) */}
+            <Route path="/private/meus-formularios" element={<MyFormsPage />} />
+            <Route path="/private/meus-formularios/novo" element={<FormBuilderPage />} />
+            <Route path="/private/meus-formularios/:id/compartilhar" element={<FormShareSettingsPage />} />
+          <Route path="/private/meus-formularios/:id/editar" element={<FormBuilderPage />} />
             
             {/* ✅ NOVO: Rota de Lista de Pacientes - Protegida apenas para Admin Master */}
             <Route element={<ProtectedRoute requiredRoles={['admin']}><Outlet /></ProtectedRoute>}>
@@ -413,6 +438,7 @@ function App() {
           {/* Rotas Públicas */}
           <Route path="/" element={<DesktopPage />} />          
           <Route path="/teste" element={<HomePage />} />
+          <Route path="/f/:slug" element={<PublicDynamicFormPage />} />
           <Route path="/mapa" element={<MapaLeaflet />} />
           <Route path="/mapa-google" element={<MapaPage />} />
           <Route path="/mapa-google/fullscreen" element={<MapaPage fullScreen={true} />} />

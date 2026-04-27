@@ -66,11 +66,17 @@ test.describe('Admin formulários — duplicar / toggle / delete', () => {
         pathname = '';
       }
 
-      if (method === 'GET' && pathname === '/api/forms') {
+      if (method === 'GET' && pathname === '/api/forms/admin') {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify([{ ...baseForm, is_active: currentActive }]),
+          body: JSON.stringify({
+            data: [{ ...baseForm, is_active: currentActive }],
+            total: 1,
+            page: 1,
+            limit: 30,
+            totalPages: 1
+          }),
         });
       }
 
@@ -99,7 +105,7 @@ test.describe('Admin formulários — duplicar / toggle / delete', () => {
 
     await expect(page).not.toHaveURL(/\/access-denied/);
     await expect(page.getByRole('heading', { name: 'Gerenciar Formulários' })).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText('Ativo', { exact: true })).toBeVisible();
+    await expect(page.locator('span').filter({ hasText: /^Ativo$/ }).first()).toBeVisible();
 
     await page.getByTitle('Desativar formulário').click();
 
@@ -125,11 +131,17 @@ test.describe('Admin formulários — duplicar / toggle / delete', () => {
         pathname = '';
       }
 
-      if (method === 'GET' && pathname === '/api/forms') {
+      if (method === 'GET' && pathname === '/api/forms/admin') {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify([baseForm]),
+          body: JSON.stringify({
+            data: [baseForm],
+            total: 1,
+            page: 1,
+            limit: 30,
+            totalPages: 1
+          }),
         });
       }
 
@@ -240,11 +252,17 @@ test.describe('Admin formulários — duplicar / toggle / delete', () => {
         search = '';
       }
 
-      if (method === 'GET' && pathname === '/api/forms') {
+      if (method === 'GET' && pathname === '/api/forms/admin') {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify([baseForm]),
+          body: JSON.stringify({
+            data: [baseForm],
+            total: 1,
+            page: 1,
+            limit: 30,
+            totalPages: 1
+          }),
         });
       }
 

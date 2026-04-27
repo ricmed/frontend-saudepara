@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { Suspense, useMemo, useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/keycloak/AuthProvider';
 import FormService, { type FormSchema, type FormSection, type FormField, type FormRule, type RuleCondition, type RuleAction, type TableColumnDef } from '@/services/FormService';
 import DatabaseService, { type TableColumn } from '@/services/DatabaseService';
 import { Plus, Trash2, Save, Eye, Settings, GripVertical, X, Download, Upload, ChevronUp, ChevronDown, Code, FileEdit, Check } from 'lucide-react';
 import { ClipboardList, Calendar, DollarSign, Target, Activity, Shield, Leaf, BarChart3, Wrench, Users } from 'lucide-react';
+import dynamicIconImports from 'lucide-react/dynamicIconImports';
 import { FormRenderer } from '../components/FormRenderer';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 
@@ -12,7 +13,11 @@ export const FormBuilderPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isGeneralBuilder = typeof window !== 'undefined' && window.location.pathname.includes('/private/meus-formularios/');
   const [loading, setLoading] = useState(false);
+  const canSeeAdvanced = Array.isArray((user as any)?.roles) && (user as any).roles.includes('admin');
+  const [showTechnicalNames, setShowTechnicalNames] = useState(false);
+  const [rulesSimpleMode, setRulesSimpleMode] = useState(true);
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formKey, setFormKey] = useState('');
@@ -31,13 +36,12 @@ export const FormBuilderPage: React.FC = () => {
   const [previewData, setPreviewData] = useState<Record<string, any>>({});
   const [previewPanel, setPreviewPanel] = useState<'form' | 'json'>('form');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [dropTarget, setDropTarget] = useState<{ sectionIdx: number; fieldIdx: number } | null>(null);
-  const [sectionDropIdx, setSectionDropIdx] = useState<number | null>(null);
   
   // Estados para configuração de banco de dados
   const [availableTables, setAvailableTables] = useState<string[]>([]);
   const [availableColumns, setAvailableColumns] = useState<Record<string, TableColumn[]>>({});
   const [loadingTables, setLoadingTables] = useState(false);
+  const [tableSearch, setTableSearch] = useState('');
 
   useEffect(() => {
     if (id) {
@@ -47,12 +51,52 @@ export const FormBuilderPage: React.FC = () => {
     loadCategorias();
   }, [id]);
 
+  const makeFormKeyFromName = (name: string) => {
+    const raw = String(name || '').trim();
+    if (!raw) return '';
+    const normalized = raw
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase();
+    const cleaned = normalized
+      .replace(/[^A-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 50);
+    return cleaned;
+  };
+
+  // Auto-gerar o "código" a partir do nome para usuários não-TI.
+  // Por padrão o usuário não edita isso na UI; preservamos apenas ao editar formulário existente.
+  useEffect(() => {
+    if (id) return; // ao editar existente, respeitar o form_key persistido
+    const next = makeFormKeyFromName(formName);
+    setFormKey(next);
+  }, [formName, id]);
+
+  useEffect(() => {
+    // no contexto "Meus formulários", default é categoria geral
+    if (isGeneralBuilder && !id) {
+      setCategoria('eventos_inscricoes');
+    }
+  }, [isGeneralBuilder, id]);
+
   const loadCategorias = async () => {
     try {
       const cats = await FormService.getCategories();
-      setCategoriasDisponiveis(cats);
+      const generalKeys = new Set([
+        'eventos_inscricoes',
+        'ouvidoria_atendimento',
+        'pesquisas_avaliacoes',
+        'capacitacoes_educacao_permanente',
+        'gestao_administrativo',
+        'comunicacao',
+        'outros_geral',
+      ]);
+      const sinanKeys = new Set(['notificacao', 'investigacao', 'encerramento']);
+      const filtered = (cats || []).filter((c) => (isGeneralBuilder ? generalKeys.has(c.key) : sinanKeys.has(c.key)));
+      setCategoriasDisponiveis(filtered);
       // Se categoria atual não existe mais, zera para forçar seleção válida (sem fallback)
-      if (cats.length > 0 && !cats.some((c) => c.key === categoria)) {
+      if (filtered.length > 0 && !filtered.some((c) => c.key === categoria)) {
         setCategoria('');
       }
     } catch (err) {
@@ -69,7 +113,7 @@ export const FormBuilderPage: React.FC = () => {
       setFormName(form.nome);
       setFormDescription(form.descricao || '');
       setFormKey(form.form_key);
-      setCategoria(form.categoria || 'notificacao');
+      setCategoria(form.categoria || (isGeneralBuilder ? 'eventos_inscricoes' : 'notificacao'));
       
       // Buscar versão ativa e carregar o schema
       if (form.active_version_id && form.versions) {
@@ -100,6 +144,50 @@ export const FormBuilderPage: React.FC = () => {
       setLoadingTables(false);
     }
   };
+
+  const databaseTableLabels: Record<string, string> = {
+    tipo_estado: 'Estados (UF)',
+    tipo_municipio: 'Municípios',
+    tipo_bairro: 'Bairros',
+    tipo_genero: 'Gênero / Sexo',
+    tipo_raca: 'Raça/Cor',
+    tipo_escolaridade: 'Escolaridade',
+    tipo_cbo: 'Ocupação (CBO)',
+    tipo_cnae: 'Atividade econômica (CNAE)',
+    tipo_pais: 'Países',
+    code_list: 'Listas (Code lists)',
+    code_list_item: 'Itens de lista (Code lists)',
+    crs: 'CRS',
+    nhe: 'NHE',
+  };
+
+  const prettyTableName = (t: string) => databaseTableLabels[t] || t;
+
+  const databaseTableDefaults: Record<string, { value: string; label: string }> = {
+    // Tipos: normalmente salva "codigo" e exibe "descricao"
+    tipo_estado: { value: 'codigo', label: 'descricao' },
+    tipo_municipio: { value: 'codigo', label: 'descricao' },
+    tipo_bairro: { value: 'idtipo_bairro', label: 'descricao' },
+    tipo_genero: { value: 'codigo', label: 'descricao' },
+    tipo_raca: { value: 'codigo', label: 'descricao' },
+    tipo_escolaridade: { value: 'codigo', label: 'descricao' },
+    tipo_cbo: { value: 'codigo', label: 'descricao' },
+    tipo_cnae: { value: 'codigo', label: 'descricao' },
+    tipo_pais: { value: 'codigo', label: 'descricao' },
+    // Code list
+    code_list: { value: 'key', label: 'name' },
+    code_list_item: { value: 'value', label: 'label' },
+    // Outras
+    crs: { value: 'codigo', label: 'descricao' },
+    nhe: { value: 'codigo', label: 'nome' },
+  };
+
+  const filteredTables = useMemo(() => {
+    const q = (tableSearch || '').trim().toLowerCase();
+    const list = availableTables || [];
+    if (!q) return list;
+    return list.filter((t) => `${t} ${prettyTableName(t)}`.toLowerCase().includes(q));
+  }, [availableTables, tableSearch]);
 
   const loadColumns = async (table: string) => {
     if (availableColumns[table]) return; // Já carregou
@@ -294,27 +382,65 @@ export const FormBuilderPage: React.FC = () => {
         return;
       }
 
+      const computedKey =
+        (formKey || '').trim() ||
+        makeFormKeyFromName(formName) ||
+        (isGeneralBuilder ? `FORM_${Date.now().toString(36).toUpperCase()}`.slice(0, 50) : '');
+
+      if (!computedKey && !id) {
+        alert('Informe um código do formulário (form_key).');
+        return;
+      }
+
       const formData = {
-        nome: formName,
-        form_key: formKey,
-        descricao: formDescription,
+        nome: (formName || '').trim(),
+        form_key: computedKey,
+        descricao: (formDescription || '').trim(),
         categoria,
         created_by: userId
       };
+      if (!formData.nome) {
+        alert('Informe o nome do formulário.');
+        return;
+      }
 
       let formId: number;
       if (id) {
-        await FormService.updateForm(parseInt(id), formData);
+        if (isGeneralBuilder) {
+          // "Meus formulários": atualizar via rota /forms/me (ACL)
+          await FormService.updateMyForm(parseInt(id), {
+            nome: formData.nome,
+            descricao: formData.descricao,
+            categoria: formData.categoria,
+          });
+        } else {
+          await FormService.updateForm(parseInt(id), formData);
+        }
         formId = parseInt(id);
       } else {
-        const newForm = await FormService.createForm(formData);
-        formId = newForm.id;
+        if (isGeneralBuilder) {
+          const newForm = await FormService.createMyForm({
+            form_key: formData.form_key,
+            nome: formData.nome,
+            descricao: formData.descricao || undefined,
+            categoria: formData.categoria,
+            visibility: 'PRIVATE',
+            require_login: false,
+          });
+          formId = newForm.id;
+          // após criar no contexto geral, a URL deve virar /:id/editar pra não salvar sempre "novo"
+          navigate(`/private/meus-formularios/${formId}/editar`, { replace: true });
+        } else {
+          const newForm = await FormService.createForm(formData);
+          formId = newForm.id;
+        }
       }
 
       // Criar versão e publicar automaticamente
       const schemaToSave = {
         ...schema,
-        agravo: formKey
+        agravo: computedKey,
+        title: (formData.nome || '').trim() || undefined,
       };
 
       const version = await FormService.createVersion(formId, {
@@ -328,7 +454,7 @@ export const FormBuilderPage: React.FC = () => {
       await FormService.publishVersion(formId, version.id, userId);
 
       alert('Formulário salvo e publicado com sucesso!');
-      navigate('/private/formularios-admin');
+      navigate(isGeneralBuilder ? '/private/meus-formularios' : '/private/formularios-admin');
     } catch (err: any) {
       console.error('Erro ao salvar:', err);
       const errorMsg = err?.response?.data?.message || err?.message || 'Erro desconhecido';
@@ -446,6 +572,13 @@ export const FormBuilderPage: React.FC = () => {
     setSchema({ ...schema, rules: newRules });
   };
 
+  const addQuickRuleAction = (ruleIdx: number, type: 'then' | 'else', action: RuleAction['action']) => {
+    const newAction: RuleAction = { action, target: '' };
+    const newRules = [...(schema.rules || [])];
+    newRules[ruleIdx][type] = [...(newRules[ruleIdx][type] || []), newAction];
+    setSchema({ ...schema, rules: newRules });
+  };
+
   const updateRuleAction = (ruleIdx: number, type: 'then' | 'else', actionIdx: number, updates: Partial<RuleAction>) => {
     const newRules = [...(schema.rules || [])];
     const actions = [...(newRules[ruleIdx][type] || [])];
@@ -489,6 +622,10 @@ export const FormBuilderPage: React.FC = () => {
     return list;
   };
 
+  const getSectionsForRules = (): Array<{ id: string; title: string }> => {
+    return (schema.sections || []).map((s) => ({ id: String(s.id), title: String(s.title || s.id) }));
+  };
+
   // Dado o key do campo da condição (left), retorna o campo do schema para pegar opções
   const getConditionField = (fieldKey: string): FormField | undefined => {
     for (const section of schema.sections || []) {
@@ -498,74 +635,391 @@ export const FormBuilderPage: React.FC = () => {
     return undefined;
   };
 
-  const fieldTypes = [
-    { value: 'text', label: '📝 Texto' },
-    { value: 'number', label: '🔢 Número' },
-    { value: 'currency', label: '💰 Moeda (R$)' },
-    { value: 'accounting', label: '🧾 Contábil (R$)' },
-    { value: 'date', label: '📅 Data' },
-    { value: 'month', label: '📅 Mês/Ano' },
-    { value: 'month-year', label: '📅 Mês/Ano (select + ano)' },
-    { value: 'datetime', label: '🕐 Data e Hora' },
-    { value: 'time', label: '⏰ Hora' },
-    { value: 'email', label: '📧 Email' },
-    { value: 'phone', label: '📱 Telefone' },
-    { value: 'international-phone', label: '🌍 Telefone Internacional' },
-    { value: 'cpf', label: '🆔 CPF' },
-    { value: 'address', label: '🏠 Endereço Completo' },
-    { value: 'textarea', label: '📄 Texto Longo' },
-    { value: 'checkbox', label: '☑️ Checkbox' },
-    { value: 'checkbox-group', label: '☑️ Grupo de Checkboxes' },
-    { value: 'radio', label: '🔘 Radio Button' },
-    { value: 'select', label: '📋 Seleção' },
-    { value: 'select-search', label: '🔍 Seleção com Busca' },
-    { value: 'multi-select', label: '📋 Seleção Múltipla' },
-    { value: 'file', label: '📁 Upload de Arquivo' },
-    { value: 'signature', label: '✍️ Assinatura Digital' },
-    { value: 'geolocation', label: '🌍 Geolocalização' },
-    { value: 'autocomplete', label: '🔍 Autocomplete' },
-    { value: 'color', label: '🎨 Seletor de Cor' },
-    { value: 'slider', label: '🎚️ Slider' },
-    { value: 'rating', label: '⭐ Avaliação (Estrelas)' },
-    { value: 'google-address', label: '🗺️ Endereço (Google Maps)' },
-    { value: 'table', label: '📊 Tabela / Grid' }
-  ];
+  const fieldTypeGroups = [
+    {
+      label: 'Básicos',
+      options: [
+        { value: 'text', label: '📝 Texto' },
+        { value: 'textarea', label: '📄 Texto longo' },
+        { value: 'number', label: '🔢 Número' },
+        { value: 'currency', label: '💰 Moeda (R$)' },
+        { value: 'accounting', label: '🧾 Contábil (R$)' },
+        { value: 'date', label: '📅 Data' },
+        { value: 'month', label: '📅 Mês/Ano (input mês)' },
+        { value: 'month-year', label: '📅 Mês/Ano (select + ano)' },
+        { value: 'datetime', label: '🕐 Data e hora' },
+        { value: 'time', label: '⏰ Hora' },
+      ],
+    },
+    {
+      label: 'Contato / Documentos',
+      options: [
+        { value: 'email', label: '📧 E-mail' },
+        { value: 'phone', label: '📱 Telefone' },
+        { value: 'international-phone', label: '🌍 Telefone internacional' },
+        { value: 'cpf', label: '🆔 CPF' },
+        { value: 'cns', label: '🏥 Cartão SUS (CNS)' },
+        { value: 'passaporte', label: '🛂 Passaporte' },
+        { value: 'cep', label: '📮 CEP' },
+        { value: 'idade', label: '🎂 Idade' },
+      ],
+    },
+    {
+      label: 'Escolha / Opções',
+      options: [
+        { value: 'checkbox', label: '☑️ Checkbox (sim/não)' },
+        { value: 'checkbox-group', label: '☑️ Grupo de checkboxes' },
+        { value: 'radio', label: '🔘 Opção única (radio)' },
+        { value: 'select', label: '📋 Seleção' },
+        { value: 'select-search', label: '🔍 Seleção com busca' },
+        { value: 'multi-select', label: '📋 Seleção múltipla' },
+        { value: 'autocomplete', label: '🔍 Autocomplete' },
+      ],
+    },
+    {
+      label: 'Anexos / Confirmação',
+      options: [
+        { value: 'file', label: '📁 Upload de arquivo' },
+        { value: 'signature', label: '✍️ Assinatura' },
+      ],
+    },
+    {
+      label: 'Avançados',
+      options: [
+        { value: 'geolocation', label: '🌍 Geolocalização' },
+        { value: 'color', label: '🎨 Seletor de cor' },
+        { value: 'slider', label: '🎚️ Slider' },
+        { value: 'rating', label: '⭐ Avaliação (estrelas)' },
+        { value: 'address', label: '🏠 Endereço completo' },
+        { value: 'google-address', label: '🗺️ Endereço (Google Maps)' },
+        { value: 'table', label: '📊 Tabela / Grid' },
+      ],
+    },
+    {
+      label: 'SINAN / Especiais',
+      options: [{ value: 'estabelecimento-search', label: '🏥 Estabelecimento (CNES) — busca' }],
+    },
+  ] as const;
 
-  const sectionIconOptions = [
-    { value: '', label: 'Sem ícone' },
-    { value: 'clipboard-list', label: 'Lista (Clipboard)' },
-    { value: 'calendar', label: 'Calendário' },
-    { value: 'dollar-sign', label: 'Custo (R$)' },
-    { value: 'target', label: 'Meta/Alvo' },
-    { value: 'activity', label: 'Atividade' },
-    { value: 'bar-chart-3', label: 'Gráfico' },
-    { value: 'shield', label: 'Vigilância/Segurança' },
-    { value: 'leaf', label: 'Ambiental' },
-    { value: 'wrench', label: 'Operacional' },
-    { value: 'users', label: 'Equipe/Pessoas' },
-  ];
+  const fieldTypesFlat = fieldTypeGroups.flatMap((g) => g.options);
 
-  const iconPreviewMap: Record<string, React.ComponentType<{ className?: string }>> = {
-    'clipboard-list': ClipboardList,
-    'calendar': Calendar,
-    'dollar-sign': DollarSign,
-    'target': Target,
-    'activity': Activity,
-    'bar-chart-3': BarChart3,
-    'shield': Shield,
-    'leaf': Leaf,
-    'wrench': Wrench,
-    'users': Users,
+  const allLucideIconNames = useMemo(() => Object.keys(dynamicIconImports).sort(), []);
+
+  const LucideIconPreview: React.FC<{ name?: string; className?: string }> = ({ name, className }) => {
+    const key = (name || '').trim();
+    const importer = (dynamicIconImports as any)[key] as undefined | (() => Promise<any>);
+    if (!key || !importer) return <span className={className} />;
+    const Icon = React.lazy(importer);
+    return (
+      <Suspense fallback={<span className={className} />}>
+        <Icon className={className} />
+      </Suspense>
+    );
   };
 
+  const IconPicker: React.FC<{
+    value?: string;
+    onChange: (next?: string) => void;
+    canSeeAll?: boolean;
+  }> = ({ value, onChange, canSeeAll }) => {
+    const [open, setOpen] = useState(false);
+    const [q, setQ] = useState('');
+    const [limit, setLimit] = useState(120);
+    const [showAll, setShowAll] = useState(false);
+    const current = (value || '').trim();
+    const rootRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+      if (!open) return;
+
+      const onPointerDown = (ev: MouseEvent | TouchEvent) => {
+        const root = rootRef.current;
+        const target = ev.target as Node | null;
+        if (!root || !target) return;
+        if (root.contains(target)) return;
+        setOpen(false);
+      };
+
+      const onKeyDown = (ev: KeyboardEvent) => {
+        if (ev.key === 'Escape') setOpen(false);
+      };
+
+      document.addEventListener('mousedown', onPointerDown);
+      document.addEventListener('touchstart', onPointerDown, { passive: true });
+      document.addEventListener('keydown', onKeyDown);
+      return () => {
+        document.removeEventListener('mousedown', onPointerDown);
+        document.removeEventListener('touchstart', onPointerDown);
+        document.removeEventListener('keydown', onKeyDown);
+      };
+    }, [open]);
+
+    const normalizeQuery = (s: string) =>
+      String(s || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+
+    // Mapa de sinônimos PT-BR -> termos prováveis no Lucide (inglês / kebab-case)
+    // Ajuda usuários leigos a encontrar ícones sem saber o nome em inglês.
+    const ptToLucideHints: Record<string, string[]> = {
+      gato: ['cat', 'paw', 'paw-print'],
+      cachorro: ['dog', 'paw', 'paw-print'],
+      pata: ['paw', 'paw-print'],
+      coracao: ['heart'],
+      coração: ['heart'],
+      calendario: ['calendar', 'date'],
+      agenda: ['calendar'],
+      relogio: ['clock', 'timer'],
+      relógio: ['clock', 'timer'],
+      hora: ['clock', 'time', 'timer'],
+      telefone: ['phone', 'mobile'],
+      celular: ['phone', 'mobile'],
+      email: ['mail', 'email'],
+      mapa: ['map', 'pin', 'location'],
+      localizacao: ['map', 'pin', 'location'],
+      localização: ['map', 'pin', 'location'],
+      endereco: ['map', 'pin', 'home'],
+      endereço: ['map', 'pin', 'home'],
+      pessoas: ['users', 'user', 'person'],
+      pessoa: ['user', 'person'],
+      usuario: ['user', 'person'],
+      usuários: ['users', 'user', 'person'],
+      usuarioS: ['users'],
+      equipe: ['users'],
+      seguranca: ['shield', 'lock', 'key'],
+      segurança: ['shield', 'lock', 'key'],
+      arquivo: ['file', 'folder', 'archive'],
+      pasta: ['folder'],
+      baixar: ['download'],
+      enviar: ['upload', 'send'],
+      buscar: ['search'],
+      lupa: ['search'],
+      imprimir: ['printer'],
+      grafico: ['chart', 'bar-chart', 'pie-chart', 'line-chart'],
+      gráfico: ['chart', 'bar-chart', 'pie-chart', 'line-chart'],
+      dinheiro: ['dollar', 'coins', 'wallet', 'credit-card'],
+      dinheiroS: ['dollar'],
+      saude: ['heart', 'activity', 'stethoscope', 'hospital', 'cross'],
+      saúde: ['heart', 'activity', 'stethoscope', 'hospital', 'cross'],
+    };
+
+    const curatedIcons = useMemo(
+      () =>
+        [
+          { name: 'calendar', label: 'Calendário', terms: ['data', 'agenda', 'evento'] },
+          { name: 'clock', label: 'Relógio', terms: ['hora', 'tempo', 'prazo'] },
+          { name: 'users', label: 'Pessoas / Equipe', terms: ['usuários', 'usuario', 'pessoa', 'grupo', 'servidores'] },
+          { name: 'user', label: 'Pessoa', terms: ['perfil', 'usuario'] },
+          { name: 'phone', label: 'Telefone', terms: ['celular', 'contato'] },
+          { name: 'mail', label: 'E-mail', terms: ['email', 'correio'] },
+          { name: 'map-pin', label: 'Localização', terms: ['mapa', 'endereço', 'local'] },
+          { name: 'home', label: 'Início', terms: ['casa', 'principal'] },
+          { name: 'building-2', label: 'Instituição', terms: ['prédio', 'unidade', 'hospital'] },
+          { name: 'hospital', label: 'Hospital', terms: ['saúde', 'unidade'] },
+          { name: 'stethoscope', label: 'Saúde', terms: ['atendimento', 'médico'] },
+          { name: 'activity', label: 'Atividade', terms: ['saúde', 'monitoramento'] },
+          { name: 'shield', label: 'Segurança', terms: ['proteção', 'vigilância'] },
+          { name: 'lock', label: 'Cadeado', terms: ['senha', 'restrito'] },
+          { name: 'file-text', label: 'Documento', terms: ['arquivo', 'ficha', 'formulário'] },
+          { name: 'folder', label: 'Pasta', terms: ['arquivos'] },
+          { name: 'upload', label: 'Enviar', terms: ['upload', 'anexar'] },
+          { name: 'download', label: 'Baixar', terms: ['download', 'exportar'] },
+          { name: 'search', label: 'Buscar', terms: ['pesquisar', 'lupa'] },
+          { name: 'clipboard-list', label: 'Lista', terms: ['checklist', 'tarefas'] },
+          { name: 'check', label: 'Confirmar', terms: ['ok', 'certo'] },
+          { name: 'x', label: 'Fechar', terms: ['cancelar'] },
+          { name: 'trash', label: 'Lixeira', terms: ['excluir', 'apagar'] },
+          { name: 'edit', label: 'Editar', terms: ['alterar', 'lápis'] },
+          { name: 'plus', label: 'Adicionar', terms: ['novo', 'mais'] },
+          { name: 'bell', label: 'Notificação', terms: ['alerta', 'aviso'] },
+          { name: 'alert-triangle', label: 'Alerta', terms: ['atenção', 'aviso'] },
+          { name: 'bar-chart-3', label: 'Gráfico', terms: ['indicador', 'estatística'] },
+          { name: 'printer', label: 'Imprimir', terms: ['impressão'] },
+          { name: 'badge-check', label: 'Certificado', terms: ['conclusão', 'aprovado'] },
+          { name: 'ticket', label: 'Inscrição', terms: ['credenciamento', 'evento'] },
+        ] as Array<{ name: string; label: string; terms: string[] }>,
+      []
+    );
+
+    const ptKeywordsForIcon = (name: string): string[] => {
+      const n = normalizeQuery(name);
+      const keywords: string[] = [];
+
+      // Regras rápidas (PT-BR) para facilitar busca por leigos
+      if (n.includes('calendar') || n.includes('date')) keywords.push('calendario', 'data', 'agenda');
+      if (n.includes('clock') || n.includes('time')) keywords.push('relogio', 'hora', 'tempo');
+      if (n.includes('mail') || n.includes('email')) keywords.push('email', 'e-mail', 'correio');
+      if (n.includes('phone') || n.includes('mobile')) keywords.push('telefone', 'celular', 'contato');
+      if (n.includes('map') || n.includes('pin') || n.includes('location')) keywords.push('mapa', 'local', 'localizacao', 'endereco');
+      if (n.includes('user') || n.includes('users') || n.includes('person')) keywords.push('pessoa', 'pessoas', 'usuario', 'usuarios', 'equipe');
+      if (n.includes('shield') || n.includes('lock') || n.includes('key')) keywords.push('seguranca', 'protecao', 'vigilancia', 'senha');
+      if (n.includes('file') || n.includes('folder') || n.includes('archive')) keywords.push('arquivo', 'pasta', 'documento');
+      if (n.includes('download')) keywords.push('baixar', 'download');
+      if (n.includes('upload')) keywords.push('enviar', 'upload');
+      if (n.includes('search')) keywords.push('buscar', 'pesquisar', 'lupa');
+      if (n.includes('trash') || n.includes('delete')) keywords.push('lixeira', 'excluir', 'apagar');
+      if (n.includes('check') || n.includes('circle-check')) keywords.push('ok', 'confirmar', 'certo', 'marcar');
+      if (n.includes('x') || n.includes('close')) keywords.push('fechar', 'cancelar');
+      if (n.includes('edit') || n.includes('pencil')) keywords.push('editar', 'alterar', 'lapis');
+      if (n.includes('plus') || n.includes('add')) keywords.push('adicionar', 'novo', 'mais');
+      if (n.includes('minus') || n.includes('remove')) keywords.push('remover', 'menos');
+      if (n.includes('info')) keywords.push('informacao', 'ajuda');
+      if (n.includes('alert') || n.includes('warning') || n.includes('triangle')) keywords.push('alerta', 'atencao', 'aviso');
+      if (n.includes('home') || n.includes('house')) keywords.push('casa', 'inicio');
+      if (n.includes('building') || n.includes('hospital')) keywords.push('predio', 'instituicao', 'hospital', 'unidade');
+      if (n.includes('chart') || n.includes('bar') || n.includes('pie')) keywords.push('grafico', 'indicador', 'estatistica');
+      if (n.includes('camera') || n.includes('image') || n.includes('photo')) keywords.push('foto', 'imagem', 'camera');
+      if (n.includes('printer')) keywords.push('imprimir', 'impressao');
+
+      return keywords;
+    };
+
+    const matches = (name: string, query: string) => {
+      const nq = normalizeQuery(query);
+      if (!nq) return true;
+
+      // suporta múltiplas palavras: todas devem bater em algum indício
+      const terms = nq.split(/\s+/g).filter(Boolean);
+      const nn = normalizeQuery(name);
+      const hayBase = `${nn} ${nn.replace(/-/g, ' ')} ${ptKeywordsForIcon(name).join(' ')}`;
+
+      return terms.every((t) => {
+        if (hayBase.includes(t)) return true;
+        const hints = ptToLucideHints[t];
+        if (!hints?.length) return false;
+        return hints.some((h) => nn.includes(normalizeQuery(h)));
+      });
+    };
+
+    const filtered = useMemo(() => {
+      const query = q.trim();
+
+      if (!showAll) {
+        const nq = normalizeQuery(query);
+        const list = !nq
+          ? curatedIcons
+          : curatedIcons.filter((it) => {
+              const hay = [it.name, it.label, ...(it.terms || [])]
+                .map((x) => normalizeQuery(x))
+                .join(' ');
+              return hay.includes(nq);
+            });
+        return list.map((it) => it.name);
+      }
+
+      const base = allLucideIconNames;
+      const list = query ? base.filter((n) => matches(n, query)) : base;
+      return list.slice(0, Math.max(40, limit));
+    }, [q, allLucideIconNames, limit, showAll, curatedIcons]);
+
+    return (
+      <div ref={rootRef} className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="px-2 py-1 border border-blue-300 rounded text-sm bg-white inline-flex items-center gap-2 hover:bg-blue-50"
+          title="Escolher ícone"
+        >
+          <LucideIconPreview name={current} className="h-4 w-4 text-blue-700" />
+          <span className="text-gray-700">{current ? current : 'Ícone'}</span>
+        </button>
+
+        {open ? (
+          <div className="absolute z-50 mt-2 w-72 rounded-lg border border-gray-200 bg-white shadow-lg p-2">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar ícone… (ex: calendário, pessoas)"
+              className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+              autoFocus
+            />
+
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <p className="text-[11px] text-gray-500">
+                {showAll ? 'Lista completa' : 'Sugestões (mais fácil)'}
+              </p>
+              {canSeeAll ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAll((v) => !v);
+                    setLimit(120);
+                  }}
+                  className="px-2 py-1 text-[11px] rounded border border-gray-200 hover:bg-gray-50 text-gray-700"
+                  title="Alternar entre sugestões e lista completa"
+                >
+                  {showAll ? 'Mostrar sugestões' : 'Ver todos'}
+                </button>
+              ) : null}
+            </div>
+
+            <div
+              className="mt-2 max-h-64 overflow-auto"
+              onScroll={(e) => {
+                if (!showAll) return;
+                const el = e.currentTarget;
+                if (el.scrollTop + el.clientHeight >= el.scrollHeight - 24) {
+                  setLimit((v) => v + 120);
+                }
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(undefined);
+                  setOpen(false);
+                }}
+                className="w-full text-left px-2 py-1 text-sm rounded hover:bg-gray-100 flex items-center gap-2"
+              >
+                <span className="h-4 w-4 inline-block" />
+                <span>Sem ícone</span>
+              </button>
+
+              {filtered.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => {
+                    onChange(name);
+                    setOpen(false);
+                  }}
+                  className={`w-full text-left px-2 py-1 text-sm rounded hover:bg-blue-50 flex items-center gap-2 ${
+                    name === current ? 'bg-blue-50' : ''
+                  }`}
+                >
+                  <LucideIconPreview name={name} className="h-4 w-4 text-gray-700" />
+                  <span className="font-mono text-xs text-gray-800">{name}</span>
+                </button>
+              ))}
+              {!filtered.length ? <p className="px-2 py-2 text-xs text-gray-500">Nenhum ícone encontrado.</p> : null}
+            </div>
+
+            <div className="mt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="px-2 py-1 text-xs text-gray-700 hover:bg-gray-100 rounded"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
+  const sectionsForRules = getSectionsForRules();
   return (
     <AppPageLayout
       title={id ? 'Editar Formulário' : 'Novo Formulário'}
-      subtitle="Construtor visual de formulários SINAN/e-SUS"
+      subtitle={isGeneralBuilder ? 'Construtor de Formulários (geral)' : 'Construtor visual de formulários SINAN/e-SUS'}
       icon={<FileEdit className="h-8 w-8" />}
       variant="desktop"
       showBottomNav={false}
-      backPath="/private/formularios-admin"
+      backPath={isGeneralBuilder ? '/private/meus-formularios' : '/private/formularios-admin'}
       headerActions={
         <div className="flex gap-2">
           <button
@@ -628,21 +1082,9 @@ export const FormBuilderPage: React.FC = () => {
                     onChange={(e) => setFormName(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                     placeholder="Ex: Dengue"
+                    maxLength={500}
                   />
-                </div>
-
-                <div>
-                  <label htmlFor="form-builder-agravo" className="block text-sm font-medium text-gray-700 mb-1">
-                    Código do Formulário *
-                  </label>
-                  <input
-                    id="form-builder-agravo"
-                    type="text"
-                    value={formKey}
-                    onChange={(e) => setFormKey(e.target.value.toUpperCase())}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    placeholder="Ex: DENGUE"
-                  />
+                  <p className="mt-1 text-xs text-gray-500">{(formName || '').length}/500</p>
                 </div>
 
                 <div>
@@ -679,6 +1121,69 @@ export const FormBuilderPage: React.FC = () => {
                   </select>
                 </div>
 
+                {isGeneralBuilder && categoria === 'capacitacoes_educacao_permanente' && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50/60 p-3 space-y-2">
+                    <p className="text-sm font-semibold text-amber-900">Prova / Quiz (com pontuação)</p>
+                    <p className="text-xs text-amber-900/80 leading-snug">
+                      Use isso quando você quiser avaliar conhecimento (ex.: pré/pós-teste em capacitações).
+                    </p>
+                    <label className="flex items-center gap-2 text-sm text-gray-800">
+                      <input
+                        type="checkbox"
+                        checked={!!schema.quiz?.enabled}
+                        onChange={(e) =>
+                          setSchema((s) => ({
+                            ...s,
+                            quiz: {
+                              ...s.quiz,
+                              enabled: e.target.checked,
+                              showScoreAfter: s.quiz?.showScoreAfter ?? true,
+                              showCorrectAnswers: s.quiz?.showCorrectAnswers ?? false,
+                            },
+                          }))
+                        }
+                        className="rounded"
+                      />
+                      Ativar pontuação (definir respostas corretas)
+                    </label>
+                    {schema.quiz?.enabled ? (
+                      <div className="space-y-2 pl-1 border-l-2 border-amber-300">
+                        <label className="flex items-center gap-2 text-xs text-gray-800">
+                          <input
+                            type="checkbox"
+                            checked={schema.quiz?.showScoreAfter !== false}
+                            onChange={(e) =>
+                              setSchema((s) => ({
+                                ...s,
+                                quiz: { ...s.quiz, enabled: true, showScoreAfter: e.target.checked },
+                              }))
+                            }
+                            className="rounded"
+                          />
+                          Mostrar pontuação após o envio
+                        </label>
+                        <label className="flex items-center gap-2 text-xs text-gray-800">
+                          <input
+                            type="checkbox"
+                            checked={!!schema.quiz?.showCorrectAnswers}
+                            onChange={(e) =>
+                              setSchema((s) => ({
+                                ...s,
+                                quiz: { ...s.quiz, enabled: true, showCorrectAnswers: e.target.checked },
+                              }))
+                            }
+                            className="rounded"
+                          />
+                          Mostrar respostas corretas na tela de confirmação
+                        </label>
+                        <p className="text-[11px] text-amber-900/80 leading-snug">
+                          Depois, em cada pergunta, marque como “vale pontos” e informe a resposta correta.
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+
                 <button
                   onClick={addSection}
                   className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center justify-center gap-2"
@@ -686,31 +1191,6 @@ export const FormBuilderPage: React.FC = () => {
                   <Plus className="h-4 w-4" />
                   Adicionar Seção
                 </button>
-
-                <div className="border-t border-gray-200 pt-4 mt-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                    <GripVertical className="h-4 w-4 text-gray-500" />
-                    Paleta de campos
-                  </h3>
-                  <p className="text-xs text-gray-500 mb-3">Arraste um tipo para uma seção ou solte entre os campos para reordenar.</p>
-                  <div className="flex flex-wrap gap-2 max-h-64 overflow-y-auto">
-                    {fieldTypes.map((ft) => (
-                      <div
-                        key={ft.value}
-                        draggable
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData('application/json', JSON.stringify({ source: 'palette', type: ft.value }));
-                          e.dataTransfer.effectAllowed = 'copy';
-                          e.currentTarget.classList.add('opacity-60');
-                        }}
-                        onDragEnd={(e) => e.currentTarget.classList.remove('opacity-60')}
-                        className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm cursor-grab active:cursor-grabbing hover:border-blue-400 hover:bg-blue-50/50 shadow-sm select-none"
-                      >
-                        {ft.label}
-                      </div>
-                    ))}
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -743,6 +1223,17 @@ export const FormBuilderPage: React.FC = () => {
                     <Code className="inline h-4 w-4 mr-2" />
                     Regras ({(schema.rules || []).length})
                   </button>
+                  {/* Campos fixos só no contexto SINAN/e-SUS */}
+                  {!isGeneralBuilder && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/private/formularios-admin`)}
+                      className="ml-auto px-6 py-3 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                      title="Campos fixos são usados nos formulários SINAN"
+                    >
+                      Campos Fixos (SINAN)
+                    </button>
+                  )}
                 </nav>
               </div>
             </div>
@@ -766,38 +1257,8 @@ export const FormBuilderPage: React.FC = () => {
                 {schema.sections.map((section, sectionIdx) => (
                   <React.Fragment key={section.id}>
                     <div
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = 'move';
-                        setSectionDropIdx(sectionIdx);
-                      }}
-                      onDragLeave={() => setSectionDropIdx(prev => (prev === sectionIdx ? null : prev))}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        setSectionDropIdx(null);
-                        try {
-                          const data = JSON.parse(e.dataTransfer.getData('application/json') || '{}');
-                          if (data.source === 'section' && data.sectionIdx !== undefined) {
-                            const fromIdx = data.sectionIdx as number;
-                            if (fromIdx !== sectionIdx) moveSectionTo(fromIdx, sectionIdx);
-                          }
-                        } catch (_) {}
-                      }}
-                      className={`h-2 rounded-sm transition-colors flex-shrink-0 ${
-                        sectionDropIdx === sectionIdx ? 'bg-blue-400' : 'bg-transparent hover:bg-gray-200'
-                      }`}
-                      title="Arraste a seção para cima ou para baixo"
-                    />
-                    <div
                       key={section.id}
-                      draggable
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData('application/json', JSON.stringify({ source: 'section', sectionIdx }));
-                        e.dataTransfer.effectAllowed = 'move';
-                        e.currentTarget.classList.add('opacity-70');
-                      }}
-                      onDragEnd={(e) => e.currentTarget.classList.remove('opacity-70')}
-                      className="bg-white rounded-lg shadow cursor-grab active:cursor-grabbing section-card-draggable"
+                      className="bg-white rounded-lg shadow"
                     >
                   {/* Cabeçalho da Seção */}
                   <div className="bg-blue-50 px-4 py-3 border-b border-blue-100 flex items-center justify-between">
@@ -813,24 +1274,11 @@ export const FormBuilderPage: React.FC = () => {
                             autoFocus
                           />
                           <div className="flex items-center gap-2">
-                            {/* Preview do ícone */}
-                            {(section as any).icon && iconPreviewMap[(section as any).icon] ? (
-                              React.createElement(iconPreviewMap[(section as any).icon], { className: 'h-4 w-4 text-blue-700' })
-                            ) : (
-                              <span className="h-4 w-4 inline-block" />
-                            )}
-                            <select
+                            <IconPicker
                               value={(section as any).icon ?? ''}
-                              onChange={(e) => updateSection(sectionIdx, { icon: e.target.value || undefined } as any)}
-                              className="px-2 py-1 border border-blue-300 rounded text-sm bg-white"
-                              title="Ícone do cabeçalho da seção"
-                            >
-                              {sectionIconOptions.map((opt) => (
-                                <option key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </option>
-                              ))}
-                            </select>
+                              onChange={(next) => updateSection(sectionIdx, { icon: next || undefined } as any)}
+                              canSeeAll={canSeeAdvanced}
+                            />
                           </div>
                         </div>
                       ) : (
@@ -875,77 +1323,18 @@ export const FormBuilderPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Campos da Seção (com zonas de drop e arrastar) */}
+                  {/* Campos da Seção */}
                   <div className="p-4 space-y-1">
                     {section.fields.length === 0 ? (
-                      <div
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          e.dataTransfer.dropEffect = 'copy';
-                          setDropTarget({ sectionIdx, fieldIdx: 0 });
-                        }}
-                        onDragLeave={() => setDropTarget(prev => (prev?.sectionIdx === sectionIdx && prev?.fieldIdx === 0 ? null : prev))}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          setDropTarget(null);
-                          try {
-                            const data = JSON.parse(e.dataTransfer.getData('application/json') || '{}');
-                            if (data.source === 'palette') {
-                              addField(sectionIdx, data.type, 0);
-                            } else if (data.source === 'field' && data.sectionIdx !== undefined && data.fieldIdx !== undefined) {
-                              moveFieldTo(data.sectionIdx, data.fieldIdx, sectionIdx, 0);
-                            }
-                          } catch (_) {}
-                        }}
-                        className={`min-h-[56px] rounded-lg border-2 border-dashed flex items-center justify-center transition-colors ${
-                          dropTarget?.sectionIdx === sectionIdx && dropTarget?.fieldIdx === 0
-                            ? 'border-blue-500 bg-blue-50 text-blue-700'
-                            : 'border-gray-200 text-gray-400 hover:border-gray-300'
-                        }`}
-                      >
-                        <span className="text-sm">Solte aqui para adicionar o primeiro campo</span>
+                      <div className="min-h-[56px] rounded-lg border border-dashed border-gray-200 flex items-center justify-center text-gray-400">
+                        <span className="text-sm">Nenhum campo nesta seção</span>
                       </div>
                     ) : (
                       <>
                         {section.fields.map((field, fieldIdx) => (
                           <React.Fragment key={field.key}>
                             <div
-                              onDragOver={(e) => {
-                                e.preventDefault();
-                                e.dataTransfer.dropEffect = 'copy';
-                                setDropTarget({ sectionIdx, fieldIdx });
-                              }}
-                              onDragLeave={() => setDropTarget(prev => (prev?.sectionIdx === sectionIdx && prev?.fieldIdx === fieldIdx ? null : prev))}
-                              onDrop={(e) => {
-                                e.preventDefault();
-                                setDropTarget(null);
-                                try {
-                                  const data = JSON.parse(e.dataTransfer.getData('application/json') || '{}');
-                                  if (data.source === 'palette') {
-                                    addField(sectionIdx, data.type, fieldIdx);
-                                  } else if (data.source === 'field' && data.sectionIdx !== undefined && data.fieldIdx !== undefined) {
-                                    const fromS = data.sectionIdx as number;
-                                    const fromF = data.fieldIdx as number;
-                                    if (fromS === sectionIdx && fromF === fieldIdx) return;
-                                    const toIndex = fromS === sectionIdx && fromF < fieldIdx ? fieldIdx - 1 : fieldIdx;
-                                    moveFieldTo(fromS, fromF, sectionIdx, toIndex);
-                                  }
-                                } catch (_) {}
-                              }}
-                              className={`h-2 rounded-sm transition-colors flex-shrink-0 ${
-                                dropTarget?.sectionIdx === sectionIdx && dropTarget?.fieldIdx === fieldIdx ? 'bg-blue-400' : 'bg-transparent hover:bg-gray-200'
-                              }`}
-                              title="Inserir campo aqui"
-                            />
-                            <div
-                              draggable
-                              onDragStart={(e) => {
-                                e.dataTransfer.setData('application/json', JSON.stringify({ source: 'field', sectionIdx, fieldIdx }));
-                                e.dataTransfer.effectAllowed = 'move';
-                                (e.target as HTMLElement).closest('.field-card-draggable')?.classList.add('opacity-60');
-                              }}
-                              onDragEnd={(e) => (e.target as HTMLElement).closest('.field-card-draggable')?.classList.remove('opacity-60')}
-                              className={`field-card-draggable border rounded-lg p-3 cursor-grab active:cursor-grabbing ${
+                              className={`border rounded-lg p-3 ${
                                 activeField?.sectionIdx === sectionIdx && activeField?.fieldIdx === fieldIdx
                                   ? 'border-blue-500 bg-blue-50'
                                   : 'border-gray-200'
@@ -953,7 +1342,7 @@ export const FormBuilderPage: React.FC = () => {
                               onClick={() => setActiveField({ sectionIdx, fieldIdx })}
                             >
                           <div className="grid grid-cols-12 gap-3">
-                            <div className="col-span-4">
+                            <div className={showTechnicalNames ? 'col-span-4' : 'col-span-7'}>
                               <label className="text-xs text-gray-600">Label</label>
                               <input
                                 type="text"
@@ -962,15 +1351,17 @@ export const FormBuilderPage: React.FC = () => {
                                 className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
                               />
                             </div>
-                            <div className="col-span-3">
-                              <label className="text-xs text-gray-600">Nome técnico</label>
-                              <input
-                                type="text"
-                                value={field.key}
-                                onChange={(e) => updateField(sectionIdx, fieldIdx, { key: e.target.value })}
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                              />
-                            </div>
+                            {showTechnicalNames && (
+                              <div className="col-span-3">
+                                <label className="text-xs text-gray-600">Nome técnico</label>
+                                <input
+                                  type="text"
+                                  value={field.key}
+                                  onChange={(e) => updateField(sectionIdx, fieldIdx, { key: e.target.value })}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                />
+                              </div>
+                            )}
                             <div className="col-span-2">
                               <label className="text-xs text-gray-600">Tipo</label>
                               <select
@@ -978,14 +1369,31 @@ export const FormBuilderPage: React.FC = () => {
                                 onChange={(e) => updateField(sectionIdx, fieldIdx, { type: e.target.value as any })}
                                 className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
                               >
-                                {fieldTypes.map(type => (
-                                  <option key={type.value} value={type.value}>
-                                    {type.label}
-                                  </option>
+                                {fieldTypeGroups.map((group) => (
+                                  <optgroup key={group.label} label={group.label}>
+                                    {group.options.map((type) => (
+                                      <option key={type.value} value={type.value}>
+                                        {type.label}
+                                      </option>
+                                    ))}
+                                  </optgroup>
                                 ))}
                               </select>
                             </div>
                             <div className="col-span-3 flex items-end gap-1">
+                              {canSeeAdvanced ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowTechnicalNames((v) => !v);
+                                  }}
+                                  className="px-2 py-1 text-xs text-gray-700 hover:bg-gray-100 rounded"
+                                  title="Mostrar/ocultar campos avançados"
+                                >
+                                  {showTechnicalNames ? 'Ocultar avançado' : 'Avançado'}
+                                </button>
+                              ) : null}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1020,6 +1428,75 @@ export const FormBuilderPage: React.FC = () => {
                               </button>
                             </div>
                           </div>
+
+                          {isGeneralBuilder &&
+                            schema.quiz?.enabled &&
+                            ['text', 'textarea', 'number', 'select', 'radio', 'select-search'].includes(field.type) && (
+                              <div
+                                className="mt-2 rounded border border-amber-200 bg-amber-50/50 p-2 text-xs space-y-2"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <label className="flex items-center gap-2 font-medium text-amber-900">
+                                  <input
+                                    type="checkbox"
+                                    checked={!!field.quiz?.enabled}
+                                    onChange={(e) =>
+                                      updateField(sectionIdx, fieldIdx, {
+                                        quiz: e.target.checked
+                                          ? {
+                                              enabled: true,
+                                              points: field.quiz?.points ?? 1,
+                                              correctValue: field.quiz?.correctValue ?? '',
+                                            }
+                                          : { enabled: false },
+                                      })
+                                    }
+                                    className="rounded"
+                                  />
+                                  Contar pontos neste campo
+                                </label>
+                                {field.quiz?.enabled ? (
+                                  <div className="flex flex-wrap items-end gap-2">
+                                    <div>
+                                      <span className="block text-[10px] text-gray-600 mb-0.5">Pontos</span>
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        value={field.quiz?.points ?? 1}
+                                        onChange={(e) =>
+                                          updateField(sectionIdx, fieldIdx, {
+                                            quiz: {
+                                              enabled: true,
+                                              points: e.target.value ? Number(e.target.value) : 1,
+                                              correctValue: field.quiz?.correctValue ?? '',
+                                            },
+                                          })
+                                        }
+                                        className="w-16 px-2 py-1 border border-gray-300 rounded"
+                                      />
+                                    </div>
+                                    <div className="flex-1 min-w-[140px]">
+                                      <span className="block text-[10px] text-gray-600 mb-0.5">Resposta correta (value / texto)</span>
+                                      <input
+                                        type="text"
+                                        value={field.quiz?.correctValue ?? ''}
+                                        onChange={(e) =>
+                                          updateField(sectionIdx, fieldIdx, {
+                                            quiz: {
+                                              enabled: true,
+                                              points: field.quiz?.points ?? 1,
+                                              correctValue: e.target.value,
+                                            },
+                                          })
+                                        }
+                                        className="w-full px-2 py-1 border border-gray-300 rounded font-mono"
+                                        placeholder="ex: sim ou valor da opção"
+                                      />
+                                    </div>
+                                  </div>
+                                ) : null}
+                              </div>
+                            )}
                           
                           <div className="mt-2 flex items-center gap-4">
                             <label className="flex items-center gap-1 text-sm">
@@ -1401,14 +1878,22 @@ export const FormBuilderPage: React.FC = () => {
                                       <label className="block text-xs font-medium text-gray-700 mb-1">
                                         Tabela:
                                       </label>
+                                      <input
+                                        value={tableSearch}
+                                        onChange={(e) => setTableSearch(e.target.value)}
+                                        placeholder="Buscar tabela…"
+                                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded mb-1"
+                                        disabled={loadingTables}
+                                      />
                                       <select
                                         value={field.dataTable || ''}
                                         onChange={(e) => {
                                           const table = e.target.value;
+                                          const defaults = databaseTableDefaults[table];
                                           updateField(sectionIdx, fieldIdx, { 
                                             dataTable: table,
-                                            dataValueColumn: undefined,
-                                            dataLabelColumn: undefined
+                                            dataValueColumn: defaults?.value,
+                                            dataLabelColumn: defaults?.label
                                           });
                                           if (table) loadColumns(table);
                                         }}
@@ -1418,8 +1903,10 @@ export const FormBuilderPage: React.FC = () => {
                                         <option value="">
                                           {loadingTables ? 'Carregando...' : 'Selecione uma tabela'}
                                         </option>
-                                        {availableTables.map(table => (
-                                          <option key={table} value={table}>{table}</option>
+                                        {filteredTables.map(table => (
+                                          <option key={table} value={table}>
+                                            {prettyTableName(table)}
+                                          </option>
                                         ))}
                                       </select>
                                     </div>
@@ -1429,7 +1916,7 @@ export const FormBuilderPage: React.FC = () => {
                                       <>
                                         <div>
                                           <label className="block text-xs font-medium text-gray-700 mb-1">
-                                            Coluna para Valor:
+                                            O que é salvo (código/ID):
                                           </label>
                                           <select
                                             value={field.dataValueColumn || ''}
@@ -1443,12 +1930,15 @@ export const FormBuilderPage: React.FC = () => {
                                               </option>
                                             ))}
                                           </select>
+                                          <p className="mt-1 text-[11px] text-gray-500">
+                                            Ex.: você vê &quot;Belém&quot;, mas o sistema salva o código (ex.: IBGE).
+                                          </p>
                                         </div>
 
                                         {/* Seletor de Coluna de Label */}
                                         <div>
                                           <label className="block text-xs font-medium text-gray-700 mb-1">
-                                            Coluna para Nome:
+                                            O que aparece para quem preenche:
                                           </label>
                                           <select
                                             value={field.dataLabelColumn || ''}
@@ -1514,66 +2004,12 @@ export const FormBuilderPage: React.FC = () => {
                         </div>
                             </React.Fragment>
                         ))}
-                        <div
-                          onDragOver={(e) => {
-                            e.preventDefault();
-                            e.dataTransfer.dropEffect = 'copy';
-                            setDropTarget({ sectionIdx, fieldIdx: section.fields.length });
-                          }}
-                          onDragLeave={() => setDropTarget(prev => (prev?.sectionIdx === sectionIdx && prev?.fieldIdx === section.fields.length ? null : prev))}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            setDropTarget(null);
-                            try {
-                              const data = JSON.parse(e.dataTransfer.getData('application/json') || '{}');
-                              if (data.source === 'palette') {
-                                addField(sectionIdx, data.type, section.fields.length);
-                              } else if (data.source === 'field' && data.sectionIdx !== undefined && data.fieldIdx !== undefined) {
-                                const fromS = data.sectionIdx as number;
-                                const fromF = data.fieldIdx as number;
-                                if (fromS === sectionIdx && fromF === section.fields.length - 1) return;
-                                const toIndex = fromS === sectionIdx && fromF < section.fields.length ? section.fields.length - 1 : section.fields.length;
-                                moveFieldTo(fromS, fromF, sectionIdx, toIndex);
-                              }
-                            } catch (_) {}
-                          }}
-                          className={`min-h-[32px] rounded-lg border-2 border-dashed flex items-center justify-center transition-colors ${
-                            dropTarget?.sectionIdx === sectionIdx && dropTarget?.fieldIdx === section.fields.length
-                              ? 'border-blue-500 bg-blue-50 text-blue-700'
-                              : 'border-gray-200 text-gray-400 hover:border-gray-300'
-                          }`}
-                        >
-                          <span className="text-xs font-medium">Solte aqui</span>
-                        </div>
                       </>
                     )}
                   </div>
                 </div>
                   </React.Fragment>
                 ))}
-                <div
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-                    setSectionDropIdx(schema.sections.length);
-                  }}
-                  onDragLeave={() => setSectionDropIdx(prev => (prev === schema.sections.length ? null : prev))}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setSectionDropIdx(null);
-                    try {
-                      const data = JSON.parse(e.dataTransfer.getData('application/json') || '{}');
-                      if (data.source === 'section' && data.sectionIdx !== undefined) {
-                        const fromIdx = data.sectionIdx as number;
-                        moveSectionTo(fromIdx, schema.sections.length);
-                      }
-                    } catch (_) {}
-                  }}
-                  className={`h-2 rounded-sm transition-colors flex-shrink-0 ${
-                    sectionDropIdx === schema.sections.length ? 'bg-blue-400' : 'bg-transparent hover:bg-gray-200'
-                  }`}
-                  title="Arraste a seção para o final"
-                />
               </>
             )}
             </>
@@ -1591,13 +2027,23 @@ export const FormBuilderPage: React.FC = () => {
                         Controle visibilidade, obrigatoriedade e valores baseado em condições
                       </p>
                     </div>
-                    <button
-                      onClick={addRule}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Nova Regra
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setRulesSimpleMode((v) => !v)}
+                        className="px-3 py-2 border border-gray-200 text-gray-700 rounded-md hover:bg-gray-50 text-sm"
+                        title="Alternar modo simples/avançado"
+                      >
+                        {rulesSimpleMode ? 'Avançado' : 'Modo simples'}
+                      </button>
+                      <button
+                        onClick={addRule}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Nova Regra
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1660,7 +2106,7 @@ export const FormBuilderPage: React.FC = () => {
                           {/* Condição WHEN */}
                           <div className="border-l-4 border-blue-500 pl-4">
                             <h5 className="text-sm font-semibold text-gray-700 mb-3">
-                              QUANDO (Condição)
+                              {rulesSimpleMode ? 'SE (condição)' : 'QUANDO (Condição)'}
                             </h5>
                             <div className="grid grid-cols-12 gap-3">
                               <div className="col-span-4">
@@ -1672,7 +2118,9 @@ export const FormBuilderPage: React.FC = () => {
                                 >
                                   <option value="">Selecione o campo...</option>
                                   {fieldsForRules.map(f => (
-                                    <option key={f.key} value={f.key}>{f.label} ({f.key})</option>
+                                    <option key={f.key} value={f.key}>
+                                      {rulesSimpleMode ? f.label : `${f.label} (${f.key})`}
+                                    </option>
                                   ))}
                                 </select>
                               </div>
@@ -1683,24 +2131,35 @@ export const FormBuilderPage: React.FC = () => {
                                   onChange={(e) => updateRuleCondition(ruleIdx, { op: e.target.value as any })}
                                   className="w-full px-2 py-2 border border-gray-300 rounded text-sm"
                                 >
-                                  <option value="eq">= (igual)</option>
-                                  <option value="neq">≠ (diferente)</option>
-                                  <option value="gt">&gt; (maior)</option>
-                                  <option value="gte">≥ (maior/igual)</option>
-                                  <option value="lt">&lt; (menor)</option>
-                                  <option value="lte">≤ (menor/igual)</option>
-                                  <option value="in">∈ (contém em lista)</option>
-                                  <option value="notIn">∉ (não contém)</option>
-                                  <option value="contains">contém texto</option>
-                                  <option value="startsWith">começa com</option>
-                                  <option value="endsWith">termina com</option>
-                                  <option value="isEmpty">está vazio</option>
-                                  <option value="isNotEmpty">não está vazio</option>
+                                  {rulesSimpleMode ? (
+                                    <>
+                                      <option value="eq">É igual a</option>
+                                      <option value="neq">É diferente de</option>
+                                      <option value="isEmpty">Está vazio</option>
+                                      <option value="isNotEmpty">Não está vazio</option>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <option value="eq">= (igual)</option>
+                                      <option value="neq">≠ (diferente)</option>
+                                      <option value="gt">&gt; (maior)</option>
+                                      <option value="gte">≥ (maior/igual)</option>
+                                      <option value="lt">&lt; (menor)</option>
+                                      <option value="lte">≤ (menor/igual)</option>
+                                      <option value="in">∈ (contém em lista)</option>
+                                      <option value="notIn">∉ (não contém)</option>
+                                      <option value="contains">contém texto</option>
+                                      <option value="startsWith">começa com</option>
+                                      <option value="endsWith">termina com</option>
+                                      <option value="isEmpty">está vazio</option>
+                                      <option value="isNotEmpty">não está vazio</option>
+                                    </>
+                                  )}
                                 </select>
                               </div>
                               <div className="col-span-5">
                                 <label className="block text-xs text-gray-600 mb-1">
-                                  Valor {['in', 'notIn'].includes(rule.when.op) && '(separado por vírgula)'}
+                                  {rulesSimpleMode ? 'Valor' : `Valor ${['in', 'notIn'].includes(rule.when.op) && '(separado por vírgula)'}`}
                                   {needsNoValue && <span className="text-gray-400 font-normal"> — não precisa preencher</span>}
                                 </label>
                                 {needsNoValue ? (
@@ -1728,7 +2187,17 @@ export const FormBuilderPage: React.FC = () => {
                                   </select>
                                 ) : (
                                   <input
-                                    type="text"
+                                    type={
+                                      rulesSimpleMode && ['number', 'currency', 'accounting', 'slider', 'rating', 'idade'].includes(String(conditionField?.type || ''))
+                                        ? 'number'
+                                        : rulesSimpleMode && String(conditionField?.type || '') === 'date'
+                                          ? 'date'
+                                          : rulesSimpleMode && String(conditionField?.type || '') === 'datetime'
+                                            ? 'datetime-local'
+                                            : rulesSimpleMode && String(conditionField?.type || '') === 'time'
+                                              ? 'time'
+                                              : 'text'
+                                    }
                                     value={
                                       Array.isArray(rule.when.right)
                                         ? rule.when.right.join(', ')
@@ -1742,7 +2211,7 @@ export const FormBuilderPage: React.FC = () => {
                                       updateRuleCondition(ruleIdx, { right: newValue });
                                     }}
                                     className="w-full px-2 py-2 border border-gray-300 rounded text-sm"
-                                    placeholder={['in', 'notIn'].includes(rule.when.op) ? 'a, b, c' : 'valor...'}
+                                    placeholder={rulesSimpleMode ? 'Digite o valor...' : (['in', 'notIn'].includes(rule.when.op) ? 'a, b, c' : 'valor...')}
                                   />
                                 )}
                               </div>
@@ -1753,15 +2222,62 @@ export const FormBuilderPage: React.FC = () => {
                           <div className="border-l-4 border-green-500 pl-4">
                             <div className="flex justify-between items-center mb-3">
                               <h5 className="text-sm font-semibold text-gray-700">
-                                ENTÃO (Ações se verdadeiro)
+                                {rulesSimpleMode ? 'ENTÃO (se a condição for verdadeira)' : 'ENTÃO (Ações se verdadeiro)'}
                               </h5>
-                              <button
-                                onClick={() => addRuleAction(ruleIdx, 'then')}
-                                className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-1"
-                              >
-                                <Plus className="h-3 w-3" />
-                                Adicionar Ação
-                              </button>
+                              {rulesSimpleMode ? (
+                                <div className="flex flex-wrap gap-1 justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={() => addQuickRuleAction(ruleIdx, 'then', 'show')}
+                                    className="px-2 py-1 text-[11px] bg-green-600 text-white rounded hover:bg-green-700"
+                                  >
+                                    Mostrar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => addQuickRuleAction(ruleIdx, 'then', 'hide')}
+                                    className="px-2 py-1 text-[11px] bg-slate-700 text-white rounded hover:bg-slate-800"
+                                  >
+                                    Ocultar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => addQuickRuleAction(ruleIdx, 'then', 'require')}
+                                    className="px-2 py-1 text-[11px] bg-amber-600 text-white rounded hover:bg-amber-700"
+                                  >
+                                    Obrigatório
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => addQuickRuleAction(ruleIdx, 'then', 'unrequire')}
+                                    className="px-2 py-1 text-[11px] bg-gray-600 text-white rounded hover:bg-gray-700"
+                                  >
+                                    Opcional
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => addQuickRuleAction(ruleIdx, 'then', 'enable')}
+                                    className="px-2 py-1 text-[11px] bg-emerald-600 text-white rounded hover:bg-emerald-700"
+                                  >
+                                    Habilitar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => addQuickRuleAction(ruleIdx, 'then', 'disable')}
+                                    className="px-2 py-1 text-[11px] bg-rose-600 text-white rounded hover:bg-rose-700"
+                                  >
+                                    Desabilitar
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => addRuleAction(ruleIdx, 'then')}
+                                  className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-1"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                  Adicionar Ação
+                                </button>
+                              )}
                             </div>
                             
                             {(rule.then || []).length === 0 ? (
@@ -1770,33 +2286,69 @@ export const FormBuilderPage: React.FC = () => {
                               <div className="space-y-2">
                                 {(rule.then || []).map((action, actionIdx) => (
                                   <div key={actionIdx} className="flex gap-2 items-start">
-                                    <select
-                                      value={action.action}
-                                      onChange={(e) => updateRuleAction(ruleIdx, 'then', actionIdx, { action: e.target.value as any })}
-                                      className="px-2 py-1 border border-gray-300 rounded text-sm"
-                                    >
-                                      <option value="show">Mostrar</option>
-                                      <option value="hide">Ocultar</option>
-                                      <option value="require">Tornar obrigatório</option>
-                                      <option value="unrequire">Tornar opcional</option>
-                                      <option value="enable">Habilitar</option>
-                                      <option value="disable">Desabilitar</option>
-                                      <option value="setValue">Definir valor</option>
-                                      <option value="clear">Limpar valor</option>
-                                    </select>
+                                    {rulesSimpleMode ? (
+                                      <span className="px-2 py-1 rounded bg-green-50 text-green-800 text-xs border border-green-200 min-w-[92px] text-center">
+                                        {action.action === 'show'
+                                          ? 'Mostrar'
+                                          : action.action === 'hide'
+                                            ? 'Ocultar'
+                                            : action.action === 'require'
+                                              ? 'Obrigatório'
+                                              : action.action === 'unrequire'
+                                                ? 'Opcional'
+                                                : action.action === 'enable'
+                                                  ? 'Habilitar'
+                                                  : action.action === 'disable'
+                                                    ? 'Desabilitar'
+                                                    : String(action.action)}
+                                      </span>
+                                    ) : (
+                                      <select
+                                        value={action.action}
+                                        onChange={(e) => updateRuleAction(ruleIdx, 'then', actionIdx, { action: e.target.value as any })}
+                                        className="px-2 py-1 border border-gray-300 rounded text-sm"
+                                      >
+                                        <option value="show">Mostrar</option>
+                                        <option value="hide">Ocultar</option>
+                                        <option value="require">Tornar obrigatório</option>
+                                        <option value="unrequire">Tornar opcional</option>
+                                        <option value="enable">Habilitar</option>
+                                        <option value="disable">Desabilitar</option>
+                                        {!rulesSimpleMode && <option value="setValue">Definir valor</option>}
+                                        {!rulesSimpleMode && <option value="clear">Limpar valor</option>}
+                                        {!rulesSimpleMode && <option value="gotoSection">Ir para seção (página)</option>}
+                                      </select>
+                                    )}
                                     
-                                    <select
-                                      value={action.target}
-                                      onChange={(e) => updateRuleAction(ruleIdx, 'then', actionIdx, { target: e.target.value })}
-                                      className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                                    >
-                                      <option value="">Selecione campo...</option>
-                                      {fieldsForRules.map(f => (
-                                        <option key={f.key} value={f.key}>{f.label} ({f.key})</option>
-                                      ))}
-                                    </select>
+                                    {!rulesSimpleMode && action.action === 'gotoSection' ? (
+                                      <select
+                                        value={action.target}
+                                        onChange={(e) => updateRuleAction(ruleIdx, 'then', actionIdx, { target: e.target.value })}
+                                        className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                                      >
+                                        <option value="">Selecione seção...</option>
+                                        {sectionsForRules.map((s) => (
+                                          <option key={s.id} value={s.id}>
+                                            {s.title} ({s.id})
+                                          </option>
+                                        ))}
+                                      </select>
+                                    ) : (
+                                      <select
+                                        value={action.target}
+                                        onChange={(e) => updateRuleAction(ruleIdx, 'then', actionIdx, { target: e.target.value })}
+                                        className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                                      >
+                                        <option value="">Selecione campo...</option>
+                                        {fieldsForRules.map(f => (
+                                          <option key={f.key} value={f.key}>
+                                            {rulesSimpleMode ? f.label : `${f.label} (${f.key})`}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    )}
 
-                                    {action.action === 'setValue' && (
+                                    {!rulesSimpleMode && action.action === 'setValue' && (
                                       <input
                                         type="text"
                                         value={action.value || ''}
@@ -1822,15 +2374,62 @@ export const FormBuilderPage: React.FC = () => {
                           <div className="border-l-4 border-orange-500 pl-4">
                             <div className="flex justify-between items-center mb-3">
                               <h5 className="text-sm font-semibold text-gray-700">
-                                SENÃO (Ações se falso)
+                                {rulesSimpleMode ? 'CASO CONTRÁRIO (se a condição for falsa)' : 'SENÃO (Ações se falso)'}
                               </h5>
-                              <button
-                                onClick={() => addRuleAction(ruleIdx, 'else')}
-                                className="px-2 py-1 text-xs bg-orange-600 text-white rounded hover:bg-orange-700 flex items-center gap-1"
-                              >
-                                <Plus className="h-3 w-3" />
-                                Adicionar Ação
-                              </button>
+                              {rulesSimpleMode ? (
+                                <div className="flex flex-wrap gap-1 justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={() => addQuickRuleAction(ruleIdx, 'else', 'show')}
+                                    className="px-2 py-1 text-[11px] bg-green-600 text-white rounded hover:bg-green-700"
+                                  >
+                                    Mostrar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => addQuickRuleAction(ruleIdx, 'else', 'hide')}
+                                    className="px-2 py-1 text-[11px] bg-slate-700 text-white rounded hover:bg-slate-800"
+                                  >
+                                    Ocultar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => addQuickRuleAction(ruleIdx, 'else', 'require')}
+                                    className="px-2 py-1 text-[11px] bg-amber-600 text-white rounded hover:bg-amber-700"
+                                  >
+                                    Obrigatório
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => addQuickRuleAction(ruleIdx, 'else', 'unrequire')}
+                                    className="px-2 py-1 text-[11px] bg-gray-600 text-white rounded hover:bg-gray-700"
+                                  >
+                                    Opcional
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => addQuickRuleAction(ruleIdx, 'else', 'enable')}
+                                    className="px-2 py-1 text-[11px] bg-emerald-600 text-white rounded hover:bg-emerald-700"
+                                  >
+                                    Habilitar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => addQuickRuleAction(ruleIdx, 'else', 'disable')}
+                                    className="px-2 py-1 text-[11px] bg-rose-600 text-white rounded hover:bg-rose-700"
+                                  >
+                                    Desabilitar
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => addRuleAction(ruleIdx, 'else')}
+                                  className="px-2 py-1 text-xs bg-orange-600 text-white rounded hover:bg-orange-700 flex items-center gap-1"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                  Adicionar Ação
+                                </button>
+                              )}
                             </div>
                             
                             {(rule.else || []).length === 0 ? (
@@ -1839,33 +2438,69 @@ export const FormBuilderPage: React.FC = () => {
                               <div className="space-y-2">
                                 {(rule.else || []).map((action, actionIdx) => (
                                   <div key={actionIdx} className="flex gap-2 items-start">
-                                    <select
-                                      value={action.action}
-                                      onChange={(e) => updateRuleAction(ruleIdx, 'else', actionIdx, { action: e.target.value as any })}
-                                      className="px-2 py-1 border border-gray-300 rounded text-sm"
-                                    >
-                                      <option value="show">Mostrar</option>
-                                      <option value="hide">Ocultar</option>
-                                      <option value="require">Tornar obrigatório</option>
-                                      <option value="unrequire">Tornar opcional</option>
-                                      <option value="enable">Habilitar</option>
-                                      <option value="disable">Desabilitar</option>
-                                      <option value="setValue">Definir valor</option>
-                                      <option value="clear">Limpar valor</option>
-                                    </select>
+                                    {rulesSimpleMode ? (
+                                      <span className="px-2 py-1 rounded bg-orange-50 text-orange-800 text-xs border border-orange-200 min-w-[92px] text-center">
+                                        {action.action === 'show'
+                                          ? 'Mostrar'
+                                          : action.action === 'hide'
+                                            ? 'Ocultar'
+                                            : action.action === 'require'
+                                              ? 'Obrigatório'
+                                              : action.action === 'unrequire'
+                                                ? 'Opcional'
+                                                : action.action === 'enable'
+                                                  ? 'Habilitar'
+                                                  : action.action === 'disable'
+                                                    ? 'Desabilitar'
+                                                    : String(action.action)}
+                                      </span>
+                                    ) : (
+                                      <select
+                                        value={action.action}
+                                        onChange={(e) => updateRuleAction(ruleIdx, 'else', actionIdx, { action: e.target.value as any })}
+                                        className="px-2 py-1 border border-gray-300 rounded text-sm"
+                                      >
+                                        <option value="show">Mostrar</option>
+                                        <option value="hide">Ocultar</option>
+                                        <option value="require">Tornar obrigatório</option>
+                                        <option value="unrequire">Tornar opcional</option>
+                                        <option value="enable">Habilitar</option>
+                                        <option value="disable">Desabilitar</option>
+                                        {!rulesSimpleMode && <option value="setValue">Definir valor</option>}
+                                        {!rulesSimpleMode && <option value="clear">Limpar valor</option>}
+                                        {!rulesSimpleMode && <option value="gotoSection">Ir para seção (página)</option>}
+                                      </select>
+                                    )}
                                     
-                                    <select
-                                      value={action.target}
-                                      onChange={(e) => updateRuleAction(ruleIdx, 'else', actionIdx, { target: e.target.value })}
-                                      className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                                    >
-                                      <option value="">Selecione campo...</option>
-                                      {fieldsForRules.map(f => (
-                                        <option key={f.key} value={f.key}>{f.label} ({f.key})</option>
-                                      ))}
-                                    </select>
+                                    {!rulesSimpleMode && action.action === 'gotoSection' ? (
+                                      <select
+                                        value={action.target}
+                                        onChange={(e) => updateRuleAction(ruleIdx, 'else', actionIdx, { target: e.target.value })}
+                                        className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                                      >
+                                        <option value="">Selecione seção...</option>
+                                        {sectionsForRules.map((s) => (
+                                          <option key={s.id} value={s.id}>
+                                            {s.title} ({s.id})
+                                          </option>
+                                        ))}
+                                      </select>
+                                    ) : (
+                                      <select
+                                        value={action.target}
+                                        onChange={(e) => updateRuleAction(ruleIdx, 'else', actionIdx, { target: e.target.value })}
+                                        className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                                      >
+                                        <option value="">Selecione campo...</option>
+                                        {fieldsForRules.map(f => (
+                                          <option key={f.key} value={f.key}>
+                                            {rulesSimpleMode ? f.label : `${f.label} (${f.key})`}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    )}
 
-                                    {action.action === 'setValue' && (
+                                    {!rulesSimpleMode && action.action === 'setValue' && (
                                       <input
                                         type="text"
                                         value={action.value || ''}
@@ -1979,10 +2614,14 @@ export const FormBuilderPage: React.FC = () => {
                       </pre>
                     ) : (
                       <FormRenderer
-                        schema={schema}
+                        schema={{
+                          ...schema,
+                          title: (formName || '').trim() || schema.title,
+                        }}
                         initialData={previewData}
                         onDataChange={setPreviewData}
                         readOnly={previewMode === 'readonly'}
+                        showTitle={false}
                         showActions={false}
                       />
                     )}
@@ -2016,3 +2655,5 @@ export const FormBuilderPage: React.FC = () => {
     </AppPageLayout>
   );
 };
+
+export default FormBuilderPage;

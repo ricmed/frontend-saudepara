@@ -3,6 +3,7 @@ import axios from 'axios';
 const server = import.meta.env.VITE_API_SERVER;
 const port = import.meta.env.VITE_API_PORT;
 const API_URL = `${server}:${port}/api`;
+const PUBLIC_API_URL = `${server}:${port}`;
 
 // Instância do axios com credenciais (cookies de autenticação)
 const api = axios.create({
@@ -14,6 +15,15 @@ const api = axios.create({
   withCredentials: true // ✅ Envia cookies de autenticação automaticamente
 });
 
+// Instância para rotas públicas (sem /api)
+const publicApi = axios.create({
+  baseURL: PUBLIC_API_URL,
+  timeout: 60000,
+  headers: {
+    'Content-Type': 'application/json'
+  },
+});
+
 // Types
 export interface Form {
   id: number;
@@ -22,8 +32,22 @@ export interface Form {
   descricao?: string;
   status: string;
   is_active: boolean;
+  /** Papel do usuário atual no formulário (somente em algumas listagens internas). */
+  my_role?: 'ADMIN' | 'EDITOR' | 'VIEWER' | null;
   active_version_id?: number;
   categoria?: string;
+  visibility?: 'PRIVATE' | 'UNLISTED' | 'PUBLIC';
+  require_login?: boolean;
+  slug?: string | null;
+  open_at?: string | null;
+  close_at?: string | null;
+  max_submissions?: number | null;
+  confirmation_message?: string | null;
+  redirect_url?: string | null;
+  collect_email?: boolean;
+  one_response_per_user?: boolean;
+  owner_user_id?: string | null;
+  allow_edit_after_submit?: boolean;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -44,8 +68,39 @@ export interface FormVersion {
   form?: Form;
 }
 
+export interface PublicFormPayload {
+  form: {
+    id: number;
+    form_key: string;
+    nome: string;
+    descricao?: string | null;
+    categoria?: string | null;
+    slug: string | null;
+    visibility: 'PRIVATE' | 'UNLISTED' | 'PUBLIC';
+    require_login: boolean;
+    open_at?: string | null;
+    close_at?: string | null;
+    max_submissions?: number | null;
+    confirmation_message?: string | null;
+    redirect_url?: string | null;
+    collect_email?: boolean;
+    one_response_per_user?: boolean;
+  };
+  version: {
+    id: number;
+    form_id: number;
+    version: number;
+    schema_json: FormSchema;
+    ui_json?: any;
+    rules_json?: any;
+    published_at?: string;
+  };
+}
+
 export interface FormSchema {
   agravo: string;
+  /** Título exibido para quem está preenchendo (ex.: "Cadastro de Pessoas"). */
+  title?: string;
   sections: FormSection[];
   rules?: FormRule[];
   validations?: FormValidation[];
@@ -55,6 +110,12 @@ export interface FormSchema {
     autoExtract?: boolean;
     columns?: string[];
   };
+  /** Questionário (pontuação no envio) — “Meus formulários”. */
+  quiz?: {
+    enabled?: boolean;
+    showScoreAfter?: boolean;
+    showCorrectAnswers?: boolean;
+  };
 }
 
 export interface FormSection {
@@ -62,6 +123,8 @@ export interface FormSection {
   title: string;
   /** Nome do ícone (lucide) para o cabeçalho da seção. Ex.: 'clipboard-list' */
   icon?: string;
+  /** Texto de orientação abaixo do título (ex.: regras de exibição condicional) */
+  description?: string;
   order: number;
   fields: FormField[];
 }
@@ -132,6 +195,11 @@ export interface FormField {
     totalMax?: number;
     message?: string;
   };
+  quiz?: {
+    enabled?: boolean;
+    points?: number;
+    correctValue?: string;
+  };
 }
 
 /** Definição de uma coluna em um campo tipo table */
@@ -180,8 +248,87 @@ export interface FormValidation {
   [key: string]: any;
 }
 
+export interface AdminFormsQuery {
+  page?: number;
+  limit?: number;
+  scope?: 'all' | 'sinan' | 'general';
+  search?: string;
+  is_active?: boolean;
+  visibility?: 'PRIVATE' | 'UNLISTED' | 'PUBLIC';
+}
+
+export interface Paginated<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface PacienteLookupBasic {
+  id: number;
+  cpf: string | null;
+  cns: string | null;
+  nome: string | null;
+  data_nascimento: string | null; // YYYY-MM-DD
+  nome_mae: string | null;
+  sexo: string | null; // M/F/I (ou conforme base interna)
+}
+
 // Service
 class FormService {
+  // Meus formulários (owner + ACL)
+  async getMyForms(): Promise<Form[]> {
+    const response = await api.get('/forms/me');
+    return response.data;
+  }
+
+  // Criar formulário “geral” (dono automático, sem precisar mandar created_by)
+  async createMyForm(data: {
+    form_key?: string;
+    nome: string;
+    descricao?: string;
+    categoria?: string;
+    visibility?: 'PRIVATE' | 'UNLISTED' | 'PUBLIC';
+    require_login?: boolean;
+    slug?: string;
+  }): Promise<Form> {
+    const response = await api.post('/forms/me', data);
+    return response.data;
+  }
+
+  async updateMyForm(
+    id: number,
+    data: {
+      nome?: string;
+      descricao?: string;
+      categoria?: string;
+      visibility?: 'PRIVATE' | 'UNLISTED' | 'PUBLIC';
+      require_login?: boolean;
+      slug?: string | null;
+      allow_edit_after_submit?: boolean;
+      is_active?: boolean;
+      open_at?: string | Date | null;
+      close_at?: string | Date | null;
+      max_submissions?: number | null;
+      confirmation_message?: string | null;
+      redirect_url?: string | null;
+      collect_email?: boolean;
+      one_response_per_user?: boolean;
+    }
+  ): Promise<Form> {
+    const response = await api.put(`/forms/me/${id}`, data);
+    return response.data;
+  }
+
+  async deleteMyForm(id: number): Promise<void> {
+    await api.delete(`/forms/me/${id}`);
+  }
+
+  async duplicateMyForm(id: number): Promise<Form> {
+    const response = await api.post(`/forms/me/${id}/duplicate`);
+    return response.data;
+  }
   async getCategories(): Promise<Array<{ key: string; label: string }>> {
     const response = await api.get('/forms/categories');
     const data = response.data;
@@ -189,6 +336,20 @@ class FormService {
     return data
       .map((c: any) => ({ key: String(c.key ?? ''), label: String(c.label ?? '') }))
       .filter((c) => c.key && c.label);
+  }
+
+  async lookupPacienteBasic(params: { cpf?: string; cns?: string }): Promise<PacienteLookupBasic | null> {
+    try {
+      const response = await api.get('/paciente/lookup', { params });
+      const data = response.data;
+      if (!data || typeof data !== 'object') return null;
+      if (typeof data.id !== 'number') return null;
+      return data as PacienteLookupBasic;
+    } catch (e: any) {
+      // 404 = não encontrado; não é erro de UX
+      if (e?.response?.status === 404) return null;
+      throw e;
+    }
   }
 
   // Listar todos os formulários
@@ -200,6 +361,12 @@ class FormService {
       console.error('Erro ao buscar formulários:', error);
       throw error;
     }
+  }
+
+  // Admin: listar globalmente (com filtros/paginação)
+  async getAdminForms(params?: AdminFormsQuery): Promise<Paginated<Form>> {
+    const response = await api.get('/forms/admin', { params: params ?? {} });
+    return response.data;
   }
 
   // Buscar formulário por ID
@@ -233,6 +400,27 @@ class FormService {
       console.error('Erro ao buscar versão ativa:', error);
       throw error;
     }
+  }
+
+  // Buscar formulário público por slug (usa token `t` quando UNLISTED)
+  async getPublicForm(slug: string, token?: string | null): Promise<PublicFormPayload> {
+    const params: Record<string, string> = {};
+    if (token) params.t = token;
+    const response = await publicApi.get(`/public/forms/${encodeURIComponent(slug)}`, { params });
+    return response.data;
+  }
+
+  /** Resposta do POST público: submissão + resumo de quiz (se configurado). */
+  async submitPublicForm(params: { slug: string; token?: string | null; data_json: Record<string, any>; draft?: boolean }): Promise<
+    Record<string, any> & {
+      quiz?: { score: number; maxScore: number; items: Array<{ key: string; points: number; awarded: number; correct: boolean; expected?: string; answer?: string }> } | null;
+    }
+  > {
+    const qs: Record<string, string> = {};
+    if (params.token) qs.t = params.token;
+    if (params.draft) qs.draft = '1';
+    const response = await publicApi.post(`/public/forms/${encodeURIComponent(params.slug)}/submissions`, { data_json: params.data_json }, { params: qs });
+    return response.data;
   }
 
   // Criar novo formulário

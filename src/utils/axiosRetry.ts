@@ -6,12 +6,35 @@ axios.defaults.withCredentials = true;
 // Estado global para controlar notificações de retry
 let isRetryNotificationActive = false;
 
+const USE_INTERNAL_AUTH = (import.meta as any).env?.VITE_USE_INTERNAL_AUTH === 'true';
+const refreshEndpoint = USE_INTERNAL_AUTH ? '/api/auth/refresh' : '/api-auth/auth/refresh';
+
+let refreshPromise: Promise<void> | null = null;
+
 // Configurar interceptor global para retry em caso de erro 429
 axios.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
     
+    // Se for 401, tentar renovar sessão uma vez e repetir a requisição.
+    // Isso evita "deslogar" quando o access token expira, usando o refresh cookie.
+    if (error.response?.status === 401 && !originalRequest._retry && originalRequest.url !== refreshEndpoint) {
+      originalRequest._retry = true;
+      try {
+        if (!refreshPromise) {
+          refreshPromise = axios.post(refreshEndpoint, {}, { withCredentials: true }).then(() => {});
+          refreshPromise.finally(() => {
+            refreshPromise = null;
+          });
+        }
+        await refreshPromise;
+        return axios(originalRequest);
+      } catch (e) {
+        return Promise.reject(error);
+      }
+    }
+
     // Se for erro 429 e ainda não foi feito retry
     if (error.response?.status === 429 && !originalRequest._retry) {
       originalRequest._retry = true;

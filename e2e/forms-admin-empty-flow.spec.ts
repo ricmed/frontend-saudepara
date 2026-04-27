@@ -79,11 +79,17 @@ test.describe('Formulários — admin e estado vazio', () => {
         pathname = '';
       }
 
-      if (method === 'GET' && pathname === '/api/forms') {
+      if (method === 'GET' && pathname === '/api/forms/admin') {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify([]),
+          body: JSON.stringify({
+            data: [],
+            total: 0,
+            page: 1,
+            limit: 30,
+            totalPages: 1
+          }),
         });
       }
 
@@ -179,7 +185,8 @@ test.describe('Formulários — admin e estado vazio', () => {
     await page.getByRole('button', { name: 'Cadastrar Primeira Notificação' }).click();
 
     await expect(page).toHaveURL(/\/private\/formularios\/EMPTY_IT\/nova\/?$/);
-    await expect(page.getByRole('heading', { name: 'EMPTY_IT' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('heading', { name: /Nova Notificação/i, level: 1 })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('Agravo sem notificações').first()).toBeVisible();
     await expect(page.getByPlaceholder('empty-flow-ph')).toBeVisible();
   });
 });

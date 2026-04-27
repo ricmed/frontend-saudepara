@@ -74,39 +74,17 @@ const UserListCrs: React.FC = () => {
         return;
       }
 
-      // TODO: Ideal: filtrar por CRS no backend.
-      // Por enquanto: busca limitada no Keycloak + enriquece com acessos e filtra no frontend.
-      const usersData = await usuarioGestaoService.getUsuarios({
-        first: 0,
-        max: 200,
+      // ✅ Melhor: usar listagem agregada do backend (paginada + com search)
+      const page = await usuarioGestaoService.getUsuariosList({
+        first: pagination.first,
+        max: pagination.max,
         search: search || undefined,
+        scope: 'crs',
+        scopeId: Number(userPermissions.crsId),
       });
 
-      const usersWithAccess: UserWithAccess[] = [];
-      for (const u of usersData) {
-        const acessos = await usuarioGestaoService.getUsuarioAcessos(u.id);
-        const hasCrsAccess = acessos.some(
-          (acesso) => acesso.nivel_acesso === 'crs' && acesso.crs_id === userPermissions.crsId
-        );
-        if (!hasCrsAccess) continue;
-
-        const roles = await usuarioGestaoService.getUserRoles(u.id);
-        usersWithAccess.push({
-          ...u,
-          emailVerified: true,
-          createdTimestamp: u.createdTimestamp || Date.now(),
-          acessos,
-          roles,
-        } as any);
-      }
-
-      const filteredUsers = usersWithAccess;
-
-      // Paginação local em cima do conjunto filtrado (limitado a 200 usuários buscados do Keycloak)
-      const start = pagination.first;
-      const end = start + pagination.max;
-      setUsers(filteredUsers.slice(start, end));
-      setPagination(prev => ({ ...prev, total: filteredUsers.length }));
+      setUsers(page.items as any);
+      setPagination((prev) => ({ ...prev, total: page.total || 0 }));
     } catch (err) {
       console.error('Erro ao carregar usuários:', err);
       setUsers([]);

@@ -16,11 +16,14 @@ export default defineConfig(({ mode }) => {
       : `${pkgJson.version}-${mode}-${Date.now()}`);
   const isHomologacao = env.VITE_ENV === 'homologacao';
   const isProducao = env.VITE_ENV === 'producao';
+  const useInternalAuth = env.VITE_USE_INTERNAL_AUTH === 'true';
   const API_AUTH_URL = isHomologacao
     ? 'https://app.hml.saude.pa.gov.br/'
     : isProducao
       ? 'https://app.saude.pa.gov.br/'
-      : 'http://localhost:4000';
+      : useInternalAuth
+        ? 'http://localhost:3000'
+        : 'http://localhost:4000';
   const API_BACKEND_URL = isHomologacao
     ? 'https://app.hml.saude.pa.gov.br/'
     : isProducao
@@ -31,6 +34,7 @@ export default defineConfig(({ mode }) => {
   console.log('📍', isHomologacao ? 'HOMOLOGAÇÃO' : isProducao ? 'PRODUÇÃO' : 'DESENVOLVIMENTO');
   console.log('🔐 API Auth proxy:', API_AUTH_URL);
   console.log('⚡ API Backend proxy:', API_BACKEND_URL);
+  console.log('🧩 Internal auth:', useInternalAuth ? 'ON' : 'OFF');
 
   return {
   plugins: [
@@ -41,8 +45,6 @@ export default defineConfig(({ mode }) => {
         'favicon.ico', 
         'apple-touch-icon.png', 
         'masked-icon.svg',
-        'pwa-192x192.png',
-        'pwa-512x512.png',
         'robots.txt'
       ],
       manifest: {
@@ -57,19 +59,9 @@ export default defineConfig(({ mode }) => {
         scope: '/',
         categories: ['medical', 'productivity', 'utilities'],
         
-        icons: [
-          {
-            src: 'pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable'
-          }
-        ],
+        // Evita 404 em homologação: não temos os PNGs no `public/`.
+        // Mantém um ícone mínimo via SVG (fallback).
+        icons: [{ src: 'vite.svg', sizes: 'any', type: 'image/svg+xml' }],
         
         shortcuts: [
           {
@@ -77,32 +69,36 @@ export default defineConfig(({ mode }) => {
             short_name: 'Notificação',
             description: 'Criar nova notificação de saúde',
             url: '/private/comunicacao-de-caso/nova',
-            icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }]
+            icons: [{ src: 'vite.svg', sizes: 'any' }]
           },
           {
             name: 'Novo Paciente',
             short_name: 'Paciente',
             description: 'Cadastrar novo paciente',
             url: '/private/pacientes/nova',
-            icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }]
+            icons: [{ src: 'vite.svg', sizes: 'any' }]
           },
           {
             name: 'Dados Offline',
             short_name: 'Offline',
             description: 'Gerenciar dados offline',
             url: '/offline-management',
-            icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }]
+            icons: [{ src: 'vite.svg', sizes: 'any' }]
           }
         ]
       },
       
       strategies: 'generateSW',
-      injectRegister: 'auto',
+      // Já registramos manualmente em `src/registerSW.ts` (chamado em `src/main.tsx`).
+      // Evita script injetado duplicado que pode quebrar em alguns ambientes (ex.: "Unexpected token 'export'").
+      injectRegister: null,
       
+      // Em dev, SW + CacheFirst em *.jpg pode guardar o index.html (fallback SPA) como "imagem"
+      // quando o ficheiro ainda não existe em public — depois o browser mostra bandeira quebrada.
       devOptions: {
-        enabled: true,
+        enabled: false,
         type: 'module',
-        navigateFallback: 'index.html'
+        navigateFallback: 'index.html',
       },
       
       workbox: {
@@ -119,8 +115,10 @@ export default defineConfig(({ mode }) => {
           '**/*.{js,css}',
           // Assets que existem
           '**/*.{ico,png,svg,json}',
+          // Bandeiras e outros estáticos em public (quando existirem no dist)
+          '**/*.{jpg,jpeg}',
           // Fonts se existirem
-          '**/*.{woff,woff2,ttf}'
+          '**/*.{woff,woff2,ttf}',
         ],
         
         globIgnores: [
@@ -251,9 +249,20 @@ export default defineConfig(({ mode }) => {
               cacheName: 'images-cache',
               expiration: {
                 maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 365
-              }
-            }
+                maxAgeSeconds: 60 * 60 * 24 * 365,
+              },
+              plugins: [
+                {
+                  cacheWillUpdate: async ({ response }: { response: Response }) => {
+                    const ct = response.headers.get('content-type') || '';
+                    if (response.status === 200 && /^image\//i.test(ct)) {
+                      return response;
+                    }
+                    return null;
+                  },
+                },
+              ],
+            },
           },
           
           {
@@ -347,6 +356,11 @@ export default defineConfig(({ mode }) => {
         changeOrigin: true,
         secure: false,
         timeout: 10000,
+        rewrite: (p) =>
+          p
+            .replace(/^\/api-auth\/auth\//, '/api/auth/')
+            .replace(/^\/api-auth\/protected\/profile$/, '/api/auth/profile')
+            .replace(/^\/api-auth\/admin\//, '/api/auth/admin/'),
         configure: (proxy) => {
           proxy.on('error', (err) => {
             console.log('❌ Proxy error - usando fallback para produção:', (err as any).code || err.message);
@@ -386,6 +400,11 @@ export default defineConfig(({ mode }) => {
         changeOrigin: true,
         secure: false,
         timeout: 10000,
+        rewrite: (p) =>
+          p
+            .replace(/^\/api-auth\/auth\//, '/api/auth/')
+            .replace(/^\/api-auth\/protected\/profile$/, '/api/auth/profile')
+            .replace(/^\/api-auth\/admin\//, '/api/auth/admin/'),
       },
       '/api': {
         target: API_BACKEND_URL,

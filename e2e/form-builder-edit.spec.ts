@@ -110,12 +110,13 @@ test.describe('Form builder — editar formulário (admin)', () => {
     });
 
     await expect(page.getByLabel('Nome do Formulário *')).toHaveValue('Formulário Edição E2E');
-    await expect(page.getByLabel('Código do Formulário *')).toHaveValue('EDIT_IT');
 
     await expect(page.getByRole('heading', { name: 'Seção E2E' })).toBeVisible();
 
-    const fieldCard = page.locator('.field-card-draggable').first();
-    await expect(fieldCard.locator('input').nth(0)).toHaveValue('Campo Teste');
-    await expect(fieldCard.locator('input').nth(1)).toHaveValue('obs.teste');
+    // Nome técnico fica oculto por padrão; admin pode abrir "Avançado" para ver.
+    await page.getByRole('button', { name: 'Avançado' }).first().click();
+    const fieldCard = page.locator('input[value="Campo Teste"]').first();
+    await expect(fieldCard).toBeVisible();
+    await expect(page.locator('input[value="obs.teste"]').first()).toBeVisible();
   });
 });

@@ -26,7 +26,6 @@ import {
   Hospital,
   ClipboardList,
   Settings,
-  Bug,
 } from "lucide-react";
 
 interface SideMenuProps {
@@ -118,6 +117,16 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     icon: <ClipboardList />,
     label: t("menu.dynamic_forms"),
     onClick: () => navigate("/private/formularios"),
+    }] : []),
+
+    // ✅ Google-Forms-like: Meus formulários (criadores)
+    ...(user && (user.roles?.includes('forms.creator') || isAdmin()) ? [{
+      icon: <FileText />,
+      label: "Meus formulários",
+      onClick: () => {
+        navigate("/private/meus-formularios");
+        onClose();
+      },
     }] : []),
     
     // Menu Dashboard - para notificadores OU usuários com role dashboard (OCULTAR para admin.crs)

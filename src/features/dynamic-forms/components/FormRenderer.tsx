@@ -32,10 +32,14 @@ import {
 } from './SpecialFields';
 import { EstadoMunicipioNotificacao } from './EstadoMunicipioNotificacao';
 import { EstabelecimentoNotificacao } from './EstabelecimentoNotificacao';
+import UnidadeNotificadoraField from '@/features/notificationForms/components/UnidadeNotificadoraField';
 import { EstadoMunicipioResidencia } from './EstadoMunicipioResidencia';
 import { TableField } from './TableField';
 import { ClipboardList, Calendar, DollarSign, Target, Activity, Shield, Leaf, BarChart3, Wrench, Users } from 'lucide-react';
 import { convertLocalDateTimeToUTC } from '@/utils/timezoneUtils';
+import FormService from '@/services/FormService';
+import { validateCPF } from '@/utils/cpfValidator';
+import { validateCNS } from '@/utils/cnsValidator';
 
 const NOTIFICATION_LOCATION_KEYS = new Set([
   'notificacao.uf_notificacao',
@@ -88,8 +92,16 @@ interface FormRendererProps {
   saveDraftLabel?: string;
   cancelLabel?: string;
   readOnly?: boolean;
+  /** Exibe o título (nome/código) dentro do renderer. */
+  showTitle?: boolean;
   /** Oculta a barra de ações (Enviar / Salvar rascunho / Cancelar) mantendo o formulário interativo. */
   showActions?: boolean;
+  /** Contexto do formulário para ocultar campos específicos do SINAN em formulários gerais/públicos. */
+  context?: 'sinan' | 'general' | 'public';
+  /** Renderiza por páginas (uma seção por vez), estilo Google Forms. */
+  pageMode?: boolean;
+  /** Exibe barra de progresso quando em modo páginas. */
+  showProgress?: boolean;
 }
 
 export const FormRenderer: React.FC<FormRendererProps> = ({
@@ -103,7 +115,11 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   saveDraftLabel = 'Salvar Rascunho',
   cancelLabel = 'Cancelar',
   readOnly = false,
+  showTitle = true,
   showActions = true,
+  context = 'sinan',
+  pageMode = false,
+  showProgress = false,
 }) => {
   const sectionIconMap: Record<string, React.ComponentType<{ className?: string }>> = React.useMemo(
     () => ({
@@ -181,6 +197,41 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     onDataChange,
   });
 
+  // Auto-preencher dados do paciente via base interna (CPF/CNS).
+  // Não sobrescreve campos já preenchidos manualmente.
+  const [, setLookupLoading] = useState(false);
+  const applyPacienteLookup = useCallback(
+    (data: any) => {
+      if (!data) return;
+      const getEmpty = (k: string) => {
+        const v = getValue(k);
+        return v == null || String(v).trim() === '';
+      };
+      if (data.nome && getEmpty('paciente.nome')) setValue('paciente.nome', String(data.nome));
+      if (data.data_nascimento && getEmpty('paciente.data_nascimento')) setValue('paciente.data_nascimento', String(data.data_nascimento));
+      if (data.nome_mae && getEmpty('paciente.nome_mae')) setValue('paciente.nome_mae', String(data.nome_mae));
+      if (data.cns && getEmpty('paciente.cns')) setValue('paciente.cns', String(data.cns));
+      if (data.sexo && getEmpty('paciente.sexo')) setValue('paciente.sexo', String(data.sexo));
+    },
+    [getValue, setValue]
+  );
+
+  const lookupByCpfOrCns = useCallback(
+    async (params: { cpf?: string; cns?: string }) => {
+      try {
+        setLookupLoading(true);
+        const res = await FormService.lookupPacienteBasic(params);
+        if (res) applyPacienteLookup(res);
+      } catch (e) {
+        // ignora erros de rede aqui (não pode travar preenchimento manual)
+        console.warn('Paciente lookup falhou', e);
+      } finally {
+        setLookupLoading(false);
+      }
+    },
+    [applyPacienteLookup]
+  );
+
   const [uploadingCount, setUploadingCount] = useState(0);
   const handleUploadingChange = useCallback((uploading: boolean) => {
     setUploadingCount(c => Math.max(0, c + (uploading ? 1 : -1)));
@@ -204,6 +255,112 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       .filter((section) => section.fields.length > 0)
       .sort((a, b) => a.order - b.order);
   }, [schema]);
+
+  const [pageIndex, setPageIndex] = useState(0);
+  useEffect(() => {
+    setPageIndex(0);
+  }, [schema]);
+
+  const totalPages = pageMode ? Math.max(1, sectionsToRender.length) : 1;
+  const currentSection = pageMode ? sectionsToRender[Math.min(pageIndex, sectionsToRender.length - 1)] : null;
+
+  const validateCurrentPage = () => {
+    if (!pageMode || !currentSection) return validateAll();
+    let ok = true;
+    const sortedFields = [...(currentSection.fields || [])].sort((a, b) => a.order - b.order);
+    for (const f of sortedFields) {
+      if (!f) continue;
+      if (!isFieldVisible(f.key)) continue;
+      if (isFieldDisabled(f.key)) continue;
+      const valid = validateField(f as any);
+      if (!valid) ok = false;
+    }
+    return ok;
+  };
+
+  const getNextPageIndexFromRules = (): number | null => {
+    if (!pageMode) return null;
+    const rules = (schema.rules || []) as any[];
+    if (!rules.length) return null;
+
+    const evalCondition = (when: any): boolean => {
+      const op = String(when?.op || '').trim();
+      const left = String(when?.left || '').trim();
+      const right = when?.right;
+      const lv = left ? getValue(left) : undefined;
+
+      const asNum = (v: any) => {
+        const n = typeof v === 'number' ? v : Number(String(v ?? '').replace(',', '.'));
+        return Number.isFinite(n) ? n : null;
+      };
+      const norm = (v: any) => (v == null ? '' : String(v));
+
+      if (op === 'isEmpty') return lv == null || norm(lv).trim() === '';
+      if (op === 'isNotEmpty') return !(lv == null || norm(lv).trim() === '');
+      if (op === 'contains') return norm(lv).toLowerCase().includes(norm(right).toLowerCase());
+      if (op === 'startsWith') return norm(lv).toLowerCase().startsWith(norm(right).toLowerCase());
+      if (op === 'endsWith') return norm(lv).toLowerCase().endsWith(norm(right).toLowerCase());
+
+      if (op === 'in' || op === 'notIn') {
+        const arr = Array.isArray(right) ? right.map(norm) : norm(right).split(',').map((s) => s.trim()).filter(Boolean);
+        const has = arr.includes(norm(lv));
+        return op === 'in' ? has : !has;
+      }
+
+      const ln = asNum(lv);
+      const rn = asNum(right);
+      if (['gt', 'gte', 'lt', 'lte'].includes(op) && ln != null && rn != null) {
+        if (op === 'gt') return ln > rn;
+        if (op === 'gte') return ln >= rn;
+        if (op === 'lt') return ln < rn;
+        if (op === 'lte') return ln <= rn;
+      }
+
+      if (op === 'eq') return norm(lv) === norm(right);
+      if (op === 'neq') return norm(lv) !== norm(right);
+      return false;
+    };
+
+    for (const r of rules) {
+      if (!evalCondition(r.when)) continue;
+      const thenActs = Array.isArray(r.then) ? r.then : [];
+      const go = thenActs.find((a: any) => String(a?.action) === 'gotoSection');
+      const targetId = String(go?.target || '').trim();
+      if (!targetId) continue;
+      const idx = sectionsToRender.findIndex((s: any) => String(s.id) === targetId);
+      if (idx >= 0) return idx;
+    }
+    return null;
+  };
+
+  const goPrev = () => setPageIndex((p) => Math.max(0, p - 1));
+  const goNext = () => {
+    if (!validateCurrentPage()) return;
+    const jump = getNextPageIndexFromRules();
+    if (jump != null) {
+      setPageIndex(Math.max(0, Math.min(jump, totalPages - 1)));
+      return;
+    }
+    setPageIndex((p) => Math.min(totalPages - 1, p + 1));
+  };
+
+  const detalhamentoFieldKeys = React.useMemo(
+    () => schema.sections.find((s) => s.id === 'detalhamento')?.fields.map((f) => f.key) ?? [],
+    [schema],
+  );
+
+  const monitorOperImpactFieldKeys = React.useMemo(
+    () =>
+      schema.sections
+        .flatMap((s) => s.fields ?? [])
+        .map((f) => f.key)
+        .filter((k) => /^(imp_epi|imp_san|imp_amb)\./.test(k)),
+    [schema],
+  );
+
+  const clearDetalhamento = useCallback(() => {
+    detalhamentoFieldKeys.forEach((k) => setValue(k, undefined));
+  }, [detalhamentoFieldKeys, setValue]);
 
   // Retorno da assinatura Gov.br: preencher campo ou exibir erro e limpar hash/query
   useEffect(() => {
@@ -304,8 +461,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     const key = String(field?.key || '');
     // Em vários instrumentos a "descrição" funciona melhor em meia coluna,
     // para permitir o próximo campo ao lado.
-    if (key === 'detalhamento.avaliacao_como') return false; // manter cheio
-    return key.includes('descricao') || key === 'detalhamento.capacitacao_como';
+    return key.includes('descricao');
   };
 
   const normalizeMaiusculo = (v: any) => {
@@ -352,12 +508,45 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       ? { ...field, type: over.type, options: over.options ?? field.options, apiSelectEndpoint: over.apiSelectEndpoint ?? field.apiSelectEndpoint, maxLength: over.maxLength ?? field.maxLength }
       : field;
     const placeholder = residenciaPlaceholders[base.key];
-    if (placeholder != null) return { ...base, placeholder: base.placeholder ?? placeholder };
-    return base;
+    const withPlaceholder =
+      placeholder != null ? { ...base, placeholder: base.placeholder ?? placeholder } : base;
+
+    if (field.key === 'detalhamento.complementar_detalhe') {
+      const parent = getValue('detalhamento.complementar_descricao');
+      const optPrevencao = [
+        { value: 'imunizacao', label: 'Imunização' },
+        { value: 'controle_vetorial', label: 'Controle Vetorial' },
+        { value: 'controle_reservatorios', label: 'Controle de Reservatórios' },
+      ];
+      const optDiagnostico = [
+        { value: 'coleta_material', label: 'Coleta de Material' },
+        { value: 'realizacao_exames', label: 'Realização de Exames' },
+      ];
+      const options =
+        parent === 'acoes_prevencao_saude'
+          ? optPrevencao
+          : parent === 'acoes_diagnostico'
+            ? optDiagnostico
+            : [];
+      return { ...withPlaceholder, options };
+    }
+
+    return withPlaceholder;
   };
 
   const renderField = (field: any) => {
     const resolved = getResolvedField(field);
+    // Em formulários gerais/públicos, ocultar campos específicos de paciente/SINAN
+    if (context !== 'sinan') {
+      const sinanOnlyKeys = new Set([
+        'paciente.e_estrangeiro',
+        'paciente.passaporte',
+        'paciente.pais_nascimento_id',
+        'paciente.cpf',
+        'paciente.cns',
+      ]);
+      if (sinanOnlyKeys.has(resolved.key)) return null;
+    }
     // Não exibir paciente.pais_nascimento (texto); só o select paciente.pais_nascimento_id é usado
     if (resolved.key === 'paciente.pais_nascimento') {
       return null;
@@ -370,6 +559,25 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
 
     if (!visible) {
       return null;
+    }
+
+    if (resolved.type === 'estabelecimento-search') {
+      return (
+        <div className={`mb-4 ${disabled ? 'pointer-events-none opacity-60' : ''}`}>
+          <UnidadeNotificadoraField
+            value={value != null && value !== '' ? String(value) : ''}
+            onChange={(newValue) => {
+              const id = newValue ? Number(newValue) : NaN;
+              setValue(resolved.key, Number.isFinite(id) ? id : undefined);
+            }}
+            label={resolved.label + (required ? ' *' : '')}
+            placeholder="Pesquise por código (CNES) ou nome (mín. 3 caracteres)"
+            allowAllEstablishments
+            hasError={!!error}
+            errorMessage={error || ''}
+          />
+        </div>
+      );
     }
 
     const commonProps = {
@@ -584,7 +792,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             return <CnaeSearchField {...commonProps} />;
           }
           if (resolved.key === 'paciente.pais_nascimento_id' || resolved.key === 'residencia.pais') {
-            return <ApiSelectSearchField {...commonProps} />;
+            return <ApiSelectSearchField {...commonProps} getValue={getValue} />;
           }
           if (resolved.key === 'paciente.qual_povo_tradicional') {
             return (
@@ -598,7 +806,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             );
           }
           if (resolved.key === 'paciente.etnia') {
-            return <ApiSelectSearchField {...commonProps} />;
+            return <ApiSelectSearchField {...commonProps} getValue={getValue} />;
           }
           if (resolved.key === 'paciente.raca_cor') {
             return (
@@ -628,7 +836,38 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
               />
             );
           }
-          return <ApiSelectField {...commonProps} />;
+        if (resolved.key === 'acao.programa_alcancado') {
+          const semArea = !getValue('acao.area');
+          return <ApiSelectField {...commonProps} disabled={disabled || semArea} getValue={getValue} />;
+        }
+        if (resolved.key === 'acao.atividade') {
+          return (
+            <ApiSelectField
+              {...commonProps}
+              getValue={getValue}
+              onChange={(val: any) => {
+                setValue(resolved.key, val);
+                clearDetalhamento();
+              }}
+            />
+          );
+        }
+        return <ApiSelectField {...commonProps} getValue={getValue} />;
+        }
+        // Ao mudar Área da vigilância, limpar Atividade (seletor dependente)
+        if (resolved.key === 'acao.area') {
+          return (
+            <SelectField
+              {...commonProps}
+              onChange={(val: any) => {
+                setValue(resolved.key, val);
+                setValue('acao.atividade', undefined);
+                setValue('acao.programa_alcancado', undefined);
+                clearDetalhamento();
+                monitorOperImpactFieldKeys.forEach((k) => setValue(k, false));
+              }}
+            />
+          );
         }
         // É estrangeiro?: ao mudar, limpar documento que não se aplica e ajustar país de nascimento
         if (resolved.key === 'paciente.e_estrangeiro') {
@@ -664,6 +903,17 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             />
           );
         }
+        if (resolved.key === 'detalhamento.complementar_descricao') {
+          return (
+            <SelectField
+              {...commonProps}
+              onChange={(val: any) => {
+                setValue(resolved.key, val);
+                setValue('detalhamento.complementar_detalhe', undefined);
+              }}
+            />
+          );
+        }
         return <SelectField {...commonProps} />;
       case 'select-search':
         if (field.codeList) {
@@ -684,9 +934,31 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       case 'international-phone':
         return <InternationalPhoneField {...commonProps} />;
       case 'cpf':
-        return <CPFField {...commonProps} onBlur={() => validateField(resolved)} />;
+        return (
+          <CPFField
+            {...commonProps}
+            onBlur={async () => {
+              const ok = validateField(resolved);
+              const digits = String(getValue(resolved.key) ?? '').replace(/\D/g, '');
+              if (ok && digits.length === 11 && validateCPF(digits)) {
+                await lookupByCpfOrCns({ cpf: digits });
+              }
+            }}
+          />
+        );
       case 'cns':
-        return <CNSField {...commonProps} onBlur={() => validateField(resolved)} />;
+        return (
+          <CNSField
+            {...commonProps}
+            onBlur={async () => {
+              const ok = validateField(resolved);
+              const digits = String(getValue(resolved.key) ?? '').replace(/\D/g, '');
+              if (ok && digits.length === 15 && validateCNS(digits)) {
+                await lookupByCpfOrCns({ cns: digits });
+              }
+            }}
+          />
+        );
       case 'passaporte':
         return <PassaporteField {...commonProps} onBlur={() => validateField(resolved)} />;
       case 'cep':
@@ -724,16 +996,29 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
 
   return (
     <form onSubmit={handleSubmit} className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow">
-      <h1 className="text-2xl font-bold mb-6 text-gray-800">{schema.agravo}</h1>
+      {showTitle ? (
+        <h1 className="text-2xl font-bold mb-6 text-gray-800">{schema.title || schema.agravo}</h1>
+      ) : null}
 
-      {sectionsToRender.map((section) => {
+      {pageMode && showProgress ? (
+        <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
+            <span>
+              Página {Math.min(pageIndex + 1, totalPages)} de {totalPages}
+            </span>
+            <span>{Math.round((Math.min(pageIndex + 1, totalPages) / totalPages) * 100)}%</span>
+          </div>
+          <div className="h-2 w-full rounded bg-gray-200">
+            <div
+              className="h-2 rounded bg-blue-600 transition-all"
+              style={{ width: `${(Math.min(pageIndex + 1, totalPages) / totalPages) * 100}%` }}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {(pageMode ? (currentSection ? [currentSection] : []) : sectionsToRender).map((section) => {
           const sortedFields = [...section.fields].sort((a, b) => a.order - b.order);
-          const firstNotificationLocationKey = sortedFields.find((f) =>
-            NOTIFICATION_LOCATION_KEYS.has(f.key)
-          )?.key;
-          const firstEstabelecimentoKey = sortedFields.find((f) =>
-            NOTIFICATION_ESTABELECIMENTO_KEYS.has(f.key)
-          )?.key;
           const firstNotificationField = sortedFields.find(
             (f) =>
               NOTIFICATION_LOCATION_KEYS.has(f.key) ||
@@ -769,6 +1054,17 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                 </div>
                 <div className="p-4 rounded-b-xl">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {section.description ? (
+                    <div className="md:col-span-2 text-sm text-gray-600 mb-1">{section.description}</div>
+                  ) : null}
+                  {section.id === 'detalhamento' &&
+                  String(schema.agravo || '').includes('Monitoramento operacional') &&
+                  !getValue('acao.atividade') ? (
+                    <div className="md:col-span-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                      Selecione a <strong>Atividade</strong> na seção &quot;Ação realizada&quot; para exibir os campos de
+                      detalhamento correspondentes.
+                    </div>
+                  ) : null}
                 {sortedFields.map((field) => {
                   // Bloco único: Estabelecimento de saúde de notificação (UF, Município, Estabelecimento). Data da notificação fica em Dados do paciente.
                   if (firstNotificationField && field.key === firstNotificationField.key) {
@@ -895,15 +1191,91 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                   }
                   if (IDENTIFICACAO_BLOCK_KEYS.has(field.key)) return null;
                   if (field.key === 'paciente.pais_nascimento') return null;
+                  if (section.id === 'detalhamento' && field.key === 'detalhamento.complementar_descricao') {
+                    const parentVal = getValue('detalhamento.complementar_descricao');
+                    const subVisivel =
+                      parentVal === 'acoes_prevencao_saude' || parentVal === 'acoes_diagnostico';
+                    const detalheFieldDef = sortedFields.find((f) => f.key === 'detalhamento.complementar_detalhe');
+                    return (
+                      <div key="detalhamento-complementar-bloco" className="md:col-span-2">
+                        <div className={subVisivel ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : 'grid grid-cols-1'}>
+                          <div className="min-w-0">{renderField(field)}</div>
+                          {subVisivel && detalheFieldDef ? (
+                            <div className="min-w-0">{renderField(detalheFieldDef)}</div>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  }
+                  if (section.id === 'detalhamento' && field.key === 'detalhamento.complementar_detalhe') {
+                    return null;
+                  }
+                  if (section.id === 'detalhamento' && field.key === 'detalhamento.aquisicao_descricao') {
+                    const quantFieldDef = sortedFields.find((f) => f.key === 'detalhamento.aquisicao_quantificacao');
+                    return (
+                      <div key="detalhamento-aquisicao-bloco" className="md:col-span-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="min-w-0">{renderField(field)}</div>
+                          {quantFieldDef ? <div className="min-w-0">{renderField(quantFieldDef)}</div> : null}
+                        </div>
+                      </div>
+                    );
+                  }
+                  if (section.id === 'detalhamento' && field.key === 'detalhamento.aquisicao_quantificacao') {
+                    return null;
+                  }
+                  if (section.id === 'detalhamento' && field.key === 'detalhamento.distribuicao_descricao') {
+                    const quantDistFieldDef = sortedFields.find(
+                      (f) => f.key === 'detalhamento.distribuicao_quantificacao',
+                    );
+                    return (
+                      <div key="detalhamento-distribuicao-bloco" className="md:col-span-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="min-w-0">{renderField(field)}</div>
+                          {quantDistFieldDef ? (
+                            <div className="min-w-0">{renderField(quantDistFieldDef)}</div>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  }
+                  if (section.id === 'detalhamento' && field.key === 'detalhamento.distribuicao_quantificacao') {
+                    return null;
+                  }
+                  if (section.id === 'detalhamento' && field.key === 'detalhamento.fiscalizacao_descricao') {
+                    const estFieldDef = sortedFields.find((f) => f.key === 'detalhamento.fiscalizacao_estabelecimento_id');
+                    return (
+                      <div key="detalhamento-fiscalizacao-bloco" className="md:col-span-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="min-w-0">{renderField(field)}</div>
+                          {estFieldDef ? <div className="min-w-0">{renderField(estFieldDef)}</div> : null}
+                        </div>
+                      </div>
+                    );
+                  }
+                  if (section.id === 'detalhamento' && field.key === 'detalhamento.fiscalizacao_estabelecimento_id') {
+                    return null;
+                  }
+                  if (section.id === 'detalhamento' && field.key === 'detalhamento.regulacao_descricao') {
+                    return (
+                      <div key="detalhamento-regulacao-bloco" className="md:col-span-2">
+                        {renderField(field)}
+                      </div>
+                    );
+                  }
                   const content = renderField(field);
                   if (content == null) return null;
                   return (
                     <div
                       key={field.key}
                       className={
-                        isFullWidth(field.type) && !isHalfWidthDescription(field)
+                        field.key === 'detalhamento.avaliacao_como' ||
+                        field.key === 'detalhamento.complementar_pop_coberta' ||
+                        /^(imp_epi|imp_san|imp_amb)\./.test(field.key)
                           ? 'md:col-span-2'
-                          : ''
+                          : isFullWidth(field.type) && !isHalfWidthDescription(field)
+                            ? 'md:col-span-2'
+                            : ''
                       }
                     >
                       {content}
@@ -945,13 +1317,44 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
               {saveDraftLabel}
             </button>
           )}
-          <button
-            type="submit"
-            disabled={isUploading}
-            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isUploading ? 'Aguarde...' : submitLabel}
-          </button>
+          {pageMode ? (
+            <>
+              <button
+                type="button"
+                onClick={goPrev}
+                disabled={isUploading || pageIndex <= 0}
+                className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Anterior
+              </button>
+              {pageIndex >= totalPages - 1 ? (
+                <button
+                  type="submit"
+                  disabled={isUploading}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isUploading ? 'Aguarde...' : submitLabel}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={goNext}
+                  disabled={isUploading}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Próximo
+                </button>
+              )}
+            </>
+          ) : (
+            <button
+              type="submit"
+              disabled={isUploading}
+              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isUploading ? 'Aguarde...' : submitLabel}
+            </button>
+          )}
         </div>
       )}
     </form>

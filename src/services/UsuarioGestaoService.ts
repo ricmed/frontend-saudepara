@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 // Configurações das APIs
-const KEYCLOAK_API_URL = '/api-auth'; // Usar proxy do Vite
+const USE_INTERNAL_AUTH = (import.meta as any).env?.VITE_USE_INTERNAL_AUTH === 'true';
+const KEYCLOAK_API_URL = '/api-auth'; // Proxy do Vite para api-keycloak
 const BACKEND_API_URL = ''; // Usar proxy do Vite (apenas se o backend estiver em porta diferente)
 
 // Interfaces
@@ -109,10 +110,8 @@ export const PERMISSOES_LABELS = {
 } as const;
 
 class UsuarioGestaoService {
-  private keycloakApi = axios.create({
-    baseURL: KEYCLOAK_API_URL,
-    withCredentials: true, // Para enviar cookies automaticamente
-  });
+  private keycloakApi = axios.create({ baseURL: KEYCLOAK_API_URL, withCredentials: true });
+  private internalAuthAdminApi = axios.create({ baseURL: '', withCredentials: true });
 
   private backendApi = axios.create({
     baseURL: `${BACKEND_API_URL}/api`,
@@ -135,7 +134,9 @@ class UsuarioGestaoService {
     exact?: boolean;
   }): Promise<Usuario[]> {
     try {
-      const response = await this.keycloakApi.get('/admin/users', { params });
+      const response = USE_INTERNAL_AUTH
+        ? await this.internalAuthAdminApi.get('/api/auth/admin/users', { params })
+        : await this.keycloakApi.get('/admin/users', { params });
       return response.data;
     } catch (error: any) {
       throw new Error(this.getErrorMessage(error, 'Erro ao carregar usuários'));
@@ -152,7 +153,9 @@ class UsuarioGestaoService {
     exact?: boolean;
   }): Promise<number> {
     try {
-      const response = await this.keycloakApi.get('/admin/users/count', { params });
+      const response = USE_INTERNAL_AUTH
+        ? await this.internalAuthAdminApi.get('/api/auth/admin/users/count', { params })
+        : await this.keycloakApi.get('/admin/users/count', { params });
       // Keycloak costuma retornar { count: number }
       if (typeof response.data === 'number') return response.data;
       if (response.data && typeof response.data.count === 'number') return response.data.count;
@@ -169,7 +172,7 @@ class UsuarioGestaoService {
     first?: number;
     max?: number;
     search?: string;
-    scope?: 'unidade' | 'municipio' | 'estado';
+    scope?: 'unidade' | 'municipio' | 'crs' | 'estado';
     scopeId?: number;
   }): Promise<{ items: UsuarioListItem[]; total: number; first: number; max: number }> {
     try {
@@ -184,7 +187,9 @@ class UsuarioGestaoService {
           cleaned.scopeId = n;
         }
       }
-      const response = await this.keycloakApi.get('/admin/users/list', { params: cleaned });
+      const response = USE_INTERNAL_AUTH
+        ? await this.internalAuthAdminApi.get('/api/auth/admin/users/list', { params: cleaned })
+        : await this.keycloakApi.get('/admin/users/list', { params: cleaned });
       return response.data;
     } catch (error: any) {
       throw new Error(this.getErrorMessage(error, 'Erro ao carregar usuários'));
@@ -211,7 +216,9 @@ class UsuarioGestaoService {
   async getUserRoles(userId: string): Promise<string[]> {
     try {
       console.log(`🎭 Buscando roles do usuário: ${userId}`);
-      const response = await this.keycloakApi.get(`/admin/users/${userId}/roles`);
+      const response = USE_INTERNAL_AUTH
+        ? await this.internalAuthAdminApi.get(`/api/auth/admin/users/${userId}/roles`)
+        : await this.keycloakApi.get(`/admin/users/${userId}/roles`);
       console.log('🔑 Response completo de roles:', {
         status: response.status,
         data: response.data,
@@ -250,7 +257,12 @@ class UsuarioGestaoService {
   async createUsuario(userData: CreateUsuarioRequest): Promise<string | null> {
     try {
       console.log('🚀 Tentando criar usuário:', userData);
-      const response = await this.keycloakApi.post('/admin/users', userData);
+      const response = USE_INTERNAL_AUTH
+        ? await this.internalAuthAdminApi.post('/api/auth/admin/users', {
+            ...userData,
+            enabled: userData.enabled ?? true,
+          })
+        : await this.keycloakApi.post('/admin/users', userData);
       
       console.log('📊 Resposta da criação:', {
         status: response.status,
@@ -284,14 +296,23 @@ class UsuarioGestaoService {
       if (userData.username) {
         console.log('🔄 Tentando buscar usuário por username:', userData.username);
         try {
-          const usuarios = await this.keycloakApi.get('/admin/users', {
+          // ✅ Usar sempre o endpoint interno — nunca chamar Keycloak diretamente aqui
+          const searchApi = USE_INTERNAL_AUTH ? this.internalAuthAdminApi : this.keycloakApi;
+          const searchPath = USE_INTERNAL_AUTH
+            ? `/api/auth/admin/users`
+            : `/admin/users`;
+          const usuarios = await searchApi.get(searchPath, {
             params: { username: userData.username, exact: true }
           });
           
           console.log('🔍 Resultado da busca:', usuarios.data);
           
-          if (usuarios.data && usuarios.data.length > 0) {
-            userId = usuarios.data[0].id;
+          const list = Array.isArray(usuarios.data)
+            ? usuarios.data
+            : (usuarios.data?.items ?? []);
+
+          if (list.length > 0) {
+            userId = list[0].id;
             console.log('✅ Usuário criado, ID encontrado via busca:', userId);
             return userId;
           }
@@ -314,7 +335,11 @@ class UsuarioGestaoService {
   async toggleUsuarioStatus(userId: string, enabled: boolean): Promise<void> {
     try {
       // Assumindo que há um endpoint para atualizar status do usuário
-      await this.keycloakApi.put(`/admin/users/${userId}`, { enabled });
+      if (USE_INTERNAL_AUTH) {
+        await this.internalAuthAdminApi.put(`/api/auth/admin/users/${userId}`, { enabled });
+      } else {
+        await this.keycloakApi.put(`/admin/users/${userId}`, { enabled });
+      }
     } catch (error: any) {
       console.error('Erro ao alterar status do usuário:', error);
       throw new Error(this.getErrorMessage(error, 'Erro ao alterar status do usuário'));
@@ -332,7 +357,11 @@ class UsuarioGestaoService {
   }): Promise<void> {
     try {
       console.log('Atualizando usuário via API:', userId, userData);
-      await this.keycloakApi.put(`/admin/users/${userId}`, userData);
+      if (USE_INTERNAL_AUTH) {
+        await this.internalAuthAdminApi.put(`/api/auth/admin/users/${userId}`, userData);
+      } else {
+        await this.keycloakApi.put(`/admin/users/${userId}`, userData);
+      }
     } catch (error: any) {
       console.error('Erro ao atualizar usuário:', error);
       throw new Error(this.getErrorMessage(error, 'Erro ao atualizar usuário'));
@@ -344,11 +373,18 @@ class UsuarioGestaoService {
    */
   async resetarSenhaUsuario(userId: string, novaSenha: string): Promise<void> {
     try {
-      await this.keycloakApi.put(`/admin/users/${userId}/reset-password`, {
-        type: 'password',
-        value: novaSenha,
-        temporary: false
-      });
+      if (USE_INTERNAL_AUTH) {
+        await this.internalAuthAdminApi.put(`/api/auth/admin/users/${userId}/reset-password`, {
+          value: novaSenha,
+          temporary: false,
+        });
+      } else {
+        await this.keycloakApi.put(`/admin/users/${userId}/reset-password`, {
+          type: 'password',
+          value: novaSenha,
+          temporary: false
+        });
+      }
     } catch (error: any) {
       console.error('Erro ao resetar senha:', error);
       throw new Error(this.getErrorMessage(error, 'Erro ao resetar senha'));
@@ -360,7 +396,11 @@ class UsuarioGestaoService {
    */
   async excluirUsuario(userId: string): Promise<void> {
     try {
-      await this.keycloakApi.delete(`/admin/users/${userId}`);
+      if (USE_INTERNAL_AUTH) {
+        await this.internalAuthAdminApi.delete(`/api/auth/admin/users/${userId}`);
+      } else {
+        await this.keycloakApi.delete(`/admin/users/${userId}`);
+      }
     } catch (error: any) {
       console.error('Erro ao excluir usuário:', error);
       throw new Error(this.getErrorMessage(error, 'Erro ao excluir usuário'));
@@ -397,6 +437,16 @@ class UsuarioGestaoService {
       console.error('Erro ao buscar acessos do usuário:', error);
       throw new Error(this.getErrorMessage(error, 'Erro ao carregar acessos do usuário'));
     }
+  }
+
+  /**
+   * ✅ Novo: lista paginada de userIds por CRS
+   */
+  async getUserIdsByCrs(crsId: number, first: number = 0, max: number = 20): Promise<{ items: string[]; total: number; first: number; max: number }> {
+    const response = await this.backendApi.get(`/usuario-acesso/user-ids/crs/${crsId}`, {
+      params: { first, max },
+    });
+    return response.data.data;
   }
 
   /**

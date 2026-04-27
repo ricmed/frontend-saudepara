@@ -1,6 +1,11 @@
 import { registerSW } from 'virtual:pwa-register';
 
 export function registerServiceWorker() {
+  // Em E2E/CI, o service worker pode causar cache/intercept e travar testes.
+  // Usamos flag de build para desabilitar quando necessário.
+  const disableSw = (import.meta as any).env?.VITE_DISABLE_SW === 'true';
+  if (disableSw) return;
+
   if (!('serviceWorker' in navigator)) {
     console.warn('Service Worker não é suportado neste navegador');
     return;

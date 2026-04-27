@@ -177,7 +177,7 @@ interface UserFormData {
   nivelAcesso: 'unidade' | 'municipio' | 'estado';
   estabelecimentoId?: number;
   municipioId?: number;
-  roles: Array<'notificador' | 'comunicacao.dae'>;
+  roles: string[];
 }
 
 const UserFormEstado: React.FC = () => {
@@ -229,8 +229,7 @@ const UserFormEstado: React.FC = () => {
       try {
         const all = await listRoles();
         const allow = new Set(['notificador', 'comunicacao.dae']);
-        const reps = (Array.isArray(all) ? all : []).filter((r: any) => allow.has(r?.name));
-        setAvailableRoleReps(reps);
+        setAvailableRoleReps(Array.isArray(all) ? all.filter((r: any) => allow.has(r?.name)) : []);
       } catch (e) {
         console.warn('⚠️ Não foi possível carregar roles disponíveis', e);
         setAvailableRoleReps([]);
@@ -267,13 +266,10 @@ const UserFormEstado: React.FC = () => {
       const userData = await response.json();
       console.log('📝 Dados do usuário carregados:', userData);
 
-      // ✅ Carregar roles atuais do usuário (Keycloak realm roles)
-      let selectedRoles: Array<'notificador' | 'comunicacao.dae'> = [];
+      let selectedRoles: string[] = [];
       try {
         const roleMappings = await getUserRoles(userId);
-        const roleNames = Array.isArray(roleMappings) ? roleMappings.map((r: any) => r?.name).filter(Boolean) : [];
-        const allow = new Set(['notificador', 'comunicacao.dae']);
-        selectedRoles = roleNames.filter((n: string) => allow.has(n)) as any;
+        selectedRoles = Array.isArray(roleMappings) ? roleMappings.map((r: any) => r?.name).filter(Boolean) : [];
       } catch (e) {
         console.warn('⚠️ Não foi possível carregar roles do usuário', e);
         selectedRoles = [];
@@ -580,16 +576,14 @@ const UserFormEstado: React.FC = () => {
           await usuarioGestaoService.createAcessoUnidade(id, formData.estabelecimentoId);
         }
 
-        // ✅ Sincronizar roles (notificador / comunicacao.dae) no modo edição
+        // ✅ Sincronizar roles no modo edição
         try {
           const currentMappings = await getUserRoles(id);
           const currentNames = Array.isArray(currentMappings) ? currentMappings.map((r: any) => r?.name).filter(Boolean) : [];
-          const allow = new Set(['notificador', 'comunicacao.dae']);
-          const currentAllowed = currentNames.filter((n: string) => allow.has(n));
           const desired = formData.roles || [];
 
-          const toAddNames = desired.filter((n) => !currentAllowed.includes(n));
-          const toRemoveNames = currentAllowed.filter((n) => !desired.includes(n as any));
+          const toAddNames = desired.filter((n) => !currentNames.includes(n));
+          const toRemoveNames = currentNames.filter((n) => !desired.includes(n));
 
           const toAdd = availableRoleReps.filter((r: any) => toAddNames.includes(r?.name));
           const toRemove = availableRoleReps.filter((r: any) => toRemoveNames.includes(r?.name));
@@ -645,7 +639,7 @@ const UserFormEstado: React.FC = () => {
           await usuarioGestaoService.createAcessoUnidade(novoUsuarioId, formData.estabelecimentoId);
         }
 
-        // 3. Atribuir roles escolhidas (admin estadual não atribui role automática)
+        // 3. Atribuir roles escolhidas (apenas permitidas para estado)
         if (!formData.roles || formData.roles.length === 0) {
           throw new Error('Selecione ao menos uma role para o usuário (notificador e/ou comunicacao.dae)');
         }
@@ -716,7 +710,7 @@ const UserFormEstado: React.FC = () => {
     }
   };
 
-  const toggleRole = (role: 'notificador' | 'comunicacao.dae') => {
+  const toggleRole = (role: string) => {
     setFormData(prev => {
       const has = prev.roles.includes(role);
       const next = has ? prev.roles.filter(r => r !== role) : [...prev.roles, role];
@@ -834,31 +828,24 @@ const UserFormEstado: React.FC = () => {
               </p>
 
               <div className="space-y-3">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.roles.includes('notificador')}
-                    onChange={() => toggleRole('notificador')}
-                    className="mt-1"
-                  />
-                  <div>
-                    <div className="font-medium text-gray-900">notificador</div>
-                    <div className="text-sm text-gray-600">Acesso às notificações e rotinas de notificação.</div>
-                  </div>
-                </label>
-
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.roles.includes('comunicacao.dae')}
-                    onChange={() => toggleRole('comunicacao.dae')}
-                    className="mt-1"
-                  />
-                  <div>
-                    <div className="font-medium text-gray-900">comunicacao.dae</div>
-                    <div className="text-sm text-gray-600">Acesso ao módulo de Comunicação DAE.</div>
-                  </div>
-                </label>
+                {availableRoleReps.length === 0 ? (
+                  <p className="text-sm text-gray-500">Nenhuma role disponível ou carregando...</p>
+                ) : (
+                  availableRoleReps.map((role: any) => (
+                    <label key={role.name} className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.roles.includes(role.name)}
+                        onChange={() => toggleRole(role.name)}
+                        className="mt-1 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <div>
+                        <div className="font-medium text-gray-900">{role.name}</div>
+                        <div className="text-sm text-gray-600">{role.description || 'Sem descrição.'}</div>
+                      </div>
+                    </label>
+                  ))
+                )}
               </div>
 
               {errors.roles && (

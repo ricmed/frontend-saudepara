@@ -110,18 +110,18 @@ test.describe('Form builder — salvar novo formulário (admin)', () => {
         });
       }
 
-      // após salvar, navega para /private/formularios-admin (lista)
-      if (method === 'GET' && pathname === '/api/forms') {
+      // após salvar, navega para /private/formularios-admin (lista) e carrega /api/forms/admin
+      if (method === 'GET' && pathname === '/api/forms/admin') {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify(
-            created
+          body: JSON.stringify({
+            data: created
               ? [
                   {
                     id: 1001,
                     nome: 'Formulário Salvo E2E',
-                    form_key: 'SAVE_IT',
+                    form_key: createdFormBody?.form_key ?? 'N/A',
                     descricao: 'Criado por E2E',
                     status: 'published',
                     is_active: true,
@@ -133,7 +133,11 @@ test.describe('Form builder — salvar novo formulário (admin)', () => {
                   },
                 ]
               : [],
-          ),
+            total: created ? 1 : 0,
+            page: 1,
+            limit: 30,
+            totalPages: 1,
+          }),
         });
       }
 
@@ -154,11 +158,8 @@ test.describe('Form builder — salvar novo formulário (admin)', () => {
     await expect(page.getByRole('heading', { name: 'Novo Formulário' })).toBeVisible({ timeout: 30_000 });
 
     const nomeInput = page.getByPlaceholder('Ex: Dengue', { exact: true });
-    const agravoInput = page.getByPlaceholder('Ex: DENGUE', { exact: true });
     await expect(nomeInput).toBeVisible({ timeout: 30_000 });
     await nomeInput.fill('Formulário Salvo E2E');
-    await expect(agravoInput).toBeVisible({ timeout: 30_000 });
-    await agravoInput.fill('save_it');
 
     await page.locator('textarea').first().fill('Criado por E2E');
 
@@ -172,16 +173,16 @@ test.describe('Form builder — salvar novo formulário (admin)', () => {
 
     await expect(page).toHaveURL(/\/private\/formularios-admin\/?$/);
     await expect(page.getByRole('heading', { name: 'Gerenciar Formulários' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Formulário Salvo E2E' })).toBeVisible();
+    await expect(page.getByText('Formulário Salvo E2E')).toBeVisible();
 
     expect(createdFormBody).toMatchObject({
       nome: 'Formulário Salvo E2E',
-      form_key: 'SAVE_IT',
       descricao: 'Criado por E2E',
       created_by: 'e2e-form-save',
     });
+    expect(String(createdFormBody?.form_key || '')).toMatch(/[A-Z0-9_]{3,50}/);
     expect(createdVersionBody?.published_by).toBe('e2e-form-save');
-    expect(createdVersionBody?.schema_json?.agravo).toBe('SAVE_IT');
+    expect(createdVersionBody?.schema_json?.agravo).toBe(createdFormBody?.form_key);
     expect(publishedBody).toMatchObject({ published_by: 'e2e-form-save' });
   });
 });
