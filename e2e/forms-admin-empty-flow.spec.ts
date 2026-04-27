@@ -186,7 +186,7 @@ test.describe('Formulários — admin e estado vazio', () => {
 
     await expect(page).toHaveURL(/\/private\/formularios\/EMPTY_IT\/nova\/?$/);
     await expect(page.getByRole('heading', { name: /Nova Notificação/i, level: 1 })).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText('Agravo sem notificações')).toBeVisible();
+    await expect(page.getByText('Agravo sem notificações').first()).toBeVisible();
     await expect(page.getByPlaceholder('empty-flow-ph')).toBeVisible();
   });
 });
