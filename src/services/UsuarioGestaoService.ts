@@ -172,7 +172,7 @@ class UsuarioGestaoService {
     first?: number;
     max?: number;
     search?: string;
-    scope?: 'unidade' | 'municipio' | 'estado';
+    scope?: 'unidade' | 'municipio' | 'crs' | 'estado';
     scopeId?: number;
   }): Promise<{ items: UsuarioListItem[]; total: number; first: number; max: number }> {
     try {
