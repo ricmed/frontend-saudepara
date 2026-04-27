@@ -10,6 +10,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 1 : undefined,
+  maxFailures: process.env.CI ? 2 : undefined, // Interrompe tudo imediatamente após 2 falhas na CI
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     baseURL,
