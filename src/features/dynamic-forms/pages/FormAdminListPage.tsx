@@ -328,7 +328,7 @@ export const FormAdminListPage: React.FC = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => navigate(`/private/formularios-admin/editar/${form.id}`)}
                       className="flex-1 px-2 sm:px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm"
