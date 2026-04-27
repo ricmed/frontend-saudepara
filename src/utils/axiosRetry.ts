@@ -19,7 +19,7 @@ axios.interceptors.response.use(
     
     // Se for 401, tentar renovar sessão uma vez e repetir a requisição.
     // Isso evita "deslogar" quando o access token expira, usando o refresh cookie.
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !originalRequest._retry && originalRequest.url !== refreshEndpoint) {
       originalRequest._retry = true;
       try {
         if (!refreshPromise) {
