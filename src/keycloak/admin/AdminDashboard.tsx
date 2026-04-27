@@ -43,6 +43,8 @@ const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
   const { selectedLanguage } = useLanguage();
   const { t } = useTranslation(selectedLanguage);
+  const USE_INTERNAL_AUTH = (import.meta as any).env?.VITE_USE_INTERNAL_AUTH === 'true';
+  const ADMIN_API_BASE = USE_INTERNAL_AUTH ? '/api/auth/admin' : '/api-auth/admin';
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [activity, setActivity] = useState<RecentActivity[]>([]);
@@ -115,7 +117,7 @@ const AdminDashboard: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      const response = await fetch('/api-auth/admin/stats', {
+      const response = await fetch(`${ADMIN_API_BASE}/stats`, {
         credentials: 'include',
         headers: { 'Accept': 'application/json' },
       });
@@ -136,7 +138,7 @@ const AdminDashboard: React.FC = () => {
 
   const loadActivity = async () => {
     try {
-      const resp = await fetch('/api-auth/admin/recent-activity?limit=5', { 
+      const resp = await fetch(`${ADMIN_API_BASE}/recent-activity?limit=5`, {
         credentials: 'include' 
       });
       if (!resp.ok) return;

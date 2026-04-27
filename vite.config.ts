@@ -45,8 +45,6 @@ export default defineConfig(({ mode }) => {
         'favicon.ico', 
         'apple-touch-icon.png', 
         'masked-icon.svg',
-        'pwa-192x192.png',
-        'pwa-512x512.png',
         'robots.txt'
       ],
       manifest: {
@@ -61,19 +59,9 @@ export default defineConfig(({ mode }) => {
         scope: '/',
         categories: ['medical', 'productivity', 'utilities'],
         
-        icons: [
-          {
-            src: 'pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable'
-          }
-        ],
+        // Evita 404 em homologação: não temos os PNGs no `public/`.
+        // Mantém um ícone mínimo via SVG (fallback).
+        icons: [{ src: 'vite.svg', sizes: 'any', type: 'image/svg+xml' }],
         
         shortcuts: [
           {
@@ -81,21 +69,21 @@ export default defineConfig(({ mode }) => {
             short_name: 'Notificação',
             description: 'Criar nova notificação de saúde',
             url: '/private/comunicacao-de-caso/nova',
-            icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }]
+            icons: [{ src: 'vite.svg', sizes: 'any' }]
           },
           {
             name: 'Novo Paciente',
             short_name: 'Paciente',
             description: 'Cadastrar novo paciente',
             url: '/private/pacientes/nova',
-            icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }]
+            icons: [{ src: 'vite.svg', sizes: 'any' }]
           },
           {
             name: 'Dados Offline',
             short_name: 'Offline',
             description: 'Gerenciar dados offline',
             url: '/offline-management',
-            icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }]
+            icons: [{ src: 'vite.svg', sizes: 'any' }]
           }
         ]
       },

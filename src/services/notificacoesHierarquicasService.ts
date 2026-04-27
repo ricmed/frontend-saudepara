@@ -75,7 +75,8 @@ export interface NotificacoesParams {
 
 class NotificacoesHierarquicasService {
   private api = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001',
+    // Normaliza para evitar URLs como ".../api/api/..." quando VITE_API_BASE_URL já vem com /api
+    baseURL: String(import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001').replace(/\/api\/?$/, ''),
     withCredentials: true, // Para enviar cookies automaticamente
   });
 
