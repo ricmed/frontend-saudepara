@@ -296,14 +296,23 @@ class UsuarioGestaoService {
       if (userData.username) {
         console.log('🔄 Tentando buscar usuário por username:', userData.username);
         try {
-          const usuarios = await this.keycloakApi.get('/admin/users', {
+          // ✅ Usar sempre o endpoint interno — nunca chamar Keycloak diretamente aqui
+          const searchApi = USE_INTERNAL_AUTH ? this.internalAuthAdminApi : this.keycloakApi;
+          const searchPath = USE_INTERNAL_AUTH
+            ? `/api/auth/admin/users`
+            : `/admin/users`;
+          const usuarios = await searchApi.get(searchPath, {
             params: { username: userData.username, exact: true }
           });
           
           console.log('🔍 Resultado da busca:', usuarios.data);
           
-          if (usuarios.data && usuarios.data.length > 0) {
-            userId = usuarios.data[0].id;
+          const list = Array.isArray(usuarios.data)
+            ? usuarios.data
+            : (usuarios.data?.items ?? []);
+
+          if (list.length > 0) {
+            userId = list[0].id;
             console.log('✅ Usuário criado, ID encontrado via busca:', userId);
             return userId;
           }
