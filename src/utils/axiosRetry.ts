@@ -11,6 +11,19 @@ const refreshEndpoint = USE_INTERNAL_AUTH ? '/api/auth/refresh' : '/api-auth/aut
 
 let refreshPromise: Promise<void> | null = null;
 
+const isPublicFormRoute = () => {
+  try {
+    return typeof window !== 'undefined' && window.location?.pathname?.startsWith('/f/');
+  } catch {
+    return false;
+  }
+};
+
+const isProfileRequest = (url?: string) => {
+  const u = String(url ?? '');
+  return u.includes('/api/auth/profile') || u.includes('/api-auth/protected/profile');
+};
+
 // Configurar interceptor global para retry em caso de erro 429
 axios.interceptors.response.use(
   (response) => response,
@@ -19,7 +32,13 @@ axios.interceptors.response.use(
     
     // Se for 401, tentar renovar sessão uma vez e repetir a requisição.
     // Isso evita "deslogar" quando o access token expira, usando o refresh cookie.
-    if (error.response?.status === 401 && !originalRequest._retry && originalRequest.url !== refreshEndpoint) {
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      originalRequest.url !== refreshEndpoint &&
+      !isProfileRequest(originalRequest.url) &&
+      !isPublicFormRoute()
+    ) {
       originalRequest._retry = true;
       try {
         if (!refreshPromise) {

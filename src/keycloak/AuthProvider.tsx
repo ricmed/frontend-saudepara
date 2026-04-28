@@ -12,6 +12,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     let alive = true;
 
+    // Rotas públicas de formulário não devem disparar verificação de sessão (evita 401 + refresh desnecessário)
+    try {
+      const path = window.location?.pathname ?? '';
+      if (path.startsWith('/f/')) {
+        setUser(null);
+        setLoading(false);
+        return () => {
+          alive = false;
+        };
+      }
+    } catch {
+      // ignore
+    }
+
     // 🆕 Verificar se há login offline ativo
     const offlineMode = localStorage.getItem('offline_mode');
     const userData = localStorage.getItem('user_data');

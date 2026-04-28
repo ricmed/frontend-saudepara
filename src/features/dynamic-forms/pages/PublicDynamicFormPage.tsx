@@ -37,6 +37,7 @@ export const PublicDynamicFormPage: React.FC = () => {
     run();
   }, [slug, token]);
 
+  const formName = (payload?.form as any)?.nome ? String((payload as any).form.nome) : 'Formulário';
   const redirectUrl = (payload?.form?.redirect_url ?? '').trim();
   const confirmationMsg = (payload?.form?.confirmation_message ?? '').trim();
 
@@ -79,12 +80,12 @@ export const PublicDynamicFormPage: React.FC = () => {
     );
   }
 
-  if (error || !payload) {
+  if (error || !payload || !payload.form || !payload.version) {
     return (
       <div className="min-h-screen bg-gray-50 px-4 py-10">
         <div className="mx-auto max-w-3xl rounded-xl border border-red-200 bg-red-50 p-6">
           <h2 className="text-lg font-bold text-red-800 mb-2">Não foi possível abrir o formulário</h2>
-          <p className="text-red-700">{error || 'Formulário não encontrado'}</p>
+          <p className="text-red-700">{error || 'Formulário não encontrado ou payload inválido'}</p>
         </div>
       </div>
     );
@@ -94,7 +95,7 @@ export const PublicDynamicFormPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-50 px-4 py-10">
         <div className="mx-auto max-w-3xl rounded-xl bg-white p-6 shadow">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">{payload.form.nome}</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">{formName}</h1>
           <p className="text-gray-700">{confirmationMsg || 'Resposta enviada com sucesso.'}</p>
           {quizSummary ? (
             <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50/80 p-4">
@@ -141,14 +142,14 @@ export const PublicDynamicFormPage: React.FC = () => {
 
       <div className="mx-auto max-w-4xl">
         <div className="mb-6 rounded-xl bg-white p-6 shadow">
-          <h1 className="text-2xl font-bold text-gray-900">{payload.form.nome}</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{formName}</h1>
           {payload.form.descricao ? <p className="mt-2 text-gray-700">{payload.form.descricao}</p> : null}
         </div>
 
         <FormRenderer
           schema={{
             ...payload.version.schema_json,
-            title: payload.form.nome,
+            title: formName,
           }}
           showTitle={false}
           initialData={{}}
