@@ -20,10 +20,10 @@ export default defineConfig({
   webServer: useDeployedEnv
     ? undefined
     : {
-        // Em ambiente local, preferimos build em "development" para respeitar `.env.local`
-        // (o build padrão usa mode=production e `.env.production` pode apontar para HML/PRD).
+        // Em ambiente local, build em "development" respeita `.env.local` / API local.
+        // CI também usa --mode development para não chamar app.saude no preview 127.0.0.1.
         command: process.env.CI
-          ? 'npx cross-env VITE_DISABLE_SW=true npm run build && npm run preview -- --host 127.0.0.1 --port 4173 --strictPort'
+          ? 'npx cross-env VITE_DISABLE_SW=true npm run build -- --mode development && npm run preview -- --host 127.0.0.1 --port 4173 --strictPort'
           : 'npm run build -- --mode development && npm run preview -- --host 127.0.0.1 --port 4173 --strictPort',
         url: 'http://127.0.0.1:4173',
         reuseExistingServer: !process.env.CI,

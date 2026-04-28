@@ -1,7 +1,7 @@
 /**
  * Origem da API (protocolo + host [+ porta]).
- * Em app.saude.pa.gov.br usa sempre o mesmo host da página — evita bundle gerado
- * com npm run build (HML) continuar chamando app.hml após deploy em produção.
+ * Em app.saude.pa.gov.br usa sempre o mesmo host da página — defesa extra se o
+ * bundle tiver VITE_API_SERVER errado (ex.: build com env de homologação).
  */
 export function getApiOrigin(): string {
   if (typeof window !== 'undefined' && window.location.hostname === 'app.saude.pa.gov.br') {
