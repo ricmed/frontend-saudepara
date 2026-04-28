@@ -406,7 +406,8 @@ class FormService {
   async getPublicForm(slug: string, token?: string | null): Promise<PublicFormPayload> {
     const params: Record<string, string> = {};
     if (token) params.t = token;
-    const response = await publicApi.get(`/public/forms/${encodeURIComponent(slug)}`, { params });
+    // Em produção o nginx costuma fazer proxy só de /api → backend.
+    const response = await publicApi.get(`/api/public/forms/${encodeURIComponent(slug)}`, { params });
     return response.data;
   }
 
@@ -419,7 +420,11 @@ class FormService {
     const qs: Record<string, string> = {};
     if (params.token) qs.t = params.token;
     if (params.draft) qs.draft = '1';
-    const response = await publicApi.post(`/public/forms/${encodeURIComponent(params.slug)}/submissions`, { data_json: params.data_json }, { params: qs });
+    const response = await publicApi.post(
+      `/api/public/forms/${encodeURIComponent(params.slug)}/submissions`,
+      { data_json: params.data_json },
+      { params: qs }
+    );
     return response.data;
   }
 
