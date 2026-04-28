@@ -362,8 +362,15 @@ export default defineConfig(({ mode }) => {
             .replace(/^\/api-auth\/protected\/profile$/, '/api/auth/profile')
             .replace(/^\/api-auth\/admin\//, '/api/auth/admin/'),
         configure: (proxy) => {
-          proxy.on('error', (err) => {
-            console.log('❌ Proxy error - usando fallback para produção:', (err as any).code || err.message);
+          proxy.on('error', (err: any, _req: any, res: any) => {
+            // Evitar que erro de proxy derrube o dev server.
+            const code = err?.code || 'PROXY_ERROR';
+            const msg = err?.message || String(err);
+            console.log('❌ Proxy error (/api-auth):', code, msg);
+            if (res && !res.headersSent) {
+              res.writeHead(502, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Proxy error', code, message: msg }));
+            }
           });
           proxy.on('proxyReq', (_proxyReq, req) => {
             console.log('🔄 Request:', req.method, req.url);
@@ -381,8 +388,14 @@ export default defineConfig(({ mode }) => {
         secure: false,
         timeout: 10000,
         configure: (proxy) => {
-          proxy.on('error', (err) => {
-            console.log('❌ API Proxy error:', (err as any).code || err.message);
+          proxy.on('error', (err: any, _req: any, res: any) => {
+            const code = err?.code || 'PROXY_ERROR';
+            const msg = err?.message || String(err);
+            console.log('❌ API Proxy error (/api):', code, msg);
+            if (res && !res.headersSent) {
+              res.writeHead(502, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Proxy error', code, message: msg }));
+            }
           });
         }
       }

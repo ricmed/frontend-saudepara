@@ -1092,10 +1092,12 @@ class UsuarioGestaoService {
       return {
         estabelecimentoId: acesso?.estabelecimento_id ?? acesso?.estabelecimentoId ?? null,
         municipioId: acesso?.tipo_municipio_id ?? acesso?.municipioId ?? null,
+        crsId: acesso?.crs_id ?? acesso?.crsId ?? null,
         estadoId: acesso?.tipo_estado_id ?? acesso?.estadoId ?? null,
         nivel: acesso?.nivel_acesso ?? acesso?.nivel ?? 'unidade',
         isEstabelecimento: (acesso?.nivel_acesso ?? acesso?.nivel) === 'unidade',
         isMunicipio: (acesso?.nivel_acesso ?? acesso?.nivel) === 'municipio',
+        isCrs: (acesso?.nivel_acesso ?? acesso?.nivel) === 'crs',
         isEstado: (acesso?.nivel_acesso ?? acesso?.nivel) === 'estado',
       };
     } catch (error) {

@@ -246,11 +246,8 @@ const UserListEstado: React.FC = () => {
       }
 
       const estadoIdNum = Number(userPermissions.estadoId);
-      // OBS: no ambiente atual, o admin estadual precisa enxergar todos os usuários do realm
-      // (estaduais, municipais e unidades), independentemente da role do alvo.
-      // Como nem todos os usuários possuem registros completos em usuario_acesso_*, usar a listagem
-      // sem scope evita "sumir" usuários (ex.: aparecer 83 em vez de ~440).
-      const hasEstadoScope = false;
+      // Para admin.estado (não master), sempre usar scope server-side (total e paginação corretos)
+      const hasEstadoScope = isAdminEstado && Number.isFinite(estadoIdNum) && estadoIdNum > 0;
       
       console.log('🔑 Permissões do admin carregadas:', userPermissions);
       

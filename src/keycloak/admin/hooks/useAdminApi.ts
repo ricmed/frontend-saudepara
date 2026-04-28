@@ -1,5 +1,5 @@
 // hooks/useAdminApi.ts
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import type { UseApiOptions, UseApiReturn } from '../types/admin.types';
 
 const USE_INTERNAL_AUTH = (import.meta as any).env?.VITE_USE_INTERNAL_AUTH === 'true';
@@ -10,10 +10,14 @@ interface ApiRequestOptions extends RequestInit {
   params?: Record<string, any>;
 }
 
-export const useAdminApi = <T = any>(options: UseApiOptions = {}): UseApiReturn<T> => {
+export const useAdminApi = <T = any>(options?: UseApiOptions): UseApiReturn<T> => {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+
+  // Evita recriar callbacks a cada render quando `options` é um object literal.
+  const onSuccess = options?.onSuccess;
+  const onError = options?.onError;
 
   const execute = useCallback(async (requestOptions?: ApiRequestOptions): Promise<T> => {
     if (!requestOptions?.endpoint) {
@@ -49,15 +53,42 @@ export const useAdminApi = <T = any>(options: UseApiOptions = {}): UseApiReturn<
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP Error: ${response.status}`);
+        // Nem todo backend retorna JSON em erro (ou pode retornar body vazio).
+        const errorText = await response.text().catch(() => '');
+        let message = `HTTP Error: ${response.status}`;
+        try {
+          const parsed = errorText ? JSON.parse(errorText) : null;
+          message = parsed?.error || parsed?.message || message;
+        } catch {
+          if (errorText) message = errorText;
+        }
+        throw new Error(message);
       }
 
-      const result = await response.json();
-      setData(result);
+      // Algumas rotas respondem 204 No Content (ex.: DELETE/POST idempotente).
+      // `response.json()` quebraria com body vazio.
+      if (response.status === 204) {
+        const result = undefined as unknown as T;
+        setData(result as any);
+        if (onSuccess) onSuccess(result);
+        return result;
+      }
+
+      const text = await response.text().catch(() => '');
+      const result = (text
+        ? (() => {
+            try {
+              return JSON.parse(text);
+            } catch {
+              return text;
+            }
+          })()
+        : undefined) as T;
+
+      setData(result as any);
       
-      if (options.onSuccess) {
-        options.onSuccess(result);
+      if (onSuccess) {
+        onSuccess(result);
       }
       
       return result;
@@ -65,15 +96,15 @@ export const useAdminApi = <T = any>(options: UseApiOptions = {}): UseApiReturn<
       const error = err instanceof Error ? err : new Error('Erro desconhecido');
       setError(error);
       
-      if (options.onError) {
-        options.onError(error);
+      if (onError) {
+        onError(error);
       }
       
       throw error;
     } finally {
       setLoading(false);
     }
-  }, [options]);
+  }, [onSuccess, onError]);
 
   const reset = useCallback(() => {
     setData(null);
@@ -81,7 +112,8 @@ export const useAdminApi = <T = any>(options: UseApiOptions = {}): UseApiReturn<
     setLoading(false);
   }, []);
 
-  return { data, loading, error, execute, reset };
+  // Mantém referência estável do objeto retornado, reduzindo re-renders/loops em hooks consumidores
+  return useMemo(() => ({ data, loading, error, execute, reset }), [data, loading, error, execute, reset]);
 };
 
 // Hooks específicos para diferentes endpoints
@@ -94,14 +126,14 @@ export const useUsers = () => {
       method: 'GET',
       params: filters,
     });
-  }, [api]);
+  }, [api.execute]);
 
   const getUser = useCallback((id: string) => {
     return api.execute({
       endpoint: `/users/${id}`,
       method: 'GET',
     });
-  }, [api]);
+  }, [api.execute]);
 
   const createUser = useCallback((userData: any) => {
     return api.execute({
@@ -109,7 +141,7 @@ export const useUsers = () => {
       method: 'POST',
       body: JSON.stringify(userData),
     });
-  }, [api]);
+  }, [api.execute]);
 
   const updateUser = useCallback((id: string, userData: any) => {
     return api.execute({
@@ -117,14 +149,14 @@ export const useUsers = () => {
       method: 'PUT',
       body: JSON.stringify(userData),
     });
-  }, [api]);
+  }, [api.execute]);
 
   const deleteUser = useCallback((id: string) => {
     return api.execute({
       endpoint: `/users/${id}`,
       method: 'DELETE',
     });
-  }, [api]);
+  }, [api.execute]);
 
   const enableUser = useCallback((id: string, enabled: boolean) => {
     return api.execute({
@@ -132,7 +164,7 @@ export const useUsers = () => {
       method: 'PUT',
       body: JSON.stringify({ enabled }),
     });
-  }, [api]);
+  }, [api.execute]);
 
   const resetPassword = useCallback((id: string, password: string, temporary = false) => {
     return api.execute({
@@ -140,28 +172,28 @@ export const useUsers = () => {
       method: 'PUT',
       body: JSON.stringify({ password, temporary }),
     });
-  }, [api]);
+  }, [api.execute]);
 
   const sendVerifyEmail = useCallback((id: string) => {
     return api.execute({
       endpoint: `/users/${id}/send-verify-email`,
       method: 'PUT',
     });
-  }, [api]);
+  }, [api.execute]);
 
   const logoutUser = useCallback((id: string) => {
     return api.execute({
       endpoint: `/users/${id}/logout`,
       method: 'DELETE',
     });
-  }, [api]);
+  }, [api.execute]);
 
   const getUserCount = useCallback(() => {
     return api.execute({
       endpoint: '/users/count',
       method: 'GET',
     });
-  }, [api]);
+  }, [api.execute]);
 
   return {
     ...api,
@@ -186,7 +218,7 @@ export const useRoles = () => {
       endpoint: '/roles',
       method: 'GET',
     });
-  }, [api]);
+  }, [api.execute]);
 
   const createRole = useCallback((roleData: any) => {
     return api.execute({
@@ -194,7 +226,7 @@ export const useRoles = () => {
       method: 'POST',
       body: JSON.stringify(roleData),
     });
-  }, [api]);
+  }, [api.execute]);
 
   const updateRole = useCallback((roleName: string, roleData: any) => {
     return api.execute({
@@ -202,21 +234,21 @@ export const useRoles = () => {
       method: 'PUT',
       body: JSON.stringify(roleData),
     });
-  }, [api]);
+  }, [api.execute]);
 
   const deleteRole = useCallback((roleName: string) => {
     return api.execute({
       endpoint: `/roles/${roleName}`,
       method: 'DELETE',
     });
-  }, [api]);
+  }, [api.execute]);
 
   const getUserRoles = useCallback((userId: string) => {
     return api.execute({
       endpoint: `/users/${userId}/roles`,
       method: 'GET',
     });
-  }, [api]);
+  }, [api.execute]);
 
   const addUserRoles = useCallback((userId: string, roles: any[]) => {
     return api.execute({
@@ -224,7 +256,7 @@ export const useRoles = () => {
       method: 'POST',
       body: JSON.stringify(roles),
     });
-  }, [api]);
+  }, [api.execute]);
 
   const removeUserRoles = useCallback((userId: string, roles: any[]) => {
     return api.execute({
@@ -232,7 +264,7 @@ export const useRoles = () => {
       method: 'DELETE',
       body: JSON.stringify(roles),
     });
-  }, [api]);
+  }, [api.execute]);
 
   return {
     ...api,
@@ -254,7 +286,7 @@ export const useAdminStats = () => {
       endpoint: '/stats',
       method: 'GET',
     });
-  }, [api]);
+  }, [api.execute]);
 
   return {
     ...api,
@@ -275,7 +307,7 @@ export const useBulkOperations = () => {
       })
     );
     return Promise.all(promises);
-  }, [api]);
+  }, [api.execute]);
 
   const bulkDisable = useCallback(async (userIds: string[]) => {
     const promises = userIds.map(id => 
@@ -286,7 +318,7 @@ export const useBulkOperations = () => {
       })
     );
     return Promise.all(promises);
-  }, [api]);
+  }, [api.execute]);
 
   const bulkDelete = useCallback(async (userIds: string[]) => {
     const promises = userIds.map(id => 
@@ -296,7 +328,7 @@ export const useBulkOperations = () => {
       })
     );
     return Promise.all(promises);
-  }, [api]);
+  }, [api.execute]);
 
   const bulkLogout = useCallback(async (userIds: string[]) => {
     const promises = userIds.map(id => 
@@ -306,7 +338,7 @@ export const useBulkOperations = () => {
       })
     );
     return Promise.all(promises);
-  }, [api]);
+  }, [api.execute]);
 
   const bulkSendVerifyEmail = useCallback(async (userIds: string[]) => {
     const promises = userIds.map(id => 
@@ -316,7 +348,7 @@ export const useBulkOperations = () => {
       })
     );
     return Promise.all(promises);
-  }, [api]);
+  }, [api.execute]);
 
   return {
     ...api,
