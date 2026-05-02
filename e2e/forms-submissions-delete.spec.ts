@@ -13,7 +13,9 @@ const formByAgravoBody = {
   versions: [],
 };
 
-const submissionsListWithOne = {
+const responsesListEmpty = { data: [], total: 0, page: 1, limit: 50, totalPages: 1 };
+
+const responsesListWithOne = {
   data: [
     {
       id: 7,
@@ -22,17 +24,15 @@ const submissionsListWithOne = {
       data_json: {},
       created_by: 'it-delete',
       created_at: '2026-01-15T15:30:00.000Z',
-      updated_at: '2026-01-15T15:30:00.000Z',
-      created_offline: false,
+      submitted_at: null,
+      synced_at: null,
     },
   ],
   total: 1,
   page: 1,
-  limit: 100,
+  limit: 50,
   totalPages: 1,
 };
-
-const submissionsListEmpty = { data: [], total: 0, page: 1, limit: 100, totalPages: 0 };
 
 async function offlineNotificador(page: Page) {
   await page.addInitScript(() => {
@@ -78,11 +78,11 @@ test.describe('Formulários — excluir submissão (lista)', () => {
         });
       }
 
-      if (method === 'GET' && pathname === '/api/submissions' && url.includes('form_version_id=42')) {
+      if (method === 'GET' && pathname === '/api/forms/1/responses') {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify(deleted ? submissionsListEmpty : submissionsListWithOne),
+          body: JSON.stringify(deleted ? responsesListEmpty : responsesListWithOne),
         });
       }
 
@@ -110,12 +110,13 @@ test.describe('Formulários — excluir submissão (lista)', () => {
     await page.goto('/private/formularios/LIST_IT');
 
     await expect(page).not.toHaveURL(/\/login$/);
-    await expect(page.getByRole('cell', { name: '#7' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('Não enviada')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('button', { name: 'Excluir' })).toBeVisible({ timeout: 30_000 });
 
     await page.getByRole('button', { name: 'Excluir' }).click();
 
     await expect(page.getByText('Nenhuma notificação cadastrada ainda')).toBeVisible({ timeout: 30_000 });
-    expect(deleteBody).toMatchObject({ deleted_by: 'user-id' });
+    expect(deleteBody).toMatchObject({ deleted_by: 'e2e-delete' });
   });
 });
 

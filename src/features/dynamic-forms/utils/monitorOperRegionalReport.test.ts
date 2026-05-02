@@ -3,8 +3,12 @@ import {
   buildMonitorOperRegionalReport,
   buildPerSubmissionSummaries,
   computeTotalAcumuladoMes,
+  defaultMonitorOperReportFilters,
   filterMonitorOperRows,
+  filterMonitorOperSubmissionsByReportFilters,
+  getMonitorOperDefaultVisibleListColIds,
   impactCheckboxAppliesToArea,
+  monitorOperPresetVisibleSheetKeys,
   monitorOperSubmissionsToCsv,
   parseMoney,
   sumCustos,
@@ -181,5 +185,28 @@ describe('monitorOperRegionalReport', () => {
     );
     expect(csv.charCodeAt(0)).toBe(0xfeff);
     expect(csv).toContain('id,status');
+  });
+
+  it('monitorOperPresetVisibleSheetKeys preserva ordem do instrumento e ignora chaves ausentes', () => {
+    const available = ['acao.area', 'cabecalho.crs_id', 'acao.atividade'];
+    const preset = monitorOperPresetVisibleSheetKeys(available);
+    expect(preset).toEqual(['cabecalho.crs_id', 'acao.area', 'acao.atividade']);
+  });
+
+  it('getMonitorOperDefaultVisibleListColIds filtra só ids existentes', () => {
+    expect(getMonitorOperDefaultVisibleListColIds(['crs', 'area', 'foo'])).toEqual(['crs', 'area']);
+  });
+
+  it('filterMonitorOperSubmissionsByReportFilters restringe por CRS e quadrimestre', () => {
+    const a = row({ cabecalho: { crs_id: 1, ano: 2026, mes: 'JAN' } });
+    const b = row({ cabecalho: { crs_id: 2, ano: 2026, mes: 'JUN', competencia_mes_ano: '2026-06' } });
+    const subs = [
+      { id: 1, status: 'x', created_at: 't', data_json: a },
+      { id: 2, status: 'x', created_at: 't', data_json: b },
+    ];
+    const f1 = { ...defaultMonitorOperReportFilters(), crs_id: '1' };
+    expect(filterMonitorOperSubmissionsByReportFilters(subs, f1)).toHaveLength(1);
+    const f2 = { ...defaultMonitorOperReportFilters(), quadrimestre: 'Q2' as const };
+    expect(filterMonitorOperSubmissionsByReportFilters(subs, f2)).toHaveLength(1);
   });
 });

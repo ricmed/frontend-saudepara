@@ -383,7 +383,7 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-              <Route path="/private/formularios/:agravo/relatorio" element={<MonitorOperRegionalReportPage />} />
+              <Route path="/private/formularios/:agravo/relatorio/*" element={<MonitorOperRegionalReportPage />} />
               <Route path="/private/formularios/:agravo" element={<FormSubmissionsListPage />} />
               <Route path="/private/formularios/:agravo/nova" element={<DynamicFormPage />} />
               <Route path="/private/formularios/:agravo/editar/:id" element={<DynamicFormPage />} />

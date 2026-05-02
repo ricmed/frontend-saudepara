@@ -36,6 +36,27 @@ class FormResponsesService {
     return response.data;
   }
 
+  /**
+   * Todas as respostas do formulário (paginação no cliente), para pré-visualização / cópia.
+   * Limite de segurança: `maxPages` × `pageSize` registros.
+   */
+  async listAllResponses(
+    formId: number,
+    filters?: { status?: ResponseStatus; pageSize?: number; maxPages?: number },
+  ): Promise<FormResponsesListResponse['data']> {
+    const pageSize = filters?.pageSize ?? 500;
+    const maxPages = filters?.maxPages ?? 500;
+    const out: FormResponsesListResponse['data'] = [];
+    let page = 1;
+    while (page <= maxPages) {
+      const res = await this.list(formId, { page, limit: pageSize, status: filters?.status });
+      out.push(...res.data);
+      if (page >= res.totalPages || res.data.length === 0) break;
+      page += 1;
+    }
+    return out;
+  }
+
   async downloadExport(formId: number, params?: { format?: 'csv' | 'xlsx'; status?: ResponseStatus }) {
     const response = await api.get(`/forms/${formId}/responses/export`, {
       params,

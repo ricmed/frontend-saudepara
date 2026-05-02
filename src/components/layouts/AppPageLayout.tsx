@@ -17,6 +17,8 @@ interface AppPageLayoutProps {
   showBottomNav?: boolean;
   currentTab?: string;
   variant?: 'mobile' | 'desktop'; // 🆕 Novo prop para escolher variante
+  /** Largura do conteúdo em desktop (ex.: listagens com muitas colunas). */
+  contentWidth?: 'default' | 'wide';
 }
 
 /**
@@ -36,11 +38,17 @@ export const AppPageLayout: React.FC<AppPageLayoutProps> = ({
   showBottomNav = true,
   currentTab = 'inicio',
   variant = 'mobile', // 🆕 Default: mobile
+  contentWidth = 'default',
 }) => {
   const navigate = useNavigate();
   const { selectedLanguage } = useLanguage();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(currentTab);
+
+  const desktopContentMax =
+    contentWidth === 'wide' ? 'max-w-[min(1920px,98vw)] w-full mx-auto' : 'max-w-7xl mx-auto';
+  const desktopPad =
+    contentWidth === 'wide' ? 'px-3 sm:px-4 lg:px-6 xl:px-8' : 'px-4 sm:px-6 lg:px-8';
 
   const handleGoBack = () => {
     if (backPath) {
@@ -57,11 +65,11 @@ export const AppPageLayout: React.FC<AppPageLayoutProps> = ({
 
   const headerContainerClasses = variant === 'mobile'
     ? 'px-4 py-4 sm:py-6'
-    : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6';
+    : `${desktopContentMax} ${desktopPad} py-4 sm:py-6`;
 
   const mainContainerClasses = variant === 'mobile'
     ? 'px-4 py-4 sm:py-6'
-    : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-24 sm:pb-32';
+    : `${desktopContentMax} ${desktopPad} py-6 sm:py-8 pb-24 sm:pb-32`;
 
   return (
     <div className="w-full min-h-screen bg-gray-50">

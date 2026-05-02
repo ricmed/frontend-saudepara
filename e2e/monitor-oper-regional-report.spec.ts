@@ -160,7 +160,7 @@ test.describe('Monitor operacional regional — relatório consolidado', () => {
 
     await expect(page).toHaveURL(/\/private\/formularios\/MONITOR_OPER_REGIONAL\/relatorio\/?$/);
     await expect(page.getByTestId('monitor-oper-report-root')).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText('Programadas (N)')).toBeVisible();
+    await expect(page.getByText('Programadas', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Coleta (epi)')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Exportar CSV' })).toBeEnabled();
 

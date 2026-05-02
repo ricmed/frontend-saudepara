@@ -13,8 +13,6 @@ const formListItem = {
   updated_at: '2026-01-01T00:00:00.000Z',
 };
 
-const formByAgravoBody = { ...formListItem, versions: [] };
-
 const activeVersionBody = {
   id: 42,
   form_id: 1,
@@ -43,6 +41,21 @@ const activeVersionBody = {
   form: { nome: 'Formulário Lista E2E', form_key: 'LIST_IT' },
 };
 
+const formByAgravoBody = {
+  ...formListItem,
+  versions: [
+    {
+      id: 42,
+      form_id: 1,
+      version: 1,
+      schema_json: activeVersionBody.schema_json,
+      published_at: '2026-01-01T00:00:00.000Z',
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    },
+  ],
+};
+
 const submission7 = {
   id: 7,
   form_version_id: 42,
@@ -54,11 +67,22 @@ const submission7 = {
   created_offline: false,
 };
 
-const submissionsListBody = {
-  data: [submission7],
+const responsesListBody = {
+  data: [
+    {
+      id: submission7.id,
+      form_version_id: 42,
+      status: submission7.status,
+      data_json: submission7.data_json,
+      created_by: submission7.created_by,
+      created_at: submission7.created_at,
+      submitted_at: '2026-01-15T16:00:00.000Z',
+      synced_at: null,
+    },
+  ],
   total: 1,
   page: 1,
-  limit: 100,
+  limit: 50,
   totalPages: 1,
 };
 
@@ -120,11 +144,11 @@ async function registerFormListMocks(page: Page) {
       });
     }
 
-    if (method === 'GET' && pathname === '/api/submissions' && url.includes('form_version_id=42')) {
+    if (method === 'GET' && pathname === '/api/forms/1/responses') {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(submissionsListBody),
+        body: JSON.stringify(responsesListBody),
       });
     }
 
@@ -143,26 +167,22 @@ async function registerFormListMocks(page: Page) {
 test.describe('Formulários — visualizar e editar a partir da lista', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test('ícone Visualizar abre notificação somente leitura com dados da submissão', async ({
-    page,
-  }) => {
+  test('Ver resposta abre modal somente leitura com dados da submissão', async ({ page }) => {
     await offlineNotificador(page);
     await registerFormListMocks(page);
 
     await page.goto('/private/formularios/LIST_IT');
 
     await expect(page).not.toHaveURL(/\/login$/);
-    await expect(page.getByRole('cell', { name: '#7' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('cell', { name: 'Lido no E2E', exact: true })).toBeVisible({ timeout: 30_000 });
 
-    await page.getByRole('button', { name: 'Visualizar' }).click();
+    await page.getByRole('button', { name: 'Ver resposta' }).click();
 
-    await expect(page).toHaveURL(/\/private\/formularios\/LIST_IT\/visualizar\/7\/?$/);
-    await expect(page.getByRole('heading', { name: 'Visualizar Notificação', level: 1 })).toBeVisible();
+    await expect(page.getByText('Resposta #7')).toBeVisible({ timeout: 30_000 });
     const viewField = page.getByPlaceholder('list-ve-placeholder');
     await expect(viewField).toBeVisible({ timeout: 30_000 });
     await expect(viewField).toHaveValue('Lido no E2E', { timeout: 30_000 });
     await expect(viewField).toBeDisabled();
-    // Em readOnly o FormRenderer não renderiza o rodapé (cancelar/enviar).
     await expect(page.getByRole('button', { name: 'Atualizar e Enviar' })).toHaveCount(0);
   });
 
@@ -174,7 +194,7 @@ test.describe('Formulários — visualizar e editar a partir da lista', () => {
 
     await page.goto('/private/formularios/LIST_IT');
 
-    await expect(page.getByRole('cell', { name: '#7' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('cell', { name: 'Lido no E2E', exact: true })).toBeVisible({ timeout: 30_000 });
 
     await page.getByRole('button', { name: 'Editar' }).click();
 

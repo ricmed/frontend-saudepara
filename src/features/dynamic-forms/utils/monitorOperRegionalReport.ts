@@ -84,6 +84,65 @@ export function filterMonitorOperRows(submissions: { data_json?: unknown }[]): M
     );
 }
 
+/** Valores de municípios alcançados no formulário (array ou valor único), normalizados e sem vazios. */
+export function normalizeMunicipiosAlcancados(raw: unknown): string[] {
+  if (raw == null) return [];
+  if (Array.isArray(raw)) {
+    const out: string[] = [];
+    for (const x of raw) {
+      if (x != null && String(x).trim() !== '') out.push(String(x).trim());
+    }
+    return out;
+  }
+  const s = String(raw).trim();
+  return s === '' ? [] : [s];
+}
+
+export type MunicipiosPorCrsAgg = {
+  crs_id: unknown;
+  municipios: string[];
+  quantidade: number;
+};
+
+/** Municípios distintos informados por regional (CRS), para painel operacional. */
+export function buildMunicipiosPorCrs(rows: MonitorOperRow[]): MunicipiosPorCrsAgg[] {
+  const map = new Map<string, Set<string>>();
+  for (const d of rows) {
+    const cid = d?.cabecalho?.crs_id;
+    const key = cid == null || cid === '' ? '__empty__' : String(cid);
+    const list = normalizeMunicipiosAlcancados(d?.acao?.municipios_alcancados);
+    if (!map.has(key)) map.set(key, new Set());
+    const set = map.get(key)!;
+    for (const m of list) set.add(m);
+  }
+  const out: MunicipiosPorCrsAgg[] = [];
+  for (const [key, set] of map) {
+    const crs_id = key === '__empty__' ? '' : key;
+    const municipios = [...set].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    out.push({ crs_id, municipios, quantidade: municipios.length });
+  }
+  return out.sort((a, b) => {
+    const sa = String(a.crs_id);
+    const sb = String(b.crs_id);
+    return sa.localeCompare(sb, undefined, { numeric: true });
+  });
+}
+
+/** Conta em quantas linhas de ação cada município aparece (uma vez por linha, mesmo se repetido no array). */
+export function buildMunicipiosRanking(rows: MonitorOperRow[], limit = 20): { municipio: string; ocorrencias: number }[] {
+  const counts = new Map<string, number>();
+  for (const d of rows) {
+    const list = normalizeMunicipiosAlcancados(d?.acao?.municipios_alcancados);
+    const uniq = new Set(list);
+    for (const m of uniq) counts.set(m, (counts.get(m) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR'))
+    .slice(0, limit)
+    .map(([municipio, ocorrencias]) => ({ municipio, ocorrencias }));
+}
+
 /** Totais QDQQ para um único grupo (CRS + ano + quadrimestre). */
 export type QdqqGroupTotal = {
   /** Chave interna `crs|ano|Q` */
@@ -101,6 +160,8 @@ export type QdqqGroupTotal = {
   perc: number | undefined;
   /** Linhas (ações) neste grupo */
   rowCount: number;
+  /** Soma do custo (`custo`) das linhas desta fatia QDQQ. */
+  custoTotal: number;
 };
 
 export type TotalAcumuladoMes =
@@ -124,7 +185,7 @@ export type TotalAcumuladoMes =
       perc: number | undefined;
     };
 
-function sumQdqqPath(
+export function sumQdqqPath(
   arr: MonitorOperRow[],
   path: 'qtd_programadas_qdqq' | 'qtd_realizadas_conforme_programacao' | 'qtd_nao_programadas_qdqq',
 ) {
@@ -151,6 +212,7 @@ export function computeTotalAcumuladoMesByGroup(rows: MonitorOperRow[]): QdqqGro
     const naoProgramadasFlag = sumQdqqPath(grp, 'qtd_nao_programadas_qdqq');
     const total = programadas + naoProgramadasFlag;
     const perc = programadas > 0 ? (realizadasFlag / programadas) * 100 : undefined;
+    const custoTotal = sumCustos(grp).total;
     out.push({
       consolidationKey,
       crs_id: sample.crs_id,
@@ -165,6 +227,7 @@ export function computeTotalAcumuladoMesByGroup(rows: MonitorOperRow[]): QdqqGro
       total,
       perc,
       rowCount: grp.length,
+      custoTotal,
     });
   }
   out.sort((a, b) =>
@@ -282,6 +345,202 @@ export function sumCustos(rows: MonitorOperRow[]): MonitorOperCustoSums {
   return acc;
 }
 
+/** Rótulo amigável da área de vigilância (chave do formulário). */
+export function monitorOperAreaLabel(areaKey: string): string {
+  return AREA_LABELS[areaKey] ?? (areaKey === '(sem área)' || areaKey === '' ? 'Sem área informada' : areaKey);
+}
+
+/** Filtros do painel executivo / técnico (aplicados aos envios com `cabecalho` + `acao`). */
+export type MonitorOperReportFilters = {
+  ano: string;
+  quadrimestre: '' | 'Q1' | 'Q2' | 'Q3';
+  crs_id: string;
+  area: string;
+};
+
+export function defaultMonitorOperReportFilters(): MonitorOperReportFilters {
+  return { ano: '', quadrimestre: '', crs_id: '', area: '' };
+}
+
+export function monitorOperRowMatchesFilters(d: MonitorOperRow, f: MonitorOperReportFilters): boolean {
+  const cab = d.cabecalho as Record<string, any> | undefined;
+  const ac = d.acao as Record<string, any> | undefined;
+  if (!cab || !ac) return false;
+  if (f.ano && String(cab.ano ?? '') !== f.ano) return false;
+  if (f.quadrimestre) {
+    const mo = monthNumberFromCabecalho(cab);
+    const q = mo == null ? '?' : quadrimestreKeyFromMonth(mo);
+    if (q !== f.quadrimestre) return false;
+  }
+  if (f.crs_id && String(cab.crs_id ?? '') !== f.crs_id) return false;
+  if (f.area && String(ac.area ?? '') !== f.area) return false;
+  return true;
+}
+
+export function filterMonitorOperSubmissionsByReportFilters<T extends { data_json?: unknown }>(
+  submissions: T[],
+  f: MonitorOperReportFilters,
+): T[] {
+  return submissions.filter((sub) => {
+    const d = sub.data_json;
+    if (!d || typeof d !== 'object') return false;
+    const row = d as MonitorOperRow;
+    if (!row.cabecalho || !row.acao) return false;
+    return monitorOperRowMatchesFilters(row, f);
+  });
+}
+
+/** Valores distintos presentes nos envios (para preencher filtros sem “sumir” opções ao filtrar). */
+export function collectMonitorOperReportFilterOptions(submissions: { data_json?: unknown }[]): {
+  anos: string[];
+  crsIds: string[];
+  areas: { value: string; label: string }[];
+} {
+  const anos = new Set<string>();
+  const crsIds = new Set<string>();
+  const areas = new Set<string>();
+  for (const s of submissions) {
+    const d = s.data_json as MonitorOperRow | undefined;
+    if (!d?.cabecalho || !d?.acao) continue;
+    const cab = d.cabecalho as Record<string, any>;
+    const ac = d.acao as Record<string, any>;
+    const ano = cab.ano;
+    if (ano != null && String(ano).trim() !== '') anos.add(String(ano));
+    const crs = cab.crs_id;
+    if (crs != null && String(crs).trim() !== '') crsIds.add(String(crs));
+    const a = ac.area;
+    if (a != null && String(a).trim() !== '') areas.add(String(a));
+  }
+  return {
+    anos: [...anos].sort((a, b) => Number(b) - Number(a) || b.localeCompare(a)),
+    crsIds: [...crsIds].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+    areas: [...areas]
+      .sort()
+      .map((value) => ({
+        value,
+        label: AREA_LABELS[value] ?? value,
+      })),
+  };
+}
+
+/** Totais agregados por regional (CRS), independente do quadrimestre — visão gestor. */
+export type MonitorOperCrsAggregate = {
+  crs_id: unknown;
+  linhas: number;
+  programadas: number;
+  realizadasFlag: number;
+  naoProgramadasFlag: number;
+  perc: number | undefined;
+  custoTotal: number;
+  municipiosDistintos: number;
+};
+
+export function buildAggregatesPorCrs(rows: MonitorOperRow[]): MonitorOperCrsAggregate[] {
+  const map = new Map<string, MonitorOperRow[]>();
+  for (const d of rows) {
+    const k =
+      d?.cabecalho?.crs_id == null || (d.cabecalho as any).crs_id === '' ? '__empty__' : String((d.cabecalho as any).crs_id);
+    if (!map.has(k)) map.set(k, []);
+    map.get(k)!.push(d);
+  }
+  const out: MonitorOperCrsAggregate[] = [];
+  for (const [k, grp] of map) {
+    const crs_id = k === '__empty__' ? '' : k;
+    const programadas = sumQdqqPath(grp, 'qtd_programadas_qdqq');
+    const realizadasFlag = sumQdqqPath(grp, 'qtd_realizadas_conforme_programacao');
+    const naoProgramadasFlag = sumQdqqPath(grp, 'qtd_nao_programadas_qdqq');
+    const perc = programadas > 0 ? (realizadasFlag / programadas) * 100 : undefined;
+    const custoTotal = sumCustos(grp).total;
+    const mun = new Set<string>();
+    for (const r of grp) {
+      for (const m of normalizeMunicipiosAlcancados(r?.acao?.municipios_alcancados)) mun.add(m);
+    }
+    out.push({
+      crs_id,
+      linhas: grp.length,
+      programadas,
+      realizadasFlag,
+      naoProgramadasFlag,
+      perc,
+      custoTotal,
+      municipiosDistintos: mun.size,
+    });
+  }
+  return out.sort((a, b) => String(a.crs_id).localeCompare(String(b.crs_id), undefined, { numeric: true }));
+}
+
+export type ProgramaAlcancadoCount = { programa: string; count: number };
+
+export function buildProgramasAlcancadosRanking(rows: MonitorOperRow[], limit = 40): ProgramaAlcancadoCount[] {
+  const m = new Map<string, number>();
+  for (const d of rows) {
+    const p = d?.acao?.programa_alcancado;
+    const key = p == null || String(p).trim() === '' ? '' : String(p).trim();
+    if (!key) continue;
+    m.set(key, (m.get(key) ?? 0) + 1);
+  }
+  return [...m.entries()]
+    .map(([programa, count]) => ({ programa, count }))
+    .sort((a, b) => b.count - a.count || a.programa.localeCompare(b.programa, 'pt-BR'))
+    .slice(0, limit);
+}
+
+export type AtividadePorAreaRow = { areaKey: string; areaLabel: string; atividade: string; count: number };
+
+export function buildAtividadesPorArea(rows: MonitorOperRow[]): AtividadePorAreaRow[] {
+  const map = new Map<string, number>();
+  for (const d of rows) {
+    const ac = d?.acao as Record<string, unknown> | undefined;
+    const ak = ac?.area == null || String(ac.area).trim() === '' ? '(sem área)' : String(ac.area);
+    const atv =
+      ac?.atividade == null || String(ac.atividade).trim() === '' ? '—' : String(ac.atividade).trim();
+    const k = `${ak}\t${atv}`;
+    map.set(k, (map.get(k) ?? 0) + 1);
+  }
+  return [...map.entries()]
+    .map(([k, count]) => {
+      const tab = k.indexOf('\t');
+      const areaKey = tab >= 0 ? k.slice(0, tab) : k;
+      const atividade = tab >= 0 ? k.slice(tab + 1) : '—';
+      return {
+        areaKey,
+        areaLabel: monitorOperAreaLabel(areaKey),
+        atividade,
+        count,
+      };
+    })
+    .sort((a, b) => a.areaLabel.localeCompare(b.areaLabel, 'pt-BR') || b.count - a.count || a.atividade.localeCompare(b.atividade, 'pt-BR'));
+}
+
+export type ObstaculoDetalheRow = {
+  crs_id: unknown;
+  atividade: string;
+  competencia: string;
+  texto: string;
+};
+
+export function buildObstaculosDetalhe(rows: MonitorOperRow[]): ObstaculoDetalheRow[] {
+  const out: ObstaculoDetalheRow[] = [];
+  for (const d of rows) {
+    const r = d?.resumo;
+    if (!r || typeof r !== 'object') continue;
+    if (!isTruthyCheckbox((r as Record<string, unknown>).houve_obstaculos)) continue;
+    const cab = d.cabecalho as Record<string, any> | undefined;
+    const rr = r as Record<string, unknown>;
+    const textoRaw = rr.qual_obstaculo ?? rr.descricao_obstaculos ?? rr.observacoes;
+    out.push({
+      crs_id: cab?.crs_id,
+      atividade: String(d?.acao?.atividade ?? '—'),
+      competencia:
+        cab?.competencia_mes_ano != null && String(cab.competencia_mes_ano) !== ''
+          ? String(cab.competencia_mes_ano)
+          : '—',
+      texto: textoRaw != null && String(textoRaw).trim() !== '' ? String(textoRaw).trim() : '—',
+    });
+  }
+  return out;
+}
+
 export function buildMonitorOperRegionalReport(
   rows: MonitorOperRow[],
   schema: FormSchema | null | undefined,
@@ -350,11 +609,176 @@ export interface MonitorOperSubmissionSummary {
   quadrimestre: string;
   area: string;
   areaLabel: string;
+  programaAlcancado: unknown;
   atividade: unknown;
   dataRealizacao: unknown;
   programada: unknown;
   realizada: unknown;
   custoTotal: number;
+}
+
+/**
+ * Ordem sugerida para pré-visualização em tabela (campos do instrumento).
+ * Só entram colunas que existirem no schema ativo.
+ */
+export const MONITOR_OPER_SHEET_PRESET_PATHS: readonly string[] = [
+  'cabecalho.crs_id',
+  'cabecalho.competencia_mes_ano',
+  'cabecalho.ano',
+  'cabecalho.mes',
+  'acao.area',
+  'acao.programa_alcancado',
+  'acao.atividade',
+  'acao.data_realizacao',
+  'acao.qtd_programadas_qdqq',
+  'acao.qtd_realizadas_conforme_programacao',
+  'acao.qtd_nao_programadas_qdqq',
+  'acao.municipios_alcancados',
+  'custo.total',
+];
+
+export function monitorOperPresetVisibleSheetKeys(availableKeys: string[]): string[] {
+  const set = new Set(availableKeys);
+  return MONITOR_OPER_SHEET_PRESET_PATHS.filter((k) => set.has(k));
+}
+
+export function formatMonitorOperSim01(v: unknown): string {
+  if (v === true || v === 1 || v === '1') return 'Sim';
+  if (v === false || v === 0 || v === '0') return 'Não';
+  if (v == null || v === '') return '—';
+  return String(v);
+}
+
+export function formatMonitorOperBrl(total: number): string {
+  try {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(total) || 0);
+  } catch {
+    return String(total);
+  }
+}
+
+export type MonitorOperListColSpec = {
+  id: string;
+  label: string;
+  /** Classe extra no `<th>` (ex.: `text-right` para custo). */
+  thClassName?: string;
+  tdClassName?: string;
+  format: (row: MonitorOperSubmissionSummary, crsById: Record<string, string>) => string;
+};
+
+/** Colunas da listagem web — alinhadas ao CSV `monitorOperSubmissionsToCsv` + programa alcançado. */
+export function getMonitorOperListColumnSpecs(): MonitorOperListColSpec[] {
+  return [
+    {
+      id: 'crs',
+      label: 'CRS (Regional de saúde)',
+      tdClassName: 'min-w-[12rem] max-w-[18rem]',
+      format: (r, crsById) =>
+        crsById[String(r.crs_id ?? '')] || (r.crs_id != null && r.crs_id !== '' ? String(r.crs_id) : '—'),
+    },
+    {
+      id: 'competencia',
+      label: 'Competência',
+      tdClassName: 'whitespace-nowrap',
+      format: (r) =>
+        r.competencia_mes_ano != null && r.competencia_mes_ano !== '' ? String(r.competencia_mes_ano) : '—',
+    },
+    {
+      id: 'qdqq',
+      label: 'Quadrimestre (QDQQ)',
+      tdClassName: 'min-w-[10rem] max-w-[14rem]',
+      format: (r) =>
+        r.quadrimestre === '?' ? '—' : quadrimestreLabel(r.quadrimestre as 'Q1' | 'Q2' | 'Q3'),
+    },
+    {
+      id: 'area',
+      label: 'Área da vigilância',
+      tdClassName: 'min-w-[11rem] max-w-[16rem] truncate',
+      format: (r) => r.areaLabel || '—',
+    },
+    {
+      id: 'programa',
+      label: 'Programa alcançado',
+      tdClassName: 'min-w-[11rem] max-w-[22rem] truncate',
+      format: (r) => (r.programaAlcancado != null && r.programaAlcancado !== '' ? String(r.programaAlcancado) : '—'),
+    },
+    {
+      id: 'atividade',
+      label: 'Atividade',
+      tdClassName: 'min-w-[10rem] max-w-[20rem] truncate',
+      format: (r) => (r.atividade != null && r.atividade !== '' ? String(r.atividade) : '—'),
+    },
+    {
+      id: 'data_realizacao',
+      label: 'Data da realização',
+      tdClassName: 'whitespace-nowrap',
+      format: (r) => (r.dataRealizacao != null && r.dataRealizacao !== '' ? String(r.dataRealizacao) : '—'),
+    },
+    {
+      id: 'programada',
+      label: 'Programada no QDQQ?',
+      tdClassName: 'whitespace-nowrap',
+      format: (r) => formatMonitorOperSim01(r.programada),
+    },
+    {
+      id: 'realizada',
+      label: 'Foi realizada?',
+      tdClassName: 'whitespace-nowrap',
+      format: (r) => formatMonitorOperSim01(r.realizada),
+    },
+    {
+      id: 'custo',
+      label: 'Custo total',
+      thClassName: 'text-right',
+      tdClassName: 'whitespace-nowrap text-right',
+      format: (r) => formatMonitorOperBrl(r.custoTotal),
+    },
+  ];
+}
+
+const LS_MONITOR_OPER_LIST_COLS = 'dynamicForms.MONITOR_OPER_REGIONAL.listCols';
+
+/** Colunas visíveis ao abrir a lista (demais em “Colunas”). */
+export const MONITOR_OPER_LIST_DEFAULT_VISIBLE_COL_IDS: readonly string[] = [
+  'crs',
+  'competencia',
+  'area',
+  'atividade',
+  'data_realizacao',
+];
+
+export function getMonitorOperDefaultVisibleListColIds(allowedIds: string[]): string[] {
+  const allowed = new Set(allowedIds);
+  return MONITOR_OPER_LIST_DEFAULT_VISIBLE_COL_IDS.filter((id) => allowed.has(id));
+}
+
+export function readMonitorOperListColSelection(): string[] | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(LS_MONITOR_OPER_LIST_COLS);
+    if (!raw) return null;
+    const arr = JSON.parse(raw) as unknown;
+    if (!Array.isArray(arr) || !arr.every((x) => typeof x === 'string')) return null;
+    return arr as string[];
+  } catch {
+    return null;
+  }
+}
+
+export function writeMonitorOperListColSelection(ids: string[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(LS_MONITOR_OPER_LIST_COLS, JSON.stringify(ids));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function buildMonitorOperSummaryById(
+  rows: { id: number; status: string; created_at: string; data_json: Record<string, any> }[],
+): Map<number, MonitorOperSubmissionSummary> {
+  const list = buildPerSubmissionSummaries(rows);
+  return new Map(list.map((s) => [s.id, s]));
 }
 
 export function buildPerSubmissionSummaries(
@@ -390,6 +814,7 @@ export function buildPerSubmissionSummaries(
       quadrimestre: qdqqQ,
       area,
       areaLabel: AREA_LABELS[area] || area || '—',
+      programaAlcancado: d?.acao?.programa_alcancado,
       atividade: d?.acao?.atividade,
       dataRealizacao: d?.acao?.data_realizacao,
       programada: d?.acao?.qtd_programadas_qdqq,

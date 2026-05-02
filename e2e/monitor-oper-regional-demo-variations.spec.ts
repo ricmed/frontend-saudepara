@@ -129,7 +129,7 @@ test.describe('Monitor operacional — cenários demo (relatório para área té
     await expect(page.getByText('6 envio(s) carregado(s)')).toBeVisible();
     await expect(page.getByText('6 linha(s) com cabeçalho + ação')).toBeVisible();
     await expect(page.getByText('Total acumulado (QDQQ — quadrimestre)')).toBeVisible();
-    await expect(page.getByText('Programadas (N)')).toBeVisible();
+    await expect(page.getByText('Programadas', { exact: true }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Exportar CSV' })).toBeEnabled();
   });
 
@@ -139,6 +139,6 @@ test.describe('Monitor operacional — cenários demo (relatório para área té
 
     await page.goto('/private/formularios/MONITOR_OPER_REGIONAL');
     await expect(page.getByText('Total acumulado (QDQQ — quadrimestre)')).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText('Programadas (N)')).toBeVisible();
+    await expect(page.getByText('Programadas', { exact: true }).first()).toBeVisible();
   });
 });

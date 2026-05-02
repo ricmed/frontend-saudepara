@@ -92,6 +92,8 @@ interface FormRendererProps {
   saveDraftLabel?: string;
   cancelLabel?: string;
   readOnly?: boolean;
+  /** Classe extra para o container do form (útil quando embutido em modais). */
+  className?: string;
   /** Exibe o título (nome/código) dentro do renderer. */
   showTitle?: boolean;
   /** Oculta a barra de ações (Enviar / Salvar rascunho / Cancelar) mantendo o formulário interativo. */
@@ -115,6 +117,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   saveDraftLabel = 'Salvar Rascunho',
   cancelLabel = 'Cancelar',
   readOnly = false,
+  className,
   showTitle = true,
   showActions = true,
   context = 'sinan',
@@ -995,7 +998,10 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow">
+    <form
+      onSubmit={handleSubmit}
+      className={`max-w-4xl mx-auto p-6 bg-white rounded-lg shadow ${className ?? ''}`.trim()}
+    >
       {showTitle ? (
         <h1 className="text-2xl font-bold mb-6 text-gray-800">{schema.title || schema.agravo}</h1>
       ) : null}
