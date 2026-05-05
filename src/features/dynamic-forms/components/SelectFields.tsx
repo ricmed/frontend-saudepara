@@ -5,15 +5,14 @@ import type { FormField } from '@/services/FormService';
 import CodeListService, { type CodeListItem } from '@/services/CodeListService';
 import DatabaseService from '@/services/DatabaseService';
 import { searchMatches } from '@/utils/searchUtils';
+import { getApiRoot } from '@/config/apiOrigin';
 
 function getFieldInputId(field: FormField) {
   const key = (field.key || field.label || 'field').toString();
   return `df-${key}`.replace(/[^a-zA-Z0-9_-]/g, '_');
 }
 
-const server = import.meta.env.VITE_API_SERVER;
-const port = import.meta.env.VITE_API_PORT;
-const API_BASE = `${server}:${port}/api`;
+const API_BASE = getApiRoot();
 
 /** Maiúsculas, sem acento e sem cedilha (ç/Ç → C). Usado em etnia, país nascimento, CBO. */
 function normalizeMaiusculoSemAcento(s: string): string {

@@ -1,9 +1,6 @@
 import axios from 'axios';
 import { useEffect, useState } from 'react';
-
-const server = import.meta.env.VITE_API_SERVER;
-const port = import.meta.env.VITE_API_PORT;
-const API_BASE = `${server}:${port}/api`;
+import { getApiRoot } from '@/config/apiOrigin';
 
 /**
  * Mapa idtipo_municipio (string) → nome (descrição), via `/api/tipo-municipio/select`.
@@ -19,7 +16,7 @@ export function useMunicipioLabelByIdMap(enabled: boolean): Record<string, strin
       try {
         const { data } = await axios.get<
           Array<{ idtipo_municipio?: number; descricao?: string; codigo?: string }>
-        >(`${API_BASE}/tipo-municipio/select`, { withCredentials: true });
+        >(`${getApiRoot()}/tipo-municipio/select`, { withCredentials: true });
         if (cancelled || !Array.isArray(data)) return;
         const next: Record<string, string> = {};
         for (const m of data) {

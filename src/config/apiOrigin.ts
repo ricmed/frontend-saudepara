@@ -1,11 +1,15 @@
 /**
  * Origem da API (protocolo + host [+ porta]).
- * Em app.saude.pa.gov.br usa sempre o mesmo host da página — defesa extra se o
- * bundle tiver VITE_API_SERVER errado (ex.: build com env de homologação).
+ * Em app oficial (prod e HML) usa o mesmo host da página — mesmo racional de prod:
+ * nginx expõe `/api` no mesmo site; evita bundle com `VITE_*` errado (ex. localhost:443).
+ * Em dev (ex. localhost:5173) segue `VITE_API_SERVER` / `VITE_API_PORT` do .env.
  */
 export function getApiOrigin(): string {
-  if (typeof window !== 'undefined' && window.location.hostname === 'app.saude.pa.gov.br') {
-    return `${window.location.protocol}//${window.location.host}`;
+  if (typeof window !== 'undefined') {
+    const h = window.location.hostname;
+    if (h === 'app.saude.pa.gov.br' || h === 'app.hml.saude.pa.gov.br') {
+      return `${window.location.protocol}//${window.location.host}`;
+    }
   }
   const server = import.meta.env.VITE_API_SERVER as string | undefined;
   const port = import.meta.env.VITE_API_PORT as string | undefined;
@@ -16,4 +20,9 @@ export function getApiOrigin(): string {
     return window.location.origin;
   }
   return `${server ?? 'http://localhost'}:${port ?? '3000'}`;
+}
+
+/** Base `…/api` para chamadas REST no mesmo padrão de `getApiOrigin`. */
+export function getApiRoot(): string {
+  return `${getApiOrigin()}/api`;
 }

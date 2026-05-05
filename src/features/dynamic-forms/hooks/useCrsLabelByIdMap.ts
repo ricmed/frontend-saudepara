@@ -1,9 +1,6 @@
 import axios from 'axios';
 import { useEffect, useState } from 'react';
-
-const server = import.meta.env.VITE_API_SERVER;
-const port = import.meta.env.VITE_API_PORT;
-const API_BASE = `${server}:${port}/api`;
+import { getApiRoot } from '@/config/apiOrigin';
 
 /**
  * Mapa id_crs → nome da regional (ex.: "11ª CRS (Marabá)"), a partir de `/api/crs/select`.
@@ -17,7 +14,7 @@ export function useCrsLabelByIdMap(enabled: boolean): Record<string, string> {
     let cancelled = false;
     (async () => {
       try {
-        const { data } = await axios.get<Array<{ value: number; label: string }>>(`${API_BASE}/crs/select`, {
+        const { data } = await axios.get<Array<{ value: number; label: string }>>(`${getApiRoot()}/crs/select`, {
           withCredentials: true,
         });
         if (cancelled || !Array.isArray(data)) return;
