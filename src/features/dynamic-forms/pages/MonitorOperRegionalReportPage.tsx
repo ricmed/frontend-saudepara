@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import FormService, { type Form, type FormSchema } from '@/services/FormService';
 import FormSubmissionService, { type FormSubmission } from '@/services/FormSubmissionService';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
-import { ArrowLeft, BarChart3, Download } from 'lucide-react';
+import { exportHtmlElementToPdfA4 } from '@/utils/exportHtmlToPdf';
+import { ArrowLeft, BarChart3, Download, FileDown, Loader2 } from 'lucide-react';
 import {
   MONITOR_OPER_REGIONAL_KEY,
   buildMonitorOperRegionalReport,
@@ -15,6 +16,7 @@ import {
   monitorOperSubmissionsToCsv,
 } from '../utils/monitorOperRegionalReport';
 import { useCrsLabelByIdMap } from '../hooks/useCrsLabelByIdMap';
+import { useMunicipioLabelByIdMap } from '../hooks/useMunicipioLabelByIdMap';
 import { MonitorOperReportProvider } from './monitorOperReportContext';
 import { MonitorOperExecutiveReportView } from './MonitorOperExecutiveReportView';
 import { MonitorOperTechnicalReportView } from './MonitorOperTechnicalReportView';
@@ -22,6 +24,9 @@ import { MonitorOperTechnicalReportView } from './MonitorOperTechnicalReportView
 export const MonitorOperRegionalReportPage: React.FC = () => {
   const { agravo } = useParams<{ agravo: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const reportExportRef = useRef<HTMLDivElement>(null);
+  const [pdfExporting, setPdfExporting] = useState(false);
   const [form, setForm] = useState<Form | null>(null);
   const [schema, setSchema] = useState<FormSchema | null>(null);
   const [submissions, setSubmissions] = useState<FormSubmission[]>([]);
@@ -31,6 +36,7 @@ export const MonitorOperRegionalReportPage: React.FC = () => {
 
   const isMonitorOper = agravo?.toUpperCase() === MONITOR_OPER_REGIONAL_KEY;
   const crsLabels = useCrsLabelByIdMap(isMonitorOper);
+  const municipioLabels = useMunicipioLabelByIdMap(isMonitorOper);
 
   useEffect(() => {
     if (!agravo || !isMonitorOper) return;
@@ -88,6 +94,30 @@ export const MonitorOperRegionalReportPage: React.FC = () => {
     URL.revokeObjectURL(url);
   }, [summaries]);
 
+  const downloadPdf = useCallback(async () => {
+    if (summaries.length === 0) return;
+    const el = reportExportRef.current;
+    if (!el) return;
+    const isTechnical = location.pathname.replace(/\/$/, '').endsWith('/tecnico');
+    const tabSlug = isTechnical ? 'detalhamento_tecnico' : 'painel_executivo';
+    setPdfExporting(true);
+    try {
+      await exportHtmlElementToPdfA4({
+        element: el,
+        filename: `monitoramento_operacional_${tabSlug}_${new Date().toISOString().slice(0, 10)}.pdf`,
+        footerExtraLines: [
+          form?.nome?.trim() ? form.nome.trim() : 'Monitoramento operacional regional',
+          isTechnical ? 'Aba: Detalhamento técnico' : 'Aba: Painel executivo',
+        ],
+        pixelRatio: 2,
+      });
+    } catch {
+      /* alert já exibido no util */
+    } finally {
+      setPdfExporting(false);
+    }
+  }, [summaries.length, location.pathname, form?.nome]);
+
   const ctxValue = useMemo(
     () => ({
       agravo: agravo ?? '',
@@ -102,6 +132,7 @@ export const MonitorOperRegionalReportPage: React.FC = () => {
       report,
       summaries,
       crsLabels,
+      municipioLabels,
       downloadCsv,
     }),
     [
@@ -116,6 +147,7 @@ export const MonitorOperRegionalReportPage: React.FC = () => {
       report,
       summaries,
       crsLabels,
+      municipioLabels,
       downloadCsv,
     ],
   );
@@ -221,26 +253,39 @@ export const MonitorOperRegionalReportPage: React.FC = () => {
             <Download className="h-4 w-4" />
             Exportar CSV
           </button>
+          <button
+            type="button"
+            data-testid="monitor-oper-report-pdf"
+            onClick={() => void downloadPdf()}
+            disabled={summaries.length === 0 || pdfExporting}
+            title="Gera PDF do painel visível (aba atual), com boa fidelidade a gráficos e imagens"
+            className="px-4 py-2 rounded-lg bg-white text-slate-800 hover:bg-slate-50 flex items-center gap-2 text-sm font-medium border border-slate-200 shadow-sm disabled:opacity-45 disabled:pointer-events-none"
+          >
+            {pdfExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+            {pdfExporting ? 'Gerando PDF…' : 'Exportar PDF'}
+          </button>
         </div>
       }
     >
       <MonitorOperReportProvider value={ctxValue}>
-        <nav
-          className="flex flex-wrap gap-2 mb-6 p-1 rounded-xl bg-slate-100/80 border border-slate-200/80"
-          aria-label="Seções do relatório"
-        >
-          <NavLink to="." end className={tabClass} data-testid="monitor-oper-tab-executive">
-            Painel executivo
-          </NavLink>
-          <NavLink to="tecnico" className={tabClass} data-testid="monitor-oper-tab-technical">
-            Detalhamento técnico
-          </NavLink>
-        </nav>
+        <div ref={reportExportRef} className="monitor-oper-pdf-export-root">
+          <nav
+            className="flex flex-wrap gap-2 mb-6 p-1 rounded-xl bg-slate-100/80 border border-slate-200/80"
+            aria-label="Seções do relatório"
+          >
+            <NavLink to="." end className={tabClass} data-testid="monitor-oper-tab-executive">
+              Painel executivo
+            </NavLink>
+            <NavLink to="tecnico" className={tabClass} data-testid="monitor-oper-tab-technical">
+              Detalhamento técnico
+            </NavLink>
+          </nav>
 
-        <Routes>
-          <Route index element={<MonitorOperExecutiveReportView />} />
-          <Route path="tecnico" element={<MonitorOperTechnicalReportView />} />
-        </Routes>
+          <Routes>
+            <Route index element={<MonitorOperExecutiveReportView />} />
+            <Route path="tecnico" element={<MonitorOperTechnicalReportView />} />
+          </Routes>
+        </div>
       </MonitorOperReportProvider>
     </AppPageLayout>
   );

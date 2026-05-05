@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { FormField } from '@/services/FormService';
 import { getLocalDateTime, convertUTCToLocalDateTime } from '@/utils/timezoneUtils';
 import { searchMatches } from '@/utils/searchUtils';
@@ -343,6 +343,14 @@ export const MultiSelectField: React.FC<AdvancedFieldProps> = ({
     searchMatches(option.label, searchTerm)
   );
 
+  const allOptionValues = useMemo(
+    () => options.map((o) => o.value).filter((v) => v !== '' && v != null),
+    [options],
+  );
+
+  const allOptionsSelected =
+    allOptionValues.length > 0 && allOptionValues.every((v) => selectedValues.includes(v));
+
   const handleToggle = (optionValue: string) => {
     if (selectedValues.includes(optionValue)) {
       onChange(selectedValues.filter(v => v !== optionValue));
@@ -383,6 +391,30 @@ export const MultiSelectField: React.FC<AdvancedFieldProps> = ({
             disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'
           }`}
         />
+      </div>
+      <div className="flex flex-wrap gap-2 mb-3">
+        <button
+          type="button"
+          disabled={
+            disabled ||
+            field.disabled ||
+            loading ||
+            allOptionValues.length === 0 ||
+            allOptionsSelected
+          }
+          onClick={() => onChange(Array.from(new Set(allOptionValues)))}
+          className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-800 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Selecionar todos
+        </button>
+        <button
+          type="button"
+          disabled={disabled || field.disabled || selectedValues.length === 0}
+          onClick={() => onChange([])}
+          className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-800 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Limpar seleção
+        </button>
       </div>
       {/* Grid de cards (mesmo layout do checkbox group / radio) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">

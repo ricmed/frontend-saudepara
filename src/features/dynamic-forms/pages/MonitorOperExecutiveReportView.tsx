@@ -58,6 +58,17 @@ export const MonitorOperExecutiveReportView: React.FC = () => {
     [report.custoSums],
   );
 
+  /** Altura em px (não flex-1 no Recharts): evita área vazia enorme sob as barras. */
+  const areaVigilanciaChartHeightPx = useMemo(
+    () => Math.min(480, Math.max(160, 72 + areaBarData.length * 36)),
+    [areaBarData.length],
+  );
+
+  const custosBarChartHeightPx = useMemo(
+    () => Math.min(300, Math.max(200, 56 + custoBarData.length * 36)),
+    [custoBarData.length],
+  );
+
   const ta = report.totalAcumulado;
 
   const executiveStrip = useMemo(() => {
@@ -255,76 +266,95 @@ export const MonitorOperExecutiveReportView: React.FC = () => {
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-2xl border border-slate-200/80 bg-white shadow-lg overflow-hidden">
-          <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-blue-50/30 px-5 py-3">
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-lg lg:h-full">
+          <div className="shrink-0 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-blue-50/30 px-5 py-3">
             <h2 className="text-sm font-semibold text-slate-900">Ações por área de vigilância</h2>
             <p className="text-xs text-slate-500 mt-0.5">Volume de registros por área (filtrado)</p>
           </div>
-          <div className="p-4">
+          <div className="flex min-h-0 flex-1 flex-col p-4">
             {areaBarData.length === 0 ? (
-              <p className="text-sm text-slate-500 py-8 text-center">Sem dados de área neste conjunto.</p>
+              <p className="flex flex-1 items-center justify-center py-8 text-center text-sm text-slate-500">
+                Sem dados de área neste conjunto.
+              </p>
             ) : (
-              <div style={{ height: Math.min(480, 72 + areaBarData.length * 36) }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart layout="vertical" data={areaBarData} margin={{ top: 4, right: 8, left: 4, bottom: 4 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal />
-                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} stroke="#94a3b8" />
-                    <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 9 }} stroke="#64748b" />
-                    <Tooltip
-                      formatter={(v: number) => [v, 'Registros']}
-                      labelFormatter={(_, p) => (p?.[0]?.payload?.fullName as string) ?? ''}
-                    />
-                    <Bar dataKey="count" name="Registros" fill="#0d9488" radius={[0, 6, 6, 0]}>
-                      <LabelList
-                        dataKey="count"
-                        position="right"
-                        style={{ fill: '#334155', fontSize: 11, fontWeight: 600 }}
+              <div className="flex min-h-0 flex-1 flex-col justify-center">
+                <div className="w-full shrink-0" style={{ height: areaVigilanciaChartHeightPx }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart layout="vertical" data={areaBarData} margin={{ top: 4, right: 8, left: 4, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal />
+                      <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} stroke="#94a3b8" />
+                      <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 9 }} stroke="#64748b" />
+                      <Tooltip
+                        formatter={(v: number) => [v, 'Registros']}
+                        labelFormatter={(_, p) => (p?.[0]?.payload?.fullName as string) ?? ''}
                       />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                      <Bar dataKey="count" name="Registros" fill="#0d9488" radius={[0, 6, 6, 0]}>
+                        <LabelList
+                          dataKey="count"
+                          position="right"
+                          style={{ fill: '#334155', fontSize: 11, fontWeight: 600 }}
+                        />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             )}
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200/80 bg-white shadow-lg overflow-hidden">
-          <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-teal-50/30 px-5 py-3">
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-lg lg:h-full">
+          <div className="shrink-0 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-teal-50/30 px-5 py-3">
             <h2 className="text-sm font-semibold text-slate-900">Custos estimados (R$)</h2>
             <p className="text-xs text-slate-500 mt-0.5">Natureza 3390 — filtrado</p>
           </div>
-          <div className="p-4 min-h-[220px] h-[260px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={custoBarData} margin={{ top: 8, right: 12, left: 4, bottom: 4 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="#64748b" />
-                <YAxis tick={{ fontSize: 10 }} stroke="#94a3b8" width={56} />
-                <Tooltip formatter={(v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} />
-                <Bar dataKey="value" fill="#0284c7" radius={[6, 6, 0, 0]} name="Valor" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="px-4 pb-4 border-t border-slate-100 bg-slate-50/40">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 pt-3 pb-2">Elemento de despesa</p>
-            <table className="w-full text-sm">
-              <tbody className="divide-y divide-slate-200/80">
-                {custoTabelaRows.map((row) => (
-                  <tr key={row.elemento}>
-                    <td className="py-2 pr-2 text-slate-700">{row.elemento}</td>
-                    <td className="py-2 text-right tabular-nums font-medium text-slate-900">
-                      {row.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex min-h-0 flex-1 flex-col justify-center p-4">
+              <div className="w-full shrink-0" style={{ height: custosBarChartHeightPx }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={custoBarData} margin={{ top: 26, right: 12, left: 4, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="#64748b" />
+                    <YAxis tick={{ fontSize: 10 }} stroke="#94a3b8" width={56} />
+                    <Tooltip formatter={(v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} />
+                    <Bar dataKey="value" fill="#0284c7" radius={[6, 6, 0, 0]} name="Valor">
+                      <LabelList
+                        dataKey="value"
+                        position="top"
+                        formatter={(v: number) =>
+                          Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                        }
+                        style={{ fontSize: 10, fontWeight: 700, fill: '#334155' }}
+                      />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            <div className="shrink-0 border-t border-slate-100 bg-slate-50/40 px-4 pb-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 pt-3 pb-2">
+                Elemento de despesa
+              </p>
+              <table className="w-full text-sm">
+                <tbody className="divide-y divide-slate-200/80">
+                  {custoTabelaRows.map((row) => (
+                    <tr key={row.elemento}>
+                      <td className="py-2 pr-2 text-slate-700">{row.elemento}</td>
+                      <td className="py-2 text-right tabular-nums font-medium text-slate-900">
+                        {row.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="bg-white">
+                    <td className="py-2.5 pr-2 font-semibold text-slate-800">Total</td>
+                    <td className="py-2.5 text-right tabular-nums font-bold text-teal-800">
+                      {report.custoSums.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </td>
                   </tr>
-                ))}
-                <tr className="bg-white">
-                  <td className="py-2.5 pr-2 font-semibold text-slate-800">Total</td>
-                  <td className="py-2.5 text-right tabular-nums font-bold text-teal-800">
-                    {report.custoSums.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
       </div>
@@ -332,7 +362,9 @@ export const MonitorOperExecutiveReportView: React.FC = () => {
       <section className="rounded-2xl border border-slate-200/80 bg-white shadow-lg overflow-hidden">
         <div className="border-b border-slate-100 bg-slate-50 px-5 py-3">
           <h2 className="text-sm font-semibold text-slate-900">Envios recentes</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Resumo filtrado — exporte CSV no topo para análise completa.</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Resumo filtrado — no topo você pode exportar CSV ou PDF (aba atual).
+          </p>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">

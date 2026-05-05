@@ -5,13 +5,14 @@ import {
   Save,
   Wand2,
   CheckCircle2,
-  Circle,
   ChevronDown,
   ChevronUp,
   AlertCircle,
   CheckCircle,
   Database,
-  Settings
+  Settings,
+  Info,
+  Layers
 } from 'lucide-react';
 import axios from 'axios';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
@@ -29,6 +30,33 @@ const api = axios.create({
   },
   withCredentials: true
 });
+
+const TECHNICAL_PREF_KEY = 'sp_fixedColumns_showTechnical_v1';
+
+/** Rótulos amigáveis para tipos de campo (modo simples). */
+const fieldTypeLabelPt = (type: string): string => {
+  const map: Record<string, string> = {
+    text: 'Texto',
+    textarea: 'Texto longo',
+    number: 'Número',
+    date: 'Data',
+    datetime: 'Data e hora',
+    select: 'Lista de opções',
+    'select-search': 'Lista com busca',
+    radio: 'Opções (única)',
+    cpf: 'CPF',
+    cns: 'CNS',
+    cep: 'CEP',
+    passaporte: 'Passaporte',
+    idade: 'Idade',
+    checkbox: 'Sim/Não',
+    'checkbox-group': 'Várias opções',
+    phone: 'Telefone',
+    'international-phone': 'Telefone',
+    email: 'E-mail',
+  };
+  return map[type] || type;
+};
 
 interface AvailableField {
   key: string;
@@ -59,12 +87,29 @@ const FixedColumnsConfigPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  /** Modo simples: esconde chaves técnicas e nomes de coluna do banco (público-alvo: vigilância/gestão). */
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(() => {
+    try {
+      return sessionStorage.getItem(TECHNICAL_PREF_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
+    if (!formId || !versionId || Number.isNaN(Number(formId)) || Number.isNaN(Number(versionId))) {
+      setLoading(false);
+      setError(
+        'Não foi possível abrir esta configuração. Volte ao editor do formulário (administração SINAN), aba Campos, e use o botão “Campos Fixos (SINAN)” — assim o sistema abre o endereço certo.'
+      );
+      setData(null);
+      return;
+    }
     loadFixedColumnsData();
   }, [formId, versionId]);
 
   const loadFixedColumnsData = async () => {
+    if (!formId || !versionId) return;
     try {
       setLoading(true);
       setError(null);
@@ -182,11 +227,23 @@ const FixedColumnsConfigPage: React.FC = () => {
     return grouped;
   };
 
+  const toggleTechnicalDetails = () => {
+    setShowTechnicalDetails((prev) => {
+      const next = !prev;
+      try {
+        sessionStorage.setItem(TECHNICAL_PREF_KEY, next ? '1' : '0');
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
   if (loading) {
     return (
       <AppPageLayout
-        title="Configurar Colunas Fixas"
-        subtitle="Modelo Híbrido SINAN"
+        title="Busca rápida nos dados da ficha"
+        subtitle="Escolha quais respostas viram filtros e relatórios mais ágeis"
         icon={<Settings className="h-8 w-8" />}
         variant="desktop"
         showBottomNav={false}
@@ -204,16 +261,26 @@ const FixedColumnsConfigPage: React.FC = () => {
   if (!data) {
     return (
       <AppPageLayout
-        title="Configurar Colunas Fixas"
-        subtitle="Modelo Híbrido SINAN"
+        title="Busca rápida nos dados da ficha"
+        subtitle="Escolha quais respostas viram filtros e relatórios mais ágeis"
         icon={<Settings className="h-8 w-8" />}
         variant="desktop"
         showBottomNav={false}
       >
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
           <AlertCircle className="h-5 w-5 text-red-600" />
-          <span className="text-red-800">Dados não encontrados</span>
+          <span className="text-red-800">{error || 'Dados não encontrados'}</span>
         </div>
+        {formId ? (
+          <button
+            type="button"
+            onClick={() => navigate(`/private/formularios-admin/editar/${formId}`)}
+            className="mt-4 px-4 py-2 bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200 inline-flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Voltar ao editor
+          </button>
+        ) : null}
       </AppPageLayout>
     );
   }
@@ -222,32 +289,48 @@ const FixedColumnsConfigPage: React.FC = () => {
   const hasChanges = data.fields.some(
     f => f.isMarked !== selectedFields.has(f.key)
   );
-  const canSave = data.fields.length > 0 && !saving;
+  const canSave = data.fields.length > 0 && !saving && hasChanges;
 
   return (
     <AppPageLayout
-      title="Configurar Colunas Fixas"
-      subtitle="Modelo Híbrido SINAN"
+      title="Busca rápida nos dados da ficha"
+      subtitle="Notificação SINAN — quem configura costuma ser vigilância ou coordenação; use “Detalhes técnicos” só se a TI pedir."
       icon={<Settings className="h-8 w-8" />}
       variant="desktop"
       showBottomNav={false}
       headerActions={
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={handleAutoMark}
-            disabled={saving}
-            className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 flex items-center gap-2 disabled:opacity-50"
+            type="button"
+            onClick={() =>
+              navigate(`/private/formularios-admin/editar/${formId}`)
+            }
+            className="px-4 py-2 bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200 flex items-center gap-2"
           >
-            <Wand2 className="h-4 w-4" />
-            Auto-Marcar
+            <ArrowLeft className="h-4 w-4" />
+            Voltar ao editor
           </button>
           <button
+            type="button"
+            onClick={toggleTechnicalDetails}
+            className={`px-4 py-2 rounded-md flex items-center gap-2 text-sm font-medium border ${
+              showTechnicalDetails
+                ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
+            title="Mostra ou esconde nomes internos usados pelo sistema e pela TI"
+          >
+            <Layers className="h-4 w-4 shrink-0" />
+            {showTechnicalDetails ? 'Modo simples' : 'Detalhes técnicos (TI)'}
+          </button>
+          <button
+            type="button"
             onClick={handleSave}
             disabled={!canSave}
-            className="px-4 py-2 bg-white text-blue-600 rounded-md hover:bg-blue-50 flex items-center gap-2 font-medium disabled:opacity-50"
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="h-4 w-4" />
-            Salvar
+            Salvar alterações
           </button>
         </div>
       }
@@ -280,40 +363,47 @@ const FixedColumnsConfigPage: React.FC = () => {
 
       {/* Info Card */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
-          <div className="flex-1">
-            <h2 className="text-xl font-semibold text-gray-800 mb-2 flex items-center gap-2">
-              <Database className="h-5 w-5 text-blue-600" />
-              Modelo Híbrido SINAN
-            </h2>
-            <p className="text-gray-600 text-sm">
-              Campos marcados como fixos serão salvos em colunas separadas no banco de dados,
-              permitindo consultas mais rápidas. Os demais campos serão salvos em JSON.
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-            <div className="bg-blue-50 px-4 py-2 rounded-lg flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-blue-600" />
-              <span className="text-sm font-medium text-blue-800">
-                {selectedFields.size} de {data.totalAvailable} marcados
-              </span>
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="flex-1 space-y-2">
+              <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+                <Database className="h-5 w-5 text-blue-600 shrink-0" />
+                O que esta tela faz?
+              </h2>
+              <p className="text-gray-700 text-sm leading-relaxed">
+                Ao marcar um item abaixo, você diz que aquela informação da ficha é importante para{' '}
+                <strong>filtros, painéis e relatórios</strong> saírem mais rápido. O restante das respostas
+                continua guardado normalmente no sistema — só não entra nesse “atalho” de busca.
+              </p>
+              {!showTechnicalDetails ? (
+                <p className="text-gray-500 text-xs leading-relaxed">
+                  Dica: se não souber o que marcar, use o botão roxo para marcar automaticamente os itens
+                  que o sistema já prevê para a ficha padrão (notificação, paciente e residência).
+                </p>
+              ) : (
+                <p className="text-gray-600 text-xs leading-relaxed font-mono bg-gray-50 border border-gray-100 rounded px-2 py-1.5">
+                  Técnico: campos marcados são persistidos também em colunas indexadas da tabela de
+                  envios; demais campos permanecem principalmente em <code className="text-xs">data_json</code>.
+                </p>
+              )}
             </div>
-            <button
-              onClick={handleAutoMark}
-              disabled={saving}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm font-medium transition-colors"
-            >
-              <Wand2 className="h-4 w-4" />
-              Marcar Automaticamente
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={!canSave}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm font-medium transition-colors"
-            >
-              <Save className="h-4 w-4" />
-              {saving ? 'Salvando...' : 'Salvar'}
-            </button>
+            <div className="flex flex-col sm:items-end gap-3 shrink-0">
+              <div className="bg-blue-50 px-4 py-2 rounded-lg flex items-center gap-2 w-full sm:w-auto justify-center sm:justify-start">
+                <CheckCircle2 className="h-5 w-5 text-blue-600 shrink-0" />
+                <span className="text-sm font-medium text-blue-800">
+                  {selectedFields.size} de {data.totalAvailable} em busca rápida
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleAutoMark}
+                disabled={saving}
+                className="w-full sm:w-auto px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium transition-colors"
+              >
+                <Wand2 className="h-4 w-4 shrink-0" />
+                Marcar o que o sistema recomenda
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -332,9 +422,9 @@ const FixedColumnsConfigPage: React.FC = () => {
                 className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <h3 className="text-lg font-semibold text-gray-800">{section}</h3>
-                  <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-1 rounded-full">
-                    {sectionMarkedCount}/{fields.length}
+                  <h3 className="text-lg font-semibold text-gray-800 text-left">{section}</h3>
+                  <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap">
+                    {sectionMarkedCount} de {fields.length} destaques
                   </span>
                 </div>
                 {isExpanded ? (
@@ -366,23 +456,40 @@ const FixedColumnsConfigPage: React.FC = () => {
 
                         {/* Field Info */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-4">
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4">
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-gray-900">{field.label}</p>
-                              <p className="text-xs text-gray-500 mt-0.5 font-mono">{field.key}</p>
+                              {showTechnicalDetails ? (
+                                <p className="text-xs text-gray-500 mt-0.5 font-mono break-all">{field.key}</p>
+                              ) : null}
                             </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800">
-                                {field.type}
-                              </span>
-                              {field.hasFixedColumn ? (
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800">
-                                  <Database className="h-3 w-3 mr-1" />
-                                  {field.fixedColumnName}
+                            <div className="flex flex-wrap items-center gap-2 sm:justify-end sm:flex-shrink-0">
+                              {showTechnicalDetails ? (
+                                <span
+                                  className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800"
+                                  title="Tipo de preenchimento no formulário"
+                                >
+                                  {field.type}
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600">
-                                  Sem coluna fixa
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-50 text-gray-600 border border-gray-100">
+                                  {fieldTypeLabelPt(field.type)}
+                                </span>
+                              )}
+                              {field.hasFixedColumn ? (
+                                showTechnicalDetails ? (
+                                  <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800 max-w-[min(100%,12rem)]">
+                                    <Database className="h-3 w-3 mr-1 shrink-0" />
+                                    <span className="truncate">{field.fixedColumnName}</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-100">
+                                    Pode usar em busca rápida
+                                  </span>
+                                )
+                              ) : (
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-amber-50 text-amber-900 border border-amber-100">
+                                  Só no formulário completo
                                 </span>
                               )}
                             </div>
@@ -400,11 +507,13 @@ const FixedColumnsConfigPage: React.FC = () => {
 
       {/* Info Footer */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-        <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+        <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" aria-hidden />
         <div className="flex-1">
-          <p className="text-sm text-blue-800">
-            <strong>Dica:</strong> Use "Marcar Automaticamente" para marcar todos os campos
-            que possuem colunas fixas disponíveis no banco (Ficha: Notificação, Paciente e Residência).
+          <p className="text-sm text-blue-900 leading-relaxed">
+            <strong>Para a equipe:</strong> priorize dados que todo mundo consulta (município, data da
+            notificação, nome, CNS, etc.). Itens muito específicos do agravo podem ficar só no
+            formulário completo. Em dúvida, peça orientação à TI ou use{' '}
+            <strong>Marcar o que o sistema recomenda</strong> acima.
           </p>
         </div>
       </div>
@@ -416,16 +525,17 @@ const FixedColumnsConfigPage: React.FC = () => {
             <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm font-semibold text-yellow-900 mb-2">
-                ⚠️ Nenhum campo com coluna fixa disponível
+                Nenhum dado deste formulário entra no modo “busca rápida” padrão
               </p>
               <p className="text-sm text-yellow-800 mb-3">
-                O modelo híbrido SINAN permite marcar campos para serem salvos em colunas fixas do banco de dados, 
-                mas este formulário não possui campos que correspondem aos campos fixos da Ficha (Notificação, Paciente e Residência).
+                Esta função vale para a ficha de notificação quando os campos seguem os nomes padrão
+                (notificação, paciente, residência). Este formulário ainda não tem itens compatíveis com
+                essa lista.
               </p>
               
               <div className="bg-yellow-100 rounded-md p-3 mb-3">
                 <p className="text-sm font-medium text-yellow-900 mb-2">
-                  📝 Como usar colunas fixas:
+                  O que fazer na prática:
                 </p>
                 <ol className="list-decimal list-inside text-sm text-yellow-800 space-y-1 ml-2">
                   <li>Edite o formulário no Form Builder</li>

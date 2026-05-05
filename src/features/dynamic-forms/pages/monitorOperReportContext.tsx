@@ -24,6 +24,8 @@ export type MonitorOperReportContextValue = {
   report: MonitorOperRegionalReport;
   summaries: MonitorOperSubmissionSummary[];
   crsLabels: Record<string, string>;
+  /** idtipo_municipio (string) → descrição — para `acao.municipios_alcancados`. */
+  municipioLabels: Record<string, string>;
   downloadCsv: () => void;
 };
 

@@ -138,6 +138,7 @@ import VersionPage from '@/pages/VersionPage';
 import { DynamicFormPage } from '@/features/dynamic-forms/pages/DynamicFormPage';
 import { FormsListPage } from '@/features/dynamic-forms/pages/FormsListPage';
 import FormBuilderPage from '@/features/dynamic-forms/pages/FormBuilderPage';
+import FixedColumnsConfigPage from '@/features/dynamic-forms/pages/FixedColumnsConfigPage';
 import { FormAdminListPage } from '@/features/dynamic-forms/pages/FormAdminListPage';
 import { FormSubmissionsListPage } from '@/features/dynamic-forms/pages/FormSubmissionsListPage';
 import { MonitorOperRegionalReportPage } from '@/features/dynamic-forms/pages/MonitorOperRegionalReportPage';
@@ -395,6 +396,10 @@ function App() {
               <Route path="/private/formularios-admin" element={<FormAdminListPage />} />
               <Route path="/private/formularios-admin/novo" element={<FormBuilderPage />} />
               <Route path="/private/formularios-admin/editar/:id" element={<FormBuilderPage />} />
+              <Route
+                path="/private/formularios-admin/:formId/versoes/:versionId/campos-fixos"
+                element={<FixedColumnsConfigPage />}
+              />
               <Route path="/private/formularios-admin/:id/compartilhar" element={<FormShareSinanSettingsPage />} />
               <Route path="/private/formularios-admin/respostas/:id" element={<FormResponsesPage />} />
               <Route path="/private/formularios-admin/respostas/:id/resumo" element={<FormResponsesSummaryPage />} />

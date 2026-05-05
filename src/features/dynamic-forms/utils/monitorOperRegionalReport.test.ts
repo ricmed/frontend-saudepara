@@ -6,6 +6,7 @@ import {
   defaultMonitorOperReportFilters,
   filterMonitorOperRows,
   filterMonitorOperSubmissionsByReportFilters,
+  formatMonitorOperMunicipioAlcancadoLabel,
   getMonitorOperDefaultVisibleListColIds,
   impactCheckboxAppliesToArea,
   monitorOperPresetVisibleSheetKeys,
@@ -14,6 +15,15 @@ import {
   sumCustos,
 } from './monitorOperRegionalReport';
 import type { FormSchema } from '@/services/FormService';
+
+describe('formatMonitorOperMunicipioAlcancadoLabel', () => {
+  it('usa o mapa quando o id existe', () => {
+    expect(formatMonitorOperMunicipioAlcancadoLabel('12', { '12': 'Belém' })).toBe('Belém');
+  });
+  it('fallback legível para id numérico sem mapa', () => {
+    expect(formatMonitorOperMunicipioAlcancadoLabel('999', {})).toBe('Município (id 999)');
+  });
+});
 
 const impactSchema: FormSchema = {
   agravo: 'x',

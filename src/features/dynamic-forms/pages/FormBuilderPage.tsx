@@ -35,6 +35,8 @@ export const FormBuilderPage: React.FC = () => {
   const [previewMode, setPreviewMode] = useState<'interactive' | 'readonly'>('interactive');
   const [previewData, setPreviewData] = useState<Record<string, any>>({});
   const [previewPanel, setPreviewPanel] = useState<'form' | 'json'>('form');
+  /** Versão publicada ativa do formulário (para abrir a tela de colunas fixas SINAN). */
+  const [activeVersionId, setActiveVersionId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Estados para configuração de banco de dados
@@ -114,7 +116,10 @@ export const FormBuilderPage: React.FC = () => {
       setFormDescription(form.descricao || '');
       setFormKey(form.form_key);
       setCategoria(form.categoria || (isGeneralBuilder ? 'eventos_inscricoes' : 'notificacao'));
-      
+      setActiveVersionId(
+        form.active_version_id != null ? Number(form.active_version_id) : null
+      );
+
       // Buscar versão ativa e carregar o schema
       if (form.active_version_id && form.versions) {
         const activeVersion = form.versions.find(v => v.id === form.active_version_id);
@@ -1227,9 +1232,20 @@ export const FormBuilderPage: React.FC = () => {
                   {!isGeneralBuilder && (
                     <button
                       type="button"
-                      onClick={() => navigate(`/private/formularios-admin`)}
-                      className="ml-auto px-6 py-3 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                      title="Campos fixos são usados nos formulários SINAN"
+                      onClick={() => {
+                        if (!id || activeVersionId == null) {
+                          alert(
+                            'É preciso ter o formulário salvo com uma versão publicada para configurar colunas fixas. Salve o formulário e tente de novo.'
+                          );
+                          return;
+                        }
+                        navigate(
+                          `/private/formularios-admin/${id}/versoes/${activeVersionId}/campos-fixos`
+                        );
+                      }}
+                      className="ml-auto px-6 py-3 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
+                      title="Abrir configuração de colunas fixas (modelo híbrido SINAN) para a versão ativa"
+                      disabled={!id || activeVersionId == null}
                     >
                       Campos Fixos (SINAN)
                     </button>

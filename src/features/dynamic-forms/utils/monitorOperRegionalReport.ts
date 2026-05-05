@@ -85,6 +85,19 @@ export function filterMonitorOperRows(submissions: { data_json?: unknown }[]): M
 }
 
 /** Valores de municípios alcançados no formulário (array ou valor único), normalizados e sem vazios. */
+/** Exibe nome do município quando o mapa foi carregado; senão, texto legível com o id. */
+export function formatMonitorOperMunicipioAlcancadoLabel(
+  id: string,
+  labels: Record<string, string>,
+): string {
+  const t = String(id).trim();
+  if (!t) return '—';
+  const label = labels[t];
+  if (label) return label;
+  if (/^\d+$/.test(t)) return `Município (id ${t})`;
+  return t;
+}
+
 export function normalizeMunicipiosAlcancados(raw: unknown): string[] {
   if (raw == null) return [];
   if (Array.isArray(raw)) {
@@ -129,18 +142,23 @@ export function buildMunicipiosPorCrs(rows: MonitorOperRow[]): MunicipiosPorCrsA
 }
 
 /** Conta em quantas linhas de ação cada município aparece (uma vez por linha, mesmo se repetido no array). */
-export function buildMunicipiosRanking(rows: MonitorOperRow[], limit = 20): { municipio: string; ocorrencias: number }[] {
+export function buildMunicipiosRanking(
+  rows: MonitorOperRow[],
+  /** Se omitido ou ≤ 0, retorna todos os municípios ordenados por ocorrência. */
+  limit?: number,
+): { municipio: string; ocorrencias: number }[] {
   const counts = new Map<string, number>();
   for (const d of rows) {
     const list = normalizeMunicipiosAlcancados(d?.acao?.municipios_alcancados);
     const uniq = new Set(list);
     for (const m of uniq) counts.set(m, (counts.get(m) ?? 0) + 1);
   }
-  return [...counts.entries()]
+  const sorted = [...counts.entries()]
     .filter(([, n]) => n > 0)
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR'))
-    .slice(0, limit)
     .map(([municipio, ocorrencias]) => ({ municipio, ocorrencias }));
+  if (limit != null && limit > 0) return sorted.slice(0, limit);
+  return sorted;
 }
 
 /** Totais QDQQ para um único grupo (CRS + ano + quadrimestre). */
