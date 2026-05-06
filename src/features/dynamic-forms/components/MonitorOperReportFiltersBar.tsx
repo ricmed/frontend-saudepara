@@ -108,7 +108,7 @@ export const MonitorOperReportFiltersBar: React.FC<Props> = ({ filters, setFilte
             }
           >
             <option value="">Todos</option>
-            <option value="CENTRAL">Nível central (estadual)</option>
+            <option value="CENTRAL">Nível Central (estadual)</option>
             <option value="REGIONAL">Nível regional (CRS)</option>
           </select>
         </label>

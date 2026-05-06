@@ -437,7 +437,7 @@ export function collectMonitorOperReportFilterOptions(submissions: { data_json?:
     if (ex === 'CENTRAL' || ex === 'REGIONAL') executorSet.add(ex);
   }
   const executorLabels: Record<'CENTRAL' | 'REGIONAL', string> = {
-    CENTRAL: 'Nível central (estadual)',
+    CENTRAL: 'Nível Central (estadual)',
     REGIONAL: 'Nível regional (CRS)',
   };
   const executorNiveis = (['CENTRAL', 'REGIONAL'] as const)
@@ -794,7 +794,7 @@ export function getMonitorOperListColumnSpecs(): MonitorOperListColSpec[] {
       tdClassName: 'whitespace-nowrap',
       format: (r) => {
         const v = r.executorNivel;
-        if (v === 'CENTRAL') return 'Central (estadual)';
+        if (v === 'CENTRAL') return 'Nível Central';
         if (v === 'REGIONAL') return 'Regional (CRS)';
         return '—';
       },
