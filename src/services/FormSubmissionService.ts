@@ -1,9 +1,8 @@
 import axios from 'axios';
 import type { FormVersion } from './FormService';
+import { getRuntimeApiRoot } from '@/config/runtimeApiBase';
 
-const server = import.meta.env.VITE_API_SERVER;
-const port = import.meta.env.VITE_API_PORT;
-const API_URL = `${server}:${port}/api`;
+const API_URL = getRuntimeApiRoot();
 
 // Instância do axios com credenciais (cookies de autenticação)
 const api = axios.create({
