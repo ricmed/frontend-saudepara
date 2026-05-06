@@ -511,48 +511,6 @@ export const FormSubmissionsListPage: React.FC = () => {
         dataJson={selected?.data_json ?? {}}
       />
 
-      {totalAcumulado && !totalAcumulado.mixed && (
-        <div className="mb-4">
-          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div>
-                <h3 className="text-sm font-semibold text-gray-800">Total acumulado (QDQQ — quadrimestre)</h3>
-                <p className="text-xs text-gray-500">
-                  {totalAcumulado.quadrimestre_label} · ano {String(totalAcumulado.ano ?? '—')}
-                  {totalAcumulado.competencia_mes_ano != null && totalAcumulado.competencia_mes_ano !== '' ? (
-                    <> · competência {String(totalAcumulado.competencia_mes_ano)}</>
-                  ) : null}
-                </p>
-              </div>
-              <div className="text-xs text-gray-500">
-                % realização:{' '}
-                <span className="font-semibold text-gray-800">
-                  {totalAcumulado.perc === undefined ? '—' : totalAcumulado.perc.toFixed(1)}
-                </span>
-              </div>
-            </div>
-            <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                <div className="text-xs text-gray-500">Programadas</div>
-                <div className="text-lg font-semibold text-gray-900">{totalAcumulado.programadas}</div>
-              </div>
-              <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                <div className="text-xs text-gray-500">Realizadas</div>
-                <div className="text-lg font-semibold text-gray-900">{totalAcumulado.realizadasFlag}</div>
-              </div>
-              <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                <div className="text-xs text-gray-500">Não programadas</div>
-                <div className="text-lg font-semibold text-gray-900">{totalAcumulado.naoProgramadasFlag}</div>
-              </div>
-              <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                <div className="text-xs text-gray-500">Total</div>
-                <div className="text-lg font-semibold text-gray-900">{totalAcumulado.total}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {listTotal === 0 ? (
         <div className="bg-white rounded-xl shadow-md border border-gray-200 p-12 text-center">
           <p className="text-gray-500 mb-4">Nenhuma notificação cadastrada ainda</p>
