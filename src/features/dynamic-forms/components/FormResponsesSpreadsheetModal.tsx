@@ -7,6 +7,7 @@ import {
 } from '../utils/formResponsesListUtils';
 import { MONITOR_OPER_REGIONAL_KEY, monitorOperPresetVisibleSheetKeys } from '../utils/monitorOperRegionalReport';
 import type { Form } from '@/services/FormService';
+import { useCrsLabelByIdMap } from '../hooks/useCrsLabelByIdMap';
 
 type Row = { id: number; data_json?: Record<string, any> };
 
@@ -31,11 +32,43 @@ export const FormResponsesSpreadsheetModal: React.FC<Props> = ({
   onDownloadCsv,
 }) => {
   const activeSchema = resolveActiveSchema(form);
-  const sheetColumns = buildSheetColumnsFromSchema(activeSchema);
   const [showSheetColumns, setShowSheetColumns] = useState(false);
   const [sheetColQuery, setSheetColQuery] = useState('');
   const [sheetVisibleKeys, setSheetVisibleKeys] = useState<string[]>([]);
   const sheetColumnsPopoverRef = useRef<HTMLDivElement | null>(null);
+  const isMonitor = (form?.form_key ?? '').toUpperCase() === MONITOR_OPER_REGIONAL_KEY;
+  const crsById = useCrsLabelByIdMap(open && isMonitor);
+
+  const sanitizeMonitorLabel = (s: string): string => {
+    const raw = String(s || '').trim();
+    if (!raw) return raw;
+    // Remove instruções técnicas entre parênteses, ex.: "(preencher com 1) (N)"
+    return raw.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
+  };
+
+  const monitorLabelOverrides: Record<string, string> = {
+    'cabecalho.crs_id': 'CRS (Regional de saúde)',
+    'cabecalho.competencia_mes_ano': 'Competência (mês/ano)',
+    'cabecalho.ano': 'Ano de referência',
+    'cabecalho.mes': 'Mês de referência',
+    'acao.area': 'Área da vigilância',
+    'acao.programa_alcancado': 'Programa alcançado',
+    'acao.atividade': 'Atividade',
+    'acao.data_realizacao': 'Data da realização',
+    'acao.qtd_programadas_qdqq': 'Programada no QDQQ?',
+    'acao.qtd_realizadas_conforme_programacao': 'Foi realizada?',
+    'acao.qtd_nao_programadas_qdqq': 'Não programada no QDQQ?',
+    'acao.municipios_alcancados': 'Municípios alcançados',
+    'custo.total': 'Total (elementos de despesa)',
+  };
+
+  const sheetColumnsRaw = buildSheetColumnsFromSchema(activeSchema);
+  const sheetColumns = isMonitor
+    ? sheetColumnsRaw.map((c) => ({
+        ...c,
+        label: monitorLabelOverrides[c.key] ?? sanitizeMonitorLabel(c.label),
+      }))
+    : sheetColumnsRaw;
 
   useEffect(() => {
     if (!open) return;
@@ -92,10 +125,73 @@ export const FormResponsesSpreadsheetModal: React.FC<Props> = ({
 
   const visibleCols = sheetColumns.filter((c) => sheetVisibleKeys.includes(c.key));
 
+  const formatSnakeTitle = (v: any): string => {
+    if (v === null || v === undefined || v === '') return '—';
+    const raw = String(v).trim();
+    if (!raw) return '—';
+    const tokens = raw.includes('_') ? raw.split('_') : raw.split(/\s+/g);
+    return tokens
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .map((t) => {
+        const lower = t.toLowerCase();
+        return lower.charAt(0).toUpperCase() + lower.slice(1);
+      })
+      .join(' ');
+  };
+
+  const formatCompetenciaPtBr = (v: any): string => {
+    if (v === null || v === undefined || v === '') return '—';
+    const raw = String(v).trim();
+    const m = /^(\d{4})-(\d{2})(?:-(\d{2}))?$/.exec(raw);
+    if (m) return `${m[2]}/${m[1]}`;
+    return raw || '—';
+  };
+
+  const formatDatePtBr = (v: any): string => {
+    if (v === null || v === undefined || v === '') return '—';
+    const raw = String(v).trim();
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+    if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+    return raw || '—';
+  };
+
+  const formatSimNao = (v: any): string => {
+    if (v === true || v === 1 || v === '1') return 'Sim';
+    if (v === false || v === 0 || v === '0') return 'Não';
+    if (v === null || v === undefined || v === '') return '—';
+    return String(v);
+  };
+
+  const formatCell = (key: string, v: any): string => {
+    if (!isMonitor) {
+      if (v === null || v === undefined) return '';
+      return String(v);
+    }
+
+    // Ajustes UX específicos do MONITOR_OPER_REGIONAL
+    if (key === 'cabecalho.crs_id') {
+      const id = v == null || v === '' ? '' : String(v);
+      return crsById[id] || id || '—';
+    }
+    if (key === 'cabecalho.competencia_mes_ano') return formatCompetenciaPtBr(v);
+    if (key === 'acao.data_realizacao') return formatDatePtBr(v);
+    if (key === 'acao.area' || key === 'acao.programa_alcancado' || key === 'acao.atividade') return formatSnakeTitle(v);
+    if (
+      key === 'acao.qtd_programadas_qdqq' ||
+      key === 'acao.qtd_realizadas_conforme_programacao' ||
+      key === 'acao.qtd_nao_programadas_qdqq'
+    )
+      return formatSimNao(v);
+
+    if (v === null || v === undefined) return '';
+    return String(v);
+  };
+
   const copySheet = async () => {
     if (loading || rows.length === 0) return;
     try {
-      await copySheetRowsToClipboard(rows, visibleCols);
+      await copySheetRowsToClipboard(rows, visibleCols, { formatCell });
     } catch (e: any) {
       alert(e?.message || 'Não foi possível copiar.');
     }
@@ -272,7 +368,7 @@ export const FormResponsesSpreadsheetModal: React.FC<Props> = ({
                     <tr key={r.id} className="border-b">
                       {visibleCols.map((c) => {
                         const v = flat[c.key];
-                        const s = v === null || v === undefined ? '' : String(v);
+                        const s = formatCell(c.key, v);
                         return (
                           <td key={c.key} className="px-3 py-2 whitespace-nowrap max-w-[22rem] truncate" title={s}>
                             {s}

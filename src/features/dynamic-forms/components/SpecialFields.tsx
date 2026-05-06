@@ -5,6 +5,7 @@ import imageCompression from 'browser-image-compression';
 import { Upload, X, Download, MapPin, Loader2, Star, FileText, Eye, Trash2 } from 'lucide-react';
 import MiniMapa from '@/features/maps/leaflet/components/MiniMapa';
 import { getRuntimeApiBaseOrigin } from '@/config/runtimeApiBase';
+import { clampNoteInRange } from '@/utils/linearScaleNote';
 
 interface SpecialFieldProps {
   field: FormField;
@@ -1032,6 +1033,107 @@ export const StarRatingField: React.FC<SpecialFieldProps> = ({
         )}
       </div>
       
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+    </div>
+  );
+};
+
+function linearScaleLabelByValue(field: FormField, low: number, high: number): Map<number, string> {
+  const m = new Map<number, string>();
+  if (field.scalePointLabels && field.scalePointLabels.length > 0) {
+    for (const r of field.scalePointLabels) {
+      const v = clampNoteInRange(Number(r.value), low, high, low);
+      const t = String(r.label ?? '').trim();
+      if (t) m.set(v, t);
+    }
+    return m;
+  }
+  const lo = (field.scaleLowLabel || '').trim();
+  const hi = (field.scaleHighLabel || '').trim();
+  if (lo) m.set(low, lo);
+  if (hi) m.set(high, hi);
+  return m;
+}
+
+// ========== LINEAR SCALE (valores discretos, rótulos por nota) ==========
+export const LinearScaleField: React.FC<SpecialFieldProps> = ({
+  field,
+  value,
+  onChange,
+  error,
+  required,
+  disabled,
+}) => {
+  const rawMin = Number(field.min ?? 1);
+  const rawMax = Number(field.max ?? 5);
+  const low = Math.min(Math.floor(rawMin), Math.floor(rawMax));
+  const high = Math.max(Math.floor(rawMin), Math.floor(rawMax));
+  const step = Math.max(1, Math.floor(Number(field.step) || 1));
+
+  const ticks: number[] = [];
+  for (let v = low; v <= high; v += step) {
+    ticks.push(v);
+    if (ticks.length > 24) break;
+  }
+
+  const labelByValue = linearScaleLabelByValue(field, low, high);
+  const selected =
+    value === '' || value === undefined || value === null ? null : Number(value);
+
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      {field.helpText ? <p className="text-xs text-gray-600 mb-2">{field.helpText}</p> : null}
+
+      <div className="rounded-lg border border-gray-200 bg-gray-50/90 px-3 py-4">
+        <div className="overflow-x-auto pb-1">
+          <div
+            className="flex flex-nowrap justify-between gap-2 min-w-min px-1"
+            role="radiogroup"
+            aria-label={field.label}
+          >
+            {ticks.map((n) => {
+              const isSel = selected !== null && Number.isFinite(selected) && selected === n;
+              const colLabel = labelByValue.get(n) || '';
+              return (
+                <div key={n} className="flex flex-col items-center gap-1 flex-1 min-w-[2.25rem]">
+                  <span
+                    className="text-[10px] text-center leading-tight text-gray-600 max-w-[6rem] min-h-[2.5rem] flex items-end justify-center px-0.5"
+                    title={colLabel || undefined}
+                  >
+                    {colLabel}
+                  </span>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={isSel}
+                    aria-label={colLabel ? `${n}: ${colLabel}` : String(n)}
+                    disabled={disabled}
+                    onClick={() => onChange(n)}
+                    className={`h-9 w-9 shrink-0 rounded-full border-2 text-xs font-semibold tabular-nums transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 disabled:opacity-50 ${
+                      isSel
+                        ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                        : 'border-gray-300 bg-white text-gray-800 hover:border-blue-400 hover:bg-blue-50/60'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {ticks.length >= 24 ? (
+          <p className="text-[11px] text-amber-800 mt-2">
+            Intervalo grande: mostrando os primeiros valores. Ajuste mínimo, máximo ou passo no editor.
+          </p>
+        ) : null}
+      </div>
+
       {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
     </div>
   );

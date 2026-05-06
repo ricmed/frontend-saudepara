@@ -136,6 +136,7 @@ export function getCreatedByUi(createdBy: string) {
 export async function copySheetRowsToClipboard(
   rows: Array<{ data_json?: Record<string, any> }>,
   cols: Array<{ key: string; label: string }>,
+  opts?: { formatCell?: (key: string, value: any) => string },
 ) {
   if (!cols.length) {
     alert('Não foi possível montar a tabela (sem colunas do formulário).');
@@ -145,7 +146,15 @@ export async function copySheetRowsToClipboard(
   lines.push(cols.map((c) => csvEscape(c.label)).join(';'));
   for (const r of rows) {
     const flat = flattenObject(r.data_json ?? {});
-    lines.push(cols.map((c) => csvEscape(flat[c.key] ?? '')).join(';'));
+    lines.push(
+      cols
+        .map((c) => {
+          const raw = (flat as any)[c.key];
+          const formatted = opts?.formatCell ? opts.formatCell(c.key, raw) : raw;
+          return csvEscape(formatted ?? '');
+        })
+        .join(';'),
+    );
   }
   await navigator.clipboard.writeText(lines.join('\n'));
   alert('Dados copiados (CSV) para a área de transferência.');

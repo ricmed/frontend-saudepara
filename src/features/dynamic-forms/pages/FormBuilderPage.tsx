@@ -8,6 +8,65 @@ import { ClipboardList, Calendar, DollarSign, Target, Activity, Shield, Leaf, Ba
 import dynamicIconImports from 'lucide-react/dynamicIconImports';
 import { FormRenderer } from '../components/FormRenderer';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
+import { clampNoteInRange, normalizeScalePointLabelRows } from '@/utils/linearScaleNote';
+
+function getLinearScaleBoundsInt(f: FormField): { loB: number; hiB: number } {
+  const loB = Math.min(Math.floor(f.min ?? 1), Math.floor(f.max ?? 5));
+  const hiB = Math.max(Math.floor(f.min ?? 1), Math.floor(f.max ?? 5));
+  return { loB, hiB };
+}
+
+/**
+ * Nota com `type="number"` (setas nativas do navegador) + rascunho local para poder apagar e digitar outro valor.
+ */
+const LinearBoundedNoteInput: React.FC<{
+  value: number;
+  minV: number;
+  maxV: number;
+  onCommit: (next: number) => void;
+  className?: string;
+}> = ({ value, minV, maxV, onCommit, className }) => {
+  const safe = clampNoteInRange(value, minV, maxV, minV);
+  const [draft, setDraft] = useState<string>(() => String(safe));
+  useEffect(() => {
+    setDraft(String(clampNoteInRange(value, minV, maxV, minV)));
+  }, [value, minV, maxV]);
+
+  const commitDraft = (raw: string) => {
+    const parsed = raw === '' || raw === '-' ? NaN : Number(raw);
+    const next = Number.isFinite(parsed) ? clampNoteInRange(parsed, minV, maxV, safe) : safe;
+    setDraft(String(next));
+    onCommit(next);
+  };
+
+  return (
+    <input
+      type="number"
+      min={minV}
+      max={maxV}
+      step={1}
+      autoComplete="off"
+      value={draft}
+      onChange={(e) => {
+        const v = e.target.value;
+        setDraft(v);
+        const n = v === '' || v === '-' ? NaN : Number(v);
+        if (Number.isFinite(n)) {
+          const next = clampNoteInRange(n, minV, maxV, safe);
+          onCommit(next);
+        }
+      }}
+      onBlur={() => commitDraft(draft)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          (e.target as HTMLInputElement).blur();
+        }
+      }}
+      className={`w-16 px-1 py-1 text-xs border border-gray-300 rounded shrink-0 ${className ?? ''}`.trim()}
+      title={`Nota de ${minV} a ${maxV}`}
+    />
+  );
+};
 
 export const FormBuilderPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -300,6 +359,21 @@ export const FormBuilderPage: React.FC = () => {
         addRowLabel: 'Adicionar linha',
       } as FormField;
     }
+    if (type === 'linear_scale') {
+      const lo = 1;
+      const hi = 5;
+      return {
+        ...base,
+        label: 'Nova pergunta em escala',
+        min: lo,
+        max: hi,
+        step: 1,
+        scalePointLabels: [
+          { value: lo, label: '' },
+          { value: hi, label: '' },
+        ],
+      } as FormField;
+    }
     return base as FormField;
   };
 
@@ -317,6 +391,33 @@ export const FormBuilderPage: React.FC = () => {
     setSchema({ ...schema, sections: newSections });
     setActiveField({ sectionIdx, fieldIdx: insertAt });
   };
+
+  /** Linhas exibidas no editor da escala linear (persistido em `scalePointLabels` ou legado nos dois extremos). */
+  const getLinearScaleEditorRows = (f: FormField): Array<{ value: number; label: string }> => {
+    const loB = Math.min(Math.floor(f.min ?? 1), Math.floor(f.max ?? 5));
+    const hiB = Math.max(Math.floor(f.min ?? 1), Math.floor(f.max ?? 5));
+    if (f.scalePointLabels && f.scalePointLabels.length > 0) {
+      return normalizeScalePointLabelRows(
+        f.scalePointLabels.map((r) => ({
+          value: Number(r.value),
+          label: String(r.label ?? ''),
+        })),
+        f.min,
+        f.max
+      );
+    }
+    if (loB === hiB) {
+      const merged = [f.scaleLowLabel, f.scaleHighLabel].filter(Boolean).join(' / ');
+      return [{ value: loB, label: merged || String(f.scaleLowLabel ?? '') }];
+    }
+    return [
+      { value: loB, label: String(f.scaleLowLabel ?? '') },
+      { value: hiB, label: String(f.scaleHighLabel ?? '') },
+    ];
+  };
+
+  const persistScalePointLabelRows = (rows: Array<{ value: number; label: string }>, f: FormField) =>
+    normalizeScalePointLabelRows(rows, f.min, f.max);
 
   const updateField = (sectionIdx: number, fieldIdx: number, updates: Partial<FormField>) => {
     const newSections = [...schema.sections];
@@ -695,6 +796,7 @@ export const FormBuilderPage: React.FC = () => {
         { value: 'color', label: '🎨 Seletor de cor' },
         { value: 'slider', label: '🎚️ Slider' },
         { value: 'rating', label: '⭐ Avaliação (estrelas)' },
+        { value: 'linear_scale', label: '📊 Escala linear' },
         { value: 'address', label: '🏠 Endereço completo' },
         { value: 'google-address', label: '🗺️ Endereço (Google Maps)' },
         { value: 'table', label: '📊 Tabela / Grid' },
@@ -1026,8 +1128,9 @@ export const FormBuilderPage: React.FC = () => {
       showBottomNav={false}
       backPath={isGeneralBuilder ? '/private/meus-formularios' : '/private/formularios-admin'}
       headerActions={
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-2">
           <button
+            type="button"
             onClick={handleExportJSON}
             className="px-3 py-2 text-white bg-blue-500 hover:bg-blue-600 rounded-md flex items-center gap-2"
             title="Exportar formulário como JSON"
@@ -1036,6 +1139,7 @@ export const FormBuilderPage: React.FC = () => {
             Exportar
           </button>
           <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
             className="px-3 py-2 text-white bg-blue-500 hover:bg-blue-600 rounded-md flex items-center gap-2"
             title="Importar formulário de JSON"
@@ -1043,25 +1147,20 @@ export const FormBuilderPage: React.FC = () => {
             <Upload className="h-4 w-4" />
             Importar
           </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            onChange={handleImportJSON}
-            className="hidden"
-          />
           <button
+            type="button"
             onClick={() => setShowPreview(true)}
-            className="px-3 py-2 text-white bg-purple-600 hover:bg-purple-700 rounded-md flex items-center gap-2"
+            className="px-3 py-2 text-white bg-purple-600 hover:bg-purple-700 rounded-md flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
             disabled={schema.sections.length === 0}
           >
             <Eye className="h-4 w-4" />
             Preview
           </button>
           <button
+            type="button"
             onClick={handleSave}
             disabled={loading}
-            className="px-4 py-2 bg-white text-blue-600 hover:bg-blue-50 rounded-md flex items-center gap-2 font-medium"
+            className="px-4 py-2 bg-white text-blue-600 hover:bg-blue-50 rounded-md flex items-center gap-2 font-medium border border-blue-200 disabled:opacity-50"
           >
             <Save className="h-4 w-4" />
             Salvar
@@ -1202,10 +1301,17 @@ export const FormBuilderPage: React.FC = () => {
 
           {/* Editor de Seções e Campos */}
           <div className="lg:col-span-2 space-y-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleImportJSON}
+              className="hidden"
+            />
             {/* Tabs de Navegação */}
             <div className="bg-white rounded-lg shadow">
               <div className="border-b border-gray-200">
-                <nav className="flex -mb-px">
+                <nav className="flex -mb-px items-center w-full min-w-0">
                   <button
                     onClick={() => setActiveTab('fields')}
                     className={`px-6 py-3 border-b-2 font-medium text-sm ${
@@ -1228,7 +1334,6 @@ export const FormBuilderPage: React.FC = () => {
                     <Code className="inline h-4 w-4 mr-2" />
                     Regras ({(schema.rules || []).length})
                   </button>
-                  {/* Campos fixos só no contexto SINAN/e-SUS */}
                   {!isGeneralBuilder && (
                     <button
                       type="button"
@@ -1243,13 +1348,22 @@ export const FormBuilderPage: React.FC = () => {
                           `/private/formularios-admin/${id}/versoes/${activeVersionId}/campos-fixos`
                         );
                       }}
-                      className="ml-auto px-6 py-3 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
-                      title="Abrir configuração de colunas fixas (modelo híbrido SINAN) para a versão ativa"
+                      className="px-6 py-3 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
+                      title="Abrir configuração de colunas fixas para a versão ativa"
                       disabled={!id || activeVersionId == null}
                     >
-                      Campos Fixos (SINAN)
+                      Campos Fixos
                     </button>
                   )}
+                  <span className="flex-1 min-w-0 shrink" aria-hidden="true" />
+                  <button
+                    type="button"
+                    onClick={addSection}
+                    className="shrink-0 px-4 py-2 my-2 mr-3 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2 text-sm font-medium"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Adicionar seção
+                  </button>
                 </nav>
               </div>
             </div>
@@ -1447,7 +1561,15 @@ export const FormBuilderPage: React.FC = () => {
 
                           {isGeneralBuilder &&
                             schema.quiz?.enabled &&
-                            ['text', 'textarea', 'number', 'select', 'radio', 'select-search'].includes(field.type) && (
+                            [
+                              'text',
+                              'textarea',
+                              'number',
+                              'select',
+                              'radio',
+                              'select-search',
+                              'linear_scale',
+                            ].includes(field.type) && (
                               <div
                                 className="mt-2 rounded border border-amber-200 bg-amber-50/50 p-2 text-xs space-y-2"
                                 onClick={(e) => e.stopPropagation()}
@@ -1572,6 +1694,168 @@ export const FormBuilderPage: React.FC = () => {
                                     className="w-20 px-2 py-1 text-xs border border-gray-300 rounded"
                                     placeholder="999999"
                                   />
+                                </div>
+                              </div>
+                            )}
+                            {field.type === 'linear_scale' && (
+                              <div className="flex flex-col gap-2 w-full min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <div className="flex items-center gap-1">
+                                    <label className="text-xs text-gray-600 whitespace-nowrap">Mín:</label>
+                                    <input
+                                      type="number"
+                                      value={field.min ?? 1}
+                                      onChange={(e) => {
+                                        const minNext = e.target.value === '' ? 1 : Number(e.target.value);
+                                        const maxCur = field.max ?? 5;
+                                        const patch: Partial<FormField> = { min: minNext };
+                                        if (field.scalePointLabels?.length) {
+                                          patch.scalePointLabels = normalizeScalePointLabelRows(
+                                            field.scalePointLabels.map((r) => ({
+                                              value: Number(r.value),
+                                              label: String(r.label ?? ''),
+                                            })),
+                                            minNext,
+                                            maxCur
+                                          );
+                                        }
+                                        updateField(sectionIdx, fieldIdx, patch);
+                                      }}
+                                      className="w-16 px-2 py-1 text-xs border border-gray-300 rounded"
+                                    />
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <label className="text-xs text-gray-600 whitespace-nowrap">Máx:</label>
+                                    <input
+                                      type="number"
+                                      value={field.max ?? 5}
+                                      onChange={(e) => {
+                                        const maxNext = e.target.value === '' ? 5 : Number(e.target.value);
+                                        const minCur = field.min ?? 1;
+                                        const patch: Partial<FormField> = { max: maxNext };
+                                        if (field.scalePointLabels?.length) {
+                                          patch.scalePointLabels = normalizeScalePointLabelRows(
+                                            field.scalePointLabels.map((r) => ({
+                                              value: Number(r.value),
+                                              label: String(r.label ?? ''),
+                                            })),
+                                            minCur,
+                                            maxNext
+                                          );
+                                        }
+                                        updateField(sectionIdx, fieldIdx, patch);
+                                      }}
+                                      className="w-16 px-2 py-1 text-xs border border-gray-300 rounded"
+                                    />
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <label className="text-xs text-gray-600 whitespace-nowrap">Passo:</label>
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      value={field.step ?? 1}
+                                      onChange={(e) =>
+                                        updateField(sectionIdx, fieldIdx, {
+                                          step: e.target.value === '' ? 1 : Math.max(1, Math.floor(Number(e.target.value))),
+                                        })
+                                      }
+                                      className="w-14 px-2 py-1 text-xs border border-gray-300 rounded"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="rounded-md border border-gray-200 bg-gray-50 p-2 space-y-2">
+                                  <p className="text-xs font-medium text-gray-700">Rótulos por nota</p>
+                                  <p className="text-[11px] text-gray-500 leading-snug">
+                                    Cada nota deve estar entre o <span className="font-medium text-gray-700">mínimo</span> e o{' '}
+                                    <span className="font-medium text-gray-700">máximo</span> da escala (
+                                    {getLinearScaleBoundsInt(field).loB} a {getLinearScaleBoundsInt(field).hiB}). Não pode repetir
+                                    a mesma nota; ao salvar, duplicatas são ajustadas para a próxima livre.
+                                  </p>
+                                  {getLinearScaleEditorRows(field).map((row, ri) => (
+                                    <div key={`${sectionIdx}-${fieldIdx}-sln-${ri}`} className="flex flex-wrap items-center gap-2">
+                                      <label className="text-[10px] text-gray-500 w-8 shrink-0">Nota</label>
+                                      <LinearBoundedNoteInput
+                                        value={row.value}
+                                        minV={getLinearScaleBoundsInt(field).loB}
+                                        maxV={getLinearScaleBoundsInt(field).hiB}
+                                        onCommit={(next) => {
+                                          const nextRows = [...getLinearScaleEditorRows(field)];
+                                          nextRows[ri] = { ...nextRows[ri], value: next };
+                                          updateField(sectionIdx, fieldIdx, {
+                                            scalePointLabels: persistScalePointLabelRows(nextRows, field),
+                                            scaleLowLabel: '',
+                                            scaleHighLabel: '',
+                                          });
+                                        }}
+                                      />
+                                      <input
+                                        type="text"
+                                        value={row.label}
+                                        onChange={(e) => {
+                                          const next = [...getLinearScaleEditorRows(field)];
+                                          next[ri] = { ...next[ri], label: e.target.value };
+                                          updateField(sectionIdx, fieldIdx, {
+                                            scalePointLabels: persistScalePointLabelRows(next, field),
+                                            scaleLowLabel: '',
+                                            scaleHighLabel: '',
+                                          });
+                                        }}
+                                        className="flex-1 min-w-[100px] px-2 py-1 text-xs border border-gray-300 rounded"
+                                        placeholder="Texto acima desta nota"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const cur = getLinearScaleEditorRows(field);
+                                          const next = cur.filter((_, i) => i !== ri);
+                                          const { loB } = getLinearScaleBoundsInt(field);
+                                          updateField(sectionIdx, fieldIdx, {
+                                            scalePointLabels: persistScalePointLabelRows(
+                                              next.length ? next : [{ value: loB, label: '' }],
+                                              field
+                                            ),
+                                            scaleLowLabel: '',
+                                            scaleHighLabel: '',
+                                          });
+                                        }}
+                                        className="p-1 text-red-600 hover:bg-red-50 rounded shrink-0"
+                                        title="Remover rótulo"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const { loB, hiB } = getLinearScaleBoundsInt(field);
+                                      const rows = getLinearScaleEditorRows(field);
+                                      const used = new Set(rows.map((r) => r.value));
+                                      let candidate = loB;
+                                      for (let x = loB; x <= hiB; x++) {
+                                        if (!used.has(x)) {
+                                          candidate = x;
+                                          break;
+                                        }
+                                      }
+                                      updateField(sectionIdx, fieldIdx, {
+                                        scalePointLabels: persistScalePointLabelRows(
+                                          [...rows, { value: candidate, label: '' }],
+                                          field
+                                        ),
+                                        scaleLowLabel: '',
+                                        scaleHighLabel: '',
+                                      });
+                                    }}
+                                    disabled={
+                                      getLinearScaleEditorRows(field).length >=
+                                      getLinearScaleBoundsInt(field).hiB - getLinearScaleBoundsInt(field).loB + 1
+                                    }
+                                    className="text-xs px-2 py-1 border border-dashed border-gray-300 rounded text-gray-700 hover:bg-gray-100 flex items-center gap-1 w-fit disabled:opacity-40 disabled:cursor-not-allowed"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                    Adicionar rótulo
+                                  </button>
                                 </div>
                               </div>
                             )}
@@ -2204,7 +2488,16 @@ export const FormBuilderPage: React.FC = () => {
                                 ) : (
                                   <input
                                     type={
-                                      rulesSimpleMode && ['number', 'currency', 'accounting', 'slider', 'rating', 'idade'].includes(String(conditionField?.type || ''))
+                                      rulesSimpleMode &&
+                                      [
+                                        'number',
+                                        'currency',
+                                        'accounting',
+                                        'slider',
+                                        'rating',
+                                        'linear_scale',
+                                        'idade',
+                                      ].includes(String(conditionField?.type || ''))
                                         ? 'number'
                                         : rulesSimpleMode && String(conditionField?.type || '') === 'date'
                                           ? 'date'
@@ -2544,6 +2837,45 @@ export const FormBuilderPage: React.FC = () => {
                 )}
               </div>
             )}
+
+            <div className="bg-white rounded-lg shadow border border-gray-100 px-4 py-4 flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={handleExportJSON}
+                className="px-3 py-2 text-white bg-blue-500 hover:bg-blue-600 rounded-md flex items-center gap-2 text-sm"
+                title="Exportar formulário como JSON"
+              >
+                <Download className="h-4 w-4" />
+                Exportar
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="px-3 py-2 text-white bg-blue-500 hover:bg-blue-600 rounded-md flex items-center gap-2 text-sm"
+                title="Importar formulário de JSON"
+              >
+                <Upload className="h-4 w-4" />
+                Importar
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowPreview(true)}
+                className="px-3 py-2 text-white bg-purple-600 hover:bg-purple-700 rounded-md flex items-center gap-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                disabled={schema.sections.length === 0}
+              >
+                <Eye className="h-4 w-4" />
+                Preview
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={loading}
+                className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-md flex items-center gap-2 text-sm font-medium disabled:opacity-50"
+              >
+                <Save className="h-4 w-4" />
+                Salvar
+              </button>
+            </div>
           </div>
       </div>
 

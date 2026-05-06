@@ -53,6 +53,7 @@ const fieldTypeLabelPt = (type: string): string => {
     phone: 'Telefone',
     'international-phone': 'Telefone',
     email: 'E-mail',
+    linear_scale: 'Escala linear',
   };
   return map[type] || type;
 };
@@ -99,7 +100,7 @@ const FixedColumnsConfigPage: React.FC = () => {
     if (!formId || !versionId || Number.isNaN(Number(formId)) || Number.isNaN(Number(versionId))) {
       setLoading(false);
       setError(
-        'Não foi possível abrir esta configuração. Volte ao editor do formulário (administração SINAN), aba Campos, e use o botão “Campos Fixos (SINAN)” — assim o sistema abre o endereço certo.'
+        'Não foi possível abrir esta configuração. Volte ao editor do formulário (administração), aba Campos, e use o botão “Campos Fixos” — assim o sistema abre o endereço certo.'
       );
       setData(null);
       return;

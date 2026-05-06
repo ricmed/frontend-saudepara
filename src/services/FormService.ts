@@ -151,6 +151,14 @@ export interface FormField {
   mask?: string;
   min?: number;
   max?: number;
+  /** Passo numérico (ex.: slider; escala linear em valores inteiros). */
+  step?: number;
+  /** Rótulo no extremo inferior/esquerdo da escala linear. */
+  scaleLowLabel?: string;
+  /** Rótulo no extremo superior/direito da escala linear. */
+  scaleHighLabel?: string;
+  /** Rótulos por valor da nota (escala linear); substitui/estende os dois extremos quando preenchido. */
+  scalePointLabels?: Array<{ value: number; label: string }>;
   minLength?: number;
   maxLength?: number;
   pattern?: string;

@@ -667,12 +667,89 @@ export function formatMonitorOperSim01(v: unknown): string {
   return String(v);
 }
 
+function formatCompetenciaMesAnoPtBr(v: unknown): string {
+  if (v == null || v === '') return '—';
+  const raw = String(v).trim();
+  if (!raw) return '—';
+
+  // Aceita "YYYY-MM" (padrão) ou "YYYY-MM-DD" e exibe como "MM/YYYY".
+  const m = /^(\d{4})-(\d{2})(?:-(\d{2}))?$/.exec(raw);
+  if (m) {
+    const year = Number(m[1]);
+    const month = Number(m[2]); // 01..12
+    if (Number.isFinite(year) && month >= 1 && month <= 12) {
+      const mm = String(month).padStart(2, '0');
+      return `${mm}/${year}`;
+    }
+  }
+
+  return raw;
+}
+
+function formatDatePtBr(v: unknown): string {
+  if (v == null || v === '') return '—';
+  const raw = String(v).trim();
+  if (!raw) return '—';
+
+  // "YYYY-MM-DD" ou "YYYY-MM-DDTHH:mm:ss..."
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+  if (m) {
+    const year = Number(m[1]);
+    const month = Number(m[2]);
+    const day = Number(m[3]);
+    if (
+      Number.isFinite(year) &&
+      month >= 1 &&
+      month <= 12 &&
+      day >= 1 &&
+      day <= 31
+    ) {
+      const dd = String(day).padStart(2, '0');
+      const mm = String(month).padStart(2, '0');
+      return `${dd}/${mm}/${year}`;
+    }
+  }
+
+  return raw;
+}
+
 export function formatMonitorOperBrl(total: number): string {
   try {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(total) || 0);
   } catch {
     return String(total);
   }
+}
+
+function formatMonitorOperProgramaAlcancado(v: unknown): string {
+  if (v == null || v === '') return '—';
+  const raw = String(v).trim();
+  if (!raw) return '—';
+  const words = raw
+    .split('_')
+    .map((w) => w.trim())
+    .filter(Boolean)
+    .map((w) => {
+      const lower = w.toLowerCase();
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    });
+  return words.join(' ');
+}
+
+function formatSnakeOrTextToTitle(v: unknown): string {
+  if (v == null || v === '') return '—';
+  const raw = String(v).trim();
+  if (!raw) return '—';
+  const normalized = raw.replace(/\s+/g, ' ');
+  const tokens = normalized.includes('_') ? normalized.split('_') : normalized.split(' ');
+  const words = tokens
+    .map((w) => w.trim())
+    .filter(Boolean)
+    .map((w) => {
+      const lower = w.toLowerCase();
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    });
+  return words.join(' ');
 }
 
 export type MonitorOperListColSpec = {
@@ -698,8 +775,7 @@ export function getMonitorOperListColumnSpecs(): MonitorOperListColSpec[] {
       id: 'competencia',
       label: 'Competência',
       tdClassName: 'whitespace-nowrap',
-      format: (r) =>
-        r.competencia_mes_ano != null && r.competencia_mes_ano !== '' ? String(r.competencia_mes_ano) : '—',
+      format: (r) => formatCompetenciaMesAnoPtBr(r.competencia_mes_ano),
     },
     {
       id: 'qdqq',
@@ -718,19 +794,19 @@ export function getMonitorOperListColumnSpecs(): MonitorOperListColSpec[] {
       id: 'programa',
       label: 'Programa alcançado',
       tdClassName: 'min-w-[11rem] max-w-[22rem] truncate',
-      format: (r) => (r.programaAlcancado != null && r.programaAlcancado !== '' ? String(r.programaAlcancado) : '—'),
+      format: (r) => formatMonitorOperProgramaAlcancado(r.programaAlcancado),
     },
     {
       id: 'atividade',
       label: 'Atividade',
       tdClassName: 'min-w-[10rem] max-w-[20rem] truncate',
-      format: (r) => (r.atividade != null && r.atividade !== '' ? String(r.atividade) : '—'),
+      format: (r) => formatSnakeOrTextToTitle(r.atividade),
     },
     {
       id: 'data_realizacao',
       label: 'Data da realização',
       tdClassName: 'whitespace-nowrap',
-      format: (r) => (r.dataRealizacao != null && r.dataRealizacao !== '' ? String(r.dataRealizacao) : '—'),
+      format: (r) => formatDatePtBr(r.dataRealizacao),
     },
     {
       id: 'programada',

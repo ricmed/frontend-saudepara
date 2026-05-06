@@ -27,6 +27,7 @@ import {
   ColorPickerField,
   SliderField,
   StarRatingField,
+  LinearScaleField,
   GoogleMapsAddressField,
   AddressField
 } from './SpecialFields';
@@ -455,6 +456,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     'google-address',
     'slider',
     'rating',
+    'linear_scale',
     'color',
     'autocomplete',
     'table',
@@ -980,6 +982,8 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
         return <SliderField {...commonProps} />;
       case 'rating':
         return <StarRatingField {...commonProps} />;
+      case 'linear_scale':
+        return <LinearScaleField {...commonProps} />;
       case 'google-address':
         return <GoogleMapsAddressField {...commonProps} />;
       case 'address':
