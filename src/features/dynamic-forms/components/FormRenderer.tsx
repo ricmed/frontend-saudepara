@@ -969,6 +969,28 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
               </div>
             );
           }
+          /** Nível central: identificação fixa + regional de destino (CRS). */
+          if (resolved.key === 'cabecalho.crs_id' && monitorOperRegionalCrsScope?.canSelectAnyCrs) {
+            const executorNivel = getValue('cabecalho.executor_nivel');
+            if (readOnly && executorNivel !== 'CENTRAL') {
+              return <ApiSelectSearchField {...commonProps} />;
+            }
+            return (
+              <div className="mb-4 md:grid md:grid-cols-2 md:gap-4 md:items-start">
+                <div className="mb-4 md:mb-0">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Identificação do executor
+                  </label>
+                  <div className="w-full px-3 py-2.5 border rounded-md bg-teal-50/90 border-teal-200 text-gray-900 font-medium">
+                    Nível central
+                  </div>
+                </div>
+                <div className="min-w-0 [&>div]:mb-0">
+                  <ApiSelectSearchField {...commonProps} />
+                </div>
+              </div>
+            );
+          }
           return <ApiSelectSearchField {...commonProps} />;
         }
         return <SelectSearchField {...commonProps} />;
