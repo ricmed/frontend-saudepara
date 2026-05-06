@@ -373,8 +373,10 @@ function App() {
               <Route path="/private/comunicacao-de-caso" element={<ListaNotificacoes />} />
               <Route path="/private/comunicacao-de-caso/nova" element={<NotificationForm />} />
               <Route path="/private/comunicacao-de-caso/editar/:id" element={<NotificationForm />} />
-              
-              {/* ✅ NOVO: Rotas de Formulários Dinâmicos (SINAN/e-SUS style) */}
+            </Route>
+
+            {/* Formulários dinâmicos: qualquer usuário autenticado; quem vê o quê vem de ACL/escopo no GET /api/forms */}
+            <Route element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
               <Route path="/private/formularios" element={<FormsListPage />} />
               <Route
                 path="/private/formularios/:id/permissoes"

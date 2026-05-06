@@ -112,12 +112,16 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       onClick: () => navigate("/private/comunicacao-de-caso"),
     }] : []),
     
-    //✅ NOVO: Formulários Dinâmicos - apenas para notificadores
-    ...(permissions.isNotificador ? [{
-    icon: <ClipboardList />,
-    label: t("menu.dynamic_forms"),
-    onClick: () => navigate("/private/formularios"),
-    }] : []),
+    // Formulários dinâmicos: qualquer usuário logado (a lista vem do GET /api/forms conforme ACL/escopo)
+    ...(user
+      ? [
+          {
+            icon: <ClipboardList />,
+            label: t("menu.dynamic_forms"),
+            onClick: () => navigate("/private/formularios"),
+          },
+        ]
+      : []),
 
     // ✅ Google-Forms-like: Meus formulários (criadores)
     ...(user && (user.roles?.includes('forms.creator') || isAdmin()) ? [{

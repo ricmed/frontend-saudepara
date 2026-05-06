@@ -219,4 +219,16 @@ describe('monitorOperRegionalReport', () => {
     const f2 = { ...defaultMonitorOperReportFilters(), quadrimestre: 'Q2' as const };
     expect(filterMonitorOperSubmissionsByReportFilters(subs, f2)).toHaveLength(1);
   });
+
+  it('filterMonitorOperSubmissionsByReportFilters restringe por executor_nivel', () => {
+    const central = row({ cabecalho: { crs_id: 1, ano: 2026, mes: 'JAN', executor_nivel: 'CENTRAL' } });
+    const regional = row({ cabecalho: { crs_id: 1, ano: 2026, mes: 'FEV', executor_nivel: 'REGIONAL' } });
+    const subs = [
+      { id: 1, status: 'x', created_at: 't', data_json: central },
+      { id: 2, status: 'x', created_at: 't', data_json: regional },
+    ];
+    const f = { ...defaultMonitorOperReportFilters(), executor_nivel: 'CENTRAL' as const };
+    expect(filterMonitorOperSubmissionsByReportFilters(subs, f)).toHaveLength(1);
+    expect(filterMonitorOperSubmissionsByReportFilters(subs, f)[0].id).toBe(1);
+  });
 });

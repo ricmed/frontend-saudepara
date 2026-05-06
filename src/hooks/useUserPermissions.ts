@@ -196,11 +196,16 @@ export const useUserPermissions = (): UserPermissions => {
     };
   }
   
+  const nivelAcesso = String(userAccess?.nivel ?? '').toLowerCase();
+  const crsIdNum = userAccess?.crsId != null ? Number(userAccess.crsId) : NaN;
+  const hasCrsId = Number.isFinite(crsIdNum) && crsIdNum > 0;
+
   const isEstabelecimento = userAccess?.nivel === 'estabelecimento' || 
                            userAccess?.nivel === 'unidade' || 
                            (!isAdmin && !userAccess?.nivel);
   const isMunicipio = userAccess?.nivel === 'municipio';
-  const isCrs = userAccess?.nivel === 'crs';
+  /** Nível CRS explícito ou vínculo a uma CRS (ex.: acesso regional sem role `notificador`). */
+  const isCrs = nivelAcesso === 'crs' || (hasCrsId && nivelAcesso !== 'estado');
   const isEstado = userAccess?.nivel === 'estado';
 
   return {

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import type { FormSchema } from '@/services/FormService';
 import { useFormRenderer } from '../hooks/useFormRenderer';
 import { TextField, DateField, NumberField, TextareaField, CheckboxField, CurrencyField, AccountingField } from './FormFields';
@@ -39,6 +39,7 @@ import { TableField } from './TableField';
 import { ClipboardList, Calendar, DollarSign, Target, Activity, Shield, Leaf, BarChart3, Wrench, Users } from 'lucide-react';
 import { convertLocalDateTimeToUTC } from '@/utils/timezoneUtils';
 import FormService from '@/services/FormService';
+import type { MonitorOperRegionalScopePayload } from '../types/monitorOperRegionalScope';
 import { validateCPF } from '@/utils/cpfValidator';
 import { validateCNS } from '@/utils/cnsValidator';
 
@@ -105,6 +106,8 @@ interface FormRendererProps {
   pageMode?: boolean;
   /** Exibe barra de progresso quando em modo páginas. */
   showProgress?: boolean;
+  /** Escopo CRS (MONITOR_OPER_REGIONAL): exibe regional somente leitura quando o usuário tem uma única CRS. */
+  monitorOperRegionalCrsScope?: MonitorOperRegionalScopePayload | null;
 }
 
 export const FormRenderer: React.FC<FormRendererProps> = ({
@@ -124,6 +127,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   context = 'sinan',
   pageMode = false,
   showProgress = false,
+  monitorOperRegionalCrsScope = null,
 }) => {
   const sectionIconMap: Record<string, React.ComponentType<{ className?: string }>> = React.useMemo(
     () => ({
@@ -200,6 +204,22 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     initialData: initialDataWithDefaults,
     onDataChange,
   });
+
+  const crsReadonlySyncedRef = useRef(false);
+  useEffect(() => {
+    crsReadonlySyncedRef.current = false;
+  }, [monitorOperRegionalCrsScope, initialDataWithDefaults]);
+  useEffect(() => {
+    if (monitorOperRegionalCrsScope?.ui !== 'readonly' || !monitorOperRegionalCrsScope.readonlyCrs) return;
+    if (crsReadonlySyncedRef.current) return;
+    const v = getValue('cabecalho.crs_id');
+    if (v != null && String(v).trim() !== '') {
+      crsReadonlySyncedRef.current = true;
+      return;
+    }
+    setValue('cabecalho.crs_id', String(monitorOperRegionalCrsScope.readonlyCrs.id));
+    crsReadonlySyncedRef.current = true;
+  }, [monitorOperRegionalCrsScope, getValue, setValue]);
 
   // Auto-preencher dados do paciente via base interna (CPF/CNS).
   // Não sobrescreve campos já preenchidos manualmente.
@@ -925,6 +945,30 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           return <CodeListSearchField {...commonProps} />;
         }
         if ((field as { apiSelectEndpoint?: string }).apiSelectEndpoint) {
+          if (
+            resolved.key === 'cabecalho.crs_id' &&
+            monitorOperRegionalCrsScope?.ui === 'readonly' &&
+            monitorOperRegionalCrsScope.readonlyCrs
+          ) {
+            const rc = monitorOperRegionalCrsScope.readonlyCrs;
+            return (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {resolved.label}
+                  {required && <span className="text-red-500 ml-1">*</span>}
+                </label>
+                {resolved.helpText && <p className="text-xs text-gray-500 mb-2">{resolved.helpText}</p>}
+                <div
+                  className={`w-full px-3 py-2 border rounded-md bg-gray-50 text-gray-800 ${
+                    error ? 'border-red-500' : 'border-gray-200'
+                  }`}
+                >
+                  {rc.nome}
+                </div>
+                {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+              </div>
+            );
+          }
           return <ApiSelectSearchField {...commonProps} />;
         }
         return <SelectSearchField {...commonProps} />;

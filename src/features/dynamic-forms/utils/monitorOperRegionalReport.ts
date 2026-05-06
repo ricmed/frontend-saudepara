@@ -374,10 +374,12 @@ export type MonitorOperReportFilters = {
   quadrimestre: '' | 'Q1' | 'Q2' | 'Q3';
   crs_id: string;
   area: string;
+  /** Quem operou o registro no envio (`cabecalho.executor_nivel`, preenchido no servidor). */
+  executor_nivel: '' | 'CENTRAL' | 'REGIONAL';
 };
 
 export function defaultMonitorOperReportFilters(): MonitorOperReportFilters {
-  return { ano: '', quadrimestre: '', crs_id: '', area: '' };
+  return { ano: '', quadrimestre: '', crs_id: '', area: '', executor_nivel: '' };
 }
 
 export function monitorOperRowMatchesFilters(d: MonitorOperRow, f: MonitorOperReportFilters): boolean {
@@ -392,6 +394,7 @@ export function monitorOperRowMatchesFilters(d: MonitorOperRow, f: MonitorOperRe
   }
   if (f.crs_id && String(cab.crs_id ?? '') !== f.crs_id) return false;
   if (f.area && String(ac.area ?? '') !== f.area) return false;
+  if (f.executor_nivel && String(cab.executor_nivel ?? '') !== f.executor_nivel) return false;
   return true;
 }
 
@@ -413,10 +416,12 @@ export function collectMonitorOperReportFilterOptions(submissions: { data_json?:
   anos: string[];
   crsIds: string[];
   areas: { value: string; label: string }[];
+  executorNiveis: { value: 'CENTRAL' | 'REGIONAL'; label: string }[];
 } {
   const anos = new Set<string>();
   const crsIds = new Set<string>();
   const areas = new Set<string>();
+  const executorSet = new Set<'CENTRAL' | 'REGIONAL'>();
   for (const s of submissions) {
     const d = s.data_json as MonitorOperRow | undefined;
     if (!d?.cabecalho || !d?.acao) continue;
@@ -428,7 +433,16 @@ export function collectMonitorOperReportFilterOptions(submissions: { data_json?:
     if (crs != null && String(crs).trim() !== '') crsIds.add(String(crs));
     const a = ac.area;
     if (a != null && String(a).trim() !== '') areas.add(String(a));
+    const ex = cab.executor_nivel;
+    if (ex === 'CENTRAL' || ex === 'REGIONAL') executorSet.add(ex);
   }
+  const executorLabels: Record<'CENTRAL' | 'REGIONAL', string> = {
+    CENTRAL: 'Nível central (estadual)',
+    REGIONAL: 'Nível regional (CRS)',
+  };
+  const executorNiveis = (['CENTRAL', 'REGIONAL'] as const)
+    .filter((v) => executorSet.has(v))
+    .map((value) => ({ value, label: executorLabels[value] }));
   return {
     anos: [...anos].sort((a, b) => Number(b) - Number(a) || b.localeCompare(a)),
     crsIds: [...crsIds].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
@@ -438,6 +452,7 @@ export function collectMonitorOperReportFilterOptions(submissions: { data_json?:
         value,
         label: AREA_LABELS[value] ?? value,
       })),
+    executorNiveis,
   };
 }
 
@@ -619,6 +634,8 @@ export interface MonitorOperSubmissionSummary {
   status: string;
   created_at: string;
   crs_id: unknown;
+  /** `CENTRAL` | `REGIONAL` — gravado no servidor em `cabecalho.executor_nivel`. */
+  executorNivel?: string;
   /** Preenchido na UI a partir de `/api/crs/select` quando disponível. */
   crs_label?: string;
   ano: unknown;
@@ -772,6 +789,17 @@ export function getMonitorOperListColumnSpecs(): MonitorOperListColSpec[] {
         crsById[String(r.crs_id ?? '')] || (r.crs_id != null && r.crs_id !== '' ? String(r.crs_id) : '—'),
     },
     {
+      id: 'executor',
+      label: 'Executor (nível)',
+      tdClassName: 'whitespace-nowrap',
+      format: (r) => {
+        const v = r.executorNivel;
+        if (v === 'CENTRAL') return 'Central (estadual)';
+        if (v === 'REGIONAL') return 'Regional (CRS)';
+        return '—';
+      },
+    },
+    {
       id: 'competencia',
       label: 'Competência',
       tdClassName: 'whitespace-nowrap',
@@ -897,11 +925,14 @@ export function buildPerSubmissionSummaries(
           parseMoney(c.el_339039);
       }
     }
+    const ex = cab?.executor_nivel;
+    const executorNivel = ex === 'CENTRAL' || ex === 'REGIONAL' ? ex : undefined;
     return {
       id: s.id,
       status: s.status,
       created_at: s.created_at,
       crs_id: d?.cabecalho?.crs_id,
+      executorNivel,
       ano: d?.cabecalho?.ano,
       mes: d?.cabecalho?.mes,
       competencia_mes_ano: cab?.competencia_mes_ano,
@@ -926,6 +957,7 @@ export function monitorOperSubmissionsToCsv(rows: MonitorOperSubmissionSummary[]
     'created_at',
     'crs_id',
     'crs_label',
+    'executor_nivel',
     'ano',
     'mes',
     'competencia_mes_ano',
@@ -952,6 +984,7 @@ export function monitorOperSubmissionsToCsv(rows: MonitorOperSubmissionSummary[]
         r.created_at,
         r.crs_id,
         r.crs_label ?? '',
+        r.executorNivel ?? '',
         r.ano,
         r.mes,
         r.competencia_mes_ano,

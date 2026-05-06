@@ -25,12 +25,12 @@ export const MonitorOperReportFiltersBar: React.FC<Props> = ({ filters, setFilte
         <button
           type="button"
           className="text-xs font-medium text-teal-700 hover:text-teal-900 underline-offset-2 hover:underline"
-          onClick={() => setFilters({ ano: '', quadrimestre: '', crs_id: '', area: '' })}
+          onClick={() => setFilters({ ano: '', quadrimestre: '', crs_id: '', area: '', executor_nivel: '' })}
         >
           Limpar filtros
         </button>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
         <label className="flex flex-col gap-1 min-w-0">
           <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">Ano</span>
           <select
@@ -93,6 +93,23 @@ export const MonitorOperReportFiltersBar: React.FC<Props> = ({ filters, setFilte
                 {a.label}
               </option>
             ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 min-w-0">
+          <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">Executor</span>
+          <select
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800"
+            value={filters.executor_nivel}
+            onChange={(e) =>
+              setFilters((f) => ({
+                ...f,
+                executor_nivel: e.target.value as '' | 'CENTRAL' | 'REGIONAL',
+              }))
+            }
+          >
+            <option value="">Todos</option>
+            <option value="CENTRAL">Nível central (estadual)</option>
+            <option value="REGIONAL">Nível regional (CRS)</option>
           </select>
         </label>
       </div>

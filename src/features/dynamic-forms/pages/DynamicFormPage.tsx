@@ -6,11 +6,14 @@ import FormSubmissionService from '@/services/FormSubmissionService';
 import { useAuth } from '@/keycloak/AuthProvider';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 import { FileEdit, Eye, FileSpreadsheet, FileText } from 'lucide-react';
+import axios from 'axios';
+import { getApiRoot } from '@/config/apiOrigin';
+import type { MonitorOperRegionalScopePayload } from '../types/monitorOperRegionalScope';
 
 export const DynamicFormPage: React.FC = () => {
   const { agravo, id } = useParams<{ agravo: string; id?: string }>(); // param name kept for route compatibility
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   
   // Detectar modo: nova, editar ou visualizar
   const isViewMode = window.location.pathname.includes('/visualizar/');
@@ -21,6 +24,8 @@ export const DynamicFormPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [monitorOperRegionalCrsScope, setMonitorOperRegionalCrsScope] =
+    useState<MonitorOperRegionalScopePayload | null>(null);
 
   const getCurrentMonthCode = () => {
     const m = new Date().getMonth(); // 0..11
@@ -44,18 +49,41 @@ export const DynamicFormPage: React.FC = () => {
 
   useEffect(() => {
     loadForm();
-  }, [agravo, id]);
+  }, [agravo, id, user?.id, user?.sub, authLoading]);
 
   const loadForm = async () => {
     if (!agravo) return;
+    if (authLoading) return;
 
     try {
       setLoading(true);
       setError(null);
+      setMonitorOperRegionalCrsScope(null);
 
       // Carregar versão ativa do formulário
       const version = await FormService.getActiveVersion(agravo);
       setFormVersion(version);
+
+      let scopePayload: MonitorOperRegionalScopePayload | null = null;
+      if (agravo === 'MONITOR_OPER_REGIONAL') {
+        const uid = user?.sub || user?.id;
+        if (!uid) {
+          setError('É necessário estar autenticado para abrir este formulário.');
+          return;
+        }
+        const { data } = await axios.get<MonitorOperRegionalScopePayload>(
+          `${getApiRoot()}/crs/monitor-oper-regional-scope`,
+          { withCredentials: true }
+        );
+        scopePayload = data;
+        setMonitorOperRegionalCrsScope(data);
+        if (data.ui === 'none') {
+          setError(
+            'Seu usuário não possui regional (CRS) ou perfil estadual vinculado. Solicite acesso ao administrador.'
+          );
+          return;
+        }
+      }
 
       if (id) {
         const submission = await FormSubmissionService.getSubmissionById(Number(id));
@@ -81,6 +109,9 @@ export const DynamicFormPage: React.FC = () => {
             ano: now.getFullYear(),
             mes: getCurrentMonthCode(),
           };
+          if (scopePayload?.ui === 'readonly' && scopePayload.readonlyCrs) {
+            base.cabecalho.crs_id = String(scopePayload.readonlyCrs.id);
+          }
         }
         // No técnico, quadrimestre é sempre obrigatório; pré-selecionar o atual.
         if (agravo === 'MONITOR_TEC_PQAVS') {
@@ -314,6 +345,9 @@ export const DynamicFormPage: React.FC = () => {
           saveDraftLabel={isEditMode ? 'Salvar Alterações' : 'Salvar Rascunho'}
           cancelLabel={isViewMode ? "Fechar" : "Cancelar"}
           readOnly={isViewMode}
+          monitorOperRegionalCrsScope={
+            agravo === 'MONITOR_OPER_REGIONAL' ? monitorOperRegionalCrsScope : null
+          }
         />
       </AppPageLayout>
     );
