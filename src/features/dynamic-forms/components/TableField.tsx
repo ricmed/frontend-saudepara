@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import type { FormField, TableColumnDef } from '@/services/FormService';
 import { Plus, Trash2 } from 'lucide-react';
+import { getRuntimeApiRoot } from '@/config/runtimeApiBase';
 
-const server = import.meta.env.VITE_API_SERVER;
-const port = import.meta.env.VITE_API_PORT;
-const API_BASE = `${server}:${port}/api`;
+const API_BASE = getRuntimeApiRoot();
 
 interface TableFieldProps {
   field: FormField;

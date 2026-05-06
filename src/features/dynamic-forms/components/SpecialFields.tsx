@@ -4,6 +4,7 @@ import { searchMatches } from '@/utils/searchUtils';
 import imageCompression from 'browser-image-compression';
 import { Upload, X, Download, MapPin, Loader2, Star, FileText, Eye, Trash2 } from 'lucide-react';
 import MiniMapa from '@/features/maps/leaflet/components/MiniMapa';
+import { getRuntimeApiBaseOrigin } from '@/config/runtimeApiBase';
 
 interface SpecialFieldProps {
   field: FormField;
@@ -451,9 +452,7 @@ export const SignatureField: React.FC<SpecialFieldProps> = ({
     setGovBrError(null);
     setGovBrLoading(true);
     try {
-      const server = import.meta.env.VITE_API_SERVER;
-      const port = import.meta.env.VITE_API_PORT;
-      const baseUrl = `${server}:${port}`;
+      const baseUrl = getRuntimeApiBaseOrigin();
       const redirectUri = encodeURIComponent(window.location.origin + window.location.pathname + window.location.search);
       const state = encodeURIComponent(JSON.stringify({ fieldKey: field.key, redirectUri: window.location.href }));
       const url = `${baseUrl}/api/forms/govbr-signature/authorize?redirect_uri=${redirectUri}&state=${state}`;

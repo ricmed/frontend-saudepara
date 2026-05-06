@@ -10,10 +10,9 @@ import { validateCPF } from '@/utils/cpfValidator';
 import { validateCNS } from '@/utils/cnsValidator';
 import { validatePassaporte, normalizePassaporte } from '@/utils/passaporteValidator';
 import axios from 'axios';
+import { getRuntimeApiRoot } from '@/config/runtimeApiBase';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost';
-const API_PORT = import.meta.env.VITE_API_PORT || '3000';
-const API_URL = `${API_BASE}:${API_PORT}`;
+const API_ROOT = getRuntimeApiRoot();
 
 function getFieldInputId(field: FormField) {
   const key = (field.key || field.label || 'field').toString();
@@ -300,7 +299,7 @@ export const MultiSelectField: React.FC<AdvancedFieldProps> = ({
         if (v !== undefined && v !== null && v !== '') params[k] = v;
       }
 
-      const response = await axios.get(`${API_URL}/api/${field.apiSelectEndpoint}`, {
+      const response = await axios.get(`${API_ROOT}/${field.apiSelectEndpoint}`, {
         params,
         withCredentials: true,
       });

@@ -16,11 +16,10 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
+import { getRuntimeApiRoot } from '@/config/runtimeApiBase';
 
 // Criar instância do axios com mesma configuração do FormService
-const server = import.meta.env.VITE_API_SERVER;
-const port = import.meta.env.VITE_API_PORT;
-const API_URL = `${server}:${port}/api`;
+const API_URL = getRuntimeApiRoot();
 
 const api = axios.create({
   baseURL: API_URL,

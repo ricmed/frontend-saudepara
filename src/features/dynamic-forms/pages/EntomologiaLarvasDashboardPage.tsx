@@ -5,11 +5,10 @@ import FormService, { type Form } from '@/services/FormService';
 import FormSubmissionService, { type FormSubmission } from '@/services/FormSubmissionService';
 import { Plus, Edit, Eye, Trash2, Calendar, User, Bug, Filter, FileSpreadsheet, FileText } from 'lucide-react';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
+import { getRuntimeApiRoot } from '@/config/runtimeApiBase';
 
 const AGRAVO = 'ENTOMOLOGIA_LARVAS';
-const server = import.meta.env.VITE_API_SERVER;
-const port = import.meta.env.VITE_API_PORT;
-const API_BASE = `${server}:${port}/api`;
+const API_BASE = getRuntimeApiRoot();
 
 interface CrsOption {
   value: string;
