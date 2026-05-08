@@ -31,7 +31,7 @@ import { useOfflineSystem } from '@/hooks/useOfflineSystem';
 import { OfflineComunicacaoDaeServiceProxy } from '@/services/OfflineComunicacaoDaeServiceProxy';
 import ConnectionStatus from '@/components/ConnectionStatus';
 import indexedDBService from '@/services/indexedDB';
-import { getLocalDateTime, convertUTCToLocalDateTime } from '@/utils/timezoneUtils';
+import { getLocalDateTime, convertUTCToLocalDateTime, calcularSemanaEpidemiologica } from '@/utils/timezoneUtils';
 import { useAuth } from '@/keycloak/AuthProvider';
 import {
   ComunicacaoDaeFormExportData,
@@ -1118,7 +1118,22 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                   className={inputClass}
                   required
                 />
-                <p className="mt-1.5 text-xs text-gray-500">Informe quando a comunicação foi realizada</p>
+              </div>
+
+              {/* Semana Epidemiológica */}
+              <div>
+                <label className={labelClass}>Semana Epidemiológica</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={(() => {
+                    const se = calcularSemanaEpidemiologica(formData.data_comunicacao);
+                    return se ? `SE ${se.semana.toString().padStart(2, '0')} / ${se.ano}` : '';
+                  })()}
+                  placeholder="—"
+                  className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-700 outline-none cursor-not-allowed select-none"
+                />
+                <p className="mt-1.5 text-xs text-gray-500">Calculada automaticamente a partir da data</p>
               </div>
 
               {/* UF de Ocorrência */}

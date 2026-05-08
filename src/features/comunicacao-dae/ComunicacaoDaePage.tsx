@@ -16,6 +16,7 @@ import {
   exportarComunicacoesDaeListaWord,
 } from './components/listDocumentExporters';
 import { formatComunicacaoDaeAgravoNomes } from '@/features/comunicacao-dae/comunicacaoDaeAgravoUtils';
+import { calcularSemanaEpidemiologica } from '@/utils/timezoneUtils';
 
 // Tipos para pesquisa
 type SearchField = 'all' | 'nome_paciente' | 'origem' | 'unidade_notificadora' | 'dae' | 'municipio';
@@ -29,6 +30,7 @@ interface SearchParams {
 type SortableField =
   | 'id_comunicacao'
   | 'data_comunicacao'
+  | 'semana_epidemiologica'
   | 'nome_paciente'
   | 'origem_tipo'
   | 'unidade_notificadora'
@@ -220,10 +222,11 @@ const ComunicacaoDaePage: React.FC = () => {
       direction = 'desc';
     }
     setSortConfig({ key, direction });
-    // Ordenação precisa ser aplicada no backend (antes da paginação)
+    // SE é derivada da data — mapeia para data_comunicacao no backend
+    const backendKey = key === 'semana_epidemiologica' ? 'data_comunicacao' : key;
     setFilters((prev) => ({
       ...prev,
-      sortKey: key,
+      sortKey: backendKey,
       sortDir: direction,
     }));
     setCurrentPage(1);
@@ -762,7 +765,7 @@ const ComunicacaoDaePage: React.FC = () => {
                           {renderSortIcon('id_comunicacao')}
                         </div>
                       </th>
-                      <th 
+                      <th
                         className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200/60 transition-colors"
                         onClick={() => handleSort('data_comunicacao')}
                       >
@@ -771,7 +774,16 @@ const ComunicacaoDaePage: React.FC = () => {
                           {renderSortIcon('data_comunicacao')}
                         </div>
                       </th>
-                      <th 
+                      <th
+                        className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200/60 transition-colors"
+                        onClick={() => handleSort('semana_epidemiologica')}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span>SE</span>
+                          {renderSortIcon('semana_epidemiologica')}
+                        </div>
+                      </th>
+                      <th
                         className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200/60 transition-colors"
                         onClick={() => handleSort('nome_paciente')}
                       >
@@ -842,6 +854,12 @@ const ComunicacaoDaePage: React.FC = () => {
                             <Calendar className="w-4 h-4 mr-2 text-gray-400" />
                             {formatDate(comunicacao.data_comunicacao)}
                           </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {(() => {
+                            const se = calcularSemanaEpidemiologica(comunicacao.data_comunicacao);
+                            return se ? `SE ${se.semana.toString().padStart(2, '0')}/${se.ano}` : '-';
+                          })()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm font-medium text-gray-900">

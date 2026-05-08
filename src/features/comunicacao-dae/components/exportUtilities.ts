@@ -4,6 +4,7 @@ import {
   formatComunicacaoDaeAgravoCodigos,
   formatComunicacaoDaeAgravoNomes,
 } from "@/features/comunicacao-dae/comunicacaoDaeAgravoUtils";
+import { calcularSemanaEpidemiologica } from "@/utils/timezoneUtils";
 import {
   exportarComunicacaoDaeDetalhadaPDF as exportarComunicacaoDaeDetalhadaPDFV2,
   exportarComunicacaoDaeDetalhadaWord as exportarComunicacaoDaeDetalhadaWordV2,
@@ -64,8 +65,10 @@ export const exportarComunicacoesDaeCSV = (
     const headers = [
       'Nº Comunicação',
       'Data da Comunicação',
+      'Semana Epidemiológica',
       'Nome do Paciente',
       'Origem',
+      'Unidade Notificadora',
       'DAE',
       'Código DAE',
       'Município de Ocorrência',
@@ -74,23 +77,29 @@ export const exportarComunicacoesDaeCSV = (
       'Data de Criação',
       'Última Atualização'
     ];
-    
+
     // Linhas de dados - usando ponto e vírgula como separador
     const rows = [
       headers.join(';'),
-      ...comunicacoes.map(com => [
-        com.id_comunicacao,
-        formatarData(com.data_comunicacao),
-        `"${(com.nome_paciente || '').replace(/"/g, '""')}"`,
-        com.origem_tipo,
-        `"${formatComunicacaoDaeAgravoNomes(com).replace(/"/g, '""')}"`,
-        `"${formatComunicacaoDaeAgravoCodigos(com).replace(/"/g, '""')}"`,
-        `"${(com.tipo_municipio?.descricao || '-').replace(/"/g, '""')}"`,
-        `"${(com.observacao_descricao || '-').replace(/"/g, '""')}"`,
-        com.comunicacao_dae_anexo?.length || 0,
-        formatarData(com.created_at),
-        formatarData(com.updated_at)
-      ].join(';'))
+      ...comunicacoes.map(com => {
+        const se = calcularSemanaEpidemiologica(com.data_comunicacao);
+        const semanaStr = se ? `SE ${se.semana.toString().padStart(2, '0')}/${se.ano}` : '-';
+        return [
+          com.id_comunicacao,
+          formatarData(com.data_comunicacao),
+          semanaStr,
+          `"${(com.nome_paciente || '').replace(/"/g, '""')}"`,
+          com.origem_tipo,
+          `"${((com.origem?.nome) || '-').replace(/"/g, '""')}"`,
+          `"${formatComunicacaoDaeAgravoNomes(com).replace(/"/g, '""')}"`,
+          `"${formatComunicacaoDaeAgravoCodigos(com).replace(/"/g, '""')}"`,
+          `"${(com.tipo_municipio?.descricao || '-').replace(/"/g, '""')}"`,
+          `"${(com.observacao_descricao || '-').replace(/"/g, '""')}"`,
+          com.comunicacao_dae_anexo?.length || 0,
+          formatarData(com.created_at),
+          formatarData(com.updated_at)
+        ].join(';');
+      })
     ];
     
     // Juntar com BOM
@@ -131,8 +140,10 @@ export const exportarComunicacoesDaeExcel = (
       [
         'Nº Comunicação',
         'Data da Comunicação',
+        'Semana Epidemiológica',
         'Nome do Paciente',
         'Origem',
+        'Unidade Notificadora',
         'DAE',
         'Código DAE',
         'Município de Ocorrência',
@@ -142,19 +153,25 @@ export const exportarComunicacoesDaeExcel = (
         'Última Atualização'
       ],
       // Dados
-      ...comunicacoes.map(com => [
-        com.id_comunicacao,
-        formatarData(com.data_comunicacao),
-        com.nome_paciente,
-        com.origem_tipo,
-        formatComunicacaoDaeAgravoNomes(com),
-        formatComunicacaoDaeAgravoCodigos(com),
-        com.tipo_municipio?.descricao || '-',
-        com.observacao_descricao || '-',
-        com.comunicacao_dae_anexo?.length || 0,
-        formatarData(com.created_at),
-        formatarData(com.updated_at)
-      ])
+      ...comunicacoes.map(com => {
+        const se = calcularSemanaEpidemiologica(com.data_comunicacao);
+        const semanaStr = se ? `SE ${se.semana.toString().padStart(2, '0')}/${se.ano}` : '-';
+        return [
+          com.id_comunicacao,
+          formatarData(com.data_comunicacao),
+          semanaStr,
+          com.nome_paciente,
+          com.origem_tipo,
+          com.origem?.nome || '-',
+          formatComunicacaoDaeAgravoNomes(com),
+          formatComunicacaoDaeAgravoCodigos(com),
+          com.tipo_municipio?.descricao || '-',
+          com.observacao_descricao || '-',
+          com.comunicacao_dae_anexo?.length || 0,
+          formatarData(com.created_at),
+          formatarData(com.updated_at)
+        ];
+      })
     ];
 
     // Criar workbook e worksheet
@@ -165,8 +182,10 @@ export const exportarComunicacoesDaeExcel = (
     ws['!cols'] = [
       { wch: 15 }, // Nº Comunicação
       { wch: 18 }, // Data da Comunicação
+      { wch: 22 }, // Semana Epidemiológica
       { wch: 30 }, // Nome do Paciente
       { wch: 10 }, // Origem
+      { wch: 30 }, // Unidade Notificadora
       { wch: 35 }, // DAE
       { wch: 12 }, // Código DAE
       { wch: 30 }, // Município

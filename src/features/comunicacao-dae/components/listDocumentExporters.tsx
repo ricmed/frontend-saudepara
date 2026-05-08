@@ -17,6 +17,7 @@ import {
   formatComunicacaoDaeAgravoCodigos,
   formatComunicacaoDaeAgravoNomes,
 } from '@/features/comunicacao-dae/comunicacaoDaeAgravoUtils';
+import { calcularSemanaEpidemiologica } from '@/utils/timezoneUtils';
 
 const fallbackValue = (value?: string | number | null): string => {
   if (value === undefined || value === null) return '-';
@@ -196,14 +197,22 @@ const pdfStyles = StyleSheet.create({
   },
 });
 
+const formatSemanaEpidemiologica = (dateString?: string | null): string => {
+  const se = calcularSemanaEpidemiologica(dateString);
+  return se ? `SE ${se.semana.toString().padStart(2, '0')}/${se.ano}` : '-';
+};
+
 const columnWidths = {
-  id: '8%',
-  data: '16%',
-  paciente: '19%',
-  origem: '10%',
-  dae: '20%',
-  municipio: '20%',
-  anexos: '7%',
+  id: '6%',
+  data: '11%',
+  semana: '9%',
+  paciente: '14%',
+  origem: '6%',
+  unidade: '13%',
+  dae: '15%',
+  municipio: '13%',
+  anexos: '6%',
+  // codigos: removed — replaced by unidade notificadora
 } as const;
 
 interface PdfCellProps {
@@ -233,11 +242,13 @@ const ComunicacoesDaeListPdfDocument = ({ comunicacoes }: { comunicacoes: Comuni
         <View style={pdfStyles.row}>
           <PdfCell text="ID" width={columnWidths.id} isHeader borderedRight />
           <PdfCell text="Data" width={columnWidths.data} isHeader borderedRight />
+          <PdfCell text="SE" width={columnWidths.semana} isHeader borderedRight />
           <PdfCell text="Paciente" width={columnWidths.paciente} isHeader borderedRight />
           <PdfCell text="Origem" width={columnWidths.origem} isHeader borderedRight />
+          <PdfCell text="Unidade" width={columnWidths.unidade} isHeader borderedRight />
           <PdfCell text="DAE" width={columnWidths.dae} isHeader borderedRight />
           <PdfCell text="Municipio" width={columnWidths.municipio} isHeader borderedRight />
-          <PdfCell text="Anexos" width={columnWidths.anexos} isHeader />
+          <PdfCell text="Anx" width={columnWidths.anexos} isHeader />
         </View>
 
         {comunicacoes.map((item, index) => (
@@ -247,8 +258,10 @@ const ComunicacoesDaeListPdfDocument = ({ comunicacoes }: { comunicacoes: Comuni
           >
             <PdfCell text={`#${fallbackValue(item.id_comunicacao)}`} width={columnWidths.id} borderedRight />
             <PdfCell text={formatDateTime(item.data_comunicacao)} width={columnWidths.data} borderedRight />
+            <PdfCell text={formatSemanaEpidemiologica(item.data_comunicacao)} width={columnWidths.semana} borderedRight />
             <PdfCell text={fallbackValue(item.nome_paciente)} width={columnWidths.paciente} borderedRight />
             <PdfCell text={fallbackValue(item.origem_tipo)} width={columnWidths.origem} borderedRight />
+            <PdfCell text={fallbackValue(item.origem?.nome)} width={columnWidths.unidade} borderedRight />
             <PdfCell text={fallbackValue(formatComunicacaoDaeAgravoNomes(item))} width={columnWidths.dae} borderedRight />
             <PdfCell text={fallbackValue(item.tipo_municipio?.descricao)} width={columnWidths.municipio} borderedRight />
             <PdfCell text={String(item.comunicacao_dae_anexo?.length || 0)} width={columnWidths.anexos} />
@@ -297,8 +310,10 @@ const buildListWordDocument = (comunicacoes: ComunicacaoDae[]): WordDocument =>
                 children: [
                   'ID',
                   'Data',
+                  'Sem. Epidemiologica',
                   'Paciente',
                   'Origem',
+                  'Unidade Notificadora',
                   'DAE',
                   'Municipio',
                   'Anexos',
@@ -320,8 +335,10 @@ const buildListWordDocument = (comunicacoes: ComunicacaoDae[]): WordDocument =>
                     children: [
                       `#${fallbackValue(item.id_comunicacao)}`,
                       formatDateTime(item.data_comunicacao),
+                      formatSemanaEpidemiologica(item.data_comunicacao),
                       fallbackValue(item.nome_paciente),
                       fallbackValue(item.origem_tipo),
+                      fallbackValue(item.origem?.nome),
                       fallbackValue(formatComunicacaoDaeAgravoNomes(item)),
                       fallbackValue(item.tipo_municipio?.descricao),
                       String(item.comunicacao_dae_anexo?.length || 0),
@@ -344,9 +361,10 @@ const ComunicacaoDaeDetalhadaPdfDocument = ({ comunicacao }: { comunicacao: Comu
   const rows: Array<{ label: string; value: string }> = [
     { label: 'Numero da comunicacao', value: comunicacao.id_comunicacao ? `#${comunicacao.id_comunicacao}` : '-' },
     { label: 'Data da comunicacao', value: formatDateTime(comunicacao.data_comunicacao) },
+    { label: 'Semana Epidemiologica', value: formatSemanaEpidemiologica(comunicacao.data_comunicacao) },
     { label: 'Nome do paciente', value: fallbackValue(comunicacao.nome_paciente) },
     { label: 'Tipo de origem', value: fallbackValue(comunicacao.origem_tipo) },
-    { label: 'Codigo da origem', value: fallbackValue(comunicacao.origem_id) },
+    { label: 'Unidade notificadora', value: fallbackValue(comunicacao.origem?.nome) },
     { label: 'DAE', value: fallbackValue(formatComunicacaoDaeAgravoNomes(comunicacao)) },
     { label: 'Codigo DAE', value: fallbackValue(formatComunicacaoDaeAgravoCodigos(comunicacao)) },
     { label: 'Municipio de ocorrencia', value: fallbackValue(comunicacao.tipo_municipio?.descricao) },
@@ -418,9 +436,10 @@ const buildDetalhadoWordDocument = (comunicacao: ComunicacaoDae): WordDocument =
   const rows: Array<{ label: string; value: string }> = [
     { label: 'Numero da comunicacao', value: comunicacao.id_comunicacao ? `#${comunicacao.id_comunicacao}` : '-' },
     { label: 'Data da comunicacao', value: formatDateTime(comunicacao.data_comunicacao) },
+    { label: 'Semana Epidemiologica', value: formatSemanaEpidemiologica(comunicacao.data_comunicacao) },
     { label: 'Nome do paciente', value: fallbackValue(comunicacao.nome_paciente) },
     { label: 'Tipo de origem', value: fallbackValue(comunicacao.origem_tipo) },
-    { label: 'Codigo da origem', value: fallbackValue(comunicacao.origem_id) },
+    { label: 'Unidade notificadora', value: fallbackValue(comunicacao.origem?.nome) },
     { label: 'DAE', value: fallbackValue(formatComunicacaoDaeAgravoNomes(comunicacao)) },
     { label: 'Codigo DAE', value: fallbackValue(formatComunicacaoDaeAgravoCodigos(comunicacao)) },
     { label: 'Municipio de ocorrencia', value: fallbackValue(comunicacao.tipo_municipio?.descricao) },

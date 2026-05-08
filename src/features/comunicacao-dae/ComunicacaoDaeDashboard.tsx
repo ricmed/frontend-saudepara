@@ -48,6 +48,7 @@ import {
   matchesDaeDashboardFilter,
 } from '@/features/comunicacao-dae/comunicacaoDaeAgravoUtils';
 import { getMunicipioBandeiraPathBase } from '@/utils/municipioBandeiraPa';
+import { calcularSemanaEpidemiologica } from '@/utils/timezoneUtils';
 
 interface ChartDataItem {
   name: string;
@@ -523,7 +524,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
 
     dadosFiltrados.forEach(c => {
       const date = new Date(c.data_comunicacao);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = date.toLocaleDateString('en-CA', { timeZone: 'America/Belem' }); // YYYY-MM-DD no fuso de Belém
 
       if (!dateMap.has(dateStr)) {
         dateMap.set(dateStr, { CRS: 0, NHE: 0, CIEVS: 0, total: 0 });
@@ -548,6 +549,29 @@ const ComunicacaoDaeDashboard: React.FC = () => {
         return dateA.localeCompare(dateB);
       })
       .slice(-30);
+  }, [dadosFiltrados]);
+
+  // Dados por semana epidemiológica
+  const dadosSemanaEpidemiologica = useMemo(() => {
+    const seMap = new Map<string, { semana: number; ano: number; value: number }>();
+
+    dadosFiltrados.forEach(c => {
+      const se = calcularSemanaEpidemiologica(c.data_comunicacao);
+      if (!se) return;
+      const key = `${se.ano}-${se.semana.toString().padStart(2, '0')}`;
+      if (!seMap.has(key)) {
+        seMap.set(key, { semana: se.semana, ano: se.ano, value: 0 });
+      }
+      seMap.get(key)!.value++;
+    });
+
+    return Array.from(seMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, d]) => ({
+        name: `SE ${d.semana.toString().padStart(2, '0')}`,
+        ano: d.ano,
+        value: d.value,
+      }));
   }, [dadosFiltrados]);
 
   // Dados para gráfico de municípios
@@ -1451,6 +1475,80 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                       />
                     </Area>
                   </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
+          {/* Casos por Semana Epidemiológica */}
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm sm:col-span-2 lg:col-span-4 xl:col-span-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-teal-100 text-teal-700 rounded-lg">
+                  <Activity className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">Casos por Semana Epidemiológica</h3>
+                  <p className="text-sm text-gray-600">Distribuição das comunicações por semana epidemiológica</p>
+                </div>
+              </div>
+              <ChartExportMenu
+                chartId="chart-semana-epidemiologica"
+                chartData={dadosSemanaEpidemiologica}
+                chartTitle="Casos por Semana Epidemiológica"
+                buttonVariant="icon"
+              />
+            </div>
+            {dadosSemanaEpidemiologica.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-80 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                <svg className="w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <p className="text-gray-500 text-lg font-medium mb-2">Nenhuma comunicação encontrada</p>
+                <p className="text-gray-400 text-sm text-center max-w-md">
+                  Não há comunicações cadastradas ou nenhuma corresponde aos filtros selecionados
+                </p>
+              </div>
+            ) : (
+              <div className="h-[480px]" id="chart-semana-epidemiologica">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={dadosSemanaEpidemiologica} margin={{ top: 30, right: 30, left: 20, bottom: 60 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis
+                      dataKey="name"
+                      stroke="#6b7280"
+                      fontSize={11}
+                      angle={-45}
+                      textAnchor="end"
+                      height={70}
+                      label={{ value: 'Semana Epidemiológica', position: 'insideBottom', offset: -10, style: { fill: '#6b7280', fontSize: 12 } }}
+                    />
+                    <YAxis
+                      stroke="#6b7280"
+                      fontSize={12}
+                      allowDecimals={false}
+                      label={{ value: 'Casos', angle: -90, position: 'insideLeft', offset: -5, style: { fill: '#6b7280', fontSize: 12 } }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'white',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        padding: '12px',
+                      }}
+                      formatter={(value: number, _name: string, props: any) => [
+                        `${value} comunicação${value !== 1 ? 'ões' : ''}`,
+                        `${props.payload.name} / ${props.payload.ano}`,
+                      ]}
+                    />
+                    <Bar dataKey="value" fill="#5eafc6" radius={[4, 4, 0, 0]} animationDuration={800}>
+                      <LabelList
+                        dataKey="value"
+                        position="top"
+                        style={{ fill: '#1e6f8c', fontWeight: 700, fontSize: 12 }}
+                      />
+                    </Bar>
+                  </BarChart>
                 </ResponsiveContainer>
               </div>
             )}

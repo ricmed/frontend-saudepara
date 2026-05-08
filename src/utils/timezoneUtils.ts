@@ -249,6 +249,53 @@ export const convertUTCToLocalDateTime = (utcDateString: string | null | undefin
 };
 
 /**
+ * Calcula a Semana Epidemiológica Brasileira (SVS/MS) para uma data.
+ * Semanas começam no domingo. A SE-01 é a primeira semana com ≥4 dias em janeiro.
+ */
+export const calcularSemanaEpidemiologica = (
+  dateString: string | null | undefined
+): { semana: number; ano: number } | null => {
+  if (!dateString) return null;
+
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return null;
+
+    const localStr = date.toLocaleDateString('en-CA', { timeZone: 'America/Belem' });
+    const [y, m, d] = localStr.split('-').map(Number);
+    const localDate = new Date(y, m - 1, d);
+
+    const week1Start = (yr: number): Date => {
+      const jan4 = new Date(yr, 0, 4);
+      const start = new Date(jan4);
+      start.setDate(jan4.getDate() - jan4.getDay()); // retrocede ao domingo
+      return start;
+    };
+
+    let weekYear = y;
+    let w1 = week1Start(weekYear);
+
+    if (localDate < w1) {
+      weekYear = y - 1;
+      w1 = week1Start(weekYear);
+    }
+
+    const nextW1 = week1Start(y + 1);
+    if (localDate >= nextW1) {
+      weekYear = y + 1;
+      w1 = nextW1;
+    }
+
+    const diffDays = Math.floor((localDate.getTime() - w1.getTime()) / 86400000);
+    const semana = Math.floor(diffDays / 7) + 1;
+
+    return { semana, ano: weekYear };
+  } catch {
+    return null;
+  }
+};
+
+/**
  * Converte datetime-local (YYYY-MM-DDTHH:MM) para UTC ISO string
  * @param localDateTimeString - String do input datetime-local (ex: "2026-02-05T11:00")
  * @returns String ISO UTC (ex: "2026-02-05T14:00:00.000Z")

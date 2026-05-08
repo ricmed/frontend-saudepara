@@ -12,6 +12,7 @@ import {
   TextRun,
   WidthType,
 } from 'docx';
+import { calcularSemanaEpidemiologica } from '@/utils/timezoneUtils';
 
 export interface ComunicacaoDaeFormExportAnexo {
   nome_arquivo: string;
@@ -209,9 +210,12 @@ const PdfFieldRow: React.FC<{ label: string; value: string; showBottomBorder?: b
 
 const ComunicacaoDaePdfDocument: React.FC<{ data: ComunicacaoDaeFormExportData }> = ({ data }) => {
   const anexos = data.anexos ?? [];
+  const seInfo = calcularSemanaEpidemiologica(data.dataComunicacao ?? null);
+  const semanaStr = seInfo ? `SE ${seInfo.semana.toString().padStart(2, '0')}/${seInfo.ano}` : '-';
   const rows: Array<{ label: string; value: string }> = [
     { label: 'Numero da comunicacao', value: data.idComunicacao ? `#${data.idComunicacao}` : 'Rascunho' },
     { label: 'Data da comunicacao', value: formatDateTime(data.dataComunicacao) },
+    { label: 'Semana Epidemiologica', value: semanaStr },
     { label: 'Nome do paciente', value: fallbackValue(data.nomePaciente) },
     { label: 'Tipo de origem', value: fallbackValue(data.origemTipo) },
     { label: 'Unidade notificadora', value: fallbackValue(data.origemNome) },
@@ -318,9 +322,12 @@ const createWordFieldTable = (rows: Array<{ label: string; value: string }>): Ta
 
 const buildWordDocument = (data: ComunicacaoDaeFormExportData): WordDocument => {
   const anexos = data.anexos ?? [];
+  const seInfo = calcularSemanaEpidemiologica(data.dataComunicacao ?? null);
+  const semanaStr = seInfo ? `SE ${seInfo.semana.toString().padStart(2, '0')}/${seInfo.ano}` : '-';
   const rows: Array<{ label: string; value: string }> = [
     { label: 'Numero da comunicacao', value: data.idComunicacao ? `#${data.idComunicacao}` : 'Rascunho' },
     { label: 'Data da comunicacao', value: formatDateTime(data.dataComunicacao) },
+    { label: 'Semana Epidemiologica', value: semanaStr },
     { label: 'Nome do paciente', value: fallbackValue(data.nomePaciente) },
     { label: 'Tipo de origem', value: fallbackValue(data.origemTipo) },
     { label: 'Unidade notificadora', value: fallbackValue(data.origemNome) },
