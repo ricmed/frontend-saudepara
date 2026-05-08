@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 import { FileSpreadsheet, Download } from 'lucide-react';
 import FormResponsesService from '@/services/FormResponsesService';
@@ -14,9 +14,18 @@ import {
 } from '../utils/monitorOperRegionalReport';
 import { useCrsLabelByIdMap } from '../hooks/useCrsLabelByIdMap';
 
+type FormResponsesLocationState = {
+  responsesBackTo?: string;
+};
+
 export const FormResponsesPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const formId = Number(id);
+
+  const responsesBackTo =
+    (location.state as FormResponsesLocationState | null)?.responsesBackTo ??
+    '/private/formularios-admin';
 
   const [form, setForm] = useState<Form | null>(null);
   const [loading, setLoading] = useState(true);
@@ -112,7 +121,7 @@ export const FormResponsesPage: React.FC = () => {
       icon={<FileSpreadsheet className="h-8 w-8" />}
       variant="desktop"
       showBottomNav={false}
-      backPath="/private/formularios-admin"
+      backPath={responsesBackTo}
       headerActions={
         <div className="flex gap-2">
           <button

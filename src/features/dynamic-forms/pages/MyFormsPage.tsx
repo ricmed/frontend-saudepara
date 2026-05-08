@@ -2,7 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 import FormService, { type Form } from '@/services/FormService';
-import { Plus, Link2, FileSpreadsheet, FileText, FileEdit, Power, Trash2, Copy, Search } from 'lucide-react';
+import { Plus, Link2, FileSpreadsheet, FileText, FileEdit, Trash2, Copy, Search } from 'lucide-react';
+
+const VISIBILITY_LABEL: Record<string, string> = {
+  PRIVATE: 'Privado',
+  UNLISTED: 'Compartilhável',
+  PUBLIC: 'Público',
+};
 
 export const MyFormsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -136,80 +142,88 @@ export const MyFormsPage: React.FC = () => {
               key={f.id}
               className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200 hover:shadow-md hover:-translate-y-0.5 transition-all w-full max-w-[26rem] justify-self-start"
             >
+              {/* Header */}
               <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4">
                 <h3 className="text-white font-semibold text-lg line-clamp-2">{f.nome}</h3>
-                <p className="text-blue-100 text-xs mt-1">
-                  {f.visibility || 'PRIVATE'} {f.slug ? `· /f/${f.slug}` : ''}
-                </p>
-              </div>
-              <div className="p-4 space-y-3">
-                {f.descricao ? <p className="text-sm text-gray-600 line-clamp-3">{f.descricao}</p> : null}
-                <div className="flex items-center justify-between text-xs text-gray-600">
-                  <span
-                    className={`px-2 py-1 rounded-full border ${
-                      f.is_active
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                        : 'bg-gray-50 text-gray-700 border-gray-200'
-                    }`}
-                  >
+                <div className="flex items-center gap-2 mt-1">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    f.is_active
+                      ? 'bg-emerald-400/30 text-emerald-100'
+                      : 'bg-white/20 text-white/70'
+                  }`}>
                     {f.is_active ? 'Ativo' : 'Inativo'}
                   </span>
+                  <span className="text-blue-200 text-xs">
+                    {VISIBILITY_LABEL[f.visibility || 'PRIVATE']}
+                    {f.slug ? ` · /f/${f.slug}` : ''}
+                  </span>
                 </div>
+              </div>
+
+              {/* Body */}
+              <div className="p-4 space-y-4">
+                {f.descricao && (
+                  <p className="text-sm text-gray-500 line-clamp-2">{f.descricao}</p>
+                )}
+
+                {/* Ações principais */}
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => navigate(`/private/meus-formularios/${f.id}/editar`)}
-                    className="w-full min-h-[2.5rem] px-2 py-2 bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200 inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-medium text-center leading-tight"
+                    className="flex flex-col items-center gap-1 py-3 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors text-xs font-medium"
                   >
-                    <FileEdit className="h-4 w-4 shrink-0" aria-hidden />
-                    <span>Campos</span>
+                    <FileEdit className="h-4 w-4" aria-hidden />
+                    Campos
                   </button>
                   <button
                     type="button"
                     onClick={() => navigate(`/private/meus-formularios/${f.id}/compartilhar`)}
-                    className="w-full min-h-[2.5rem] px-2 py-2 bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-medium text-center leading-tight"
+                    className="flex flex-col items-center gap-1 py-3 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-xs font-medium"
                   >
-                    <Link2 className="h-4 w-4 shrink-0" aria-hidden />
-                    <span>Compartilhar</span>
+                    <Link2 className="h-4 w-4" aria-hidden />
+                    Compartilhar
                   </button>
                   <button
                     type="button"
-                    onClick={() => navigate(`/private/formularios-admin/respostas/${f.id}`)}
-                    className="w-full min-h-[2.5rem] px-2 py-2 bg-emerald-50 text-emerald-800 rounded-md hover:bg-emerald-100 inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-medium text-center leading-tight"
+                    onClick={() =>
+                      navigate(`/private/formularios-admin/respostas/${f.id}`, {
+                        state: { responsesBackTo: '/private/meus-formularios' },
+                      })
+                    }
+                    className="flex flex-col items-center gap-1 py-3 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 transition-colors text-xs font-medium"
                   >
-                    <FileSpreadsheet className="h-4 w-4 shrink-0" aria-hidden />
-                    <span>Respostas</span>
+                    <FileSpreadsheet className="h-4 w-4" aria-hidden />
+                    Respostas
                   </button>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+
+                {/* Ações secundárias */}
+                <div className="flex items-center justify-end gap-4 pt-1 border-t">
                   <button
                     type="button"
                     onClick={() => toggleActive(f)}
-                    className={`w-full min-h-[2.5rem] px-2 py-2 rounded-md inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-medium text-center leading-tight ${
-                      f.is_active
-                        ? 'bg-amber-50 text-amber-900 hover:bg-amber-100'
-                        : 'bg-green-50 text-green-800 hover:bg-green-100'
+                    className={`text-xs hover:underline ${
+                      f.is_active ? 'text-amber-700' : 'text-emerald-700'
                     }`}
                   >
-                    <Power className="h-4 w-4 shrink-0" aria-hidden />
-                    <span>{f.is_active ? 'Desativar' : 'Ativar'}</span>
+                    {f.is_active ? 'Desativar' : 'Ativar'}
                   </button>
                   <button
                     type="button"
                     onClick={() => duplicate(f)}
-                    className="w-full min-h-[2.5rem] px-2 py-2 rounded-md bg-purple-50 text-purple-800 hover:bg-purple-100 inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-medium text-center leading-tight"
+                    className="text-xs text-gray-500 hover:underline flex items-center gap-1"
                   >
-                    <Copy className="h-4 w-4 shrink-0" aria-hidden />
-                    <span>Duplicar</span>
+                    <Copy className="h-3 w-3" aria-hidden />
+                    Duplicar
                   </button>
                   <button
                     type="button"
                     onClick={() => removeForm(f)}
-                    title="Remove o formulário e todas as respostas. Não pode ser desfeito."
-                    className="w-full min-h-[2.5rem] px-2 py-2 rounded-md bg-red-50 text-red-800 hover:bg-red-100 inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-medium text-center leading-tight"
+                    className="text-xs text-red-500 hover:underline flex items-center gap-1"
                   >
-                    <Trash2 className="h-4 w-4 shrink-0" aria-hidden />
-                    <span>Excluir</span>
+                    <Trash2 className="h-3 w-3" aria-hidden />
+                    Excluir
                   </button>
                 </div>
               </div>

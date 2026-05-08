@@ -317,6 +317,7 @@ class FormService {
     visibility?: 'PRIVATE' | 'UNLISTED' | 'PUBLIC';
     require_login?: boolean;
     slug?: string;
+    is_active?: boolean;
   }): Promise<Form> {
     const response = await api.post('/forms/me', data);
     return response.data;

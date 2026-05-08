@@ -534,6 +534,7 @@ export const FormBuilderPage: React.FC = () => {
             categoria: formData.categoria,
             visibility: 'PRIVATE',
             require_login: false,
+            is_active: true,
           });
           formId = newForm.id;
           // após criar no contexto geral, a URL deve virar /:id/editar pra não salvar sempre "novo"
