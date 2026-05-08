@@ -539,16 +539,12 @@ const ComunicacaoDaeDashboard: React.FC = () => {
     });
 
     return Array.from(dateMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b)) // ordena pela chave YYYY-MM-DD diretamente
+      .slice(-30)
       .map(([date, data]) => ({
-        date: new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+        date: `${date.slice(8, 10)}/${date.slice(5, 7)}`, // "2026-05-07" → "07/05" sem passar por new Date()
         ...data
-      }))
-      .sort((a, b) => {
-        const dateA = a.date.split('/').reverse().join('-');
-        const dateB = b.date.split('/').reverse().join('-');
-        return dateA.localeCompare(dateB);
-      })
-      .slice(-30);
+      }));
   }, [dadosFiltrados]);
 
   // Dados por semana epidemiológica
