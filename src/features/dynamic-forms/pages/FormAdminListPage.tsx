@@ -166,14 +166,16 @@ export const FormAdminListPage: React.FC = () => {
       showBottomNav={false}
       backPath="/"
       headerActions={
-        <button
-          onClick={() => navigate('/private/formularios-admin/novo')}
-          className="px-3 sm:px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 flex items-center gap-1 sm:gap-2 shadow-lg font-medium text-sm sm:text-base"
-        >
-          <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
-          <span className="hidden sm:inline">Novo</span>
-          <span className="sm:hidden">+</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/private/formularios-admin/novo')}
+            className="px-3 sm:px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 flex items-center gap-1 sm:gap-2 shadow-lg font-medium text-sm sm:text-base"
+          >
+            <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
+            <span className="hidden sm:inline">Novo</span>
+            <span className="sm:hidden">+</span>
+          </button>
+        </div>
       }
     >
       <div className="bg-white rounded-lg shadow p-4 mb-4">
@@ -399,6 +401,7 @@ export const FormAdminListPage: React.FC = () => {
           ))}
         </div>
       )}
+
     </AppPageLayout>
   );
 };

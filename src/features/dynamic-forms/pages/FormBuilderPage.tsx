@@ -1,12 +1,13 @@
 import React, { Suspense, useMemo, useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/keycloak/AuthProvider';
-import FormService, { type FormSchema, type FormSection, type FormField, type FormRule, type RuleCondition, type RuleAction, type TableColumnDef } from '@/services/FormService';
+import FormService, { type FormSchema, type FormSection, type FormField, type FormRule, type RuleCondition, type RuleAction, type TableColumnDef, type XlsFormPreview } from '@/services/FormService';
 import DatabaseService, { type TableColumn } from '@/services/DatabaseService';
 import { Plus, Trash2, Save, Eye, Settings, GripVertical, X, Download, Upload, ChevronUp, ChevronDown, Code, FileEdit, Check } from 'lucide-react';
 import { ClipboardList, Calendar, DollarSign, Target, Activity, Shield, Leaf, BarChart3, Wrench, Users } from 'lucide-react';
 import dynamicIconImports from 'lucide-react/dynamicIconImports';
 import { FormRenderer } from '../components/FormRenderer';
+import { ImportExcelModal } from '../components/ImportExcelModal';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 import { clampNoteInRange, normalizeScalePointLabelRows } from '@/utils/linearScaleNote';
 
@@ -97,7 +98,8 @@ export const FormBuilderPage: React.FC = () => {
   /** Versão publicada ativa do formulário (para abrir a tela de colunas fixas SINAN). */
   const [activeVersionId, setActiveVersionId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+  const [importExcelOpen, setImportExcelOpen] = useState(false);
+
   // Estados para configuração de banco de dados
   const [availableTables, setAvailableTables] = useState<string[]>([]);
   const [availableColumns, setAvailableColumns] = useState<Record<string, TableColumn[]>>({});
@@ -631,8 +633,36 @@ export const FormBuilderPage: React.FC = () => {
     }
   };
 
+  const handleImportFromExcel = (xlsPreview: XlsFormPreview) => {
+    // Build a lookup for codeList items so we can inline them (no DB write needed in builder mode)
+    const codeListMap: Record<string, { value: string; label: string }[]> = {};
+    xlsPreview.codeLists.forEach((cl) => {
+      codeListMap[cl.name] = cl.items.map(i => ({ value: i.code, label: i.label }));
+    });
+
+    const populatedSchema: FormSchema = {
+      ...xlsPreview.schema_json,
+      sections: xlsPreview.schema_json.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) => {
+          if (field.codeList && codeListMap[field.codeList]) {
+            const { codeList: _removed, ...rest } = field as any;
+            return { ...rest, options: codeListMap[field.codeList] } as FormField;
+          }
+          return field;
+        }),
+      })),
+    };
+
+    setFormName(xlsPreview.form.nome);
+    setFormKey(xlsPreview.form.form_key);
+    setFormDescription(xlsPreview.form.descricao || '');
+    setCategoria(xlsPreview.form.categoria || (isGeneralBuilder ? 'eventos_inscricoes' : 'notificacao'));
+    setSchema(populatedSchema);
+  };
+
   // ========== FUNÇÕES DE REGRAS ==========
-  
+
   const addRule = () => {
     const newRule: FormRule = {
       id: `rule_${Date.now()}`,
@@ -1146,6 +1176,15 @@ export const FormBuilderPage: React.FC = () => {
           >
             <Upload className="h-4 w-4" />
             Importar
+          </button>
+          <button
+            type="button"
+            onClick={() => setImportExcelOpen(true)}
+            className="px-3 py-2 text-white bg-emerald-600 hover:bg-emerald-700 rounded-md flex items-center gap-2"
+            title="Importar formulário de planilha Excel"
+          >
+            <Upload className="h-4 w-4" />
+            Importar Planilha
           </button>
           <button
             type="button"
@@ -2859,6 +2898,15 @@ export const FormBuilderPage: React.FC = () => {
               </button>
               <button
                 type="button"
+                onClick={() => setImportExcelOpen(true)}
+                className="px-3 py-2 text-white bg-emerald-600 hover:bg-emerald-700 rounded-md flex items-center gap-2 text-sm"
+                title="Importar formulário de planilha Excel"
+              >
+                <Upload className="h-4 w-4" />
+                Excel
+              </button>
+              <button
+                type="button"
                 onClick={() => setShowPreview(true)}
                 className="px-3 py-2 text-white bg-purple-600 hover:bg-purple-700 rounded-md flex items-center gap-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                 disabled={schema.sections.length === 0}
@@ -3000,6 +3048,12 @@ export const FormBuilderPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ImportExcelModal
+        open={importExcelOpen}
+        onClose={() => setImportExcelOpen(false)}
+        onSchema={handleImportFromExcel}
+      />
     </AppPageLayout>
   );
 };

@@ -282,6 +282,24 @@ export interface PacienteLookupBasic {
   sexo: string | null; // M/F/I (ou conforme base interna)
 }
 
+// ── Tipos para importação via Excel ──────────────────────────────────────────
+
+export interface XlsFormPreview {
+  form: {
+    form_key: string;
+    nome: string;
+    descricao?: string;
+    categoria?: string;
+    agravo: string;
+  };
+  schema_json: FormSchema;
+  codeLists: Array<{
+    name: string;
+    items: Array<{ code: string; label: string }>;
+  }>;
+  warnings: string[];
+}
+
 // Service
 class FormService {
   // Meus formulários (owner + ACL)
@@ -531,6 +549,34 @@ class FormService {
       console.error('Erro ao excluir formulário (force):', error);
       throw error;
     }
+  }
+
+  // ── Importação via Excel (XLSForm) ────────────────────────────────────────
+
+  async downloadImportTemplate(): Promise<void> {
+    const response = await api.get('/forms/import-excel/template', { responseType: 'blob' });
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'template_formulario.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  }
+
+  async previewImportExcel(file: File): Promise<XlsFormPreview> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/forms/import-excel/preview', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
+  async confirmImportExcel(preview: XlsFormPreview): Promise<{ formId: number; versionId: number }> {
+    const response = await api.post('/forms/import-excel/confirm', { preview });
+    return response.data;
   }
 }
 
