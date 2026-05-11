@@ -396,7 +396,7 @@ const ValidacaoCientificaPage: React.FC = () => {
                         ? `rastreado em ${dados.sincronizacao_offline.com_tempo_rastreado} registros`
                         : dados.sincronizacao_offline.total_offline === 0
                           ? "sem registros offline no período"
-                          : "synced_at sem rastreamento (dados históricos)"}
+                          : "intervalo não calculado — veja a nota abaixo"}
                     </p>
                   </div>
                   <div className="bg-gray-50 rounded-xl p-4">
