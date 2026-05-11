@@ -101,7 +101,11 @@ export const CheckboxGroupField: React.FC<AdvancedFieldProps> = ({
       {field.helpText && (
         <p className="text-xs text-gray-500 mb-2">{field.helpText}</p>
       )}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className={`grid gap-3 ${
+        field.gridCols === 3
+          ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+          : 'grid-cols-1 sm:grid-cols-2'
+      }`}>
         {options.map((option) => {
           const isSelected = selectedValues.includes(option.value);
           return (

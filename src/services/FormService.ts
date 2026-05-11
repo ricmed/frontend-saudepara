@@ -202,6 +202,8 @@ export interface FormField {
     totalMax?: number;
     message?: string;
   };
+  /** Número de colunas do grid para campos tipo checkbox-group (padrão: 2). */
+  gridCols?: number;
   quiz?: {
     enabled?: boolean;
     points?: number;

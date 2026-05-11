@@ -65,7 +65,7 @@ export const es: TranslationRecord = {
   "menu.qualify_establishments": "Calificar Establecimientos",
   "menu.notification": "Módulo de Comunicación de Caso",
   "menu.notify_case": "Reportar Caso",
-  "menu.dynamic_forms": "Formularios de Notificación",
+  "menu.dynamic_forms": "Formularios compartidos",
   "menu.dashboard": "Dashboard",
   "menu.offline_management": "Datos Sin Conexión",
   "menu.educational": "Materiales Educativos",

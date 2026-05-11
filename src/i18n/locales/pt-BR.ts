@@ -62,7 +62,7 @@ export const ptBR = {
   "menu.qualify_establishments": "Qualificar Estabelecimentos",
   "menu.notification": "Módulo Comunicação de Caso",
   "menu.notify_case": "Comunicar Caso",
-  "menu.dynamic_forms": "Formulários de Notificação",
+  "menu.dynamic_forms": "Formulários compartilhados",
   "menu.dashboard": "Dashboard",
   "menu.offline_management": "Dados Offline",
   "menu.educational": "Materiais Educativos",

@@ -65,7 +65,7 @@ export const en: TranslationRecord = {
   "menu.qualify_establishments": "Qualify Establishments",
   "menu.notification": "Case Communication Module",
   "menu.notify_case": "Report Case",
-  "menu.dynamic_forms": "Notification Forms",
+  "menu.dynamic_forms": "Shared Forms",
   "menu.dashboard": "Dashboard",
   "menu.offline_management": "Offline Data",
   "menu.educational": "Educational Materials",

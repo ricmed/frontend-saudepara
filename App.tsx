@@ -134,6 +134,7 @@ import AscomPage from '@/features/contact/AscomPage';
 import OuvidoriaPage from '@/features/contact/OuvidoriaPage';
 // Version page
 import VersionPage from '@/pages/VersionPage';
+import ValidacaoCientificaPage from '@/pages/ValidacaoCientificaPage';
 // Dynamic Forms System
 import { DynamicFormPage } from '@/features/dynamic-forms/pages/DynamicFormPage';
 import { FormsListPage } from '@/features/dynamic-forms/pages/FormsListPage';
@@ -493,6 +494,16 @@ function App() {
           
           {/* Version Page */}
           <Route path="/versao" element={<VersionPage />} />
+
+          {/* Validação Científica — qualquer usuário autenticado */}
+          <Route
+            path="/validacao-cientifica"
+            element={
+              <ProtectedRoute>
+                <ValidacaoCientificaPage />
+              </ProtectedRoute>
+            }
+          />
           
           {/* ✅ NOVO: Rota para Admin do Chat de Suporte */}
           <Route 

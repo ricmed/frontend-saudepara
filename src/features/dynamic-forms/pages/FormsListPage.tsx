@@ -36,8 +36,8 @@ export const FormsListPage: React.FC = () => {
   if (loading) {
     return (
       <AppPageLayout
-        title="Formulários de Notificação"
-        subtitle="Selecione um agravo para preencher o formulário"
+        title="Formulários compartilhados"
+        subtitle="Selecione um formulário para preencher"
         icon={<ClipboardList className="h-8 w-8" />}
         variant="desktop"
         showBottomNav={false}
@@ -55,8 +55,8 @@ export const FormsListPage: React.FC = () => {
   if (error) {
     return (
       <AppPageLayout
-        title="Formulários de Notificação"
-        subtitle="Selecione um agravo para preencher o formulário"
+        title="Formulários compartilhados"
+        subtitle="Selecione um formulário para preencher"
         icon={<ClipboardList className="h-8 w-8" />}
         variant="desktop"
         showBottomNav={false}
@@ -70,7 +70,7 @@ export const FormsListPage: React.FC = () => {
 
   return (
     <AppPageLayout
-      title="Formulários de Notificação"
+      title="Formulários compartilhados"
       subtitle="Selecione um agravo para preencher o formulário"
       icon={<ClipboardList className="h-8 w-8" />}
       variant="desktop"

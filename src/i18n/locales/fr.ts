@@ -59,7 +59,7 @@ export const fr: TranslationRecord = {
   "menu.qualify_establishments": "Qualifier les Établissements",
   "menu.notification": "Module de Communication de Cas",
   "menu.notify_case": "Signaler un Cas",
-  "menu.dynamic_forms": "Formulaires de Notification",
+  "menu.dynamic_forms": "Formulaires partagés",
   "menu.dashboard": "Tableau de Bord",
   "menu.offline_management": "Données Hors Ligne",
   "menu.educational": "Matériaux Éducatifs",
