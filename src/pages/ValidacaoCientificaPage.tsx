@@ -394,7 +394,9 @@ const ValidacaoCientificaPage: React.FC = () => {
                     <p className="text-xs text-gray-400 mt-0.5">
                       {dados.sincronizacao_offline.com_tempo_rastreado > 0
                         ? `rastreado em ${dados.sincronizacao_offline.com_tempo_rastreado} registros`
-                        : "synced_at não rastreado neste período"}
+                        : dados.sincronizacao_offline.total_offline === 0
+                          ? "sem registros offline no período"
+                          : "synced_at sem rastreamento (dados históricos)"}
                     </p>
                   </div>
                   <div className="bg-gray-50 rounded-xl p-4">
