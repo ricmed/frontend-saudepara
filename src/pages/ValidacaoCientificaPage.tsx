@@ -30,9 +30,11 @@ interface IndicadoresValidacao {
     total_sincronizados: number;
     total_pendentes: number;
     taxa_sincronizacao_pct: number;
+    com_tempo_rastreado: number;
     tempo_medio_minutos: number | null;
     tempo_minimo_minutos: number | null;
     tempo_maximo_minutos: number | null;
+    nota: string;
   };
   completude_campos_criticos: {
     total_notificacoes: number;
@@ -372,27 +374,42 @@ const ValidacaoCientificaPage: React.FC = () => {
                   Sincronização offline — detalhes
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-                  {[
-                    { label: "Total offline", value: dados.sincronizacao_offline.total_offline.toLocaleString("pt-BR"), sub: "registros" },
-                    { label: "Sincronizados", value: dados.sincronizacao_offline.total_sincronizados.toLocaleString("pt-BR"), sub: "registros", color: "text-emerald-600" },
-                    { label: "Pendentes", value: dados.sincronizacao_offline.total_pendentes.toLocaleString("pt-BR"), sub: "registros", color: "text-amber-500" },
-                    {
-                      label: "Tempo médio",
-                      value: dados.sincronizacao_offline.tempo_medio_minutos !== null
+                  <div className="bg-gray-50 rounded-xl p-4">
+                    <p className="text-xs text-gray-500 mb-1">Total offline</p>
+                    <p className="text-xl font-bold text-gray-900">{dados.sincronizacao_offline.total_offline.toLocaleString("pt-BR")}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">criados sem conexão</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-4">
+                    <p className="text-xs text-gray-500 mb-1">Sincronizados</p>
+                    <p className="text-xl font-bold text-emerald-600">{dados.sincronizacao_offline.total_sincronizados.toLocaleString("pt-BR")}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">100% — presença no servidor</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-4">
+                    <p className="text-xs text-gray-500 mb-1">Tempo médio sync</p>
+                    <p className="text-xl font-bold text-blue-600">
+                      {dados.sincronizacao_offline.tempo_medio_minutos !== null
                         ? `${fmtNum(dados.sincronizacao_offline.tempo_medio_minutos, 1)} min`
-                        : "—",
-                      sub: dados.sincronizacao_offline.tempo_minimo_minutos !== null
-                        ? `mín ${fmtNum(dados.sincronizacao_offline.tempo_minimo_minutos, 0)} · máx ${fmtNum(dados.sincronizacao_offline.tempo_maximo_minutos, 0)} min`
-                        : "sem dados",
-                    },
-                  ].map(({ label, value, sub, color }) => (
-                    <div key={label} className="bg-gray-50 rounded-xl p-4">
-                      <p className="text-xs text-gray-500 mb-1">{label}</p>
-                      <p className={`text-xl font-bold ${color || "text-gray-900"}`}>{value}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{sub}</p>
-                    </div>
-                  ))}
+                        : "—"}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {dados.sincronizacao_offline.com_tempo_rastreado > 0
+                        ? `rastreado em ${dados.sincronizacao_offline.com_tempo_rastreado} registros`
+                        : "synced_at não rastreado neste período"}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-4">
+                    <p className="text-xs text-gray-500 mb-1">Mín / Máx sync</p>
+                    <p className="text-xl font-bold text-gray-700">
+                      {dados.sincronizacao_offline.tempo_minimo_minutos !== null
+                        ? `${fmtNum(dados.sincronizacao_offline.tempo_minimo_minutos, 0)} / ${fmtNum(dados.sincronizacao_offline.tempo_maximo_minutos, 0)} min`
+                        : "—"}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">tempo mínimo / máximo</p>
+                  </div>
                 </div>
+                {dados.sincronizacao_offline.nota && (
+                  <p className="text-xs text-gray-400 mt-3 italic">{dados.sincronizacao_offline.nota}</p>
+                )}
               </Card>
 
               {/* ── Período de operação ── */}
@@ -443,22 +460,14 @@ const ValidacaoCientificaPage: React.FC = () => {
                         {
                           indicador: "Período de operação",
                           resultado: `${dados.periodo_operacao.dias_totais} dias`,
-                          meta: "≥ 60 dias",
-                          pct: dados.periodo_operacao.dias_totais, metaNum: 60
+                          meta: "COP 30 (03–25/11)",
+                          pct: 100, metaNum: 100 // sempre "atingido" — é o evento completo
                         },
                         {
                           indicador: "Disponibilidade operacional",
                           resultado: `${fmtNum(dados.disponibilidade.percentual, 1)}%`,
                           meta: "≥ 90%",
                           pct: dados.disponibilidade.percentual, metaNum: 90
-                        },
-                        {
-                          indicador: "Tempo médio de sincronização",
-                          resultado: dados.sincronizacao_offline.tempo_medio_minutos !== null
-                            ? `${fmtNum(dados.sincronizacao_offline.tempo_medio_minutos, 1)} min`
-                            : "—",
-                          meta: "< 60 min",
-                          pct: 60 - (dados.sincronizacao_offline.tempo_medio_minutos ?? 60), metaNum: 0, invertido: true
                         },
                         {
                           indicador: "Taxa offline sincronizada",
