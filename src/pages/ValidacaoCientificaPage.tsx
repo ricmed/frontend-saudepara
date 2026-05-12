@@ -31,7 +31,7 @@ interface IndicadoresValidacao {
     total_pendentes: number;
     taxa_sincronizacao_pct: number;
     com_tempo_rastreado: number;
-    /** Truncado ao segundo — costuma ser 0 quando created_at e synced_at vêm do mesmo create. */
+    /** Igual ao export Excel: epoch em `offline_id` → `created_at` (minutos). */
     tempo_medio_minutos: number | null;
     tempo_minimo_minutos: number | null;
     tempo_maximo_minutos: number | null;
@@ -387,38 +387,53 @@ const ValidacaoCientificaPage: React.FC = () => {
                   <div className="bg-gray-50 rounded-xl p-4">
                     <p className="text-xs text-gray-500 mb-1">Sincronizados</p>
                     <p className="text-xl font-bold text-emerald-600">{dados.sincronizacao_offline.total_sincronizados.toLocaleString("pt-BR")}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">100% — presença no servidor</p>
+                    <p className="text-xs text-gray-400 mt-0.5">com synced_at no servidor</p>
                   </div>
                   <div className="bg-gray-50 rounded-xl p-4">
-                    <p className="text-xs text-gray-500 mb-1">Latência created ↔ synced</p>
+                    <p className="text-xs text-gray-500 mb-1">Tempo médio (regra Excel)</p>
                     <p className="text-xl font-bold text-blue-600">
-                      {dados.sincronizacao_offline.latencia_sync_ms_media != null
-                        ? `${fmtNum(dados.sincronizacao_offline.latencia_sync_ms_media, 2)} ms`
-                        : dados.sincronizacao_offline.tempo_medio_minutos != null
-                          ? `${fmtNum(dados.sincronizacao_offline.tempo_medio_minutos, 4)} min`
-                          : "—"}
+                      {dados.sincronizacao_offline.tempo_medio_minutos != null
+                        ? `${fmtNum(dados.sincronizacao_offline.tempo_medio_minutos, 1)} min`
+                        : "—"}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
                       {dados.sincronizacao_offline.com_tempo_rastreado > 0
-                        ? `média em ms · ${dados.sincronizacao_offline.com_tempo_rastreado} registro(s)`
+                        ? `offline_id → created_at · ${dados.sincronizacao_offline.com_tempo_rastreado} registro(s)`
                         : dados.sincronizacao_offline.total_offline === 0
                           ? "sem registros offline no período"
-                          : "veja a nota abaixo"}
+                          : "sem offline_id parseável no período"}
                     </p>
                   </div>
                   <div className="bg-gray-50 rounded-xl p-4">
-                    <p className="text-xs text-gray-500 mb-1">Mín / Máx (ms)</p>
+                    <p className="text-xs text-gray-500 mb-1">Mín / Máx (fila, min)</p>
                     <p className="text-xl font-bold text-gray-700">
-                      {dados.sincronizacao_offline.latencia_sync_ms_min != null &&
-                      dados.sincronizacao_offline.latencia_sync_ms_max != null
-                        ? `${fmtNum(dados.sincronizacao_offline.latencia_sync_ms_min, 2)} / ${fmtNum(dados.sincronizacao_offline.latencia_sync_ms_max, 2)} ms`
-                        : dados.sincronizacao_offline.tempo_minimo_minutos != null
-                          ? `${fmtNum(dados.sincronizacao_offline.tempo_minimo_minutos, 0)} / ${fmtNum(dados.sincronizacao_offline.tempo_maximo_minutos ?? 0, 0)} min`
-                          : "—"}
+                      {dados.sincronizacao_offline.tempo_minimo_minutos != null &&
+                      dados.sincronizacao_offline.tempo_maximo_minutos != null
+                        ? `${fmtNum(dados.sincronizacao_offline.tempo_minimo_minutos, 0)} / ${fmtNum(dados.sincronizacao_offline.tempo_maximo_minutos, 0)} min`
+                        : "—"}
                     </p>
-                    <p className="text-xs text-gray-400 mt-0.5">entre carimbos no servidor</p>
+                    <p className="text-xs text-gray-400 mt-0.5">mesma base do export da lista</p>
                   </div>
                 </div>
+                {dados.sincronizacao_offline.latencia_sync_ms_media != null && (
+                  <p className="text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 mt-3">
+                    Carimbos no servidor (referência técnica):{" "}
+                    <span className="font-medium">
+                      média {fmtNum(dados.sincronizacao_offline.latencia_sync_ms_media, 2)} ms
+                    </span>
+                    {dados.sincronizacao_offline.latencia_sync_ms_min != null &&
+                      dados.sincronizacao_offline.latencia_sync_ms_max != null && (
+                      <>
+                        {" "}
+                        (mín / máx{" "}
+                        {fmtNum(dados.sincronizacao_offline.latencia_sync_ms_min, 2)} /{" "}
+                        {fmtNum(dados.sincronizacao_offline.latencia_sync_ms_max, 2)} ms
+                        , |created_at − synced_at|)
+                      </>
+                    )}
+                    .
+                  </p>
+                )}
                 {dados.sincronizacao_offline.criacao_ate_updated_at_media_min != null && (
                   <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-3">
                     Média <span className="font-medium">criação → última atualização</span> no servidor:{" "}
@@ -497,6 +512,15 @@ const ValidacaoCientificaPage: React.FC = () => {
                           pct: dados.sincronizacao_offline.taxa_sincronizacao_pct, metaNum: 95
                         },
                         {
+                          indicador: "Tempo médio de sincronização (regra Excel)",
+                          resultado:
+                            dados.sincronizacao_offline.tempo_medio_minutos != null
+                              ? `${fmtNum(dados.sincronizacao_offline.tempo_medio_minutos, 1)} min · ${dados.sincronizacao_offline.com_tempo_rastreado.toLocaleString("pt-BR")} reg.`
+                              : "—",
+                          meta: "offline_id → created_at",
+                          informativo: true as const,
+                        },
+                        {
                           indicador: "Completude de campos críticos",
                           resultado: `${fmtNum(dados.completude_campos_criticos.percentual, 1)}%`,
                           meta: "≥ 90%",
@@ -508,7 +532,22 @@ const ValidacaoCientificaPage: React.FC = () => {
                           meta: "≤ 10%",
                           pct: dados.incidentes_indisponibilidade.percentual_indisponibilidade, metaNum: 10, invertido: true
                         },
-                      ].map(({ indicador, resultado, meta, pct, metaNum, invertido }, i) => {
+                      ].map(({ indicador, resultado, meta, pct, metaNum, invertido, informativo }, i) => {
+                        if (informativo) {
+                          return (
+                            <tr key={indicador} className={i % 2 === 0 ? "bg-blue-50/40" : "bg-white"}>
+                              <td className="px-4 py-2 font-medium text-gray-800">{indicador}</td>
+                              <td className="px-4 py-2 font-semibold text-gray-900">{resultado}</td>
+                              <td className="px-4 py-2 text-gray-500">{meta}</td>
+                              <td className="px-4 py-2">
+                                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                                  <Activity className="h-3 w-3" />
+                                  Referência
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        }
                         const ok = invertido ? pct <= metaNum : pct >= metaNum;
                         return (
                           <tr key={indicador} className={i % 2 === 0 ? "bg-blue-50/40" : "bg-white"}>
