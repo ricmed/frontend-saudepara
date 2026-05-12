@@ -230,6 +230,10 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
       if (key === 'paciente.distrito_sanitario' || key === 'paciente.polo_base' || key === 'paciente.aldeia') {
         return getValue('paciente.vive_aldeado') === '1';
       }
+      // Gestante: só visível quando Sexo ao nascimento = Feminino ('F')
+      if (key === 'paciente.gestante') {
+        return getValue('paciente.sexo') === 'F';
+      }
       // Monitoramento operacional: detalhamento condicionado à atividade e à área
       if (schema?.agravo?.includes('Monitoramento operacional') && key.startsWith('detalhamento.')) {
         const atividade = getValue('acao.atividade');
@@ -278,43 +282,77 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
       const estrangeiro = getValue('paciente.e_estrangeiro');
       const orientacaoSexual = getValue('paciente.orientacao_sexual');
       const povoTradicional = getValue('paciente.povo_tradicional');
-      // Data da notificação (SINAN): sempre obrigatória quando presente no formulário
-      if (key === 'notificacao.dt_notificacao') {
-        return true;
+      const sexo = getValue('paciente.sexo');
+      const racaCor = String(getValue('paciente.raca_cor') ?? '');
+      const situacaoRua = String(getValue('paciente.situacao_rua') ?? '');
+      const privadoLiberdade = String(getValue('paciente.privado_liberdade') ?? '');
+
+      // Data da notificação: sempre obrigatória
+      if (key === 'notificacao.dt_notificacao') return true;
+      // Nome completo: sempre obrigatório
+      if (key === 'paciente.nome') return true;
+      // Nome da mãe: sempre obrigatório
+      if (key === 'paciente.nome_mae') return true;
+      // CPF obrigatório só quando É Estrangeiro = NÃO (2)
+      if (key === 'paciente.cpf') return estrangeiro === '2';
+      // CNS obrigatório quando CPF não preenchido e não é estrangeiro
+      if (key === 'paciente.cns') {
+        const cpfDigits = String(getValue('paciente.cpf') ?? '').replace(/\D/g, '');
+        return estrangeiro !== '1' && cpfDigits.length < 11;
       }
-      // Nome completo do paciente (SINAN): obrigatório quando presente no formulário
-      if (key === 'paciente.nome') {
-        return true;
-      }
-      // CPF obrigatório só quando É Estrangeiro = NÃO; quando Sim continua visível mas não obrigatório
-      if (key === 'paciente.cpf') {
-        return estrangeiro === '2';
-      }
-      // Passaporte: opcional mesmo quando É Estrangeiro = SIM (só valida formato se preenchido)
-      // País de nascimento: obrigatório quando É Estrangeiro = SIM
-      if (key === 'paciente.pais_nascimento_id') {
-        return estrangeiro === '1';
-      }
-      // Outra orientação sexual obrigatório quando visível (Orientação sexual = 4 OUTRA)
-      if (key === 'paciente.outra_orientacao_sexual') {
-        return orientacaoSexual === '4';
-      }
-      // Qual povo ou comunidade tradicional obrigatório quando visível (É membro = SIM)
-      if (key === 'paciente.qual_povo_tradicional') {
-        return povoTradicional === '1';
-      }
-      // Especifique (outro povo) obrigatório quando visível (Qual povo = 39 OUTROS)
-      if (key === 'paciente.outro_povo_tradicional') {
-        return getValue('paciente.qual_povo_tradicional') === '39';
-      }
-      // Qual etnia? obrigatório quando visível (Raça/Cor = 5 INDÍGENA); aceita valor string ou número
-      if (key === 'paciente.etnia') {
-        return String(getValue('paciente.raca_cor') ?? '') === '5';
-      }
-      // DSEI, Polo Base, Aldeia obrigatórios quando visíveis (Vive aldeado? = Sim)
-      if (key === 'paciente.distrito_sanitario' || key === 'paciente.polo_base' || key === 'paciente.aldeia') {
+      // País de nascimento: obrigatório quando É Estrangeiro = SIM (1)
+      if (key === 'paciente.pais_nascimento_id') return estrangeiro === '1';
+      // Sexo ao nascimento: sempre obrigatório
+      if (key === 'paciente.sexo') return true;
+      // Orientação sexual: sempre obrigatório
+      if (key === 'paciente.orientacao_sexual') return true;
+      // Outra orientação sexual: obrigatório quando Orientação = 4 (OUTRA)
+      if (key === 'paciente.outra_orientacao_sexual') return orientacaoSexual === '4';
+      // Raça/Cor: sempre obrigatório
+      if (key === 'paciente.raca_cor') return true;
+      // É membro de povo/comunidade tradicional: sempre obrigatório
+      if (key === 'paciente.povo_tradicional') return true;
+      // Qual povo: obrigatório quando É membro = SIM (1)
+      if (key === 'paciente.qual_povo_tradicional') return povoTradicional === '1';
+      // Especifique (outro povo): obrigatório quando Qual povo = 39 (OUTROS)
+      if (key === 'paciente.outro_povo_tradicional') return getValue('paciente.qual_povo_tradicional') === '39';
+      // Qual etnia: obrigatório quando Raça/Cor = 5 (INDÍGENA)
+      if (key === 'paciente.etnia') return racaCor === '5';
+      // Vive aldeado: obrigatório quando Raça/Cor = 5 (INDÍGENA)
+      if (key === 'paciente.vive_aldeado') return racaCor === '5';
+      // DSEI, Polo Base, Aldeia: obrigatórios quando Vive aldeado = Sim (1)
+      if (key === 'paciente.distrito_sanitario' || key === 'paciente.polo_base' || key === 'paciente.aldeia')
         return getValue('paciente.vive_aldeado') === '1';
+      // Gestante: obrigatório quando Sexo = Feminino ('F')
+      if (key === 'paciente.gestante') return sexo === 'F';
+      // Escolaridade: sempre obrigatório
+      if (key === 'paciente.escolaridade') return true;
+      // Ocupação CBO: sempre obrigatório
+      if (key === 'paciente.ocupacao_cbo') return true;
+      // Atividade econômica CNAE: sempre obrigatório
+      if (key === 'paciente.atividade_cnae') return true;
+      // Situação de rua: sempre obrigatório
+      if (key === 'paciente.situacao_rua') return true;
+      // Profissional de saúde: sempre obrigatório
+      if (key === 'paciente.profissional_saude') return true;
+      // Privado de liberdade: sempre obrigatório
+      if (key === 'paciente.privado_liberdade') return true;
+      // Pessoa com deficiência: sempre obrigatório
+      if (key === 'paciente.com_deficiencia') return true;
+      // Endereço: obrigatório exceto quando situação de rua = Sim (1) ou privado de liberdade = Sim (1)
+      if (
+        key === 'residencia.cep' ||
+        key === 'residencia.uf' ||
+        key === 'residencia.municipio_ibge' ||
+        key === 'residencia.bairro' ||
+        key === 'residencia.logradouro' ||
+        key === 'residencia.numero'
+      ) {
+        return situacaoRua !== '1' && privadoLiberdade !== '1';
       }
+      // Telefone de residência: sempre obrigatório
+      if (key === 'residencia.telefone') return true;
+
       return fieldRequired[key] === true;
     },
     [fieldRequired, getValue]
