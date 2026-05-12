@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { FormSchema, FormField } from '@/services/FormService';
 import { get, set } from 'lodash';
+import {
+  DF_CHOICE_WITH_TEXT_DEFAULT_VALUE,
+  radioChoiceOtherTextKey,
+} from '@/features/dynamic-forms/utils/radioChoiceOther';
 import { evaluateRules, createDefaultFieldStates } from '@/utils/rulesEngine';
 import { validateCPF } from '@/utils/cpfValidator';
 import { validateCNS } from '@/utils/cnsValidator';
@@ -274,12 +278,21 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
       const estrangeiro = getValue('paciente.e_estrangeiro');
       const orientacaoSexual = getValue('paciente.orientacao_sexual');
       const povoTradicional = getValue('paciente.povo_tradicional');
+      // Data da notificação (SINAN): sempre obrigatória quando presente no formulário
+      if (key === 'notificacao.dt_notificacao') {
+        return true;
+      }
+      // Nome completo do paciente (SINAN): obrigatório quando presente no formulário
+      if (key === 'paciente.nome') {
+        return true;
+      }
       // CPF obrigatório só quando É Estrangeiro = NÃO; quando Sim continua visível mas não obrigatório
       if (key === 'paciente.cpf') {
         return estrangeiro === '2';
       }
-      // Passaporte obrigatório quando visível (É Estrangeiro = SIM)
-      if (key === 'paciente.passaporte') {
+      // Passaporte: opcional mesmo quando É Estrangeiro = SIM (só valida formato se preenchido)
+      // País de nascimento: obrigatório quando É Estrangeiro = SIM
+      if (key === 'paciente.pais_nascimento_id') {
         return estrangeiro === '1';
       }
       // Outra orientação sexual obrigatório quando visível (Orientação sexual = 4 OUTRA)
@@ -347,6 +360,20 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
       if (isRequired && (!value || value === '')) {
         setError(field.key, `${field.label} é obrigatório`);
         return false;
+      }
+
+      if (field.type === 'radio' && field.choiceWithText) {
+        const rawSent = String(field.choiceWithTextValue ?? DF_CHOICE_WITH_TEXT_DEFAULT_VALUE).trim();
+        const sentinel = rawSent || DF_CHOICE_WITH_TEXT_DEFAULT_VALUE;
+        if (String(value ?? '') === sentinel) {
+          const otherKey = radioChoiceOtherTextKey(field.key);
+          const otherTxt = getValue(otherKey);
+          if (isRequired && (!otherTxt || !String(otherTxt).trim())) {
+            const hint = (field.choiceWithTextLabel ?? 'Outro').trim() || 'Outro';
+            setError(field.key, `Preencha o texto da opção "${hint}"`);
+            return false;
+          }
+        }
       }
 
       if (field.minLength && String(value).length < field.minLength) {

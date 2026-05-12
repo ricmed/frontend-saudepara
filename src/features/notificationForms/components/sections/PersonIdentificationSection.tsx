@@ -180,7 +180,35 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
               placeholder="Nome da mãe do paciente"
               error={errors.nomeMae}
               maxLength={100}
+              required
             />
+
+            {/* Sexo ao nascimento (SINAN) */}
+            <div>
+              <label className="block mb-2 font-medium text-gray-700">
+                Sexo ao nascimento <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="sexoNascimento"
+                className={`w-full p-3 border ${
+                  errors.sexoNascimento
+                    ? "border-red-500 bg-red-50"
+                    : "border-gray-200"
+                } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
+                value={formData.sexoNascimento ?? ""}
+                onChange={handleChange}
+                data-error={errors.sexoNascimento ? "true" : "false"}
+              >
+                <option value="">Selecione</option>
+                <option value="1">Masculino</option>
+                <option value="2">Feminino</option>
+                <option value="3">Intersexo</option>
+                <option value="9">Ignorado</option>
+              </select>
+              {errors.sexoNascimento && (
+                <p className="mt-1 text-sm text-red-500">{errors.sexoNascimento}</p>
+              )}
+            </div>
 
             {/* Data de Nascimento */}
             <div>
@@ -271,10 +299,38 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
               )}
             </div>
 
+            {/* É estrangeiro? */}
+            <div>
+              <label className="block mb-2 font-medium text-gray-700">
+                É estrangeiro? <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="eEstrangeiro"
+                className={`w-full p-3 border ${
+                  errors.eEstrangeiro
+                    ? "border-red-500 bg-red-50"
+                    : "border-gray-200"
+                } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
+                value={formData.eEstrangeiro ?? ""}
+                onChange={handleChange}
+                data-error={errors.eEstrangeiro ? "true" : "false"}
+              >
+                <option value="">Selecione</option>
+                <option value="2">Não</option>
+                <option value="1">Sim</option>
+              </select>
+              {errors.eEstrangeiro && (
+                <p className="mt-1 text-sm text-red-500">{errors.eEstrangeiro}</p>
+              )}
+            </div>
+
             {/* CPF */}
             <div>
               <label className="block mb-2 font-medium text-gray-700">
                 CPF
+                {formData.eEstrangeiro === "2" && (
+                  <span className="text-red-500"> *</span>
+                )}
               </label>
               <div className="relative">
                 <input
@@ -303,6 +359,35 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
               )}
               {/* ✅ REMOVIDO: Mensagem "CPF válido e disponível para cadastro" */}
             </div>
+
+            {/* CNS — obrigatório se não houver CPF válido (não estrangeiro) */}
+            {formData.eEstrangeiro === "2" && (
+              <div>
+                <label className="block mb-2 font-medium text-gray-700">
+                  CNS (Cartão SUS)
+                  {(!formData.cpf || formData.cpf.replace(/\D/g, "").length !== 11) && (
+                    <span className="text-red-500"> *</span>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  name="cns"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="Somente números (15 dígitos)"
+                  className={`w-full p-3 border ${
+                    errors.cns ? "border-red-500 bg-red-50" : "border-gray-200"
+                  } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
+                  value={formData.cns ?? ""}
+                  onChange={handleChange}
+                  maxLength={18}
+                  data-error={errors.cns ? "true" : "false"}
+                />
+                {errors.cns && (
+                  <p className="mt-1 text-sm text-red-500">{errors.cns}</p>
+                )}
+              </div>
+            )}
 
             {/* Identidade de Gênero */}
             <div>
@@ -399,18 +484,24 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
               )}
             </div>
 
-            {/* Gestante (condicional) - Mulher cisgênero OU Homem transgênero */}
-            {(formData.identidadeGenero === "1" || formData.identidadeGenero === "4") && (
+            {/* Gestante — visível quando sexo ao nascimento = Feminino (SINAN) */}
+            {formData.sexoNascimento === "2" && (
               <FormField
                 label="Gestante"
                 name="gestante"
                 value={formData.gestante}
                 onChange={handleChange}
                 type="select"
+                required
                 error={errors.gestante}
                 options={[
-                  { value: "S", label: "Sim" },
-                  { value: "N", label: "Não" }
+                  { value: "T1", label: "1º trimestre" },
+                  { value: "T2", label: "2º trimestre" },
+                  { value: "T3", label: "3º trimestre" },
+                  { value: "TI", label: "Idade gestacional ignorada" },
+                  { value: "N", label: "Não" },
+                  { value: "NA", label: "Não se aplica" },
+                  { value: "9", label: "Ignorado" },
                 ]}
               />
             )}
@@ -439,6 +530,8 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
               value={formData.escolaridade}
               onChange={handleChange}
               type="select"
+              required
+              error={errors.escolaridade}
               options={
                 escolaridadeOptions?.map((option) => ({
                   value: option.idtipo_escolaridade.toString(),
@@ -449,18 +542,31 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
 
             {/* Profissão/Ocupação com pesquisa */}
             <div>
+              <label className="block mb-2 font-medium text-gray-700">
+                Profissão/Ocupação (CBO) <span className="text-red-500">*</span>
+              </label>
               <CboInput
                 name="profissao"
                 value={formData.profissao}
-                onChange={(value) =>
+                onChange={(value) => {
                   setFormData((prev) => ({
                     ...prev,
                     profissao: value,
-                  }))
-                }
+                  }));
+                  if (errors.profissao) {
+                    setErrors((prev: Record<string, string>) => {
+                      const next = { ...prev };
+                      delete next.profissao;
+                      return next;
+                    });
+                  }
+                }}
                 placeholder="Pesquisar profissão"
-                label="Profissão/Ocupação (CBO)"
+                label=""
               />
+              {errors.profissao && (
+                <p className="mt-1 text-sm text-red-500">{errors.profissao}</p>
+              )}
             </div>
 
             {/* Contato Telefônico */}
@@ -493,7 +599,7 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
                     ddi: ddi,
                   }));
                 }}
-                label="Contato Telefônico"
+                label="Contato Telefônico *"
                 placeholder="Digite o número de telefone"
               />
               {errors.contatoTelefonico && (

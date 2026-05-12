@@ -232,7 +232,7 @@ export function createDefaultFieldStates(
     for (const field of section.fields) {
       states[field.key] = {
         visible: !field.hidden,
-        required: !!field.required,
+        required: field.key === 'notificacao.dt_notificacao' || field.key === 'paciente.nome' || !!field.required,
         disabled: !!field.disabled
       };
     }

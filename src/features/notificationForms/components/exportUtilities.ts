@@ -341,7 +341,18 @@ const prepareDataForExport = (
   };
 
   const getGestanteLabel = (value: string): string => {
-    const map: Record<string, string> = { "1": "Sim", "2": "Não" };
+    const map: Record<string, string> = {
+      "1": "Sim",
+      "2": "Não",
+      S: "Sim",
+      N: "Não",
+      T1: "1º trimestre",
+      T2: "2º trimestre",
+      T3: "3º trimestre",
+      TI: "Idade gestacional ignorada",
+      NA: "Não se aplica",
+      "9": "Ignorado",
+    };
     return map[value] || value;
   };
 

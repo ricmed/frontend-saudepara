@@ -2,6 +2,31 @@
 
 import { FormData, AtendimentoOption, EncerramentoOption, detectUserTimezone } from '@/features/notificationForms/types/index2';
 import type { SectionState } from '@/features/notificationForms/hooks/useSectionExpansion';
+import { validateCPF } from '@/utils/cpfValidator';
+import { validateCNS } from '@/utils/cnsValidator';
+
+/**
+ * Converte o valor detalhado de gestante do formulário (SINAN) para o que a API costuma aceitar (S/N/9).
+ * Mantém compatibilidade com valores legados "S", "N", "1", "2".
+ */
+export function mapGestanteForApi(gestante: string): string | null {
+  const g = (gestante || "").trim();
+  if (!g) return null;
+  if (g === "S" || g === "N" || g === "9") return g;
+  if (g === "1") return "S";
+  if (g === "2") return "N";
+  if (["T1", "T2", "T3", "TI"].includes(g)) return "S";
+  if (g === "NA") return "N";
+  return g;
+}
+
+/** Valor de sexo biológico para APIs que usam M / F / I */
+export function mapSexoNascimentoToApi(code: string): string | null {
+  if (code === '1') return 'M';
+  if (code === '2') return 'F';
+  if (code === '3') return 'I';
+  return null;
+}
 
 /**
  * Normaliza texto removendo acentos e convertendo para caixa alta
@@ -418,6 +443,18 @@ newErrors.municipio = "O campo Município é obrigatório para não residentes e
 newErrors.paciente = "O nome do paciente é obrigatório";
  }
 
+ if (!formData.nomeMae || formData.nomeMae.trim() === "") {
+newErrors.nomeMae = "O nome da mãe é obrigatório";
+ }
+
+ if (!formData.sexoNascimento || formData.sexoNascimento === "") {
+newErrors.sexoNascimento = "O sexo ao nascimento é obrigatório";
+ }
+
+ if (!formData.eEstrangeiro || formData.eEstrangeiro === "") {
+newErrors.eEstrangeiro = "Informe se o paciente é estrangeiro";
+ }
+
  // NOVA VALIDAÇÃO: Data de nascimento
  if (formData.dataNascimento) {
 const birthValidation = validateBirthDate(formData.dataNascimento);
@@ -432,12 +469,23 @@ if (!birthValidation.isValid) {
 Object.assign(newErrors, ageValidation.errors);
  }
 
- // Validação de CPF melhorada
- if (formData.cpf && formData.cpf.length > 0) {
-if (formData.cpf.length !== 11) {
+ const cpfDigits = (formData.cpf || "").replace(/\D/g, "");
+ const cnsDigits = (formData.cns || "").replace(/\D/g, "");
+ const isEstrangeiro = formData.eEstrangeiro === "1";
+
+ if (!isEstrangeiro) {
+const cpfOk = cpfDigits.length === 11 && validateCPF(cpfDigits);
+const cnsOk = validateCNS(cnsDigits);
+if (!cpfOk && !cnsOk) {
+ if (cpfDigits.length > 0 && cpfDigits.length !== 11) {
  newErrors.cpf = "CPF deve ter 11 dígitos";
-} else if (!/^\d{11}$/.test(formData.cpf)) {
- newErrors.cpf = "CPF deve conter apenas números";
+ } else if (cpfDigits.length === 11 && !validateCPF(cpfDigits)) {
+ newErrors.cpf = "CPF inválido";
+ } else if (cnsDigits.length > 0 && !validateCNS(cnsDigits)) {
+ newErrors.cns = "CNS inválido";
+ } else {
+ newErrors.cpf = "Informe CPF válido (11 dígitos) ou CNS válido (15 dígitos)";
+ }
 }
  }
 
@@ -449,6 +497,25 @@ newErrors.identidadeGenero = "A Identidade de Gênero é obrigatória";
  // ✅ NOVA VALIDAÇÃO: Raça obrigatório  
  if (!formData.raca || formData.raca === "") {
 newErrors.raca = "A Raça/Cor é obrigatória";
+ }
+
+ if (!formData.escolaridade || formData.escolaridade === "") {
+newErrors.escolaridade = "A escolaridade é obrigatória";
+ }
+
+ if (!formData.profissao || String(formData.profissao).trim() === "") {
+newErrors.profissao = "Ocupação (CBO) é obrigatória";
+ }
+
+ const telDigits = (formData.contatoTelefonico || "").replace(/\D/g, "");
+ if (telDigits.length < 8) {
+newErrors.contatoTelefonico = "Informe um telefone de contato válido (mínimo 8 dígitos)";
+ }
+
+ if (formData.sexoNascimento === "2") {
+if (!formData.gestante || formData.gestante === "") {
+ newErrors.gestante = "O campo Gestante é obrigatório para sexo feminino ao nascimento";
+}
  }
 
  // ========================================
@@ -589,6 +656,9 @@ if (
  newErrors.idade ||
  newErrors.idadeMeses || // NOVO
  newErrors.cpf ||
+ newErrors.cns ||
+ newErrors.sexoNascimento ||
+ newErrors.eEstrangeiro ||
  newErrors.identidadeGenero ||
  newErrors.gestante ||
  newErrors.raca ||

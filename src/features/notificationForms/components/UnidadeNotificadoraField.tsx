@@ -43,6 +43,8 @@ interface UnidadeNotificadoraFieldProps {
   denyOutsideMessage?: string;
   /** Formulário dinâmico: buscar entre todos os estabelecimentos (~11k), sem filtro por permissão */
   allowAllEstablishments?: boolean;
+  /** Somente leitura: não abre busca nem limpa (ex.: usuário vinculado à unidade). */
+  disabled?: boolean;
 }
 
 const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
@@ -62,6 +64,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   restrictToAllowed = false,
   denyOutsideMessage = "Unidade não permitida para o seu perfil",
   allowAllEstablishments = false,
+  disabled = false,
 }) => {
   const [unidadesNotificadoras, setUnidadesNotificadoras] = useState<Estabelecimento[]>([]);
   const [loadingUnidades, setLoadingUnidades] = useState(false);
@@ -93,6 +96,13 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
       estabelecimentosCache.current = {};
     }
   }, [isForEncaminhamento]);
+
+  useEffect(() => {
+    if (disabled) {
+      setIsDropdownOpen(false);
+    }
+  }, [disabled]);
+
   
   // �🔤 Normalizador para busca acento/case-insensitive
   const norm = (s?: string) =>
@@ -751,6 +761,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   }, [allowedOptions, allowedEstablishmentIds, value, selectedEstabelecimento, onChange]); // Executar quando props mudarem
 
   const handleFocus = () => {
+    if (disabled) return;
     // Store current scroll position
     setScrollPosition({
       x: window.scrollX,
@@ -797,6 +808,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   };
 
   const handleEstabelecimentoSelect = (estabelecimento: Estabelecimento) => {
+    if (disabled) return;
     // 1.6. Bloqueie seleção fora do permitido
     if (restrictToAllowed && !isAllowed(estabelecimento.idestabelecimento)) {
       alert(denyOutsideMessage);
@@ -818,6 +830,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   };
 
   const handleClear = () => {
+    if (disabled) return;
     setDisplayValue("");
     setSearchQuery("");
     setSelectedEstabelecimento(null);
@@ -826,6 +839,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   };
   
   const handleSearchButtonClick = (e: React.MouseEvent) => {
+    if (disabled) return;
     e.stopPropagation(); // Evitar propagação
     
     // Store current scroll position
@@ -953,6 +967,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   const errorClasses = hasError ? 
     "border-red-500 bg-red-50" : 
     "border-gray-200";
+  const lockedClasses = disabled ? "bg-gray-50 text-gray-800 cursor-not-allowed" : "bg-white";
 
   return (
     <div className="w-full">
@@ -961,24 +976,25 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
           {label} {hasError && <span className="text-red-500">*</span>}
         </label>
       )}
-      <div className="flex gap-2">
-        <div className="relative flex-1">
+      <div className={`flex gap-2 items-stretch ${disabled ? 'w-full' : ''}`}>
+        <div className={`relative min-w-0 ${disabled ? 'w-full' : 'flex-1'}`}>
           <input
             ref={inputRef}
             type="text"
             placeholder={placeholder}
-            className={`w-full p-3 pl-9 border rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none ${errorClasses} ${className}`}
+            className={`w-full min-w-0 p-3 pl-9 ${displayValue && !disabled ? 'pr-9' : 'pr-3'} border rounded-lg text-sm truncate ${lockedClasses} transition-colors ${disabled ? '' : 'hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'} outline-none ${errorClasses} ${className}`}
             value={displayValue}
             readOnly={true}
             onFocus={handleFocus}
             onClick={handleFocus}
-            disabled={loadingUnidades && !isDropdownOpen}
+            disabled={disabled || (loadingUnidades && !isDropdownOpen)}
+            title={displayValue ? displayValue : undefined}
             data-field-type={isForEncaminhamento ? "encaminhamento" : "unidade"}
             data-specific-filter={specificEstablishments && specificEstablishments.length > 0 ? "true" : "false"}
             data-error={hasError ? "true" : "false"} // Adicionar atributo para marcar erro para scroll
           />
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          {displayValue && (
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          {displayValue && !disabled && (
             <button 
               onClick={handleClear}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500 focus:outline-none"
@@ -988,14 +1004,16 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
             </button>
           )}
         </div>
+        {!disabled && (
         <button
           type="button"
           onClick={handleSearchButtonClick}
-          className={`px-4 py-2 ${hasError ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-lg transition-colors flex items-center gap-2`}
+          className={`shrink-0 px-4 py-2 ${hasError ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-lg transition-colors flex items-center gap-2`}
           disabled={loadingUnidades && !isDropdownOpen}
         >
           <Search className="h-4 w-4" />
         </button>
+        )}
       </div>
 
       {/* Mensagem de erro */}

@@ -9,6 +9,13 @@ import { FileEdit, Eye, FileSpreadsheet, FileText } from 'lucide-react';
 import axios from 'axios';
 import { getApiRoot } from '@/config/apiOrigin';
 import type { MonitorOperRegionalScopePayload } from '../types/monitorOperRegionalScope';
+import { usuarioGestaoService } from '@/services/UsuarioGestaoService';
+import {
+  buildNotificacaoPrefillFromAccess,
+  escopoFromAccess,
+  schemaUsesNotificacao,
+  type NotificacaoEscopo,
+} from '../utils/notificacaoScopeDefaults';
 
 export const DynamicFormPage: React.FC = () => {
   const { agravo, id } = useParams<{ agravo: string; id?: string }>(); // param name kept for route compatibility
@@ -26,6 +33,7 @@ export const DynamicFormPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [monitorOperRegionalCrsScope, setMonitorOperRegionalCrsScope] =
     useState<MonitorOperRegionalScopePayload | null>(null);
+  const [notificacaoEscopo, setNotificacaoEscopo] = useState<NotificacaoEscopo>('livre');
 
   const getCurrentMonthCode = () => {
     const m = new Date().getMonth(); // 0..11
@@ -64,6 +72,22 @@ export const DynamicFormPage: React.FC = () => {
       const version = await FormService.getActiveVersion(agravo);
       setFormVersion(version);
 
+      const schema = version.schema_json;
+      const wantsNotificacaoScope = schemaUsesNotificacao(schema);
+
+      let access: Record<string, any> | null = null;
+      if (wantsNotificacaoScope && user) {
+        try {
+          access = await usuarioGestaoService.getUserAccess();
+        } catch {
+          access = null;
+        }
+      }
+      const roles = user?.roles || [];
+      const isAdmin = roles.includes('admin') || roles.includes('administrator');
+      const escopo = wantsNotificacaoScope ? escopoFromAccess(access, isAdmin) : 'livre';
+      setNotificacaoEscopo(escopo);
+
       let scopePayload: MonitorOperRegionalScopePayload | null = null;
       if (agravo === 'MONITOR_OPER_REGIONAL') {
         const uid = user?.sub || user?.id;
@@ -94,6 +118,11 @@ export const DynamicFormPage: React.FC = () => {
         const now = new Date();
         const base: Record<string, any> = { notificacao: { dt_notificacao: hoje } };
 
+        const prefill =
+          wantsNotificacaoScope && escopo !== 'livre'
+            ? await buildNotificacaoPrefillFromAccess(access, escopo)
+            : {};
+
         // Defaults de cabeçalho para formulários de monitoramento (editável pelo usuário)
         if (agravo === 'MONITOR_OPER_REGIONAL' || agravo === 'MONITOR_TEC_PQAVS') {
           base.cabecalho = {
@@ -121,6 +150,7 @@ export const DynamicFormPage: React.FC = () => {
           };
         }
 
+        base.notificacao = { ...(base.notificacao || {}), ...prefill };
         setInitialData(base);
       }
     } catch (err: any) {
@@ -348,6 +378,7 @@ export const DynamicFormPage: React.FC = () => {
           monitorOperRegionalCrsScope={
             agravo === 'MONITOR_OPER_REGIONAL' ? monitorOperRegionalCrsScope : null
           }
+          notificacaoEscopo={notificacaoEscopo}
         />
       </AppPageLayout>
     );

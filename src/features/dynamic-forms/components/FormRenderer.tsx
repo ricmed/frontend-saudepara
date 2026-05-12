@@ -40,6 +40,7 @@ import { ClipboardList, Calendar, DollarSign, Target, Activity, Shield, Leaf, Ba
 import { convertLocalDateTimeToUTC } from '@/utils/timezoneUtils';
 import FormService from '@/services/FormService';
 import type { MonitorOperRegionalScopePayload } from '../types/monitorOperRegionalScope';
+import type { NotificacaoEscopo } from '../utils/notificacaoScopeDefaults';
 import { validateCPF } from '@/utils/cpfValidator';
 import { validateCNS } from '@/utils/cnsValidator';
 
@@ -108,6 +109,8 @@ interface FormRendererProps {
   showProgress?: boolean;
   /** Escopo CRS (MONITOR_OPER_REGIONAL): exibe regional somente leitura quando o usuário tem uma única CRS. */
   monitorOperRegionalCrsScope?: MonitorOperRegionalScopePayload | null;
+  /** Vínculo territorial do usuário (SINAN): pré-preenche e trava UF / município / estabelecimento como no e-SUS. */
+  notificacaoEscopo?: NotificacaoEscopo;
 }
 
 export const FormRenderer: React.FC<FormRendererProps> = ({
@@ -128,6 +131,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   pageMode = false,
   showProgress = false,
   monitorOperRegionalCrsScope = null,
+  notificacaoEscopo = 'livre',
 }) => {
   const sectionIconMap: Record<string, React.ComponentType<{ className?: string }>> = React.useMemo(
     () => ({
@@ -206,6 +210,18 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   });
 
   const crsReadonlySyncedRef = useRef(false);
+  const { lockNotifUf, lockNotifMun, lockNotifEst } = React.useMemo(() => {
+    if (notificacaoEscopo === 'unidade') {
+      return { lockNotifUf: true, lockNotifMun: true, lockNotifEst: true };
+    }
+    if (notificacaoEscopo === 'municipio') {
+      return { lockNotifUf: true, lockNotifMun: true, lockNotifEst: false };
+    }
+    if (notificacaoEscopo === 'estado') {
+      return { lockNotifUf: true, lockNotifMun: false, lockNotifEst: false };
+    }
+    return { lockNotifUf: false, lockNotifMun: false, lockNotifEst: false };
+  }, [notificacaoEscopo]);
   useEffect(() => {
     crsReadonlySyncedRef.current = false;
   }, [monitorOperRegionalCrsScope, initialDataWithDefaults]);
@@ -997,7 +1013,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       case 'multi-select':
         return <MultiSelectField {...commonProps} getValue={getValue} />;
       case 'radio':
-        return <RadioGroupField {...commonProps} />;
+        return <RadioGroupField {...commonProps} getValue={getValue} setValue={setValue} />;
       case 'email':
         return <EmailField {...commonProps} />;
       case 'phone':
@@ -1070,7 +1086,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   return (
     <form
       onSubmit={handleSubmit}
-      className={`max-w-4xl mx-auto p-6 bg-white rounded-lg shadow ${className ?? ''}`.trim()}
+      className={`max-w-5xl mx-auto p-6 bg-white rounded-lg shadow ${className ?? ''}`.trim()}
     >
       {showTitle ? (
         <h1 className="text-2xl font-bold mb-6 text-gray-800">{schema.title || schema.agravo}</h1>
@@ -1147,11 +1163,14 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                     return (
                       <div key="notificacao-estabelecimento-block" className="md:col-span-2">
                         <h3 className="text-sm font-semibold text-gray-700 mb-3">Estabelecimento de saúde de notificação</h3>
-                        <div className="space-y-4">
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1.35fr)] md:items-start md:gap-3">
                           <EstadoMunicipioNotificacao
                             getValue={getValue}
                             setValue={setValue}
                             disabled={readOnly}
+                            lockUf={lockNotifUf}
+                            lockMunicipio={lockNotifMun}
+                            sinanThreeColumn
                             error={getError('notificacao.municipio_id') || getError('notificacao.uf_notificacao')}
                             required={isFieldRequired('notificacao.uf_notificacao') || isFieldRequired('notificacao.municipio_id')}
                           />
@@ -1159,6 +1178,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                             getValue={getValue}
                             setValue={setValue}
                             disabled={readOnly}
+                            lockEstablishment={lockNotifEst}
                             error={getError('notificacao.unidade_id') || getError('notificacao.estabelecimento_cnes')}
                             required={isFieldRequired('notificacao.unidade_id') || isFieldRequired('notificacao.estabelecimento_cnes')}
                           />

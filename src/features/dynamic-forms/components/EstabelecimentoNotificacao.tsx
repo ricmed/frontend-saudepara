@@ -15,6 +15,8 @@ interface EstabelecimentoNotificacaoProps {
   disabled?: boolean;
   error?: string;
   required?: boolean;
+  /** Usuário vinculado à unidade: campo somente leitura (valor já definido pelo vínculo). */
+  lockEstablishment?: boolean;
 }
 
 export const EstabelecimentoNotificacao: React.FC<EstabelecimentoNotificacaoProps> = ({
@@ -23,6 +25,7 @@ export const EstabelecimentoNotificacao: React.FC<EstabelecimentoNotificacaoProp
   disabled = false,
   error,
   required = false,
+  lockEstablishment = false,
 }) => {
   const unidadeId = getValue('notificacao.unidade_id');
   const value = unidadeId != null && unidadeId !== '' ? String(unidadeId) : '';
@@ -53,13 +56,13 @@ export const EstabelecimentoNotificacao: React.FC<EstabelecimentoNotificacaoProp
   );
 
   return (
-    <div>
+    <div className="min-w-0">
       <UnidadeNotificadoraField
         value={value}
         onChange={handleChange}
         label={required ? 'Estabelecimento *' : 'Estabelecimento'}
-        placeholder="Pesquise por código (CNES) ou nome (mín. 3 caracteres)"
-        disabled={disabled}
+        placeholder="CNES ou nome (mín. 3 caracteres)"
+        disabled={disabled || lockEstablishment}
         allowAllEstablishments
         hasError={!!error}
         errorMessage={error}

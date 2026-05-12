@@ -20,6 +20,9 @@ export interface FormData {
     dataNascimento: string;
     idade: string;
     cpf: string;
+    sexoNascimento: string;
+    eEstrangeiro: string;
+    cns: string;
     identidadeGenero: string;
     gestante: string;
     raca: string;

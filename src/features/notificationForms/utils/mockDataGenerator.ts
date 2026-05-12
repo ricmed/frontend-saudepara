@@ -301,9 +301,14 @@ export function gerarCasoAleatorio(): FormData {
     idadeMeses: nascimento.meses,
     idadeUnidade: 'anos' as 'anos',
     cpf: gerarCPF(),
+    sexoNascimento: genero === "Masculino" ? "1" : "2",
+    eEstrangeiro: "2",
+    cns: "",
     identidadeGenero: genero === 'Masculino' ? escolherAleatorio(['2', '4']) : escolherAleatorio(['1', '3']), // 1=Mulher cis, 2=Homem cis, 3=Mulher trans, 4=Homem trans
-    gestante: genero === 'Feminino' && parseInt(nascimento.idade) >= 15 && parseInt(nascimento.idade) <= 45 ? 
-              escolherAleatorio(['N', 'N', 'N', 'S']) : 'A', // S=Sim, N=Não, A=Não se aplica, I=Ignorado
+    gestante:
+      genero === "Feminino" && parseInt(nascimento.idade) >= 15 && parseInt(nascimento.idade) <= 45
+        ? escolherAleatorio(["T1", "T2", "N", "NA"])
+        : "",
     raca: escolherAleatorio(['1', '2', '3', '4', '5', '9']), // 1=Branca, 2=Preta, 3=Amarela, 4=Parda, 5=Indígena, 9=Ignorado
     escolaridade: escolherAleatorio(['1', '2', '3', '4', '5', '6', '7', '8', '9', '11']), // 1=Analfabeto, 2=Fund.incompleto, 3=Fund.completo, 4=Médio incompleto, 5=Médio completo, 6=Superior incompleto, 7=Superior completo, 8=Ignorado, 9=Não se aplica, 11=Pós-graduado
     profissao: escolherAleatorio(PROFISSOES_CBO_IDS).toString(),

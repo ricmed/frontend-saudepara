@@ -48,7 +48,7 @@ export const useSectionExpansion = (initialState?: Partial<SectionState>) => {
         sectionsToExpand.dadosGerais = true;
       } else if (['residenteBelem', 'bairro', 'municipio', 'uf', 'paisProcedencia', 'localHospedagem', 'contatoLocal'].includes(field)) {
         sectionsToExpand.procedencia = true;
-      } else if (['paciente', 'nomeMae', 'dataNascimento', 'idade', 'cpf', 'identidadeGenero', 'gestante', 'raca', 'escolaridade', 'profissao', 'contatoTelefonico'].includes(field)) {
+      } else if (['paciente', 'nomeMae', 'dataNascimento', 'idade', 'cpf', 'cns', 'sexoNascimento', 'eEstrangeiro', 'identidadeGenero', 'gestante', 'raca', 'escolaridade', 'profissao', 'contatoTelefonico'].includes(field)) {
         sectionsToExpand.identificacao = true;
       } else if (['tipoAtendimento', 'sinaisESintomas', 'dataInicioSintomas', 'hipoteseDiagnostica', 'tipoTrauma', 'dataOcorrencia'].includes(field)) {
         sectionsToExpand.atendimento = true;

@@ -145,6 +145,14 @@ const LocationInput: React.FC<LocationInputProps> = ({
       
       // Update reference to new parent value
       lastParentValueRef.current = parentValue;
+
+      // Campo travado (ex.: município fixo por vínculo): não limpar valor ao sincronizar UF
+      if (disabled) {
+        if (parentValue) {
+          fetchMunicipiosByEstado(parentValue);
+        }
+        return;
+      }
       
       // Clear current selection
       if (value) {
@@ -164,7 +172,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
         fetchMunicipiosByEstado(parentValue);
       }
     }
-  }, [parentValue, isMunicipioInput]);
+  }, [parentValue, isMunicipioInput, disabled]);
 
   // Função para atualizar a posição do dropdown
   const updateDropdownPosition = () => {
@@ -681,6 +689,12 @@ const LocationInput: React.FC<LocationInputProps> = ({
     };
   }, []);
 
+  useEffect(() => {
+    if (disabled) {
+      setIsDropdownOpen(false);
+    }
+  }, [disabled]);
+
   const handleFocus = () => {
     if (disabled) return;
     
@@ -698,6 +712,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (disabled) return;
     const query = e.target.value;
     
     // When user starts typing, enter manual editing mode
@@ -716,6 +731,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
   };
 
   const handleOptionSelect = (option: LocationOption) => {
+    if (disabled) return;
     debugLog(`Option selected: ${option.descricao} (${option[idField]})`);
     
     setSelectedOption(option);
@@ -728,6 +744,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
 
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent opening dropdown when clearing
+    if (disabled) return;
     debugLog('Selection cleared');
     setDisplayValue("");
     setSearchQuery("");
@@ -832,22 +849,23 @@ const LocationInput: React.FC<LocationInputProps> = ({
           type="text"
           name={name}
           placeholder={isLoading ? "Carregando..." : placeholder}
-          className={`w-full p-3 pl-3 pr-10 border ${
+          className={`w-full p-3 pl-3 ${disabled ? 'pr-3' : 'pr-10'} border ${
             error ? "border-red-500 bg-red-50" : "border-gray-200"
-          } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none ${className} ${
-            disabled ? "opacity-60 cursor-not-allowed bg-gray-50" : ""
+          } rounded-lg text-sm bg-white transition-colors ${disabled ? '' : 'hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'} outline-none truncate ${className} ${
+            disabled ? "opacity-90 cursor-not-allowed bg-gray-50" : ""
           }`}
           value={displayValue}
           readOnly={true}  // Make the main input read-only
           onFocus={handleFocus}
           onClick={handleFocus}
           disabled={disabled || isLoading}
+          title={displayValue ? displayValue : undefined}
           data-error={error ? "true" : "false"} // Para fins de CSS e scroll automatizado
         />
         <div className="absolute inset-y-0 right-0 flex items-center pr-3">
           {isLoading ? (
             <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full" />
-          ) : displayValue ? (
+          ) : displayValue && !disabled ? (
             <button 
               onClick={handleClear}
               className="text-gray-400 hover:text-red-500 focus:outline-none"
@@ -855,7 +873,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
             >
               <X className="h-4 w-4" />
             </button>
-          ) : (
+          ) : displayValue && disabled ? null : (
             <Search className="h-4 w-4 text-gray-400 pointer-events-none" />
           )}
         </div>

@@ -59,7 +59,9 @@ import {
   compareDates,
   isTipoAtendimento,
   isTipoEncerramento,
-  validateForm
+  validateForm,
+  mapGestanteForApi,
+  mapSexoNascimentoToApi
 } from '../utils/formUtils';
 import { 
   exportToExcel, 
@@ -147,6 +149,9 @@ const initialFormData: FormData = {
   idadeMeses: "", // <-- CAMPO ADICIONADO AQUI
   idadeUnidade: 'anos' as 'anos' | 'meses', // <-- VALOR INICIAL
   cpf: "",
+  sexoNascimento: "",
+  eEstrangeiro: "",
+  cns: "",
   identidadeGenero: "",
   gestante: "",
   raca: "",
@@ -1538,9 +1543,12 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
             nome_mae: formData.nomeMae?.toUpperCase() || "",
             data_nascimento: formData.dataNascimento || null,
             cpf: formData.cpf || "",
+            cns: formData.cns || null,
+            sexo: mapSexoNascimentoToApi(formData.sexoNascimento),
+            e_estrangeiro: formData.eEstrangeiro === "1" ? "1" : formData.eEstrangeiro === "2" ? "2" : null,
             contato: formData.contatoTelefonico || "",
             ddi: formData.ddi || "55",
-            gestante: formData.gestante || null,
+            gestante: mapGestanteForApi(formData.gestante),
             tipo_genero_idtipo_genero: formData.identidadeGenero ? parseInt(formData.identidadeGenero) : null,
             tipo_raca_idtipo_raca: formData.raca ? parseInt(formData.raca) : null,
             escolaridade_idescolaridade: formData.escolaridade ? parseInt(formData.escolaridade) : null,
@@ -1630,9 +1638,12 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           nome: formData.paciente,
           nome_mae: formData.nomeMae || "",
           cpf: formData.cpf || "",
+          cns: formData.cns || null,
+          sexo: mapSexoNascimentoToApi(formData.sexoNascimento),
+          e_estrangeiro: formData.eEstrangeiro === "1" ? "1" : formData.eEstrangeiro === "2" ? "2" : null,
           contato: formData.contatoTelefonico || "",
           ddi: formData.ddi || "55",
-          gestante: formData.gestante || null, // ✅ Preservar valores "S" ou "N", converter "" para null
+          gestante: mapGestanteForApi(formData.gestante),
         };
         
         // ✅ DEBUG: Log para verificar valor de gestante
@@ -2202,6 +2213,21 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       });
     }
 
+    if (name === "cns") {
+      const digits = value.replace(/\D/g, "").slice(0, 15);
+      setFormData((prev) => ({ ...prev, cns: digits }));
+      return;
+    }
+
+    if (name === "sexoNascimento") {
+      setFormData((prev) => {
+        const next = { ...prev, sexoNascimento: value };
+        if (value !== "2") next.gestante = "";
+        return next;
+      });
+      return;
+    }
+
     // ✅ CORREÇÃO: Tratar idadeUnidade ANTES da normalização
     if (name === 'idadeUnidade') {
       // Limpar erros quando mudar a unidade
@@ -2390,11 +2416,26 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     setFormData((prev) => ({
       ...prev,
       paciente: paciente.nome || "",
+      pacienteId: paciente.idpaciente,
       cpf: paciente.cpf || "",
+      cns: (paciente as any).cns ? String((paciente as any).cns).replace(/\D/g, "").slice(0, 15) : "",
       dataNascimento: paciente.data_nascimento || "",
       nomeMae: paciente.nome_mae || "",
-      // Usar os IDs dos tipos em vez dos nomes diretos
-      genero: paciente.tipo_genero?.idtipo_genero?.toString() || "",
+      identidadeGenero: paciente.tipo_genero?.idtipo_genero?.toString() || "",
+      sexoNascimento: (() => {
+        const s = (paciente as any).sexo;
+        if (s === "M" || s === "m") return "1";
+        if (s === "F" || s === "f") return "2";
+        if (s === "I" || s === "i") return "3";
+        return "";
+      })(),
+      eEstrangeiro: (() => {
+        const e = (paciente as any).e_estrangeiro;
+        if (e === 1 || e === "1" || e === "S") return "1";
+        if (e === 2 || e === "2" || e === "N") return "2";
+        return "";
+      })(),
+      gestante: paciente.gestante || "",
       raca: paciente.tipo_raca?.idtipo_raca?.toString() || "",
       escolaridade: paciente.escolaridade_idescolaridade?.toString() || "",
       contatoTelefonico: paciente.contato || "",
@@ -2497,12 +2538,16 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         nome_mae: formData.nomeMae || "",
         data_nascimento: formData.dataNascimento || null,
         cpf: formData.cpf || "",
+        cns: formData.cns || null,
+        sexo: mapSexoNascimentoToApi(formData.sexoNascimento),
+        e_estrangeiro: formData.eEstrangeiro === "1" ? "1" : formData.eEstrangeiro === "2" ? "2" : null,
         contato: formData.contatoTelefonico || "",
-        gestante: formData.gestante || null, // ✅ ADICIONADO: Incluir campo gestante
-        tipo_genero_idtipo_genero: formData.identidadeGenero || null,
-        tipo_raca_idtipo_raca: formData.raca || null,
-        escolaridade_idescolaridade: formData.escolaridade || null,
-        cbo_idcbo: formData.profissao || null,
+        gestante: mapGestanteForApi(formData.gestante),
+        tipo_genero_idtipo_genero: formData.identidadeGenero ? parseInt(formData.identidadeGenero, 10) : null,
+        tipo_raca_idtipo_raca: formData.raca ? parseInt(formData.raca, 10) : null,
+        escolaridade_idescolaridade: formData.escolaridade ? parseInt(formData.escolaridade, 10) : null,
+        cbo_idcbo: formData.profissao ? parseInt(formData.profissao, 10) : null,
+        ddi: formData.ddi || "55",
       };
       
       // ✅ CORREÇÃO: SEMPRE enviar idade em meses quando não há data de nascimento

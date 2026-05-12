@@ -11,6 +11,10 @@ import { validateCNS } from '@/utils/cnsValidator';
 import { validatePassaporte, normalizePassaporte } from '@/utils/passaporteValidator';
 import axios from 'axios';
 import { getRuntimeApiRoot } from '@/config/runtimeApiBase';
+import {
+  DF_CHOICE_WITH_TEXT_DEFAULT_VALUE,
+  radioChoiceOtherTextKey,
+} from '@/features/dynamic-forms/utils/radioChoiceOther';
 
 const API_ROOT = getRuntimeApiRoot();
 
@@ -29,6 +33,8 @@ interface AdvancedFieldProps {
   onBlur?: () => void;
   /** Lê valores de outros campos do formulário (para filtros/params). */
   getValue?: (key: string) => any;
+  /** Persiste valor em outra chave (ex.: texto da opção “Outro” no tipo radio). */
+  setValue?: (key: string, value: any) => void;
 }
 
 // ========== CHECKBOX GROUP (múltiplos checkboxes) ==========
@@ -156,10 +162,19 @@ export const RadioGroupField: React.FC<AdvancedFieldProps> = ({
   error,
   required,
   disabled,
+  getValue,
+  setValue,
 }) => {
   const [options, setOptions] = useState(field.options || []);
   const [loading, setLoading] = useState(false);
   const inputId = getFieldInputId(field);
+  const choiceWithText = Boolean(field.choiceWithText) && typeof setValue === 'function' && typeof getValue === 'function';
+  const otherSentinelRaw = String(field.choiceWithTextValue ?? DF_CHOICE_WITH_TEXT_DEFAULT_VALUE).trim();
+  const otherSentinel = otherSentinelRaw || DF_CHOICE_WITH_TEXT_DEFAULT_VALUE;
+  const otherTextKey = radioChoiceOtherTextKey(field.key);
+  const otherLabel = (field.choiceWithTextLabel ?? 'Outro').trim() || 'Outro';
+  const otherTextValue = choiceWithText ? String(getValue!(otherTextKey) ?? '') : '';
+  const sentinelCollides = options.some((o) => String(o.value) === otherSentinel);
 
   useEffect(() => {
     if (field.dataSource === 'database' && field.dataTable && field.dataValueColumn && field.dataLabelColumn) {
@@ -200,6 +215,13 @@ export const RadioGroupField: React.FC<AdvancedFieldProps> = ({
     );
   }
 
+  const selectMain = (next: string) => {
+    onChange(next);
+    if (choiceWithText && setValue && next !== otherSentinel) {
+      setValue(otherTextKey, undefined);
+    }
+  };
+
   return (
     <div className="mb-4">
       <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-2">
@@ -208,6 +230,11 @@ export const RadioGroupField: React.FC<AdvancedFieldProps> = ({
       </label>
       {field.helpText && (
         <p className="text-xs text-gray-500 mb-2">{field.helpText}</p>
+      )}
+      {choiceWithText && sentinelCollides && (
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mb-2">
+          Alguma opção usa o mesmo valor interno da opção com texto; altere o valor dessa opção ou o valor interno nas configurações do campo.
+        </p>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {options.map((option) => {
@@ -229,7 +256,7 @@ export const RadioGroupField: React.FC<AdvancedFieldProps> = ({
                   type="radio"
                   name={field.key}
                   checked={isSelected}
-                  onChange={() => onChange(option.value)}
+                  onChange={() => selectMain(option.value)}
                   disabled={disabled || field.disabled}
                   className="w-6 h-6 rounded-full border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer"
                 />
@@ -248,6 +275,50 @@ export const RadioGroupField: React.FC<AdvancedFieldProps> = ({
           );
         })}
       </div>
+      {choiceWithText && !sentinelCollides && (
+        <div className="mt-3 sm:col-span-2">
+          <label
+            className={`
+              flex flex-wrap items-center gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200
+              ${disabled || field.disabled ? 'opacity-60 cursor-not-allowed' : ''}
+              ${value === otherSentinel
+                ? 'bg-blue-50 border-2 border-blue-500 shadow-md'
+                : 'bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-sm'
+              }
+            `}
+          >
+            <div className="flex items-center h-6 flex-shrink-0">
+              <input
+                type="radio"
+                name={field.key}
+                checked={value === otherSentinel}
+                onChange={() => selectMain(otherSentinel)}
+                disabled={disabled || field.disabled}
+                className="w-6 h-6 rounded-full border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer"
+              />
+            </div>
+            <span className={`text-sm font-medium shrink-0 ${value === otherSentinel ? 'text-blue-900' : 'text-gray-900'}`}>
+              {otherLabel}
+            </span>
+            <input
+              type="text"
+              value={value === otherSentinel ? otherTextValue : ''}
+              onChange={(e) => setValue!(otherTextKey, e.target.value)}
+              onClick={() => {
+                if (!(disabled || field.disabled)) selectMain(otherSentinel);
+              }}
+              onFocus={() => {
+                if (!(disabled || field.disabled)) selectMain(otherSentinel);
+              }}
+              disabled={disabled || field.disabled || value !== otherSentinel}
+              placeholder={field.choiceWithTextPlaceholder || 'Digite aqui…'}
+              className="flex-1 min-w-[10rem] bg-transparent border-0 border-b-2 border-dotted border-gray-400 px-1 py-0.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+              aria-label={otherLabel}
+            />
+            {value === otherSentinel && <Check className="h-5 w-5 text-blue-600 flex-shrink-0" />}
+          </label>
+        </div>
+      )}
       {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
     </div>
   );

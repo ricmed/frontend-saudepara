@@ -480,7 +480,7 @@ const ValidacaoCientificaPage: React.FC = () => {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-blue-700 text-white">
-                        {["Indicador", "Resultado", "Meta", "Status"].map((h) => (
+                        {["Indicador", "Resultado", "Observação"].map((h) => (
                           <th key={h} className="px-4 py-2 text-left font-semibold text-xs">{h}</th>
                         ))}
                       </tr>
@@ -488,81 +488,51 @@ const ValidacaoCientificaPage: React.FC = () => {
                     <tbody>
                       {[
                         {
-                          indicador: "Unidades treinadas",
-                          resultado: `${dados.unidades_treinadas} unidades`,
-                          meta: "≥ 30",
-                          pct: dados.unidades_treinadas, metaNum: 30
+                          indicador: "Unidades de saúde treinadas",
+                          resultado: `${dados.unidades_treinadas} (${dados.unidades_com_notificacao} com registros)`,
+                          obs: "Unidades cadastradas e habilitadas no sistema",
                         },
                         {
                           indicador: "Período de operação",
                           resultado: `${dados.periodo_operacao.dias_totais} dias`,
-                          meta: "COP 30 (03–25/11)",
-                          pct: 100, metaNum: 100 // sempre "atingido" — é o evento completo
+                          obs: "03 a 25 de novembro de 2025 (COP 30)",
                         },
                         {
                           indicador: "Disponibilidade operacional",
                           resultado: `${fmtNum(dados.disponibilidade.percentual, 1)}%`,
-                          meta: "≥ 90%",
-                          pct: dados.disponibilidade.percentual, metaNum: 90
+                          obs: `${dados.disponibilidade.dias_com_registro} de ${dados.disponibilidade.dias_totais_operacao} dias com ao menos um registro`,
                         },
                         {
-                          indicador: "Taxa offline sincronizada",
-                          resultado: `${fmtNum(dados.sincronizacao_offline.taxa_sincronizacao_pct, 1)}%`,
-                          meta: "≥ 95%",
-                          pct: dados.sincronizacao_offline.taxa_sincronizacao_pct, metaNum: 95
+                          indicador: "Taxa de sincronização offline",
+                          resultado: `${fmtNum(dados.sincronizacao_offline.taxa_sincronizacao_pct, 1)}% (${dados.sincronizacao_offline.total_sincronizados}/${dados.sincronizacao_offline.total_offline})`,
+                          obs: "Registros criados sem conectividade e sincronizados com o servidor",
                         },
                         {
-                          indicador: "Tempo médio de sincronização (regra Excel)",
-                          resultado:
-                            dados.sincronizacao_offline.tempo_medio_minutos != null
-                              ? `${fmtNum(dados.sincronizacao_offline.tempo_medio_minutos, 1)} min · ${dados.sincronizacao_offline.com_tempo_rastreado.toLocaleString("pt-BR")} reg.`
-                              : "—",
-                          meta: "offline_id → created_at",
-                          informativo: true as const,
+                          indicador: "Tempo de persistência offline",
+                          resultado: dados.sincronizacao_offline.tempo_medio_minutos != null
+                            ? `${fmtNum(dados.sincronizacao_offline.tempo_medio_minutos, 1)} min (média)`
+                            : "—",
+                          obs: dados.sincronizacao_offline.tempo_minimo_minutos != null
+                            ? `Mín: ${fmtNum(dados.sincronizacao_offline.tempo_minimo_minutos, 0)} min · Máx: ${fmtNum(dados.sincronizacao_offline.tempo_maximo_minutos!, 0)} min · ${dados.sincronizacao_offline.com_tempo_rastreado} registros`
+                            : "Tempo entre criação offline no dispositivo e chegada ao servidor",
                         },
                         {
                           indicador: "Completude de campos críticos",
                           resultado: `${fmtNum(dados.completude_campos_criticos.percentual, 1)}%`,
-                          meta: "≥ 90%",
-                          pct: dados.completude_campos_criticos.percentual, metaNum: 90
+                          obs: `${dados.completude_campos_criticos.notificacoes_completas.toLocaleString("pt-BR")} de ${dados.completude_campos_criticos.total_notificacoes.toLocaleString("pt-BR")} notificações com todos os 6 campos obrigatórios preenchidos`,
                         },
                         {
                           indicador: "Incidentes de indisponibilidade",
                           resultado: `${dados.incidentes_indisponibilidade.dias_sem_registro} dias (${fmtNum(dados.incidentes_indisponibilidade.percentual_indisponibilidade, 1)}%)`,
-                          meta: "≤ 10%",
-                          pct: dados.incidentes_indisponibilidade.percentual_indisponibilidade, metaNum: 10, invertido: true
+                          obs: "Dias sem nenhum registro no período de operação",
                         },
-                      ].map(({ indicador, resultado, meta, pct, metaNum, invertido, informativo }, i) => {
-                        if (informativo) {
-                          return (
-                            <tr key={indicador} className={i % 2 === 0 ? "bg-blue-50/40" : "bg-white"}>
-                              <td className="px-4 py-2 font-medium text-gray-800">{indicador}</td>
-                              <td className="px-4 py-2 font-semibold text-gray-900">{resultado}</td>
-                              <td className="px-4 py-2 text-gray-500">{meta}</td>
-                              <td className="px-4 py-2">
-                                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                                  <Activity className="h-3 w-3" />
-                                  Referência
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        }
-                        const ok = invertido ? pct <= metaNum : pct >= metaNum;
-                        return (
-                          <tr key={indicador} className={i % 2 === 0 ? "bg-blue-50/40" : "bg-white"}>
-                            <td className="px-4 py-2 font-medium text-gray-800">{indicador}</td>
-                            <td className="px-4 py-2 font-semibold text-gray-900">{resultado}</td>
-                            <td className="px-4 py-2 text-gray-500">{meta}</td>
-                            <td className="px-4 py-2">
-                              <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${ok ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"}`}>
-                                {ok ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
-                                {ok ? "Atingido" : "Abaixo da meta"}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      ].map(({ indicador, resultado, obs }, i) => (
+                        <tr key={indicador} className={i % 2 === 0 ? "bg-blue-50/40" : "bg-white"}>
+                          <td className="px-4 py-2 font-medium text-gray-800">{indicador}</td>
+                          <td className="px-4 py-2 font-semibold text-gray-900 whitespace-nowrap">{resultado}</td>
+                          <td className="px-4 py-2 text-gray-500 text-xs">{obs}</td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>

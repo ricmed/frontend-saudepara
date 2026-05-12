@@ -22,6 +22,15 @@ interface EstadoMunicipioNotificacaoProps {
   disabled?: boolean;
   error?: string;
   required?: boolean;
+  /** Bloqueia alteração da UF (perfil estadual ou escopos inferiores). */
+  lockUf?: boolean;
+  /** Bloqueia alteração do município (perfil municipal ou unidade). */
+  lockMunicipio?: boolean;
+  /**
+   * Quando true, não envolve UF+município em grid próprio: os dois filhos são células irmãs
+   * de um grid pai de 3 colunas (UF | Município | Estabelecimento), estilo e-SUS.
+   */
+  sinanThreeColumn?: boolean;
 }
 
 export const EstadoMunicipioNotificacao: React.FC<EstadoMunicipioNotificacaoProps> = ({
@@ -30,6 +39,9 @@ export const EstadoMunicipioNotificacao: React.FC<EstadoMunicipioNotificacaoProp
   disabled = false,
   error,
   required = false,
+  lockUf = false,
+  lockMunicipio = false,
+  sinanThreeColumn = false,
 }) => {
   const [estados, setEstados] = useState<Estado[]>([]);
 
@@ -108,40 +120,67 @@ export const EstadoMunicipioNotificacao: React.FC<EstadoMunicipioNotificacaoProp
     [setValue]
   );
 
+  const ufDisabled = disabled || lockUf;
+  const munDisabled = disabled || lockMunicipio || (!estadoValue && !lockMunicipio);
+
+  const ufPlaceholder = sinanThreeColumn
+    ? 'UF (código, sigla ou nome)'
+    : 'Pesquise por código ou nome (ex.: 15, PA)';
+  const munPlaceholder = sinanThreeColumn
+    ? estadoValue
+      ? 'Município (código ou nome)'
+      : 'Selecione a UF'
+    : estadoValue
+      ? 'Pesquise por código ou nome (ex.: 150140, Belém)'
+      : 'Selecione primeiro a UF';
+
+  const ufCell = (
+    <div className="min-w-0">
+      <LocationInput
+        name="uf"
+        label={required ? 'UF da Notificação *' : 'UF da Notificação'}
+        value={estadoValue}
+        onChange={handleUfChange}
+        placeholder={ufPlaceholder}
+        disabled={ufDisabled}
+        apiEndpoint="api/tipo-estado"
+        idField="idtipo_estado"
+        required={required}
+        error={error}
+      />
+    </div>
+  );
+
+  const munCell = (
+    <div className="min-w-0">
+      <LocationInput
+        name="municipio"
+        label={required ? 'Município da Notificação *' : 'Município da Notificação'}
+        value={municipioValue}
+        onChange={handleMunicipioChange}
+        placeholder={munPlaceholder}
+        disabled={munDisabled}
+        apiEndpoint="api/tipo-municipio"
+        idField="idtipo_municipio"
+        parentValue={estadoValue}
+        required={required}
+      />
+    </div>
+  );
+
+  if (sinanThreeColumn) {
+    return (
+      <>
+        {ufCell}
+        {munCell}
+      </>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div>
-        <LocationInput
-          name="uf"
-          label={required ? 'UF da Notificação *' : 'UF da Notificação'}
-          value={estadoValue}
-          onChange={handleUfChange}
-          placeholder="Pesquise por código ou nome (ex.: 15, PA)"
-          disabled={disabled}
-          apiEndpoint="api/tipo-estado"
-          idField="idtipo_estado"
-          required={required}
-          error={error}
-        />
-      </div>
-      <div>
-        <LocationInput
-          name="municipio"
-          label={required ? 'Município da Notificação *' : 'Município da Notificação'}
-          value={municipioValue}
-          onChange={handleMunicipioChange}
-          placeholder={
-            estadoValue
-              ? 'Pesquise por código ou nome (ex.: 150140, Belém)'
-              : 'Selecione primeiro a UF'
-          }
-          disabled={disabled || !estadoValue}
-          apiEndpoint="api/tipo-municipio"
-          idField="idtipo_municipio"
-          parentValue={estadoValue}
-          required={required}
-        />
-      </div>
+      {ufCell}
+      {munCell}
     </div>
   );
 };

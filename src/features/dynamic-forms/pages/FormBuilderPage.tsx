@@ -7,6 +7,7 @@ import { Plus, Trash2, Save, Eye, Settings, GripVertical, X, Download, Upload, C
 import { ClipboardList, Calendar, DollarSign, Target, Activity, Shield, Leaf, BarChart3, Wrench, Users } from 'lucide-react';
 import dynamicIconImports from 'lucide-react/dynamicIconImports';
 import { FormRenderer } from '../components/FormRenderer';
+import { DF_CHOICE_WITH_TEXT_DEFAULT_VALUE } from '@/features/dynamic-forms/utils/radioChoiceOther';
 import { ImportExcelModal } from '../components/ImportExcelModal';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 import { clampNoteInRange, normalizeScalePointLabelRows } from '@/utils/linearScaleNote';
@@ -479,88 +480,94 @@ export const FormBuilderPage: React.FC = () => {
     setActiveField({ sectionIdx: toSectionIdx, fieldIdx: insertAt });
   };
 
+  /**
+   * Cria ou atualiza o formulário, grava uma nova versão do schema e publica.
+   * Usado pelo Salvar e pelo fluxo “Campos Fixos” antes de existir versão ativa.
+   */
+  const persistFormAndPublish = async (): Promise<{ formId: number; versionId: number } | null> => {
+    const userId = user?.sub || user?.id;
+    if (!userId) {
+      alert('Usuário não autenticado');
+      console.error('user object:', user);
+      return null;
+    }
+
+    const computedKey =
+      (formKey || '').trim() ||
+      makeFormKeyFromName(formName) ||
+      (isGeneralBuilder ? `FORM_${Date.now().toString(36).toUpperCase()}`.slice(0, 50) : '');
+
+    if (!computedKey && !id) {
+      alert('Informe um código do formulário (form_key).');
+      return null;
+    }
+
+    const formData = {
+      nome: (formName || '').trim(),
+      form_key: computedKey,
+      descricao: (formDescription || '').trim(),
+      categoria,
+      created_by: userId
+    };
+    if (!formData.nome) {
+      alert('Informe o nome do formulário.');
+      return null;
+    }
+
+    let formId: number;
+    if (id) {
+      if (isGeneralBuilder) {
+        await FormService.updateMyForm(parseInt(id), {
+          nome: formData.nome,
+          descricao: formData.descricao,
+          categoria: formData.categoria,
+        });
+      } else {
+        await FormService.updateForm(parseInt(id), formData);
+      }
+      formId = parseInt(id);
+    } else {
+      if (isGeneralBuilder) {
+        const newForm = await FormService.createMyForm({
+          form_key: formData.form_key,
+          nome: formData.nome,
+          descricao: formData.descricao || undefined,
+          categoria: formData.categoria,
+          visibility: 'PRIVATE',
+          require_login: false,
+          is_active: true,
+        });
+        formId = newForm.id;
+        navigate(`/private/meus-formularios/${formId}/editar`, { replace: true });
+      } else {
+        const newForm = await FormService.createForm(formData);
+        formId = newForm.id;
+      }
+    }
+
+    const schemaToSave = {
+      ...schema,
+      agravo: computedKey,
+      title: (formData.nome || '').trim() || undefined,
+    };
+
+    const version = await FormService.createVersion(formId, {
+      schema_json: schemaToSave,
+      ui_json: {},
+      rules_json: {},
+      published_by: userId
+    });
+
+    await FormService.publishVersion(formId, version.id, userId);
+
+    return { formId, versionId: version.id };
+  };
+
   const handleSave = async () => {
     try {
       setLoading(true);
-      
-      const userId = user?.sub || user?.id;
-      if (!userId) {
-        alert('Usuário não autenticado');
-        console.error('user object:', user);
-        return;
-      }
-
-      const computedKey =
-        (formKey || '').trim() ||
-        makeFormKeyFromName(formName) ||
-        (isGeneralBuilder ? `FORM_${Date.now().toString(36).toUpperCase()}`.slice(0, 50) : '');
-
-      if (!computedKey && !id) {
-        alert('Informe um código do formulário (form_key).');
-        return;
-      }
-
-      const formData = {
-        nome: (formName || '').trim(),
-        form_key: computedKey,
-        descricao: (formDescription || '').trim(),
-        categoria,
-        created_by: userId
-      };
-      if (!formData.nome) {
-        alert('Informe o nome do formulário.');
-        return;
-      }
-
-      let formId: number;
-      if (id) {
-        if (isGeneralBuilder) {
-          // "Meus formulários": atualizar via rota /forms/me (ACL)
-          await FormService.updateMyForm(parseInt(id), {
-            nome: formData.nome,
-            descricao: formData.descricao,
-            categoria: formData.categoria,
-          });
-        } else {
-          await FormService.updateForm(parseInt(id), formData);
-        }
-        formId = parseInt(id);
-      } else {
-        if (isGeneralBuilder) {
-          const newForm = await FormService.createMyForm({
-            form_key: formData.form_key,
-            nome: formData.nome,
-            descricao: formData.descricao || undefined,
-            categoria: formData.categoria,
-            visibility: 'PRIVATE',
-            require_login: false,
-            is_active: true,
-          });
-          formId = newForm.id;
-          // após criar no contexto geral, a URL deve virar /:id/editar pra não salvar sempre "novo"
-          navigate(`/private/meus-formularios/${formId}/editar`, { replace: true });
-        } else {
-          const newForm = await FormService.createForm(formData);
-          formId = newForm.id;
-        }
-      }
-
-      // Criar versão e publicar automaticamente
-      const schemaToSave = {
-        ...schema,
-        agravo: computedKey,
-        title: (formData.nome || '').trim() || undefined,
-      };
-
-      const version = await FormService.createVersion(formId, {
-        schema_json: schemaToSave,
-        ui_json: {},
-        rules_json: {},
-        published_by: userId
-      });
-
-      // Publicar a versão automaticamente para o formulário ficar disponível
-      await FormService.publishVersion(formId, version.id, userId);
+      const result = await persistFormAndPublish();
+      if (!result) return;
 
       alert('Formulário salvo e publicado com sucesso!');
       navigate(isGeneralBuilder ? '/private/meus-formularios' : '/private/formularios-admin');
@@ -568,6 +575,30 @@ export const FormBuilderPage: React.FC = () => {
       console.error('Erro ao salvar:', err);
       const errorMsg = err?.response?.data?.message || err?.message || 'Erro desconhecido';
       alert(`Erro ao salvar formulário: ${errorMsg}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openFixedColumns = async () => {
+    if (isGeneralBuilder) return;
+    if (id && activeVersionId != null) {
+      navigate(`/private/formularios-admin/${id}/versoes/${activeVersionId}/campos-fixos`);
+      return;
+    }
+    try {
+      setLoading(true);
+      const result = await persistFormAndPublish();
+      if (!result) return;
+      setActiveVersionId(result.versionId);
+      navigate(
+        `/private/formularios-admin/${result.formId}/versoes/${result.versionId}/campos-fixos`,
+        { replace: !id }
+      );
+    } catch (err: any) {
+      console.error('Erro ao preparar campos fixos:', err);
+      const errorMsg = err?.response?.data?.message || err?.message || 'Erro desconhecido';
+      alert(`Não foi possível abrir campos fixos: ${errorMsg}`);
     } finally {
       setLoading(false);
     }
@@ -806,7 +837,7 @@ export const FormBuilderPage: React.FC = () => {
       options: [
         { value: 'checkbox', label: '☑️ Checkbox (sim/não)' },
         { value: 'checkbox-group', label: '☑️ Grupo de checkboxes' },
-        { value: 'radio', label: '🔘 Opção única (radio)' },
+        { value: 'radio', label: '📋 Múltipla escolha (uma resposta)' },
         { value: 'select', label: '📋 Seleção' },
         { value: 'select-search', label: '🔍 Seleção com busca' },
         { value: 'multi-select', label: '📋 Seleção múltipla' },
@@ -1377,20 +1408,10 @@ export const FormBuilderPage: React.FC = () => {
                   {!isGeneralBuilder && (
                     <button
                       type="button"
-                      onClick={() => {
-                        if (!id || activeVersionId == null) {
-                          alert(
-                            'É preciso ter o formulário salvo com uma versão publicada para configurar colunas fixas. Salve o formulário e tente de novo.'
-                          );
-                          return;
-                        }
-                        navigate(
-                          `/private/formularios-admin/${id}/versoes/${activeVersionId}/campos-fixos`
-                        );
-                      }}
+                      onClick={() => void openFixedColumns()}
                       className="px-6 py-3 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
-                      title="Abrir configuração de colunas fixas para a versão ativa"
-                      disabled={!id || activeVersionId == null}
+                      title="Colunas fixas SINAN: se o formulário ainda não foi salvo, gravamos e publicamos uma versão ao abrir."
+                      disabled={loading}
                     >
                       Campos Fixos
                     </button>
@@ -2300,6 +2321,92 @@ export const FormBuilderPage: React.FC = () => {
                                           </p>
                                         )}
                                       </>
+                                    )}
+                                  </div>
+                                )}
+                                {field.type === 'radio' && (
+                                  <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
+                                    <label className="flex items-start gap-2 text-xs text-gray-800 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        className="mt-0.5 rounded border-gray-300"
+                                        checked={!!field.choiceWithText}
+                                        onChange={(e) =>
+                                          updateField(sectionIdx, fieldIdx, {
+                                            choiceWithText: e.target.checked,
+                                            ...(e.target.checked
+                                              ? {}
+                                              : {
+                                                  choiceWithTextLabel: undefined,
+                                                  choiceWithTextPlaceholder: undefined,
+                                                  choiceWithTextValue: undefined,
+                                                }),
+                                          })
+                                        }
+                                      />
+                                      <span>
+                                        <span className="font-medium text-gray-900">Opção com texto livre</span>
+                                        <span className="block text-gray-600 mt-0.5">
+                                          Uma alternativa extra com campo ao lado (como em formulários Google). O rótulo pode ser qualquer texto (ex.: Outro, Especifique, NSI).
+                                        </span>
+                                      </span>
+                                    </label>
+                                    {field.choiceWithText && (
+                                      <div className="pl-6 space-y-2">
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                                            Rótulo exibido ao lado do campo
+                                          </label>
+                                          <input
+                                            type="text"
+                                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                                            value={field.choiceWithTextLabel ?? ''}
+                                            onChange={(e) =>
+                                              updateField(sectionIdx, fieldIdx, {
+                                                choiceWithTextLabel: e.target.value || undefined,
+                                              })
+                                            }
+                                            placeholder="Ex.: Outro, Especifique, NSI — comente"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                                            Placeholder do campo de texto
+                                          </label>
+                                          <input
+                                            type="text"
+                                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                                            value={field.choiceWithTextPlaceholder ?? ''}
+                                            onChange={(e) =>
+                                              updateField(sectionIdx, fieldIdx, {
+                                                choiceWithTextPlaceholder: e.target.value || undefined,
+                                              })
+                                            }
+                                            placeholder="Opcional"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                                            Valor interno quando essa opção está marcada (avançado)
+                                          </label>
+                                          <input
+                                            type="text"
+                                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded font-mono"
+                                            value={field.choiceWithTextValue ?? ''}
+                                            onChange={(e) =>
+                                              updateField(sectionIdx, fieldIdx, {
+                                                choiceWithTextValue: e.target.value.trim()
+                                                  ? e.target.value.trim()
+                                                  : undefined,
+                                              })
+                                            }
+                                            placeholder={`Padrão: ${DF_CHOICE_WITH_TEXT_DEFAULT_VALUE}`}
+                                          />
+                                          <p className="text-[10px] text-gray-500 mt-0.5">
+                                            Não pode ser igual ao valor de nenhuma opção carregada. Deixe vazio para o padrão.
+                                          </p>
+                                        </div>
+                                      </div>
                                     )}
                                   </div>
                                 )}

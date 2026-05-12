@@ -204,6 +204,20 @@ export interface FormField {
   };
   /** Número de colunas do grid para campos tipo checkbox-group (padrão: 2). */
   gridCols?: number;
+  /**
+   * Tipo `radio`: oferece uma opção extra com campo de texto (estilo Google Forms).
+   * O texto é salvo em `radioChoiceOtherTextKey(key)`; o valor da escolha segue sendo `choiceWithTextValue`.
+   */
+  choiceWithText?: boolean;
+  /** Rótulo da opção com texto (ex.: Outro, Especifique, NSI — comente). */
+  choiceWithTextLabel?: string;
+  /** Placeholder do campo de texto ao lado da opção. */
+  choiceWithTextPlaceholder?: string;
+  /**
+   * Valor persistido no campo quando a opção com texto está marcada.
+   * Não pode repetir o `value` de nenhuma opção manual.
+   */
+  choiceWithTextValue?: string;
   quiz?: {
     enabled?: boolean;
     points?: number;
