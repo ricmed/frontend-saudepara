@@ -31,9 +31,14 @@ interface IndicadoresValidacao {
     total_pendentes: number;
     taxa_sincronizacao_pct: number;
     com_tempo_rastreado: number;
+    /** Truncado ao segundo — costuma ser 0 quando created_at e synced_at vêm do mesmo create. */
     tempo_medio_minutos: number | null;
     tempo_minimo_minutos: number | null;
     tempo_maximo_minutos: number | null;
+    latencia_sync_ms_media?: number | null;
+    latencia_sync_ms_min?: number | null;
+    latencia_sync_ms_max?: number | null;
+    criacao_ate_updated_at_media_min?: number | null;
     nota: string;
   };
   completude_campos_criticos: {
@@ -385,30 +390,44 @@ const ValidacaoCientificaPage: React.FC = () => {
                     <p className="text-xs text-gray-400 mt-0.5">100% — presença no servidor</p>
                   </div>
                   <div className="bg-gray-50 rounded-xl p-4">
-                    <p className="text-xs text-gray-500 mb-1">Tempo médio sync</p>
+                    <p className="text-xs text-gray-500 mb-1">Latência created ↔ synced</p>
                     <p className="text-xl font-bold text-blue-600">
-                      {dados.sincronizacao_offline.tempo_medio_minutos !== null
-                        ? `${fmtNum(dados.sincronizacao_offline.tempo_medio_minutos, 1)} min`
-                        : "—"}
+                      {dados.sincronizacao_offline.latencia_sync_ms_media != null
+                        ? `${fmtNum(dados.sincronizacao_offline.latencia_sync_ms_media, 2)} ms`
+                        : dados.sincronizacao_offline.tempo_medio_minutos != null
+                          ? `${fmtNum(dados.sincronizacao_offline.tempo_medio_minutos, 4)} min`
+                          : "—"}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
                       {dados.sincronizacao_offline.com_tempo_rastreado > 0
-                        ? `rastreado em ${dados.sincronizacao_offline.com_tempo_rastreado} registros`
+                        ? `média em ms · ${dados.sincronizacao_offline.com_tempo_rastreado} registro(s)`
                         : dados.sincronizacao_offline.total_offline === 0
                           ? "sem registros offline no período"
-                          : "intervalo não calculado — veja a nota abaixo"}
+                          : "veja a nota abaixo"}
                     </p>
                   </div>
                   <div className="bg-gray-50 rounded-xl p-4">
-                    <p className="text-xs text-gray-500 mb-1">Mín / Máx sync</p>
+                    <p className="text-xs text-gray-500 mb-1">Mín / Máx (ms)</p>
                     <p className="text-xl font-bold text-gray-700">
-                      {dados.sincronizacao_offline.tempo_minimo_minutos !== null
-                        ? `${fmtNum(dados.sincronizacao_offline.tempo_minimo_minutos, 0)} / ${fmtNum(dados.sincronizacao_offline.tempo_maximo_minutos, 0)} min`
-                        : "—"}
+                      {dados.sincronizacao_offline.latencia_sync_ms_min != null &&
+                      dados.sincronizacao_offline.latencia_sync_ms_max != null
+                        ? `${fmtNum(dados.sincronizacao_offline.latencia_sync_ms_min, 2)} / ${fmtNum(dados.sincronizacao_offline.latencia_sync_ms_max, 2)} ms`
+                        : dados.sincronizacao_offline.tempo_minimo_minutos != null
+                          ? `${fmtNum(dados.sincronizacao_offline.tempo_minimo_minutos, 0)} / ${fmtNum(dados.sincronizacao_offline.tempo_maximo_minutos ?? 0, 0)} min`
+                          : "—"}
                     </p>
-                    <p className="text-xs text-gray-400 mt-0.5">tempo mínimo / máximo</p>
+                    <p className="text-xs text-gray-400 mt-0.5">entre carimbos no servidor</p>
                   </div>
                 </div>
+                {dados.sincronizacao_offline.criacao_ate_updated_at_media_min != null && (
+                  <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-3">
+                    Média <span className="font-medium">criação → última atualização</span> no servidor:{" "}
+                    <span className="font-semibold">
+                      {fmtNum(dados.sincronizacao_offline.criacao_ate_updated_at_media_min, 1)} min
+                    </span>
+                    {" "}— inclui edições posteriores; não use como latência de sync em rede.
+                  </p>
+                )}
                 {dados.sincronizacao_offline.nota && (
                   <p className="text-xs text-gray-400 mt-3 italic">{dados.sincronizacao_offline.nota}</p>
                 )}
