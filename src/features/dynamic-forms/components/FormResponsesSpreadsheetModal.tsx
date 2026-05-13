@@ -1,9 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  EMPTY_RESPONSE_LIST_LABEL_MAPS,
   buildSheetColumnsFromSchema,
   copySheetRowsToClipboard,
+  findFormFieldByKey,
   flattenObject,
+  formatCellValueForResponseList,
   resolveActiveSchema,
+  type ResponseListLabelMaps,
 } from '../utils/formResponsesListUtils';
 import { MONITOR_OPER_REGIONAL_KEY, monitorOperPresetVisibleSheetKeys } from '../utils/monitorOperRegionalReport';
 import type { Form } from '@/services/FormService';
@@ -20,6 +24,7 @@ type Props = {
   loading?: boolean;
   onDownloadXlsx: () => void;
   onDownloadCsv: () => void;
+  labelMaps?: ResponseListLabelMaps;
 };
 
 export const FormResponsesSpreadsheetModal: React.FC<Props> = ({
@@ -30,6 +35,7 @@ export const FormResponsesSpreadsheetModal: React.FC<Props> = ({
   loading = false,
   onDownloadXlsx,
   onDownloadCsv,
+  labelMaps,
 }) => {
   const activeSchema = resolveActiveSchema(form);
   const [showSheetColumns, setShowSheetColumns] = useState(false);
@@ -166,7 +172,9 @@ export const FormResponsesSpreadsheetModal: React.FC<Props> = ({
   const formatCell = (key: string, v: any): string => {
     if (!isMonitor) {
       if (v === null || v === undefined) return '';
-      return String(v);
+      const maps = labelMaps ?? EMPTY_RESPONSE_LIST_LABEL_MAPS;
+      const field = findFormFieldByKey(activeSchema, key);
+      return formatCellValueForResponseList(v, field, maps);
     }
 
     // Ajustes UX específicos do MONITOR_OPER_REGIONAL

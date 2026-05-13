@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 import { FileSpreadsheet, Download } from 'lucide-react';
@@ -6,16 +6,159 @@ import FormResponsesService from '@/services/FormResponsesService';
 import FormService, { type Form } from '@/services/FormService';
 import { FormResponseReadonlyModal } from '../components/FormResponseReadonlyModal';
 import { FormResponsesSpreadsheetModal } from '../components/FormResponsesSpreadsheetModal';
-import { getStatusUi, getValueAtPath, guessKeyFields, resolveActiveSchema } from '../utils/formResponsesListUtils';
+import {
+  collectSchemaReferenceMapsNeeded,
+  findFormFieldByKey,
+  formatCellValueForResponseList,
+  getStatusUi,
+  getValueAtPath,
+  guessKeyFields,
+  resolveActiveSchema,
+  type ResponseListLabelMaps,
+} from '../utils/formResponsesListUtils';
 import {
   MONITOR_OPER_REGIONAL_KEY,
   buildMonitorOperSummaryById,
   getMonitorOperListColumnSpecs,
+  type MonitorOperListColSpec,
+  type MonitorOperSubmissionSummary,
 } from '../utils/monitorOperRegionalReport';
 import { useCrsLabelByIdMap } from '../hooks/useCrsLabelByIdMap';
+import { useMunicipioLabelByIdMap } from '../hooks/useMunicipioLabelByIdMap';
+import { useTipoPaisLabelByIdMap } from '../hooks/useTipoPaisLabelByIdMap';
+import { compareValues } from '@/features/notificationForms/utils';
 
 type FormResponsesLocationState = {
   responsesBackTo?: string;
+};
+
+type ResponseRow = {
+  id: number;
+  status: string;
+  created_at: string;
+  submitted_at?: string | null;
+  created_by: string;
+  data_json: Record<string, unknown>;
+};
+
+const LIST_SORT_MONITOR = 'm:';
+const LIST_SORT_FIELD = 'f:';
+
+function buildListSortMonitorKey(colId: string) {
+  return `${LIST_SORT_MONITOR}${colId}`;
+}
+
+function buildListSortFieldKey(fieldKey: string) {
+  return `${LIST_SORT_FIELD}${fieldKey}`;
+}
+
+function parseListSortKey(key: string):
+  | { type: 'monitor'; colId: string }
+  | { type: 'field'; fieldKey: string }
+  | { type: 'status' }
+  | { type: 'submitted_at' }
+  | null {
+  if (key === 'status') return { type: 'status' };
+  if (key === 'submitted_at') return { type: 'submitted_at' };
+  if (key.startsWith(LIST_SORT_MONITOR)) return { type: 'monitor', colId: key.slice(LIST_SORT_MONITOR.length) };
+  if (key.startsWith(LIST_SORT_FIELD)) return { type: 'field', fieldKey: key.slice(LIST_SORT_FIELD.length) };
+  return null;
+}
+
+function compareFormListValues(valA: unknown, valB: unknown, sortOrder: 'asc' | 'desc'): number {
+  const isNumA = typeof valA === 'number' && !Number.isNaN(valA);
+  const isNumB = typeof valB === 'number' && !Number.isNaN(valB);
+  if (isNumA && isNumB) {
+    const diff = valA - valB;
+    return sortOrder === 'asc' ? diff : -diff;
+  }
+  return compareValues(valA, valB, sortOrder);
+}
+
+function getListSortComparableValue(
+  row: ResponseRow,
+  sortKey: string,
+  opts: {
+    monitorSummaryById: Map<number, MonitorOperSubmissionSummary>;
+    monitorColById: Map<string, MonitorOperListColSpec>;
+    crsLabels: Record<string, string>;
+    activeSchema: unknown;
+    responseMaps: ResponseListLabelMaps;
+  },
+): string | number {
+  const p = parseListSortKey(sortKey);
+  if (!p) return '';
+  if (p.type === 'status') return row.status ?? '';
+  if (p.type === 'submitted_at') return row.submitted_at ?? row.created_at ?? '';
+  if (p.type === 'field') {
+    const v = getValueAtPath(row.data_json ?? {}, p.fieldKey);
+    if (v === null || v === undefined) return '';
+    const field = findFormFieldByKey(opts.activeSchema, p.fieldKey);
+    const display = formatCellValueForResponseList(v, field, opts.responseMaps);
+    if (display !== '' && display !== String(v)) return display;
+    if (typeof v === 'number' && Number.isFinite(v)) return v;
+    if (typeof v === 'boolean') return v ? 1 : 0;
+    return String(v);
+  }
+  const sum = opts.monitorSummaryById.get(row.id);
+  if (!sum) return '';
+  if (p.colId === 'custo') return sum.custoTotal ?? 0;
+  const spec = opts.monitorColById.get(p.colId);
+  if (!spec) return '';
+  return spec.format(sum, opts.crsLabels);
+}
+
+type FormListSortableThProps = {
+  label: string;
+  sortKey: string;
+  activeKey: string | null;
+  sortOrder: 'asc' | 'desc';
+  onSort: (key: string) => void;
+  thClassName?: string;
+  titleAttr?: string;
+  hiddenLg?: boolean;
+};
+
+const FormListSortableTh: React.FC<FormListSortableThProps> = ({
+  label,
+  sortKey,
+  activeKey,
+  sortOrder,
+  onSort,
+  thClassName = '',
+  titleAttr,
+  hiddenLg,
+}) => {
+  const isRight = thClassName.includes('text-right');
+  const active = activeKey === sortKey;
+  return (
+    <th
+      scope="col"
+      className={`px-3 lg:px-4 xl:px-6 py-3 align-middle text-xs font-semibold uppercase tracking-wider text-white whitespace-nowrap ${hiddenLg ? 'hidden lg:table-cell' : ''} ${thClassName}`.trim()}
+      title={titleAttr ?? label}
+    >
+      <div className={`flex min-w-0 items-center ${isRight ? 'justify-end' : ''}`}>
+        <span className="min-w-0 truncate">{label}</span>
+        <button
+          type="button"
+          onClick={() => onSort(sortKey)}
+          className="ml-1 shrink-0 text-white focus:outline-none"
+          aria-label={sortOrder === 'asc' && active ? 'Ordenar decrescente' : 'Ordenar crescente'}
+          title={active ? (sortOrder === 'asc' ? 'Ordenar decrescente' : 'Ordenar crescente') : 'Ordenar'}
+        >
+          {active ? (
+            sortOrder === 'asc' ? (
+              <span>▲</span>
+            ) : (
+              <span>▼</span>
+            )
+          ) : (
+            <span className="text-blue-200">▼</span>
+          )}
+        </button>
+      </div>
+    </th>
+  );
 };
 
 export const FormResponsesPage: React.FC = () => {
@@ -29,21 +172,64 @@ export const FormResponsesPage: React.FC = () => {
 
   const [form, setForm] = useState<Form | null>(null);
   const [loading, setLoading] = useState(true);
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<ResponseRow[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [selected, setSelected] = useState<any | null>(null);
+  const [listTotal, setListTotal] = useState(0);
+  const [selected, setSelected] = useState<ResponseRow | null>(null);
   const [showSheet, setShowSheet] = useState(false);
-  const [sheetPreviewRows, setSheetPreviewRows] = useState<any[]>([]);
+  const [sheetPreviewRows, setSheetPreviewRows] = useState<ResponseRow[]>([]);
   const [sheetPreviewLoading, setSheetPreviewLoading] = useState(false);
+  const [listSort, setListSort] = useState<{ key: string | null; order: 'asc' | 'desc' }>({
+    key: null,
+    order: 'asc',
+  });
 
   const isMonitorOperList = (form?.form_key ?? '').toUpperCase() === MONITOR_OPER_REGIONAL_KEY;
-  const crsLabels = useCrsLabelByIdMap(isMonitorOperList);
+
+  const activeSchema = resolveActiveSchema(form);
+  const refMapsNeeded = useMemo(() => collectSchemaReferenceMapsNeeded(activeSchema), [activeSchema]);
+  const municipioById = useMunicipioLabelByIdMap(refMapsNeeded.municipio);
+  const crsByIdMap = useCrsLabelByIdMap(refMapsNeeded.crs || isMonitorOperList);
+  const paisById = useTipoPaisLabelByIdMap(refMapsNeeded.pais);
+  const responseLabelMaps = useMemo<ResponseListLabelMaps>(
+    () => ({ municipioById, crsById: crsByIdMap, paisById }),
+    [municipioById, crsByIdMap, paisById],
+  );
+
   const monitorListCols = useMemo(() => (isMonitorOperList ? getMonitorOperListColumnSpecs() : []), [isMonitorOperList]);
   const monitorSummaryById = useMemo(
-    () => (isMonitorOperList ? buildMonitorOperSummaryById(rows) : new Map()),
+    () =>
+      isMonitorOperList
+        ? buildMonitorOperSummaryById(rows as Parameters<typeof buildMonitorOperSummaryById>[0])
+        : new Map<number, MonitorOperSubmissionSummary>(),
     [isMonitorOperList, rows],
   );
+
+  const monitorColById = useMemo(() => {
+    const m = new Map<string, MonitorOperListColSpec>();
+    for (const c of monitorListCols) m.set(c.id, c);
+    return m;
+  }, [monitorListCols]);
+
+  const handleListSortChange = useCallback((key: string) => {
+    setListSort((prev) => {
+      if (prev.key !== key) return { key, order: 'asc' };
+      return { key, order: prev.order === 'asc' ? 'desc' : 'asc' };
+    });
+  }, []);
+
+  const sortedRows = useMemo(() => {
+    const sk = listSort.key;
+    if (!sk) return rows;
+    const dir = listSort.order;
+    const opts = { monitorSummaryById, monitorColById, crsLabels: crsByIdMap, activeSchema, responseMaps: responseLabelMaps };
+    return [...rows].sort((a, b) => {
+      const va = getListSortComparableValue(a, sk, opts);
+      const vb = getListSortComparableValue(b, sk, opts);
+      return compareFormListValues(va, vb, dir);
+    });
+  }, [rows, listSort.key, listSort.order, monitorSummaryById, monitorColById, crsByIdMap, activeSchema, responseLabelMaps]);
 
   const load = async (p = 1) => {
     try {
@@ -53,11 +239,14 @@ export const FormResponsesPage: React.FC = () => {
         FormResponsesService.list(formId, { page: p, limit: 50 }),
       ]);
       setForm(f);
-      setRows(res.data);
+      setRows(res.data as ResponseRow[]);
       setPage(res.page);
       setTotalPages(res.totalPages);
-    } catch (e: any) {
-      alert(e?.response?.data?.message || e?.message || 'Erro ao carregar respostas');
+      setListTotal(res.total);
+      setListSort({ key: null, order: 'asc' });
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } }; message?: string };
+      alert(err?.response?.data?.message || err?.message || 'Erro ao carregar respostas');
     } finally {
       setLoading(false);
     }
@@ -65,7 +254,7 @@ export const FormResponsesPage: React.FC = () => {
 
   useEffect(() => {
     if (!Number.isFinite(formId)) return;
-    load(1);
+    void load(1);
   }, [formId]);
 
   useEffect(() => {
@@ -79,12 +268,13 @@ export const FormResponsesPage: React.FC = () => {
     setSheetPreviewRows([]);
     FormResponsesService.listAllResponses(formId)
       .then((data) => {
-        if (!cancelled) setSheetPreviewRows(data);
+        if (!cancelled) setSheetPreviewRows(data as ResponseRow[]);
       })
-      .catch((e: any) => {
+      .catch((e: unknown) => {
         console.error(e);
         if (!cancelled) {
-          alert(e?.response?.data?.message || e?.message || 'Erro ao carregar respostas para a visualização');
+          const err = e as { response?: { data?: { message?: string } }; message?: string };
+          alert(err?.response?.data?.message || err?.message || 'Erro ao carregar respostas para a visualização');
           setSheetPreviewRows([]);
         }
       })
@@ -105,26 +295,32 @@ export const FormResponsesPage: React.FC = () => {
       a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
-    } catch (e: any) {
-      alert(e?.response?.data?.message || e?.message || 'Erro ao exportar');
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } }; message?: string };
+      alert(err?.response?.data?.message || err?.message || 'Erro ao exportar');
     }
   };
 
-  const activeSchema = resolveActiveSchema(form);
-  const genericKeyFields = guessKeyFields(activeSchema as any);
+  const genericKeyFields = guessKeyFields(activeSchema as Parameters<typeof guessKeyFields>[0]);
   const dataColCount = isMonitorOperList ? monitorListCols.length : genericKeyFields.length;
 
   return (
     <AppPageLayout
       title="Respostas do Formulário"
-      subtitle={form?.nome || ''}
+      subtitle={
+        listTotal > 0
+          ? `${listTotal} resposta(s) — ${form?.nome || ''}`.trim()
+          : form?.nome || ''
+      }
       icon={<FileSpreadsheet className="h-8 w-8" />}
       variant="desktop"
+      contentWidth="wide"
       showBottomNav={false}
       backPath={responsesBackTo}
       headerActions={
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
+            type="button"
             onClick={() => setShowSheet(true)}
             className="px-3 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-50 flex items-center gap-2 shadow font-medium"
             title="Pré-visualizar em tabela"
@@ -133,6 +329,7 @@ export const FormResponsesPage: React.FC = () => {
             Tabela
           </button>
           <button
+            type="button"
             onClick={() => download('xlsx')}
             className="px-3 py-2 bg-white text-emerald-700 rounded-lg hover:bg-emerald-50 flex items-center gap-2 shadow font-medium"
             title="Exportar XLSX"
@@ -141,6 +338,7 @@ export const FormResponsesPage: React.FC = () => {
             XLSX
           </button>
           <button
+            type="button"
             onClick={() => download('csv')}
             className="px-3 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-50 flex items-center gap-2 shadow font-medium"
             title="Exportar CSV"
@@ -159,6 +357,7 @@ export const FormResponsesPage: React.FC = () => {
         loading={sheetPreviewLoading}
         onDownloadXlsx={() => download('xlsx')}
         onDownloadCsv={() => download('csv')}
+        labelMaps={responseLabelMaps}
       />
 
       <FormResponseReadonlyModal
@@ -168,7 +367,7 @@ export const FormResponsesPage: React.FC = () => {
         responseId={selected?.id ?? 0}
         status={selected?.status ?? ''}
         activeSchema={activeSchema}
-        dataJson={selected?.data_json ?? {}}
+        dataJson={(selected?.data_json ?? {}) as Record<string, any>}
       />
 
       {loading ? (
@@ -177,47 +376,80 @@ export const FormResponsesPage: React.FC = () => {
           <p className="text-gray-600">Carregando…</p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-auto">
-            <table className="min-w-full text-sm border-collapse">
-              <thead className="bg-gray-50 text-gray-700">
+        <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-full text-sm divide-y divide-gray-200">
+              <thead className="bg-blue-600 text-white">
                 <tr>
                   {isMonitorOperList
                     ? monitorListCols.map((c) => (
-                        <th
+                        <FormListSortableTh
                           key={c.id}
-                          className={`px-4 py-2 align-middle whitespace-nowrap ${c.thClassName ?? 'text-left'}`}
-                          title={c.label}
-                        >
-                          {c.label}
-                        </th>
+                          label={c.label}
+                          sortKey={buildListSortMonitorKey(c.id)}
+                          activeKey={listSort.key}
+                          sortOrder={listSort.order}
+                          onSort={handleListSortChange}
+                          thClassName={`${c.thClassName ?? 'text-left'} whitespace-nowrap`.trim()}
+                          titleAttr={c.label}
+                        />
                       ))
                     : genericKeyFields.map((f, idx) => (
-                        <th
+                        <FormListSortableTh
                           key={f.key}
-                          className={`px-4 py-2 align-middle text-left ${idx >= 2 ? 'hidden lg:table-cell' : ''}`}
-                          title={f.key}
-                        >
-                          {f.label}
-                        </th>
+                          label={f.label}
+                          sortKey={buildListSortFieldKey(f.key)}
+                          activeKey={listSort.key}
+                          sortOrder={listSort.order}
+                          onSort={handleListSortChange}
+                          thClassName="text-left"
+                          titleAttr={f.key}
+                          hiddenLg={idx >= 2}
+                        />
                       ))}
-                  <th className="px-4 py-2 align-middle text-left">Status</th>
-                  <th className="px-4 py-2 align-middle text-left whitespace-nowrap">Data do envio</th>
-                  <th className="px-4 py-2 align-middle text-right whitespace-nowrap">Ações</th>
+                  <FormListSortableTh
+                    label="Status"
+                    sortKey="status"
+                    activeKey={listSort.key}
+                    sortOrder={listSort.order}
+                    onSort={handleListSortChange}
+                    thClassName="text-left"
+                    titleAttr="Status"
+                  />
+                  <FormListSortableTh
+                    label="Data do envio"
+                    sortKey="submitted_at"
+                    activeKey={listSort.key}
+                    sortOrder={listSort.order}
+                    onSort={handleListSortChange}
+                    thClassName="text-left whitespace-nowrap"
+                    titleAttr="Data do envio"
+                  />
+                  <th
+                    scope="col"
+                    className="px-3 lg:px-4 xl:px-6 py-3 align-middle text-right text-xs font-semibold uppercase tracking-wider text-white whitespace-nowrap"
+                  >
+                    <span className="sr-only">Ações</span>
+                    Ações
+                  </th>
                 </tr>
               </thead>
-              <tbody>
-                {rows.map((r) => {
+              <tbody className="bg-white divide-y divide-gray-200">
+                {sortedRows.map((r) => {
                   const st = getStatusUi(r.status);
                   const submittedAt = r.submitted_at ? new Date(r.submitted_at) : null;
                   return (
-                    <tr key={r.id} className="border-t">
+                    <tr key={r.id} className="transition-colors duration-150 hover:bg-gray-50">
                       {isMonitorOperList ? (
                         monitorListCols.map((c) => {
                           const sum = monitorSummaryById.get(r.id);
-                          const text = sum ? c.format(sum, crsLabels) : '—';
+                          const text = sum ? c.format(sum, crsByIdMap) : '—';
                           return (
-                            <td key={c.id} className={`px-4 py-2 align-middle ${c.tdClassName ?? ''}`} title={text}>
+                            <td
+                              key={c.id}
+                              className={`px-3 lg:px-4 xl:px-6 py-3 align-middle text-sm text-gray-900 ${c.tdClassName ?? ''}`}
+                              title={text}
+                            >
                               {text}
                             </td>
                           );
@@ -225,34 +457,34 @@ export const FormResponsesPage: React.FC = () => {
                       ) : (
                         genericKeyFields.map((f, idx) => {
                           const v = getValueAtPath(r.data_json ?? {}, f.key);
-                          const s = v === null || v === undefined ? '' : String(v);
+                          const field = findFormFieldByKey(activeSchema, f.key);
+                          const display = formatCellValueForResponseList(v, field, responseLabelMaps);
+                          const s = display;
                           return (
                             <td
                               key={f.key}
-                              className={`px-4 py-2 align-middle max-w-[18rem] truncate ${idx >= 2 ? 'hidden lg:table-cell' : ''}`}
-                              title={s}
+                              className={`px-3 lg:px-4 xl:px-6 py-3 align-middle text-sm text-gray-900 max-w-[18rem] truncate ${idx >= 2 ? 'hidden lg:table-cell' : ''}`}
+                              title={s || f.key}
                             >
-                              {s || <span className="text-gray-400">-</span>}
+                              {s ? s : <span className="text-gray-400">-</span>}
                             </td>
                           );
                         })
                       )}
-                      <td className="px-4 py-2 align-middle">
+                      <td className="px-3 lg:px-4 xl:px-6 py-3 align-middle text-sm">
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded-full border text-xs font-semibold ${st.className}`}
                         >
                           {st.label}
                         </span>
                       </td>
-                      <td className="px-4 py-2 align-middle whitespace-nowrap" title="Data do envio">
+                      <td className="px-3 lg:px-4 xl:px-6 py-3 align-middle text-sm text-gray-900 whitespace-nowrap" title="Data do envio">
                         {submittedAt ? submittedAt.toLocaleString('pt-BR') : '—'}
                       </td>
-                      <td className="px-4 py-2 align-middle text-right whitespace-nowrap">
+                      <td className="px-3 lg:px-4 xl:px-6 py-3 align-middle text-right text-sm whitespace-nowrap">
                         <button
                           type="button"
-                          onClick={() => {
-                            setSelected(r);
-                          }}
+                          onClick={() => setSelected(r)}
                           className="inline-flex shrink-0 px-2.5 py-1 rounded-lg border bg-white text-xs sm:text-sm text-blue-700 hover:bg-blue-50 font-medium whitespace-nowrap"
                           title="Ver conteúdo preenchido"
                         >
@@ -273,9 +505,10 @@ export const FormResponsesPage: React.FC = () => {
             </table>
           </div>
 
-          <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
+          <div className="flex items-center justify-between px-3 lg:px-4 py-3 border-t border-gray-200 bg-gray-50">
             <button
-              onClick={() => load(Math.max(1, page - 1))}
+              type="button"
+              onClick={() => void load(Math.max(1, page - 1))}
               disabled={page <= 1}
               className="px-3 py-1 rounded border disabled:opacity-50"
             >
@@ -285,7 +518,8 @@ export const FormResponsesPage: React.FC = () => {
               Página {page} de {totalPages}
             </span>
             <button
-              onClick={() => load(Math.min(totalPages, page + 1))}
+              type="button"
+              onClick={() => void load(Math.min(totalPages, page + 1))}
               disabled={page >= totalPages}
               className="px-3 py-1 rounded border disabled:opacity-50"
             >
@@ -297,4 +531,3 @@ export const FormResponsesPage: React.FC = () => {
     </AppPageLayout>
   );
 };
-

@@ -1,4 +1,133 @@
-/** Helpers compartilhados entre lista de respostas (admin) e lista SINAN/notificações. */
+import type { FormField } from '@/services/FormService';
+
+/** Mapas id → rótulo para listagens de respostas (selects via API). */
+export type ResponseListLabelMaps = {
+  municipioById: Record<string, string>;
+  crsById: Record<string, string>;
+  paisById: Record<string, string>;
+};
+
+export const EMPTY_RESPONSE_LIST_LABEL_MAPS: ResponseListLabelMaps = {
+  municipioById: {},
+  crsById: {},
+  paisById: {},
+};
+
+export function findFormFieldByKey(schema: unknown, fieldKey: string): FormField | undefined {
+  const key = String(fieldKey || '').trim();
+  if (!key) return undefined;
+  for (const sec of (schema as { sections?: Array<{ fields?: FormField[] }> })?.sections ?? []) {
+    for (const f of sec?.fields ?? []) {
+      if (String(f?.key || '').trim() === key) return f;
+    }
+  }
+  return undefined;
+}
+
+/** Indica quais listas `/select` precisam ser carregadas para exibir rótulos em vez de ids. */
+export function collectSchemaReferenceMapsNeeded(schema: unknown): {
+  municipio: boolean;
+  crs: boolean;
+  pais: boolean;
+} {
+  const out = { municipio: false, crs: false, pais: false };
+  const considerEp = (epRaw: string | undefined | null) => {
+    const ep = String(epRaw || '').toLowerCase();
+    if (!ep) return;
+    if (ep.includes('municipio') || ep.includes('tipo_municipio')) out.municipio = true;
+    if (ep.includes('crs')) out.crs = true;
+    if (ep.includes('pais') || ep.includes('tipo_pais')) out.pais = true;
+  };
+  for (const sec of (schema as { sections?: Array<{ fields?: FormField[] }> })?.sections ?? []) {
+    for (const raw of sec?.fields ?? []) {
+      const f = raw as FormField;
+      considerEp(f.customApiSelectEndpoint ?? undefined);
+      considerEp(f.apiSelectEndpoint);
+    }
+  }
+  return out;
+}
+
+function mergedFieldOptions(f: FormField | undefined): Array<{ value: string; label: string }> | undefined {
+  if (!f) return undefined;
+  const manual = (f.options && f.options.length > 0 ? f.options : null) ?? (f.customOptions && f.customOptions.length > 0 ? f.customOptions : null);
+  return manual ?? undefined;
+}
+
+function labelFromOptions(raw: unknown, options: Array<{ value: string; label: string }> | undefined): string | null {
+  if (!options?.length) return null;
+  if (raw === null || raw === undefined || raw === '') return null;
+  if (Array.isArray(raw)) {
+    const parts = raw.map((x) => labelFromOptions(x, options)).filter((x): x is string => x != null && x !== '');
+    return parts.length ? parts.join(', ') : null;
+  }
+  const s = String(raw);
+  const found = options.find(
+    (o) => o.value === s || String(o.value) === String(raw) || (Number.isFinite(Number(s)) && String(o.value) === String(Number(s))),
+  );
+  return found?.label?.trim() ? found.label : null;
+}
+
+function effectiveApiEndpoint(f: FormField | undefined): string {
+  if (!f) return '';
+  return String(f.customApiSelectEndpoint || f.apiSelectEndpoint || '').toLowerCase();
+}
+
+/**
+ * Converte valor bruto gravado em `data_json` em texto amigável para listas (rótulo de select, município, CRS, país).
+ */
+export function formatCellValueForResponseList(
+  raw: unknown,
+  field: FormField | undefined,
+  maps: ResponseListLabelMaps,
+): string {
+  if (raw === null || raw === undefined) return '';
+  if (Array.isArray(raw)) {
+    const opts = mergedFieldOptions(field);
+    const joined = labelFromOptions(raw, opts);
+    if (joined) return joined;
+    return raw.map((x) => (x === null || x === undefined ? '' : String(x))).join(', ');
+  }
+  if (typeof raw === 'object') {
+    try {
+      return JSON.stringify(raw);
+    } catch {
+      return String(raw);
+    }
+  }
+
+  const type = String(field?.type || '').toLowerCase();
+  const opts = mergedFieldOptions(field);
+
+  if (opts?.length) {
+    const lbl = labelFromOptions(raw, opts);
+    if (lbl) return lbl;
+  }
+
+  if (type === 'checkbox' || field?.storeAs01) {
+    if (raw === true || raw === 1 || raw === '1') return 'Sim';
+    if (raw === false || raw === 0 || raw === '0') return 'Não';
+  }
+
+  const ep = effectiveApiEndpoint(field);
+  if (ep) {
+    const id = String(raw);
+    if (ep.includes('municipio') || ep.includes('tipo_municipio')) {
+      const hit = maps.municipioById[id];
+      if (hit) return hit;
+    }
+    if (ep.includes('crs')) {
+      const hit = maps.crsById[id];
+      if (hit) return hit;
+    }
+    if (ep.includes('pais') || ep.includes('tipo_pais')) {
+      const hit = maps.paisById[id];
+      if (hit) return hit;
+    }
+  }
+
+  return String(raw);
+}
 
 export function flattenObject(input: any, maxDepth = 6): Record<string, any> {
   const out: Record<string, any> = {};

@@ -19,9 +19,11 @@ import {
 } from '../utils/monitorOperRegionalReport';
 import { compareValues } from '@/features/notificationForms/utils';
 import { useCrsLabelByIdMap } from '../hooks/useCrsLabelByIdMap';
+import { useMunicipioLabelByIdMap } from '../hooks/useMunicipioLabelByIdMap';
+import { useTipoPaisLabelByIdMap } from '../hooks/useTipoPaisLabelByIdMap';
 import { FormResponseReadonlyModal } from '../components/FormResponseReadonlyModal';
 import { FormResponsesSpreadsheetModal } from '../components/FormResponsesSpreadsheetModal';
-import { getStatusUi, getValueAtPath, guessKeyFields, resolveActiveSchema } from '../utils/formResponsesListUtils';
+import { getStatusUi, getValueAtPath, guessKeyFields, resolveActiveSchema, collectSchemaReferenceMapsNeeded, findFormFieldByKey, formatCellValueForResponseList, type ResponseListLabelMaps } from '../utils/formResponsesListUtils';
 import { useAuth } from '@/keycloak/AuthProvider';
 
 type ResponseRow = {
@@ -64,6 +66,8 @@ function getListSortComparableValue(
     monitorSummaryById: Map<number, MonitorOperSubmissionSummary>;
     monitorColById: Map<string, MonitorOperListColSpec>;
     crsLabels: Record<string, string>;
+    activeSchema: unknown;
+    responseMaps: ResponseListLabelMaps;
   },
 ): string | number {
   const p = parseListSortKey(sortKey);
@@ -73,6 +77,9 @@ function getListSortComparableValue(
   if (p.type === 'field') {
     const v = getValueAtPath(row.data_json ?? {}, p.fieldKey);
     if (v === null || v === undefined) return '';
+    const field = findFormFieldByKey(opts.activeSchema, p.fieldKey);
+    const display = formatCellValueForResponseList(v, field, opts.responseMaps);
+    if (display !== '' && display !== String(v)) return display;
     if (typeof v === 'number' && Number.isFinite(v)) return v;
     if (typeof v === 'boolean') return v ? 1 : 0;
     return String(v);
@@ -153,7 +160,6 @@ export const FormSubmissionsListPage: React.FC = () => {
   const { agravo } = useParams<{ agravo: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const crsLabels = useCrsLabelByIdMap(agravo?.toUpperCase() === MONITOR_OPER_REGIONAL_KEY);
 
   const [form, setForm] = useState<Form | null>(null);
   /** Carregamento completo só para totais QDQQ (monitor operacional). */
@@ -177,6 +183,17 @@ export const FormSubmissionsListPage: React.FC = () => {
   });
   const listColPickerRef = useRef<HTMLDivElement | null>(null);
 
+  const isMonitorOperList = agravo?.toUpperCase() === MONITOR_OPER_REGIONAL_KEY;
+  const activeSchema = useMemo(() => resolveActiveSchema(form), [form]);
+  const refMapsNeeded = useMemo(() => collectSchemaReferenceMapsNeeded(activeSchema), [activeSchema]);
+  const municipioById = useMunicipioLabelByIdMap(refMapsNeeded.municipio);
+  const crsByIdMap = useCrsLabelByIdMap(refMapsNeeded.crs || isMonitorOperList);
+  const paisById = useTipoPaisLabelByIdMap(refMapsNeeded.pais);
+  const responseLabelMaps = useMemo<ResponseListLabelMaps>(
+    () => ({ municipioById, crsById: crsByIdMap, paisById }),
+    [municipioById, crsByIdMap, paisById],
+  );
+
   const totalAcumulado = useMemo(() => {
     if (agravo !== MONITOR_OPER_REGIONAL_KEY) return null;
     const monitorRows = filterMonitorOperRows(monitorSubmissionsForTotals);
@@ -184,7 +201,6 @@ export const FormSubmissionsListPage: React.FC = () => {
     return computeTotalAcumuladoMes(monitorRows);
   }, [agravo, monitorSubmissionsForTotals]);
 
-  const isMonitorOperList = agravo?.toUpperCase() === MONITOR_OPER_REGIONAL_KEY;
   const monitorListCols = useMemo(() => (isMonitorOperList ? getMonitorOperListColumnSpecs() : []), [isMonitorOperList]);
   const monitorSummaryById = useMemo(
     () => (isMonitorOperList ? buildMonitorOperSummaryById(rows) : new Map()),
@@ -213,13 +229,13 @@ export const FormSubmissionsListPage: React.FC = () => {
     const sk = listSort.key;
     if (!sk) return rows;
     const dir = listSort.order;
-    const opts = { monitorSummaryById, monitorColById, crsLabels };
+    const opts = { monitorSummaryById, monitorColById, crsLabels: crsByIdMap, activeSchema, responseMaps: responseLabelMaps };
     return [...rows].sort((a, b) => {
       const va = getListSortComparableValue(a, sk, opts);
       const vb = getListSortComparableValue(b, sk, opts);
       return compareFormListValues(va, vb, dir);
     });
-  }, [rows, listSort.key, listSort.order, monitorSummaryById, monitorColById, crsLabels]);
+  }, [rows, listSort.key, listSort.order, monitorSummaryById, monitorColById, crsByIdMap, activeSchema, responseLabelMaps]);
 
   const sheetMonitorSummaryById = useMemo(
     () => (isMonitorOperList ? buildMonitorOperSummaryById(sheetPreviewRows) : new Map()),
@@ -230,13 +246,13 @@ export const FormSubmissionsListPage: React.FC = () => {
     const sk = listSort.key;
     if (!sk || sheetPreviewRows.length === 0) return sheetPreviewRows;
     const dir = listSort.order;
-    const opts = { monitorSummaryById: sheetMonitorSummaryById, monitorColById, crsLabels };
+    const opts = { monitorSummaryById: sheetMonitorSummaryById, monitorColById, crsLabels: crsByIdMap, activeSchema, responseMaps: responseLabelMaps };
     return [...sheetPreviewRows].sort((a, b) => {
       const va = getListSortComparableValue(a, sk, opts);
       const vb = getListSortComparableValue(b, sk, opts);
       return compareFormListValues(va, vb, dir);
     });
-  }, [sheetPreviewRows, listSort.key, listSort.order, sheetMonitorSummaryById, monitorColById, crsLabels]);
+  }, [sheetPreviewRows, listSort.key, listSort.order, sheetMonitorSummaryById, monitorColById, crsByIdMap, activeSchema, responseLabelMaps]);
 
   useEffect(() => {
     if (!isMonitorOperList) {
@@ -377,8 +393,7 @@ export const FormSubmissionsListPage: React.FC = () => {
     }
   };
 
-  const activeSchema = resolveActiveSchema(form);
-  const genericKeyFields = guessKeyFields(activeSchema as any);
+  const genericKeyFields = guessKeyFields(activeSchema as Parameters<typeof guessKeyFields>[0]);
 
   if (loading) {
     return (
@@ -499,6 +514,7 @@ export const FormSubmissionsListPage: React.FC = () => {
         loading={sheetPreviewLoading}
         onDownloadXlsx={() => download('xlsx')}
         onDownloadCsv={() => download('csv')}
+        labelMaps={responseLabelMaps}
       />
 
       <FormResponseReadonlyModal
@@ -693,7 +709,7 @@ export const FormSubmissionsListPage: React.FC = () => {
                       {isMonitorOperList ? (
                         visibleMonitorCols.map((c) => {
                           const sum = monitorSummaryById.get(r.id);
-                          const text = sum ? c.format(sum, crsLabels) : '—';
+                          const text = sum ? c.format(sum, crsByIdMap) : '—';
                           return (
                             <td
                               key={c.id}
@@ -707,14 +723,16 @@ export const FormSubmissionsListPage: React.FC = () => {
                       ) : (
                         genericKeyFields.map((f, idx) => {
                           const v = getValueAtPath(r.data_json ?? {}, f.key);
-                          const s = v === null || v === undefined ? '' : String(v);
+                          const field = findFormFieldByKey(activeSchema, f.key);
+                          const display = formatCellValueForResponseList(v, field, responseLabelMaps);
+                          const s = display;
                           return (
                             <td
                               key={f.key}
                               className={`px-3 lg:px-4 xl:px-6 py-3 align-middle text-sm text-gray-900 max-w-[18rem] truncate ${idx >= 2 ? 'hidden lg:table-cell' : ''}`}
-                              title={s}
+                              title={s || f.key}
                             >
-                              {s || <span className="text-gray-400">-</span>}
+                              {s ? s : <span className="text-gray-400">-</span>}
                             </td>
                           );
                         })
