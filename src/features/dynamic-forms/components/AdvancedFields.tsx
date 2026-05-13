@@ -11,6 +11,7 @@ import { validateCNS } from '@/utils/cnsValidator';
 import { validatePassaporte, normalizePassaporte } from '@/utils/passaporteValidator';
 import axios from 'axios';
 import { getRuntimeApiRoot } from '@/config/runtimeApiBase';
+import { buildApiSelectQueryParams } from './SelectFields';
 import {
   DF_CHOICE_WITH_TEXT_DEFAULT_VALUE,
   radioChoiceOtherTextKey,
@@ -354,6 +355,7 @@ export const MultiSelectField: React.FC<AdvancedFieldProps> = ({
   }, [
     field.apiSelectEndpoint,
     JSON.stringify(field.apiSelectEndpointParams || []),
+    JSON.stringify((field as FormField & { apiSelectStaticParams?: Record<string, string> }).apiSelectStaticParams || {}),
     ...(field.apiSelectEndpointParams || []).map((k) => getValue?.(k)),
     field.dataSource,
     field.dataTable,
@@ -368,11 +370,7 @@ export const MultiSelectField: React.FC<AdvancedFieldProps> = ({
     try {
       setLoading(true);
 
-      const params: Record<string, any> = {};
-      for (const k of field.apiSelectEndpointParams || []) {
-        const v = getValue?.(k);
-        if (v !== undefined && v !== null && v !== '') params[k] = v;
-      }
+      const params = buildApiSelectQueryParams(field, getValue);
 
       const response = await axios.get(`${API_ROOT}/${field.apiSelectEndpoint}`, {
         params,

@@ -825,7 +825,10 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
         if (resolved.codeList) {
           return <CodeListSelectField {...commonProps} />;
         }
-        if ((resolved as { apiSelectEndpoint?: string }).apiSelectEndpoint) {
+        if (
+          (resolved as { apiSelectEndpoint?: string }).apiSelectEndpoint ||
+          (resolved as { dataSource?: string }).dataSource === 'api'
+        ) {
           if (resolved.key === 'paciente.ocupacao_cbo') {
             return <CboSearchField {...commonProps} />;
           }
@@ -960,7 +963,10 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
         if (field.codeList) {
           return <CodeListSearchField {...commonProps} />;
         }
-        if ((field as { apiSelectEndpoint?: string }).apiSelectEndpoint) {
+        if (
+          (resolved as { apiSelectEndpoint?: string }).apiSelectEndpoint ||
+          (resolved as { dataSource?: string }).dataSource === 'api'
+        ) {
           if (
             resolved.key === 'cabecalho.crs_id' &&
             monitorOperRegionalCrsScope?.ui === 'readonly' &&
@@ -989,7 +995,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           if (resolved.key === 'cabecalho.crs_id' && monitorOperRegionalCrsScope?.canSelectAnyCrs) {
             const executorNivel = getValue('cabecalho.executor_nivel');
             if (readOnly && executorNivel !== 'CENTRAL') {
-              return <ApiSelectSearchField {...commonProps} />;
+              return <ApiSelectSearchField {...commonProps} getValue={getValue} />;
             }
             return (
               <div className="mb-4 md:grid md:grid-cols-2 md:gap-4 md:items-start">
@@ -1002,12 +1008,12 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                   </div>
                 </div>
                 <div className="min-w-0 [&>div]:mb-0">
-                  <ApiSelectSearchField {...commonProps} />
+                  <ApiSelectSearchField {...commonProps} getValue={getValue} />
                 </div>
               </div>
             );
           }
-          return <ApiSelectSearchField {...commonProps} />;
+          return <ApiSelectSearchField {...commonProps} getValue={getValue} />;
         }
         return <SelectSearchField {...commonProps} />;
       case 'multi-select':

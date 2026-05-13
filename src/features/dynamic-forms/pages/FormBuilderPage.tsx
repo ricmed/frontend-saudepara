@@ -1,14 +1,16 @@
 import React, { Suspense, useMemo, useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { useAuth } from '@/keycloak/AuthProvider';
 import FormService, { type FormSchema, type FormSection, type FormField, type FormRule, type RuleCondition, type RuleAction, type TableColumnDef, type XlsFormPreview } from '@/services/FormService';
 import DatabaseService, { type TableColumn } from '@/services/DatabaseService';
+import { getRuntimeApiRoot } from '@/config/runtimeApiBase';
 import { Plus, Trash2, Save, Eye, Settings, GripVertical, X, Download, Upload, ChevronUp, ChevronDown, Code, FileEdit, Check } from 'lucide-react';
 import { ClipboardList, Calendar, DollarSign, Target, Activity, Shield, Leaf, BarChart3, Wrench, Users } from 'lucide-react';
 import dynamicIconImports from 'lucide-react/dynamicIconImports';
 import { FormRenderer } from '../components/FormRenderer';
-import { DF_CHOICE_WITH_TEXT_DEFAULT_VALUE } from '@/features/dynamic-forms/utils/radioChoiceOther';
 import { ImportExcelModal } from '../components/ImportExcelModal';
+import { FieldSourceConfig } from '../components/FieldSourceConfig';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 import { clampNoteInRange, normalizeScalePointLabelRows } from '@/utils/linearScaleNote';
 
@@ -107,12 +109,36 @@ export const FormBuilderPage: React.FC = () => {
   const [loadingTables, setLoadingTables] = useState(false);
   const [tableSearch, setTableSearch] = useState('');
 
+  const builderTipoEstadoLoadedRef = useRef(false);
+  const [builderTipoEstadoOptions, setBuilderTipoEstadoOptions] = useState<Array<{ value: string; label: string }>>([]);
+
+  const ensureBuilderTipoEstadoOptions = () => {
+    if (builderTipoEstadoLoadedRef.current) return;
+    builderTipoEstadoLoadedRef.current = true;
+    void axios
+      .get(`${getRuntimeApiRoot()}/tipo-estado/select`, { withCredentials: true })
+      .then(({ data }) => {
+        const list = Array.isArray(data) ? data : [];
+        setBuilderTipoEstadoOptions(
+          list
+            .map((row: any) => ({
+              value: String(row.value ?? row.idtipo_estado ?? row.id ?? ''),
+              label: String(row.label ?? row.descricao ?? row.nome ?? ''),
+            }))
+            .filter((o) => o.value && o.label),
+        );
+      })
+      .catch(() => setBuilderTipoEstadoOptions([]));
+  };
+
   useEffect(() => {
     if (id) {
       loadForm();
     }
     loadTables();
     loadCategorias();
+    builderTipoEstadoLoadedRef.current = false;
+    setBuilderTipoEstadoOptions([]);
   }, [id]);
 
   const makeFormKeyFromName = (name: string) => {
@@ -395,6 +421,128 @@ export const FormBuilderPage: React.FC = () => {
     setActiveField({ sectionIdx, fieldIdx: insertAt });
   };
 
+  /**
+   * Encontra a posição (seção, índice) de um campo pelo key.
+   */
+  const locateField = (key: string): { sectionIdx: number; fieldIdx: number } | null => {
+    for (let s = 0; s < schema.sections.length; s++) {
+      const idx = (schema.sections[s].fields || []).findIndex((f) => f.key === key);
+      if (idx >= 0) return { sectionIdx: s, fieldIdx: idx };
+    }
+    return null;
+  };
+
+  /**
+   * Cria um campo de seleção relacionado a outro existente, abaixo (filho cascata) ou
+   * acima (pai cascata). Usado pelas sugestões do `FieldSourceConfig`.
+   */
+  const addRelatedField = (
+    req:
+      | {
+          kind: 'addChildBelow';
+          parentField: FormField;
+          childSource: { endpoint: string; defaultStaticParams?: Record<string, string> };
+          childLabel: string;
+        }
+      | {
+          kind: 'addParentAbove';
+          childField: FormField;
+          parentSource: {
+            endpoint: string;
+            defaultStaticParams?: Record<string, string>;
+            acceptedParentKeys?: string[];
+          };
+          parentLabel: string;
+        },
+  ): void => {
+    if (req.kind === 'addChildBelow') {
+      const pos = locateField(req.parentField.key);
+      if (!pos) return;
+      const parentType = req.parentField.type;
+      const childType: string =
+        parentType === 'select-search' || parentType === 'multi-select' ? parentType : 'select';
+
+      const base = createFieldByType(childType, pos.fieldIdx + 2);
+      const childField: FormField = {
+        ...base,
+        label: req.childLabel,
+        dataSource: 'api',
+        apiSelectEndpoint: req.childSource.endpoint,
+        apiSelectEndpointParams: [req.parentField.key],
+        apiSelectStaticParams: req.childSource.defaultStaticParams,
+        apiListGuidedPreset: undefined,
+        options: undefined,
+      };
+
+      const newSections = [...schema.sections];
+      const fields = [...newSections[pos.sectionIdx].fields];
+      const insertAt = Math.min(pos.fieldIdx + 1, fields.length);
+      fields.splice(insertAt, 0, childField);
+      fields.forEach((f, i) => (f.order = i + 1));
+      newSections[pos.sectionIdx] = { ...newSections[pos.sectionIdx], fields };
+      setSchema({ ...schema, sections: newSections });
+      setActiveField({ sectionIdx: pos.sectionIdx, fieldIdx: insertAt });
+      return;
+    }
+
+    // addParentAbove
+    const pos = locateField(req.childField.key);
+    if (!pos) return;
+    const childType = req.childField.type;
+    const parentType: string =
+      childType === 'select-search' || childType === 'multi-select' ? childType : 'select';
+
+    // O backend só reconhece nomes de query param específicos pra essa cascata
+    // (ex.: 'crs_id' pra Regional). Sem isso, a lista do filho não filtra.
+    // Forçamos o key do campo pai a ser o nome aceito; se já existir, sufixamos —
+    // mas nesse caso a cascata pode não funcionar pro segundo pai (limitação do backend).
+    const allKeys = new Set<string>();
+    for (const s of schema.sections) for (const f of s.fields) if (f.key) allKeys.add(f.key);
+
+    const preferredKey = req.parentSource.acceptedParentKeys?.[0];
+    let parentKey: string;
+    if (preferredKey && !allKeys.has(preferredKey)) {
+      parentKey = preferredKey;
+    } else if (preferredKey) {
+      let n = 2;
+      while (allKeys.has(`${preferredKey}_${n}`)) n++;
+      parentKey = `${preferredKey}_${n}`;
+    } else {
+      parentKey = `field_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    const base = createFieldByType(parentType, pos.fieldIdx + 1);
+    const parentField: FormField = {
+      ...base,
+      key: parentKey,
+      label: req.parentLabel,
+      dataSource: 'api',
+      apiSelectEndpoint: req.parentSource.endpoint,
+      apiSelectStaticParams: req.parentSource.defaultStaticParams,
+      apiSelectEndpointParams: undefined,
+      apiListGuidedPreset: undefined,
+      options: undefined,
+    };
+
+    const newSections = [...schema.sections];
+    const fields = [...newSections[pos.sectionIdx].fields];
+    const insertAt = pos.fieldIdx; // acima
+    fields.splice(insertAt, 0, parentField);
+
+    // Vincula o filho ao novo pai
+    const childIdxAfterInsert = pos.fieldIdx + 1;
+    fields[childIdxAfterInsert] = {
+      ...fields[childIdxAfterInsert],
+      apiSelectEndpointParams: [parentKey],
+      apiListGuidedPreset: undefined,
+    };
+
+    fields.forEach((f, i) => (f.order = i + 1));
+    newSections[pos.sectionIdx] = { ...newSections[pos.sectionIdx], fields };
+    setSchema({ ...schema, sections: newSections });
+    setActiveField({ sectionIdx: pos.sectionIdx, fieldIdx: insertAt });
+  };
+
   /** Linhas exibidas no editor da escala linear (persistido em `scalePointLabels` ou legado nos dois extremos). */
   const getLinearScaleEditorRows = (f: FormField): Array<{ value: number; label: string }> => {
     const loB = Math.min(Math.floor(f.min ?? 1), Math.floor(f.max ?? 5));
@@ -506,11 +654,15 @@ export const FormBuilderPage: React.FC = () => {
       nome: (formName || '').trim(),
       form_key: computedKey,
       descricao: (formDescription || '').trim(),
-      categoria,
+      categoria: (categoria || '').trim(),
       created_by: userId
     };
     if (!formData.nome) {
       alert('Informe o nome do formulário.');
+      return null;
+    }
+    if (!formData.categoria) {
+      alert('Selecione uma categoria para o formulário no painel à esquerda antes de salvar.');
       return null;
     }
 
@@ -2120,297 +2272,12 @@ export const FormBuilderPage: React.FC = () => {
                               </div>
                             )}
                             {(field.type === 'checkbox-group' || field.type === 'radio' || field.type === 'select' || field.type === 'select-search' || field.type === 'multi-select') && (
-                              <div className="mt-3 p-3 border border-gray-200 rounded-lg bg-gray-50">
-                                {/* Seletor de Origem dos Dados */}
-                                <div className="mb-3">
-                                  <label className="block text-xs font-medium text-gray-700 mb-2">
-                                    Origem dos Dados:
-                                  </label>
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    {[
-                                      { value: 'manual' as const, label: 'Manual' },
-                                      { value: 'database' as const, label: 'Banco de Dados' },
-                                    ].map(({ value, label }) => {
-                                      const isSelected = value === 'manual'
-                                        ? !field.dataSource || field.dataSource === 'manual'
-                                        : field.dataSource === 'database';
-                                      return (
-                                        <label
-                                          key={value}
-                                          className={`
-                                            flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200
-                                            ${isSelected
-                                              ? 'bg-blue-50 border-2 border-blue-500 shadow-md scale-[1.02]'
-                                              : 'bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-sm'
-                                            }
-                                          `}
-                                        >
-                                          <div className="flex items-center h-5 mt-0.5 flex-shrink-0">
-                                            <input
-                                              type="radio"
-                                              name={`dataSource_${sectionIdx}_${fieldIdx}`}
-                                              checked={isSelected}
-                                              onChange={() => updateField(sectionIdx, fieldIdx, value === 'manual'
-                                                ? { dataSource: 'manual', dataTable: undefined, dataValueColumn: undefined, dataLabelColumn: undefined }
-                                                : { dataSource: 'database', options: undefined }
-                                              )}
-                                              className="w-5 h-5 rounded-full border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer"
-                                            />
-                                          </div>
-                                          <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
-                                            <span className={`text-sm font-medium transition-colors ${isSelected ? 'text-blue-900' : 'text-gray-900'}`}>
-                                              {label}
-                                            </span>
-                                            {isSelected && <Check className="h-5 w-5 text-blue-600 flex-shrink-0" />}
-                                          </div>
-                                        </label>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-
-                                {/* Configuração Manual */}
-                                {(!field.dataSource || field.dataSource === 'manual') && (
-                                  <>
-                                    <div className="flex justify-between items-center mb-2">
-                                      <label className="block text-xs font-medium text-gray-700">
-                                        Opções:
-                                      </label>
-                                      <button
-                                        onClick={() => {
-                                          const newOption = { value: `option_${Date.now()}`, label: 'Nova Opção' };
-                                          updateField(sectionIdx, fieldIdx, { 
-                                            options: [...(field.options || []), newOption] 
-                                          });
-                                        }}
-                                        className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
-                                      >
-                                        + Adicionar Opção
-                                      </button>
-                                    </div>
-                                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                                      {(field.options || []).map((option, optIdx) => (
-                                        <div key={optIdx} className="flex gap-2 items-center">
-                                          <input
-                                            type="text"
-                                            value={option.label}
-                                            onChange={(e) => {
-                                              const newOptions = [...(field.options || [])];
-                                              newOptions[optIdx] = { ...newOptions[optIdx], label: e.target.value };
-                                              updateField(sectionIdx, fieldIdx, { options: newOptions });
-                                            }}
-                                            placeholder="Nome da opção"
-                                            className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded"
-                                          />
-                                          <input
-                                            type="text"
-                                            value={option.value}
-                                            onChange={(e) => {
-                                              const newOptions = [...(field.options || [])];
-                                              newOptions[optIdx] = { ...newOptions[optIdx], value: e.target.value };
-                                              updateField(sectionIdx, fieldIdx, { options: newOptions });
-                                            }}
-                                            placeholder="Valor"
-                                            className="w-24 px-2 py-1 text-xs border border-gray-300 rounded"
-                                          />
-                                          <button
-                                            onClick={() => {
-                                              const newOptions = (field.options || []).filter((_, i) => i !== optIdx);
-                                              updateField(sectionIdx, fieldIdx, { options: newOptions });
-                                            }}
-                                            className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded"
-                                          >
-                                            ✕
-                                          </button>
-                                        </div>
-                                      ))}
-                                      {(!field.options || field.options.length === 0) && (
-                                        <p className="text-xs text-gray-500 text-center py-2">Nenhuma opção adicionada</p>
-                                      )}
-                                    </div>
-                                  </>
-                                )}
-
-                                {/* Configuração de Banco de Dados */}
-                                {field.dataSource === 'database' && (
-                                  <div className="space-y-3">
-                                    {/* Seletor de Tabela */}
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        Tabela:
-                                      </label>
-                                      <input
-                                        value={tableSearch}
-                                        onChange={(e) => setTableSearch(e.target.value)}
-                                        placeholder="Buscar tabela…"
-                                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded mb-1"
-                                        disabled={loadingTables}
-                                      />
-                                      <select
-                                        value={field.dataTable || ''}
-                                        onChange={(e) => {
-                                          const table = e.target.value;
-                                          const defaults = databaseTableDefaults[table];
-                                          updateField(sectionIdx, fieldIdx, { 
-                                            dataTable: table,
-                                            dataValueColumn: defaults?.value,
-                                            dataLabelColumn: defaults?.label
-                                          });
-                                          if (table) loadColumns(table);
-                                        }}
-                                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
-                                        disabled={loadingTables}
-                                      >
-                                        <option value="">
-                                          {loadingTables ? 'Carregando...' : 'Selecione uma tabela'}
-                                        </option>
-                                        {filteredTables.map(table => (
-                                          <option key={table} value={table}>
-                                            {prettyTableName(table)}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </div>
-
-                                    {/* Seletor de Coluna de Valor */}
-                                    {field.dataTable && (
-                                      <>
-                                        <div>
-                                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                                            O que é salvo (código/ID):
-                                          </label>
-                                          <select
-                                            value={field.dataValueColumn || ''}
-                                            onChange={(e) => updateField(sectionIdx, fieldIdx, { dataValueColumn: e.target.value })}
-                                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
-                                          >
-                                            <option value="">Selecione uma coluna</option>
-                                            {(availableColumns[field.dataTable] || []).map(col => (
-                                              <option key={col.name} value={col.name}>
-                                                {col.name} ({col.type})
-                                              </option>
-                                            ))}
-                                          </select>
-                                          <p className="mt-1 text-[11px] text-gray-500">
-                                            Ex.: você vê &quot;Belém&quot;, mas o sistema salva o código (ex.: IBGE).
-                                          </p>
-                                        </div>
-
-                                        {/* Seletor de Coluna de Label */}
-                                        <div>
-                                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                                            O que aparece para quem preenche:
-                                          </label>
-                                          <select
-                                            value={field.dataLabelColumn || ''}
-                                            onChange={(e) => updateField(sectionIdx, fieldIdx, { dataLabelColumn: e.target.value })}
-                                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
-                                          >
-                                            <option value="">Selecione uma coluna</option>
-                                            {(availableColumns[field.dataTable] || []).map(col => (
-                                              <option key={col.name} value={col.name}>
-                                                {col.name} ({col.type})
-                                              </option>
-                                            ))}
-                                          </select>
-                                        </div>
-
-                                        {field.dataValueColumn && field.dataLabelColumn && (
-                                          <p className="text-xs text-green-600">
-                                            ✓ Configurado: {field.dataTable}.{field.dataValueColumn} → {field.dataLabelColumn}
-                                          </p>
-                                        )}
-                                      </>
-                                    )}
-                                  </div>
-                                )}
-                                {field.type === 'radio' && (
-                                  <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
-                                    <label className="flex items-start gap-2 text-xs text-gray-800 cursor-pointer">
-                                      <input
-                                        type="checkbox"
-                                        className="mt-0.5 rounded border-gray-300"
-                                        checked={!!field.choiceWithText}
-                                        onChange={(e) =>
-                                          updateField(sectionIdx, fieldIdx, {
-                                            choiceWithText: e.target.checked,
-                                            ...(e.target.checked
-                                              ? {}
-                                              : {
-                                                  choiceWithTextLabel: undefined,
-                                                  choiceWithTextPlaceholder: undefined,
-                                                  choiceWithTextValue: undefined,
-                                                }),
-                                          })
-                                        }
-                                      />
-                                      <span>
-                                        <span className="font-medium text-gray-900">Opção com texto livre</span>
-                                        <span className="block text-gray-600 mt-0.5">
-                                          Uma alternativa extra com campo ao lado (como em formulários Google). O rótulo pode ser qualquer texto (ex.: Outro, Especifique, NSI).
-                                        </span>
-                                      </span>
-                                    </label>
-                                    {field.choiceWithText && (
-                                      <div className="pl-6 space-y-2">
-                                        <div>
-                                          <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                                            Rótulo exibido ao lado do campo
-                                          </label>
-                                          <input
-                                            type="text"
-                                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
-                                            value={field.choiceWithTextLabel ?? ''}
-                                            onChange={(e) =>
-                                              updateField(sectionIdx, fieldIdx, {
-                                                choiceWithTextLabel: e.target.value || undefined,
-                                              })
-                                            }
-                                            placeholder="Ex.: Outro, Especifique, NSI — comente"
-                                          />
-                                        </div>
-                                        <div>
-                                          <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                                            Placeholder do campo de texto
-                                          </label>
-                                          <input
-                                            type="text"
-                                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
-                                            value={field.choiceWithTextPlaceholder ?? ''}
-                                            onChange={(e) =>
-                                              updateField(sectionIdx, fieldIdx, {
-                                                choiceWithTextPlaceholder: e.target.value || undefined,
-                                              })
-                                            }
-                                            placeholder="Opcional"
-                                          />
-                                        </div>
-                                        <div>
-                                          <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                                            Valor interno quando essa opção está marcada (avançado)
-                                          </label>
-                                          <input
-                                            type="text"
-                                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded font-mono"
-                                            value={field.choiceWithTextValue ?? ''}
-                                            onChange={(e) =>
-                                              updateField(sectionIdx, fieldIdx, {
-                                                choiceWithTextValue: e.target.value.trim()
-                                                  ? e.target.value.trim()
-                                                  : undefined,
-                                              })
-                                            }
-                                            placeholder={`Padrão: ${DF_CHOICE_WITH_TEXT_DEFAULT_VALUE}`}
-                                          />
-                                          <p className="text-[10px] text-gray-500 mt-0.5">
-                                            Não pode ser igual ao valor de nenhuma opção carregada. Deixe vazio para o padrão.
-                                          </p>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
+                              <FieldSourceConfig
+                                field={field}
+                                schema={schema}
+                                onChange={(updates) => updateField(sectionIdx, fieldIdx, updates)}
+                                onAddRelatedField={addRelatedField}
+                              />
                             )}
                             {field.type === 'address' && (
                               <div className="mt-3 p-3 border border-gray-200 rounded-lg bg-gray-50">

@@ -14,6 +14,26 @@ function getFieldInputId(field: FormField) {
 
 const API_BASE = getApiRoot();
 
+/** Query params para GET de selects via API: estáticos (schema) + valores de outros campos. */
+export function buildApiSelectQueryParams(
+  field: FormField,
+  getValue?: (key: string) => any
+): Record<string, string | number> {
+  const params: Record<string, string | number> = {};
+  const staticParams = (field as FormField & { apiSelectStaticParams?: Record<string, string> }).apiSelectStaticParams;
+  if (staticParams && typeof staticParams === 'object') {
+    for (const [k, v] of Object.entries(staticParams)) {
+      if (v === undefined || v === null || String(v).trim() === '') continue;
+      params[k] = v;
+    }
+  }
+  for (const k of (field as FormField & { apiSelectEndpointParams?: string[] }).apiSelectEndpointParams || []) {
+    const v = getValue?.(k);
+    if (v !== undefined && v !== null && v !== '') params[k] = v;
+  }
+  return params;
+}
+
 /** Maiúsculas, sem acento e sem cedilha (ç/Ç → C). Usado em etnia, país nascimento, CBO. */
 function normalizeMaiusculoSemAcento(s: string): string {
   if (!s) return s;
@@ -78,7 +98,9 @@ function mapApiItemToSearchableOption(item: any): SelectOptionSearchable {
   if (item.idtipo_pais != null && item.descricao != null) {
     return mapTipoPaisToOption(item);
   }
-  const value = String(item.id ?? item.value ?? '');
+  const value = String(
+    item.idtipo_municipio ?? item.id ?? item.value ?? ''
+  );
   const label = String(item.descricao ?? item.nome ?? item.label ?? value);
   return {
     value,
@@ -159,11 +181,7 @@ export const ApiSelectField: React.FC<SelectFieldProps> = ({
     (async () => {
       try {
         const url = `${API_BASE}/${endpoint}`;
-        const params: Record<string, any> = {};
-        for (const k of (field as any).apiSelectEndpointParams || []) {
-          const v = getValue?.(k);
-          if (v !== undefined && v !== null && v !== '') params[k] = v;
-        }
+        const params = buildApiSelectQueryParams(field, getValue);
         const { data } = await axios.get<any[]>(url, { withCredentials: true, params });
         if (cancelled) return;
         const list = Array.isArray(data) ? data : [];
@@ -182,6 +200,7 @@ export const ApiSelectField: React.FC<SelectFieldProps> = ({
   }, [
     (field as FormField & { apiSelectEndpoint?: string }).apiSelectEndpoint,
     JSON.stringify((field as any).apiSelectEndpointParams || []),
+    JSON.stringify((field as FormField & { apiSelectStaticParams?: Record<string, string> }).apiSelectStaticParams || {}),
     ...(((field as any).apiSelectEndpointParams || []) as string[]).map((k: string) => getValue?.(k)),
   ]);
 
@@ -218,6 +237,7 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
   error,
   required,
   disabled,
+  getValue,
 }) => {
   const [options, setOptions] = useState<SelectOptionSearchable[]>([]);
   const [loading, setLoading] = useState(true);
@@ -231,15 +251,12 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
   const useMaiusculoSemAcento = isTipoPaisSearchList || isEtnia;
   const inputId = getFieldInputId(field);
 
-  // País (nascimento / residência): lista completa via index com limit alto
-  const fetchUrl = isTipoPaisSearchList
-    ? `${API_BASE}/tipo-pais?limit=500`
-    : apiEndpoint
-      ? `${API_BASE}/${apiEndpoint}`
-      : null;
+  const staticKey = JSON.stringify((field as FormField & { apiSelectStaticParams?: Record<string, string> }).apiSelectStaticParams || {});
+  const paramsKeys = (field as FormField & { apiSelectEndpointParams?: string[] }).apiSelectEndpointParams || [];
+  const paramDeps = paramsKeys.map((k) => getValue?.(k));
 
   useEffect(() => {
-    if (!fetchUrl) {
+    if (!isTipoPaisSearchList && !apiEndpoint) {
       setOptions(
         (field.options || []).map((o: { value: string; label: string }) => ({
           value: String(o.value),
@@ -253,7 +270,17 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
     let cancelled = false;
     (async () => {
       try {
-        const { data } = await axios.get<any>(fetchUrl, { withCredentials: true });
+        let url: string;
+        let requestConfig: { withCredentials: boolean; params?: Record<string, string | number> };
+        if (isTipoPaisSearchList) {
+          url = `${API_BASE}/tipo-pais?limit=500`;
+          requestConfig = { withCredentials: true };
+        } else {
+          url = `${API_BASE}/${apiEndpoint}`;
+          const params = buildApiSelectQueryParams(field, getValue);
+          requestConfig = { withCredentials: true, params };
+        }
+        const { data } = await axios.get<any>(url, requestConfig);
         if (cancelled) return;
         const list = Array.isArray(data)
           ? data
@@ -267,8 +294,17 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
-  }, [fetchUrl]);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isTipoPaisSearchList,
+    apiEndpoint,
+    staticKey,
+    JSON.stringify(paramsKeys),
+    JSON.stringify(field.options || []),
+    ...paramDeps,
+  ]);
 
   const normalizedSearch = normalizeSearchHaystack(searchTerm || '');
   const filteredOptions = options.filter(
@@ -634,6 +670,11 @@ export const SelectField: React.FC<SelectFieldProps> = ({
 
   useEffect(() => {
     const apiEndpoint = (field as FormField & { apiSelectEndpoint?: string }).apiSelectEndpoint;
+    if (field.dataSource === 'api') {
+      setOptions([]);
+      setLoading(false);
+      return;
+    }
     if (apiEndpoint) {
       return; // ApiSelectField handles this
     }
@@ -706,6 +747,11 @@ export const SelectSearchField: React.FC<SelectFieldProps> = ({
   const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
+    if (field.dataSource === 'api') {
+      setOptions([]);
+      setLoading(false);
+      return;
+    }
     if (field.dataSource === 'database' && field.dataTable && field.dataValueColumn && field.dataLabelColumn) {
       loadDatabaseOptions();
     } else {

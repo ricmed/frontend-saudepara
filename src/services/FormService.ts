@@ -168,10 +168,22 @@ export interface FormField {
   /** Para checkbox: salva como '1'/'0' em vez de boolean */
   storeAs01?: boolean;
   // Configuração de origem de dados
-  dataSource?: 'manual' | 'database';
+  dataSource?: 'manual' | 'database' | 'api';
   dataTable?: string;
   dataValueColumn?: string;
   dataLabelColumn?: string;
+  /** Query params fixos na chamada da API (ex.: tipo_estado_idtipo_estado=15, todos=1). */
+  apiSelectStaticParams?: Record<string, string>;
+  /**
+   * Preset escolhido no construtor em “Lista pronta” (API). Ajuda a UI quando o endpoint
+   * ainda não reflete o passo (ex.: “cidades que seguem a regional” antes de ligar o campo).
+   */
+  apiListGuidedPreset?:
+    | 'crs_regionais'
+    | 'municipios_segue_regional'
+    | 'municipios_cidades'
+    | 'municipios_todos'
+    | 'outro_lista_pronta';
   /** Usado na tela "Configurar Colunas Fixas": quando true, campo é exibido no formulário e persistido em coluna fixa */
   isFixedColumn?: boolean;
   /** Nome da coluna no banco (quando isFixedColumn) */
