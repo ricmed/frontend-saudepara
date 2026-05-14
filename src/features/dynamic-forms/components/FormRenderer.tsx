@@ -630,6 +630,8 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       disabled,
     };
 
+    const selectAux = { getValue, setValue };
+
     const isNomeOuNomeSocialOuNomeMae =
       resolved.key === 'paciente.nome' || resolved.key === 'paciente.nome_social' || resolved.key === 'paciente.nome_mae';
     const isResidenciaMaiusculo =
@@ -805,7 +807,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       case 'checkbox':
         return <CheckboxField {...commonProps} />;
       case 'checkbox-group':
-        return <CheckboxGroupField {...commonProps} />;
+        return <CheckboxGroupField {...commonProps} {...selectAux} />;
       case 'select':
         // Vive aldeado?: ao mudar para Não/Ignorado, limpar DSEI, Polo Base e Aldeia
         if (resolved.key === 'paciente.vive_aldeado') {
@@ -818,12 +820,12 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             }
           };
           if (resolved.codeList) {
-            return <CodeListSelectField {...commonProps} onChange={viveAldeadoOnChange} />;
+            return <CodeListSelectField {...commonProps} {...selectAux} onChange={viveAldeadoOnChange} />;
           }
-          return <SelectField {...commonProps} onChange={viveAldeadoOnChange} />;
+          return <SelectField {...commonProps} {...selectAux} onChange={viveAldeadoOnChange} />;
         }
         if (resolved.codeList) {
-          return <CodeListSelectField {...commonProps} />;
+          return <CodeListSelectField {...commonProps} {...selectAux} />;
         }
         if (
           (resolved as { apiSelectEndpoint?: string }).apiSelectEndpoint ||
@@ -856,6 +858,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             return (
               <ApiSelectField
                 {...commonProps}
+                {...selectAux}
                 onChange={(val: any) => {
                   setValue(resolved.key, val);
                   if (String(val ?? '') !== '5') {
@@ -873,6 +876,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             return (
               <ApiSelectField
                 {...commonProps}
+                {...selectAux}
                 onChange={(val: any) => {
                   setValue(resolved.key, val);
                   if (val !== '4') setValue('paciente.outra_orientacao_sexual', undefined);
@@ -882,13 +886,13 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           }
         if (resolved.key === 'acao.programa_alcancado') {
           const semArea = !getValue('acao.area');
-          return <ApiSelectField {...commonProps} disabled={disabled || semArea} getValue={getValue} />;
+          return <ApiSelectField {...commonProps} {...selectAux} disabled={disabled || semArea} />;
         }
         if (resolved.key === 'acao.atividade') {
           return (
             <ApiSelectField
               {...commonProps}
-              getValue={getValue}
+              {...selectAux}
               onChange={(val: any) => {
                 setValue(resolved.key, val);
                 clearDetalhamento();
@@ -896,13 +900,14 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             />
           );
         }
-        return <ApiSelectField {...commonProps} getValue={getValue} />;
+        return <ApiSelectField {...commonProps} {...selectAux} />;
         }
         // Ao mudar Área da vigilância, limpar Atividade (seletor dependente)
         if (resolved.key === 'acao.area') {
           return (
             <SelectField
               {...commonProps}
+              {...selectAux}
               onChange={(val: any) => {
                 setValue(resolved.key, val);
                 setValue('acao.atividade', undefined);
@@ -918,6 +923,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           return (
             <SelectField
               {...commonProps}
+              {...selectAux}
               onChange={(val: any) => {
                 setValue(resolved.key, val);
                 if (val === '1') {
@@ -937,6 +943,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           return (
             <SelectField
               {...commonProps}
+              {...selectAux}
               onChange={(val: any) => {
                 setValue(resolved.key, val);
                 if (val !== '1') {
@@ -951,6 +958,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           return (
             <SelectField
               {...commonProps}
+              {...selectAux}
               onChange={(val: any) => {
                 setValue(resolved.key, val);
                 setValue('detalhamento.complementar_detalhe', undefined);
@@ -958,7 +966,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             />
           );
         }
-        return <SelectField {...commonProps} />;
+        return <SelectField {...commonProps} {...selectAux} />;
       case 'select-search':
         if (field.codeList) {
           return <CodeListSearchField {...commonProps} />;

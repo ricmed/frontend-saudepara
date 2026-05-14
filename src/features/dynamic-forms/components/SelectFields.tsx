@@ -8,6 +8,10 @@ import { searchMatches } from '@/utils/searchUtils';
 import { getApiRoot } from '@/config/apiOrigin';
 import { Check } from 'lucide-react';
 import { optionsChoiceGridClass } from '@/features/dynamic-forms/utils/optionsChoiceGridClass';
+import {
+  DF_CHOICE_WITH_TEXT_DEFAULT_VALUE,
+  radioChoiceOtherTextKey,
+} from '@/features/dynamic-forms/utils/radioChoiceOther';
 
 function getFieldInputId(field: FormField) {
   const key = (field.key || field.label || 'field').toString();
@@ -30,8 +34,43 @@ const SingleSelectTiles: React.FC<{
   required?: boolean;
   disabled?: boolean;
   loading?: boolean;
-}> = ({ field, inputId, options, value, onPick, onClear, error, required, disabled, loading }) => {
+  getValue?: (key: string) => any;
+  setValue?: (key: string, value: any) => void;
+}> = ({
+  field,
+  inputId,
+  options,
+  value,
+  onPick,
+  onClear,
+  error,
+  required,
+  disabled,
+  loading,
+  getValue,
+  setValue,
+}) => {
   const busy = Boolean(disabled || field.disabled || loading);
+  const choiceWithText = Boolean(field.choiceWithText) && typeof setValue === 'function' && typeof getValue === 'function';
+  const otherSentinelRaw = String(field.choiceWithTextValue ?? DF_CHOICE_WITH_TEXT_DEFAULT_VALUE).trim();
+  const otherSentinel = otherSentinelRaw || DF_CHOICE_WITH_TEXT_DEFAULT_VALUE;
+  const otherTextKey = radioChoiceOtherTextKey(field.key);
+  const otherLabel = (field.choiceWithTextLabel ?? 'Outro').trim() || 'Outro';
+  const otherTextValue = choiceWithText ? String(getValue!(otherTextKey) ?? '') : '';
+  const sentinelCollides = options.some((o) => String(o.value) === otherSentinel);
+
+  const selectMain = (next: string) => {
+    onPick(next);
+    if (choiceWithText && setValue && next !== otherSentinel) {
+      setValue(otherTextKey, undefined);
+    }
+  };
+
+  const handleClear = () => {
+    onClear?.();
+    if (choiceWithText && setValue) setValue(otherTextKey, undefined);
+  };
+
   return (
     <div className="mb-4">
       <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
@@ -45,6 +84,11 @@ const SingleSelectTiles: React.FC<{
         <p className="text-sm text-gray-500">Nenhuma opção disponível.</p>
       ) : (
         <>
+          {choiceWithText && sentinelCollides && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mb-2">
+              Alguma opção usa o mesmo valor interno da opção com texto; altere o valor dessa opção ou o valor interno nas configurações do campo.
+            </p>
+          )}
           <div className={optionsChoiceGridClass(field)}>
             {options.map((option) => {
               const isSelected = String(value ?? '') === String(option.value);
@@ -68,7 +112,7 @@ const SingleSelectTiles: React.FC<{
                       id={rid}
                       name={field.key}
                       checked={isSelected}
-                      onChange={() => onPick(option.value)}
+                      onChange={() => selectMain(option.value)}
                       disabled={busy}
                       className="w-6 h-6 rounded-full border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer"
                     />
@@ -87,10 +131,61 @@ const SingleSelectTiles: React.FC<{
               );
             })}
           </div>
+          {choiceWithText && !sentinelCollides && (
+            <div className="mt-3 sm:col-span-2">
+              <label
+                className={`
+                  flex flex-wrap items-center gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200
+                  ${busy ? 'opacity-60 cursor-not-allowed' : ''}
+                  ${
+                    String(value ?? '') === otherSentinel
+                      ? 'bg-blue-50 border-2 border-blue-500 shadow-md'
+                      : 'bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-sm'
+                  }
+                `}
+              >
+                <div className="flex items-center h-6 flex-shrink-0">
+                  <input
+                    type="radio"
+                    name={field.key}
+                    checked={String(value ?? '') === otherSentinel}
+                    onChange={() => selectMain(otherSentinel)}
+                    disabled={busy}
+                    className="w-6 h-6 rounded-full border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer"
+                  />
+                </div>
+                <span
+                  className={`text-sm font-medium shrink-0 ${
+                    String(value ?? '') === otherSentinel ? 'text-blue-900' : 'text-gray-900'
+                  }`}
+                >
+                  {otherLabel}
+                </span>
+                <input
+                  type="text"
+                  value={String(value ?? '') === otherSentinel ? otherTextValue : ''}
+                  onChange={(e) => setValue!(otherTextKey, e.target.value)}
+                  onClick={() => {
+                    if (!busy) selectMain(otherSentinel);
+                  }}
+                  onFocus={() => {
+                    if (!busy) selectMain(otherSentinel);
+                  }}
+                  disabled={busy || String(value ?? '') !== otherSentinel}
+                  placeholder={field.choiceWithTextPlaceholder || 'Digite aqui…'}
+                  className="flex-1 min-w-[10rem] bg-transparent border-0 border-b-2 border-dotted border-gray-400 px-1 py-0.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                  aria-label={otherLabel}
+                />
+                {String(value ?? '') === otherSentinel && (
+                  <Check className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                )}
+              </label>
+            </div>
+          )}
           {!required && onClear && value != null && String(value) !== '' && (
             <button
               type="button"
-              onClick={() => onClear()}
+              onClick={() => handleClear()}
               disabled={busy}
               className="mt-2 text-xs text-blue-600 hover:text-blue-800 disabled:opacity-50"
             >
@@ -210,6 +305,8 @@ interface SelectFieldProps {
   disabled?: boolean;
   /** Lê valores de outros campos do formulário (para filtros/params). */
   getValue?: (key: string) => any;
+  /** Grava em outra chave (ex.: texto da opção «Outro» em select em cartões). */
+  setValue?: (key: string, value: any) => void;
 }
 
 /** Posiciona menu flutuante em coordenadas da viewport (evita recorte por overflow em cards/seções). */
@@ -257,6 +354,7 @@ export const ApiSelectField: React.FC<SelectFieldProps> = ({
   required,
   disabled,
   getValue,
+  setValue,
 }) => {
   const [options, setOptions] = useState<Array<{ value: string; label: string }>>(field.options || []);
   const [loading, setLoading] = useState(true);
@@ -310,6 +408,8 @@ export const ApiSelectField: React.FC<SelectFieldProps> = ({
           required={required}
           disabled={disabled}
           loading={loading}
+          getValue={getValue}
+          setValue={setValue}
         />
       ) : (
         <>
@@ -775,6 +875,8 @@ export const SelectField: React.FC<SelectFieldProps> = ({
   error,
   required,
   disabled,
+  getValue,
+  setValue,
 }) => {
   const [options, setOptions] = useState(field.options || []);
   const [loading, setLoading] = useState(false);
@@ -831,6 +933,8 @@ export const SelectField: React.FC<SelectFieldProps> = ({
           required={required}
           disabled={disabled}
           loading={loading}
+          getValue={getValue}
+          setValue={setValue}
         />
       ) : (
         <>
@@ -1220,6 +1324,8 @@ export const CodeListSelectField: React.FC<SelectFieldProps> = ({
   error,
   required,
   disabled,
+  getValue,
+  setValue,
 }) => {
   const [items, setItems] = useState<CodeListItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1264,6 +1370,8 @@ export const CodeListSelectField: React.FC<SelectFieldProps> = ({
           required={required}
           disabled={disabled}
           loading={loading}
+          getValue={getValue}
+          setValue={setValue}
         />
       ) : (
         <>

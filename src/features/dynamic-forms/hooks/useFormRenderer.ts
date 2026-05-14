@@ -400,16 +400,28 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
         return false;
       }
 
-      if (field.type === 'radio' && field.choiceWithText) {
+      if (field.choiceWithText) {
         const rawSent = String(field.choiceWithTextValue ?? DF_CHOICE_WITH_TEXT_DEFAULT_VALUE).trim();
         const sentinel = rawSent || DF_CHOICE_WITH_TEXT_DEFAULT_VALUE;
-        if (String(value ?? '') === sentinel) {
-          const otherKey = radioChoiceOtherTextKey(field.key);
-          const otherTxt = getValue(otherKey);
-          if (isRequired && (!otherTxt || !String(otherTxt).trim())) {
-            const hint = (field.choiceWithTextLabel ?? 'Outro').trim() || 'Outro';
+        const otherKey = radioChoiceOtherTextKey(field.key);
+        const otherTxt = getValue(otherKey);
+        const hint = (field.choiceWithTextLabel ?? 'Outro').trim() || 'Outro';
+
+        if (field.type === 'checkbox-group') {
+          const arr = Array.isArray(value) ? value : [];
+          if (arr.includes(sentinel) && isRequired && (!otherTxt || !String(otherTxt).trim())) {
             setError(field.key, `Preencha o texto da opção "${hint}"`);
             return false;
+          }
+        } else {
+          const selectWithTiles =
+            field.type === 'select' &&
+            (field.gridCols === 1 || field.gridCols === 2 || field.gridCols === 3);
+          if (field.type === 'radio' || selectWithTiles) {
+            if (String(value ?? '') === sentinel && isRequired && (!otherTxt || !String(otherTxt).trim())) {
+              setError(field.key, `Preencha o texto da opção "${hint}"`);
+              return false;
+            }
           }
         }
       }

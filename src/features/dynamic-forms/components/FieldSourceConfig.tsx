@@ -9,6 +9,7 @@ import {
   type DatabaseSource,
   type RelatedSuggestion,
 } from '../utils/databaseSources';
+import { DF_CHOICE_WITH_TEXT_DEFAULT_VALUE } from '@/features/dynamic-forms/utils/radioChoiceOther';
 
 /**
  * Configuração de "de onde vêm as opções" de um campo de seleção.
@@ -131,6 +132,10 @@ export const FieldSourceConfig: React.FC<FieldSourceConfigProps> = ({
 
       {primary === 'manual' && <ManualOptions field={field} onChange={onChange} />}
 
+      {(field.type === 'radio' || field.type === 'select' || field.type === 'checkbox-group') && (
+        <ChoiceWithTextConfig field={field} onChange={onChange} />
+      )}
+
       {primary === 'database' && (
         <div className="space-y-3 p-3 bg-white border border-gray-200 rounded-lg">
           {/* Badge de vínculo (filho de outro campo) */}
@@ -246,6 +251,96 @@ const PrimaryPicker: React.FC<{
 };
 
 /* ────────────────────────────────────────────────────────────────────────── */
+
+const ChoiceWithTextConfig: React.FC<{
+  field: FormField;
+  onChange: (updates: Partial<FormField>) => void;
+}> = ({ field, onChange }) => {
+  const isSelect = field.type === 'select';
+  const tiles =
+    field.gridCols === 1 || field.gridCols === 2 || field.gridCols === 3;
+  const enabled = Boolean(field.choiceWithText);
+  const sentinel = String(field.choiceWithTextValue ?? DF_CHOICE_WITH_TEXT_DEFAULT_VALUE).trim() || DF_CHOICE_WITH_TEXT_DEFAULT_VALUE;
+  const collides = (field.options || []).some((o) => String(o.value) === sentinel);
+
+  return (
+    <div className="p-3 bg-white border border-indigo-200 rounded-lg space-y-2">
+      <label className="flex items-start gap-2 text-xs cursor-pointer">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => {
+            if (e.target.checked) {
+              onChange({
+                choiceWithText: true,
+                choiceWithTextLabel: field.choiceWithTextLabel?.trim() || 'Outro',
+                choiceWithTextValue: field.choiceWithTextValue?.trim() || DF_CHOICE_WITH_TEXT_DEFAULT_VALUE,
+                ...(isSelect && !tiles ? { gridCols: 2 as const } : {}),
+              });
+            } else {
+              onChange({ choiceWithText: false });
+            }
+          }}
+          className="rounded mt-0.5"
+        />
+        <span>
+          <span className="font-medium text-gray-800">Opção com texto livre</span>
+          <span className="block text-[11px] text-gray-500 mt-0.5 leading-snug">
+            Adiciona automaticamente uma escolha (ex.: «Outro») com campo ao lado para o respondente digitar. Não coloque essa linha na lista de
+            opções acima.
+            {isSelect ? (
+              <span className="block mt-1 text-indigo-800">
+                Em «Seleção», se a disposição for lista suspensa, ao marcar aqui o formulário passa a usar cartões (2 colunas) para poder exibir o
+                campo de texto.
+              </span>
+            ) : null}
+          </span>
+        </span>
+      </label>
+      {enabled && collides && (
+        <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+          Alguma opção da lista usa o mesmo valor interno reservado para «texto livre». Altere o valor dessa opção ou o valor interno abaixo.
+        </p>
+      )}
+      {enabled && (
+        <div className="pl-5 space-y-2 border-l-2 border-indigo-100 ml-0.5">
+          <div>
+            <label className="block text-[10px] text-gray-600 mb-0.5">Rótulo exibido (ex.: Outro, Especifique)</label>
+            <input
+              type="text"
+              value={field.choiceWithTextLabel ?? 'Outro'}
+              onChange={(e) => onChange({ choiceWithTextLabel: e.target.value })}
+              className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] text-gray-600 mb-0.5">Placeholder do campo de texto</label>
+            <input
+              type="text"
+              value={field.choiceWithTextPlaceholder ?? ''}
+              onChange={(e) => onChange({ choiceWithTextPlaceholder: e.target.value || undefined })}
+              className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+              placeholder="Digite aqui…"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] text-gray-600 mb-0.5">Valor interno da escolha (não repetir nas opções)</label>
+            <input
+              type="text"
+              value={field.choiceWithTextValue ?? DF_CHOICE_WITH_TEXT_DEFAULT_VALUE}
+              onChange={(e) =>
+                onChange({
+                  choiceWithTextValue: e.target.value.trim() || DF_CHOICE_WITH_TEXT_DEFAULT_VALUE,
+                })
+              }
+              className="w-full px-2 py-1 text-xs border border-gray-300 rounded font-mono"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const ManualOptions: React.FC<{
   field: FormField;

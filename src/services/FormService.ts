@@ -219,8 +219,10 @@ export interface FormField {
   /** Número de colunas do grid para opções em `checkbox-group`, `radio` e `select` em modo cartões (padrão 2). Omitir em `select` para lista suspensa nativa. */
   gridCols?: number;
   /**
-   * Tipo `radio`: oferece uma opção extra com campo de texto (estilo Google Forms).
-   * O texto é salvo em `radioChoiceOtherTextKey(key)`; o valor da escolha segue sendo `choiceWithTextValue`.
+   * `radio`, `select` em cartões (`gridCols` 1–3) ou `checkbox-group`: opção extra com campo de texto (estilo Google Forms).
+   * O texto é salvo em `radioChoiceOtherTextKey(key)`; no `radio`/`select` o valor da escolha segue sendo `choiceWithTextValue`;
+   * no `checkbox-group` esse valor entra no array de opções marcadas.
+   * Não inclua essa opção na lista manual — ela é exibida automaticamente ao ativar.
    */
   choiceWithText?: boolean;
   /** Rótulo da opção com texto (ex.: Outro, Especifique, NSI — comente). */
