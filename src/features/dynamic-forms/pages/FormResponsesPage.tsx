@@ -10,7 +10,6 @@ import {
   collectSchemaReferenceMapsNeeded,
   findFormFieldByKey,
   formatCellValueForResponseList,
-  getStatusUi,
   getValueAtPath,
   guessKeyFields,
   resolveActiveSchema,
@@ -55,10 +54,8 @@ function buildListSortFieldKey(fieldKey: string) {
 function parseListSortKey(key: string):
   | { type: 'monitor'; colId: string }
   | { type: 'field'; fieldKey: string }
-  | { type: 'status' }
   | { type: 'submitted_at' }
   | null {
-  if (key === 'status') return { type: 'status' };
   if (key === 'submitted_at') return { type: 'submitted_at' };
   if (key.startsWith(LIST_SORT_MONITOR)) return { type: 'monitor', colId: key.slice(LIST_SORT_MONITOR.length) };
   if (key.startsWith(LIST_SORT_FIELD)) return { type: 'field', fieldKey: key.slice(LIST_SORT_FIELD.length) };
@@ -88,7 +85,6 @@ function getListSortComparableValue(
 ): string | number {
   const p = parseListSortKey(sortKey);
   if (!p) return '';
-  if (p.type === 'status') return row.status ?? '';
   if (p.type === 'submitted_at') return row.submitted_at ?? row.created_at ?? '';
   if (p.type === 'field') {
     const v = getValueAtPath(row.data_json ?? {}, p.fieldKey);
@@ -236,7 +232,7 @@ export const FormResponsesPage: React.FC = () => {
       setLoading(true);
       const [f, res] = await Promise.all([
         FormService.getFormById(formId),
-        FormResponsesService.list(formId, { page: p, limit: 50 }),
+        FormResponsesService.list(formId, { page: p, limit: 50, status: 'submitted' }),
       ]);
       setForm(f);
       setRows(res.data as ResponseRow[]);
@@ -266,7 +262,7 @@ export const FormResponsesPage: React.FC = () => {
     let cancelled = false;
     setSheetPreviewLoading(true);
     setSheetPreviewRows([]);
-    FormResponsesService.listAllResponses(formId)
+    FormResponsesService.listAllResponses(formId, { status: 'submitted' })
       .then((data) => {
         if (!cancelled) setSheetPreviewRows(data as ResponseRow[]);
       })
@@ -288,7 +284,7 @@ export const FormResponsesPage: React.FC = () => {
 
   const download = async (format: 'xlsx' | 'csv') => {
     try {
-      const { blob, filename } = await FormResponsesService.downloadExport(formId, { format });
+      const { blob, filename } = await FormResponsesService.downloadExport(formId, { format, status: 'submitted' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -408,15 +404,6 @@ export const FormResponsesPage: React.FC = () => {
                         />
                       ))}
                   <FormListSortableTh
-                    label="Status"
-                    sortKey="status"
-                    activeKey={listSort.key}
-                    sortOrder={listSort.order}
-                    onSort={handleListSortChange}
-                    thClassName="text-left"
-                    titleAttr="Status"
-                  />
-                  <FormListSortableTh
                     label="Data do envio"
                     sortKey="submitted_at"
                     activeKey={listSort.key}
@@ -436,7 +423,6 @@ export const FormResponsesPage: React.FC = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {sortedRows.map((r) => {
-                  const st = getStatusUi(r.status);
                   const submittedAt = r.submitted_at ? new Date(r.submitted_at) : null;
                   return (
                     <tr key={r.id} className="transition-colors duration-150 hover:bg-gray-50">
@@ -471,13 +457,6 @@ export const FormResponsesPage: React.FC = () => {
                           );
                         })
                       )}
-                      <td className="px-3 lg:px-4 xl:px-6 py-3 align-middle text-sm">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full border text-xs font-semibold ${st.className}`}
-                        >
-                          {st.label}
-                        </span>
-                      </td>
                       <td className="px-3 lg:px-4 xl:px-6 py-3 align-middle text-sm text-gray-900 whitespace-nowrap" title="Data do envio">
                         {submittedAt ? submittedAt.toLocaleString('pt-BR') : '—'}
                       </td>
@@ -496,7 +475,7 @@ export const FormResponsesPage: React.FC = () => {
                 })}
                 {rows.length === 0 && (
                   <tr>
-                    <td className="px-4 py-6 text-center text-gray-600" colSpan={3 + dataColCount}>
+                    <td className="px-4 py-6 text-center text-gray-600" colSpan={2 + dataColCount}>
                       Nenhuma resposta encontrada.
                     </td>
                   </tr>

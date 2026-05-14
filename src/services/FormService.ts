@@ -84,6 +84,8 @@ export interface PublicFormPayload {
     redirect_url?: string | null;
     collect_email?: boolean;
     one_response_per_user?: boolean;
+    /** Quando true, o respondente pode alterar a resposta após o envio (fluxo público). */
+    allow_edit_after_submit?: boolean;
   };
   version: {
     id: number;
@@ -476,6 +478,27 @@ class FormService {
     if (params.draft) qs.draft = '1';
     const response = await publicApi.post(
       `/api/public/forms/${encodeURIComponent(params.slug)}/submissions`,
+      { data_json: params.data_json },
+      { params: qs }
+    );
+    return response.data;
+  }
+
+  /** Atualiza resposta já enviada no fluxo público (requer `allow_edit_after_submit` no formulário). */
+  async updatePublicSubmission(params: {
+    slug: string;
+    submissionId: number;
+    token?: string | null;
+    data_json: Record<string, any>;
+  }): Promise<
+    Record<string, any> & {
+      quiz?: { score: number; maxScore: number; items: Array<{ key: string; points: number; awarded: number; correct: boolean; expected?: string; answer?: string }> } | null;
+    }
+  > {
+    const qs: Record<string, string> = {};
+    if (params.token) qs.t = params.token;
+    const response = await publicApi.patch(
+      `/api/public/forms/${encodeURIComponent(params.slug)}/submissions/${params.submissionId}`,
       { data_json: params.data_json },
       { params: qs }
     );

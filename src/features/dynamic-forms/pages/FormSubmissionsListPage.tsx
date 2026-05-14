@@ -23,7 +23,7 @@ import { useMunicipioLabelByIdMap } from '../hooks/useMunicipioLabelByIdMap';
 import { useTipoPaisLabelByIdMap } from '../hooks/useTipoPaisLabelByIdMap';
 import { FormResponseReadonlyModal } from '../components/FormResponseReadonlyModal';
 import { FormResponsesSpreadsheetModal } from '../components/FormResponsesSpreadsheetModal';
-import { getStatusUi, getValueAtPath, guessKeyFields, resolveActiveSchema, collectSchemaReferenceMapsNeeded, findFormFieldByKey, formatCellValueForResponseList, type ResponseListLabelMaps } from '../utils/formResponsesListUtils';
+import { getValueAtPath, guessKeyFields, resolveActiveSchema, collectSchemaReferenceMapsNeeded, findFormFieldByKey, formatCellValueForResponseList, type ResponseListLabelMaps } from '../utils/formResponsesListUtils';
 import { useAuth } from '@/keycloak/AuthProvider';
 
 type ResponseRow = {
@@ -49,10 +49,8 @@ function buildListSortFieldKey(fieldKey: string) {
 function parseListSortKey(key: string):
   | { type: 'monitor'; colId: string }
   | { type: 'field'; fieldKey: string }
-  | { type: 'status' }
   | { type: 'submitted_at' }
   | null {
-  if (key === 'status') return { type: 'status' };
   if (key === 'submitted_at') return { type: 'submitted_at' };
   if (key.startsWith(LIST_SORT_MONITOR)) return { type: 'monitor', colId: key.slice(LIST_SORT_MONITOR.length) };
   if (key.startsWith(LIST_SORT_FIELD)) return { type: 'field', fieldKey: key.slice(LIST_SORT_FIELD.length) };
@@ -72,7 +70,6 @@ function getListSortComparableValue(
 ): string | number {
   const p = parseListSortKey(sortKey);
   if (!p) return '';
-  if (p.type === 'status') return row.status ?? '';
   if (p.type === 'submitted_at') return row.submitted_at ?? row.created_at ?? '';
   if (p.type === 'field') {
     const v = getValueAtPath(row.data_json ?? {}, p.fieldKey);
@@ -292,7 +289,7 @@ export const FormSubmissionsListPage: React.FC = () => {
   }, [agravo]);
 
   const loadResponsesPage = async (formId: number, p = 1) => {
-    const res = await FormResponsesService.list(formId, { page: p, limit: 50 });
+    const res = await FormResponsesService.list(formId, { page: p, limit: 50, status: 'submitted' });
     setRows(res.data as ResponseRow[]);
     setPage(res.page);
     setTotalPages(res.totalPages);
@@ -339,7 +336,7 @@ export const FormSubmissionsListPage: React.FC = () => {
     let cancelled = false;
     setSheetPreviewLoading(true);
     setSheetPreviewRows([]);
-    FormResponsesService.listAllResponses(form.id)
+    FormResponsesService.listAllResponses(form.id, { status: 'submitted' })
       .then((data) => {
         if (!cancelled) setSheetPreviewRows(data as ResponseRow[]);
       })
@@ -361,7 +358,7 @@ export const FormSubmissionsListPage: React.FC = () => {
   const download = async (format: 'xlsx' | 'csv') => {
     if (!form?.id) return;
     try {
-      const { blob, filename } = await FormResponsesService.downloadExport(form.id, { format });
+      const { blob, filename } = await FormResponsesService.downloadExport(form.id, { format, status: 'submitted' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -672,16 +669,6 @@ export const FormSubmissionsListPage: React.FC = () => {
                         />
                       ))}
                   <FormListSortableTh
-                    key="status"
-                    label="Status"
-                    sortKey="status"
-                    activeKey={listSort.key}
-                    sortOrder={listSort.order}
-                    onSort={handleListSortChange}
-                    thClassName="text-left"
-                    titleAttr="Status"
-                  />
-                  <FormListSortableTh
                     key="submitted_at"
                     label="Data do envio"
                     sortKey="submitted_at"
@@ -702,7 +689,6 @@ export const FormSubmissionsListPage: React.FC = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {sortedRows.map((r) => {
-                  const st = getStatusUi(r.status);
                   const submittedAt = r.submitted_at ? new Date(r.submitted_at) : null;
                   return (
                     <tr key={r.id} className="transition-colors duration-150 hover:bg-gray-50">
@@ -737,13 +723,6 @@ export const FormSubmissionsListPage: React.FC = () => {
                           );
                         })
                       )}
-                      <td className="px-3 lg:px-4 xl:px-6 py-3 align-middle text-sm">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full border text-xs font-semibold ${st.className}`}
-                        >
-                          {st.label}
-                        </span>
-                      </td>
                       <td className="px-3 lg:px-4 xl:px-6 py-3 align-middle text-sm text-gray-900 whitespace-nowrap" title="Data do envio">
                         {submittedAt ? submittedAt.toLocaleString('pt-BR') : '—'}
                       </td>

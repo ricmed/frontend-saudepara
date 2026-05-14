@@ -1,7 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import FormService, { type PublicFormPayload } from '@/services/FormService';
 import { FormRenderer } from '../components/FormRenderer';
+
+function cloneFormData<T>(value: T): T {
+  if (typeof structuredClone === 'function') {
+    return structuredClone(value);
+  }
+  return JSON.parse(JSON.stringify(value)) as T;
+}
 
 export const PublicDynamicFormPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -13,6 +20,12 @@ export const PublicDynamicFormPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
+  /** Após envio ou reenvio: id + payload completo para reabrir o formulário quando permitido. */
+  const [lastSubmission, setLastSubmission] = useState<{ id: number; data_json: Record<string, any> } | null>(null);
+  /** Quando não nulo, o formulário está reabrindo uma resposta já enviada para edição. */
+  const [editingSubmissionId, setEditingSubmissionId] = useState<number | null>(null);
+  const [formInitialData, setFormInitialData] = useState<Record<string, any>>({});
+  const [formMountKey, setFormMountKey] = useState(0);
   const [quizSummary, setQuizSummary] = useState<{
     score: number;
     maxScore: number;
@@ -40,6 +53,7 @@ export const PublicDynamicFormPage: React.FC = () => {
   const formName = (payload?.form as any)?.nome ? String((payload as any).form.nome) : 'Formulário';
   const redirectUrl = (payload?.form?.redirect_url ?? '').trim();
   const confirmationMsg = (payload?.form?.confirmation_message ?? '').trim();
+  const allowEditAfterSubmit = Boolean(payload?.form?.allow_edit_after_submit);
 
   useEffect(() => {
     if (!submitted || !redirectUrl) return;
@@ -53,12 +67,46 @@ export const PublicDynamicFormPage: React.FC = () => {
     return () => window.clearTimeout(t);
   }, [submitted, redirectUrl]);
 
+  const handleContinueEditing = useCallback(() => {
+    if (!lastSubmission) return;
+    setFormInitialData(cloneFormData(lastSubmission.data_json ?? {}));
+    setEditingSubmissionId(lastSubmission.id);
+    setFormMountKey((k) => k + 1);
+    setSubmitted(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [lastSubmission]);
+
   const handleSubmit = async (data: Record<string, any>) => {
     if (!slug) return;
     try {
       setSaving(true);
+      if (editingSubmissionId != null) {
+        const res = await FormService.updatePublicSubmission({
+          slug,
+          token,
+          submissionId: editingSubmissionId,
+          data_json: data,
+        });
+        setQuizSummary(res.quiz && typeof res.quiz === 'object' ? res.quiz : null);
+        setLastSubmission({
+          id: Number(res.id) || editingSubmissionId,
+          data_json: (res.data_json as Record<string, any>) ?? {},
+        });
+        setEditingSubmissionId(null);
+        setFormInitialData({});
+        setSubmitted(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+
       const res = await FormService.submitPublicForm({ slug, token, data_json: data });
       setQuizSummary(res.quiz && typeof res.quiz === 'object' ? res.quiz : null);
+      setLastSubmission({
+        id: Number(res.id),
+        data_json: (res.data_json as Record<string, any>) ?? {},
+      });
+      setEditingSubmissionId(null);
+      setFormInitialData({});
       setSubmitted(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (e: any) {
@@ -97,6 +145,20 @@ export const PublicDynamicFormPage: React.FC = () => {
         <div className="mx-auto max-w-3xl rounded-xl bg-white p-6 shadow">
           <h1 className="text-2xl font-bold text-gray-900 mb-2">{formName}</h1>
           <p className="text-gray-700">{confirmationMsg || 'Resposta enviada com sucesso.'}</p>
+          {allowEditAfterSubmit && lastSubmission ? (
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={handleContinueEditing}
+                className="inline-flex items-center rounded-lg border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                Editar resposta
+              </button>
+              <p className="mt-2 text-xs text-gray-500">
+                Você pode alterar e salvar novamente enquanto o formulário permitir edição após o envio.
+              </p>
+            </div>
+          ) : null}
           {quizSummary ? (
             <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50/80 p-4">
               <p className="text-sm font-semibold text-amber-900">
@@ -135,7 +197,7 @@ export const PublicDynamicFormPage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="rounded-lg bg-white p-6 shadow-xl text-center">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-4" />
-            <p className="text-gray-700">Enviando…</p>
+            <p className="text-gray-700">{editingSubmissionId != null ? 'Salvando…' : 'Enviando…'}</p>
           </div>
         </div>
       )}
@@ -147,16 +209,17 @@ export const PublicDynamicFormPage: React.FC = () => {
         </div>
 
         <FormRenderer
+          key={`public-${slug ?? 'form'}-${formMountKey}`}
           schema={{
             ...payload.version.schema_json,
             title: formName,
           }}
           showTitle={false}
-          initialData={{}}
+          initialData={editingSubmissionId != null ? formInitialData : {}}
           onSubmit={handleSubmit}
           onSaveDraft={undefined}
           onCancel={undefined}
-          submitLabel="Enviar"
+          submitLabel={editingSubmissionId != null ? 'Salvar alterações' : 'Enviar'}
           readOnly={false}
           showActions={true}
           context="public"
@@ -167,4 +230,3 @@ export const PublicDynamicFormPage: React.FC = () => {
     </div>
   );
 };
-
