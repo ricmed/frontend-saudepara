@@ -4,6 +4,7 @@ import { EstabelecimentoFormService } from '@/services/EstabelecimentoFormServic
 import { salvarNotificacaoCompleta } from '@/utils/notificacaoAdapter';
 import { toast } from 'react-toastify';
 import { convertLocalDateTimeToUTC } from '@/utils/timezoneUtils';
+import axios from '@/utils/axiosRetry';
 
 class SyncService {
   private isOnline: boolean;
@@ -20,6 +21,7 @@ class SyncService {
   // ✅ NOVO: Lock atômico para prevenir race conditions
   private syncLockPromise: Promise<void> | null = null;
   private syncLockId: string | null = null;
+  private readonly anexoBatchSize: number = 10;
 
   // 🆕 MODO OFFLINE FORÇADO (tipo Spotify)
   private isOfflineModeForced: boolean = false;
@@ -72,6 +74,21 @@ class SyncService {
     });
   }
 
+  private getSyncTimestamp(record: any): number {
+    return Number(record?.timestamp ?? record?.savedAt ?? record?.created_at ?? 0) || 0;
+  }
+
+  private isCreationRecord(record: any): boolean {
+    if (!record) return true;
+    if (record.createdOffline === true) return true;
+    if (record.isEdit === true) return false;
+
+    const id = record.id ?? record.idnotificacao ?? record.id_comunicacao;
+    if (typeof id === 'number') return id <= 0;
+
+    return true;
+  }
+
   // ✅ NOVO: Verificar se realmente pode fazer chamadas API
   private async checkAuthenticationStatus(): Promise<boolean> {
     // ✅ PRIORIDADE: Verificar conexão de rede PRIMEIRO
@@ -104,22 +121,16 @@ class SyncService {
     }
 
     try {
-      // ✅ Usar AbortController para timeout rápido
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 segundos
-      
-      // ✅ Fazer uma chamada simples para verificar autenticação
-      const response = await fetch('/api/usuario-acesso/current', {
-        method: 'GET',
-        credentials: 'include',
+      const response = await axios.get('/api/usuario-acesso/current', {
+        withCredentials: true,
+        timeout: 3000,
         headers: {
-          'Accept': 'application/json',
+          Accept: 'application/json',
         },
-        signal: controller.signal
+        validateStatus: () => true,
       });
 
-      clearTimeout(timeoutId);
-      this.isAuthenticated = response.ok;
+      this.isAuthenticated = response.status >= 200 && response.status < 300;
       this.authCheckCooldown = now;
 
       if (this.isAuthenticated) {
@@ -445,7 +456,7 @@ class SyncService {
         const pacienteIdMapping: Map<number, number> = new Map();
         
         // ✅ FILTRAR APENAS PACIENTES REALMENTE CRIADOS LOCALMENTE
-        const pacientesParaSincronizar = unsyncedPacientes.filter(p => {
+      const pacientesParaSincronizar = unsyncedPacientes.filter(p => {
           const isLocalCreation = (
             p.source === 'local_creation' || 
           (!p.source && p.synced === 'false' && p.idpaciente < 0)
@@ -457,6 +468,7 @@ class SyncService {
         
         return isLocalCreation;
       });
+      pacientesParaSincronizar.sort((a, b) => this.getSyncTimestamp(a) - this.getSyncTimestamp(b));
       
       console.log(`🔄 ${pacientesParaSincronizar.length} pacientes realmente criados localmente para sincronizar`);
       
@@ -649,6 +661,7 @@ class SyncService {
         
         return isLocalCreation;
       });
+      estabelecimentosParaSincronizar.sort((a, b) => this.getSyncTimestamp(a) - this.getSyncTimestamp(b));
       
       console.log(`🔄 ${estabelecimentosParaSincronizar.length} estabelecimentos criados localmente para sincronizar`);
       
@@ -708,6 +721,11 @@ class SyncService {
 
       // ===== 3. SINCRONIZAR COMUNICAÇÕES DAE =====
       const pendingComunicacoesDae = await indexedDBService.getPendingComunicacoesDae();
+      pendingComunicacoesDae.sort((a: any, b: any) => {
+        const priorityDiff = Number(!this.isCreationRecord(a)) - Number(!this.isCreationRecord(b));
+        if (priorityDiff !== 0) return priorityDiff;
+        return this.getSyncTimestamp(a) - this.getSyncTimestamp(b);
+      });
       console.log(`🔄 Sincronizando ${pendingComunicacoesDae.length} comunicações DAE...`);
       
       const ComunicacaoDaeService = (await import('@/services/ComunicacaoDaeService')).default;
@@ -763,8 +781,8 @@ class SyncService {
       }
 
       // ===== 3.5. SINCRONIZAR ANEXOS PENDENTES =====
-      const pendingAnexos = await indexedDBService.getAllAnexosPendentes();
-      console.log(`📎 Sincronizando ${pendingAnexos.length} anexos pendentes...`);
+      const pendingAnexos = await indexedDBService.getPendingAnexosBatch(this.anexoBatchSize);
+      console.log(`📎 Sincronizando ${pendingAnexos.length} anexos pendentes (lote de ${this.anexoBatchSize})...`);
       
       for (const anexo of pendingAnexos) {
         try {
@@ -807,6 +825,12 @@ class SyncService {
 
       // ===== 4. SINCRONIZAR NOTIFICAÇÕES =====
       const pendingNotificacoes = await indexedDBService.getPendingNotificacoes();
+      pendingNotificacoes.sort((a: any, b: any) => {
+        const aPriority = Number(!this.isCreationRecord({ ...a, id: a.id, isEdit: a.isEdit }));
+        const bPriority = Number(!this.isCreationRecord({ ...b, id: b.id, isEdit: b.isEdit }));
+        if (aPriority !== bPriority) return aPriority - bPriority;
+        return this.getSyncTimestamp(a) - this.getSyncTimestamp(b);
+      });
       console.log(`🔄 Sincronizando ${pendingNotificacoes.length} notificações...`);
       
       for (const { id, formData, offlineId, deviceId } of pendingNotificacoes) {
@@ -969,7 +993,7 @@ class SyncService {
             await indexedDBService.markNotificacaoAsError(offlineId, errorMessage, errorDetails);
             
             toast.error(`Erro ao sincronizar notificação ${offlineId}: ${errorMessage}`, {
-              autoClose: false, // Não fechar automaticamente para dar tempo do usuário ler
+              autoClose: 10000,
               toastId: `sync-error-${id}` // Evitar duplicatas
             });
             

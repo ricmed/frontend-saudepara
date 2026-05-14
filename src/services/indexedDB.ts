@@ -877,6 +877,32 @@ export class IndexedDBService {
   }
 
   /**
+   * Obter lote de anexos pendentes sem carregar tudo em memória.
+   */
+  async getPendingAnexosBatch(limit: number = 20): Promise<any[]> {
+    await this.init();
+
+    try {
+      const safeLimit = Math.max(1, limit);
+      const tx = this.db!.transaction('anexos_pendentes', 'readonly');
+      const index = tx.store.index('by-sync-status');
+      const batch: any[] = [];
+
+      let cursor = await index.openCursor('pending');
+      while (cursor && batch.length < safeLimit) {
+        batch.push(cursor.value);
+        cursor = await cursor.continue();
+      }
+
+      await tx.done;
+      return batch;
+    } catch (error) {
+      console.error('❌ Erro ao buscar lote de anexos pendentes:', error);
+      return [];
+    }
+  }
+
+  /**
    * Atualizar status de sincronização do anexo
    */
   async updateAnexoSyncStatus(
@@ -1300,7 +1326,7 @@ export class IndexedDBService {
     return notificacao ? notificacao.formData : null;
   }
 
-  async getPendingNotificacoes(): Promise<Array<{ id: number; formData: FormData; offlineId: string; deviceId: string }>> {
+  async getPendingNotificacoes(): Promise<Array<{ id: number; formData: FormData; offlineId: string; deviceId: string; timestamp?: number; isEdit?: boolean }>> {
     await this.init();
 
     let pending: any[] = [];
@@ -1330,7 +1356,9 @@ export class IndexedDBService {
       id: item.id as number, 
       formData: item.formData,
       offlineId: item.offlineId,
-      deviceId: item.deviceId
+      deviceId: item.deviceId,
+      timestamp: item.timestamp,
+      isEdit: item.isEdit
     }));
   }
 
