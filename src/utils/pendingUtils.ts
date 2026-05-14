@@ -90,7 +90,7 @@ class PendingNotificationUtils {
       console.log(`🔄 Marcando ${pendingNotificacoes.length} notificações como sincronizadas...`);
       
       for (const notif of pendingNotificacoes) {
-        await indexedDBService.markNotificacaoAsSynced(notif.id);
+        await indexedDBService.markNotificacaoAsSynced(notif.offlineId, { remove: true });
       }
       
       console.log('✅ Todas as notificações pendentes foram removidas');

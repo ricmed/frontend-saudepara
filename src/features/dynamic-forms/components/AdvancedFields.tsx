@@ -16,6 +16,7 @@ import {
   DF_CHOICE_WITH_TEXT_DEFAULT_VALUE,
   radioChoiceOtherTextKey,
 } from '@/features/dynamic-forms/utils/radioChoiceOther';
+import { optionsChoiceGridClass } from '@/features/dynamic-forms/utils/optionsChoiceGridClass';
 
 const API_ROOT = getRuntimeApiRoot();
 
@@ -108,11 +109,7 @@ export const CheckboxGroupField: React.FC<AdvancedFieldProps> = ({
       {field.helpText && (
         <p className="text-xs text-gray-500 mb-2">{field.helpText}</p>
       )}
-      <div className={`grid gap-3 ${
-        field.gridCols === 3
-          ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
-          : 'grid-cols-1 sm:grid-cols-2'
-      }`}>
+      <div className={optionsChoiceGridClass(field)}>
         {options.map((option) => {
           const isSelected = selectedValues.includes(option.value);
           return (
@@ -237,7 +234,7 @@ export const RadioGroupField: React.FC<AdvancedFieldProps> = ({
           Alguma opção usa o mesmo valor interno da opção com texto; altere o valor dessa opção ou o valor interno nas configurações do campo.
         </p>
       )}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className={optionsChoiceGridClass(field)}>
         {options.map((option) => {
           const isSelected = value === option.value;
           return (

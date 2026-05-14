@@ -11,10 +11,14 @@ export function registerServiceWorker() {
     return;
   }
 
-  registerSW({
+  const updateSW = registerSW({
     onNeedRefresh() {
-      // Sem UI: com registerType "autoUpdate" no Vite o SW costuma ativar sozinho;
-      // evitamos toast/botão "Atualizar".
+      const shouldUpdate = window.confirm(
+        'Uma nova versão do aplicativo está disponível. Deseja atualizar agora?'
+      );
+      if (shouldUpdate) {
+        void updateSW(true);
+      }
     },
 
     onOfflineReady() {

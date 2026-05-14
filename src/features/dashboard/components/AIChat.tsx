@@ -14,6 +14,7 @@ import {
   Cloud,
   Info
 } from 'lucide-react';
+import { STORAGE_KEYS, readStringWithLegacy } from '@/utils/storageKeys';
 
 interface Message {
   id: string;
@@ -49,6 +50,8 @@ export const AIChat: React.FC<AIChatProps> = ({
   dashboardData,
   className = ""
 }) => {
+  const LEGACY_AI_GLOBAL_CONFIG_KEY = 'aiGlobalConfig';
+  const LEGACY_AI_CHAT_CONFIG_KEY = 'aiChatConfig';
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -57,11 +60,14 @@ export const AIChat: React.FC<AIChatProps> = ({
   
   // Configuração da IA - carrega das configurações globais primeiro, depois do local antigo
   const [aiConfig, setAiConfig] = useState<AIConfig>(() => {
-    const globalSaved = localStorage.getItem('aiGlobalConfig');
+    const globalSaved = readStringWithLegacy(
+      STORAGE_KEYS.ai.globalConfig,
+      [LEGACY_AI_GLOBAL_CONFIG_KEY, LEGACY_AI_CHAT_CONFIG_KEY]
+    );
     if (globalSaved) {
       return JSON.parse(globalSaved);
     }
-    const localSaved = localStorage.getItem('aiChatConfig');
+    const localSaved = readStringWithLegacy(STORAGE_KEYS.ai.chatConfig, [LEGACY_AI_CHAT_CONFIG_KEY]);
     return localSaved ? JSON.parse(localSaved) : { mode: 'localhost' };
   });
   
@@ -79,7 +85,10 @@ export const AIChat: React.FC<AIChatProps> = ({
   // Sincronizar com configurações globais
   useEffect(() => {
     const handleStorageChange = () => {
-      const globalSaved = localStorage.getItem('aiGlobalConfig');
+      const globalSaved = readStringWithLegacy(
+        STORAGE_KEYS.ai.globalConfig,
+        [LEGACY_AI_GLOBAL_CONFIG_KEY, LEGACY_AI_CHAT_CONFIG_KEY]
+      );
       if (globalSaved) {
         const config = JSON.parse(globalSaved);
         setAiConfig(config);
@@ -89,7 +98,10 @@ export const AIChat: React.FC<AIChatProps> = ({
     window.addEventListener('storage', handleStorageChange);
     
     // Verificar se há configuração global no carregamento
-    const globalSaved = localStorage.getItem('aiGlobalConfig');
+    const globalSaved = readStringWithLegacy(
+      STORAGE_KEYS.ai.globalConfig,
+      [LEGACY_AI_GLOBAL_CONFIG_KEY, LEGACY_AI_CHAT_CONFIG_KEY]
+    );
     if (globalSaved) {
       const config = JSON.parse(globalSaved);
       setAiConfig(config);

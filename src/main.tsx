@@ -1,6 +1,6 @@
-import { StrictMode } from "react";
+import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -41,25 +41,61 @@ function AppWithNotifications() {
   );
 }
 
+function SyncQueryInvalidationBridge() {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const handleCacheUpdated = () => {
+      queryClient.invalidateQueries();
+    };
+
+    window.addEventListener('cache-updated', handleCacheUpdated);
+    return () => window.removeEventListener('cache-updated', handleCacheUpdated);
+  }, [queryClient]);
+
+  return null;
+}
+
 // Cria o cliente do React Query
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutos
       retry: 1,
+      networkMode: 'offlineFirst',
+    },
+    mutations: {
+      networkMode: 'offlineFirst',
+      retry: (failureCount) => {
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          return false;
+        }
+        return failureCount < 1;
+      },
     },
   },
 })
 
-createRoot(document.getElementById("root")!).render(
-  <AuthProvider>
-    <QueryClientProvider client={queryClient}>
-      <StrictMode>
-        <AppWithNotifications />
-      </StrictMode>
-    </QueryClientProvider>
-  </AuthProvider>
-);
+async function bootstrapApp() {
+  try {
+    // Executa política de cache antes do primeiro render para evitar janela de dados stale na UI.
+    await runIndexedDbCachePolicyIfNewBuild();
+  } catch (error) {
+    console.warn('Falha ao aplicar política de cache no bootstrap:', error);
+  }
 
-void runIndexedDbCachePolicyIfNewBuild();
-registerServiceWorker();
+  createRoot(document.getElementById("root")!).render(
+    <AuthProvider>
+      <QueryClientProvider client={queryClient}>
+        <SyncQueryInvalidationBridge />
+        <StrictMode>
+          <AppWithNotifications />
+        </StrictMode>
+      </QueryClientProvider>
+    </AuthProvider>
+  );
+
+  registerServiceWorker();
+}
+
+void bootstrapApp();

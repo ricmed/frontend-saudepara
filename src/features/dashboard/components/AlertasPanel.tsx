@@ -17,6 +17,7 @@ import {
 import { 
   detectarAlertas
 } from '../config/vigilancia.config';
+import { STORAGE_KEYS, readJsonWithLegacy, removeWithLegacy } from '@/utils/storageKeys';
 
 interface AlertaItem {
   id: string;
@@ -59,6 +60,9 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({
   notificacoes = [], 
   isGlobalFilterActive = () => false 
 }) => {
+  const SHOW_DISMISSED_LEGACY_KEY = 'alertas-show-dismissed';
+  const DISMISSED_IDS_LEGACY_KEY = 'alertas-dismissed-ids';
+  const FILTER_TYPES_LEGACY_KEY = 'alertas-filtros-tipos';
   const navigate = useNavigate();
   const [alertas, setAlertas] = useState<AlertaItem[]>([]);
   const [alertasAtivos, setAlertasAtivos] = useState<AlertaItem[]>([]);
@@ -178,8 +182,11 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({
   // 🆕 ESTADO: Persistir se está mostrando dispensados ou ativos
   const [showDismissed, setShowDismissed] = useState<boolean>(() => {
     try {
-      const showDismissedSalvo = localStorage.getItem('alertas-show-dismissed');
-      return showDismissedSalvo ? JSON.parse(showDismissedSalvo) : false;
+      return readJsonWithLegacy<boolean>(
+        STORAGE_KEYS.ui.alertsShowDismissed,
+        false,
+        [SHOW_DISMISSED_LEGACY_KEY]
+      );
     } catch (error) {
       console.warn('Erro ao carregar estado show-dismissed:', error);
       return false;
@@ -188,8 +195,12 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({
   
   const [alertasDismissed, setAlertasDismissed] = useState<Set<string>>(() => {
     try {
-      const dismissedSalvos = localStorage.getItem('alertas-dismissed-ids');
-      return dismissedSalvos ? new Set(JSON.parse(dismissedSalvos)) : new Set();
+      const dismissedIds = readJsonWithLegacy<string[]>(
+        STORAGE_KEYS.ui.alertsDismissedIds,
+        [],
+        [DISMISSED_IDS_LEGACY_KEY]
+      );
+      return new Set(dismissedIds);
     } catch (error) {
       console.warn('Erro ao carregar alertas dispensados:', error);
       return new Set();
@@ -199,7 +210,7 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({
   // 🆕 EFEITO: Salvar estado showDismissed
   useEffect(() => {
     try {
-      localStorage.setItem('alertas-show-dismissed', JSON.stringify(showDismissed));
+      localStorage.setItem(STORAGE_KEYS.ui.alertsShowDismissed, JSON.stringify(showDismissed));
     } catch (error) {
       console.warn('Erro ao salvar estado show-dismissed:', error);
     }
@@ -208,7 +219,7 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({
   // 🆕 EFEITO: Salvar alertas dispensados
   useEffect(() => {
     try {
-      localStorage.setItem('alertas-dismissed-ids', JSON.stringify([...alertasDismissed]));
+      localStorage.setItem(STORAGE_KEYS.ui.alertsDismissedIds, JSON.stringify([...alertasDismissed]));
     } catch (error) {
       console.warn('Erro ao salvar alertas dispensados:', error);
     }
@@ -222,10 +233,11 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({
   }>(() => {
     // Carregar filtros salvos do localStorage
     try {
-      const filtrosSalvos = localStorage.getItem('alertas-filtros-tipos');
-      if (filtrosSalvos) {
-        return JSON.parse(filtrosSalvos);
-      }
+      return readJsonWithLegacy(
+        STORAGE_KEYS.ui.alertsFilterTypes,
+        { critico: true, alerta: true, info: true },
+        [FILTER_TYPES_LEGACY_KEY]
+      );
     } catch (error) {
       console.warn('Erro ao carregar filtros salvos:', error);
     }
@@ -240,7 +252,7 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({
   // 🆕 EFEITO: Salvar filtros no localStorage sempre que mudarem
   useEffect(() => {
     try {
-      localStorage.setItem('alertas-filtros-tipos', JSON.stringify(filtrosTipos));
+      localStorage.setItem(STORAGE_KEYS.ui.alertsFilterTypes, JSON.stringify(filtrosTipos));
     } catch (error) {
       console.warn('Erro ao salvar filtros:', error);
     }
@@ -291,9 +303,9 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({
     
     // Limpar localStorage
     try {
-      localStorage.removeItem('alertas-filtros-tipos');
-      localStorage.removeItem('alertas-show-dismissed');
-      localStorage.removeItem('alertas-dismissed-ids');
+      removeWithLegacy(STORAGE_KEYS.ui.alertsFilterTypes, [FILTER_TYPES_LEGACY_KEY]);
+      removeWithLegacy(STORAGE_KEYS.ui.alertsShowDismissed, [SHOW_DISMISSED_LEGACY_KEY]);
+      removeWithLegacy(STORAGE_KEYS.ui.alertsDismissedIds, [DISMISSED_IDS_LEGACY_KEY]);
     } catch (error) {
       console.warn('Erro ao limpar configurações salvas:', error);
     }

@@ -5,11 +5,28 @@ axios.defaults.withCredentials = true;
 
 // Estado global para controlar notificações de retry
 let isRetryNotificationActive = false;
+let lastRetryEventAt = 0;
+const endpoint429WaitMap = new Map<string, Promise<void>>();
 
 const USE_INTERNAL_AUTH = (import.meta as any).env?.VITE_USE_INTERNAL_AUTH === 'true';
 const refreshEndpoint = USE_INTERNAL_AUTH ? '/api/auth/refresh' : '/api-auth/auth/refresh';
 
 let refreshPromise: Promise<void> | null = null;
+
+const RETRY_EVENT_COOLDOWN_MS = 1500;
+
+const getEndpointKey = (config?: AxiosRequestConfig) => {
+  const method = String(config?.method ?? 'get').toUpperCase();
+  const url = String(config?.url ?? '');
+  return `${method}:${url}`;
+};
+
+const cloneRequestConfig = (config: AxiosRequestConfig) => ({
+  ...config,
+  headers: {
+    ...(config.headers || {}),
+  },
+});
 
 const isPublicFormRoute = () => {
   try {
@@ -48,7 +65,8 @@ axios.interceptors.response.use(
           });
         }
         await refreshPromise;
-        return axios(originalRequest);
+        // Clona a config para evitar reutilização de referência stale em concorrência.
+        return axios(cloneRequestConfig(originalRequest));
       } catch (e) {
         return Promise.reject(error);
       }
@@ -56,17 +74,23 @@ axios.interceptors.response.use(
 
     // Se for erro 429 e ainda não foi feito retry
     if (error.response?.status === 429 && !originalRequest._retry) {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        return Promise.reject(error);
+      }
+
       originalRequest._retry = true;
       
       // Pegar o tempo de retry do header Retry-After (se disponível) ou usar 30 segundos
       const retryAfter = error.response.headers['retry-after'];
       const delayMs = retryAfter ? parseInt(retryAfter) * 1000 : 30000;
+      const endpointKey = getEndpointKey(originalRequest);
       
       console.log(`⚠️ Rate limit atingido (429). Aguardando ${delayMs/1000}s antes de tentar novamente...`);
       
-      // Mostrar notificação visual se não estiver ativa
-      if (!isRetryNotificationActive) {
+      const now = Date.now();
+      if (!isRetryNotificationActive && now - lastRetryEventAt > RETRY_EVENT_COOLDOWN_MS) {
         isRetryNotificationActive = true;
+        lastRetryEventAt = now;
         
         // Disparar evento customizado para componentes React escutarem
         window.dispatchEvent(new CustomEvent('retry429', {
@@ -76,15 +100,23 @@ axios.interceptors.response.use(
           }
         }));
       }
-      
-      // Aguardar o tempo especificado
-      await new Promise(resolve => setTimeout(resolve, delayMs));
-      
+
+      let waitPromise = endpoint429WaitMap.get(endpointKey);
+      if (!waitPromise) {
+        waitPromise = new Promise<void>((resolve) => {
+          setTimeout(() => resolve(), delayMs);
+        }).finally(() => {
+          endpoint429WaitMap.delete(endpointKey);
+          isRetryNotificationActive = false;
+        });
+        endpoint429WaitMap.set(endpointKey, waitPromise);
+      }
+
+      await waitPromise;
       console.log(`🔄 Fazendo nova tentativa da requisição...`);
-      isRetryNotificationActive = false;
       
       // Fazer nova tentativa
-      return axios(originalRequest);
+      return axios(cloneRequestConfig(originalRequest));
     }
     
     // Se não for 429 ou já foi feito retry, rejeitar normalmente
@@ -105,8 +137,14 @@ export const retryRequest = async <T>(
       return await requestFn();
     } catch (error: any) {
       lastError = error;
+      const status = error?.response?.status;
+      const interceptorAlreadyRetried = Boolean((error?.config as any)?._retry);
       
-      if (error.response?.status === 429 && attempt < maxRetries) {
+      // Evita dobrar retry quando o interceptor já tratou 429 para essa request.
+      if (status === 429 && !interceptorAlreadyRetried && attempt < maxRetries) {
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          throw error;
+        }
         const delay = baseDelay * Math.pow(2, attempt);
         console.log(`⚠️ Retry ${attempt + 1}/${maxRetries + 1} - Aguardando ${delay/1000}s...`);
         

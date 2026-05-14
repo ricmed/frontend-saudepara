@@ -12,7 +12,8 @@ interface StorageTokens {
 class StorageTokenService {
   private static instance: StorageTokenService;
   private tokens: StorageTokens | null = null;
-  private readonly STORAGE_KEY = 'storage_tokens';
+  private readonly STORAGE_KEY = 'sp.auth.storage.tokens.v1';
+  private readonly LEGACY_STORAGE_KEY = 'storage_tokens';
   private readonly TOKEN_BUFFER = 5 * 60 * 1000; // 5 minutos de buffer antes da expiração
   private renewalPromise: Promise<string> | null = null;
 
@@ -33,14 +34,23 @@ class StorageTokenService {
   }
 
   /**
-   * Carrega tokens do localStorage
+   * Carrega tokens do sessionStorage (com migração de legado)
    */
   private loadTokensFromStorage(): void {
     try {
-      const stored = localStorage.getItem(this.STORAGE_KEY);
+      const stored = sessionStorage.getItem(this.STORAGE_KEY);
       if (stored) {
         this.tokens = JSON.parse(stored);
         console.log('🔑 Tokens carregados do storage');
+        return;
+      }
+
+      const legacyStored = localStorage.getItem(this.LEGACY_STORAGE_KEY);
+      if (legacyStored) {
+        this.tokens = JSON.parse(legacyStored);
+        sessionStorage.setItem(this.STORAGE_KEY, legacyStored);
+        localStorage.removeItem(this.LEGACY_STORAGE_KEY);
+        console.log('🔑 Tokens legados migrados para sessionStorage');
       }
     } catch (error) {
       console.error('❌ Erro ao carregar tokens:', error);
@@ -49,12 +59,12 @@ class StorageTokenService {
   }
 
   /**
-   * Salva tokens no localStorage
+   * Salva tokens no sessionStorage
    */
   private saveTokensToStorage(tokens: StorageTokens): void {
     try {
       this.tokens = tokens;
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(tokens));
+      sessionStorage.setItem(this.STORAGE_KEY, JSON.stringify(tokens));
       console.log('💾 Tokens salvos no storage');
     } catch (error) {
       console.error('❌ Erro ao salvar tokens:', error);
@@ -66,7 +76,8 @@ class StorageTokenService {
    */
   private clearTokens(): void {
     this.tokens = null;
-    localStorage.removeItem(this.STORAGE_KEY);
+    sessionStorage.removeItem(this.STORAGE_KEY);
+    localStorage.removeItem(this.LEGACY_STORAGE_KEY);
     console.log('🗑️ Tokens removidos');
   }
 

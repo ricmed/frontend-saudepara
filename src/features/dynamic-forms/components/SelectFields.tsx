@@ -6,11 +6,103 @@ import CodeListService, { type CodeListItem } from '@/services/CodeListService';
 import DatabaseService from '@/services/DatabaseService';
 import { searchMatches } from '@/utils/searchUtils';
 import { getApiRoot } from '@/config/apiOrigin';
+import { Check } from 'lucide-react';
+import { optionsChoiceGridClass } from '@/features/dynamic-forms/utils/optionsChoiceGridClass';
 
 function getFieldInputId(field: FormField) {
   const key = (field.key || field.label || 'field').toString();
   return `df-${key}`.replace(/[^a-zA-Z0-9_-]/g, '_');
 }
+
+/** `select` em cartões (1–3 colunas); `undefined` mantém select nativo. */
+function fieldUsesSelectTiles(field: FormField): boolean {
+  return field.gridCols === 1 || field.gridCols === 2 || field.gridCols === 3;
+}
+
+const SingleSelectTiles: React.FC<{
+  field: FormField;
+  inputId: string;
+  options: Array<{ value: string; label: string }>;
+  value: any;
+  onPick: (value: string) => void;
+  onClear?: () => void;
+  error?: string;
+  required?: boolean;
+  disabled?: boolean;
+  loading?: boolean;
+}> = ({ field, inputId, options, value, onPick, onClear, error, required, disabled, loading }) => {
+  const busy = Boolean(disabled || field.disabled || loading);
+  return (
+    <div className="mb-4">
+      <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
+        {field.label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      {field.helpText && <p className="text-xs text-gray-500 mb-2">{field.helpText}</p>}
+      {loading ? (
+        <p className="text-sm text-gray-500">Carregando...</p>
+      ) : options.length === 0 ? (
+        <p className="text-sm text-gray-500">Nenhuma opção disponível.</p>
+      ) : (
+        <>
+          <div className={optionsChoiceGridClass(field)}>
+            {options.map((option) => {
+              const isSelected = String(value ?? '') === String(option.value);
+              const rid = `${inputId}-opt-${option.value}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+              return (
+                <label
+                  key={option.value}
+                  className={`
+                    flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200
+                    ${busy ? 'opacity-60 cursor-not-allowed' : ''}
+                    ${
+                      isSelected
+                        ? 'bg-blue-50 border-2 border-blue-500 shadow-md scale-[1.02]'
+                        : 'bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-sm'
+                    }
+                  `}
+                >
+                  <div className="flex items-center h-6 mt-0.5 flex-shrink-0">
+                    <input
+                      type="radio"
+                      id={rid}
+                      name={field.key}
+                      checked={isSelected}
+                      onChange={() => onPick(option.value)}
+                      disabled={busy}
+                      className="w-6 h-6 rounded-full border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
+                    <span
+                      className={`text-sm font-medium transition-colors leading-relaxed ${
+                        isSelected ? 'text-blue-900' : 'text-gray-900'
+                      }`}
+                    >
+                      {option.label}
+                    </span>
+                    {isSelected && <Check className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />}
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+          {!required && onClear && value != null && String(value) !== '' && (
+            <button
+              type="button"
+              onClick={() => onClear()}
+              disabled={busy}
+              className="mt-2 text-xs text-blue-600 hover:text-blue-800 disabled:opacity-50"
+            >
+              Limpar seleção
+            </button>
+          )}
+        </>
+      )}
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+    </div>
+  );
+};
 
 const API_BASE = getApiRoot();
 
@@ -206,25 +298,44 @@ export const ApiSelectField: React.FC<SelectFieldProps> = ({
 
   return (
     <div className="mb-4">
-      <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
-        {field.label}
-        {required && <span className="text-red-500 ml-1">*</span>}
-      </label>
-      <select
-        id={inputId}
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value || undefined)}
-        disabled={disabled || field.disabled || loading}
-        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-          error ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
-        } ${disabled || field.disabled || loading ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-      >
-        <option value="">{loading ? 'Carregando...' : 'Selecione...'}</option>
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
-      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+      {fieldUsesSelectTiles(field) ? (
+        <SingleSelectTiles
+          field={field}
+          inputId={inputId}
+          options={options}
+          value={value}
+          onPick={(v) => onChange(v || undefined)}
+          onClear={() => onChange(undefined)}
+          error={error}
+          required={required}
+          disabled={disabled}
+          loading={loading}
+        />
+      ) : (
+        <>
+          <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
+            {field.label}
+            {required && <span className="text-red-500 ml-1">*</span>}
+          </label>
+          <select
+            id={inputId}
+            value={value ?? ''}
+            onChange={(e) => onChange(e.target.value || undefined)}
+            disabled={disabled || field.disabled || loading}
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+              error ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+            } ${disabled || field.disabled || loading ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+          >
+            <option value="">{loading ? 'Carregando...' : 'Selecione...'}</option>
+            {options.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+        </>
+      )}
     </div>
   );
 };
@@ -704,30 +815,50 @@ export const SelectField: React.FC<SelectFieldProps> = ({
     }
   };
 
+  const inputId = getFieldInputId(field);
+
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        {field.label}
-        {required && <span className="text-red-500 ml-1">*</span>}
-      </label>
-      <select
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled || field.disabled || loading}
-        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-          error
-            ? 'border-red-500 focus:ring-red-500'
-            : 'border-gray-300 focus:ring-blue-500'
-        } ${disabled || field.disabled || loading ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-      >
-        <option value="">{loading ? 'Carregando...' : 'Selecione...'}</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+      {fieldUsesSelectTiles(field) ? (
+        <SingleSelectTiles
+          field={field}
+          inputId={inputId}
+          options={options}
+          value={value}
+          onPick={(v) => onChange(v)}
+          onClear={() => onChange('')}
+          error={error}
+          required={required}
+          disabled={disabled}
+          loading={loading}
+        />
+      ) : (
+        <>
+          <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
+            {field.label}
+            {required && <span className="text-red-500 ml-1">*</span>}
+          </label>
+          <select
+            id={inputId}
+            value={value || ''}
+            onChange={(e) => onChange(e.target.value)}
+            disabled={disabled || field.disabled || loading}
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+              error
+                ? 'border-red-500 focus:ring-red-500'
+                : 'border-gray-300 focus:ring-blue-500'
+            } ${disabled || field.disabled || loading ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+          >
+            <option value="">{loading ? 'Carregando...' : 'Selecione...'}</option>
+            {options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+        </>
+      )}
     </div>
   );
 };
@@ -1113,32 +1244,56 @@ export const CodeListSelectField: React.FC<SelectFieldProps> = ({
     }
   };
 
+  const inputId = getFieldInputId(field);
+  const tileOptions = items.map((item) => ({
+    value: String(item.code),
+    label: String(item.label ?? item.code),
+  }));
+
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        {field.label}
-        {required && <span className="text-red-500 ml-1">*</span>}
-      </label>
-      <select
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled || field.disabled || loading}
-        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-          error
-            ? 'border-red-500 focus:ring-red-500'
-            : 'border-gray-300 focus:ring-blue-500'
-        } ${disabled || field.disabled || loading ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-      >
-        <option value="">
-          {loading ? 'Carregando...' : 'Selecione...'}
-        </option>
-        {items.map((item) => (
-          <option key={item.id} value={item.code}>
-            {item.label}
-          </option>
-        ))}
-      </select>
-      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+      {fieldUsesSelectTiles(field) ? (
+        <SingleSelectTiles
+          field={field}
+          inputId={inputId}
+          options={tileOptions}
+          value={value}
+          onPick={(v) => onChange(v)}
+          onClear={() => onChange('')}
+          error={error}
+          required={required}
+          disabled={disabled}
+          loading={loading}
+        />
+      ) : (
+        <>
+          <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
+            {field.label}
+            {required && <span className="text-red-500 ml-1">*</span>}
+          </label>
+          <select
+            id={inputId}
+            value={value || ''}
+            onChange={(e) => onChange(e.target.value)}
+            disabled={disabled || field.disabled || loading}
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+              error
+                ? 'border-red-500 focus:ring-red-500'
+                : 'border-gray-300 focus:ring-blue-500'
+            } ${disabled || field.disabled || loading ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+          >
+            <option value="">
+              {loading ? 'Carregando...' : 'Selecione...'}
+            </option>
+            {items.map((item) => (
+              <option key={item.id} value={item.code}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+          {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+        </>
+      )}
     </div>
   );
 };

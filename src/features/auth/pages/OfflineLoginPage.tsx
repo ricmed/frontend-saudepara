@@ -5,6 +5,12 @@ import { offlineAuthService } from '@/services/offlineAuthService';
 import { toast } from 'react-toastify';
 import { useAuth } from '@/keycloak/AuthProvider';
 
+const OFFLINE_MODE_KEY = 'sp.auth.offline.mode.v1';
+const OFFLINE_USER_DATA_KEY = 'sp.auth.offline.user-data.v1';
+const LEGACY_OFFLINE_MODE_KEY = 'offline_mode';
+const LEGACY_OFFLINE_USER_DATA_KEY = 'user_data';
+const USER_IDENTIFIER_KEY = 'sp.user.id.v1';
+
 /**
  * Página de Login Offline
  * Exibida quando o usuário não tem conexão e já configurou PIN
@@ -29,47 +35,16 @@ const OfflineLoginPage: React.FC = () => {
   }, [user, navigate]);
 
   useEffect(() => {
-    // Pegar o usuário mais recente (último que fez login)
-    const allData = localStorage.getItem('offline_auth_data_multi');
-    if (allData) {
-      try {
-        const parsed = JSON.parse(allData);
-        const users = parsed.users || {};
-        
-        if (Object.keys(users).length === 0) {
-          navigate('/login');
-          return;
-        }
-        
-        // Encontrar o usuário com lastAccess mais recente
-        let mostRecentUser = null;
-        let mostRecentTime = 0;
-        
-        for (const [userId, authData] of Object.entries(users)) {
-          const lastAccess = (authData as any).lastAccess || 0;
-          if (lastAccess > mostRecentTime) {
-            mostRecentTime = lastAccess;
-            mostRecentUser = userId;
-          }
-        }
-        
-        // Se não encontrou por lastAccess, pega o último adicionado (último do objeto)
-        if (!mostRecentUser) {
-          const userIds = Object.keys(users);
-          mostRecentUser = userIds[userIds.length - 1];
-        }
-        
-        console.log('👤 Selecionando usuário:', mostRecentUser);
-        setSelectedUserId(mostRecentUser);
-        const info = offlineAuthService.getSessionInfo(mostRecentUser);
-        setSessionInfo(info);
-      } catch (error) {
-        console.error('Erro ao carregar dados offline:', error);
-        navigate('/login');
-      }
-    } else {
+    const mostRecentUser = offlineAuthService.getMostRecentOfflineUserId();
+    if (!mostRecentUser) {
       navigate('/login');
+      return;
     }
+
+    console.log('👤 Selecionando usuário:', mostRecentUser);
+    setSelectedUserId(mostRecentUser);
+    const info = offlineAuthService.getSessionInfo(mostRecentUser);
+    setSessionInfo(info);
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -100,8 +75,13 @@ const OfflineLoginPage: React.FC = () => {
         toast.success('✅ Login offline realizado com sucesso!');
         
         // Simular autenticação no sistema
-        localStorage.setItem('offline_mode', 'true');
-        localStorage.setItem('user_data', JSON.stringify(result.userData));
+        localStorage.setItem(OFFLINE_MODE_KEY, 'true');
+        localStorage.setItem(OFFLINE_USER_DATA_KEY, JSON.stringify(result.userData));
+        localStorage.removeItem(LEGACY_OFFLINE_MODE_KEY);
+        localStorage.removeItem(LEGACY_OFFLINE_USER_DATA_KEY);
+        if (selectedUserId) {
+          sessionStorage.setItem(USER_IDENTIFIER_KEY, selectedUserId);
+        }
         
         // Criar um evento customizado para notificar o AuthProvider
         window.dispatchEvent(new CustomEvent('offline-login-success', { 

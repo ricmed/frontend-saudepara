@@ -79,10 +79,7 @@ const UserFormUnidade: React.FC = () => {
       console.log('🔄 Carregando dados do usuário para edição...');
       
       const response = await fetch(`/api-auth/admin/users/${userId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json'
-        }
+        credentials: 'include'
       });
 
       if (!response.ok) {
@@ -199,8 +196,8 @@ const UserFormUnidade: React.FC = () => {
 
         const response = await fetch(`/api-auth/admin/users/${id}`, {
           method: 'PUT',
+          credentials: 'include',
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify(updateData)
@@ -235,10 +232,10 @@ const UserFormUnidade: React.FC = () => {
 
         // Se senha foi informada, atualizar também
         if (formData.password) {
-          await fetch(`/api-auth/admin/users/${id}/reset-password`, {
+          const passwordResponse = await fetch(`/api-auth/admin/users/${id}/reset-password`, {
             method: 'PUT',
+            credentials: 'include',
             headers: {
-              'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -247,6 +244,10 @@ const UserFormUnidade: React.FC = () => {
               temporary: formData.temporaryPassword
             })
           });
+
+          if (!passwordResponse.ok) {
+            throw new Error(`Erro ao atualizar senha do usuário: ${passwordResponse.status}`);
+          }
         }
 
         // 🔥 HARD DELETE: Limpar todos os acessos existentes antes de criar novos

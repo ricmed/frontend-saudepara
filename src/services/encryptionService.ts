@@ -11,17 +11,32 @@
 class EncryptionService {
   private algorithm = 'AES-GCM';
   private keyLength = 256;
-  private saltPhrase = 'saude-para-offline-2025'; // ✅ Salt fixo (mudar para ambiente)
+  private readonly SALT_STORAGE_KEY = 'sp.crypto.salt.v1';
+  private readonly CRYPTO_IDENTITY_KEY = 'sp.crypto.identity.v1';
+  private readonly BROWSER_ID_KEY = 'sp.browser.id.v1';
+  private readonly USER_IDENTIFIER_KEY = 'sp.user.id.v1';
+  private readonly LEGACY_USER_IDENTIFIER_KEY = 'userId';
+  private readonly LEGACY_SALT_PHRASE = 'saude-para-offline-2025';
   
   /**
    * Gera uma chave de criptografia baseada em uma senha/identificador
    * @param userIdentifier - Identificador único do usuário (ex: userId)
    */
-  private async deriveKey(userIdentifier: string): Promise<CryptoKey> {
+  private getOrCreateSaltPhrase(): string {
+    const stored = localStorage.getItem(this.SALT_STORAGE_KEY);
+    if (stored) return stored;
+
+    const randomSalt = `sp-salt-${Date.now()}-${Math.random().toString(36).substring(2, 12)}`;
+    localStorage.setItem(this.SALT_STORAGE_KEY, randomSalt);
+    return randomSalt;
+  }
+
+  private async deriveKey(userIdentifier: string, saltPhraseOverride?: string): Promise<CryptoKey> {
     const encoder = new TextEncoder();
+    const saltPhrase = saltPhraseOverride || this.getOrCreateSaltPhrase();
     
     // Combinar identificador do usuário com salt
-    const keyMaterial = encoder.encode(userIdentifier + this.saltPhrase);
+    const keyMaterial = encoder.encode(`${userIdentifier}:${saltPhrase}`);
     
     // Importar como chave base
     const importedKey = await crypto.subtle.importKey(
@@ -33,7 +48,7 @@ class EncryptionService {
     );
     
     // Derivar chave AES-GCM
-    const salt = encoder.encode(this.saltPhrase);
+    const salt = encoder.encode(saltPhrase);
     const key = await crypto.subtle.deriveKey(
       {
         name: 'PBKDF2',
@@ -49,33 +64,55 @@ class EncryptionService {
     
     return key;
   }
+
+  private getOrCreateCryptoIdentity(): string {
+    const stored = localStorage.getItem(this.CRYPTO_IDENTITY_KEY);
+    if (stored) return stored;
+
+    const identity = `crypto-${Date.now()}-${Math.random().toString(36).substring(2, 12)}`;
+    localStorage.setItem(this.CRYPTO_IDENTITY_KEY, identity);
+    return identity;
+  }
   
   /**
-   * Obtém identificador do usuário atual (fallback para deviceId)
+   * Obtém identificador de criptografia estável entre trocas de conta.
    */
-  private async getUserIdentifier(): Promise<string> {
+  private async getPrimaryIdentifier(): Promise<string> {
     try {
-      // Tentar buscar userId do localStorage/sessionStorage
-      const userId = localStorage.getItem('userId') || sessionStorage.getItem('userId');
-      if (userId) return userId;
-      
-      // Fallback: usar deviceId (já existe no sistema)
-      const deviceId = localStorage.getItem('device_fingerprint');
+      const identity = this.getOrCreateCryptoIdentity();
+      if (identity) return identity;
+
+      // Fallback: usar deviceId
+      const deviceId = localStorage.getItem('sp.device.id.v2') || sessionStorage.getItem('sp.device.id.v2');
       if (deviceId) return deviceId;
       
       // Último fallback: ID único do browser
-      const browserId = localStorage.getItem('browser_id');
+      const browserId = localStorage.getItem(this.BROWSER_ID_KEY);
       if (browserId) return browserId;
       
       // Se não existe, criar um
       const newBrowserId = `browser-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-      localStorage.setItem('browser_id', newBrowserId);
+      localStorage.setItem(this.BROWSER_ID_KEY, newBrowserId);
       return newBrowserId;
     } catch (error) {
       console.error('Erro ao obter identificador:', error);
       // Fallback extremo
       return 'default-user-id';
     }
+  }
+
+  private getLegacyIdentifiers(): string[] {
+    const candidates = [
+      sessionStorage.getItem(this.USER_IDENTIFIER_KEY),
+      localStorage.getItem(this.USER_IDENTIFIER_KEY),
+      localStorage.getItem(this.LEGACY_USER_IDENTIFIER_KEY),
+      sessionStorage.getItem(this.LEGACY_USER_IDENTIFIER_KEY),
+      localStorage.getItem('sp.device.id.v2'),
+      sessionStorage.getItem('sp.device.id.v2'),
+      localStorage.getItem(this.BROWSER_ID_KEY),
+    ].filter((v): v is string => Boolean(v && v.trim()));
+
+    return Array.from(new Set(candidates));
   }
   
   /**
@@ -94,7 +131,7 @@ class EncryptionService {
       const iv = crypto.getRandomValues(new Uint8Array(12)); // 96 bits para GCM
       
       // 3. Obter chave
-      const userIdentifier = await this.getUserIdentifier();
+      const userIdentifier = await this.getPrimaryIdentifier();
       const key = await this.deriveKey(userIdentifier);
       
       // 4. Criptografar
@@ -144,18 +181,33 @@ class EncryptionService {
       const encryptedData = combined.slice(12);
       
       // 3. Obter chave
-      const userIdentifier = await this.getUserIdentifier();
-      const key = await this.deriveKey(userIdentifier);
-      
-      // 4. Descriptografar
-      const decryptedBuffer = await crypto.subtle.decrypt(
-        {
-          name: this.algorithm,
-          iv: iv
-        },
-        key,
-        encryptedData
-      );
+      const identifiers = [await this.getPrimaryIdentifier(), ...this.getLegacyIdentifiers()];
+      const salts = [undefined, this.LEGACY_SALT_PHRASE] as const;
+      let decryptedBuffer: ArrayBuffer | null = null;
+
+      for (const identifier of identifiers) {
+        for (const salt of salts) {
+          try {
+            const key = await this.deriveKey(identifier, salt);
+            decryptedBuffer = await crypto.subtle.decrypt(
+              {
+                name: this.algorithm,
+                iv: iv
+              },
+              key,
+              encryptedData
+            );
+            break;
+          } catch {
+            // tenta próxima combinação
+          }
+        }
+        if (decryptedBuffer) break;
+      }
+
+      if (!decryptedBuffer) {
+        throw new Error('Falha ao descriptografar com identidades conhecidas');
+      }
       
       // 5. Decodificar e parsear JSON
       const decoder = new TextDecoder();

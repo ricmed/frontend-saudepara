@@ -26,7 +26,7 @@ async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey>
     {
       name: 'PBKDF2',
       salt: salt.buffer as ArrayBuffer,
-      iterations: 100000, // 100k iterações para segurança
+      iterations: 310000, // endurecido para mitigar brute-force em GPU
       hash: 'SHA-256'
     },
     passwordKey,

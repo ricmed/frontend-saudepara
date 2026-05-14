@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getOptimalTileProvider, isProviderAvailable, type TileProvider } from '../config/tileProviders';
+import { STORAGE_KEYS, readStringWithLegacy } from '@/utils/storageKeys';
 
 export type MapProvider = 'openstreetmap' | 'mapbox';
 
@@ -17,6 +18,8 @@ interface UseMapProviderReturn {
 }
 
 export function useMapProvider(options: UseMapProviderOptions = {}): UseMapProviderReturn {
+  const LEGACY_MAP_PROVIDER_KEY = 'map-provider';
+  const LEGACY_MAPBOX_API_KEY = 'mapbox-api-key';
   const { 
     defaultProvider = 'openstreetmap', 
     mapboxApiKey = 'pk.eyJ1IjoiZGFuaWVsbW9yYWVzNyIsImEiOiJjbWVtdmNvZm8wdmd6MmlvYTY5YWdqYXk0In0.6c-WJv8161bzZhq7dBxz3A' 
@@ -25,7 +28,7 @@ export function useMapProvider(options: UseMapProviderOptions = {}): UseMapProvi
   // Estado do provedor atual
   const [currentProvider, setCurrentProvider] = useState<MapProvider>(() => {
     // Recupera do localStorage se existir
-    const saved = localStorage.getItem('map-provider');
+    const saved = readStringWithLegacy(STORAGE_KEYS.map.provider, [LEGACY_MAP_PROVIDER_KEY]);
     if (saved && (saved === 'openstreetmap' || saved === 'mapbox')) {
       return saved;
     }
@@ -35,12 +38,12 @@ export function useMapProvider(options: UseMapProviderOptions = {}): UseMapProvi
   // Estado da API key do Mapbox
   const [apiKey] = useState<string | undefined>(() => {
     // Recupera do localStorage se existir
-    const saved = localStorage.getItem('mapbox-api-key');
+    const saved = readStringWithLegacy(STORAGE_KEYS.map.mapboxApiKey, [LEGACY_MAPBOX_API_KEY]);
     if (saved) return saved;
     
     // Se não existe e foi fornecida uma API key, salva ela
     if (mapboxApiKey) {
-      localStorage.setItem('mapbox-api-key', mapboxApiKey);
+      localStorage.setItem(STORAGE_KEYS.map.mapboxApiKey, mapboxApiKey);
       return mapboxApiKey;
     }
     
@@ -49,13 +52,13 @@ export function useMapProvider(options: UseMapProviderOptions = {}): UseMapProvi
 
   // Persiste o provedor no localStorage
   useEffect(() => {
-    localStorage.setItem('map-provider', currentProvider);
+    localStorage.setItem(STORAGE_KEYS.map.provider, currentProvider);
   }, [currentProvider]);
 
   // Persiste a API key no localStorage
   useEffect(() => {
     if (apiKey) {
-      localStorage.setItem('mapbox-api-key', apiKey);
+      localStorage.setItem(STORAGE_KEYS.map.mapboxApiKey, apiKey);
     }
   }, [apiKey]);
 

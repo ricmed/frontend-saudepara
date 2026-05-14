@@ -216,7 +216,7 @@ export interface FormField {
     totalMax?: number;
     message?: string;
   };
-  /** Número de colunas do grid para campos tipo checkbox-group (padrão: 2). */
+  /** Número de colunas do grid para opções em `checkbox-group`, `radio` e `select` em modo cartões (padrão 2). Omitir em `select` para lista suspensa nativa. */
   gridCols?: number;
   /**
    * Tipo `radio`: oferece uma opção extra com campo de texto (estilo Google Forms).

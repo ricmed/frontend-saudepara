@@ -1,6 +1,7 @@
 import { useAuth } from '@/keycloak/AuthProvider';
 import { useState, useEffect } from 'react';
 import { usuarioGestaoService } from '../services/UsuarioGestaoService';
+import { STORAGE_KEYS, readStringWithLegacy } from '@/utils/storageKeys';
 
 // ✅ Cache global em memória para evitar múltiplas chamadas API
 let cachedPermissions: any = null;
@@ -37,6 +38,9 @@ export const useUserPermissions = (): UserPermissions => {
 
   // Carregar dados de acesso do usuário
   useEffect(() => {
+    const getUserAccessKey = (userId: string) => `${STORAGE_KEYS.auth.userAccessPrefix}.${userId}`;
+    const getLegacyUserAccessKey = (userId: string) => `user_access_${userId}`;
+
     const loadUserAccess = async () => {
       if (!user?.id) {
         setLoading(false);
@@ -72,7 +76,10 @@ export const useUserPermissions = (): UserPermissions => {
         
         // ✅ FALLBACK: Tentar carregar do localStorage
         try {
-          const cachedAccess = localStorage.getItem(`user_access_${user.id}`);
+          const cachedAccess = readStringWithLegacy(
+            getUserAccessKey(user.id),
+            [getLegacyUserAccessKey(user.id)]
+          );
           console.log('🔍 Cache encontrado:', cachedAccess ? 'SIM' : 'NÃO');
           
           if (cachedAccess) {
@@ -96,7 +103,10 @@ export const useUserPermissions = (): UserPermissions => {
       // ✅ SEMPRE tentar carregar do cache primeiro (mais rápido)
       let hasCache = false;
       try {
-        const cachedAccess = localStorage.getItem(`user_access_${user.id}`);
+        const cachedAccess = readStringWithLegacy(
+          getUserAccessKey(user.id),
+          [getLegacyUserAccessKey(user.id)]
+        );
         if (cachedAccess) {
           const parsedAccess = JSON.parse(cachedAccess);
           console.log('✅ Permissões carregadas do cache (será atualizado em background):', parsedAccess);
@@ -120,7 +130,8 @@ export const useUserPermissions = (): UserPermissions => {
           
           // ✅ SALVAR no localStorage para uso offline
           if (access && user.id) {
-            localStorage.setItem(`user_access_${user.id}`, JSON.stringify(access));
+            localStorage.setItem(getUserAccessKey(user.id), JSON.stringify(access));
+            localStorage.removeItem(getLegacyUserAccessKey(user.id));
             console.log('💾 Permissões salvas no cache local');
           }
           
@@ -131,7 +142,10 @@ export const useUserPermissions = (): UserPermissions => {
           // Se não tinha cache antes, tentar carregar agora
           if (!hasCache) {
             try {
-              const cachedAccess = localStorage.getItem(`user_access_${user.id}`);
+              const cachedAccess = readStringWithLegacy(
+                getUserAccessKey(user.id),
+                [getLegacyUserAccessKey(user.id)]
+              );
               if (cachedAccess) {
                 const parsedAccess = JSON.parse(cachedAccess);
                 console.log('✅ Usando permissões do cache após erro na API:', parsedAccess);

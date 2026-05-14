@@ -3,6 +3,14 @@ import axios from '../utils/axiosRetry'; // Usar axios com retry configurado
 
 const AuthContext = createContext<any>(null);
 const USE_INTERNAL_AUTH = (import.meta as any).env?.VITE_USE_INTERNAL_AUTH === 'true';
+const OFFLINE_MODE_KEY = 'sp.auth.offline.mode.v1';
+const OFFLINE_USER_DATA_KEY = 'sp.auth.offline.user-data.v1';
+const LEGACY_OFFLINE_MODE_KEY = 'offline_mode';
+const LEGACY_OFFLINE_USER_DATA_KEY = 'user_data';
+const USER_IDENTIFIER_KEY = 'sp.user.id.v1';
+
+const resolveUserIdentifier = (user: any): string | null =>
+  user?.id || user?.sub || user?.email || user?.cpf || null;
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState(null);
@@ -27,8 +35,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     // 🆕 Verificar se há login offline ativo
-    const offlineMode = localStorage.getItem('offline_mode');
-    const userData = localStorage.getItem('user_data');
+    const offlineMode = localStorage.getItem(OFFLINE_MODE_KEY) ?? localStorage.getItem(LEGACY_OFFLINE_MODE_KEY);
+    const userData = localStorage.getItem(OFFLINE_USER_DATA_KEY) ?? localStorage.getItem(LEGACY_OFFLINE_USER_DATA_KEY);
     
     if (offlineMode === 'true' && userData) {
       console.log('🔄 Detectado login offline, carregando usuário...');
@@ -37,6 +45,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (alive) {
           setUser(parsedUser);
           setLoading(false);
+          const userIdentifier = resolveUserIdentifier(parsedUser);
+          if (userIdentifier) {
+            sessionStorage.setItem(USER_IDENTIFIER_KEY, String(userIdentifier));
+          }
+          localStorage.setItem(OFFLINE_MODE_KEY, 'true');
+          localStorage.setItem(OFFLINE_USER_DATA_KEY, userData);
+          localStorage.removeItem(LEGACY_OFFLINE_MODE_KEY);
+          localStorage.removeItem(LEGACY_OFFLINE_USER_DATA_KEY);
         }
         return;
       } catch (error) {
@@ -62,9 +78,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       .then((res) => {
         if (!alive) return;
         setUser(res.data);
+        const userIdentifier = resolveUserIdentifier(res.data);
+        if (userIdentifier) {
+          sessionStorage.setItem(USER_IDENTIFIER_KEY, String(userIdentifier));
+        }
         // Limpar modo offline se conseguir conectar
-        localStorage.removeItem('offline_mode');
-        localStorage.removeItem('user_data');
+        localStorage.removeItem(OFFLINE_MODE_KEY);
+        localStorage.removeItem(OFFLINE_USER_DATA_KEY);
+        localStorage.removeItem(LEGACY_OFFLINE_MODE_KEY);
+        localStorage.removeItem(LEGACY_OFFLINE_USER_DATA_KEY);
       })
       .catch((err) => {
         if (!alive) return;
@@ -102,6 +124,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const res = await axios.get(USE_INTERNAL_AUTH ? '/api/auth/profile' : '/api-auth/protected/profile', { withCredentials: true });
       
       setUser(res.data);
+      const userIdentifier = resolveUserIdentifier(res.data);
+      if (userIdentifier) {
+        sessionStorage.setItem(USER_IDENTIFIER_KEY, String(userIdentifier));
+      }
     } catch (error: any) {
       if (error.response?.status === 429) {
         setRetryMessage('Muitas tentativas de login. O sistema está fazendo nova tentativa automaticamente...');
@@ -118,9 +144,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } finally {
       setUser(null);
       setRetryMessage(null);
+      sessionStorage.removeItem(USER_IDENTIFIER_KEY);
       // 🆕 Limpar modo offline ao fazer logout
-      localStorage.removeItem('offline_mode');
-      localStorage.removeItem('user_data');
+      localStorage.removeItem(OFFLINE_MODE_KEY);
+      localStorage.removeItem(OFFLINE_USER_DATA_KEY);
+      localStorage.removeItem(LEGACY_OFFLINE_MODE_KEY);
+      localStorage.removeItem(LEGACY_OFFLINE_USER_DATA_KEY);
     }
   };
 

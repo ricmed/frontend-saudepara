@@ -14,6 +14,7 @@ import {
   Info,
   Search
 } from 'lucide-react';
+import { STORAGE_KEYS, readStringWithLegacy } from '@/utils/storageKeys';
 
 export interface AIConfig {
   mode: 'localhost' | 'api';
@@ -171,6 +172,8 @@ export const AIGlobalConfig: React.FC<AIGlobalConfigProps> = ({
   onConfigChange,
   className = ""
 }) => {
+  const LEGACY_AI_GLOBAL_CONFIG_KEY = 'aiGlobalConfig';
+  const LEGACY_AI_CHAT_CONFIG_KEY = 'aiChatConfig';
   const [isOpen, setIsOpen] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
@@ -182,7 +185,10 @@ export const AIGlobalConfig: React.FC<AIGlobalConfigProps> = ({
 
   // Configuração da IA - carrega do localStorage
   const [aiConfig, setAiConfig] = useState<AIConfig>(() => {
-    const saved = localStorage.getItem('aiGlobalConfig');
+    const saved = readStringWithLegacy(
+      STORAGE_KEYS.ai.globalConfig,
+      [LEGACY_AI_GLOBAL_CONFIG_KEY, LEGACY_AI_CHAT_CONFIG_KEY]
+    );
     return saved ? JSON.parse(saved) : { 
       mode: 'localhost',
       endpoint: 'https://openrouter.ai/api/v1/chat/completions',
@@ -228,16 +234,18 @@ export const AIGlobalConfig: React.FC<AIGlobalConfigProps> = ({
   // Salvar configuração no localStorage e notificar mudanças
   const saveConfig = useCallback((config: AIConfig) => {
     setAiConfig(config);
-    localStorage.setItem('aiGlobalConfig', JSON.stringify(config));
-    // Também salva no local antigo para compatibilidade
-    localStorage.setItem('aiChatConfig', JSON.stringify(config));
+    localStorage.setItem(STORAGE_KEYS.ai.globalConfig, JSON.stringify(config));
+    localStorage.setItem(STORAGE_KEYS.ai.chatConfig, JSON.stringify(config));
     onConfigChange?.(config);
   }, [onConfigChange]);
 
   // Sincronizar com localStorage quando componente carrega
   useEffect(() => {
     const handleStorageChange = () => {
-      const saved = localStorage.getItem('aiGlobalConfig');
+      const saved = readStringWithLegacy(
+        STORAGE_KEYS.ai.globalConfig,
+        [LEGACY_AI_GLOBAL_CONFIG_KEY, LEGACY_AI_CHAT_CONFIG_KEY]
+      );
       if (saved) {
         const config = JSON.parse(saved);
         setAiConfig(config);

@@ -5,7 +5,7 @@ import { useAuth } from '@/keycloak/AuthProvider';
 import FormService, { type FormSchema, type FormSection, type FormField, type FormRule, type RuleCondition, type RuleAction, type TableColumnDef, type XlsFormPreview } from '@/services/FormService';
 import DatabaseService, { type TableColumn } from '@/services/DatabaseService';
 import { getRuntimeApiRoot } from '@/config/runtimeApiBase';
-import { Plus, Trash2, Save, Eye, Settings, GripVertical, X, Download, Upload, ChevronUp, ChevronDown, Code, FileEdit, Check } from 'lucide-react';
+import { Plus, Trash2, Save, Eye, Settings, GripVertical, X, Download, Upload, ChevronUp, ChevronDown, Code, FileEdit, Check, Copy } from 'lucide-react';
 import { ClipboardList, Calendar, DollarSign, Target, Activity, Shield, Leaf, BarChart3, Wrench, Users } from 'lucide-react';
 import dynamicIconImports from 'lucide-react/dynamicIconImports';
 import { FormRenderer } from '../components/FormRenderer';
@@ -612,6 +612,46 @@ export const FormBuilderPage: React.FC = () => {
     if (activeField?.sectionIdx === sectionIdx && activeField?.fieldIdx === fieldIdx) {
       setActiveField(null);
     }
+  };
+
+  /** Copia o campo logo abaixo, com nova chave e rótulo “(cópia)”. Coluna fixa SINAN não é duplicada (evita conflito no banco). */
+  const duplicateField = (sectionIdx: number, fieldIdx: number) => {
+    const source = schema.sections[sectionIdx]?.fields[fieldIdx];
+    if (!source) return;
+
+    const allKeys = new Set<string>();
+    for (const s of schema.sections) {
+      for (const f of s.fields) {
+        if (f.key) allKeys.add(f.key);
+      }
+    }
+
+    let newKey = `field_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    let n = 2;
+    while (allKeys.has(newKey)) {
+      newKey = `field_${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${n++}`;
+    }
+
+    const cloned = JSON.parse(JSON.stringify(source)) as FormField;
+    cloned.key = newKey;
+    const baseLabel = String(source.label ?? 'Campo').replace(/\s*\(cópia\)\s*$/i, '').trim();
+    cloned.label = `${baseLabel || 'Campo'} (cópia)`;
+
+    if (cloned.isFixedColumn) {
+      cloned.isFixedColumn = false;
+      cloned.fixedColumnName = undefined;
+    }
+
+    const newSections = [...schema.sections];
+    const fields = [...newSections[sectionIdx].fields];
+    const insertAt = fieldIdx + 1;
+    fields.splice(insertAt, 0, cloned);
+    fields.forEach((f, i) => {
+      f.order = i + 1;
+    });
+    newSections[sectionIdx] = { ...newSections[sectionIdx], fields };
+    setSchema({ ...schema, sections: newSections });
+    setActiveField({ sectionIdx, fieldIdx: insertAt });
   };
 
   const moveFieldTo = (fromSectionIdx: number, fromFieldIdx: number, toSectionIdx: number, toIndex: number) => {
@@ -1762,6 +1802,16 @@ export const FormBuilderPage: React.FC = () => {
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  duplicateField(sectionIdx, fieldIdx);
+                                }}
+                                className="p-1 text-gray-600 hover:bg-gray-100 rounded"
+                                title="Duplicar campo"
+                              >
+                                <Copy className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   deleteField(sectionIdx, fieldIdx);
                                 }}
                                 className="p-1 text-red-600 hover:bg-red-50 rounded"
@@ -2269,6 +2319,62 @@ export const FormBuilderPage: React.FC = () => {
                                     />
                                   </div>
                                 </div>
+                              </div>
+                            )}
+                            {(field.type === 'checkbox-group' || field.type === 'radio') && (
+                              <div
+                                className="mt-2 flex flex-wrap items-center gap-2"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <label className="text-xs text-gray-600 whitespace-nowrap">Disposição das opções:</label>
+                                <select
+                                  value={field.gridCols === 1 ? 1 : field.gridCols === 3 ? 3 : 2}
+                                  onChange={(e) =>
+                                    updateField(sectionIdx, fieldIdx, {
+                                      gridCols: Number(e.target.value) as 1 | 2 | 3,
+                                    })
+                                  }
+                                  className="px-2 py-1 text-xs border border-gray-300 rounded bg-white"
+                                >
+                                  <option value={1}>1 coluna</option>
+                                  <option value={2}>2 colunas</option>
+                                  <option value={3}>3 colunas</option>
+                                </select>
+                              </div>
+                            )}
+                            {field.type === 'select' && (
+                              <div
+                                className="mt-2 flex flex-wrap items-center gap-2"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <label className="text-xs text-gray-600 whitespace-nowrap">Disposição das opções:</label>
+                                <select
+                                  value={
+                                    field.gridCols === 1
+                                      ? '1'
+                                      : field.gridCols === 3
+                                        ? '3'
+                                        : field.gridCols === 2
+                                          ? '2'
+                                          : 'dropdown'
+                                  }
+                                  onChange={(e) => {
+                                    const v = e.target.value;
+                                    if (v === 'dropdown') {
+                                      updateField(sectionIdx, fieldIdx, { gridCols: undefined });
+                                    } else {
+                                      updateField(sectionIdx, fieldIdx, {
+                                        gridCols: Number(v) as 1 | 2 | 3,
+                                      });
+                                    }
+                                  }}
+                                  className="px-2 py-1 text-xs border border-gray-300 rounded bg-white min-w-[10rem]"
+                                >
+                                  <option value="dropdown">Lista suspensa (padrão)</option>
+                                  <option value="1">1 coluna (cartões)</option>
+                                  <option value="2">2 colunas (cartões)</option>
+                                  <option value="3">3 colunas (cartões)</option>
+                                </select>
                               </div>
                             )}
                             {(field.type === 'checkbox-group' || field.type === 'radio' || field.type === 'select' || field.type === 'select-search' || field.type === 'multi-select') && (

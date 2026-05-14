@@ -46,7 +46,22 @@ interface OfflineSystemState {
   initialized: boolean;
 }
 
-export function useOfflineSystem() {  const [state, setState] = useState<OfflineSystemState>({
+interface UseOfflineSystemOptions {
+  includePatientsCache?: boolean;
+  includeEstabelecimentosCache?: boolean;
+  includePeriodicRefresh?: boolean;
+  refreshIntervalMs?: number;
+}
+
+export function useOfflineSystem(options: UseOfflineSystemOptions = {}) {
+  const {
+    includePatientsCache = true,
+    includeEstabelecimentosCache = true,
+    includePeriodicRefresh = true,
+    refreshIntervalMs = 30000,
+  } = options;
+
+  const [state, setState] = useState<OfflineSystemState>({
     isOnline: navigator.onLine,
     syncing: false,
     stats: null,
@@ -133,18 +148,23 @@ export function useOfflineSystem() {  const [state, setState] = useState<Offline
   const initializeOfflineSystem = useCallback(async () => {
     try {
       await indexedDBService.init();
-      await Promise.all([
-        updateStats(), 
-        updatePendingData(),
-        updatePatientsCache(),
-        updateEstabelecimentosCache()
-      ]);
+      const tasks: Promise<any>[] = [updateStats(), updatePendingData()];
+      if (includePatientsCache) tasks.push(updatePatientsCache());
+      if (includeEstabelecimentosCache) tasks.push(updateEstabelecimentosCache());
+      await Promise.all(tasks);
       setState(prev => ({ ...prev, initialized: true }));
     } catch (error) {
       console.error('Erro ao inicializar sistema offline:', error);
       toast.error('Erro ao inicializar sistema offline');
     }
-  }, [updateStats, updatePendingData, updatePatientsCache, updateEstabelecimentosCache]);
+  }, [
+    updateStats,
+    updatePendingData,
+    updatePatientsCache,
+    updateEstabelecimentosCache,
+    includePatientsCache,
+    includeEstabelecimentosCache,
+  ]);
 
   // Eventos de conexão
   useEffect(() => {
@@ -171,16 +191,28 @@ export function useOfflineSystem() {  const [state, setState] = useState<Offline
   useEffect(() => {
     initializeOfflineSystem();
 
-    // Atualizar dados a cada 30 segundos
+    if (!includePeriodicRefresh) return;
+
+    // Atualizar dados periodicamente (configurável)
     const interval = setInterval(() => {
       updateStats();
       updatePendingData();
-      updatePatientsCache();
-      updateEstabelecimentosCache();
-    }, 30000);
+      if (includePatientsCache) updatePatientsCache();
+      if (includeEstabelecimentosCache) updateEstabelecimentosCache();
+    }, refreshIntervalMs);
 
     return () => clearInterval(interval);
-  }, [initializeOfflineSystem, updateStats, updatePendingData, updatePatientsCache, updateEstabelecimentosCache]);
+  }, [
+    initializeOfflineSystem,
+    updateStats,
+    updatePendingData,
+    updatePatientsCache,
+    updateEstabelecimentosCache,
+    includePeriodicRefresh,
+    includePatientsCache,
+    includeEstabelecimentosCache,
+    refreshIntervalMs,
+  ]);
 
   // Funções para componentes
   const downloadEssentialData = useCallback(async (

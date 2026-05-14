@@ -46,14 +46,7 @@ const LoginPage = () => {
     // Verificar se HÁ QUALQUER usuário com PIN configurado (não precisa estar logado)
     const checkOfflineAuth = () => {
       try {
-        const allData = localStorage.getItem('offline_auth_data_multi');
-        if (allData) {
-          const parsed = JSON.parse(allData);
-          const hasUsers = Object.keys(parsed.users || {}).length > 0;
-          setHasOfflineAuth(hasUsers);
-        } else {
-          setHasOfflineAuth(false);
-        }
+        setHasOfflineAuth(offlineAuthService.hasAnyOfflineUsers());
       } catch {
         setHasOfflineAuth(false);
       }

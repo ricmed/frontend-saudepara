@@ -1,8 +1,9 @@
 import React from 'react';
 import { CheckCircle, Key, Globe } from 'lucide-react';
+import { STORAGE_KEYS, readStringWithLegacy } from '@/utils/storageKeys';
 
 export const MapboxConfigStatus: React.FC = () => {
-  const mapboxApiKey = localStorage.getItem('mapbox-api-key');
+  const mapboxApiKey = readStringWithLegacy(STORAGE_KEYS.map.mapboxApiKey, ['mapbox-api-key']);
   const hasMapboxKey = !!(mapboxApiKey && mapboxApiKey.trim());
 
   return (

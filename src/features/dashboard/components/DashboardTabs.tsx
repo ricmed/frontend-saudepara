@@ -6,6 +6,7 @@ import {
   TrendingUp
   // Brain - temporariamente comentado, será usado no futuro
 } from 'lucide-react';
+import { STORAGE_KEYS, readStringWithLegacy } from '@/utils/storageKeys';
 
 export type DashboardTab = 'graficos' | 'fluxo' | 'mapa'; // | 'ia' - temporariamente removido
 
@@ -115,10 +116,11 @@ export const DashboardTabs: React.FC<DashboardTabsProps> = ({
  * Persiste a aba ativa no localStorage para manter estado entre recarregamentos
  */
 export const useDashboardTabs = (initialTab: DashboardTab = 'graficos') => {
+  const LEGACY_DASHBOARD_TAB_KEY = 'dashboard-active-tab';
   // Recuperar aba salva do localStorage ou usar initialTab
   const getStoredTab = (): DashboardTab => {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('dashboard-active-tab');
+      const stored = readStringWithLegacy(STORAGE_KEYS.ui.dashboardActiveTab, [LEGACY_DASHBOARD_TAB_KEY]);
       if (stored && ['graficos', 'fluxo', 'mapa', 'ia'].includes(stored)) {
         return stored as DashboardTab;
       }
@@ -132,7 +134,7 @@ export const useDashboardTabs = (initialTab: DashboardTab = 'graficos') => {
     setActiveTab(tab);
     // Salvar no localStorage
     if (typeof window !== 'undefined') {
-      localStorage.setItem('dashboard-active-tab', tab);
+      localStorage.setItem(STORAGE_KEYS.ui.dashboardActiveTab, tab);
     }
   }, []);
   

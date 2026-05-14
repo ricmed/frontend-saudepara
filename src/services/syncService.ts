@@ -1,6 +1,7 @@
 import indexedDBService from './indexedDB';
 import PacienteService from '@/services/PacienteService';
 import { EstabelecimentoFormService } from '@/services/EstabelecimentoFormService';
+import { NotificacaoService } from '@/services/NotificacaoService';
 import { salvarNotificacaoCompleta } from '@/utils/notificacaoAdapter';
 import { toast } from 'react-toastify';
 import { convertLocalDateTimeToUTC } from '@/utils/timezoneUtils';
@@ -25,21 +26,25 @@ class SyncService {
 
   // 🆕 MODO OFFLINE FORÇADO (tipo Spotify)
   private isOfflineModeForced: boolean = false;
-  private readonly FORCE_OFFLINE_KEY = 'app_force_offline_mode';
+  private readonly FORCE_OFFLINE_KEY = 'sp.sync.force-offline.v1';
+  private readonly LEGACY_FORCE_OFFLINE_KEY = 'app_force_offline_mode';
 
   constructor() {
     this.isOnline = navigator.onLine;
     
     // 🆕 Restaurar preferência de modo offline do localStorage
-    const savedOfflineMode = localStorage.getItem(this.FORCE_OFFLINE_KEY);
+    const savedOfflineMode = localStorage.getItem(this.FORCE_OFFLINE_KEY) ?? localStorage.getItem(this.LEGACY_FORCE_OFFLINE_KEY);
     
     // ✅ GARANTIR que padrão seja ONLINE (false) se não houver valor salvo
     if (savedOfflineMode === null || savedOfflineMode === undefined) {
       this.isOfflineModeForced = false;
       localStorage.setItem(this.FORCE_OFFLINE_KEY, 'false'); // Inicializar como false
+      localStorage.removeItem(this.LEGACY_FORCE_OFFLINE_KEY);
       console.log('🌐 Modo online PADRÃO ativado (primeira inicialização)');
     } else {
       this.isOfflineModeForced = savedOfflineMode === 'true';
+      localStorage.setItem(this.FORCE_OFFLINE_KEY, this.isOfflineModeForced ? 'true' : 'false');
+      localStorage.removeItem(this.LEGACY_FORCE_OFFLINE_KEY);
       
       if (this.isOfflineModeForced) {
         console.log('📵 Modo offline forçado ATIVADO (restaurado do localStorage)');
@@ -87,6 +92,53 @@ class SyncService {
     if (typeof id === 'number') return id <= 0;
 
     return true;
+  }
+
+  private extractServerNotificationId(payload: any): number | null {
+    const raw =
+      payload?.idnotificacao ??
+      payload?.id ??
+      payload?.data?.idnotificacao ??
+      payload?.data?.id;
+    if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+    if (typeof raw === 'string' && raw.trim() !== '') {
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  }
+
+  private async reconcileNotificationConflict(
+    offlineId: string,
+    localDeviceId?: string
+  ): Promise<number | null> {
+    const MAX_PAGES = 3;
+    const PAGE_SIZE = 200;
+
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      const response = await NotificacaoService.getAll(page, PAGE_SIZE);
+      const items = response?.data || [];
+      if (items.length === 0) break;
+
+      const match = items.find((item: any) => {
+        const original = item.original || item;
+        const sameOfflineId =
+          original?.offline_id === offlineId ||
+          original?.offlineId === offlineId;
+        const sameDevice = localDeviceId && (
+          original?.device_id === localDeviceId ||
+          original?.deviceId === localDeviceId
+        );
+        return sameOfflineId || Boolean(sameDevice && sameOfflineId);
+      });
+
+      if (match) {
+        const original = match.original || match;
+        return this.extractServerNotificationId(original);
+      }
+    }
+
+    return null;
   }
 
   // ✅ NOVO: Verificar se realmente pode fazer chamadas API
@@ -599,6 +651,28 @@ class SyncService {
             
             continue; // Não criar novo, usar existente
           }
+
+          // ✅ SEGURANÇA ANTI-DUPLICATA: sem CPF, evitar criar homônimos automaticamente
+          if (!pacienteExistenteServidor && !paciente.cpf && paciente.nome) {
+            try {
+              const possibleMatches = await PacienteService.search(paciente.nome);
+              const nomeNormalizado = paciente.nome.toUpperCase().trim();
+              const homonimos = (possibleMatches.data || []).filter((p: any) =>
+                p.nome?.toUpperCase?.().trim?.() === nomeNormalizado
+              );
+
+              if (homonimos.length > 0) {
+                throw new Error(
+                  'Possível duplicata por homônimo sem CPF. Revisar cadastro antes de sincronizar.'
+                );
+              }
+            } catch (homonymCheckError: any) {
+              if (homonymCheckError?.message?.includes('Possível duplicata por homônimo')) {
+                throw homonymCheckError;
+              }
+              console.warn('⚠️ Falha na verificação adicional de homônimo:', homonymCheckError);
+            }
+          }
           
           // ✅ CRIAR PACIENTE NO SERVIDOR (apenas se não existir)
           const { idpaciente, synced, savedAt, syncedAt, savedOffline, source, ...pacienteData } = paciente;
@@ -640,6 +714,12 @@ class SyncService {
             console.log(`⚠️ Paciente ${paciente.nome} detectado como duplicata, marcando como sincronizado`);
             await indexedDBService.markPacienteAsSynced(paciente.idpaciente);
             syncedCount++;
+          } else if (error.message?.includes('Possível duplicata por homônimo')) {
+            toast.warning(`Paciente "${paciente.nome}" exige revisão manual (possível duplicata sem CPF).`, {
+              autoClose: 12000,
+              toastId: `sync-homonimo-${paciente.idpaciente}`
+            });
+            errorCount++;
           } else {
             errorCount++;
           }
@@ -833,7 +913,7 @@ class SyncService {
       });
       console.log(`🔄 Sincronizando ${pendingNotificacoes.length} notificações...`);
       
-      for (const { id, formData, offlineId, deviceId } of pendingNotificacoes) {
+      for (const { id, formData, offlineId, deviceId, isEdit: pendingIsEdit } of pendingNotificacoes) {
         try {
           console.log(`📋 Sincronizando notificação offlineId: ${offlineId} (ID temp: ${id})`);
           
@@ -952,33 +1032,77 @@ class SyncService {
           await indexedDBService.markNotificacaoAsSyncing(offlineId);
 
           // ✅ SINCRONIZAR NOTIFICAÇÃO
-          const isEdit = !!(formDataAtualizada as any).id && (formDataAtualizada as any).id > 0;
+          const isEdit = pendingIsEdit === true || (!!(formDataAtualizada as any).id && (formDataAtualizada as any).id > 0);
           const editId = isEdit ? Number((formDataAtualizada as any).id) : undefined;
           
-          await salvarNotificacaoCompleta(formDataAtualizada as any, isEdit, editId);
+          const syncResult = await salvarNotificacaoCompleta(formDataAtualizada as any, isEdit, editId);
+          const serverNotificationId = this.extractServerNotificationId(syncResult);
+          if (!isEdit && !serverNotificationId) {
+            console.warn(`⚠️ Notificação ${offlineId} sincronizada sem ID de resposta do servidor. Mantendo registro local marcado como synced.`);
+          }
           
           // ✅ Marcar como sincronizada SOMENTE após sucesso (usar offlineId)
-          await indexedDBService.markNotificacaoAsSynced(offlineId);
+          await indexedDBService.markNotificacaoAsSynced(offlineId, {
+            serverId: serverNotificationId || undefined
+          });
           syncedCount++;
           
         } catch (error: any) {
           console.error(`❌ Erro ao sincronizar notificação offlineId ${offlineId}:`, error);
           
           // ✅ REVERTER de 'syncing' para 'pending' ou marcar como erro
+          const statusCode = error?.response?.status;
           const isServerError = error?.response?.status === 500;
           const isOrphanedNotification = id < 0;
-          const isInvalidData = error?.message?.includes('validation') || error?.message?.includes('required');
+          const isInvalidData = statusCode === 422 || error?.message?.includes('validation') || error?.message?.includes('required');
           const isNetworkError = !error?.response || error?.code === 'NETWORK_ERROR';
+          const isConflict = statusCode === 409;
           
           if (isOrphanedNotification) {
             // Apenas notificações órfãs devem ser removidas permanentemente
             console.log(`🗑️ Removendo notificação órfã offlineId ${offlineId} - ID negativo inválido`);
-            await indexedDBService.markNotificacaoAsSynced(offlineId);
+            await indexedDBService.markNotificacaoAsSynced(offlineId, { remove: true });
             toast.info(`Notificação órfã (offlineId: ${offlineId}) foi removida da fila de sincronização`);
+          } else if (isConflict) {
+            // ✅ CONFLITO: tentar reconciliar com registro já criado no servidor (outro device)
+            const reconciledServerId = await this.reconcileNotificationConflict(offlineId, deviceId);
+            if (reconciledServerId) {
+              await indexedDBService.markNotificacaoAsSynced(offlineId, { serverId: reconciledServerId });
+              toast.info(`Conflito resolvido automaticamente para notificação ${offlineId}.`);
+              syncedCount++;
+            } else {
+              const conflictMessage = 'Conflito de sincronização (possível duplicata já existente no servidor)';
+              await indexedDBService.markNotificacaoAsError(offlineId, conflictMessage, {
+                status: statusCode,
+                message: error?.message,
+                timestamp: Date.now(),
+                notificationId: id,
+                offlineId: offlineId
+              });
+              toast.warning(`Conflito na notificação ${offlineId}. Revisar no painel de pendências.`, {
+                autoClose: 12000,
+                toastId: `sync-conflict-${offlineId}`
+              });
+              errorCount++;
+            }
+          } else if (isInvalidData) {
+            // ✅ VALIDAÇÃO: erro orientado ao usuário para correção manual
+            const validationMessage = 'Erro de validação (422). Edite os dados e tente novamente.';
+            await indexedDBService.markNotificacaoAsError(offlineId, validationMessage, {
+              status: statusCode,
+              message: error?.message,
+              timestamp: Date.now(),
+              notificationId: id,
+              offlineId: offlineId
+            });
+            toast.warning(`Notificação ${offlineId} com dados inválidos. Abra, corrija e reenvie.`, {
+              autoClose: 12000,
+              toastId: `sync-validation-${offlineId}`
+            });
+            errorCount++;
           } else {
             // ✅ TODOS OS OUTROS ERROS: Marcar como erro para retry posterior
             const errorMessage = isServerError ? 'Erro interno do servidor' :
-                                isInvalidData ? 'Dados inválidos na notificação' :
                                 isNetworkError ? 'Erro de conexão' :
                                 error?.message || 'Erro desconhecido';
             
@@ -1137,7 +1261,7 @@ class SyncService {
         
         if (shouldClear) {
           console.log(`🗑️ Removendo notificação órfã offlineId ${notif.offlineId}: ${reason}`);
-          await indexedDBService.markNotificacaoAsSynced(notif.offlineId); // ✅ Usar offlineId
+          await indexedDBService.markNotificacaoAsSynced(notif.offlineId, { remove: true }); // ✅ Remoção explícita
           clearedCount++;
         }
       }
@@ -1496,7 +1620,7 @@ class SyncService {
       const editId = isEdit ? Number((notificacao.formData as any).id) : undefined;
       
       await salvarNotificacaoCompleta(notificacao.formData as any, isEdit, editId);
-      await indexedDBService.markNotificacaoAsSynced(offlineId);
+      await indexedDBService.markNotificacaoAsSynced(offlineId, { remove: true });
       
       toast.success(`✅ Notificação ${offlineId} sincronizada com sucesso!`);
       return true;

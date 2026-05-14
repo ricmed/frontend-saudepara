@@ -1,6 +1,7 @@
 // utils/admin.utils.ts
 
-import type { User, Role, UserFilters, PaginationData } from  './types/admin.types';
+import type { User, UserFilters, PaginationData } from  './types/admin.types';
+import { STORAGE_KEYS, readStringWithLegacy } from '@/utils/storageKeys';
 
 /**
  * Utilitários para formatação de dados
@@ -9,7 +10,7 @@ export const formatUtils = {
   /**
    * Formatar data relativa (ex: "há 2 horas")
    */
-  formatRelativeTime: (date: Date | string | number, locale = 'pt-BR'): string => {
+  formatRelativeTime: (date: Date | string | number): string => {
     const now = new Date();
     const targetDate = new Date(date);
     const diffInSeconds = Math.floor((now.getTime() - targetDate.getTime()) / 1000);
@@ -296,7 +297,8 @@ export const storageUtils = {
    */
   saveAdminPreferences: (preferences: Record<string, any>): void => {
     try {
-      localStorage.setItem('adminPreferences', JSON.stringify(preferences));
+      localStorage.setItem(STORAGE_KEYS.admin.preferences, JSON.stringify(preferences));
+      localStorage.removeItem('adminPreferences');
     } catch (error) {
       console.warn('Não foi possível salvar preferências:', error);
     }
@@ -307,7 +309,7 @@ export const storageUtils = {
    */
   loadAdminPreferences: (): Record<string, any> => {
     try {
-      const stored = localStorage.getItem('adminPreferences');
+      const stored = readStringWithLegacy(STORAGE_KEYS.admin.preferences, ['adminPreferences']);
       return stored ? JSON.parse(stored) : {};
     } catch (error) {
       console.warn('Não foi possível carregar preferências:', error);
@@ -320,7 +322,7 @@ export const storageUtils = {
    */
   saveTableFilters: (tableId: string, filters: UserFilters): void => {
     try {
-      const key = `tableFilters_${tableId}`;
+      const key = `${STORAGE_KEYS.admin.tableFiltersPrefix}.${tableId}`;
       localStorage.setItem(key, JSON.stringify(filters));
     } catch (error) {
       console.warn('Não foi possível salvar filtros:', error);
@@ -332,8 +334,8 @@ export const storageUtils = {
    */
   loadTableFilters: (tableId: string): UserFilters | null => {
     try {
-      const key = `tableFilters_${tableId}`;
-      const stored = localStorage.getItem(key);
+      const key = `${STORAGE_KEYS.admin.tableFiltersPrefix}.${tableId}`;
+      const stored = readStringWithLegacy(key, [`tableFilters_${tableId}`]);
       return stored ? JSON.parse(stored) : null;
     } catch (error) {
       console.warn('Não foi possível carregar filtros:', error);

@@ -19,6 +19,8 @@ interface OfflineAuthData {
   createdAt: number; // Timestamp de criação
   lastAccess: number; // Último acesso
   expiresAt: number; // Data de expiração (7 dias)
+  failedAttempts?: number; // Tentativas de PIN inválidas
+  lockoutUntil?: number; // Timestamp de lockout
 }
 
 interface MultiUserOfflineData {
@@ -28,7 +30,8 @@ interface MultiUserOfflineData {
 }
 
 class OfflineAuthService {
-  private readonly STORAGE_KEY = 'offline_auth_data_multi';
+  private readonly STORAGE_KEY = 'sp.auth.offline.users.v2';
+  private readonly LEGACY_STORAGE_KEY = 'offline_auth_data_multi';
   private readonly EXPIRATION_DAYS = 7;
   private readonly MAX_PIN_ATTEMPTS = 5;
   private readonly LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutos
@@ -39,8 +42,17 @@ class OfflineAuthService {
   private getAllUsersData(): MultiUserOfflineData {
     try {
       const data = localStorage.getItem(this.STORAGE_KEY);
-      if (!data) return { users: {} };
-      return JSON.parse(data);
+      if (!data) {
+        const legacyData = localStorage.getItem(this.LEGACY_STORAGE_KEY);
+        if (!legacyData) return { users: {} };
+
+        const parsedLegacy = JSON.parse(legacyData);
+        const migrated = this.normalizeUsersData(parsedLegacy);
+        this.saveAllUsersData(migrated);
+        localStorage.removeItem(this.LEGACY_STORAGE_KEY);
+        return migrated;
+      }
+      return this.normalizeUsersData(JSON.parse(data));
     } catch {
       return { users: {} };
     }
@@ -51,6 +63,21 @@ class OfflineAuthService {
    */
   private saveAllUsersData(data: MultiUserOfflineData): void {
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
+  }
+
+  private normalizeUsersData(data: any): MultiUserOfflineData {
+    const users = data?.users && typeof data.users === 'object' ? data.users : {};
+
+    for (const userId of Object.keys(users)) {
+      const current = users[userId];
+      users[userId] = {
+        ...current,
+        failedAttempts: Number(current?.failedAttempts || 0) || 0,
+        lockoutUntil: Number(current?.lockoutUntil || 0) || 0,
+      };
+    }
+
+    return { users };
   }
 
   /**
@@ -98,6 +125,20 @@ class OfflineAuthService {
     return users;
   }
 
+  hasAnyOfflineUsers(): boolean {
+    const allData = this.getAllUsersData();
+    return Object.values(allData.users).some((authData) => !this.isExpired(authData));
+  }
+
+  getMostRecentOfflineUserId(): string | null {
+    const allData = this.getAllUsersData();
+    const validEntries = Object.entries(allData.users).filter(([, authData]) => !this.isExpired(authData));
+    if (validEntries.length === 0) return null;
+
+    validEntries.sort(([, a], [, b]) => (b.lastAccess || 0) - (a.lastAccess || 0));
+    return validEntries[0][0];
+  }
+
   /**
    * Configura o PIN para login offline (após primeiro login online)
    */
@@ -124,7 +165,9 @@ class OfflineAuthService {
         sessionId: generateSessionId(),
         createdAt: now,
         lastAccess: now,
-        expiresAt: now + (this.EXPIRATION_DAYS * 24 * 60 * 60 * 1000)
+        expiresAt: now + (this.EXPIRATION_DAYS * 24 * 60 * 60 * 1000),
+        failedAttempts: 0,
+        lockoutUntil: 0,
       };
 
       // Obter todos os dados e adicionar/atualizar este usuário
@@ -341,28 +384,32 @@ class OfflineAuthService {
     return Date.now() > authData.expiresAt;
   }
 
-  // Controle de tentativas falhas (por usuário)
-  private getFailedAttemptsKey(userId: string): string {
-    return `offline_failed_attempts_${userId}`;
-  }
+  // Controle de tentativas falhas (escopado por usuário no blob de auth)
+  private updateUserAuthData(userId: string, updater: (current: OfflineAuthData) => OfflineAuthData): void {
+    const allData = this.getAllUsersData();
+    const current = allData.users[userId];
+    if (!current) return;
 
-  private getLockoutKey(userId: string): string {
-    return `offline_lockout_until_${userId}`;
+    allData.users[userId] = updater(current);
+    this.saveAllUsersData(allData);
   }
 
   private recordFailedAttempt(userId: string): void {
     const attempts = this.getFailedAttempts(userId);
     const newAttempts = attempts + 1;
-    localStorage.setItem(this.getFailedAttemptsKey(userId), newAttempts.toString());
-    
-    if (newAttempts >= this.MAX_PIN_ATTEMPTS) {
-      localStorage.setItem(this.getLockoutKey(userId), (Date.now() + this.LOCKOUT_TIME).toString());
-    }
+    const lockoutUntil = newAttempts >= this.MAX_PIN_ATTEMPTS ? Date.now() + this.LOCKOUT_TIME : 0;
+
+    this.updateUserAuthData(userId, (current) => ({
+      ...current,
+      failedAttempts: newAttempts,
+      lockoutUntil,
+      lastAccess: Date.now(),
+    }));
   }
 
   private getFailedAttempts(userId: string): number {
-    const attempts = localStorage.getItem(this.getFailedAttemptsKey(userId));
-    return attempts ? parseInt(attempts, 10) : 0;
+    const authData = this.getUserData(userId);
+    return Number(authData?.failedAttempts || 0) || 0;
   }
 
   private getRemainingAttempts(userId: string): number {
@@ -370,23 +417,23 @@ class OfflineAuthService {
   }
 
   private clearFailedAttempts(userId: string): void {
-    localStorage.removeItem(this.getFailedAttemptsKey(userId));
-    localStorage.removeItem(this.getLockoutKey(userId));
+    this.updateUserAuthData(userId, (current) => ({
+      ...current,
+      failedAttempts: 0,
+      lockoutUntil: 0,
+      lastAccess: Date.now(),
+    }));
   }
 
   private isLockedOut(userId: string): boolean {
-    const lockoutUntil = localStorage.getItem(this.getLockoutKey(userId));
-    if (!lockoutUntil) return false;
-    
-    const lockoutTime = parseInt(lockoutUntil, 10);
-    return Date.now() < lockoutTime;
+    const lockoutTime = Number(this.getUserData(userId)?.lockoutUntil || 0) || 0;
+    return lockoutTime > 0 && Date.now() < lockoutTime;
   }
 
   private getRemainingLockoutTime(userId: string): number {
-    const lockoutUntil = localStorage.getItem(this.getLockoutKey(userId));
-    if (!lockoutUntil) return 0;
-    
-    const lockoutTime = parseInt(lockoutUntil, 10);
+    const lockoutTime = Number(this.getUserData(userId)?.lockoutUntil || 0) || 0;
+    if (!lockoutTime) return 0;
+
     return Math.max(0, lockoutTime - Date.now());
   }
 }

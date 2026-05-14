@@ -16,6 +16,7 @@ interface NotificacaoDatabase extends DBSchema {
       createdOffline: boolean; // ✅ NOVO: Flag se foi criada offline
       sincronizado: boolean; // ✅ NOVO: Flag de controle de sincronização
       syncedAt?: number; // ✅ NOVO: Timestamp da sincronização
+      serverId?: number; // ✅ NOVO: ID definitivo no servidor (quando disponível)
       isEdit?: boolean;
       syncStartedAt?: number;
       errorInfo?: {
@@ -1386,17 +1387,31 @@ export class IndexedDBService {
   }
 
   // ✅ ATUALIZADO: Aceita offlineId (string) ao invés de id (number)
-  // ✅ CORRIGIDO: Remove notificação do store após sincronização para evitar duplicatas
-  async markNotificacaoAsSynced(offlineId: string): Promise<void> {
+  // ✅ COMPORTAMENTO SEGURO: marca como sincronizada; remove só quando explicitamente solicitado.
+  async markNotificacaoAsSynced(
+    offlineId: string,
+    options?: { remove?: boolean; serverId?: number }
+  ): Promise<void> {
     await this.init();
     const notificacao = await this.db!.get('notificacoes', offlineId);
     if (notificacao) {
-      // ✅ CORREÇÃO: REMOVER a notificação ao invés de apenas marcar como 'synced'
-      // Pois ela já estará disponível no cache após a próxima sincronização/download
-      await this.db!.delete('notificacoes', offlineId);
-      console.log(`✅ Notificação ${offlineId} REMOVIDA do store após sincronização (evitando duplicatas)`);
+      if (options?.remove) {
+        await this.db!.delete('notificacoes', offlineId);
+        console.log(`✅ Notificação ${offlineId} removida do store (remoção explícita)`);
+        return;
+      }
+
+      notificacao.syncStatus = 'synced';
+      notificacao.sincronizado = true;
+      notificacao.syncedAt = Date.now();
+      notificacao.timestamp = Date.now();
+      if (typeof options?.serverId === 'number' && Number.isFinite(options.serverId)) {
+        notificacao.serverId = options.serverId;
+      }
+      await this.db!.put('notificacoes', notificacao);
+      console.log(`✅ Notificação ${offlineId} marcada como sincronizada`);
     } else {
-      console.warn(`⚠️ Notificação ${offlineId} não encontrada para remoção`);
+      console.warn(`⚠️ Notificação ${offlineId} não encontrada para sincronização`);
     }
   }
 

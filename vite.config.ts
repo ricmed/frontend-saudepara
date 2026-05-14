@@ -35,6 +35,8 @@ export default defineConfig(({ mode }) => {
   console.log('🔐 API Auth proxy:', API_AUTH_URL);
   console.log('⚡ API Backend proxy:', API_BACKEND_URL);
   console.log('🧩 Internal auth:', useInternalAuth ? 'ON' : 'OFF');
+  const APP_ORIGIN_REGEX = /^https:\/\/app(?:\.hml)?\.saude\.pa\.gov\.br\/.*$/i;
+  const API_ORIGIN_REGEX = /^https:\/\/app-api(?:\.hml)?\.saude\.pa\.gov\.br\/.*$/i;
 
   return {
   plugins: [
@@ -133,17 +135,16 @@ export default defineConfig(({ mode }) => {
         runtimeCaching: [
           // 1) Trata /api/paciente/check-cpf/########### sempre como NetworkOnly
           {
-            urlPattern: /^https:\/\/app-api\.hml\.saude\.pa\.gov\.br\/api\/paciente\/check-cpf\/\d{11}.*$/i,
-            handler: 'NetworkFirst',
+            urlPattern: /^https:\/\/app-api(?:\.hml)?\.saude\.pa\.gov\.br\/api\/paciente\/check-cpf\/\d{11}.*$/i,
+            handler: 'NetworkOnly',
             options: {
-              cacheName: 'check-cpf-network-only',
-              networkTimeoutSeconds: 5
+              cacheName: 'check-cpf-network-only'
             }
           },
           
-          // === APIs DE PRODUÇÃO ===
+          // === APIs (HML + PRODUÇÃO) ===
           {
-            urlPattern: /^https:\/\/app-api\.hml\.saude\.pa\.gov\.br\/api\/(tipo-|componentes|estabelecimentos).*$/i,
+            urlPattern: /^https:\/\/app-api(?:\.hml)?\.saude\.pa\.gov\.br\/api\/(tipo-|componentes|estabelecimentos).*$/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'api-tipos-cache',
@@ -159,7 +160,7 @@ export default defineConfig(({ mode }) => {
           
           {
             // essa rota genérica de paciente continua existindo, mas o check-cpf já foi "capturado" acima
-            urlPattern: /^https:\/\/app-api\.hml\.saude\.pa\.gov\.br\/api\/(notificacao|paciente).*$/i,
+            urlPattern: /^https:\/\/app-api(?:\.hml)?\.saude\.pa\.gov\.br\/api\/(notificacao|paciente).*$/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-dynamic-cache',
@@ -178,10 +179,10 @@ export default defineConfig(({ mode }) => {
           },
           
           {
-            urlPattern: /^https:\/\/app-api\.hml\.saude\.pa\.gov\.br\/.*$/i,
+            urlPattern: API_ORIGIN_REGEX,
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'api-hml-cache',
+              cacheName: 'api-origin-cache',
               expiration: {
                 maxEntries: 200,
                 maxAgeSeconds: 60 * 60 * 24 * 30
@@ -191,36 +192,10 @@ export default defineConfig(({ mode }) => {
           },
           
           {
-            urlPattern: /^https:\/\/app\.hml\.saude\.pa\.gov\.br\/.*$/i,
+            urlPattern: APP_ORIGIN_REGEX,
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'app-hml-cache',
-              expiration: {
-                maxEntries: 200,
-                maxAgeSeconds: 60 * 60 * 24 * 30
-              },
-              networkTimeoutSeconds: 5
-            }
-          },
-
-          {
-            urlPattern: /^https:\/\/app\.saude\.pa\.gov\.br\/api\/.*$/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-prod-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 7
-              },
-              networkTimeoutSeconds: 5
-            }
-          },
-
-          {
-            urlPattern: /^https:\/\/app\.saude\.pa\.gov\.br\/.*$/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'app-prod-cache',
+              cacheName: 'app-origin-cache',
               expiration: {
                 maxEntries: 200,
                 maxAgeSeconds: 60 * 60 * 24 * 30
@@ -294,13 +269,7 @@ export default defineConfig(({ mode }) => {
         navigateFallback: '/index.html',
         navigateFallbackAllowlist: [
           /^\/$/,
-          /^\/dashboard/,
-          /^\/dashboard-page/,
-          /^\/private/,
-          /^\/public/,
-          /^\/comunicacao-de-caso/,
-          /^\/estabelecimentos/,
-          /^\/notificacoes/
+          /^\/(?!api(?:\/|$)|_).+/,
         ],
         navigateFallbackDenylist: [
           /^\/_/,

@@ -5,7 +5,9 @@
 
 class DeviceIdService {
   private deviceId: string | null = null;
-  private readonly STORAGE_KEY = 'saude-para-device-id';
+  private readonly STORAGE_KEY = 'sp.device.id.v2';
+  private readonly LEGACY_STORAGE_KEY = 'saude-para-device-id';
+  private readonly TAB_NONCE_KEY = 'sp.device.tab.nonce';
 
   /**
    * Gera ou recupera o Device ID do dispositivo
@@ -16,18 +18,21 @@ class DeviceIdService {
       return this.deviceId;
     }
 
-    // Tentar recuperar do localStorage
-    const storedId = localStorage.getItem(this.STORAGE_KEY);
+    // Tentar recuperar do sessionStorage (escopo por aba)
+    const storedId = sessionStorage.getItem(this.STORAGE_KEY);
     if (storedId) {
       this.deviceId = storedId;
       console.log('📱 Device ID recuperado do storage:', storedId);
       return storedId;
     }
 
-    // Gerar novo Device ID
+    // Limpar legado persistente para reduzir rastreamento cross-tab/sessão
+    localStorage.removeItem(this.LEGACY_STORAGE_KEY);
+
+    // Gerar novo Device ID (escopo de sessão/aba)
     const newId = await this.generateDeviceId();
     this.deviceId = newId;
-    localStorage.setItem(this.STORAGE_KEY, newId);
+    sessionStorage.setItem(this.STORAGE_KEY, newId);
     console.log('🆔 Novo Device ID gerado:', newId);
     
     return newId;
@@ -40,8 +45,15 @@ class DeviceIdService {
     const components: string[] = [];
 
     try {
-      // 1. User Agent
-      components.push(navigator.userAgent);
+      // Identificador efêmero por aba (evita fingerprint estável entre abas/sessões)
+      let tabNonce = sessionStorage.getItem(this.TAB_NONCE_KEY);
+      if (!tabNonce) {
+        tabNonce = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+        sessionStorage.setItem(this.TAB_NONCE_KEY, tabNonce);
+      }
+
+      // 1. Nonce da aba
+      components.push(tabNonce);
 
       // 2. Idioma
       components.push(navigator.language || 'unknown');
@@ -56,19 +68,8 @@ class DeviceIdService {
         components.push('unknown-tz');
       }
 
-      // 5. Platform
-      components.push(navigator.platform || 'unknown-platform');
-
-      // 6. Hardware Concurrency (número de CPUs)
+      // 5. Hardware Concurrency (número de CPUs)
       components.push(String(navigator.hardwareConcurrency || 0));
-
-      // 7. Canvas Fingerprint (mais robusto)
-      const canvasFingerprint = await this.getCanvasFingerprint();
-      components.push(canvasFingerprint);
-
-      // 8. WebGL Fingerprint
-      const webglFingerprint = this.getWebGLFingerprint();
-      components.push(webglFingerprint);
 
       // Combinar tudo e gerar hash
       const combined = components.join('|');
@@ -79,59 +80,6 @@ class DeviceIdService {
       console.warn('⚠️ Erro ao gerar Device ID, usando fallback:', error);
       // Fallback: timestamp + random
       return `fp-fallback-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
-    }
-  }
-
-  /**
-   * Gera fingerprint baseado em Canvas (mais único)
-   */
-  private async getCanvasFingerprint(): Promise<string> {
-    try {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
-      if (!ctx) return 'no-canvas';
-
-      // Desenhar texto com configurações específicas
-      canvas.width = 200;
-      canvas.height = 50;
-      ctx.textBaseline = 'top';
-      ctx.font = '14px Arial';
-      ctx.fillStyle = '#f60';
-      ctx.fillRect(125, 1, 62, 20);
-      ctx.fillStyle = '#069';
-      ctx.fillText('Saúde Pará Device', 2, 15);
-      ctx.fillStyle = 'rgba(102, 204, 0, 0.7)';
-      ctx.fillText('Saúde Pará Device', 4, 17);
-
-      // Converter para data URL e gerar hash
-      const dataUrl = canvas.toDataURL();
-      return await this.hashString(dataUrl);
-    } catch (error) {
-      console.warn('⚠️ Erro ao gerar canvas fingerprint:', error);
-      return 'canvas-error';
-    }
-  }
-
-  /**
-   * Gera fingerprint baseado em WebGL
-   */
-  private getWebGLFingerprint(): string {
-    try {
-      const canvas = document.createElement('canvas');
-      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-      
-      if (!gl) return 'no-webgl';
-
-      const debugInfo = (gl as any).getExtension('WEBGL_debug_renderer_info');
-      if (!debugInfo) return 'no-debug-info';
-
-      const vendor = (gl as any).getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
-      const renderer = (gl as any).getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
-
-      return `${vendor}|${renderer}`;
-    } catch (error) {
-      return 'webgl-error';
     }
   }
 
@@ -223,7 +171,9 @@ class DeviceIdService {
    */
   clearDeviceId(): void {
     this.deviceId = null;
-    localStorage.removeItem(this.STORAGE_KEY);
+    sessionStorage.removeItem(this.STORAGE_KEY);
+    sessionStorage.removeItem(this.TAB_NONCE_KEY);
+    localStorage.removeItem(this.LEGACY_STORAGE_KEY);
     console.log('🗑️ Device ID limpo');
   }
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Settings, Globe, Zap, ChevronDown } from 'lucide-react';
 import { MapboxConfigModal } from './MapboxConfigModal';
 import { useMapProvider } from '../contexts/MapProviderContext';
+import { STORAGE_KEYS } from '@/utils/storageKeys';
 
 export type MapProvider = 'openstreetmap' | 'mapbox';
 
@@ -17,7 +18,8 @@ export const MapProviderOverlay: React.FC = () => {
   const [showMapboxConfig, setShowMapboxConfig] = useState(false);
 
   const handleMapboxConfig = (apiKey: string) => {
-    localStorage.setItem('mapbox-api-key', apiKey);
+    localStorage.setItem(STORAGE_KEYS.map.mapboxApiKey, apiKey);
+    localStorage.removeItem('mapbox-api-key');
     setShowMapboxConfig(false);
     // Forçar reload para aplicar a nova configuração
     window.location.reload();
