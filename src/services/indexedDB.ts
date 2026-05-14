@@ -143,20 +143,80 @@ interface NotificacaoDatabase extends DBSchema {
 const DB_VERSION = 7; // ✅ VERSÃO 7: Adiciona store para anexos_pendentes
 const DB_NAME = 'NotificacaoOfflineDB';
 const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 dias
+const INIT_MAX_RETRIES = 3;
+const INIT_RETRY_BASE_MS = 400;
+const BLOCKED_UPGRADE_TIMEOUT_MS = 8000;
+
+type ConnectionStatus = 'idle' | 'recovering' | 'blocked' | 'ready' | 'error';
+
+interface ConnectionState {
+  status: ConnectionStatus;
+  retryCount: number;
+  lastBlockedAt: number | null;
+  lastError: string | null;
+}
+
+interface DisplayNotificationsOptions {
+  offset?: number;
+  limit?: number;
+}
 
 export class IndexedDBService {
   private db: IDBPDatabase<NotificacaoDatabase> | null = null;
+  private blockedUpgradeTimer: ReturnType<typeof setTimeout> | null = null;
+  private connectionState: ConnectionState = {
+    status: 'idle',
+    retryCount: 0,
+    lastBlockedAt: null,
+    lastError: null,
+  };
+
+  private clearBlockedUpgradeTimer(): void {
+    if (this.blockedUpgradeTimer) {
+      clearTimeout(this.blockedUpgradeTimer);
+      this.blockedUpgradeTimer = null;
+    }
+  }
+
+  private wait(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private updateConnectionState(status: ConnectionStatus, patch: Partial<ConnectionState> = {}): void {
+    this.connectionState = {
+      ...this.connectionState,
+      ...patch,
+      status,
+    };
+  }
+
+  private emitConnectionEvent(eventName: string, detail: Record<string, unknown>): void {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(eventName, { detail }));
+    }
+
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker?.controller?.postMessage({
+        type: eventName,
+        detail,
+      });
+    }
+  }
+
+  getConnectionState(): ConnectionState {
+    return { ...this.connectionState };
+  }
 
   /**
-   * 🆕 Verifica e limpa versões antigas do IndexedDB
-   * Se detectar versão < 5, deleta o banco inteiro para garantir estrutura limpa
+   * Verifica a versão atual para telemetria e troubleshooting.
+   * Não executa limpeza automática para preservar dados offline do usuário.
    */
-  private async checkAndCleanOldVersions(): Promise<void> {
+  private async checkExistingVersion(): Promise<void> {
     try {
       // Tentar abrir o banco sem especificar versão para ver qual versão existe
       const request = indexedDB.open(DB_NAME);
       
-      return new Promise((resolve, reject) => {
+      return new Promise((resolve) => {
         request.onsuccess = (event) => {
           const db = (event.target as IDBOpenDBRequest).result;
           const currentVersion = db.version;
@@ -164,32 +224,16 @@ export class IndexedDBService {
           
           console.log(`📊 Versão atual do IndexedDB: ${currentVersion}`);
           
-          // Se versão antiga detectada, deletar banco
           if (currentVersion < DB_VERSION) {
-            console.warn(`⚠️ Versão antiga detectada (v${currentVersion}). Limpando banco para v${DB_VERSION}...`);
-            
-            const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
-            
-            deleteRequest.onsuccess = () => {
-              console.log('✅ Banco de dados antigo deletado com sucesso!');
-              console.log('🔄 Nova versão será criada na próxima inicialização...');
-              resolve();
-            };
-            
-            deleteRequest.onerror = (err) => {
-              console.error('❌ Erro ao deletar banco antigo:', err);
-              reject(err);
-            };
-            
-            deleteRequest.onblocked = () => {
-              console.warn('⚠️ Deleção bloqueada. Feche todas as abas e tente novamente.');
-              // Continua mesmo bloqueado - upgrade tentará migrar
-              resolve();
-            };
+            console.warn(
+              `⚠️ Versão antiga detectada (v${currentVersion} -> v${DB_VERSION}). ` +
+              'Mantendo dados locais e deixando a migração no fluxo de upgrade.'
+            );
           } else {
             console.log('✅ Versão do banco está atualizada');
-            resolve();
           }
+
+          resolve();
         };
         
         request.onerror = () => {
@@ -206,155 +250,247 @@ export class IndexedDBService {
   async init(): Promise<void> {
     if (this.db) return;
 
-    try {
-      console.log(`🔧 Inicializando IndexedDB: ${DB_NAME} v${DB_VERSION}`);
-      
-      // 🆕 VERIFICAR E LIMPAR VERSÕES ANTIGAS
-      await this.checkAndCleanOldVersions();
-      
-      this.db = await openDB<NotificacaoDatabase>(DB_NAME, DB_VERSION, {
-        upgrade(db, oldVersion, newVersion) {
-          console.log(`📈 Upgrade DB: v${oldVersion} → v${newVersion}`);
-          
-          // Store para notificações
-          if (!db.objectStoreNames.contains('notificacoes')) {
-            console.log('🆕 Criando store: notificacoes');
-            const notificacoesStore = db.createObjectStore('notificacoes', {
-              keyPath: 'offlineId' // ✅ NOVO: Usar offlineId como chave
-            });
-            notificacoesStore.createIndex('by-sync-status', 'syncStatus');
-            notificacoesStore.createIndex('by-device-id', 'deviceId'); // ✅ NOVO
-            notificacoesStore.createIndex('by-offline-id', 'offlineId'); // ✅ NOVO
-            notificacoesStore.createIndex('by-sincronizado', 'sincronizado'); // ✅ NOVO
-          } else if (oldVersion < 5) {
-            // ✅ Migração para versão 5: adicionar novos índices e migrar dados
-            console.log('🔄 Migrando notificações para v5 com offlineId...');
-            const tx = (db as any).transaction.objectStore('notificacoes');
-            
-            // Criar novos índices se não existirem
-            if (!tx.indexNames.contains('by-device-id')) {
-              tx.createIndex('by-device-id', 'deviceId');
-            }
-            if (!tx.indexNames.contains('by-offline-id')) {
-              tx.createIndex('by-offline-id', 'offlineId');
-            }
-            if (!tx.indexNames.contains('by-sincronizado')) {
-              tx.createIndex('by-sincronizado', 'sincronizado');
-            }
-            
-            console.log('✅ Índices v5 criados. ATENÇÃO: Dados antigos podem precisar migração manual.');
-          }
+    console.log(`🔧 Inicializando IndexedDB: ${DB_NAME} v${DB_VERSION}`);
+    await this.checkExistingVersion();
 
-          // Store para opções
-          if (!db.objectStoreNames.contains('opcoes')) {
-            console.log('🆕 Criando store: opcoes');
-            db.createObjectStore('opcoes', {
-              keyPath: 'tipo'
-            });
-          }          // Store para pacientes (dados criados localmente)
-          if (!db.objectStoreNames.contains('pacientes')) {
-            console.log('🆕 Criando store: pacientes');
-            const pacientesStore = db.createObjectStore('pacientes', {
-              keyPath: 'idpaciente'
-            });
-            pacientesStore.createIndex('by-nome', 'nome');
-            pacientesStore.createIndex('by-cpf', 'cpf');
-            pacientesStore.createIndex('by-synced', 'synced');
-            pacientesStore.createIndex('by-source', 'source');
-          }          // ✅ NOVO: Store para cache de verificação
-          if (!db.objectStoreNames.contains('pacientes_cache')) {
-            console.log('🆕 Criando store: pacientes_cache');
-            db.createObjectStore('pacientes_cache', {
-              keyPath: 'cpf'
-            });
-          }          // ✅ NOVO: Store específico para cache de CPFs
-          if (!db.objectStoreNames.contains('cpfs_cache')) {
-            console.log('🆕 Criando store: cpfs_cache');
-            db.createObjectStore('cpfs_cache', {
-              keyPath: 'cpf'
-            });
-          }
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= INIT_MAX_RETRIES; attempt++) {
+      this.updateConnectionState('recovering', { retryCount: attempt - 1 });
 
-          // ✅ NOVO: Store para estabelecimentos (dados criados localmente)
-          if (!db.objectStoreNames.contains('estabelecimentos')) {
-            console.log('🆕 Criando store: estabelecimentos');
-            const estabelecimentosStore = db.createObjectStore('estabelecimentos', {
-              keyPath: 'id'
-            });
-            estabelecimentosStore.createIndex('by-nome', 'nome');
-            estabelecimentosStore.createIndex('by-cnes', 'cnes');
-            estabelecimentosStore.createIndex('by-synced', 'synced');
-            estabelecimentosStore.createIndex('by-source', 'source');
-          }
-
-          // ✅ NOVO: Store para cache de verificação de estabelecimentos
-          if (!db.objectStoreNames.contains('estabelecimentos_cache')) {
-            console.log('🆕 Criando store: estabelecimentos_cache');
-            db.createObjectStore('estabelecimentos_cache', {
-              keyPath: 'cnes'
-            });
-          }
-
-          // ✅ NOVO V6: Store para comunicações DAE offline
-          if (!db.objectStoreNames.contains('comunicacoes_dae')) {
-            console.log('🆕 Criando store: comunicacoes_dae');
-            const comunicacoesDaeStore = db.createObjectStore('comunicacoes_dae', {
-              keyPath: 'offlineId'
-            });
-            comunicacoesDaeStore.createIndex('by-sync-status', 'syncStatus');
-            comunicacoesDaeStore.createIndex('by-device-id', 'deviceId');
-            comunicacoesDaeStore.createIndex('by-offline-id', 'offlineId');
-            comunicacoesDaeStore.createIndex('by-sincronizado', 'sincronizado');
-          }
-
-          // ✅ VERSÃO 7: Criar store para anexos pendentes
-          if (oldVersion < 7 && !db.objectStoreNames.contains('anexos_pendentes')) {
-            console.log('📦 Criando store: anexos_pendentes');
-            const anexosStore = db.createObjectStore('anexos_pendentes', {
-              keyPath: 'anexoId'
-            });
-            anexosStore.createIndex('by-comunicacao-offline', 'comunicacaoOfflineId');
-            anexosStore.createIndex('by-comunicacao-id', 'comunicacaoId');
-            anexosStore.createIndex('by-sync-status', 'syncStatus');
-          }
-        },
-        
-        blocked() {
-          console.warn('⚠️ IndexedDB bloqueado por outra aba/processo');
-        },
-        
-        blocking: () => {
-          console.warn('⚠️ IndexedDB bloqueando para upgrade');
-          if (this.db) {
-            this.db.close();
-            this.db = null;
-          }
-        },
-        
-        terminated: () => {
-          console.error('❌ IndexedDB conexão terminada');
-          this.db = null;
-        }
+      let rejectOnBlockedTimeout: ((reason?: unknown) => void) | null = null;
+      const blockedTimeoutPromise = new Promise<IDBPDatabase<NotificacaoDatabase>>((_, reject) => {
+        rejectOnBlockedTimeout = reject;
       });
 
-      console.log('✅ IndexedDB inicializado com sucesso!');
-      
-    } catch (error) {
-      console.error('❌ Erro ao inicializar IndexedDB:', error);
-      
-      if (error instanceof Error && error.name === 'VersionError') {
-        console.log('🔄 VersionError detectado, tentando resetar banco...');
-        await this.resetDatabase();
+      try {
+        const openPromise = openDB<NotificacaoDatabase>(DB_NAME, DB_VERSION, {
+          upgrade(db, oldVersion, newVersion) {
+            console.log(`📈 Upgrade DB: v${oldVersion} → v${newVersion}`);
+            
+            // Store para notificações
+            if (!db.objectStoreNames.contains('notificacoes')) {
+              console.log('🆕 Criando store: notificacoes');
+              const notificacoesStore = db.createObjectStore('notificacoes', {
+                keyPath: 'offlineId' // ✅ NOVO: Usar offlineId como chave
+              });
+              notificacoesStore.createIndex('by-sync-status', 'syncStatus');
+              notificacoesStore.createIndex('by-device-id', 'deviceId'); // ✅ NOVO
+              notificacoesStore.createIndex('by-offline-id', 'offlineId'); // ✅ NOVO
+              notificacoesStore.createIndex('by-sincronizado', 'sincronizado'); // ✅ NOVO
+            } else if (oldVersion < 5) {
+              // ✅ Migração para versão 5: adicionar novos índices e migrar dados
+              console.log('🔄 Migrando notificações para v5 com offlineId...');
+              const tx = (db as any).transaction.objectStore('notificacoes');
+              
+              // Criar novos índices se não existirem
+              if (!tx.indexNames.contains('by-device-id')) {
+                tx.createIndex('by-device-id', 'deviceId');
+              }
+              if (!tx.indexNames.contains('by-offline-id')) {
+                tx.createIndex('by-offline-id', 'offlineId');
+              }
+              if (!tx.indexNames.contains('by-sincronizado')) {
+                tx.createIndex('by-sincronizado', 'sincronizado');
+              }
+              
+              console.log('✅ Índices v5 criados. ATENÇÃO: Dados antigos podem precisar migração manual.');
+            }
+
+            // Store para opções
+            if (!db.objectStoreNames.contains('opcoes')) {
+              console.log('🆕 Criando store: opcoes');
+              db.createObjectStore('opcoes', {
+                keyPath: 'tipo'
+              });
+            }          // Store para pacientes (dados criados localmente)
+            if (!db.objectStoreNames.contains('pacientes')) {
+              console.log('🆕 Criando store: pacientes');
+              const pacientesStore = db.createObjectStore('pacientes', {
+                keyPath: 'idpaciente'
+              });
+              pacientesStore.createIndex('by-nome', 'nome');
+              pacientesStore.createIndex('by-cpf', 'cpf');
+              pacientesStore.createIndex('by-synced', 'synced');
+              pacientesStore.createIndex('by-source', 'source');
+            }          // ✅ NOVO: Store para cache de verificação
+            if (!db.objectStoreNames.contains('pacientes_cache')) {
+              console.log('🆕 Criando store: pacientes_cache');
+              db.createObjectStore('pacientes_cache', {
+                keyPath: 'cpf'
+              });
+            }          // ✅ NOVO: Store específico para cache de CPFs
+            if (!db.objectStoreNames.contains('cpfs_cache')) {
+              console.log('🆕 Criando store: cpfs_cache');
+              db.createObjectStore('cpfs_cache', {
+                keyPath: 'cpf'
+              });
+            }
+
+            // ✅ NOVO: Store para estabelecimentos (dados criados localmente)
+            if (!db.objectStoreNames.contains('estabelecimentos')) {
+              console.log('🆕 Criando store: estabelecimentos');
+              const estabelecimentosStore = db.createObjectStore('estabelecimentos', {
+                keyPath: 'id'
+              });
+              estabelecimentosStore.createIndex('by-nome', 'nome');
+              estabelecimentosStore.createIndex('by-cnes', 'cnes');
+              estabelecimentosStore.createIndex('by-synced', 'synced');
+              estabelecimentosStore.createIndex('by-source', 'source');
+            }
+
+            // ✅ NOVO: Store para cache de verificação de estabelecimentos
+            if (!db.objectStoreNames.contains('estabelecimentos_cache')) {
+              console.log('🆕 Criando store: estabelecimentos_cache');
+              db.createObjectStore('estabelecimentos_cache', {
+                keyPath: 'cnes'
+              });
+            }
+
+            // ✅ NOVO V6: Store para comunicações DAE offline
+            if (!db.objectStoreNames.contains('comunicacoes_dae')) {
+              console.log('🆕 Criando store: comunicacoes_dae');
+              const comunicacoesDaeStore = db.createObjectStore('comunicacoes_dae', {
+                keyPath: 'offlineId'
+              });
+              comunicacoesDaeStore.createIndex('by-sync-status', 'syncStatus');
+              comunicacoesDaeStore.createIndex('by-device-id', 'deviceId');
+              comunicacoesDaeStore.createIndex('by-offline-id', 'offlineId');
+              comunicacoesDaeStore.createIndex('by-sincronizado', 'sincronizado');
+            }
+
+            // ✅ VERSÃO 7: Criar store para anexos pendentes
+            if (oldVersion < 7 && !db.objectStoreNames.contains('anexos_pendentes')) {
+              console.log('📦 Criando store: anexos_pendentes');
+              const anexosStore = db.createObjectStore('anexos_pendentes', {
+                keyPath: 'anexoId'
+              });
+              anexosStore.createIndex('by-comunicacao-offline', 'comunicacaoOfflineId');
+              anexosStore.createIndex('by-comunicacao-id', 'comunicacaoId');
+              anexosStore.createIndex('by-sync-status', 'syncStatus');
+            }
+          },
+          
+          blocked: () => {
+            const blockedAt = Date.now();
+            this.updateConnectionState('blocked', {
+              lastBlockedAt: blockedAt,
+              lastError: `Upgrade bloqueado por mais de ${BLOCKED_UPGRADE_TIMEOUT_MS}ms`,
+            });
+            this.emitConnectionEvent('indexeddb-upgrade-blocked', {
+              dbName: DB_NAME,
+              version: DB_VERSION,
+              attempt,
+              blockedAt,
+            });
+            console.warn('⚠️ IndexedDB bloqueado por outra aba/processo');
+
+            this.clearBlockedUpgradeTimer();
+            this.blockedUpgradeTimer = setTimeout(() => {
+              const timeoutError = new Error(
+                `IndexedDB upgrade bloqueado por ${BLOCKED_UPGRADE_TIMEOUT_MS}ms (tentativa ${attempt}/${INIT_MAX_RETRIES})`
+              );
+              this.updateConnectionState('error', {
+                retryCount: attempt,
+                lastError: timeoutError.message,
+              });
+              this.emitConnectionEvent('indexeddb-upgrade-timeout', {
+                dbName: DB_NAME,
+                version: DB_VERSION,
+                attempt,
+                timeoutMs: BLOCKED_UPGRADE_TIMEOUT_MS,
+              });
+              rejectOnBlockedTimeout?.(timeoutError);
+            }, BLOCKED_UPGRADE_TIMEOUT_MS);
+          },
+          
+          blocking: () => {
+            console.warn('⚠️ IndexedDB bloqueando para upgrade');
+            this.updateConnectionState('recovering', {
+              retryCount: attempt,
+              lastError: null,
+            });
+            this.emitConnectionEvent('indexeddb-blocking-upgrade', {
+              dbName: DB_NAME,
+              version: DB_VERSION,
+              attempt,
+            });
+            if (this.db) {
+              this.db.close();
+              this.db = null;
+            }
+          },
+          
+          terminated: () => {
+            console.error('❌ IndexedDB conexão terminada');
+            this.clearBlockedUpgradeTimer();
+            this.updateConnectionState('error', {
+              lastError: 'Conexão IndexedDB terminada inesperadamente',
+            });
+            this.emitConnectionEvent('indexeddb-connection-terminated', {
+              dbName: DB_NAME,
+              version: DB_VERSION,
+              attempt,
+            });
+            this.db = null;
+          }
+        });
+
+        this.db = await Promise.race([openPromise, blockedTimeoutPromise]);
+        this.clearBlockedUpgradeTimer();
+        this.updateConnectionState('ready', {
+          retryCount: attempt - 1,
+          lastError: null,
+        });
+        this.emitConnectionEvent('indexeddb-ready', {
+          dbName: DB_NAME,
+          version: DB_VERSION,
+          attempt,
+        });
+        console.log('✅ IndexedDB inicializado com sucesso!');
         return;
+      } catch (error) {
+        lastError = error;
+        this.clearBlockedUpgradeTimer();
+        console.error(`❌ Erro ao inicializar IndexedDB (tentativa ${attempt}/${INIT_MAX_RETRIES}):`, error);
+
+        if (error instanceof Error && error.name === 'VersionError') {
+          console.log('🔄 VersionError detectado, tentando resetar banco...');
+          await this.resetDatabase();
+          return;
+        }
+
+        if (attempt < INIT_MAX_RETRIES) {
+          const retryDelayMs = INIT_RETRY_BASE_MS * 2 ** (attempt - 1);
+          this.updateConnectionState('recovering', {
+            retryCount: attempt,
+            lastError: error instanceof Error ? error.message : String(error),
+          });
+          this.emitConnectionEvent('indexeddb-retry-scheduled', {
+            dbName: DB_NAME,
+            version: DB_VERSION,
+            attempt,
+            retryDelayMs,
+          });
+          await this.wait(retryDelayMs);
+          continue;
+        }
       }
-      
-      throw error;
     }
+
+    this.updateConnectionState('error', {
+      retryCount: INIT_MAX_RETRIES,
+      lastError: lastError instanceof Error ? lastError.message : String(lastError),
+    });
+    throw lastError instanceof Error ? lastError : new Error('Falha ao inicializar IndexedDB');
   }
 
   async resetDatabase(): Promise<void> {
     try {
       console.log('🗑️ Resetando banco de dados...');
+      this.clearBlockedUpgradeTimer();
+      this.updateConnectionState('recovering', {
+        lastError: null,
+      });
       
       if (this.db) {
         this.db.close();
@@ -378,6 +514,9 @@ export class IndexedDBService {
       
     } catch (error) {
       console.error('❌ Erro ao resetar banco:', error);
+      this.updateConnectionState('error', {
+        lastError: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }
@@ -1163,26 +1302,31 @@ export class IndexedDBService {
 
   async getPendingNotificacoes(): Promise<Array<{ id: number; formData: FormData; offlineId: string; deviceId: string }>> {
     await this.init();
-    
-    // ✅ NOVO: Buscar por sincronizado = false
-    const allNotificacoes = await this.db!.getAll('notificacoes');
-    const pending = allNotificacoes.filter(item => item.sincronizado === false);
-    
-    console.log(`📋 [INDEXEDDB] Notificações pendentes de sincronização: ${pending.length}`);
-    
-    // ✅ DEBUG ESPECÍFICO: Log dos campos de trauma nas notificações pendentes
-    pending.forEach(item => {
-      console.log(`🩹 [DEBUG TRAUMA] Notificação pendente offlineId ${item.offlineId}:`, {
-        id: item.id,
-        deviceId: item.deviceId,
-        tipoTrauma: item.formData.tipoTrauma,
-        observacaoTrauma: item.formData.observacaoTrauma,
-        observacaoSintomas: item.formData.observacaoSintomas,
-        observacaoHipotese: item.formData.observacaoHipotese
+
+    let pending: any[] = [];
+
+    // Preferir índice para evitar varredura completa em dispositivos com muito dado.
+    try {
+      const pendingByBoolean = await this.db!.getAllFromIndex('notificacoes', 'by-sincronizado', false as any);
+      pending = pendingByBoolean;
+
+      if (pending.length === 0) {
+        const pendingByString = await this.db!.getAllFromIndex('notificacoes', 'by-sincronizado', 'false' as any);
+        pending = pendingByString;
+      }
+    } catch (indexError) {
+      console.warn('⚠️ Falha ao buscar pendentes por índice; aplicando fallback por varredura:', indexError);
+      const allNotificacoes = await this.db!.getAll('notificacoes');
+      pending = allNotificacoes.filter(item => {
+        const sincronizado = (item as any).sincronizado;
+        return sincronizado === false || sincronizado === 'false';
       });
-    });
-    
-    return pending.map(item => ({ 
+    }
+
+    pending.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    console.log(`📋 [INDEXEDDB] Notificações pendentes de sincronização: ${pending.length}`);
+
+    return pending.map(item => ({
       id: item.id as number, 
       formData: item.formData,
       offlineId: item.offlineId,
@@ -1525,40 +1669,35 @@ export class IndexedDBService {
   }
 
   // ✅ NOVO: Buscar todas as notificações para visualização (pendentes + sincronizadas)
-  async getAllNotificacoesForDisplay(): Promise<any[]> {
+  async getAllNotificacoesForDisplay(options: DisplayNotificationsOptions = {}): Promise<any[]> {
     await this.init();
     if (!this.db) return [];
+
+    const safeOffset = Math.max(0, options.offset ?? 0);
+    const safeLimit = options.limit && options.limit > 0 ? options.limit : undefined;
     
     try {
       console.log('📋 Buscando notificações para visualização (pendentes + cache)...');
-      
-      // 1. Buscar notificações sincronizadas (cache) - USAR MÉTODO QUE DESCRIPTOGRAFA
+
+      // 1. Buscar notificações sincronizadas (cache)
       const cachedWrapper: any = await this.getOpcoes('notificacoes-cache');
       let cached: any[] = [];
-      
-      // Verificar formato do cache
-      if (!cachedWrapper) {
-        // Cache vazio/não existe
-        console.log('   📭 Nenhuma notificação no cache');
-        cached = [];
-      } else if (typeof cachedWrapper === 'object' && !Array.isArray(cachedWrapper) && 'encrypted' in cachedWrapper) {
-        // Formato novo com wrapper { encrypted, data }
+
+      if (Array.isArray(cachedWrapper)) {
+        cached = cachedWrapper;
+      } else if (cachedWrapper && typeof cachedWrapper === 'object' && 'encrypted' in cachedWrapper) {
         if (cachedWrapper.encrypted === true && typeof cachedWrapper.data === 'string') {
-          // Dados criptografados - usar offlineDataManager para descriptografar
           console.log('   🔓 Cache criptografado detectado, descriptografando...');
           const offlineDataManager = (await import('@/services/offlineDataManager')).offlineDataManager;
           cached = await offlineDataManager.getNotificacoesFromCache();
         } else if (cachedWrapper.encrypted === false && Array.isArray(cachedWrapper.data)) {
-          // Dados não criptografados
           cached = cachedWrapper.data;
-        } else {
-          cached = [];
         }
-      } else if (Array.isArray(cachedWrapper)) {
-        // Formato antigo (array direto)
-        cached = cachedWrapper;
       }
       
+      if (!cachedWrapper) {
+        console.log('   📭 Nenhuma notificação no cache');
+      }
       console.log(`   ✅ ${cached.length} notificações do cache`);
       
       // 2. Buscar notificações pendentes
@@ -1595,86 +1734,110 @@ export class IndexedDBService {
       // 4. Mesclar (pendentes primeiro para aparecer no topo)
       const all = [...pendingFormatted, ...cached];
       
-      // 5. Remover duplicatas por offlineId (priorizar pendentes)
-      // ✅ MELHORADO: Deduplicação mais robusta com múltiplas chaves
-      const uniqueMap = new Map();
-      const offlineIdIndex = new Map(); // Índice adicional por offline_id
-      
-      all.forEach(n => {
-        // ✅ CORREÇÃO: Criar múltiplas chaves possíveis para detectar duplicatas
-        const offlineId = n._offlineId || n.offline_id || null;
-        const numericId = n.idnotificacao || n.id || null;
-        
-        // Criar chave primária (preferir offlineId se disponível)
-        const primaryKey = offlineId || `id_${numericId}`;
-        
-        // Verificar duplicatas por offlineId
-        let isDuplicate = false;
-        if (offlineId) {
-          if (offlineIdIndex.has(offlineId)) {
-            isDuplicate = true;
-            const existingKey = offlineIdIndex.get(offlineId);
-            const existing = uniqueMap.get(existingKey);
-            
-            // Priorizar pendentes sobre sincronizadas
-            if (n._isPending && !existing._isPending) {
-              uniqueMap.delete(existingKey);
-              isDuplicate = false; // Vai adicionar a versão pendente
-            }
-          } else {
-            offlineIdIndex.set(offlineId, primaryKey);
+      // 5. Remover duplicatas com custo linear O(n), priorizando pendentes.
+      const uniqueMap = new Map<string, any>();
+      const offlineIdIndex = new Map<string, string>();
+      const numericIdIndex = new Map<number, string>();
+      const requiredItems = safeLimit ? safeOffset + safeLimit : Number.POSITIVE_INFINITY;
+
+      const getNumericId = (notification: any): number | null => {
+        const raw = notification.idnotificacao ?? notification.id;
+        if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+        if (typeof raw === 'string' && raw.trim() !== '') {
+          const parsed = Number(raw);
+          return Number.isFinite(parsed) ? parsed : null;
+        }
+        return null;
+      };
+
+      for (let idx = 0; idx < all.length; idx++) {
+        const notification = all[idx];
+        const offlineId = notification._offlineId || notification.offline_id || null;
+        const numericId = getNumericId(notification);
+
+        let existingKey: string | undefined;
+        if (offlineId && offlineIdIndex.has(offlineId)) {
+          existingKey = offlineIdIndex.get(offlineId);
+        } else if (numericId !== null && numericId > 0 && numericIdIndex.has(numericId)) {
+          existingKey = numericIdIndex.get(numericId);
+        }
+
+        if (!existingKey) {
+          const newKey = offlineId || (numericId !== null && numericId > 0 ? `id_${numericId}` : `tmp_${idx}`);
+          uniqueMap.set(newKey, notification);
+          if (offlineId) offlineIdIndex.set(offlineId, newKey);
+          if (numericId !== null && numericId > 0) numericIdIndex.set(numericId, newKey);
+          if (uniqueMap.size >= requiredItems) {
+            break;
           }
-        }
-        
-        // Verificar duplicatas por ID numérico (se não for temporário)
-        if (!isDuplicate && numericId && numericId > 0) {
-          for (const [existingKey, existingNotif] of uniqueMap.entries()) {
-            const existingNumericId = existingNotif.idnotificacao || existingNotif.id;
-            if (existingNumericId === numericId) {
-              // Se já existe com mesmo ID, priorizar pendentes
-              if (n._isPending && !existingNotif._isPending) {
-                uniqueMap.delete(existingKey);
-                if (existingNotif.offline_id || existingNotif._offlineId) {
-                  offlineIdIndex.delete(existingNotif.offline_id || existingNotif._offlineId);
-                }
-              } else {
-                isDuplicate = true;
-              }
-              break;
-            }
+          if (idx > 0 && idx % 400 === 0) {
+            await this.wait(0);
           }
+          continue;
         }
-        
-        // Adicionar se não for duplicata
-        if (!isDuplicate) {
-          uniqueMap.set(primaryKey, n);
+
+        const existing = uniqueMap.get(existingKey);
+        const shouldReplace = notification._isPending && !existing?._isPending;
+        if (shouldReplace) {
+          uniqueMap.set(existingKey, notification);
         }
-      });
-      
+
+        if (offlineId) offlineIdIndex.set(offlineId, existingKey);
+        if (numericId !== null && numericId > 0) numericIdIndex.set(numericId, existingKey);
+        if (idx > 0 && idx % 400 === 0) {
+          await this.wait(0);
+        }
+      }
+
       const result = Array.from(uniqueMap.values());
       const duplicatesRemoved = all.length - result.length;
       console.log(`   📊 Total: ${result.length} notificações únicas (${pendingFiltered.length} pendentes + ${cached.length} cache - ${duplicatesRemoved} duplicatas removidas)`);
+
+      if (safeLimit) {
+        return result.slice(safeOffset, safeOffset + safeLimit);
+      }
       
-      return result;
+      return safeOffset > 0 ? result.slice(safeOffset) : result;
     } catch (error) {
       console.error('❌ Erro ao buscar notificações para display:', error);
-      // Fallback: tentar retornar apenas pendentes
-      try {
-        const pending = await this.getPendingNotificacoes();
-        console.warn(`⚠️ Fallback: retornando apenas ${pending.length} notificações pendentes`);
-        const pendingFormatted = pending.map(p => ({
-          ...p.formData,
-          idnotificacao: p.id,
-          _isPending: true,
-          _offlineId: p.offlineId,
-          _badge: '🟡 Aguardando sincronização'
-        }));
-        return pendingFormatted;
-      } catch (fallbackError) {
-        console.error('❌ Erro no fallback:', fallbackError);
-        return [];
+      const pending = await this.getPendingNotificacoes().catch(() => []);
+      console.warn(`⚠️ Fallback: retornando apenas ${pending.length} notificações pendentes`);
+      const fallbackResult = pending.map(p => ({
+        ...p.formData,
+        idnotificacao: p.id,
+        _isPending: true,
+        _offlineId: p.offlineId,
+        _badge: '🟡 Aguardando sincronização'
+      }));
+      if (safeLimit) {
+        return fallbackResult.slice(safeOffset, safeOffset + safeLimit);
       }
+      return safeOffset > 0 ? fallbackResult.slice(safeOffset) : fallbackResult;
     }
+  }
+
+  async getNotificacoesForDisplayPage(
+    page: number = 1,
+    limit: number = 100
+  ): Promise<{ data: any[]; page: number; limit: number; hasMore: boolean }> {
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.max(1, limit);
+    const offset = (safePage - 1) * safeLimit;
+
+    const batch = await this.getAllNotificacoesForDisplay({
+      offset,
+      limit: safeLimit + 1,
+    });
+
+    const hasMore = batch.length > safeLimit;
+    const data = hasMore ? batch.slice(0, safeLimit) : batch;
+
+    return {
+      data,
+      page: safePage,
+      limit: safeLimit,
+      hasMore,
+    };
   }
 
   // ✅ NOVO: Obter estatísticas do cache

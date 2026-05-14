@@ -226,11 +226,9 @@ export const useNotifications = () => {
   const fetchNotificacoesOffline = useCallback(async (page: number = 1, limit: number = 10) => {
     try {
       console.log('📱 Buscando notificações offline...');
-      
-      // Buscar todas as notificações do cache
-      const cachedNotificacoes = await indexedDBService.getOpcoes('notificacoes-cache') || [];
-      
-      if (cachedNotificacoes.length === 0) {
+
+      const pageResult = await indexedDBService.getNotificacoesForDisplayPage(page, limit);
+      if (pageResult.data.length === 0 && page === 1 && !pageResult.hasMore) {
         console.warn('⚠️ Nenhuma notificação encontrada no cache offline');
         return {
           data: [],
@@ -239,22 +237,23 @@ export const useNotifications = () => {
       }
 
       // 🆕 FILTRAR: Aplicar filtro de eventos ativos
-      const notificacoesFiltradas = await filterNotificacoesComEventosAtivos(cachedNotificacoes);
-
-      // Calcular paginação
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const paginatedData = notificacoesFiltradas.slice(startIndex, endIndex);
+      const notificacoesFiltradas = await filterNotificacoesComEventosAtivos(pageResult.data as any);
+      const estimatedTotal = pageResult.hasMore
+        ? (pageResult.page * pageResult.limit) + 1
+        : ((pageResult.page - 1) * pageResult.limit) + notificacoesFiltradas.length;
+      const estimatedTotalPages = pageResult.hasMore
+        ? pageResult.page + 1
+        : Math.max(1, pageResult.page);
       
-      console.log(`✅ Notificações offline: ${paginatedData.length}/${notificacoesFiltradas.length} (página ${page})`);
+      console.log(`✅ Notificações offline: ${notificacoesFiltradas.length} itens na página ${pageResult.page} (hasMore=${pageResult.hasMore})`);
       
       return {
-        data: paginatedData,
+        data: notificacoesFiltradas,
         meta: {
-          total: notificacoesFiltradas.length,
-          totalPages: Math.ceil(notificacoesFiltradas.length / limit),
-          page,
-          limit
+          total: estimatedTotal,
+          totalPages: estimatedTotalPages,
+          page: pageResult.page,
+          limit: pageResult.limit
         }
       };
     } catch (error) {
@@ -266,6 +265,33 @@ export const useNotifications = () => {
     }
   }, [filterNotificacoesComEventosAtivos]);
 
+  const loadOfflineDisplayData = useCallback(async (pageSize: number = 200, maxPages: number = 50) => {
+    const normalizedPageSize = Math.max(1, pageSize);
+    const normalizedMaxPages = Math.max(1, maxPages);
+    const allData: any[] = [];
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore && page <= normalizedMaxPages) {
+      const result = await indexedDBService.getNotificacoesForDisplayPage(page, normalizedPageSize);
+      if (result.data.length === 0) break;
+
+      allData.push(...result.data);
+      hasMore = result.hasMore;
+      page += 1;
+
+      if (page % 5 === 0) {
+        await new Promise<void>(resolve => setTimeout(resolve, 0));
+      }
+    }
+
+    if (hasMore) {
+      console.warn(`⚠️ Leitura offline truncada em ${normalizedMaxPages} páginas para preservar performance`);
+    }
+
+    return allData;
+  }, []);
+
   // ✅ FUNÇÃO: Buscar todas as notificações (online/offline)
   const fetchAllData = useCallback(async () => {
     try {
@@ -276,8 +302,7 @@ export const useNotifications = () => {
       if (!isOnline) {
         console.log('📱 Modo offline: buscando todas as notificações (cache + pendentes)...');
         
-        // ✅ NOVO: Usar método unificado que busca cache + pendentes
-        const allData = await indexedDBService.getAllNotificacoesForDisplay();
+        const allData = await loadOfflineDisplayData();
         
         if (allData.length === 0) {
           setError('Nenhuma notificação disponível offline. Conecte-se à internet e baixe os dados primeiro.');
@@ -305,8 +330,7 @@ export const useNotifications = () => {
       if (!podeUsarAPI) {
         console.log('⚠️ Sistema offline ou não autenticado, buscando do cache + pendentes...');
         
-        // ✅ NOVO: Usar método unificado que busca cache + pendentes
-        const allData = await indexedDBService.getAllNotificacoesForDisplay();
+        const allData = await loadOfflineDisplayData();
         
         if (allData.length === 0) {
           setError('Nenhuma notificação disponível offline.');
@@ -355,8 +379,7 @@ export const useNotifications = () => {
           // ✅ FALLBACK: Se API falhar, tentar usar cache + pendentes
           console.error('❌ Erro ao buscar da API, tentando cache + pendentes...', apiError);
           
-          // ✅ NOVO: Usar método unificado
-          const allData = await indexedDBService.getAllNotificacoesForDisplay();
+          const allData = await loadOfflineDisplayData();
           
           if (allData.length > 0) {
             console.log(`⚠️ Usando ${allData.length} notificações (${allData.filter(n => n._isPending).length} pendentes + cache) - fallback`);
@@ -379,8 +402,7 @@ export const useNotifications = () => {
         console.log('⚠️ Erro online, tentando usar cache + pendentes como fallback...');
         
         try {
-          // ✅ NOVO: Usar método unificado
-          const allData = await indexedDBService.getAllNotificacoesForDisplay();
+          const allData = await loadOfflineDisplayData();
           
           if (allData.length > 0) {
             toast.warning('Usando dados locais devido a erro de conexão');
@@ -399,7 +421,7 @@ export const useNotifications = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [isOnline]);
+  }, [isOnline, filterNotificacoesComEventosAtivos, loadOfflineDisplayData]);
 
   // ✅ CARREGAR DADOS (online/offline) - useEffect principal
   useEffect(() => {
@@ -419,7 +441,7 @@ export const useNotifications = () => {
 
         // 🆕 ATIVAR ORDENAÇÃO LOCAL NA PRIMEIRA CARGA
         // Se ainda não ativou ordenação local e não tem busca ativa, buscar todos os dados
-        if (!isUsingLocalSort && !debouncedSearchParams.term && allNotificacoes.length === 0) {
+        if (isOnline && !isUsingLocalSort && !debouncedSearchParams.term && allNotificacoes.length === 0) {
           console.log('🔄 Primeira carga: buscando todos os dados para ordenação...');
           const allData = await fetchAllData();
           
