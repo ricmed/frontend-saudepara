@@ -3,6 +3,7 @@ import { getRuntimeApiBaseOrigin, getRuntimeApiRoot } from '@/config/runtimeApiB
 
 const API_URL = getRuntimeApiRoot();
 const PUBLIC_API_URL = getRuntimeApiBaseOrigin();
+const PUBLIC_FORM_SUBMIT_TIMEOUT_MS = 180000;
 
 // Instância do axios com credenciais (cookies de autenticação)
 const api = axios.create({
@@ -483,7 +484,7 @@ class FormService {
     const response = await publicApi.post(
       `/api/public/forms/${encodeURIComponent(params.slug)}/submissions`,
       { data_json: params.data_json },
-      { params: qs }
+      { params: qs, timeout: PUBLIC_FORM_SUBMIT_TIMEOUT_MS }
     );
     return response.data;
   }
@@ -504,7 +505,7 @@ class FormService {
     const response = await publicApi.patch(
       `/api/public/forms/${encodeURIComponent(params.slug)}/submissions/${params.submissionId}`,
       { data_json: params.data_json },
-      { params: qs }
+      { params: qs, timeout: PUBLIC_FORM_SUBMIT_TIMEOUT_MS }
     );
     return response.data;
   }
