@@ -65,6 +65,34 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
     setFieldDisabled(disabled);
   }, [schema]);
 
+  // Para campos de data configurados com "preencher com data atual",
+  // define hoje apenas quando o campo ainda está vazio (mantém editável).
+  useEffect(() => {
+    const todayLocal = (() => {
+      const d = new Date();
+      const local = new Date(d.getTime() - d.getTimezoneOffset() * 60_000);
+      return local.toISOString().slice(0, 10);
+    })();
+
+    setFormData((prev) => {
+      const next = { ...prev };
+      let changed = false;
+
+      for (const section of schema.sections || []) {
+        for (const field of section.fields || []) {
+          if (field.type !== 'date' || !field.defaultCurrentDate) continue;
+          const current = get(next, field.key);
+          if (current === undefined || current === null || String(current).trim() === '') {
+            set(next, field.key, todayLocal);
+            changed = true;
+          }
+        }
+      }
+
+      return changed ? next : prev;
+    });
+  }, [schema]);
+
   // Sempre notificar mudanças de dados (útil para preview/sandbox e debug)
   useEffect(() => {
     if (!onDataChange) return;

@@ -150,6 +150,8 @@ export interface FormField {
   apiSelectEndpointParams?: string[];
   options?: Array<{ value: string; label: string }>;
   placeholder?: string;
+  /** Para campo `date`: inicia com a data atual (usuário pode editar normalmente). */
+  defaultCurrentDate?: boolean;
   mask?: string;
   min?: number;
   max?: number;

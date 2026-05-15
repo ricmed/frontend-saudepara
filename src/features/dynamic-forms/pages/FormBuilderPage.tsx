@@ -1909,6 +1909,19 @@ export const FormBuilderPage: React.FC = () => {
                               />
                               Obrigatório
                             </label>
+                            {field.type === 'date' && (
+                              <label className="flex items-center gap-1 text-sm">
+                                <input
+                                  type="checkbox"
+                                  checked={field.defaultCurrentDate || false}
+                                  onChange={(e) =>
+                                    updateField(sectionIdx, fieldIdx, { defaultCurrentDate: e.target.checked })
+                                  }
+                                  className="rounded"
+                                />
+                                Preencher com data atual
+                              </label>
+                            )}
                             <input
                               type="text"
                               value={field.placeholder || ''}
