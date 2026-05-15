@@ -838,12 +838,13 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             return <CnaeSearchField {...commonProps} />;
           }
           if (resolved.key === 'paciente.pais_nascimento_id' || resolved.key === 'residencia.pais') {
-            return <ApiSelectSearchField {...commonProps} getValue={getValue} />;
+            return <ApiSelectSearchField {...commonProps} getValue={getValue} context={context} />;
           }
           if (resolved.key === 'paciente.qual_povo_tradicional') {
             return (
               <ApiSelectSearchField
                 {...commonProps}
+                context={context}
                 onChange={(val: any) => {
                   setValue(resolved.key, val);
                   if (val !== '39') setValue('paciente.outro_povo_tradicional', undefined);
@@ -852,13 +853,14 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             );
           }
           if (resolved.key === 'paciente.etnia') {
-            return <ApiSelectSearchField {...commonProps} getValue={getValue} />;
+            return <ApiSelectSearchField {...commonProps} getValue={getValue} context={context} />;
           }
           if (resolved.key === 'paciente.raca_cor') {
             return (
               <ApiSelectField
                 {...commonProps}
                 {...selectAux}
+                context={context}
                 onChange={(val: any) => {
                   setValue(resolved.key, val);
                   if (String(val ?? '') !== '5') {
@@ -877,6 +879,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
               <ApiSelectField
                 {...commonProps}
                 {...selectAux}
+                context={context}
                 onChange={(val: any) => {
                   setValue(resolved.key, val);
                   if (val !== '4') setValue('paciente.outra_orientacao_sexual', undefined);
@@ -886,13 +889,14 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           }
         if (resolved.key === 'acao.programa_alcancado') {
           const semArea = !getValue('acao.area');
-          return <ApiSelectField {...commonProps} {...selectAux} disabled={disabled || semArea} />;
+          return <ApiSelectField {...commonProps} {...selectAux} context={context} disabled={disabled || semArea} />;
         }
         if (resolved.key === 'acao.atividade') {
           return (
             <ApiSelectField
               {...commonProps}
               {...selectAux}
+              context={context}
               onChange={(val: any) => {
                 setValue(resolved.key, val);
                 clearDetalhamento();
@@ -900,7 +904,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             />
           );
         }
-        return <ApiSelectField {...commonProps} {...selectAux} />;
+        return <ApiSelectField {...commonProps} {...selectAux} context={context} />;
         }
         // Ao mudar Área da vigilância, limpar Atividade (seletor dependente)
         if (resolved.key === 'acao.area') {
@@ -1003,7 +1007,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           if (resolved.key === 'cabecalho.crs_id' && monitorOperRegionalCrsScope?.canSelectAnyCrs) {
             const executorNivel = getValue('cabecalho.executor_nivel');
             if (readOnly && executorNivel !== 'CENTRAL') {
-              return <ApiSelectSearchField {...commonProps} getValue={getValue} />;
+              return <ApiSelectSearchField {...commonProps} getValue={getValue} context={context} />;
             }
             return (
               <div className="mb-4 md:grid md:grid-cols-2 md:gap-4 md:items-start">
@@ -1016,12 +1020,12 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                   </div>
                 </div>
                 <div className="min-w-0 [&>div]:mb-0">
-                  <ApiSelectSearchField {...commonProps} getValue={getValue} />
+                  <ApiSelectSearchField {...commonProps} getValue={getValue} context={context} />
                 </div>
               </div>
             );
           }
-          return <ApiSelectSearchField {...commonProps} getValue={getValue} />;
+          return <ApiSelectSearchField {...commonProps} getValue={getValue} context={context} />;
         }
         return <SelectSearchField {...commonProps} />;
       case 'multi-select':

@@ -307,6 +307,16 @@ interface SelectFieldProps {
   getValue?: (key: string) => any;
   /** Grava em outra chave (ex.: texto da opção «Outro» em select em cartões). */
   setValue?: (key: string, value: any) => void;
+  /** Contexto de uso do formulário (ex.: público compartilhado). */
+  context?: 'sinan' | 'general' | 'public';
+}
+
+function resolveApiSelectEndpoint(endpoint: string, context?: SelectFieldProps['context']): string {
+  const normalized = String(endpoint || '').replace(/^\/+/, '');
+  if (context === 'public' && normalized === 'crs/select') {
+    return 'public/crs/select';
+  }
+  return normalized;
 }
 
 /** Posiciona menu flutuante em coordenadas da viewport (evita recorte por overflow em cards/seções). */
@@ -355,6 +365,7 @@ export const ApiSelectField: React.FC<SelectFieldProps> = ({
   disabled,
   getValue,
   setValue,
+  context,
 }) => {
   const [options, setOptions] = useState<Array<{ value: string; label: string }>>(field.options || []);
   const [loading, setLoading] = useState(true);
@@ -370,7 +381,7 @@ export const ApiSelectField: React.FC<SelectFieldProps> = ({
     let cancelled = false;
     (async () => {
       try {
-        const url = `${API_BASE}/${endpoint}`;
+        const url = `${API_BASE}/${resolveApiSelectEndpoint(endpoint, context)}`;
         const params = buildApiSelectQueryParams(field, getValue);
         const { data } = await axios.get<any[]>(url, { withCredentials: true, params });
         if (cancelled) return;
@@ -389,6 +400,7 @@ export const ApiSelectField: React.FC<SelectFieldProps> = ({
     return () => { cancelled = true; };
   }, [
     (field as FormField & { apiSelectEndpoint?: string }).apiSelectEndpoint,
+    context,
     JSON.stringify((field as any).apiSelectEndpointParams || []),
     JSON.stringify((field as FormField & { apiSelectStaticParams?: Record<string, string> }).apiSelectStaticParams || {}),
     ...(((field as any).apiSelectEndpointParams || []) as string[]).map((k: string) => getValue?.(k)),
@@ -449,6 +461,7 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
   required,
   disabled,
   getValue,
+  context,
 }) => {
   const [options, setOptions] = useState<SelectOptionSearchable[]>([]);
   const [loading, setLoading] = useState(true);
@@ -487,7 +500,7 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
           url = `${API_BASE}/tipo-pais?limit=500`;
           requestConfig = { withCredentials: true };
         } else {
-          url = `${API_BASE}/${apiEndpoint}`;
+          url = `${API_BASE}/${resolveApiSelectEndpoint(String(apiEndpoint || ''), context)}`;
           const params = buildApiSelectQueryParams(field, getValue);
           requestConfig = { withCredentials: true, params };
         }
@@ -511,6 +524,7 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
   }, [
     isTipoPaisSearchList,
     apiEndpoint,
+    context,
     staticKey,
     JSON.stringify(paramsKeys),
     JSON.stringify(field.options || []),
