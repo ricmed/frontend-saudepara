@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
-import { FileSpreadsheet, Download } from 'lucide-react';
+import { FileSpreadsheet, Download, Trash2 } from 'lucide-react';
 import FormResponsesService from '@/services/FormResponsesService';
 import FormService, { type Form } from '@/services/FormService';
+import { useAuth } from '@/keycloak/AuthProvider';
 import { FormResponseReadonlyModal } from '../components/FormResponseReadonlyModal';
 import { FormResponsesSpreadsheetModal } from '../components/FormResponsesSpreadsheetModal';
 import {
@@ -160,6 +161,7 @@ const FormListSortableTh: React.FC<FormListSortableThProps> = ({
 export const FormResponsesPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
+  const { user } = useAuth();
   const formId = Number(id);
 
   const responsesBackTo =
@@ -182,6 +184,7 @@ export const FormResponsesPage: React.FC = () => {
   });
 
   const isMonitorOperList = (form?.form_key ?? '').toUpperCase() === MONITOR_OPER_REGIONAL_KEY;
+  const canDeleteResponse = Array.isArray((user as any)?.roles) && (user as any).roles.some((role: string) => role === 'admin');
 
   const activeSchema = resolveActiveSchema(form);
   const refMapsNeeded = useMemo(() => collectSchemaReferenceMapsNeeded(activeSchema), [activeSchema]);
@@ -294,6 +297,20 @@ export const FormResponsesPage: React.FC = () => {
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } }; message?: string };
       alert(err?.response?.data?.message || err?.message || 'Erro ao exportar');
+    }
+  };
+
+  const handleDelete = async (responseId: number) => {
+    if (!canDeleteResponse) return;
+    if (!window.confirm('Tem certeza que deseja excluir esta resposta?')) return;
+    const deletedBy = ((user as any)?.sub || (user as any)?.id) as string | undefined;
+    try {
+      await FormResponsesService.deleteResponse(responseId, deletedBy);
+      const targetPage = rows.length === 1 && page > 1 ? page - 1 : page;
+      await load(targetPage);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } }; message?: string };
+      alert(err?.response?.data?.message || err?.message || 'Erro ao excluir resposta');
     }
   };
 
@@ -461,14 +478,26 @@ export const FormResponsesPage: React.FC = () => {
                         {submittedAt ? submittedAt.toLocaleString('pt-BR') : '—'}
                       </td>
                       <td className="px-3 lg:px-4 xl:px-6 py-3 align-middle text-right text-sm whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => setSelected(r)}
-                          className="inline-flex shrink-0 px-2.5 py-1 rounded-lg border bg-white text-xs sm:text-sm text-blue-700 hover:bg-blue-50 font-medium whitespace-nowrap"
-                          title="Ver conteúdo preenchido"
-                        >
-                          Ver resposta
-                        </button>
+                        <div className="inline-flex justify-end items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setSelected(r)}
+                            className="inline-flex shrink-0 px-2.5 py-1 rounded-lg border bg-white text-xs sm:text-sm text-blue-700 hover:bg-blue-50 font-medium whitespace-nowrap"
+                            title="Ver conteúdo preenchido"
+                          >
+                            Ver resposta
+                          </button>
+                          {canDeleteResponse && (
+                            <button
+                              type="button"
+                              onClick={() => void handleDelete(r.id)}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                              title="Excluir resposta"
+                            >
+                              <Trash2 className="h-5 w-5" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

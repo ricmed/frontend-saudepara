@@ -67,6 +67,12 @@ class FormResponsesService {
     const filename = match?.[1] ?? `form-${formId}-respostas.${params?.format ?? 'xlsx'}`;
     return { blob, filename };
   }
+
+  async deleteResponse(responseId: number, deletedBy?: string): Promise<void> {
+    await api.delete(`/submissions/${responseId}`, {
+      data: deletedBy ? { deleted_by: deletedBy } : undefined,
+    });
+  }
 }
 
 export default new FormResponsesService();
