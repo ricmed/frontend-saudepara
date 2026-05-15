@@ -4,6 +4,7 @@ import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 import FormService, { type Form } from '@/services/FormService';
 import FormShareLinkService, { type FormShareLink } from '@/services/FormShareLinkService';
 import FormAclService, { type FormAclItem, type FormAclRole, type UserPick } from '@/services/FormAclService';
+import { useAuth } from '@/keycloak/AuthProvider';
 import {
   Copy, Plus, Shield, FileText, Lock, Globe, Link2,
   ChevronDown, ChevronUp, Users, Check, Settings,
@@ -36,6 +37,7 @@ export const FormShareSettingsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const formId = Number(id);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [form, setForm] = useState<Form | null>(null);
   const [links, setLinks] = useState<FormShareLink[]>([]);
@@ -85,11 +87,15 @@ export const FormShareSettingsPage: React.FC = () => {
   const load = async () => {
     try {
       setLoading(true);
-      const [f, l, a] = await Promise.all([
+      const [f, l] = await Promise.all([
         FormService.getFormById(formId),
         FormShareLinkService.list(formId),
-        FormAclService.list(formId),
       ]);
+      const currentUserId = ((user as any)?.sub || (user as any)?.id || '') as string;
+      const isOwner = !!currentUserId && String(f.owner_user_id || '') === String(currentUserId);
+      const myRole = (f.my_role ?? null) as FormAclRole | null;
+      const canManageAcl = myRole === 'ADMIN' || isOwner;
+      const a = canManageAcl ? await FormAclService.list(formId) : [];
       setForm(f);
       setLinks(l);
       setAcl(a);
@@ -108,7 +114,7 @@ export const FormShareSettingsPage: React.FC = () => {
   useEffect(() => {
     if (!Number.isFinite(formId)) return;
     load();
-  }, [formId]);
+  }, [formId, user?.sub, user?.id]);
 
   const update = async (patch: Partial<Form>) => {
     try {
@@ -121,6 +127,10 @@ export const FormShareSettingsPage: React.FC = () => {
       setSaving(false);
     }
   };
+
+  const currentUserId = ((user as any)?.sub || (user as any)?.id || '') as string;
+  const isOwner = !!currentUserId && String(form?.owner_user_id || '') === String(currentUserId);
+  const canManageCollaborators = form?.my_role === 'ADMIN' || isOwner;
 
   const changeVisibility = async (vis: Visibility) => {
     if (vis === (form?.visibility || 'PRIVATE')) return;
@@ -167,6 +177,7 @@ export const FormShareSettingsPage: React.FC = () => {
   };
 
   const searchUsers = async () => {
+    if (!canManageCollaborators) return;
     try {
       const q = userQuery.trim();
       if (q.length < 2) { setUserResults([]); return; }
@@ -178,6 +189,7 @@ export const FormShareSettingsPage: React.FC = () => {
   };
 
   const addCollaborator = async () => {
+    if (!canManageCollaborators) return;
     if (!selectedUser) return;
     try {
       const item = await FormAclService.upsert(formId, { user_id: selectedUser.id, role: selectedRole });
@@ -195,6 +207,7 @@ export const FormShareSettingsPage: React.FC = () => {
   };
 
   const removeCollaborator = async (aclId: number) => {
+    if (!canManageCollaborators) return;
     try {
       await FormAclService.remove(formId, aclId);
       setAcl((prev) => prev.filter((p) => p.id !== aclId));
@@ -550,104 +563,106 @@ export const FormShareSettingsPage: React.FC = () => {
           </div>
 
           {/* ── Colaboradores ─────────────────────────────────── */}
-          <div className="bg-white rounded-xl shadow p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Users className="h-5 w-5 text-gray-400" />
-              <h2 className="text-base font-semibold text-gray-900">Colaboradores</h2>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex gap-2">
-                <input
-                  value={userQuery}
-                  onChange={(e) => setUserQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && searchUsers()}
-                  className="flex-1 border rounded-lg px-3 py-2 text-sm"
-                  placeholder="Buscar por nome, e-mail ou usuário..."
-                />
-                <button
-                  onClick={searchUsers}
-                  className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 text-sm font-medium"
-                  type="button"
-                >
-                  Buscar
-                </button>
+          {canManageCollaborators && (
+            <div className="bg-white rounded-xl shadow p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Users className="h-5 w-5 text-gray-400" />
+                <h2 className="text-base font-semibold text-gray-900">Colaboradores</h2>
               </div>
 
-              {userResults.length > 0 && (
-                <div className="border rounded-lg overflow-hidden">
-                  {userResults.map((u) => (
-                    <button
-                      key={u.id}
-                      type="button"
-                      onClick={() => { setSelectedUser(u); setUserResults([]); }}
-                      className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0"
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <input
+                    value={userQuery}
+                    onChange={(e) => setUserQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && searchUsers()}
+                    className="flex-1 border rounded-lg px-3 py-2 text-sm"
+                    placeholder="Buscar por nome, e-mail ou usuário..."
+                  />
+                  <button
+                    onClick={searchUsers}
+                    className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 text-sm font-medium"
+                    type="button"
+                  >
+                    Buscar
+                  </button>
+                </div>
+
+                {userResults.length > 0 && (
+                  <div className="border rounded-lg overflow-hidden">
+                    {userResults.map((u) => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => { setSelectedUser(u); setUserResults([]); }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0"
+                      >
+                        <div className="text-sm font-medium text-gray-900">{u.username}</div>
+                        <div className="text-xs text-gray-500">
+                          {u.name || '-'}{u.email ? ` · ${u.email}` : ''}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {selectedUser && (
+                  <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-blue-900">{selectedUser.username}</p>
+                      {selectedUser.email && (
+                        <p className="text-xs text-blue-700">{selectedUser.email}</p>
+                      )}
+                    </div>
+                    <select
+                      value={selectedRole}
+                      onChange={(e) => setSelectedRole(e.target.value as FormAclRole)}
+                      className="border rounded-lg px-2 py-1.5 text-sm bg-white"
                     >
-                      <div className="text-sm font-medium text-gray-900">{u.username}</div>
-                      <div className="text-xs text-gray-500">
-                        {u.name || '-'}{u.email ? ` · ${u.email}` : ''}
-                      </div>
+                      {(Object.entries(ROLE_LABELS) as [FormAclRole, string][]).map(([v, l]) => (
+                        <option key={v} value={v}>{l}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={addCollaborator}
+                      className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 shrink-0"
+                    >
+                      Adicionar
                     </button>
+                  </div>
+                )}
+              </div>
+
+              {acl.length === 0 ? (
+                <p className="mt-4 text-sm text-gray-400 italic">Nenhum colaborador adicionado.</p>
+              ) : (
+                <div className="mt-4 space-y-2">
+                  {acl.map((a) => (
+                    <div key={a.id} className="flex items-center justify-between gap-3 p-3 border rounded-lg">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-900">{a.user.username}</div>
+                        <div className="text-xs text-gray-500">
+                          {a.user.name || '-'}{a.user.email ? ` · ${a.user.email}` : ''}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs font-medium px-2 py-1 rounded-full bg-gray-100 text-gray-700">
+                          {ROLE_LABELS[a.role] || a.role}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeCollaborator(a.id)}
+                          className="text-xs text-red-600 hover:underline"
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
-
-              {selectedUser && (
-                <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-blue-900">{selectedUser.username}</p>
-                    {selectedUser.email && (
-                      <p className="text-xs text-blue-700">{selectedUser.email}</p>
-                    )}
-                  </div>
-                  <select
-                    value={selectedRole}
-                    onChange={(e) => setSelectedRole(e.target.value as FormAclRole)}
-                    className="border rounded-lg px-2 py-1.5 text-sm bg-white"
-                  >
-                    {(Object.entries(ROLE_LABELS) as [FormAclRole, string][]).map(([v, l]) => (
-                      <option key={v} value={v}>{l}</option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={addCollaborator}
-                    className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 shrink-0"
-                  >
-                    Adicionar
-                  </button>
-                </div>
-              )}
             </div>
-
-            {acl.length === 0 ? (
-              <p className="mt-4 text-sm text-gray-400 italic">Nenhum colaborador adicionado.</p>
-            ) : (
-              <div className="mt-4 space-y-2">
-                {acl.map((a) => (
-                  <div key={a.id} className="flex items-center justify-between gap-3 p-3 border rounded-lg">
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium text-gray-900">{a.user.username}</div>
-                      <div className="text-xs text-gray-500">
-                        {a.user.name || '-'}{a.user.email ? ` · ${a.user.email}` : ''}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs font-medium px-2 py-1 rounded-full bg-gray-100 text-gray-700">
-                        {ROLE_LABELS[a.role] || a.role}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => removeCollaborator(a.id)}
-                        className="text-xs text-red-600 hover:underline"
-                      >
-                        Remover
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
 
         </div>
       )}

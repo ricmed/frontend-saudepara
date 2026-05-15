@@ -1,10 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ComunicacaoDaeService, { ComunicacaoDae, ComunicacaoDaeFilters } from '@/services/ComunicacaoDaeService';
-import CrsService, { Crs } from '@/services/CrsService';
-import NheService, { Nhe } from '@/services/NheService';
-import CievsService, { Cievs } from '@/services/CievsService';
-import { usuarioGestaoService } from '@/services/UsuarioGestaoService';
+import { ComunicacaoDae } from '@/services/ComunicacaoDaeService';
 import {
   BarChart,
   Bar,
@@ -32,9 +28,6 @@ import {
   Layers,
   Info,
   AlertCircle,
-  Search,
-  Eye,
-  Edit,
   Clock,
   Filter,
 } from 'lucide-react';
@@ -44,54 +37,42 @@ import DashboardExportMenu from '@/components/common/DashboardExportMenu';
 import MapaDashboardDAE, { LocalizacaoMapa, LocalizacaoTipo } from '@/features/dashboard/components/MapaDashboardDAE';
 import { MapProviderProvider } from '@/features/maps/leaflet/contexts/MapProviderContext';
 import {
-  getComunicacaoDaeAgravoIds,
-  matchesDaeDashboardFilter,
-} from '@/features/comunicacao-dae/comunicacaoDaeAgravoUtils';
+  formatDateTimePtBr,
+} from '@/features/comunicacao-dae/utils/dashboardFormatters';
+import {
+  getOrigemTipoBadgeClass
+} from '@/features/comunicacao-dae/utils/origemPresentation';
 import { getMunicipioBandeiraPathBase } from '@/utils/municipioBandeiraPa';
-import { calcularSemanaEpidemiologica } from '@/utils/timezoneUtils';
-
-interface ChartDataItem {
-  name: string;
-  value: number;
-  id?: number;
-}
-
-interface DashboardStats {
-  total: number;
-  crs: number;
-  nhe: number;
-  cievs: number;
-}
-
-interface ActiveFilters {
-  origem_tipo: string | string[] | null;
-  origem_id: number | number[] | null;
-  dae_id: number | number[] | null;
-  municipio_id: number | number[] | null;
-  municipio_residencia_id: number | number[] | null;
-}
-
-type OrigemTipo = 'CRS' | 'NHE' | 'CIEVS';
+import { useComunicacaoDaeDashboardData } from '@/features/comunicacao-dae/hooks/useComunicacaoDaeDashboardData';
+import { useDashboardAutoRefresh } from '@/features/comunicacao-dae/hooks/useDashboardAutoRefresh';
+import { useComunicacaoDaeDashboardFilters } from '@/features/comunicacao-dae/hooks/useComunicacaoDaeDashboardFilters';
+import { useComunicacaoDaeDashboardCharts } from '@/features/comunicacao-dae/hooks/useComunicacaoDaeDashboardCharts';
+import { ComunicacoesModal } from '@/features/comunicacao-dae/components/ComunicacoesModal';
+import { ComunicacaoFichaModal } from '@/features/comunicacao-dae/components/ComunicacaoFichaModal';
+import { LocalizacaoComunicacoesModal } from '@/features/comunicacao-dae/components/LocalizacaoComunicacoesModal';
 
 const ComunicacaoDaeDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [comunicacoes, setComunicacoes] = useState<ComunicacaoDae[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [isRestrictedOriginView, setIsRestrictedOriginView] = useState(false);
-
-  // Listas de CRS, NHE e CIEVS para nomes descritivos
-  const [crsList, setCrsList] = useState<Crs[]>([]);
-  const [nheList, setNheList] = useState<Nhe[]>([]);
-  const [cievsList, setCievsList] = useState<Cievs[]>([]);
+  const {
+    loading,
+    comunicacoes,
+    error,
+    isRestrictedOriginView,
+    crsList,
+    nheList,
+    cievsList,
+    localizacoes,
+    lastUpdate,
+    loadAllData,
+    loadLocalizacoes
+  } = useComunicacaoDaeDashboardData();
 
   // Modal de comunicações
   const [showComunicacoesModal, setShowComunicacoesModal] = useState(false);
   const [modalSearchTerm, setModalSearchTerm] = useState('');
   
   // Estado para localizações do mapa
-  const [localizacoes, setLocalizacoes] = useState<LocalizacaoMapa[]>([]);
   const [selectedLocalizacao, setSelectedLocalizacao] = useState<LocalizacaoMapa | null>(null);
   const [showLocalizacaoModal, setShowLocalizacaoModal] = useState(false);
   
@@ -100,32 +81,29 @@ const ComunicacaoDaeDashboard: React.FC = () => {
   const [showFichaModal, setShowFichaModal] = useState(false);
   const [fichaModalMode, setFichaModalMode] = useState<'view' | 'edit'>('view');
 
-  // Filtros
-  const [activeFilters, setActiveFilters] = useState<ActiveFilters>({
-    origem_tipo: null,
-    origem_id: null,
-    dae_id: null,
-    municipio_id: null,
-    municipio_residencia_id: null,
-  });
-  
-  // Filtro de período
-  const [dataInicio, setDataInicio] = useState<string>('');
-  const [dataFim, setDataFim] = useState<string>('');
-  
-  // Filtro de horário
-  const [horaInicio, setHoraInicio] = useState<string>('');
-  const [horaFim, setHoraFim] = useState<string>('');
+  const {
+    activeFilters,
+    dataInicio,
+    setDataInicio,
+    dataFim,
+    setDataFim,
+    horaInicio,
+    setHoraInicio,
+    horaFim,
+    setHoraFim,
+    clearAllFilters,
+    activeFiltersCount,
+    comunicacoesFiltradas,
+    dadosFiltrados,
+    isFilterActive,
+    getCellColor,
+    toggleFilter
+  } = useComunicacaoDaeDashboardFilters(comunicacoes);
 
   // Auto-atualização
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
-  const [autoRefreshCountdown, setAutoRefreshCountdown] = useState(60); // 60 segundos = 1 minuto
-  const [lastUpdate, setLastUpdate] = useState(new Date().toLocaleString('pt-BR'));
   const [viewportWidth, setViewportWidth] = useState(
     typeof window !== 'undefined' ? window.innerWidth : 1280
   );
-  const autoRefreshInterval = useRef<NodeJS.Timeout | null>(null);
-  const refreshDataRef = useRef<(() => void) | null>(null);
   const ctrlPressedRef = useRef(false);
   const [isCtrlPressed, setIsCtrlPressed] = useState(false);
   const scrollPositionRef = useRef<number>(0);
@@ -164,139 +142,18 @@ const ComunicacaoDaeDashboard: React.FC = () => {
 
   const isMobileViewport = viewportWidth < 640;
 
-  useEffect(() => {
+  const refreshDashboardData = useCallback(() => {
+    scrollPositionRef.current = window.scrollY || document.documentElement.scrollTop;
     loadAllData();
-  }, []);
-
-  const loadAllData = async () => {
-    try {
-      // Salvar posição atual do scroll antes de atualizar
-      scrollPositionRef.current = window.scrollY || document.documentElement.scrollTop;
-      
-      setLoading(true);
-      setError(null);
-
-      // Aplicar escopo de acesso do usuário (mesma lógica da listagem)
-      const filtrosComPermissoes: ComunicacaoDaeFilters = {};
-      let restrictedOriginView = false;
-      try {
-        const userAccess = await usuarioGestaoService.getUserAccess();
-        if (userAccess?.isEstabelecimento && userAccess.estabelecimentoId) {
-          filtrosComPermissoes.estabelecimento_id = userAccess.estabelecimentoId;
-          restrictedOriginView = true;
-        }
-      } catch (permError) {
-        // Em caso de falha ao buscar permissões, mantém fallback sem filtro
-      }
-      setIsRestrictedOriginView(restrictedOriginView);
-      
-      // Carregar dados em paralelo
-      const [comunicacoesRes, crsRes, nheRes, cievsRes] = await Promise.all([
-        ComunicacaoDaeService.getAll(1, 9999, filtrosComPermissoes),
-        CrsService.getAll(1, 9999),
-        NheService.getAll(1, 9999),
-        CievsService.getAll(1, 9999)
-      ]);
-      
-      setComunicacoes(comunicacoesRes.data || []);
-      setCrsList(crsRes.data || []);
-      setNheList(nheRes.data || []);
-      setCievsList(cievsRes.data || []);
-      
-      // Atualizar timestamp da última atualização
-      setLastUpdate(new Date().toLocaleString('pt-BR'));
-      
-      // As localizações serão carregadas automaticamente pelo useEffect que observa dadosFiltrados
-    } catch (err: any) {
-      setError('Erro ao carregar dados do dashboard');
-      console.error('Erro ao carregar dados:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadLocalizacoes = useCallback(async (comunicacoesData: ComunicacaoDae[], filteredComunicacoes?: ComunicacaoDae[]) => {
-    try {
-      // Usar comunicações filtradas se fornecidas, senão usar todas
-      const comunicacoesParaContar = filteredComunicacoes || comunicacoesData;
-
-      // Buscar NHE, CIEVS e CRS com localização
-      const [nheWithLocation, cievsWithLocation, crsWithLocation] = await Promise.all([
-        NheService.getAllWithLocation(),
-        CievsService.getAllWithLocation(),
-        CrsService.getAllWithLocation()
-      ]);
-
-      const localizacoesData: LocalizacaoMapa[] = [];
-
-      // Processar NHE
-      nheWithLocation.forEach((nhe: any) => {
-        if (nhe.estabelecimento && nhe.estabelecimento.latitude && nhe.estabelecimento.longitude) {
-          // Contar fichas relacionadas a este NHE (usando comunicações filtradas)
-          const fichasCount = comunicacoesParaContar.filter(
-            c => c.origem_tipo === 'NHE' && c.origem_id === nhe.id_nhe
-          ).length;
-
-          localizacoesData.push({
-            id: `nhe-${nhe.id_nhe}`,
-            nome: nhe.nome,
-            tipo: 'NHE' as LocalizacaoTipo,
-            lat: parseFloat(nhe.estabelecimento.latitude),
-            lng: parseFloat(nhe.estabelecimento.longitude),
-            endereco: `${nhe.estabelecimento.logradouro || ''}, ${nhe.estabelecimento.numero || 's/n'} - ${nhe.estabelecimento.bairro || ''}, ${nhe.estabelecimento.cidade || ''}`.trim(),
-            fichasCount
-          });
-        }
-      });
-
-      // Processar CIEVS
-      cievsWithLocation.forEach((cievs: any) => {
-        if (cievs.estabelecimento && cievs.estabelecimento.latitude && cievs.estabelecimento.longitude) {
-          const fichasCount = comunicacoesParaContar.filter(
-            c => c.origem_tipo === 'CIEVS' && c.origem_id === cievs.id_cievs
-          ).length;
-
-          localizacoesData.push({
-            id: `cievs-${cievs.id_cievs}`,
-            nome: cievs.nome,
-            tipo: 'CIEVS' as LocalizacaoTipo,
-            lat: parseFloat(cievs.estabelecimento.latitude),
-            lng: parseFloat(cievs.estabelecimento.longitude),
-            endereco: `${cievs.estabelecimento.logradouro || ''}, ${cievs.estabelecimento.numero || 's/n'} - ${cievs.estabelecimento.bairro || ''}, ${cievs.estabelecimento.cidade || ''}`.trim(),
-            fichasCount
-          });
-        }
-      });
-
-      // Processar CRS
-      crsWithLocation.forEach((crs: any) => {
-        if (crs.estabelecimento && crs.estabelecimento.latitude && crs.estabelecimento.longitude) {
-          const fichasCount = comunicacoesParaContar.filter(
-            c => c.origem_tipo === 'CRS' && c.origem_id === crs.id_crs
-          ).length;
-
-          localizacoesData.push({
-            id: `crs-${crs.id_crs}`,
-            nome: crs.nome,
-            tipo: 'CRS' as LocalizacaoTipo,
-            lat: parseFloat(crs.estabelecimento.latitude),
-            lng: parseFloat(crs.estabelecimento.longitude),
-            endereco: `${crs.estabelecimento.logradouro || ''}, ${crs.estabelecimento.numero || 's/n'} - ${crs.estabelecimento.bairro || ''}, ${crs.estabelecimento.cidade || ''}`.trim(),
-            fichasCount
-          });
-        }
-      });
-
-      setLocalizacoes(localizacoesData);
-    } catch (err) {
-      console.error('Erro ao carregar localizações:', err);
-    }
-  }, []);
-
-  // Registrar função de refresh para uso do auto-refresh
-  useEffect(() => {
-    refreshDataRef.current = loadAllData;
-  }, []);
+  }, [loadAllData]);
+  const {
+    autoRefreshEnabled,
+    autoRefreshCountdown,
+    toggleAutoRefresh
+  } = useDashboardAutoRefresh(refreshDashboardData, {
+    intervalSeconds: 60,
+    enabledByDefault: true
+  });
 
   // Restaurar posição do scroll após atualização dos dados
   useEffect(() => {
@@ -305,210 +162,27 @@ const ComunicacaoDaeDashboard: React.FC = () => {
     }
   }, [loading, comunicacoes]);
 
-  // Configurar auto-refresh
-  useEffect(() => {
-    // Limpar intervalo anterior se existir
-    if (autoRefreshInterval.current) {
-      clearInterval(autoRefreshInterval.current);
-      autoRefreshInterval.current = null;
-    }
-
-    // Se a atualização automática está habilitada, configurar o intervalo
-    if (autoRefreshEnabled) {
-      // Configurar o contador regressivo - 60 segundos (1 minuto)
-      let countdown = 60;
-      setAutoRefreshCountdown(countdown);
-      
-      // Atualizar o contador a cada segundo
-      const countdownTimer = setInterval(() => {
-        countdown -= 1;
-        setAutoRefreshCountdown(countdown);
-        
-        // Quando o contador chegar a zero, atualizar os dados
-        if (countdown <= 0) {
-          refreshDataRef.current && refreshDataRef.current();
-          countdown = 60; // Resetar para 60 segundos
-          setAutoRefreshCountdown(countdown);
-        }
-      }, 1000);
-      
-      autoRefreshInterval.current = countdownTimer;
-    }
-
-    // Cleanup: limpar intervalo quando componente desmontar ou autoRefresh mudar
-    return () => {
-      if (autoRefreshInterval.current) {
-        clearInterval(autoRefreshInterval.current);
-        autoRefreshInterval.current = null;
-      }
-    };
-  }, [autoRefreshEnabled]);
-
-  const toggleAutoRefresh = useCallback(() => {
-    setAutoRefreshEnabled(prev => !prev);
-  }, []);
-
-  // Função para limpar todos os filtros
-  const clearAllFilters = useCallback(() => {
-    setActiveFilters({
-      origem_tipo: null,
-      origem_id: null,
-      dae_id: null,
-      municipio_id: null,
-      municipio_residencia_id: null
-    });
-    setDataInicio('');
-    setDataFim('');
-    setHoraInicio('');
-    setHoraFim('');
-  }, []);
-
-  // Contar quantos filtros estão ativos
-  const activeFiltersCount = useMemo(() => {
-    let count = 0;
-    Object.values(activeFilters).forEach(value => {
-      if (value !== null) {
-        if (Array.isArray(value)) {
-          count += value.length;
-        } else {
-          count += 1;
-        }
-      }
-    });
-    return count;
-  }, [activeFilters]);
-
-  // Aplicar filtros de data e hora
-  const comunicacoesFiltradas = useMemo(() => {
-    let filtered = [...comunicacoes];
-
-    if (dataInicio) {
-      // Criar data início no formato local (00:00:00)
-      const [ano, mes, dia] = dataInicio.split('-').map(Number);
-      const dataInicioObj = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
-      
-      filtered = filtered.filter(c => {
-        const dataCom = new Date(c.data_comunicacao);
-        return dataCom >= dataInicioObj;
-      });
-    }
-    
-    if (dataFim) {
-      // Criar data fim no formato local (23:59:59)
-      const [ano, mes, dia] = dataFim.split('-').map(Number);
-      const dataFimObj = new Date(ano, mes - 1, dia, 23, 59, 59, 999);
-      
-      filtered = filtered.filter(c => {
-        const dataCom = new Date(c.data_comunicacao);
-        return dataCom <= dataFimObj;
-      });
-    }
-
-    if (horaInicio || horaFim) {
-      filtered = filtered.filter(c => {
-        const dataCom = new Date(c.data_comunicacao);
-        const hora = dataCom.getHours();
-        const minuto = dataCom.getMinutes();
-        const horaAtual = hora * 60 + minuto;
-
-        let passaHoraInicio = true;
-        let passaHoraFim = true;
-
-        if (horaInicio) {
-          const [h, m] = horaInicio.split(':').map(Number);
-          const horaInicioMin = h * 60 + m;
-          passaHoraInicio = horaAtual >= horaInicioMin;
-        }
-
-        if (horaFim) {
-          const [h, m] = horaFim.split(':').map(Number);
-          const horaFimMin = h * 60 + m;
-          passaHoraFim = horaAtual <= horaFimMin;
-        }
-
-        return passaHoraInicio && passaHoraFim;
-      });
-    }
-
-    return filtered;
-  }, [comunicacoes, dataInicio, dataFim, horaInicio, horaFim]);
-
-  // Função helper para verificar se valor está no filtro (suporta string simples ou array)
-  const matchesFilter = (value: any, filterValue: any): boolean => {
-    if (!filterValue) return true;
-    if (Array.isArray(filterValue)) {
-      return filterValue.includes(value);
-    }
-    return value === filterValue;
-  };
-
-  // Função helper para verificar se um item está ativo no filtro (para UI)
-  const isFilterActive = (value: any, filterValue: any): boolean => {
-    if (!filterValue) return false;
-    if (Array.isArray(filterValue)) {
-      return filterValue.includes(value);
-    }
-    return value === filterValue;
-  };
-
-  // Função para obter cor com opacidade baseado no filtro
-  const getCellColor = (itemId: any, filterValue: any, baseColor: string): string => {
-    const hasFilter = filterValue && (Array.isArray(filterValue) ? filterValue.length > 0 : true);
-    if (!hasFilter) return baseColor;
-    if (isFilterActive(itemId, filterValue)) return baseColor;
-    // Adicionar 30% de opacidade (hexadecimal 4D)
-    return baseColor + "4D";
-  };
-
-  // Aplicar filtros ativos de gráficos (com suporte a seleção múltipla)
-  const dadosFiltrados = useMemo(() => {
-    let filtered = [...comunicacoesFiltradas];
-
-    if (activeFilters.origem_tipo) {
-      filtered = filtered.filter(c => matchesFilter(c.origem_tipo, activeFilters.origem_tipo));
-    }
-    if (activeFilters.origem_id) {
-      filtered = filtered.filter(c => matchesFilter(c.origem_id, activeFilters.origem_id));
-    }
-    if (activeFilters.dae_id) {
-      filtered = filtered.filter((c) => matchesDaeDashboardFilter(c, activeFilters.dae_id));
-    }
-    if (activeFilters.municipio_id) {
-      filtered = filtered.filter(c => matchesFilter(c.id_municipio_ocorrencia, activeFilters.municipio_id));
-    }
-    if (activeFilters.municipio_residencia_id) {
-      filtered = filtered.filter(c => matchesFilter(c.id_municipio_residencia, activeFilters.municipio_residencia_id));
-    }
-
-    return filtered;
-  }, [comunicacoesFiltradas, activeFilters]);
-
-  // Calcular estatísticas
-  const stats: DashboardStats = useMemo(() => {
-    const calculatedStats = {
-      total: dadosFiltrados.length,
-      crs: dadosFiltrados.filter(c => c.origem_tipo === 'CRS').length,
-      nhe: dadosFiltrados.filter(c => c.origem_tipo === 'NHE').length,
-      cievs: dadosFiltrados.filter(c => c.origem_tipo === 'CIEVS').length,
-    };
-    console.log('📊 Stats calculados:', calculatedStats);
-    return calculatedStats;
-  }, [dadosFiltrados]);
-
-  // No escopo restrito, exibir apenas cards dos tipos realmente disponíveis ao usuário.
-  const visibleOrigemCards = useMemo<OrigemTipo[]>(() => {
-    const allTypes: OrigemTipo[] = ['CRS', 'NHE', 'CIEVS'];
-    if (!isRestrictedOriginView) return allTypes;
-
-    const availableTypes = new Set(
-      comunicacoes
-        .map(c => c.origem_tipo)
-        .filter((tipo): tipo is OrigemTipo => tipo === 'CRS' || tipo === 'NHE' || tipo === 'CIEVS')
-    );
-
-    const restrictedTypes = allTypes.filter(tipo => availableTypes.has(tipo));
-    return restrictedTypes.length > 0 ? restrictedTypes : allTypes;
-  }, [isRestrictedOriginView, comunicacoes]);
+  const {
+    stats,
+    visibleOrigemCards,
+    dadosSerieTemporalData,
+    dadosSemanaEpidemiologica,
+    dadosMunicipios,
+    dadosMunicipiosResidencia,
+    dadosDae,
+    dadosCrs,
+    dadosNhe,
+    dadosCievs,
+  } = useComunicacaoDaeDashboardCharts({
+    comunicacoes,
+    comunicacoesFiltradas,
+    dadosFiltrados,
+    activeFilters,
+    isRestrictedOriginView,
+    crsList,
+    nheList,
+    cievsList,
+  });
 
   const summaryCardSpanClass = useMemo(() => {
     const totalCards = 1 + visibleOrigemCards.length; // +1 = card "Total"
@@ -518,278 +192,6 @@ const ComunicacaoDaeDashboard: React.FC = () => {
     return 'sm:col-span-2 lg:col-span-2 xl:col-span-2';
   }, [visibleOrigemCards]);
 
-  // Dados para série temporal
-  const dadosSerieTemporalData = useMemo(() => {
-    const dateMap = new Map<string, { CRS: number; NHE: number; CIEVS: number; total: number }>();
-
-    dadosFiltrados.forEach(c => {
-      const date = new Date(c.data_comunicacao);
-      const dateStr = date.toLocaleDateString('en-CA', { timeZone: 'America/Belem' }); // YYYY-MM-DD no fuso de Belém
-
-      if (!dateMap.has(dateStr)) {
-        dateMap.set(dateStr, { CRS: 0, NHE: 0, CIEVS: 0, total: 0 });
-      }
-
-      const data = dateMap.get(dateStr)!;
-      data.total++;
-      
-      if (c.origem_tipo === 'CRS') data.CRS++;
-      else if (c.origem_tipo === 'NHE') data.NHE++;
-      else if (c.origem_tipo === 'CIEVS') data.CIEVS++;
-    });
-
-    return Array.from(dateMap.entries())
-      .sort(([a], [b]) => a.localeCompare(b)) // ordena pela chave YYYY-MM-DD diretamente
-      .slice(-30)
-      .map(([date, data]) => ({
-        date: `${date.slice(8, 10)}/${date.slice(5, 7)}`, // "2026-05-07" → "07/05" sem passar por new Date()
-        ...data
-      }));
-  }, [dadosFiltrados]);
-
-  // Dados por semana epidemiológica
-  const dadosSemanaEpidemiologica = useMemo(() => {
-    const seMap = new Map<string, { semana: number; ano: number; value: number }>();
-
-    dadosFiltrados.forEach(c => {
-      const se = calcularSemanaEpidemiologica(c.data_comunicacao);
-      if (!se) return;
-      const key = `${se.ano}-${se.semana.toString().padStart(2, '0')}`;
-      if (!seMap.has(key)) {
-        seMap.set(key, { semana: se.semana, ano: se.ano, value: 0 });
-      }
-      seMap.get(key)!.value++;
-    });
-
-    return Array.from(seMap.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([, d]) => ({
-        name: `SE ${d.semana.toString().padStart(2, '0')}`,
-        ano: d.ano,
-        value: d.value,
-      }));
-  }, [dadosFiltrados]);
-
-  // Dados para gráfico de municípios
-  const dadosMunicipios = useMemo(() => {
-    const excludingMunicipio = activeFilters.municipio_id
-      ? comunicacoesFiltradas.filter(c => 
-          (!activeFilters.origem_tipo || c.origem_tipo === activeFilters.origem_tipo) &&
-          (!activeFilters.origem_id || c.origem_id === activeFilters.origem_id) &&
-          matchesDaeDashboardFilter(c, activeFilters.dae_id) &&
-          (!activeFilters.municipio_residencia_id || c.id_municipio_residencia === activeFilters.municipio_residencia_id)
-        )
-      : dadosFiltrados;
-
-    const counts = excludingMunicipio.reduce((acc, com) => {
-      const municipio = com.tipo_municipio?.descricao || 'Não informado';
-      const id = com.id_municipio_ocorrencia;
-      const key = `${id}_${municipio}`;
-      if (!acc[key]) {
-        acc[key] = { name: municipio, value: 0, id };
-      }
-      acc[key].value++;
-      return acc;
-    }, {} as Record<string, ChartDataItem>);
-
-    return Object.values(counts).sort((a, b) => b.value - a.value).slice(0, 10);
-  }, [comunicacoesFiltradas, activeFilters, dadosFiltrados]);
-
-  // Dados para gráfico de municípios de residência
-  const dadosMunicipiosResidencia = useMemo(() => {
-    const excludingMunicipioResidencia = activeFilters.municipio_residencia_id
-      ? comunicacoesFiltradas.filter(c =>
-          (!activeFilters.origem_tipo || c.origem_tipo === activeFilters.origem_tipo) &&
-          (!activeFilters.origem_id || c.origem_id === activeFilters.origem_id) &&
-          matchesDaeDashboardFilter(c, activeFilters.dae_id) &&
-          (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id)
-        )
-      : dadosFiltrados;
-
-    const counts = excludingMunicipioResidencia.reduce((acc, com) => {
-      const municipio = com.tipo_municipio_residencia?.descricao || 'Não informado';
-      const id = com.id_municipio_residencia;
-      const key = `${id}_${municipio}`;
-      if (!acc[key]) {
-        acc[key] = { name: municipio, value: 0, id };
-      }
-      acc[key].value++;
-      return acc;
-    }, {} as Record<string, ChartDataItem>);
-
-    return Object.values(counts).sort((a, b) => b.value - a.value).slice(0, 10);
-  }, [comunicacoesFiltradas, activeFilters, dadosFiltrados]);
-
-  // Dados para gráfico de DAE (Agravos)
-  const dadosDae = useMemo(() => {
-    const excludingDae = activeFilters.dae_id
-      ? comunicacoesFiltradas.filter(c => 
-          (!activeFilters.origem_tipo || c.origem_tipo === activeFilters.origem_tipo) &&
-          (!activeFilters.origem_id || c.origem_id === activeFilters.origem_id) &&
-          (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id) &&
-          (!activeFilters.municipio_residencia_id || c.id_municipio_residencia === activeFilters.municipio_residencia_id)
-        )
-      : dadosFiltrados;
-
-    const counts = excludingDae.reduce((acc, com) => {
-      const ids = getComunicacaoDaeAgravoIds(com);
-      for (const agravoId of ids) {
-        const nome =
-          com.daes?.find((d) => d.id_dae === agravoId)?.nome ||
-          (agravoId === com.id_dae ? com.dae?.nome : undefined) ||
-          'Não informado';
-        const key = `dae_${agravoId}`;
-        if (!acc[key]) {
-          acc[key] = { name: nome, value: 0, id: agravoId };
-        }
-        acc[key].value++;
-      }
-      return acc;
-    }, {} as Record<string, ChartDataItem>);
-
-    return Object.values(counts).sort((a, b) => b.value - a.value).slice(0, 15);
-  }, [comunicacoesFiltradas, activeFilters, dadosFiltrados]);
-
-  // Mapas para buscar nomes descritivos por ID
-  const crsMap = useMemo(() => {
-    const map = new Map<number, string>();
-    crsList.forEach(crs => map.set(crs.id_crs, crs.nome));
-    return map;
-  }, [crsList]);
-
-  const nheMap = useMemo(() => {
-    const map = new Map<number, string>();
-    nheList.forEach(nhe => map.set(nhe.id_nhe, nhe.nome));
-    return map;
-  }, [nheList]);
-
-  const cievsMap = useMemo(() => {
-    const map = new Map<number, string>();
-    cievsList.forEach(cievs => map.set(cievs.id_cievs, cievs.nome));
-    return map;
-  }, [cievsList]);
-
-  // Dados para gráfico de CRS (todos os 13) - se origem_tipo estiver filtrado e não for CRS, ou se origem_id de outro tipo estiver filtrado, retornar vazio
-  const dadosCrs = useMemo(() => {
-    // Se filtrou por origem_tipo e não é CRS, retornar vazio
-    if (activeFilters.origem_tipo && activeFilters.origem_tipo !== 'CRS') {
-      return [];
-    }
-
-    // Se filtrou por origem_id, verificar se é de um tipo diferente
-    if (activeFilters.origem_id) {
-      const origemIds = Array.isArray(activeFilters.origem_id) ? activeFilters.origem_id : [activeFilters.origem_id];
-      const temCrsNaSelecao = comunicacoesFiltradas.some(c => 
-        c.origem_tipo === 'CRS' && origemIds.includes(c.origem_id)
-      );
-      // Se não tem CRS na seleção, retornar vazio
-      if (!temCrsNaSelecao) {
-        return [];
-      }
-    }
-
-    const excludingOrigemId = activeFilters.origem_id
-      ? comunicacoesFiltradas.filter(c => 
-          c.origem_tipo === 'CRS' &&
-          matchesDaeDashboardFilter(c, activeFilters.dae_id) &&
-          (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id) &&
-          (!activeFilters.municipio_residencia_id || c.id_municipio_residencia === activeFilters.municipio_residencia_id)
-        )
-      : comunicacoesFiltradas.filter(c => c.origem_tipo === 'CRS');
-
-    const counts = excludingOrigemId.reduce((acc, com) => {
-      const crsName = crsMap.get(com.origem_id) || `CRS ${com.origem_id}`;
-      if (!acc[crsName]) {
-        acc[crsName] = { name: crsName, value: 0, id: com.origem_id };
-      }
-      acc[crsName].value++;
-      return acc;
-    }, {} as Record<string, ChartDataItem>);
-
-    return Object.values(counts).sort((a, b) => b.value - a.value);
-  }, [comunicacoesFiltradas, activeFilters.origem_tipo, activeFilters.origem_id, activeFilters.dae_id, activeFilters.municipio_id, activeFilters.municipio_residencia_id, crsMap]);
-
-  // Dados para gráfico de NHE - se origem_tipo estiver filtrado e não for NHE, ou se origem_id de outro tipo estiver filtrado, retornar vazio
-  const dadosNhe = useMemo(() => {
-    // Se filtrou por origem_tipo e não é NHE, retornar vazio
-    if (activeFilters.origem_tipo && activeFilters.origem_tipo !== 'NHE') {
-      return [];
-    }
-
-    // Se filtrou por origem_id, verificar se é de um tipo diferente
-    if (activeFilters.origem_id) {
-      const origemIds = Array.isArray(activeFilters.origem_id) ? activeFilters.origem_id : [activeFilters.origem_id];
-      const temNheNaSelecao = comunicacoesFiltradas.some(c => 
-        c.origem_tipo === 'NHE' && origemIds.includes(c.origem_id)
-      );
-      // Se não tem NHE na seleção, retornar vazio
-      if (!temNheNaSelecao) {
-        return [];
-      }
-    }
-
-    const excludingOrigemId = activeFilters.origem_id
-      ? comunicacoesFiltradas.filter(c => 
-          c.origem_tipo === 'NHE' &&
-          matchesDaeDashboardFilter(c, activeFilters.dae_id) &&
-          (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id) &&
-          (!activeFilters.municipio_residencia_id || c.id_municipio_residencia === activeFilters.municipio_residencia_id)
-        )
-      : comunicacoesFiltradas.filter(c => c.origem_tipo === 'NHE');
-
-    const counts = excludingOrigemId.reduce((acc, com) => {
-      const nheName = nheMap.get(com.origem_id) || `NHE ${com.origem_id}`;
-      if (!acc[nheName]) {
-        acc[nheName] = { name: nheName, value: 0, id: com.origem_id };
-      }
-      acc[nheName].value++;
-      return acc;
-    }, {} as Record<string, ChartDataItem>);
-
-    return Object.values(counts).sort((a, b) => b.value - a.value).slice(0, 10);
-  }, [comunicacoesFiltradas, activeFilters.origem_tipo, activeFilters.origem_id, activeFilters.dae_id, activeFilters.municipio_id, activeFilters.municipio_residencia_id, nheMap]);
-
-  // Dados para gráfico de CIEVS (todos os 11) - se origem_tipo estiver filtrado e não for CIEVS, ou se origem_id de outro tipo estiver filtrado, retornar vazio
-  const dadosCievs = useMemo(() => {
-    // Se filtrou por origem_tipo e não é CIEVS, retornar vazio
-    if (activeFilters.origem_tipo && activeFilters.origem_tipo !== 'CIEVS') {
-      return [];
-    }
-
-    // Se filtrou por origem_id, verificar se é de um tipo diferente
-    if (activeFilters.origem_id) {
-      const origemIds = Array.isArray(activeFilters.origem_id) ? activeFilters.origem_id : [activeFilters.origem_id];
-      const temCievsNaSelecao = comunicacoesFiltradas.some(c => 
-        c.origem_tipo === 'CIEVS' && origemIds.includes(c.origem_id)
-      );
-      // Se não tem CIEVS na seleção, retornar vazio
-      if (!temCievsNaSelecao) {
-        return [];
-      }
-    }
-
-    const excludingOrigemId = activeFilters.origem_id
-      ? comunicacoesFiltradas.filter(c => 
-          c.origem_tipo === 'CIEVS' &&
-          matchesDaeDashboardFilter(c, activeFilters.dae_id) &&
-          (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id) &&
-          (!activeFilters.municipio_residencia_id || c.id_municipio_residencia === activeFilters.municipio_residencia_id)
-        )
-      : comunicacoesFiltradas.filter(c => c.origem_tipo === 'CIEVS');
-
-    const counts = excludingOrigemId.reduce((acc, com) => {
-      const cievsName = cievsMap.get(com.origem_id) || `CIEVS ${com.origem_id}`;
-      if (!acc[cievsName]) {
-        acc[cievsName] = { name: cievsName, value: 0, id: com.origem_id };
-      }
-      acc[cievsName].value++;
-      return acc;
-    }, {} as Record<string, ChartDataItem>);
-
-    return Object.values(counts).sort((a, b) => b.value - a.value);
-  }, [comunicacoesFiltradas, activeFilters.origem_tipo, activeFilters.origem_id, activeFilters.dae_id, activeFilters.municipio_id, activeFilters.municipio_residencia_id, cievsMap]);
-
-
   // 🗺️ Atualizar localizações do mapa sempre que os filtros ou dados mudarem
   useEffect(() => {
     if (comunicacoes.length > 0 && !loading && !isRestrictedOriginView) {
@@ -797,39 +199,6 @@ const ComunicacaoDaeDashboard: React.FC = () => {
       loadLocalizacoes(comunicacoes, dadosFiltrados);
     }
   }, [comunicacoes, dadosFiltrados, loading, loadLocalizacoes, isRestrictedOriginView]);
-
-  // Função para alternar filtros (com suporte a seleção múltipla)
-  const toggleFilter = useCallback((filterKey: keyof ActiveFilters, value: any, multiSelect = false) => {
-    setActiveFilters(prev => {
-      const newFilters = { ...prev };
-      const currVal = newFilters[filterKey];
-
-      if (multiSelect) {
-        // Modo de seleção múltipla (Ctrl pressionado)
-        const vals = Array.isArray(currVal) ? currVal : currVal ? [currVal] : [];
-        
-        if (vals.includes(value)) {
-          // Remove o valor se já estiver selecionado
-          const updated = vals.filter(v => v !== value);
-          newFilters[filterKey] = updated.length ? (updated as any) : null;
-        } else {
-          // Adiciona o novo valor ao array
-          newFilters[filterKey] = [...vals, value] as any;
-        }
-      } else {
-        // Modo de seleção simples (comportamento padrão)
-        // Se clicar no mesmo item, remove o filtro; senão, substitui
-        if (currVal === value || (Array.isArray(currVal) && currVal.length === 1 && currVal[0] === value)) {
-          newFilters[filterKey] = null;
-        } else {
-          newFilters[filterKey] = value as any;
-        }
-      }
-      
-      console.log(`🎯 Filtro alterado:`, { filterKey, value, multiSelect, newValue: newFilters[filterKey] });
-      return newFilters;
-    });
-  }, []);
 
   // Verificar se há filtros ativos
   const hasActiveFilters = 
@@ -848,193 +217,38 @@ const ComunicacaoDaeDashboard: React.FC = () => {
     }
   };
 
-  // Formatar data
-  const formatDate = (dateString: string) => {
-    if (!dateString) return 'N/A';
-    try {
-      return new Date(dateString).toLocaleDateString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch {
-      return dateString;
-    }
-  };
+  const handleOpenComunicacaoView = useCallback((com: ComunicacaoDae) => {
+    setSelectedComunicacao(com);
+    setFichaModalMode('view');
+    setShowFichaModal(true);
+  }, []);
 
-  // Modal de Comunicações
-  const ComunicacoesModal = useMemo(() => {
-    if (!showComunicacoesModal) return null;
+  const handleOpenComunicacaoEdit = useCallback((com: ComunicacaoDae) => {
+    setSelectedComunicacao(com);
+    setFichaModalMode('edit');
+    setShowFichaModal(true);
+  }, []);
 
-    const comunicacoesOrdenadas = [...dadosFiltrados].sort((a, b) => {
-      return new Date(b.data_comunicacao).getTime() - new Date(a.data_comunicacao).getTime();
-    });
+  const handleCloseMenu = useCallback(() => {
+    setIsMenuOpen(false);
+  }, []);
 
-    const comunicacoesPesquisadas = comunicacoesOrdenadas.filter(com => {
-      if (!modalSearchTerm) return true;
-      const termo = modalSearchTerm.toLowerCase();
-      return (
-        com.id_comunicacao?.toString().includes(termo) ||
-        com.nome_paciente?.toLowerCase().includes(termo) ||
-        com.dae?.nome?.toLowerCase().includes(termo) ||
-        com.tipo_municipio?.descricao?.toLowerCase().includes(termo) ||
-        com.tipo_municipio_residencia?.descricao?.toLowerCase().includes(termo) ||
-        com.origem_tipo?.toLowerCase().includes(termo)
-      );
-    });
+  const handleCloseComunicacoesModal = useCallback(() => {
+    setShowComunicacoesModal(false);
+  }, []);
 
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
-        <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] sm:max-h-[85vh] overflow-hidden">
-          {/* Header */}
-          <div className="p-4 sm:p-6 border-b border-gray-200">
-            <div className="flex items-start sm:items-center justify-between mb-4 gap-3">
-              <div className="flex items-center gap-3">
-                <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
-                <div>
-                  <h2 className="text-lg sm:text-xl font-bold text-gray-900">
-                    Comunicações DAE
-                  </h2>
-                  <p className="text-sm text-gray-600">
-                    {comunicacoesPesquisadas.length} de {comunicacoesOrdenadas.length} comunicação(ões)
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowComunicacoesModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+  const handleOpenLocalizacaoModal = useCallback((loc: LocalizacaoMapa) => {
+    setSelectedLocalizacao(loc);
+    setShowLocalizacaoModal(true);
+  }, []);
 
-            {/* Campo de Pesquisa */}
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Pesquisar por ID, paciente, DAE, município, origem..."
-                value={modalSearchTerm}
-                onChange={(e) => setModalSearchTerm(e.target.value)}
-                className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              {modalSearchTerm && (
-                <button
-                  onClick={() => setModalSearchTerm('')}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          </div>
+  const handleCloseLocalizacaoModal = useCallback(() => {
+    setShowLocalizacaoModal(false);
+  }, []);
 
-          {/* Lista de Comunicações */}
-          <div className="p-3 sm:p-6 overflow-y-auto max-h-[calc(90vh-180px)] sm:max-h-[calc(85vh-200px)]">
-            {comunicacoesPesquisadas.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-                <Search className="h-16 w-16 mb-4 text-gray-300" />
-                <p className="text-lg font-medium">Nenhuma comunicação encontrada</p>
-                <p className="text-sm">Tente ajustar os filtros ou o termo de pesquisa</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {comunicacoesPesquisadas.map((com) => (
-                  <div
-                    key={com.id_comunicacao}
-                    className="bg-gray-50 rounded-lg p-3 sm:p-4 hover:bg-gray-100 transition-colors border border-gray-200"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                      {/* Info Principal */}
-                      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {/* Coluna 1 */}
-                        <div>
-                          <p className="text-xs text-gray-500 mb-1">ID / Paciente</p>
-                          <p className="font-semibold text-gray-900">#{com.id_comunicacao}</p>
-                          <p className="text-sm text-gray-700">{com.nome_paciente || 'Não informado'}</p>
-                        </div>
-
-                        {/* Coluna 2 */}
-                        <div>
-                          <p className="text-xs text-gray-500 mb-1">DAE / Origem</p>
-                          <p className="text-sm font-medium text-gray-900">{com.dae?.nome || 'Não informado'}</p>
-                          <p className="text-sm">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                              com.origem_tipo === 'CRS' ? 'bg-blue-100 text-blue-800' :
-                              com.origem_tipo === 'NHE' ? 'bg-green-100 text-green-800' :
-                              com.origem_tipo === 'CIEVS' ? 'bg-purple-100 text-purple-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {com.origem_tipo}
-                            </span>
-                          </p>
-                        </div>
-
-                        {/* Coluna 3 */}
-                        <div>
-                          <p className="text-xs text-gray-500 mb-1">Município Ocorrência / Residência</p>
-                          <p className="text-sm text-gray-700">
-                            Ocor.: {com.tipo_municipio?.descricao || 'Não informado'}
-                          </p>
-                          <p className="text-xs text-gray-600">
-                            Res.: {com.tipo_municipio_residencia?.descricao || 'Não informado'}
-                          </p>
-                          <p className="text-xs text-gray-600">{formatDate(com.data_comunicacao)}</p>
-                        </div>
-                      </div>
-
-                      {/* Ações */}
-                      <div className="flex sm:flex-col gap-2">
-                        <button
-                          onClick={() => {
-                            setSelectedComunicacao(com);
-                            setFichaModalMode('view');
-                            setShowFichaModal(true);
-                          }}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Visualizar em modal"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedComunicacao(com);
-                            setFichaModalMode('edit');
-                            setShowFichaModal(true);
-                          }}
-                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                          title="Editar em modal"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="p-4 border-t border-gray-200 bg-gray-50">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <p className="text-sm text-gray-600">
-                Total: {comunicacoesPesquisadas.length} comunicação(ões)
-              </p>
-              <button
-                onClick={() => setShowComunicacoesModal(false)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors w-full sm:w-auto"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }, [showComunicacoesModal, dadosFiltrados, modalSearchTerm, navigate]);
+  const handleCloseFichaModal = useCallback(() => {
+    setShowFichaModal(false);
+  }, []);
 
   if (loading) {
     return (
@@ -1049,8 +263,15 @@ const ComunicacaoDaeDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Modal de Comunicações */}
-      {ComunicacoesModal}
+      <ComunicacoesModal
+        isOpen={showComunicacoesModal}
+        comunicacoes={dadosFiltrados}
+        modalSearchTerm={modalSearchTerm}
+        onSearchTermChange={setModalSearchTerm}
+        onClose={handleCloseComunicacoesModal}
+        onOpenView={handleOpenComunicacaoView}
+        onOpenEdit={handleOpenComunicacaoEdit}
+      />
 
       {/* Header */}
       <header className="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-xl sticky top-0 z-40">
@@ -1084,7 +305,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
               {/* Botões de Ação */}
               <div className="flex flex-wrap justify-end gap-2" data-export-menu>
                 <button
-                  onClick={loadAllData}
+                  onClick={refreshDashboardData}
                   disabled={loading}
                   className="flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50 text-xs sm:text-sm"
                 >
@@ -1142,7 +363,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
         </div>
       </header>
 
-      <SideMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
+      <SideMenu isOpen={isMenuOpen} onClose={handleCloseMenu} />
 
       {/* Indicador de seleção múltipla ativa */}
       {isCtrlPressed && (
@@ -2423,10 +1644,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
             <MapProviderProvider>
               <MapaDashboardDAE 
                 localizacoes={localizacoes.filter(loc => (loc.fichasCount || 0) > 0)}
-                onLocalizacaoClick={(loc) => {
-                  setSelectedLocalizacao(loc);
-                  setShowLocalizacaoModal(true);
-                }}
+                onLocalizacaoClick={handleOpenLocalizacaoModal}
               />
             </MapProviderProvider>
           </div>
@@ -2457,210 +1675,21 @@ const ComunicacaoDaeDashboard: React.FC = () => {
         </div>
       </main>
 
-      {/* Modal de Fichas por Localização */}
-      {showLocalizacaoModal && selectedLocalizacao && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-3 sm:p-4"
-          style={{ zIndex: 9999 }}
-          onClick={() => setShowLocalizacaoModal(false)}
-        >
-          <div 
-            className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] sm:max-h-[80vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header do Modal */}
-            <div className={`p-4 sm:p-6 border-b flex items-start sm:items-center justify-between gap-3 ${
-              selectedLocalizacao.tipo === 'NHE' ? 'bg-green-50' :
-              selectedLocalizacao.tipo === 'CIEVS' ? 'bg-purple-50' :
-              'bg-orange-50'
-            }`}>
-              <div className="flex items-center gap-3">
-                <div className={`w-4 h-4 rounded-full ${
-                  selectedLocalizacao.tipo === 'NHE' ? 'bg-green-600' :
-                  selectedLocalizacao.tipo === 'CIEVS' ? 'bg-purple-600' :
-                  'bg-orange-600'
-                }`}></div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {selectedLocalizacao.nome}
-                  </h3>
-                  <p className="text-sm text-gray-600">
-                    {selectedLocalizacao.tipo} • {selectedLocalizacao.fichasCount} ficha(s)
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowLocalizacaoModal(false)}
-                className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      <LocalizacaoComunicacoesModal
+        isOpen={showLocalizacaoModal}
+        selectedLocalizacao={selectedLocalizacao}
+        dadosFiltrados={dadosFiltrados}
+        onClose={handleCloseLocalizacaoModal}
+        onOpenView={handleOpenComunicacaoView}
+        onOpenEdit={handleOpenComunicacaoEdit}
+      />
 
-            {/* Conteúdo do Modal */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-              <div className="mb-4">
-                <p className="text-sm text-gray-600">
-                  <strong>Endereço:</strong> {selectedLocalizacao.endereco}
-                </p>
-              </div>
-
-              {/* Lista de Comunicações */}
-              <div className="space-y-3">
-                <h4 className="font-semibold text-gray-800 mb-3">
-                  Comunicações Relacionadas
-                </h4>
-                
-                {dadosFiltrados
-                  .filter(c => {
-                    const [tipo, id] = selectedLocalizacao.id.split('-');
-                    return c.origem_tipo === tipo.toUpperCase() && 
-                           c.origem_id === parseInt(id);
-                  })
-                  .map((comunicacao, index) => (
-                    <div
-                      key={comunicacao.id_comunicacao}
-                      className="bg-gray-50 p-4 rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded">
-                              #{index + 1}
-                            </span>
-                            <span className="text-sm font-medium text-gray-900">
-                              {comunicacao.nome_paciente || 'Nome não informado'}
-                            </span>
-                          </div>
-                          
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-600">
-                            <div>
-                              <strong>Data:</strong> {new Date(comunicacao.data_comunicacao).toLocaleDateString('pt-BR')}
-                            </div>
-                            <div>
-                              <strong>Hora:</strong> {new Date(comunicacao.data_comunicacao).toLocaleTimeString('pt-BR')}
-                            </div>
-                            <div>
-                              <strong>Município (Ocorrência):</strong> {comunicacao.tipo_municipio?.descricao || 'N/A'}
-                            </div>
-                            <div>
-                              <strong>Município (Residência):</strong> {comunicacao.tipo_municipio_residencia?.descricao || 'N/A'}
-                            </div>
-                            <div><strong>DAE:</strong> {comunicacao.dae?.nome || 'N/A'}</div>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            onClick={() => {
-                              setSelectedComunicacao(comunicacao);
-                              setFichaModalMode('view');
-                              setShowFichaModal(true);
-                            }}
-                            className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1"
-                            title="Visualizar em modal"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                            Ver
-                          </button>
-                          <button
-                            onClick={() => {
-                              setSelectedComunicacao(comunicacao);
-                              setFichaModalMode('edit');
-                              setShowFichaModal(true);
-                            }}
-                            className="px-3 py-1.5 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-1"
-                            title="Editar em modal"
-                          >
-                            <Edit className="h-3.5 w-3.5" />
-                            Editar
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                {dadosFiltrados.filter(c => {
-                  const [tipo, id] = selectedLocalizacao.id.split('-');
-                  return c.origem_tipo === tipo.toUpperCase() && c.origem_id === parseInt(id);
-                }).length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
-                    <FileText className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-                    <p>Nenhuma comunicação encontrada para esta localização</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Footer do Modal */}
-            <div className="p-4 border-t bg-gray-50 flex justify-end">
-              <button
-                onClick={() => setShowLocalizacaoModal(false)}
-                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors font-medium"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Visualização da Ficha */}
-      {showFichaModal && selectedComunicacao && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-3 sm:p-4"
-          style={{ zIndex: 10000 }}
-          onClick={() => setShowFichaModal(false)}
-        >
-          <div 
-            className="bg-white rounded-lg shadow-2xl w-full max-w-6xl h-[95vh] sm:h-[90vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header do Modal */}
-            <div className={`flex items-center justify-between p-4 border-b text-white rounded-t-lg ${
-              fichaModalMode === 'edit' 
-                ? 'bg-gradient-to-r from-green-500 to-green-600' 
-                : 'bg-gradient-to-r from-blue-500 to-blue-600'
-            }`}>
-              <h3 className="text-sm sm:text-lg font-semibold flex items-center gap-2 flex-wrap">
-                {fichaModalMode === 'edit' ? <Edit className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
-                {fichaModalMode === 'edit' ? 'Editar' : 'Visualizar'} Comunicação DAE - ID: {selectedComunicacao.id_comunicacao}
-              </h3>
-              <button
-                onClick={() => setShowFichaModal(false)}
-                className={`p-2 rounded-lg transition-colors ${
-                  fichaModalMode === 'edit' ? 'hover:bg-green-700' : 'hover:bg-blue-700'
-                }`}
-                title="Fechar"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Conteúdo - Iframe com a página real */}
-            <div className="flex-1 overflow-hidden">
-              <iframe
-                src={fichaModalMode === 'edit' 
-                  ? `/private/comunicacao-dae/editar/${selectedComunicacao.id_comunicacao}`
-                  : `/private/comunicacao-dae/${selectedComunicacao.id_comunicacao}`
-                }
-                className="w-full h-full border-0"
-                title={`${fichaModalMode === 'edit' ? 'Edição' : 'Visualização'} da Comunicação DAE`}
-              />
-            </div>
-
-            {/* Footer */}
-            <div className="p-4 border-t bg-gray-50 flex justify-end">
-              <button
-                onClick={() => setShowFichaModal(false)}
-                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors font-medium"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ComunicacaoFichaModal
+        isOpen={showFichaModal}
+        selectedComunicacao={selectedComunicacao}
+        mode={fichaModalMode}
+        onClose={handleCloseFichaModal}
+      />
     </div>
   );
 };

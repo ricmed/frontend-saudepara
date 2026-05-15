@@ -166,7 +166,9 @@ export const FormResponsesPage: React.FC = () => {
 
   const responsesBackTo =
     (location.state as FormResponsesLocationState | null)?.responsesBackTo ??
-    '/private/formularios-admin';
+    (location.pathname.includes('/meus-formularios/')
+      ? '/private/meus-formularios'
+      : '/private/formularios-admin');
 
   const [form, setForm] = useState<Form | null>(null);
   const [loading, setLoading] = useState(true);
@@ -184,7 +186,8 @@ export const FormResponsesPage: React.FC = () => {
   });
 
   const isMonitorOperList = (form?.form_key ?? '').toUpperCase() === MONITOR_OPER_REGIONAL_KEY;
-  const canDeleteResponse = Array.isArray((user as any)?.roles) && (user as any).roles.some((role: string) => role === 'admin');
+  const isGlobalAdmin = Array.isArray((user as any)?.roles) && (user as any).roles.some((role: string) => role === 'admin');
+  const canDeleteResponse = isGlobalAdmin || form?.my_role === 'ADMIN';
 
   const activeSchema = resolveActiveSchema(form);
   const refMapsNeeded = useMemo(() => collectSchemaReferenceMapsNeeded(activeSchema), [activeSchema]);

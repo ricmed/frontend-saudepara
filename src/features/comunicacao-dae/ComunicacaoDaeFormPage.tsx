@@ -33,11 +33,14 @@ import ConnectionStatus from '@/components/ConnectionStatus';
 import indexedDBService from '@/services/indexedDB';
 import { getLocalDateTime, convertUTCToLocalDateTime, calcularSemanaEpidemiologica } from '@/utils/timezoneUtils';
 import { useAuth } from '@/keycloak/AuthProvider';
+import { getRuntimeApiRoot } from '@/config/runtimeApiBase';
 import {
   ComunicacaoDaeFormExportData,
   exportarComunicacaoDaeFormularioPDF,
   exportarComunicacaoDaeFormularioWord,
 } from './components/formDocumentExporters';
+import { useComunicacaoDaeForm } from './hooks/useComunicacaoDaeForm';
+import { useComunicacaoDaeValidation } from './hooks/useComunicacaoDaeValidation';
 
 // Função para normalizar texto (remover acentos e converter para maiúsculas)
 const normalizeText = (text: string): string => {
@@ -81,20 +84,6 @@ const ComunicacaoDaeFormPage: React.FC = () => {
     }));
   };
 
-  // Dados do formulário
-  const [formData, setFormData] = useState<CreateComunicacaoDaeData>({
-    data_comunicacao: getLocalDateTime(),
-    nome_paciente: '',
-    observacao_descricao: '',
-    digitador: '',
-    telefone_digitador: '',
-    id_municipio_ocorrencia: 0,
-    id_municipio_residencia: 0,
-    origem_tipo: 'CRS' as OrigemTipo,
-    origem_id: 0,
-    id_daes: [],
-  });
-
   // Dados adicionais para exibição
   const [comunicacaoCompleta, setComunicacaoCompleta] = useState<ComunicacaoDae | null>(null);
 
@@ -107,6 +96,17 @@ const ComunicacaoDaeFormPage: React.FC = () => {
   const [lockOrigemSelection, setLockOrigemSelection] = useState(false);
   const [origemPreSelecionadaNome, setOrigemPreSelecionadaNome] = useState<string | null>(null);
   const [isOriginScopeInitialized, setIsOriginScopeInitialized] = useState(false);
+
+  const {
+    formData,
+    setFormData,
+    resetFormData
+  } = useComunicacaoDaeForm({
+    isEditMode,
+    lockOrigemSelection,
+    allowedOrigemTipos
+  });
+  const { validateAndBuildPayload } = useComunicacaoDaeValidation();
 
   // Estados para UF e município
   const [ufOcorrencia, setUfOcorrencia] = useState<string>('15'); // Pará por padrão
@@ -127,23 +127,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
   // Função para limpar o formulário
   const handleClearForm = () => {
     if (window.confirm('Deseja realmente limpar todos os campos do formulário?')) {
-      const shouldPreserveLockedOrigem = !isEditMode && lockOrigemSelection && formData.origem_id > 0;
-      const defaultOrigemTipo = !isEditMode && allowedOrigemTipos.length === 1
-        ? allowedOrigemTipos[0]
-        : ('CRS' as OrigemTipo);
-
-      setFormData({
-        data_comunicacao: getLocalDateTime(),
-        nome_paciente: '',
-        observacao_descricao: '',
-        digitador: '',
-        telefone_digitador: '',
-        id_municipio_ocorrencia: 0,
-        id_municipio_residencia: 0,
-        origem_tipo: shouldPreserveLockedOrigem ? formData.origem_tipo : defaultOrigemTipo,
-        origem_id: shouldPreserveLockedOrigem ? formData.origem_id : 0,
-        id_daes: [],
-      });
+      resetFormData(formData);
       setUfOcorrencia('15'); // Resetar para Pará
       setMunicipioOcorrencia('');
       setUfResidencia('15'); // Resetar para Pará
@@ -386,10 +370,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
           }
 
           // Tentar buscar do backend como fallback
-          const server = import.meta.env.VITE_API_SERVER || "";
-          const port = import.meta.env.VITE_API_PORT || "";
-          const baseUrl = server && port ? `${server}:${port}/` : "/";
-          const response = await axios.get(`${baseUrl}api/tipo-municipio/${municipioId}`);
+          const response = await axios.get(`${getRuntimeApiRoot()}/tipo-municipio/${municipioId}`);
 
           if (response.data && response.data.tipo_estado_idtipo_estado) {
             setUf(String(response.data.tipo_estado_idtipo_estado));
@@ -434,34 +415,13 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       return;
     }
     
-    // Validações
-    if (!formData.nome_paciente.trim()) {
-      setError('Nome do paciente é obrigatório');
-      return;
-    }
-    if (!formData.id_municipio_ocorrencia) {
-      setError('Município de ocorrência é obrigatório');
-      return;
-    }
-    if (!formData.id_municipio_residencia) {
-      setError('Município de residência é obrigatório');
-      return;
-    }
-    if (!formData.origem_id) {
-      setError('Origem da comunicação é obrigatória');
-      return;
-    }
-    const agravoIds = [...new Set(formData.id_daes || [])].filter((x) => x > 0);
-    if (agravoIds.length === 0) {
-      setError('Selecione ao menos um agravo (DAE)');
+    const validation = validateAndBuildPayload(formData);
+    if (validation.error || !validation.formPayload) {
+      setError(validation.error || 'Dados inválidos para salvar comunicação.');
       return;
     }
 
-    const formPayload: CreateComunicacaoDaeData = {
-      ...formData,
-      id_daes: agravoIds,
-      id_dae: agravoIds[0],
-    };
+    const { formPayload } = validation;
 
     try {
       setLoading(true);

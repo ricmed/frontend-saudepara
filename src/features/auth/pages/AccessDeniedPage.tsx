@@ -3,27 +3,27 @@ import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Language } from '@/i18n/types';
 import { SideMenu } from '@/features/home/components/SideMenu';
-import { Header } from '../features/desktop/components/Header';
+import { Header } from '@/features/desktop/components/Header';
 import Footer from '@/features/desktop/components/Footer';
 import { useTranslation } from '@/i18n/useTranslations';
 
-const MobileAccessDenied = ({ 
-  onMenuToggle, 
+const MobileAccessDenied = ({
+  onMenuToggle,
   handleLogout,
   selectedLanguage
-}: { 
-  onMenuToggle: () => void, 
+}: {
+  onMenuToggle: () => void,
   handleLogout: () => void,
   selectedLanguage: Language
 }) => {
   const { t } = useTranslation(selectedLanguage);
-  
+
   return (
     <div className="bg-white min-h-screen flex flex-col">
-      <Header 
-        onMenuToggle={onMenuToggle} 
-        isMobile={true} 
-        selectedLanguage={selectedLanguage} 
+      <Header
+        onMenuToggle={onMenuToggle}
+        isMobile={true}
+        selectedLanguage={selectedLanguage}
       />
 
       <main className="flex-1 flex items-center justify-center p-6">
@@ -39,8 +39,8 @@ const MobileAccessDenied = ({
             <Link to="/" className="bg-blue-900 text-white py-2 px-4 rounded hover:bg-blue-800 transition">
               {t('accessDenied.button')}
             </Link>
-            <button 
-              onClick={handleLogout} 
+            <button
+              onClick={handleLogout}
               className="bg-blue-900 text-white py-2 px-4 rounded hover:bg-blue-800 transition"
             >
               Fazer Logout
@@ -54,23 +54,23 @@ const MobileAccessDenied = ({
   );
 };
 
-const DesktopAccessDenied = ({ 
-  onMenuToggle, 
+const DesktopAccessDenied = ({
+  onMenuToggle,
   selectedLanguage,
   handleLogout
-}: { 
-  onMenuToggle: () => void, 
+}: {
+  onMenuToggle: () => void,
   selectedLanguage: Language,
   handleLogout: () => void
 }) => {
   const { t } = useTranslation(selectedLanguage);
-  
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <Header 
-        onMenuToggle={onMenuToggle} 
-        isMobile={false} 
-        selectedLanguage={selectedLanguage} 
+      <Header
+        onMenuToggle={onMenuToggle}
+        isMobile={false}
+        selectedLanguage={selectedLanguage}
       />
 
       <main className="flex-1 flex items-center justify-center p-8">
@@ -86,8 +86,8 @@ const DesktopAccessDenied = ({
             <Link to="/" className="bg-blue-600 text-white py-2 px-6 rounded hover:bg-blue-800 transition">
               {t('accessDenied.button')}
             </Link>
-            <button 
-              onClick={handleLogout} 
+            <button
+              onClick={handleLogout}
               className="bg-blue-600 text-white py-2 px-6 rounded hover:bg-blue-800 transition"
             >
               Fazer Logout
@@ -101,7 +101,7 @@ const DesktopAccessDenied = ({
   );
 };
 
-const AccessDenied: React.FC = () => {
+const AccessDeniedPage: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { selectedLanguage } = useLanguage();
 
@@ -116,20 +116,20 @@ const AccessDenied: React.FC = () => {
   return (
     <div>
       <div className="md:hidden">
-        <MobileAccessDenied 
+        <MobileAccessDenied
           onMenuToggle={handleMenuToggle}
           handleLogout={handleLogout}
           selectedLanguage={selectedLanguage}
         />
       </div>
       <div className="hidden md:block">
-        <DesktopAccessDenied 
-          onMenuToggle={handleMenuToggle} 
+        <DesktopAccessDenied
+          onMenuToggle={handleMenuToggle}
           selectedLanguage={selectedLanguage}
           handleLogout={handleLogout}
         />
       </div>
-      <SideMenu 
+      <SideMenu
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
       />
@@ -137,4 +137,4 @@ const AccessDenied: React.FC = () => {
   );
 };
 
-export default AccessDenied;
+export default AccessDeniedPage;

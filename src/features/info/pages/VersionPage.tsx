@@ -21,7 +21,6 @@ const VersionPage: React.FC = () => {
         selectedLanguage={selectedLanguage}
       />
 
-      {/* SideMenu */}
       <SideMenu
         isOpen={isMobileMenuOpen}
         onClose={() => setIsMobileMenuOpen(false)}
@@ -29,7 +28,6 @@ const VersionPage: React.FC = () => {
 
       <main className="flex-grow">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          {/* Botão de Voltar */}
           <button
             onClick={() => navigate("/")}
             className="inline-flex items-center gap-2 mb-6 px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 border border-gray-200"
@@ -38,7 +36,6 @@ const VersionPage: React.FC = () => {
             <span className="font-medium">Voltar para Home</span>
           </button>
 
-          {/* Hero Section */}
           <div className="text-center mb-12">
             <div className="flex justify-center mb-6">
               <div className="relative">
@@ -64,9 +61,7 @@ const VersionPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Information Cards */}
           <div className="grid md:grid-cols-2 gap-6 mb-12">
-            {/* Version Info Card */}
             <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 p-6 border border-gray-100">
               <div className="flex items-start gap-4">
                 <div className="bg-blue-100 p-3 rounded-lg">
@@ -85,7 +80,6 @@ const VersionPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Release Date Card */}
             <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 p-6 border border-gray-100">
               <div className="flex items-start gap-4">
                 <div className="bg-green-100 p-3 rounded-lg">
@@ -115,7 +109,6 @@ const VersionPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Features Card */}
             <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 p-6 border border-gray-100">
               <div className="flex items-start gap-4">
                 <div className="bg-purple-100 p-3 rounded-lg">
@@ -151,7 +144,6 @@ const VersionPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Security Card */}
             <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 p-6 border border-gray-100">
               <div className="flex items-start gap-4">
                 <div className="bg-red-100 p-3 rounded-lg">
@@ -184,7 +176,6 @@ const VersionPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Technical Information */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl shadow-xl p-8 text-white">
             <h2 className="text-2xl font-bold mb-6 text-center">
               Informações Técnicas
@@ -205,7 +196,6 @@ const VersionPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Footer Info */}
           <div className="mt-12 text-center text-gray-600">
             <p className="mb-2">
               Desenvolvido pela{" "}

@@ -13,15 +13,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { debounce } from 'lodash';
 import axios from 'axios';
 import syncService from '@/services/syncService';
 import indexedDBService from '@/services/indexedDB';
 import { deviceIdService } from '@/services/deviceIdService';
 
 import { useOfflineSystem } from '@/hooks/useOfflineSystem';
-
-import type { Notificacao } from '../types';
 
 // Certificar que window.fileStorage existe
 if (!(window as any).fileStorage) {
@@ -36,7 +33,6 @@ import {
   validateFile,
   DEFAULT_UPLOAD_CONFIG,
   detectUserTimezone,
-  formatDateWithTimezone,
   EventoOption, 
   PublicoOption, 
   PaisOption, 
@@ -63,6 +59,19 @@ import {
   mapGestanteForApi,
   mapSexoNascimentoToApi
 } from '../utils/formUtils';
+import {
+  normalizeOptionLabels,
+  orderOptionsByPriorityIncludes
+} from '../utils/optionHelpers';
+import {
+  findExistingPatientByPriority
+} from '../utils/patientLookupHelpers';
+import { buildPatientPayloadFromForm } from '../utils/patientPayloadHelpers';
+import { buildNotificationDataForBackend } from '../utils/notificationPayloadHelpers';
+import {
+  extractBackendMessage,
+  mapBackendValidationErrors
+} from '../utils/backendErrorHelpers';
 import { 
   exportToExcel, 
   exportToWord, 
@@ -72,7 +81,6 @@ import {
 import { useSectionExpansion } from './useSectionExpansion';
 import { NotificacaoService } from '@/services/NotificacaoService';
 import { Paciente, PacienteService } from '@/services/PacienteService';
-import { salvarNotificacaoCompleta } from '@/utils/notificacaoAdapter';
 import { ListaSindromicaService } from '@/services/ListaSindromicaService';
 
 // 🔧 REMOVIDA A CLASSE FILEMANAGER - AGORA USANDO window.fileStorage
@@ -194,6 +202,25 @@ const initialFormData: FormData = {
   // Campos de auditoria (apenas para exibição)
   created_at: undefined,
   updated_at: undefined,
+};
+
+const PATIENT_CREATE_ERROR_FIELD_MAP: Record<string, string> = {
+  nome: "paciente",
+  cpf: "cpf",
+  data_nascimento: "dataNascimento",
+};
+
+const NOTIFICATION_SAVE_ERROR_FIELD_MAP: Record<string, string> = {
+  tipo_evento_idtipo_evento: "evento",
+  tipo_publico_idtipo_publico: "publicoAtendido",
+  paciente_idpaciente: "paciente",
+  residente_belem: "residenteBelem",
+  tipo_pais_idtipo_pais: "paisProcedencia",
+  tipo_estado_idtipo_estado: "uf",
+  tipo_municipio_idtipo_municipio: "municipio",
+  tipo_bairro_idtipo_bairro: "bairro",
+  tipo_atendimento_idtipo_atendimento: "tipoAtendimento",
+  tipo_encerramento_idtipo_encerramento: "tipoEncerramento",
 };
 
 export const useNotificationForm = (isEditMode: boolean = false, id?: string) => {
@@ -714,27 +741,11 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         return { hasData: false };
       }
 
-      // Função para converter opções para caixa alta
-      const convertOptionsToUpperCase = (options: any[]) => {
-        if (!options) return [];
-        return options.map((option) => {
-          const newOption = { ...option };
-          if (newOption.descricao) {
-            newOption.descricao = normalizeText(newOption.descricao);
-          }
-          // ✅ ADICIONADO: Também normalizar o campo 'nome' se existir (para estabelecimentos)
-          if (newOption.nome) {
-            newOption.nome = normalizeText(newOption.nome);
-          }
-          return newOption;
-        });
-      };
-
       // Definir todas as opções carregadas do cache
       if (eventos) {
         // 🆕 FILTRAR: Apenas eventos ativos para o formulário
         const eventosAtivos = eventos.filter((evento: any) => evento.ativo === 'S' || evento.ativo === undefined);
-        setEventoOptions(convertOptionsToUpperCase(eventosAtivos));
+        setEventoOptions(normalizeOptionLabels(eventosAtivos, { includeNome: true }));
         console.log(`✅ Eventos ativos carregados do cache: ${eventosAtivos.length}/${eventos.length}`);
       }
 
@@ -744,36 +755,29 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           "Participante", "Trab. do Evento", "Autoridade", "Outro"
         ].map((item) => normalizeText(item));
 
-        const publicosUpperCase = convertOptionsToUpperCase(publicos);
-        const publicosOrdenados = [...publicosUpperCase].sort((a, b) => {
-          const posA = ordenacaoPublico.findIndex((item) => a.descricao.includes(item));
-          const posB = ordenacaoPublico.findIndex((item) => b.descricao.includes(item));
-          if (posA !== -1 && posB !== -1) return posA - posB;
-          if (posA !== -1) return -1;
-          if (posB !== -1) return 1;
-          return 0;
-        });
+        const publicosUpperCase = normalizeOptionLabels(publicos, { includeNome: true });
+        const publicosOrdenados = orderOptionsByPriorityIncludes(publicosUpperCase, ordenacaoPublico);
         setPublicoOptions(publicosOrdenados);
         console.log(`✅ Públicos carregados do cache: ${publicos.length}`);
       }
 
       if (paises) {
-        setPaisOptions(convertOptionsToUpperCase(paises));
+        setPaisOptions(normalizeOptionLabels(paises, { includeNome: true }));
         console.log(`✅ Países carregados do cache: ${paises.length}`);
       }
 
       if (estados) {
-        setEstadoOptions(convertOptionsToUpperCase(estados));
+        setEstadoOptions(normalizeOptionLabels(estados, { includeNome: true }));
         console.log(`✅ Estados carregados do cache: ${estados.length}`);
       }
 
       if (municipios) {
-        setMunicipioOptions(convertOptionsToUpperCase(municipios));
+        setMunicipioOptions(normalizeOptionLabels(municipios, { includeNome: true }));
         console.log(`✅ Municípios carregados do cache: ${municipios.length}`);
       }
 
       if (bairros) {
-        setBairroOptions(convertOptionsToUpperCase(bairros));
+        setBairroOptions(normalizeOptionLabels(bairros, { includeNome: true }));
         console.log(`✅ Bairros carregados do cache: ${bairros.length}`);
       }
 
@@ -784,7 +788,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           "Homem transgênero", "Travesti", "Não binário", "Não se aplica", "Ignorado"
         ].map((item) => normalizeText(item));
 
-        const generosUpperCase = convertOptionsToUpperCase(generos);
+        const generosUpperCase = normalizeOptionLabels(generos, { includeNome: true });
         const generosOrdenados = [...generosUpperCase].sort((a, b) => {
           const posA = ordenacaoGenero.findIndex((item) => a.descricao.includes(item));
           const posB = ordenacaoGenero.findIndex((item) => b.descricao.includes(item));
@@ -798,7 +802,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       }
 
       if (racas) {
-        setRacaOptions(convertOptionsToUpperCase(racas));
+        setRacaOptions(normalizeOptionLabels(racas, { includeNome: true }));
         console.log(`✅ Raças carregadas do cache: ${racas.length}`);
       }
 
@@ -810,7 +814,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           "Ensino superior completo", "Pós-graduado", "Ignorado", "Não se aplica"
         ].map((item) => normalizeText(item));
 
-        const escolaridadesUpperCase = convertOptionsToUpperCase(escolaridades);
+        const escolaridadesUpperCase = normalizeOptionLabels(escolaridades, { includeNome: true });
         const escolaridadesOrdenadas = [...escolaridadesUpperCase].sort((a, b) => {
           const posA = ordenacaoEscolaridade.findIndex((item) => a.descricao.includes(item));
           const posB = ordenacaoEscolaridade.findIndex((item) => b.descricao.includes(item));
@@ -829,7 +833,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           "Clínico", "Trauma", "Múltiplas vítimas", "Incidente QBRN"
         ].map((item) => normalizeText(item));
 
-        const atendimentosUpperCase = convertOptionsToUpperCase(atendimentos);
+        const atendimentosUpperCase = normalizeOptionLabels(atendimentos, { includeNome: true });
         const atendimentosOrdenados = [...atendimentosUpperCase].sort((a, b) => {
           const posA = ordenacaoAtendimento.findIndex((item) => a.descricao.includes(item));
           const posB = ordenacaoAtendimento.findIndex((item) => b.descricao.includes(item));
@@ -843,15 +847,15 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       }
 
       if (sintomas) {
-        setSintomaOptions(convertOptionsToUpperCase(sintomas));
+        setSintomaOptions(normalizeOptionLabels(sintomas, { includeNome: true }));
         console.log(`✅ Sintomas carregados do cache: ${sintomas.length}`);
       }      if (hipoteses) {
-        setHipoteseDiagOptions(convertOptionsToUpperCase(hipoteses));
+        setHipoteseDiagOptions(normalizeOptionLabels(hipoteses, { includeNome: true }));
         console.log(`✅ Hipóteses carregadas do cache: ${hipoteses.length}`);
       }
 
       if (traumas) {
-        setTraumaOptions(convertOptionsToUpperCase(traumas));
+        setTraumaOptions(normalizeOptionLabels(traumas, { includeNome: true }));
         console.log(`✅ Traumas carregados do cache: ${traumas.length}`);
       }
 
@@ -861,7 +865,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           "Atendido e liberado", "Internação", "Observação", "Transferido", "Óbito"
         ].map((item) => normalizeText(item));
 
-        const encerramentosUpperCase = convertOptionsToUpperCase(encerramentos);
+        const encerramentosUpperCase = normalizeOptionLabels(encerramentos, { includeNome: true });
         const encerramentosOrdenados = [...encerramentosUpperCase].sort((a, b) => {
           const getPosition = (option: EncerramentoOption) => {
             const exactIndex = ordenacaoEncerramento.findIndex((item) => option.descricao === item);
@@ -881,7 +885,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       }
 
       if (estabelecimentos) {
-        setEstabelecimentoOptions(convertOptionsToUpperCase(estabelecimentos));
+        setEstabelecimentoOptions(normalizeOptionLabels(estabelecimentos, { includeNome: true }));
         console.log(`✅ Estabelecimentos carregados do cache: ${estabelecimentos.length} (chave: estabelecimentos-permitidos)`);
       } else {
         console.warn('⚠️ Nenhum estabelecimento encontrado no cache');
@@ -966,23 +970,8 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       // ✅ FILTRAR: Apenas eventos ativos para o formulário
       const eventosAtivos = eventos.filter((evento: any) => evento.ativo === 'S' || evento.ativo === undefined);
       
-      // Converter todas as descrições para caixa alta
-      const convertOptionsToUpperCase = (options: any[]) => {
-        return options.map((option) => {
-          const newOption = { ...option };
-          if (newOption.descricao) {
-            newOption.descricao = normalizeText(newOption.descricao);
-          }
-          // ✅ ADICIONADO: Também normalizar o campo 'nome' se existir (para estabelecimentos)
-          if (newOption.nome) {
-            newOption.nome = normalizeText(newOption.nome);
-          }
-          return newOption;
-        });
-      };
-
       // Definir opções essenciais imediatamente com ordenações específicas
-      setEventoOptions(convertOptionsToUpperCase(eventosAtivos));
+      setEventoOptions(normalizeOptionLabels(eventosAtivos, { includeNome: true }));
       
       // Ordenação específica para público atendido
       const ordenacaoPublico = [
@@ -992,19 +981,12 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         "Outro",
       ].map((item) => normalizeText(item));
 
-      const publicosUpperCase = convertOptionsToUpperCase(publicos);
-      const publicosOrdenados = [...publicosUpperCase].sort((a, b) => {
-        const posA = ordenacaoPublico.findIndex((item) => a.descricao.includes(item));
-        const posB = ordenacaoPublico.findIndex((item) => b.descricao.includes(item));
-        if (posA !== -1 && posB !== -1) return posA - posB;
-        if (posA !== -1) return -1;
-        if (posB !== -1) return 1;
-        return 0;
-      });
+      const publicosUpperCase = normalizeOptionLabels(publicos, { includeNome: true });
+      const publicosOrdenados = orderOptionsByPriorityIncludes(publicosUpperCase, ordenacaoPublico);
       setPublicoOptions(publicosOrdenados);
       
-      setPaisOptions(convertOptionsToUpperCase(paises));
-      setEstadoOptions(convertOptionsToUpperCase(estados));
+      setPaisOptions(normalizeOptionLabels(paises, { includeNome: true }));
+      setEstadoOptions(normalizeOptionLabels(estados, { includeNome: true }));
       
       // Ordenação específica para identidade de gênero
       const ordenacaoGenero = [
@@ -1018,7 +1000,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         "Ignorado",
       ].map((item) => normalizeText(item));
 
-      const generosUpperCase = convertOptionsToUpperCase(generos);
+      const generosUpperCase = normalizeOptionLabels(generos, { includeNome: true });
       const generosOrdenados = [...generosUpperCase].sort((a, b) => {
         const posA = ordenacaoGenero.findIndex((item) => a.descricao.includes(item));
         const posB = ordenacaoGenero.findIndex((item) => b.descricao.includes(item));
@@ -1037,7 +1019,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         "Incidente QBRN",
       ].map((item) => normalizeText(item));
 
-      const atendimentosUpperCase = convertOptionsToUpperCase(atendimentos);
+      const atendimentosUpperCase = normalizeOptionLabels(atendimentos, { includeNome: true });
       const atendimentosOrdenados = [...atendimentosUpperCase].sort((a, b) => {
         const posA = ordenacaoAtendimento.findIndex((item) => a.descricao.includes(item));
         const posB = ordenacaoAtendimento.findIndex((item) => b.descricao.includes(item));
@@ -1100,19 +1082,8 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         NotificacaoService.getEstabelecimentoOptions(currentEstabelecimentoId)
       ]);
 
-      // Converter descrições para caixa alta
-      const convertOptionsToUpperCase = (options: any[]) => {
-        return options.map((option) => {
-          const newOption = { ...option };
-          if (newOption.descricao) {
-            newOption.descricao = normalizeText(newOption.descricao);
-          }
-          return newOption;
-        });
-      };
-
       // Definir opções restantes com ordenações específicas
-      setRacaOptions(convertOptionsToUpperCase(racas));
+      setRacaOptions(normalizeOptionLabels(racas, { includeNome: true }));
       
       // Ordenação específica para escolaridade
       const ordenacaoEscolaridade = [
@@ -1128,7 +1099,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         "Não se aplica",
       ].map((item) => normalizeText(item));
 
-      const escolaridadesUpperCase = convertOptionsToUpperCase(escolaridades);
+      const escolaridadesUpperCase = normalizeOptionLabels(escolaridades, { includeNome: true });
       const escolaridadesOrdenadas = [...escolaridadesUpperCase].sort((a, b) => {
         const posA = ordenacaoEscolaridade.findIndex((item) => a.descricao.includes(item));
         const posB = ordenacaoEscolaridade.findIndex((item) => b.descricao.includes(item));
@@ -1139,9 +1110,9 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       });
       setEscolaridadeOptions(escolaridadesOrdenadas);
       
-      setSintomaOptions(convertOptionsToUpperCase(sintomas));
-      setHipoteseDiagOptions(convertOptionsToUpperCase(hipoteseDiag));
-      setTraumaOptions(convertOptionsToUpperCase(traumas));
+      setSintomaOptions(normalizeOptionLabels(sintomas, { includeNome: true }));
+      setHipoteseDiagOptions(normalizeOptionLabels(hipoteseDiag, { includeNome: true }));
+      setTraumaOptions(normalizeOptionLabels(traumas, { includeNome: true }));
       
       // Ordenação específica para tipo de encerramento
       const ordenacaoEncerramento = [
@@ -1152,7 +1123,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         "Óbito",
       ].map((item) => normalizeText(item));
 
-      const encerramentosUpperCase = convertOptionsToUpperCase(encerramentos);
+      const encerramentosUpperCase = normalizeOptionLabels(encerramentos, { includeNome: true });
       const encerramentosOrdenados = [...encerramentosUpperCase].sort((a, b) => {
         const getPosition = (option: any) => {
           const exactIndex = ordenacaoEncerramento.findIndex((item) => option.descricao === item);
@@ -1169,7 +1140,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       });
       setEncerramentoOptions(encerramentosOrdenados);
       
-      setEstabelecimentoOptions(convertOptionsToUpperCase(estabelecimentos));
+      setEstabelecimentoOptions(normalizeOptionLabels(estabelecimentos, { includeNome: true }));
 
       // ✅ SALVAR NO CACHE após carregar tudo
       await Promise.all([
@@ -1335,73 +1306,43 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     }
   }, [navigate, loadMunicipiosByEstado, loadRemainingOptions]);
 
-  // 🆕 NOVA FUNÇÃO: Adicionar timezone ao FormData
-  const addTimezoneToFormData = useCallback((data: FormData): FormData => {
-    // Se não tiver timezone definido, detectar automaticamente
-    if (!data.timezone_name || !data.timezone_offset_minutos) {
-      const timezone = detectUserTimezone();
-      return {
-        ...data,
-        timezone_name: timezone.timezone_name,
-        timezone_offset_minutos: timezone.timezone_offset_minutos
-      };
-    }
-    
-    return data;
-  }, []);
+  const handlePatientAutoCreateError = useCallback(async (error: any): Promise<boolean> => {
+    console.error("Erro ao criar paciente automaticamente:", error);
 
-  // ✅ FUNÇÃO MODIFICADA PARA SUBMETER O FORMULÁRIO (COM SISTEMA OFFLINE)
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Limpar estados de feedback
-    setApiError(null);
-    setIsSuccess(false);
-
-    console.log("=== INICIANDO VALIDAÇÃO DO FORMULÁRIO ===");
-
-    // ========================================
-    // VALIDAÇÃO PRINCIPAL - COLETAR TODOS OS ERROS
-    // ========================================
-    
-    // IMPORTANTE: Chamar validateForm PRIMEIRO para coletar todos os erros
-    const isValid = validateForm(
-      formData, 
-      errors, 
-      setErrors, 
-      setExpandedSections, 
-      expandedSections,
-      atendimentoOptions,
-      encerramentoOptions
+    const isNetworkError = (
+      error?.code === 'ERR_NETWORK' ||
+      error?.code === 'ERR_INTERNET_DISCONNECTED' ||
+      error?.message?.includes('Network Error') ||
+      error?.message?.includes('Failed to fetch') ||
+      !(await syncService.canUseOnlineMode())
     );
 
-    // Se a validação falhou, mostrar toast e impedir submissão
-    if (!isValid) {
-      // Aguardar um frame para que o estado seja atualizado
-      setTimeout(() => {
-        const currentErrors = Object.keys(errors).length;
-        console.log(`Validação falhou. Total de erros: ${currentErrors}`);
-        toast.error(`${currentErrors} erro(s) encontrado(s). Verifique o resumo acima.`);
-      }, 100);
-      return;
+    if (isNetworkError) {
+      console.log('🔄 Erro de rede na criação de paciente, já está usando sistema offline');
+      setApiError(`Erro ao salvar paciente: ${error.message}`);
+      return false;
     }
 
-    console.log("Validação passou. Procedendo com criação/atualização do paciente...");
+    const errorMessage = extractBackendMessage(
+      error,
+      "Erro ao criar o paciente. Verifique os dados e tente novamente."
+    );
+    toast.error(errorMessage);
+    setApiError(errorMessage);
 
-    // ✅ VALIDAR ARQUIVOS (funcional, mas seção UI oculta - sempre será array vazio)
-    const arquivosError = validateArquivos(formData.arquivos || []);
-    if (arquivosError) {
-      setErrors(prev => ({ ...prev, arquivos: arquivosError }));
-      toast.error("Erro nos arquivos anexados. Verifique e tente novamente.");
-      // Expandir seção de anexos se houver erro - SEÇÃO OCULTA NA UI
-      // setExpandedSections(prev => ({ ...prev, anexos: true }));
-      return;
+    if (error.response && error.response.data && error.response.data.errors) {
+      const mappedErrors = mapBackendValidationErrors(
+        error.response.data.errors,
+        PATIENT_CREATE_ERROR_FIELD_MAP
+      );
+      setErrors((prev) => ({ ...prev, ...mappedErrors }));
+      setExpandedSections((prev) => ({ ...prev, identificacao: true }));
     }
 
-    // ========================================
-    // VERIFICAÇÕES DE PACIENTE (APÓS VALIDAÇÃO)
-    // ========================================
+    return false;
+  }, []);
 
+  const ensurePatientReadyForSubmit = useCallback(async (): Promise<boolean> => {
     // Verifica se tem paciente
     if (!formData.paciente.trim()) {
       console.log("Nome do paciente ausente");
@@ -1414,154 +1355,62 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         ...prev,
         identificacao: true,
       }));
-      return;
+      return false;
     }
 
     // Create patient automatically if name exists without ID
     if (formData.paciente.trim() && !formData.pacienteId) {
       try {
-        // ✅ NOVO: Verificar se já existe paciente similar
-        // Usa múltiplos campos para identificar paciente (não apenas CPF)
         let pacienteExistente = null;
-        
+
         console.log("🔍 Buscando paciente existente com critérios...");
-        
-        // ESTRATÉGIA 1: Buscar por CPF (se disponível e válido)
-        if (formData.cpf && formData.cpf.length === 11) {
-          console.log("🔍 Tentativa 1: Buscando por CPF:", formData.cpf);
-          try {
-            const pacientesPorCpf = await searchPatientsOfflineSafe(formData.cpf);
-            console.log(`📊 Resultado busca CPF:`, pacientesPorCpf);
-            if (pacientesPorCpf && pacientesPorCpf.length > 0) {
-              pacienteExistente = pacientesPorCpf[0];
-              console.log("✅ Paciente encontrado por CPF:", {
-                id: pacienteExistente.idpaciente,
-                nome: pacienteExistente.nome,
-                source: pacienteExistente.source
-              });
-            }
-          } catch (error) {
-            console.log("⚠️ Erro ao buscar por CPF, tentando outros métodos...");
-          }
+        const lookupResult = await findExistingPatientByPriority({
+          cpf: formData.cpf,
+          nomePaciente: formData.paciente,
+          dataNascimento: formData.dataNascimento,
+          nomeMae: formData.nomeMae,
+          searchPatients: searchPatientsOfflineSafe
+        });
+        pacienteExistente = lookupResult.pacienteExistente;
+
+        if (lookupResult.matchedBy) {
+          console.log(`✅ Paciente encontrado por estratégia: ${lookupResult.matchedBy}`, {
+            id: pacienteExistente?.idpaciente,
+            nome: pacienteExistente?.nome,
+            source: pacienteExistente?.source
+          });
+        } else {
+          console.log("❌ Nenhum paciente correspondente encontrado nas estratégias de associação");
         }
-        
-        // ESTRATÉGIA 2: Buscar por Nome + Data de Nascimento (se não encontrou por CPF)
-        if (!pacienteExistente && formData.paciente && formData.dataNascimento) {
-          console.log("🔍 Tentativa 2: Buscando por Nome + Data de Nascimento");
-          console.log(`  Nome procurado: "${formData.paciente}"`);
-          console.log(`  Data procurada: "${formData.dataNascimento}"`);
-          try {
-            const pacientesPorNome = await searchPatientsOfflineSafe(formData.paciente);
-            console.log(`📊 Resultado busca Nome (total: ${pacientesPorNome?.length || 0}):`, pacientesPorNome);
-            
-            if (pacientesPorNome && pacientesPorNome.length > 0) {
-              // ✅ FILTRAR: Nome EXATO + Data de nascimento
-              const nomeNormalizado = formData.paciente.toUpperCase().trim();
-              console.log(`  Filtrando por nome exato: "${nomeNormalizado}"`);
-              
-              const pacienteMesmaData = pacientesPorNome.find((p: any) => {
-                if (!p.data_nascimento) {
-                  console.log(`    ❌ ${p.nome} - sem data de nascimento`);
-                  return false;
-                }
-                const nomeMatch = p.nome.toUpperCase().trim() === nomeNormalizado;
-                const dataPaciente = new Date(p.data_nascimento).toISOString().split('T')[0];
-                const dataMatch = dataPaciente === formData.dataNascimento;
-                
-                console.log(`    ${nomeMatch && dataMatch ? '✅' : '❌'} ${p.nome} (ID: ${p.idpaciente})`);
-                console.log(`       Nome: "${p.nome.toUpperCase().trim()}" === "${nomeNormalizado}" ? ${nomeMatch}`);
-                console.log(`       Data: ${dataPaciente} === ${formData.dataNascimento} ? ${dataMatch}`);
-                
-                return nomeMatch && dataMatch;
-              });
-              
-              if (pacienteMesmaData) {
-                pacienteExistente = pacienteMesmaData;
-                console.log("✅ Paciente encontrado por Nome + Data de Nascimento:", {
-                  id: pacienteExistente.idpaciente,
-                  nome: pacienteExistente.nome,
-                  source: pacienteExistente.source
-                });
-              } else {
-                console.log("❌ Nenhum paciente com nome E data correspondentes");
-              }
-            }
-          } catch (error) {
-            console.log("⚠️ Erro ao buscar por nome e data...");
-          }
-        }
-        
-        // ESTRATÉGIA 3: Buscar por Nome + Nome da Mãe (se não encontrou ainda)
-        if (!pacienteExistente && formData.paciente && formData.nomeMae && formData.nomeMae.length > 5) {
-          console.log("🔍 Tentativa 3: Buscando por Nome + Nome da Mãe");
-          try {
-            const pacientesPorNome = await searchPatientsOfflineSafe(formData.paciente);
-            
-            if (pacientesPorNome && pacientesPorNome.length > 0) {
-              // ✅ FILTRAR: Nome EXATO + Nome da mãe EXATO
-              const nomeNormalizado = formData.paciente.toUpperCase().trim();
-              const nomeMaeNormalizado = formData.nomeMae.toUpperCase().trim();
-              const pacienteMesmaMae = pacientesPorNome.find((p: any) => {
-                if (!p.nome_mae) return false;
-                const nomeMatch = p.nome.toUpperCase().trim() === nomeNormalizado;
-                const nomeMaePaciente = p.nome_mae.toUpperCase().trim();
-                const maeMatch = nomeMaePaciente === nomeMaeNormalizado;
-                return nomeMatch && maeMatch;
-              });
-              
-              if (pacienteMesmaMae) {
-                pacienteExistente = pacienteMesmaMae;
-                console.log("✅ Paciente encontrado por Nome + Nome da Mãe:", pacienteExistente.idpaciente);
-              }
-            }
-          } catch (error) {
-            console.log("⚠️ Erro ao buscar por nome e mãe...");
-          }
-        }
-        
+
         // Se encontrou paciente existente, usar ele
         if (pacienteExistente) {
           formData.pacienteId = pacienteExistente.idpaciente;
           console.log("✅ Paciente existente encontrado! ID:", pacienteExistente.idpaciente);
           toast.success(`Paciente ${pacienteExistente.nome} encontrado e associado à notificação`);
-        } 
+        }
         // Se não encontrou, criar novo paciente
         else {
           console.log("⚠️ Nenhum paciente similar encontrado, criando novo...");
-          
+
           toast.info("Criando novo paciente automaticamente...");
           console.log("Criando novo paciente com dados:", {
             nome: formData.paciente,
             nomeMae: formData.nomeMae,
             dataNascimento: formData.dataNascimento,
             cpf: formData.cpf
-          });        
-          
-          // ✅ USAR SISTEMA OFFLINE
-          const novoPaciente: any = {
-            nome: formData.paciente.toUpperCase(),
-            nome_mae: formData.nomeMae?.toUpperCase() || "",
-            data_nascimento: formData.dataNascimento || null,
-            cpf: formData.cpf || "",
-            cns: formData.cns || null,
-            sexo: mapSexoNascimentoToApi(formData.sexoNascimento),
-            e_estrangeiro: formData.eEstrangeiro === "1" ? "1" : formData.eEstrangeiro === "2" ? "2" : null,
-            contato: formData.contatoTelefonico || "",
-            ddi: formData.ddi || "55",
-            gestante: mapGestanteForApi(formData.gestante),
-            tipo_genero_idtipo_genero: formData.identidadeGenero ? parseInt(formData.identidadeGenero) : null,
-            tipo_raca_idtipo_raca: formData.raca ? parseInt(formData.raca) : null,
-            escolaridade_idescolaridade: formData.escolaridade ? parseInt(formData.escolaridade) : null,
-            cbo_idcbo: formData.profissao ? parseInt(formData.profissao) : null
-          };
-          
-          // ✅ CORREÇÃO: SEMPRE enviar idade em meses quando não há data de nascimento
-          if ((!formData.dataNascimento || formData.dataNascimento.trim() === '') && formData.idadeMeses) {
-            novoPaciente.idade = parseInt(formData.idadeMeses);
-          } else {
-            novoPaciente.idade = null;
-          }
-          
+          });
+
+          const novoPaciente: any = buildPatientPayloadFromForm(
+            formData,
+            { mapSexoNascimentoToApi, mapGestanteForApi },
+            {
+              uppercaseNome: true,
+              uppercaseNomeMae: true,
+              includeNullableClassificationIds: true
+            }
+          );
+
           console.log('🔍 DEBUG - Criando paciente com gestante e idade:', {
             gestante: formData.gestante,
             gestante_novoPaciente: novoPaciente.gestante,
@@ -1576,121 +1425,39 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           console.log("Paciente criado automaticamente com ID:", pacienteCriado.idpaciente);
         }
       } catch (error: any) {
-        console.error("Erro ao criar paciente automaticamente:", error);
-
-        // ✅ VERIFICAR SE É ERRO DE REDE PARA USAR SISTEMA OFFLINE
-        const isNetworkError = (
-          error?.code === 'ERR_NETWORK' ||
-          error?.code === 'ERR_INTERNET_DISCONNECTED' ||
-          error?.message?.includes('Network Error') ||
-          error?.message?.includes('Failed to fetch') ||
-          !(await syncService.canUseOnlineMode())
-        );
-
-        if (isNetworkError) {
-          console.log('🔄 Erro de rede na criação de paciente, já está usando sistema offline');
-          // O syncService.savePaciente já deveria ter funcionado offline
-          setApiError(`Erro ao salvar paciente: ${error.message}`);
-        } else {
-          // Erros não de rede (validação, etc) - tratamento original
-          let errorMessage = "Erro ao criar o paciente. Verifique os dados e tente novamente.";
-          if (error.response && error.response.data && error.response.data.message) {
-            errorMessage = error.response.data.message;
-          } else if (error.message) {
-            errorMessage = error.message;
-          }
-
-          toast.error(errorMessage);
-          setApiError(errorMessage);
-
-          // Destacar campos específicos com erro
-          if (error.response && error.response.data && error.response.data.errors) {
-            const backendErrors = error.response.data.errors;
-            const mappedErrors: Record<string, string> = {};
-
-            Object.entries(backendErrors).forEach(([key, value]) => {
-              const fieldMapping: Record<string, string> = {
-                nome: "paciente",
-                cpf: "cpf",
-                data_nascimento: "dataNascimento",
-              };
-
-              const fieldName = fieldMapping[key] || key;
-              mappedErrors[fieldName] = Array.isArray(value) ? value[0] : String(value);
-            });
-
-            setErrors((prev) => ({ ...prev, ...mappedErrors }));
-            setExpandedSections((prev) => ({ ...prev, identificacao: true }));
-          }
-        }
-
-        setIsSaving(false);
-        return; // Impedir envio do formulário
+        return handlePatientAutoCreateError(error);
       }
     }
     // Se já tem ID de paciente, atualizar dados do paciente
     else if (formData.pacienteId) {
       try {
         console.log("Atualizando dados do paciente ID:", formData.pacienteId);
-        
-        // ✅ USAR SISTEMA OFFLINE
-        const pacienteData: any = {
-          nome: formData.paciente,
-          nome_mae: formData.nomeMae || "",
-          cpf: formData.cpf || "",
-          cns: formData.cns || null,
-          sexo: mapSexoNascimentoToApi(formData.sexoNascimento),
-          e_estrangeiro: formData.eEstrangeiro === "1" ? "1" : formData.eEstrangeiro === "2" ? "2" : null,
-          contato: formData.contatoTelefonico || "",
-          ddi: formData.ddi || "55",
-          gestante: mapGestanteForApi(formData.gestante),
-        };
-        
-        // ✅ DEBUG: Log para verificar valor de gestante
+
+        const pacienteData: any = buildPatientPayloadFromForm(
+          formData,
+          { mapSexoNascimentoToApi, mapGestanteForApi },
+          {
+            uppercaseNome: false,
+            uppercaseNomeMae: false,
+            includeNullableClassificationIds: false
+          }
+        );
+
         console.log('🔍 DEBUG useNotificationForm - Valor de gestante:', {
           original: formData.gestante,
           final: pacienteData.gestante,
           tipo: typeof formData.gestante
         });
 
-        // CORREÇÃO: SEMPRE enviar data_nascimento (null se vazio)
-        if (formData.dataNascimento && formData.dataNascimento.trim() !== '') {
-          pacienteData.data_nascimento = formData.dataNascimento;
-        } else {
-          pacienteData.data_nascimento = null;
-        }
-
-        // CORREÇÃO: SEMPRE enviar idade em meses quando não há data de nascimento
-        if ((!formData.dataNascimento || formData.dataNascimento.trim() === '') && formData.idadeMeses) {
-          pacienteData.idade = parseInt(formData.idadeMeses); // Envia o total de meses
-        } else {
-          pacienteData.idade = null;
-        }
-
-        if (formData.identidadeGenero) {
-          pacienteData.tipo_genero_idtipo_genero = parseInt(formData.identidadeGenero);
-        }
-        if (formData.raca) {
-          pacienteData.tipo_raca_idtipo_raca = parseInt(formData.raca);
-        }
-        if (formData.escolaridade) {
-          pacienteData.escolaridade_idescolaridade = parseInt(formData.escolaridade);
-        }
-        if (formData.profissao) {
-          pacienteData.cbo_idcbo = parseInt(formData.profissao);
-        }
-
         console.log("Dados do paciente para atualização:", pacienteData);
 
-        // Para edição, usar PacienteService diretamente se online
         const canUseOnline = await syncService.canUseOnlineMode();
         if (canUseOnline && isEditMode) {
           await PacienteService.update(formData.pacienteId, pacienteData);
         } else {
-          // Offline ou criação, usar sistema offline
           await syncService.savePaciente({ ...pacienteData, idpaciente: formData.pacienteId });
         }
-        
+
         console.log("Dados do paciente atualizados com sucesso!");
       } catch (error) {
         console.error("Erro ao atualizar dados do paciente:", error);
@@ -1698,150 +1465,201 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       }
     }
 
-    // ========================================
-    // SALVAMENTO DA NOTIFICAÇÃO
-    // ========================================
+    return true;
+  }, [
+    formData,
+    isEditMode,
+    mapSexoNascimentoToApi,
+    mapGestanteForApi,
+    searchPatientsOfflineSafe,
+    savePatientOfflineSafe,
+    handlePatientAutoCreateError
+  ]);
 
-    setIsSaving(true);
-    try {
-      console.log("Iniciando salvamento da notificação...");
-      
-      // 🆕 DEBUG ANTES DO SALVAMENTO
-      debugAntesDoSalvamento(formData);
-      
-      // ✅ CORREÇÃO CRÍTICA: Isolar o array 'arquivos' da conversão para maiúsculas
-      const { arquivos = [], ...restOfData } = formData; // Default para array vazio se undefined
-      const dataForBackend = {
-        ...toUpperCaseAllStrings(restOfData), // Converte apenas os outros dados
-        arquivos: arquivos, // Funcional, mas seção UI oculta
-        // ✅ NOVO: Envia a lista de IDs para exclusão
-        arquivos_para_excluir: arquivosParaExcluir,
-        // 🆕 GARANTIR que timezone seja sempre enviado
-        timezone_name: formData.timezone_name || detectUserTimezone().timezone_name,
-        timezone_offset_minutos: formData.timezone_offset_minutos ?? detectUserTimezone().timezone_offset_minutos,
-      };
+  const emitNotificationSavedEvent = useCallback((detail: Record<string, any>) => {
+    const notificationSavedEvent = new CustomEvent('notification-saved', {
+      detail: {
+        ...detail,
+        timestamp: Date.now(),
+      },
+    });
+    window.dispatchEvent(notificationSavedEvent);
+  }, []);
 
-      console.log("✅ Dados preparados para backend (arquivos preservados):", {
-        totalCampos: Object.keys(dataForBackend).length,
-        arquivosCount: arquivos?.length || 0, // Proteção extra
-        arquivosIDs: (arquivos || []).map(a => a.id), // Proteção extra  
-        arquivosParaExcluir: arquivosParaExcluir
-      });
-
-      // ✅ DEBUG ESPECÍFICO: Log do campo observacaoTrauma antes do envio
-      console.log('🩹 [DEBUG TRAUMA] observacaoTrauma no handleSubmit:', {
-        original: formData.observacaoTrauma,
-        processado: dataForBackend.observacaoTrauma,
-        tipoTrauma: formData.tipoTrauma,
-        tipoTraumaProcessado: dataForBackend.tipoTrauma
-      });
-
-      // ✅ NOVO: Usar sistema offline para todas as operações (criação e edição)
+  const persistNotificationAndHandleSuccess = useCallback(
+    async (dataForBackend: Record<string, any>) => {
       if (isEditMode && id) {
-        // Para edições, usar sistema offline que tenta online primeiro
         console.log("Editando notificação ID:", id, "via sistema offline");
-        await saveNotificationOfflineSafe(dataForBackend, true, id); // isEdit = true, notificacaoId = id
+        await saveNotificationOfflineSafe(dataForBackend, true, id);
         console.log("Notificação editada com sucesso");
         setIsSuccess(true);
         toast.success("Notificação atualizada com sucesso");
-        
-        // ✅ NOVO: Limpa a lista de exclusão após salvamento bem-sucedido
         setArquivosParaExcluir([]);
-        
-        // ✅ NOVO: Disparar evento para atualização automática da lista
-        const notificationSavedEvent = new CustomEvent('notification-saved', {
-          detail: { 
-            action: 'edit',
-            id: id,
-            timestamp: Date.now() 
-          }
+        emitNotificationSavedEvent({
+          action: 'edit',
+          id,
         });
-        window.dispatchEvent(notificationSavedEvent);
         console.log('📤 Evento de notificação editada disparado');
       } else {
-        // Para criação, usar sistema offline
         console.log("Criando nova notificação via sistema offline");
-        await saveNotificationOfflineSafe(dataForBackend, false); // isEdit = false
+        await saveNotificationOfflineSafe(dataForBackend, false);
         console.log("Notificação salva (online ou offline conforme disponibilidade)");
         setIsSuccess(true);
-        
         toast.success(systemIsOnline ? "Notificação criada com sucesso" : "Notificação salva offline");
-        
-        // ✅ NOVO: Limpa a lista de exclusão após salvamento bem-sucedido
         setArquivosParaExcluir([]);
-        
-        // ✅ NOVO: Disparar evento para atualização automática da lista
-        const notificationSavedEvent = new CustomEvent('notification-saved', {
-          detail: { 
-            action: 'create',
-            offlineId: dataForBackend.offline_id,
-            timestamp: Date.now(),
-            isOffline: !systemIsOnline
-          }
+        emitNotificationSavedEvent({
+          action: 'create',
+          offlineId: dataForBackend.offline_id,
+          isOffline: !systemIsOnline,
         });
-        window.dispatchEvent(notificationSavedEvent);
         console.log('📤 Evento de nova notificação disparado');
       }
 
-      // Redirecionar para página de listagem ou detalhes após um breve delay
       setTimeout(() => {
         navigate("/private/comunicacao-de-caso");
       }, 1500);
-    } catch (error: any) {
+    },
+    [
+      emitNotificationSavedEvent,
+      id,
+      isEditMode,
+      navigate,
+      saveNotificationOfflineSafe,
+      systemIsOnline,
+    ]
+  );
+
+  const handleNotificationSaveError = useCallback(
+    (error: any) => {
       console.error("Erro ao salvar notificação:", error);
 
-      // Tratamento de erros melhorado
       let errorMessage = "Erro ao salvar notificação";
       let validationErrors: Record<string, string> = {};
 
-      // Extrair mensagem de erro e possíveis erros de validação do backend
       if (error.response && error.response.data) {
-        // Mensagem geral de erro
-        if (error.response.data.message) {
-          errorMessage = error.response.data.message;
-        }
+        errorMessage = extractBackendMessage(error, "Erro ao salvar notificação");
 
-        // Erros específicos por campo
         if (error.response.data.errors) {
-          const backendErrors = error.response.data.errors;
-
-          // Mapear os erros do backend para nossos campos do formulário
-          Object.entries(backendErrors).forEach(([key, value]) => {
-            // Mapeamento dos nomes de campo do backend para o frontend
-            const fieldMapping: Record<string, string> = {
-              tipo_evento_idtipo_evento: "evento",
-              tipo_publico_idtipo_publico: "publicoAtendido",
-              paciente_idpaciente: "paciente",
-              residente_belem: "residenteBelem",
-              tipo_pais_idtipo_pais: "paisProcedencia",
-              tipo_estado_idtipo_estado: "uf",
-              tipo_municipio_idtipo_municipio: "municipio",
-              tipo_bairro_idtipo_bairro: "bairro",
-              tipo_atendimento_idtipo_atendimento: "tipoAtendimento",
-              tipo_encerramento_idtipo_encerramento: "tipoEncerramento",
-              // Adicionar mais mapeamentos conforme necessário
-            };
-
-            const fieldName = fieldMapping[key] || key;
-            validationErrors[fieldName] = Array.isArray(value) ? value[0] : String(value);
-          });
+          validationErrors = mapBackendValidationErrors(
+            error.response.data.errors,
+            NOTIFICATION_SAVE_ERROR_FIELD_MAP
+          );
         }
       } else if (error.message) {
         errorMessage = error.message;
       }
 
-      // Atualizar estado de erro e exibir toast
       setApiError(errorMessage);
       toast.error(errorMessage);
 
-      // Atualizar erros específicos por campo
       if (Object.keys(validationErrors).length > 0) {
         setErrors((prev) => ({ ...prev, ...validationErrors }));
         sectionExpansion.expandSectionsWithErrors(validationErrors);
       }
+    },
+    [sectionExpansion]
+  );
+
+  const runPreSubmitChecks = useCallback(async (): Promise<boolean> => {
+    console.log("=== INICIANDO VALIDAÇÃO DO FORMULÁRIO ===");
+
+    const isValid = validateForm(
+      formData,
+      errors,
+      setErrors,
+      setExpandedSections,
+      expandedSections,
+      atendimentoOptions,
+      encerramentoOptions
+    );
+
+    if (!isValid) {
+      setTimeout(() => {
+        const currentErrors = Object.keys(errors).length;
+        console.log(`Validação falhou. Total de erros: ${currentErrors}`);
+        toast.error(`${currentErrors} erro(s) encontrado(s). Verifique o resumo acima.`);
+      }, 100);
+      return false;
+    }
+
+    console.log("Validação passou. Procedendo com criação/atualização do paciente...");
+
+    const arquivosError = validateArquivos(formData.arquivos || []);
+    if (arquivosError) {
+      setErrors((prev) => ({ ...prev, arquivos: arquivosError }));
+      toast.error("Erro nos arquivos anexados. Verifique e tente novamente.");
+      return false;
+    }
+
+    const patientReady = await ensurePatientReadyForSubmit();
+    if (!patientReady) {
+      return false;
+    }
+
+    return true;
+  }, [
+    atendimentoOptions,
+    encerramentoOptions,
+    ensurePatientReadyForSubmit,
+    errors,
+    expandedSections,
+    formData,
+  ]);
+
+  const prepareNotificationPayloadForSubmit = useCallback((): Record<string, any> => {
+    debugAntesDoSalvamento(formData);
+
+    const dataForBackend = buildNotificationDataForBackend(formData, arquivosParaExcluir);
+    const arquivos = dataForBackend.arquivos || [];
+
+    console.log("✅ Dados preparados para backend (arquivos preservados):", {
+      totalCampos: Object.keys(dataForBackend).length,
+      arquivosCount: arquivos?.length || 0,
+      arquivosIDs: (arquivos as Array<{ id?: string | number }>).map((arquivo) => arquivo.id),
+      arquivosParaExcluir: arquivosParaExcluir
+    });
+
+    console.log('🩹 [DEBUG TRAUMA] observacaoTrauma no handleSubmit:', {
+      original: formData.observacaoTrauma,
+      processado: dataForBackend.observacaoTrauma,
+      tipoTrauma: formData.tipoTrauma,
+      tipoTraumaProcessado: dataForBackend.tipoTrauma
+    });
+
+    return dataForBackend;
+  }, [arquivosParaExcluir, formData]);
+
+  const submitNotification = useCallback(async () => {
+    setIsSaving(true);
+    try {
+      console.log("Iniciando salvamento da notificação...");
+      const dataForBackend = prepareNotificationPayloadForSubmit();
+      await persistNotificationAndHandleSuccess(dataForBackend);
+    } catch (error: any) {
+      handleNotificationSaveError(error);
     } finally {
       setIsSaving(false);
     }
+  }, [
+    handleNotificationSaveError,
+    persistNotificationAndHandleSuccess,
+    prepareNotificationPayloadForSubmit,
+  ]);
+
+  // ✅ FUNÇÃO MODIFICADA PARA SUBMETER O FORMULÁRIO (COM SISTEMA OFFLINE)
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Limpar estados de feedback
+    setApiError(null);
+    setIsSuccess(false);
+
+    const canSubmit = await runPreSubmitChecks();
+    if (!canSubmit) {
+      return;
+    }
+
+    await submitNotification();
   };
 
   // Efeitos
@@ -2166,37 +1984,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
   
     fetchHipoteses();
   }, [formData.sinaisESintomas, formData.tipoAtendimento, hipoteseDiagOptions]);
-
-  // ✅ NOVA FUNÇÃO: Buscar pacientes com sistema offline
-  const searchPacientes = useCallback(
-    debounce(async (query: string) => {
-      if (!query || query.length < 3) {
-        setPacienteSuggestions([]);
-        setShowSuggestions(false);
-        return;
-      }
-
-      try {
-        console.log('🔍 Buscando pacientes:', query);
-        const results = await searchPatientsOfflineSafe(query);
-        
-        if (results && results.length > 0) {
-          setPacienteSuggestions(results);
-          setShowSuggestions(true);
-          console.log(`✅ Encontrados ${results.length} pacientes`);
-        } else {
-          setPacienteSuggestions([]);
-          setShowSuggestions(false);
-          console.log('ℹ️ Nenhum paciente encontrado');
-        }
-      } catch (error) {
-        console.error('Erro ao buscar pacientes:', error);
-        setPacienteSuggestions([]);
-        setShowSuggestions(false);
-      }
-    }, 500),
-    [searchPatientsOfflineSafe]
-  );
 
   // Retornar todos os estados e funções necessários
 
@@ -2533,29 +2320,15 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
     try {
       // ✅ USAR SISTEMA OFFLINE
-      const novoPaciente: any = {
-        nome: formData.paciente,
-        nome_mae: formData.nomeMae || "",
-        data_nascimento: formData.dataNascimento || null,
-        cpf: formData.cpf || "",
-        cns: formData.cns || null,
-        sexo: mapSexoNascimentoToApi(formData.sexoNascimento),
-        e_estrangeiro: formData.eEstrangeiro === "1" ? "1" : formData.eEstrangeiro === "2" ? "2" : null,
-        contato: formData.contatoTelefonico || "",
-        gestante: mapGestanteForApi(formData.gestante),
-        tipo_genero_idtipo_genero: formData.identidadeGenero ? parseInt(formData.identidadeGenero, 10) : null,
-        tipo_raca_idtipo_raca: formData.raca ? parseInt(formData.raca, 10) : null,
-        escolaridade_idescolaridade: formData.escolaridade ? parseInt(formData.escolaridade, 10) : null,
-        cbo_idcbo: formData.profissao ? parseInt(formData.profissao, 10) : null,
-        ddi: formData.ddi || "55",
-      };
-      
-      // ✅ CORREÇÃO: SEMPRE enviar idade em meses quando não há data de nascimento
-      if ((!formData.dataNascimento || formData.dataNascimento.trim() === '') && formData.idadeMeses) {
-        novoPaciente.idade = parseInt(formData.idadeMeses); // Envia o total de meses
-      } else {
-        novoPaciente.idade = null;
-      }
+      const novoPaciente: any = buildPatientPayloadFromForm(
+        formData,
+        { mapSexoNascimentoToApi, mapGestanteForApi },
+        {
+          uppercaseNome: false,
+          uppercaseNomeMae: false,
+          includeNullableClassificationIds: true
+        }
+      );
       
       // ✅ DEBUG: Log para verificar se gestante e idade estão incluídos
       console.log('🔍 DEBUG - Criando novo paciente com gestante e idade:', {

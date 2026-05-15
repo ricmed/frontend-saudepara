@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 import FormService, { type Form } from '@/services/FormService';
 import { Plus, Link2, FileSpreadsheet, FileText, FileEdit, Trash2, Copy, Search } from 'lucide-react';
+import { useAuth } from '@/keycloak/AuthProvider';
 
 const VISIBILITY_LABEL: Record<string, string> = {
   PRIVATE: 'Privado',
@@ -10,8 +11,11 @@ const VISIBILITY_LABEL: Record<string, string> = {
   PUBLIC: 'Público',
 };
 
+type FormRole = 'ADMIN' | 'EDITOR' | 'VIEWER';
+
 export const MyFormsPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [forms, setForms] = useState<Form[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
@@ -79,6 +83,16 @@ export const MyFormsPage: React.FC = () => {
       })
     : forms;
 
+  const getRole = (form: Form): FormRole | null => {
+    const role = form.my_role;
+    if (role === 'ADMIN' || role === 'EDITOR' || role === 'VIEWER') return role;
+    const currentUserId = ((user as any)?.sub || (user as any)?.id || '') as string;
+    if (currentUserId && String(form.owner_user_id || '') === String(currentUserId)) return 'ADMIN';
+    const aclRole = ((form as any)?.acl?.[0]?.role ?? null) as string | null;
+    if (aclRole === 'ADMIN' || aclRole === 'EDITOR' || aclRole === 'VIEWER') return aclRole;
+    return null;
+  };
+
   return (
     <AppPageLayout
       title="Meus Formulários"
@@ -137,7 +151,13 @@ export const MyFormsPage: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
-          {filteredForms.map((f) => (
+          {filteredForms.map((f) => {
+            const role = getRole(f);
+            const canEditFields = role === 'ADMIN' || role === 'EDITOR';
+            const canShare = role === 'ADMIN' || role === 'EDITOR';
+            const canViewResponses = role === 'ADMIN' || role === 'EDITOR' || role === 'VIEWER';
+            const canManageForm = role === 'ADMIN';
+            return (
             <div
               key={f.id}
               className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200 hover:shadow-md hover:-translate-y-0.5 transition-all w-full max-w-[26rem] justify-self-start"
@@ -168,67 +188,82 @@ export const MyFormsPage: React.FC = () => {
 
                 {/* Ações principais */}
                 <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/private/meus-formularios/${f.id}/editar`)}
-                    className="flex flex-col items-center gap-1 py-3 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors text-xs font-medium"
-                  >
-                    <FileEdit className="h-4 w-4" aria-hidden />
-                    Campos
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/private/meus-formularios/${f.id}/compartilhar`)}
-                    className="flex flex-col items-center gap-1 py-3 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-xs font-medium"
-                  >
-                    <Link2 className="h-4 w-4" aria-hidden />
-                    Compartilhar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      navigate(`/private/formularios-admin/respostas/${f.id}`, {
-                        state: { responsesBackTo: '/private/meus-formularios' },
-                      })
-                    }
-                    className="flex flex-col items-center gap-1 py-3 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 transition-colors text-xs font-medium"
-                  >
-                    <FileSpreadsheet className="h-4 w-4" aria-hidden />
-                    Respostas
-                  </button>
+                  {canEditFields ? (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/private/meus-formularios/${f.id}/editar`)}
+                      className="flex flex-col items-center gap-1 py-3 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors text-xs font-medium"
+                    >
+                      <FileEdit className="h-4 w-4" aria-hidden />
+                      Campos
+                    </button>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50" />
+                  )}
+                  {canShare ? (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/private/meus-formularios/${f.id}/compartilhar`)}
+                      className="flex flex-col items-center gap-1 py-3 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-xs font-medium"
+                    >
+                      <Link2 className="h-4 w-4" aria-hidden />
+                      Compartilhar
+                    </button>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50" />
+                  )}
+                  {canViewResponses ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(`/private/meus-formularios/${f.id}/respostas`, {
+                          state: { responsesBackTo: '/private/meus-formularios' },
+                        })
+                      }
+                      className="flex flex-col items-center gap-1 py-3 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 transition-colors text-xs font-medium"
+                    >
+                      <FileSpreadsheet className="h-4 w-4" aria-hidden />
+                      Respostas
+                    </button>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50" />
+                  )}
                 </div>
 
                 {/* Ações secundárias */}
-                <div className="flex items-center justify-end gap-4 pt-1 border-t">
-                  <button
-                    type="button"
-                    onClick={() => toggleActive(f)}
-                    className={`text-xs hover:underline ${
-                      f.is_active ? 'text-amber-700' : 'text-emerald-700'
-                    }`}
-                  >
-                    {f.is_active ? 'Desativar' : 'Ativar'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => duplicate(f)}
-                    className="text-xs text-gray-500 hover:underline flex items-center gap-1"
-                  >
-                    <Copy className="h-3 w-3" aria-hidden />
-                    Duplicar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeForm(f)}
-                    className="text-xs text-red-500 hover:underline flex items-center gap-1"
-                  >
-                    <Trash2 className="h-3 w-3" aria-hidden />
-                    Excluir
-                  </button>
-                </div>
+                {canManageForm && (
+                  <div className="flex items-center justify-end gap-4 pt-1 border-t">
+                    <button
+                      type="button"
+                      onClick={() => toggleActive(f)}
+                      className={`text-xs hover:underline ${
+                        f.is_active ? 'text-amber-700' : 'text-emerald-700'
+                      }`}
+                    >
+                      {f.is_active ? 'Desativar' : 'Ativar'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => duplicate(f)}
+                      className="text-xs text-gray-500 hover:underline flex items-center gap-1"
+                    >
+                      <Copy className="h-3 w-3" aria-hidden />
+                      Duplicar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeForm(f)}
+                      className="text-xs text-red-500 hover:underline flex items-center gap-1"
+                    >
+                      <Trash2 className="h-3 w-3" aria-hidden />
+                      Excluir
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </AppPageLayout>

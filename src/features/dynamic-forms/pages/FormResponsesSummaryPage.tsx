@@ -1,12 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 import { BarChart3 } from 'lucide-react';
 import FormResponsesSummaryService, { type SummaryResponse } from '@/services/FormResponsesSummaryService';
 
 export const FormResponsesSummaryPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const formId = Number(id);
+  const responsesBackPath = location.pathname.includes('/meus-formularios/')
+    ? `/private/meus-formularios/${formId}/respostas`
+    : `/private/formularios-admin/respostas/${formId}`;
 
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<SummaryResponse | null>(null);
@@ -38,7 +42,7 @@ export const FormResponsesSummaryPage: React.FC = () => {
       icon={<BarChart3 className="h-8 w-8" />}
       variant="desktop"
       showBottomNav={false}
-      backPath={`/private/formularios-admin/respostas/${formId}`}
+      backPath={responsesBackPath}
       headerActions={
         <div className="flex items-center gap-2">
           <span className="hidden sm:inline text-sm text-white/90">Mostrar:</span>

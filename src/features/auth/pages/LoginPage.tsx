@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../keycloak/AuthProvider';
+import { useAuth } from '@/keycloak/AuthProvider';
 import { User, Lock, Shield, WifiOff } from 'lucide-react';
-import { Header } from '../features/desktop/components/Header';
+import { Header } from '@/features/desktop/components/Header';
 import Footer from '@/features/desktop/components/Footer';
 import { SideMenu } from '@/features/home/components/SideMenu';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -20,8 +20,8 @@ const LoginPage = () => {
   const { selectedLanguage } = useLanguage();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { t } = useTranslation(selectedLanguage);
-  
-  // 🆕 Estados para login offline
+
+  // Estados para login offline
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [showPinSetup, setShowPinSetup] = useState(false);
   const [loginResult, setLoginResult] = useState<{ token: string; userData: any } | null>(null);
@@ -51,7 +51,7 @@ const LoginPage = () => {
         setHasOfflineAuth(false);
       }
     };
-    
+
     checkOfflineAuth();
   }, []);
 
@@ -66,23 +66,23 @@ const LoginPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
+
     try {
       const result = await login(username, password);
-      
-      // 🆕 Login online bem-sucedido!
+
+      // Login online bem-sucedido
       // Verificar se deve oferecer configuração de PIN
       if (result && result.user) {
         const userId = result.user.email || result.user.cpf || result.user.id || 'default';
         const hasPinConfigured = offlineAuthService.isOfflineAuthEnabled(userId);
-        
+
         if (!hasPinConfigured) {
           // Salvar resultado do login para usar no modal de PIN
           setLoginResult({
             token: result.token || '',
             userData: result.user || {}
           });
-          
+
           // Mostrar modal de configuração de PIN
           setShowPinSetup(true);
         }
@@ -93,14 +93,14 @@ const LoginPage = () => {
     }
   };
 
-  // 🆕 Handler para quando usuário configurar PIN com sucesso
+  // Handler para quando usuário configurar PIN com sucesso
   const handlePinSetupSuccess = () => {
     setShowPinSetup(false);
     // Usuário já está logado, apenas fechar o modal
     // O useEffect vai redirecionar
   };
 
-  // 🆕 Handler para login offline
+  // Handler para login offline
   const handleOfflineLogin = () => {
     navigate('/offline-login');
   };
@@ -123,12 +123,12 @@ const LoginPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <Header 
-        onMenuToggle={handleMenuToggle} 
-        isMobile={false} 
-        selectedLanguage={selectedLanguage} 
+      <Header
+        onMenuToggle={handleMenuToggle}
+        isMobile={false}
+        selectedLanguage={selectedLanguage}
       />
-      
+
       <main className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-lg mx-4 sm:mx-auto">
           <div className="text-center">
@@ -137,8 +137,7 @@ const LoginPage = () => {
               {t('login.subtitle')}
             </p>
           </div>
-          
-          {/* 🆕 Alert de conexão offline + botão de login offline */}
+
           {!isOnline && hasOfflineAuth && (
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
               <div className="flex items-start gap-3">
@@ -161,7 +160,7 @@ const LoginPage = () => {
               </div>
             </div>
           )}
-          
+
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
               <span className="block sm:inline">{error}</span>
@@ -173,7 +172,7 @@ const LoginPage = () => {
               <span className="block sm:inline">⚠️ {retryMessage}</span>
             </div>
           )}
-          
+
           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
             <div className="rounded-md shadow-sm -space-y-px">
               <div className="relative mb-4">
@@ -244,12 +243,11 @@ const LoginPage = () => {
       </main>
 
       <Footer selectedLanguage={selectedLanguage} />
-      <SideMenu 
+      <SideMenu
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
       />
-      
-      {/* 🆕 Modal de configuração de PIN */}
+
       {loginResult && (
         <SetupPinModal
           isOpen={showPinSetup}

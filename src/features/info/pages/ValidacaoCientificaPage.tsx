@@ -10,8 +10,6 @@ import {
   Activity, Copy, Check
 } from "lucide-react";
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
-
 interface IndicadoresValidacao {
   unidades_treinadas: number;
   unidades_com_notificacao: number;
@@ -31,7 +29,6 @@ interface IndicadoresValidacao {
     total_pendentes: number;
     taxa_sincronizacao_pct: number;
     com_tempo_rastreado: number;
-    /** Igual ao export Excel: epoch em `offline_id` → `created_at` (minutos). */
     tempo_medio_minutos: number | null;
     tempo_minimo_minutos: number | null;
     tempo_maximo_minutos: number | null;
@@ -54,13 +51,9 @@ interface IndicadoresValidacao {
   gerado_em: string;
 }
 
-// ─── Config de API ────────────────────────────────────────────────────────────
-
 const server = import.meta.env.VITE_API_SERVER || "http://localhost";
 const port = import.meta.env.VITE_API_PORT || "3000";
 const API_URL = `${server}:${port}`;
-
-// ─── Helpers visuais ──────────────────────────────────────────────────────────
 
 function statusIcon(percentual: number, meta: number, invertido = false) {
   const ok = invertido ? percentual <= meta : percentual >= meta;
@@ -115,8 +108,6 @@ function fmtNum(n: number | null, decimais = 1) {
   return n.toLocaleString("pt-BR", { minimumFractionDigits: decimais, maximumFractionDigits: decimais });
 }
 
-// ─── Componente principal ─────────────────────────────────────────────────────
-
 const ValidacaoCientificaPage: React.FC = () => {
   const [selectedLanguage] = useState<Language>("pt-BR");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -164,7 +155,6 @@ const ValidacaoCientificaPage: React.FC = () => {
       <main className="flex-grow">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
-          {/* ── Cabeçalho ── */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
             <div className="flex items-center gap-3">
               <button
@@ -216,7 +206,6 @@ const ValidacaoCientificaPage: React.FC = () => {
             </div>
           </div>
 
-          {/* ── Estado de carregamento / erro ── */}
           {carregando && !dados && (
             <div className="flex flex-col items-center justify-center py-24 text-gray-400">
               <RefreshCw className="h-10 w-10 animate-spin mb-4 text-blue-400" />
@@ -237,19 +226,14 @@ const ValidacaoCientificaPage: React.FC = () => {
             </div>
           )}
 
-          {/* ── Conteúdo principal ── */}
           {dados && (
             <div className="space-y-6">
-
-              {/* Data de geração */}
               <p className="text-xs text-gray-400 text-right">
                 Dados extraídos em {new Date(dados.gerado_em).toLocaleString("pt-BR")}
                 {carregando && <span className="ml-2 text-blue-400">(atualizando…)</span>}
               </p>
 
-              {/* ── Linha 1: Cards de destaque ── */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-
                 <Card className="text-center">
                   <Building2 className="h-7 w-7 text-blue-500 mx-auto mb-2" />
                   <p className="text-3xl font-bold text-gray-900">{dados.unidades_treinadas}</p>
@@ -286,10 +270,7 @@ const ValidacaoCientificaPage: React.FC = () => {
                 </Card>
               </div>
 
-              {/* ── Linha 2: Indicadores detalhados ── */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-
-                {/* 3. Disponibilidade */}
                 <Card>
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2 text-gray-700 font-semibold text-sm">
@@ -307,7 +288,6 @@ const ValidacaoCientificaPage: React.FC = () => {
                   </p>
                 </Card>
 
-                {/* 5. Taxa offline sincronizada */}
                 <Card>
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2 text-gray-700 font-semibold text-sm">
@@ -326,7 +306,6 @@ const ValidacaoCientificaPage: React.FC = () => {
                   </p>
                 </Card>
 
-                {/* 6. Completude */}
                 <Card>
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2 text-gray-700 font-semibold text-sm">
@@ -349,7 +328,6 @@ const ValidacaoCientificaPage: React.FC = () => {
                   </div>
                 </Card>
 
-                {/* 7. Incidentes */}
                 <Card>
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2 text-gray-700 font-semibold text-sm">
@@ -372,7 +350,6 @@ const ValidacaoCientificaPage: React.FC = () => {
                 </Card>
               </div>
 
-              {/* ── Sincronização offline — detalhes ── */}
               <Card>
                 <div className="flex items-center gap-2 text-gray-700 font-semibold text-sm mb-4">
                   <Clock className="h-4 w-4 text-blue-400" />
@@ -448,7 +425,6 @@ const ValidacaoCientificaPage: React.FC = () => {
                 )}
               </Card>
 
-              {/* ── Período de operação ── */}
               <Card>
                 <div className="flex items-center gap-2 text-gray-700 font-semibold text-sm mb-4">
                   <Calendar className="h-4 w-4 text-purple-400" />
@@ -471,7 +447,6 @@ const ValidacaoCientificaPage: React.FC = () => {
                 </div>
               </Card>
 
-              {/* ── Tabela resumo para o artigo ── */}
               <Card>
                 <p className="text-sm font-semibold text-gray-700 mb-3">
                   Tabela resumo para o artigo
@@ -537,7 +512,6 @@ const ValidacaoCientificaPage: React.FC = () => {
                   </table>
                 </div>
               </Card>
-
             </div>
           )}
         </div>

@@ -185,6 +185,13 @@ export const FormShareSinanSettingsPage: React.FC = () => {
             Este formulário parece ser <strong>GERAL</strong>. Para formulários gerais, use a tela de compartilhar em{' '}
             <code>/private/meus-formularios</code>.
           </p>
+          <button
+            type="button"
+            onClick={() => navigate(`/private/meus-formularios/${form.id}/compartilhar`)}
+            className="mt-3 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+          >
+            Ir para compartilhamento do formulário geral
+          </button>
         </div>
       ) : (
         <div className="space-y-6">

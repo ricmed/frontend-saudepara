@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, startTransition } from "react";
 import NotificacaoService from '@/services/NotificacaoService';
-import DashboardExportMenu from '../../components/common/DashboardExportMenu';
+import DashboardExportMenu from '@/components/common/DashboardExportMenu';
 import {
   BarChart,
   Bar,
@@ -34,7 +34,6 @@ import {
   ChevronDown,
   File,
   FileSearch2,
-  FileImage,
   Info,
   Award,
   AlertTriangle,
@@ -77,6 +76,18 @@ import PrincipaisSintomasChart from './components/charts/PrincipaisSintomasChart
 import TiposTraumaChart from './components/charts/TiposTraumaChart';
 import HipotesesDiagnosticasChart from './components/charts/HipotesesDiagnosticasChart';
 import SerieTemporalChart from './components/SerieTemporalChart';
+import {
+  ATENDIMENTO_TO_FILTER_KEY,
+  getAtendimentoColorByDescription,
+  isAtendimentoCategory,
+  matchesAtendimentoType,
+  resolveAtendimentoDescricaoById
+} from './utils/atendimentoFilters';
+import {
+  formatAgeFromMonths,
+  formatNotificationDatePtBr,
+  getOptionDescriptionById
+} from './utils/notificationModalFormatters';
 
 // ⚡ OTIMIZAÇÃO: Memoizar componentes de gráfico para evitar re-renderizações desnecessárias
 const MemoizedPiramideEtariaChart = React.memo(PiramideEtariaChart);
@@ -101,149 +112,10 @@ import DateRangeSelector from './components/TimeRangeSelector';
 
 // 🆕 SISTEMA DE EXPORTAÇÃO DISPONÍVEL:
 // Para integrar exportação em um gráfico individual, importe:
-import ChartExportMenu from '../../components/common/ChartExportMenu';
+import ChartExportMenu from '@/components/common/ChartExportMenu';
 // E adicione como prop ou elemento ao lado do gráfico
 
-// Funções de exportação para diferentes formatos
-const exportChartAsPNG = (chartId: string, title: string): void => {
-  const element = document.getElementById(chartId);
-  if (!element) {
-    alert('Elemento não encontrado!');
-    return;
-  }
-  
-  // Simulação de exportação para PNG
-  console.log(`Exportando ${title} como PNG`);
-  alert(`Exportação PNG simulada para: ${title}`);
-};
-
-const exportChartAsPDF = (chartId: string, title: string): void => {
-  const element = document.getElementById(chartId);
-  if (!element) {
-    alert('Elemento não encontrado!');
-    return;
-  }
-  
-  // Simulação de exportação para PDF
-  console.log(`Exportando ${title} como PDF`);
-  alert(`Exportação PDF simulada para: ${title}`);
-};
-
-const exportChartAsWord = (chartId: string, data: ChartDataItem[], title: string): void => {
-  const element = document.getElementById(chartId);
-  if (!element) {
-    alert('Elemento não encontrado!');
-    return;
-  }
-  
-  // Simulação de exportação para Word
-  console.log(`Exportando ${title} como Word`);
-  alert(`Exportação Word simulada para: ${title}`);
-};
-
-const exportChartAsCSV = (data: ChartDataItem[], title: string): void => {
-  try {
-    // Criar cabeçalhos
-    const headers = ['Categoria', 'Valor'];
-    
-    // Criar linhas
-    const rows = [
-      headers.join(','),
-      ...data.map(item => `"${item.name.replace(/"/g, '""')}",${item.value}`)
-    ];
-    
-    // Juntar linhas
-    const csvContent = rows.join('\n');
-    
-    // Criar blob e link para download
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `${title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.csv`;
-    link.click();
-  } catch (error) {
-    console.error('Erro ao exportar CSV:', error);
-    alert('Erro ao exportar CSV');
-  }
-};
-
-// Interface para as props do componente GraphExportMenu
-interface GraphExportMenuProps {
-  chartId: string;
-  chartType: string;
-  chartData: ChartDataItem[];
-  chartTitle: string;
-}
-
-// Componente de menu de exportação para cada gráfico
-const GraphExportMenu: React.FC<GraphExportMenuProps> = ({ chartId, chartType, chartData, chartTitle }) => {
-  const [showMenu, setShowMenu] = useState(false);
-  
-  const handleExport = (format: string) => {
-    switch (format) {
-      case 'png':
-        exportChartAsPNG(chartId, chartTitle);
-        break;
-      case 'pdf':
-        exportChartAsPDF(chartId, chartTitle);
-        break;
-      case 'word':
-        exportChartAsWord(chartId, chartData, chartTitle);
-        break;
-      case 'csv':
-        exportChartAsCSV(chartData, chartTitle);
-        break;
-      default:
-        break;
-    }
-    setShowMenu(false);
-  };
-  
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setShowMenu(!showMenu)}
-        className="p-1 text-gray-500 hover:text-blue-500 transition-colors"
-        title="Exportar gráfico"
-      >
-        <Download className="h-4 w-4" />
-      </button>
-      
-      {showMenu && (
-        <div className="absolute right-0 mt-1 bg-white rounded shadow-lg py-1 z-20 min-w-40">
-          <button 
-            className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-            onClick={() => handleExport('png')}
-          >
-            <FileImage className="h-4 w-4 text-green-500" />
-            Exportar PNG
-          </button>
-          <button 
-            className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-            onClick={() => handleExport('pdf')}
-          >
-            <FileSearch2 className="h-4 w-4 text-red-500" />
-            Exportar PDF
-          </button>
-          <button 
-            className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-            onClick={() => handleExport('word')}
-          >
-            <File className="h-4 w-4 text-blue-500" />
-            Exportar Word
-          </button>
-          <button 
-            className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-            onClick={() => handleExport('csv')}
-          >
-            <File className="h-4 w-4 text-gray-500" />
-            Exportar CSV
-          </button>
-        </div>
-      )}
-    </div>
-  );
-};
+// Exportações por gráfico usam o componente compartilhado ChartExportMenu.
 
 // Cores padronizadas - voltando para a paleta original com tonalidades de azul
 const COLORS = {
@@ -524,32 +396,15 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   const [tipoAtendimentoMap, setTipoAtendimentoMap] = useState<Record<string, string>>({});
 
   // Mapeamento de descrições para identificadores de filtro
-  const atendimentoToFilterKey: Record<string, string> = {
-    'clinico': 'Clínico',
-    'clínico': 'Clínico', 
-    'trauma': 'Trauma',
-    'multiplas': 'Múltiplas Vítimas',
-    'múltiplas vítimas': 'Múltiplas Vítimas',
-    'qbrn': 'Incidente QBRN',
-    'incidente qbrn': 'Incidente QBRN'
-  };
+  const atendimentoToFilterKey = ATENDIMENTO_TO_FILTER_KEY;
 
   // Função para obter a cor correta para cada tipo de atendimento
   const getAtendimentoColor = useCallback((tipoAtendimento: string): string => {
-    const tipo = tipoAtendimento.toLowerCase();
-    
-    if (tipo.includes('clínico') || tipo.includes('clinico')) {
-      return COLORS.atendimento.clinico;
-    } else if (tipo.includes('trauma')) {
-      return COLORS.atendimento.trauma;
-    } else if (tipo.includes('múltiplas') || tipo.includes('multiplas')) {
-      return COLORS.atendimento.multiplas;
-    } else if (tipo.includes('qbrn') || tipo.includes('incidente q')) {
-      return COLORS.atendimento.qbrn;
-    }
-    
-    // Cor padrão se não encontrar correspondência
-    return COLORS.blue[0];
+    return getAtendimentoColorByDescription(
+      tipoAtendimento,
+      COLORS.atendimento,
+      COLORS.blue[0]
+    );
   }, []);
 
   // 🕐 NOVO: FILTRAR NOTIFICAÇÕES PELO PERÍODO PERSONALIZADO (PRIMEIRO FILTRO)
@@ -630,20 +485,11 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   
   // Função para obter a descrição de um tipo de atendimento pelo ID
   const getAtendimentoDescById = useCallback((idAtendimento: string | number): string => {
-    // Se tipoAtendimentoMap já foi inicializado, usar diretamente
-    if (Object.keys(tipoAtendimentoMap).length > 0) {
-      return tipoAtendimentoMap[String(idAtendimento)] || "Desconhecido";
-    }
-    
-    // Se não, tentar buscar nas opções
-    if (exportOptions?.atendimentoOptions?.length > 0) {
-      const atendimento = exportOptions.atendimentoOptions.find(
-        (opt: any) => String(opt.idtipo_atendimento) === String(idAtendimento)
-      );
-      return atendimento?.descricao || "Desconhecido";
-    }
-    
-    return "Desconhecido";
+    return resolveAtendimentoDescricaoById(
+      idAtendimento,
+      tipoAtendimentoMap,
+      exportOptions?.atendimentoOptions
+    );
   }, [exportOptions, tipoAtendimentoMap]);
 
   // Inicializa o mapeamento de tipos de atendimento a partir das opções
@@ -662,29 +508,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
   // Função para verificar se uma notificação pertence a um tipo de atendimento específico
   const checkAtendimentoType = useCallback((notificacao: any, tipoDesc: string): boolean => {
-    // Normalizar a descrição para comparação
-    const tipoDescLower = tipoDesc.toLowerCase();
-    
-    // Verificar por ID
-    const tipoId = notificacao?.original?.tipo_atendimento_idtipo_atendimento;
-    if (tipoId !== undefined) {
-      const desc = getAtendimentoDescById(tipoId);
-      return desc.toLowerCase().includes(tipoDescLower);
-    }
-    
-    // Verificar por descrição
-    if (notificacao?.original?.tipo_atendimento?.descricao) {
-      return notificacao.original.tipo_atendimento.descricao
-        .toLowerCase()
-        .includes(tipoDescLower);
-    }
-    
-    // Verificar outros campos possíveis
-    if (notificacao?.tipoAtendimento) {
-      return notificacao.tipoAtendimento.toLowerCase().includes(tipoDescLower);
-    }
-    
-    return false;
+    return matchesAtendimentoType(notificacao, tipoDesc, getAtendimentoDescById);
   }, [getAtendimentoDescById]);
 
   // Função para filtrar notificações
@@ -698,8 +522,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     const categoriaLower = categoria.toLowerCase();
     
     // Verificar se é um tipo de atendimento
-    const tiposAtendimento = ["clínico", "trauma", "múltiplas vítimas", "incidente qbrn"];
-    const isTipoAtendimento = tiposAtendimento.some(tipo => categoriaLower.includes(tipo));
+    const isTipoAtendimento = isAtendimentoCategory(categoriaLower);
     
     if (isTipoAtendimento) {
       // Filtrar por tipo de atendimento
@@ -3289,23 +3112,17 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       const termo = modalSearchTerm.toLowerCase();
       
       // Pesquisar em múltiplos campos
-      const getDescById = (options: any[], id: any, idField: string, descField: string) => {
-        if (!options || !Array.isArray(options)) return 'N/A';
-        const item = options.find((opt: any) => String(opt[idField]) === String(id));
-        return item ? item[descField] : 'N/A';
-      };
-      
       return (
         original.idnotificacao?.toString().includes(termo) ||
         original.paciente?.nome?.toLowerCase().includes(termo) ||
         original.paciente?.cpf?.includes(termo) ||
-        getDescById(
+        getOptionDescriptionById(
           exportOptions?.estabelecimentoOptions || [],
           original.estabelecimento_idestabelecimento,
           'idestabelecimento',
           'nome'
         )?.toLowerCase().includes(termo) ||
-        getDescById(
+        getOptionDescriptionById(
           exportOptions?.hipoteseDiagOptions || [],
           original.tipo_hipotese_diag_idtipo_hipotese_diag,
           'idtipo_hipotese_diag',
@@ -3313,46 +3130,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         )?.toLowerCase().includes(termo)
       );
     });
-    
-    // Função para formatar data
-    const formatDate = (dateString: string) => {
-      if (!dateString) return 'N/A';
-      try {
-        return new Date(dateString).toLocaleDateString('pt-BR', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
-      } catch {
-        return dateString;
-      }
-    };
-
-    // Função para obter descrição por ID
-    const getDescById = (options: any[], id: any, idField: string, descField: string) => {
-      if (!options || !Array.isArray(options)) return 'N/A';
-      const item = options.find((opt: any) => String(opt[idField]) === String(id));
-      return item ? item[descField] : 'N/A';
-    };
-
-    // 🆕 Função para formatar idade corretamente (idade vem em MESES do banco)
-    const formatIdade = (idade: number | null | undefined): string => {
-      if (!idade || isNaN(Number(idade))) return 'N/A';
-      
-      const idadeMeses = Number(idade);
-      
-      // Se for menor que 12 meses, mostrar em meses
-      if (idadeMeses < 12) {
-        return `${idadeMeses} ${idadeMeses === 1 ? 'mês' : 'meses'}`;
-      }
-      
-      // Se for 12 meses ou mais, converter para anos
-      const anos = Math.floor(idadeMeses / 12);
-      return `${anos} ${anos === 1 ? 'ano' : 'anos'}`;
-    };
-
     // 🆕 Função para abrir modal de detalhes do paciente
     const abrirDetalhesPaciente = (notificacao: any) => {
       const original = notificacao.original || notificacao;
@@ -3434,12 +3211,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                               Notificação #{original.idnotificacao}
                             </h3>
                             <p className="text-xs text-gray-500">
-                              {formatDate(original.data_notificacao)}
+                              {formatNotificationDatePtBr(original.data_notificacao)}
                             </p>
                           </div>
                         </div>
                         <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
-                          {getDescById(
+                          {getOptionDescriptionById(
                             exportOptions?.atendimentoOptions || [],
                             original.tipo_atendimento_idtipo_atendimento,
                             'idtipo_atendimento',
@@ -3462,7 +3239,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         <div>
                           <span className="text-gray-500 font-medium">Idade:</span>
                           <p className="text-gray-900">
-                            {formatIdade(original.paciente?.idade)}
+                            {formatAgeFromMonths(original.paciente?.idade)}
                           </p>
                         </div>
 
@@ -3470,7 +3247,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         <div>
                           <span className="text-gray-500 font-medium">Sexo:</span>
                           <p className="text-gray-900">
-                            {getDescById(
+                            {getOptionDescriptionById(
                               exportOptions?.generoOptions || [],
                               original.paciente?.tipo_genero_idtipo_genero,
                               'idtipo_genero',
@@ -3483,7 +3260,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         <div className="md:col-span-2">
                           <span className="text-gray-500 font-medium">Estabelecimento:</span>
                           <p className="text-gray-900">
-                            {getDescById(
+                            {getOptionDescriptionById(
                               exportOptions?.estabelecimentoOptions || [],
                               original.estabelecimento_idestabelecimento,
                               'idestabelecimento',
@@ -3496,7 +3273,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         <div>
                           <span className="text-gray-500 font-medium">Hipótese:</span>
                           <p className="text-gray-900">
-                            {getDescById(
+                            {getOptionDescriptionById(
                               exportOptions?.hipoteseDiagOptions || [],
                               original.tipo_hipotese_diag_idtipo_hipotese_diag,
                               'idtipo_hipotese_diag',
@@ -3509,7 +3286,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         <div>
                           <span className="text-gray-500 font-medium">Público:</span>
                           <p className="text-gray-900">
-                            {getDescById(
+                            {getOptionDescriptionById(
                               exportOptions?.publicoOptions || [],
                               original.tipo_publico_idtipo_publico,
                               'idtipo_publico',
@@ -3522,7 +3299,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                         <div>
                           <span className="text-gray-500 font-medium">Raça/Cor:</span>
                           <p className="text-gray-900">
-                            {getDescById(
+                            {getOptionDescriptionById(
                               exportOptions?.racaOptions || [],
                               original.paciente?.tipo_raca_idtipo_raca,
                               'idtipo_raca',
