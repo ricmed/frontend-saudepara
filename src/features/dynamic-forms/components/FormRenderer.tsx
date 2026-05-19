@@ -45,7 +45,9 @@ import { validateCPF } from '@/utils/cpfValidator';
 import { validateCNS } from '@/utils/cnsValidator';
 import {
   fetchSyndromicAgravos,
+  fetchSyndromicAgravosRanking,
   fetchSyndromicSintomas,
+  type SyndromicAgravoRanking,
 } from '@/features/dynamic-forms/services/syndromicMatrixService';
 
 const NOTIFICATION_LOCATION_KEYS = new Set([
@@ -587,6 +589,8 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   >([]);
   const [clinicaLoadingAgravos, setClinicaLoadingAgravos] = useState(false);
   const [clinicaLoadingSintomas, setClinicaLoadingSintomas] = useState(false);
+  const [clinicaLoadingRanking, setClinicaLoadingRanking] = useState(false);
+  const [clinicaAgravosRankeados, setClinicaAgravosRankeados] = useState<SyndromicAgravoRanking[]>([]);
   const clinicaAgravosSelecionados = React.useMemo(() => {
     const raw = getValue('clinica.agravos_notificados');
     return Array.isArray(raw) ? raw.map((v) => String(v)) : [];
@@ -643,6 +647,32 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     return Array.isArray(raw) ? raw.map((v) => String(v)) : [];
   }, [formData, getValue]);
   const clinicaTemOutroSintoma = clinicaSintomasSelecionados.includes(SINTOMA_OUTRO_ID);
+  useEffect(() => {
+    if (context !== 'sinan') return;
+    const sintomaIds = clinicaSintomasSelecionados.filter((id) => id !== SINTOMA_OUTRO_ID);
+    if (sintomaIds.length === 0) {
+      setClinicaAgravosRankeados([]);
+      setClinicaLoadingRanking(false);
+      return;
+    }
+
+    let cancelled = false;
+    const load = async () => {
+      try {
+        setClinicaLoadingRanking(true);
+        const data = await fetchSyndromicAgravosRanking(sintomaIds);
+        if (!cancelled) setClinicaAgravosRankeados(data);
+      } catch {
+        if (!cancelled) setClinicaAgravosRankeados([]);
+      } finally {
+        if (!cancelled) setClinicaLoadingRanking(false);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [context, clinicaSintomasSelecionados.join(',')]);
 
   // Mapeamento por key: garante tipo/opções corretos mesmo quando o schema vem com type "text" do banco
   const getResolvedField = (field: any) => {
@@ -1649,9 +1679,37 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                   </div>
                 </div>
                 <div className="md:col-span-2">
-                  <p className="text-xs text-indigo-900/80">
-                    Sugestão assistiva: os CIDs são preenchidos automaticamente pelos agravos selecionados.
-                  </p>
+                  <div className="rounded-md border border-indigo-100 bg-indigo-50/60 px-3 py-2">
+                    <p className="text-xs text-indigo-900/80">
+                      Sugestão assistiva: os CIDs são preenchidos automaticamente pelos agravos selecionados.
+                    </p>
+                    {clinicaLoadingRanking ? (
+                      <p className="text-xs text-indigo-800 mt-2">Calculando compatibilidade...</p>
+                    ) : clinicaAgravosRankeados.length > 0 ? (
+                      <div className="mt-2 space-y-1">
+                        {clinicaAgravosRankeados.slice(0, 5).map((item) => (
+                          <div
+                            key={item.value}
+                            className="flex items-start justify-between gap-2 text-xs text-indigo-900"
+                          >
+                            <div className="min-w-0">
+                              <p className="font-medium truncate">{item.label}</p>
+                              <p className="text-indigo-800/80">
+                                {item.matchedSymptomsCount} sintoma(s) compatível(is)
+                              </p>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-indigo-200 px-2 py-0.5 font-semibold">
+                              {item.compatibility}%
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-indigo-800 mt-2">
+                        Selecione sinais e sintomas para ver a compatibilidade dos agravos.
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="min-w-0">

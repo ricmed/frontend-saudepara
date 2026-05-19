@@ -14,6 +14,15 @@ export interface SyndromicSintomaOption {
   label: string;
 }
 
+export interface SyndromicAgravoRanking {
+  value: string;
+  label: string;
+  score: number;
+  compatibility: number;
+  matchedSymptomsCount: number;
+  matchedSymptoms: string[];
+}
+
 export async function fetchSyndromicAgravos(): Promise<SyndromicAgravoOption[]> {
   const response = await axios.get(`${API_ROOT}/syndromic-matrix/agravos/select`, {
     withCredentials: true,
@@ -41,6 +50,30 @@ export async function fetchSyndromicSintomas(agravoIds: string[]): Promise<Syndr
   return data.map((item: any) => ({
     value: String(item.value),
     label: String(item.label),
+  }));
+}
+
+export async function fetchSyndromicAgravosRanking(
+  sintomaIds: string[],
+): Promise<SyndromicAgravoRanking[]> {
+  const params =
+    sintomaIds.length > 0
+      ? { sintomaIds: sintomaIds.join(',') }
+      : undefined;
+  const response = await axios.get(`${API_ROOT}/syndromic-matrix/agravos/ranking`, {
+    params,
+    withCredentials: true,
+  });
+  const data = Array.isArray(response.data) ? response.data : [];
+  return data.map((item: any) => ({
+    value: String(item.value),
+    label: String(item.label),
+    score: Number(item.score) || 0,
+    compatibility: Number(item.compatibility) || 0,
+    matchedSymptomsCount: Number(item.matchedSymptomsCount) || 0,
+    matchedSymptoms: Array.isArray(item.matchedSymptoms)
+      ? item.matchedSymptoms.map((v: any) => String(v))
+      : [],
   }));
 }
 
