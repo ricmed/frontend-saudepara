@@ -43,6 +43,10 @@ import type { MonitorOperRegionalScopePayload } from '../types/monitorOperRegion
 import type { NotificacaoEscopo } from '../utils/notificacaoScopeDefaults';
 import { validateCPF } from '@/utils/cpfValidator';
 import { validateCNS } from '@/utils/cnsValidator';
+import {
+  fetchSyndromicAgravos,
+  fetchSyndromicSintomas,
+} from '@/features/dynamic-forms/services/syndromicMatrixService';
 
 const NOTIFICATION_LOCATION_KEYS = new Set([
   'notificacao.uf_notificacao',
@@ -83,6 +87,24 @@ const IDENTIFICACAO_BLOCK_KEYS = new Set([
   'paciente.passaporte',
   'paciente.pais_nascimento_id',
 ]);
+
+const CLINICA_LAYOUT_KEYS = new Set([
+  'clinica.data_inicio_sintomas',
+  'clinica.relacionado_trabalho',
+  'clinica.relacionado_desastre',
+  'clinica.agravos_notificados',
+  'clinica.sinais_sintomas',
+  'clinica.sintomas_outro',
+  'agravo_cid',
+]);
+
+const CLINICA_RADIO_OPTIONS = [
+  { value: '1', label: 'Sim' },
+  { value: '2', label: 'Não' },
+  { value: '9', label: 'Ignorado' },
+];
+
+const SINTOMA_OUTRO_ID = '__outro_especifique__';
 
 interface FormRendererProps {
   schema: FormSchema;
@@ -528,6 +550,100 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     'residencia.complemento': 'Ex.: APTO 101, CASA 2, FUNDOS',
   };
 
+  const buildClinicaMultiSelectField = useCallback(
+    (
+      key: string,
+      label: string,
+      helpText: string,
+      options: Array<{ value: string; label: string }>,
+    ) => ({
+      key,
+      label,
+      type: 'multi-select',
+      options,
+      helpText,
+    }),
+    [],
+  );
+  const normalizeClinicaSimNaoIgnorado = useCallback((value: any): string => {
+    if (value === null || value === undefined || value === '') return '';
+    if (value === true || value === 1 || value === '1') return '1';
+    if (value === '2') return '2';
+    if (value === '9') return '9';
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'sim') return '1';
+      if (normalized === 'nao' || normalized === 'não') return '2';
+      if (normalized === 'ignorado') return '9';
+    }
+    if (value === false || value === 0) return '2';
+    return '';
+  }, []);
+  const [clinicaAgravoOptions, setClinicaAgravoOptions] = useState<
+    Array<{ value: string; label: string; cid10Lista: string[] }>
+  >([]);
+  const [clinicaSintomaBaseOptions, setClinicaSintomaBaseOptions] = useState<
+    Array<{ value: string; label: string }>
+  >([]);
+  const [clinicaLoadingAgravos, setClinicaLoadingAgravos] = useState(false);
+  const [clinicaLoadingSintomas, setClinicaLoadingSintomas] = useState(false);
+  const clinicaAgravosSelecionados = React.useMemo(() => {
+    const raw = getValue('clinica.agravos_notificados');
+    return Array.isArray(raw) ? raw.map((v) => String(v)) : [];
+  }, [formData, getValue]);
+  useEffect(() => {
+    if (context !== 'sinan') return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        setClinicaLoadingAgravos(true);
+        const data = await fetchSyndromicAgravos();
+        if (!cancelled) setClinicaAgravoOptions(data);
+      } catch {
+        if (!cancelled) setClinicaAgravoOptions([]);
+      } finally {
+        if (!cancelled) setClinicaLoadingAgravos(false);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [context]);
+  useEffect(() => {
+    if (context !== 'sinan') return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        setClinicaLoadingSintomas(true);
+        const data = await fetchSyndromicSintomas(clinicaAgravosSelecionados);
+        if (!cancelled) setClinicaSintomaBaseOptions(data);
+      } catch {
+        if (!cancelled) setClinicaSintomaBaseOptions([]);
+      } finally {
+        if (!cancelled) setClinicaLoadingSintomas(false);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [context, clinicaAgravosSelecionados.join(',')]);
+  const clinicaAgravoSelectOptions = React.useMemo(
+    () => clinicaAgravoOptions.map((item) => ({ value: item.value, label: item.label })),
+    [clinicaAgravoOptions],
+  );
+  const clinicaSintomaOptions = React.useMemo(() => {
+    const base = clinicaSintomaBaseOptions;
+    const hasOutro = base.some((item) => item.value === SINTOMA_OUTRO_ID);
+    return hasOutro ? base : [...base, { value: SINTOMA_OUTRO_ID, label: 'Outro, especifique' }];
+  }, [clinicaSintomaBaseOptions]);
+  const clinicaSintomasSelecionados = React.useMemo(() => {
+    const raw = getValue('clinica.sinais_sintomas');
+    return Array.isArray(raw) ? raw.map((v) => String(v)) : [];
+  }, [formData, getValue]);
+  const clinicaTemOutroSintoma = clinicaSintomasSelecionados.includes(SINTOMA_OUTRO_ID);
+
   // Mapeamento por key: garante tipo/opções corretos mesmo quando o schema vem com type "text" do banco
   const getResolvedField = (field: any) => {
     const keyMap: Record<string, { type: string; options?: Array<{ value: string; label: string }>; apiSelectEndpoint?: string; maxLength?: number }> = {
@@ -543,6 +659,22 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       'paciente.data_nascimento': { type: 'date' },
       'paciente.idade': { type: 'idade' },
       'paciente.nome_mae': { type: 'text', maxLength: 100 },
+      'clinica.relacionado_trabalho': {
+        type: 'select',
+        options: [
+          { value: '1', label: 'SIM' },
+          { value: '2', label: 'NÃO' },
+          { value: '9', label: 'IGNORADO' },
+        ],
+      },
+      'clinica.relacionado_desastre': {
+        type: 'select',
+        options: [
+          { value: '1', label: 'SIM' },
+          { value: '2', label: 'NÃO' },
+          { value: '9', label: 'IGNORADO' },
+        ],
+      },
     };
     const over = keyMap[field.key];
     const base = over
@@ -1128,6 +1260,15 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       ) : null}
 
       {(pageMode ? (currentSection ? [currentSection] : []) : sectionsToRender).map((section) => {
+          const isLegacyClinicaSection =
+            context === 'sinan' &&
+            !pageMode &&
+            section.fields.length > 0 &&
+            section.fields.some((f) => CLINICA_LAYOUT_KEYS.has(f.key)) &&
+            section.fields.every((f) => CLINICA_LAYOUT_KEYS.has(f.key));
+          if (isLegacyClinicaSection) {
+            return null;
+          }
           const sortedFields = [...section.fields].sort((a, b) => a.order - b.order);
           const firstNotificationField = sortedFields.find(
             (f) =>
@@ -1304,6 +1445,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                     );
                   }
                   if (IDENTIFICACAO_BLOCK_KEYS.has(field.key)) return null;
+                  if (CLINICA_LAYOUT_KEYS.has(field.key)) return null;
                   if (field.key === 'paciente.pais_nascimento') return null;
                   if (section.id === 'detalhamento' && field.key === 'detalhamento.complementar_descricao') {
                     const parentVal = getValue('detalhamento.complementar_descricao');
@@ -1402,6 +1544,189 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             </div>
           );
         })}
+
+      {context === 'sinan' && !pageMode ? (
+        <div className="mb-6">
+          <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div className="bg-blue-600 px-4 py-3 flex items-center gap-3 rounded-t-xl">
+              <Activity className="h-5 w-5 text-white/95 flex-shrink-0" />
+              <h2 className="text-base sm:text-lg font-semibold text-white leading-tight">Dados clínicos</h2>
+            </div>
+            <div className="p-4 rounded-b-xl">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <MultiSelectField
+                    field={buildClinicaMultiSelectField(
+                      'clinica.agravos_notificados',
+                      'Doenças/agravos notificados',
+                      clinicaLoadingAgravos
+                        ? 'Carregando agravos...'
+                        : 'Selecione um ou mais agravos. A lista de sintomas será sugerida automaticamente.',
+                      clinicaAgravoSelectOptions,
+                    ) as any}
+                    value={getValue('clinica.agravos_notificados')}
+                    onChange={(val: any) => {
+                      const selectedIds = Array.isArray(val) ? val.map((item) => String(item)) : [];
+                      setValue('clinica.agravos_notificados', selectedIds);
+                      const cids = Array.from(
+                        new Set(
+                          clinicaAgravoOptions
+                            .filter((item) => selectedIds.includes(item.value))
+                            .flatMap((item) => item.cid10Lista)
+                            .map((cid) => String(cid).trim())
+                            .filter(Boolean),
+                        ),
+                      );
+                      setValue('agravo_cid', cids.length > 0 ? cids.join('; ') : undefined);
+                    }}
+                    error={getError('clinica.agravos_notificados')}
+                    required
+                    disabled={readOnly || clinicaLoadingAgravos}
+                    getValue={getValue}
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <MultiSelectField
+                    field={buildClinicaMultiSelectField(
+                      'clinica.sinais_sintomas',
+                      'Sinais e sintomas',
+                      clinicaLoadingSintomas
+                        ? 'Carregando sintomas...'
+                        : 'Sugestão baseada nos agravos selecionados, sem bloquear sintomas fora da lista.',
+                      clinicaSintomaOptions,
+                    ) as any}
+                    value={getValue('clinica.sinais_sintomas')}
+                    onChange={(val: any) => {
+                      setValue('clinica.sinais_sintomas', val);
+                      const selected = Array.isArray(val) ? val.map((item) => String(item)) : [];
+                      if (!selected.includes(SINTOMA_OUTRO_ID)) {
+                        setValue('clinica.sintomas_outro', undefined);
+                      }
+                    }}
+                    error={getError('clinica.sinais_sintomas')}
+                    required
+                    disabled={readOnly || clinicaLoadingSintomas}
+                    getValue={getValue}
+                  />
+                </div>
+                {clinicaTemOutroSintoma ? (
+                  <div className="md:col-span-2">
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Outro sintoma (texto livre)
+                      </label>
+                      <input
+                        type="text"
+                        value={String(getValue('clinica.sintomas_outro') ?? '')}
+                        onChange={(event) => setValue('clinica.sintomas_outro', event.target.value)}
+                        disabled={readOnly}
+                        placeholder="Descreva o sintoma não listado"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+                ) : null}
+                <div className="md:col-span-2">
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      CID10 do Agravo
+                      {isFieldRequired('agravo_cid') ? <span className="text-red-500 ml-1">*</span> : null}
+                    </label>
+                    <input
+                      type="text"
+                      value={String(getValue('agravo_cid') ?? '')}
+                      onChange={(event) => setValue('agravo_cid', event.target.value)}
+                      disabled={readOnly}
+                      placeholder="Ex.: A90, B04, Z20.5"
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        getError('agravo_cid') ? 'border-red-500' : 'border-gray-300'
+                      } disabled:bg-gray-100 disabled:cursor-not-allowed`}
+                    />
+                    {getError('agravo_cid') ? (
+                      <p className="text-red-500 text-sm mt-1">{getError('agravo_cid')}</p>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="md:col-span-2">
+                  <p className="text-xs text-indigo-900/80">
+                    Sugestão assistiva: os CIDs são preenchidos automaticamente pelos agravos selecionados.
+                  </p>
+                </div>
+
+                <div className="min-w-0">
+                  <DateField
+                    field={{
+                      key: 'clinica.data_inicio_sintomas',
+                      label: 'Data de início dos sintomas',
+                      type: 'date',
+                    } as any}
+                    value={getValue('clinica.data_inicio_sintomas')}
+                    onChange={(val: any) => setValue('clinica.data_inicio_sintomas', val)}
+                    error={getError('clinica.data_inicio_sintomas')}
+                    required={isFieldRequired('clinica.data_inicio_sintomas')}
+                    disabled={readOnly}
+                  />
+                </div>
+
+                <div className="min-w-0">
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Doenças/agravos relacionados ao trabalho?
+                      {isFieldRequired('clinica.relacionado_trabalho') ? <span className="text-red-500 ml-1">*</span> : null}
+                    </label>
+                    <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+                      {CLINICA_RADIO_OPTIONS.map((option) => (
+                        <label key={option.value} className="inline-flex items-center gap-2 text-sm text-gray-800">
+                          <input
+                            type="radio"
+                            name="clinica-relacionado-trabalho"
+                            checked={normalizeClinicaSimNaoIgnorado(getValue('clinica.relacionado_trabalho')) === option.value}
+                            onChange={() => setValue('clinica.relacionado_trabalho', option.value)}
+                            disabled={readOnly}
+                            className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          {option.label}
+                        </label>
+                      ))}
+                    </div>
+                    {getError('clinica.relacionado_trabalho') && (
+                      <p className="text-red-500 text-sm mt-1">{getError('clinica.relacionado_trabalho')}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="md:col-span-2 min-w-0">
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Doenças/agravos relacionados ao desastre?
+                      {isFieldRequired('clinica.relacionado_desastre') ? <span className="text-red-500 ml-1">*</span> : null}
+                    </label>
+                    <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+                      {CLINICA_RADIO_OPTIONS.map((option) => (
+                        <label key={option.value} className="inline-flex items-center gap-2 text-sm text-gray-800">
+                          <input
+                            type="radio"
+                            name="clinica-relacionado-desastre"
+                            checked={normalizeClinicaSimNaoIgnorado(getValue('clinica.relacionado_desastre')) === option.value}
+                            onChange={() => setValue('clinica.relacionado_desastre', option.value)}
+                            disabled={readOnly}
+                            className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          {option.label}
+                        </label>
+                      ))}
+                    </div>
+                    {getError('clinica.relacionado_desastre') && (
+                      <p className="text-red-500 text-sm mt-1">{getError('clinica.relacionado_desastre')}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {!readOnly && showActions && (
         <div className="flex gap-4 justify-end mt-6 pt-6 border-t">
