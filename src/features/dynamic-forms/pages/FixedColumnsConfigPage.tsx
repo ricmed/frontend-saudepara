@@ -377,8 +377,8 @@ const FixedColumnsConfigPage: React.FC = () => {
               </p>
               {!showTechnicalDetails ? (
                 <p className="text-gray-500 text-xs leading-relaxed">
-                  Dica: se não souber o que marcar, use o botão roxo para marcar automaticamente os itens
-                  que o sistema já prevê para a ficha padrão (notificação, paciente e residência).
+                  Dica: use o botão roxo para marcar tudo que o sistema recomenda para este formulário
+                  (em fichas SINAN isso pode incluir Dados Clínicos, se aparecerem na lista abaixo).
                 </p>
               ) : (
                 <p className="text-gray-600 text-xs leading-relaxed font-mono bg-gray-50 border border-gray-100 rounded px-2 py-1.5">
