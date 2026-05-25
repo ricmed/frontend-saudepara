@@ -320,6 +320,15 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       .sort((a, b) => a.order - b.order);
   }, [schema]);
 
+  /** Dados clínicos (layout assistido) só quando ativados em Campos Fixos. */
+  const hasClinicaFixedFields = React.useMemo(
+    () =>
+      schema.sections?.some((s) =>
+        s.fields?.some((f) => f.isFixedColumn === true && CLINICA_LAYOUT_KEYS.has(f.key))
+      ) ?? false,
+    [schema]
+  );
+
   const [pageIndex, setPageIndex] = useState(0);
   useEffect(() => {
     setPageIndex(0);
@@ -1291,6 +1300,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
 
       {(pageMode ? (currentSection ? [currentSection] : []) : sectionsToRender).map((section) => {
           const isLegacyClinicaSection =
+            hasClinicaFixedFields &&
             context === 'sinan' &&
             !pageMode &&
             section.fields.length > 0 &&
@@ -1475,7 +1485,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                     );
                   }
                   if (IDENTIFICACAO_BLOCK_KEYS.has(field.key)) return null;
-                  if (CLINICA_LAYOUT_KEYS.has(field.key)) return null;
+                  if (hasClinicaFixedFields && CLINICA_LAYOUT_KEYS.has(field.key)) return null;
                   if (field.key === 'paciente.pais_nascimento') return null;
                   if (section.id === 'detalhamento' && field.key === 'detalhamento.complementar_descricao') {
                     const parentVal = getValue('detalhamento.complementar_descricao');
@@ -1575,7 +1585,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           );
         })}
 
-      {context === 'sinan' && !pageMode ? (
+      {context === 'sinan' && !pageMode && hasClinicaFixedFields ? (
         <div className="mb-6">
           <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
             <div className="bg-blue-600 px-4 py-3 flex items-center gap-3 rounded-t-xl">
