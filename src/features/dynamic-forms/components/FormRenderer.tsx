@@ -90,15 +90,12 @@ const IDENTIFICACAO_BLOCK_KEYS = new Set([
   'paciente.pais_nascimento_id',
 ]);
 
-const CLINICA_LAYOUT_KEYS = new Set([
-  'clinica.data_inicio_sintomas',
-  'clinica.relacionado_trabalho',
-  'clinica.relacionado_desastre',
-  'clinica.agravos_notificados',
-  'clinica.sinais_sintomas',
-  'clinica.sintomas_outro',
-  'agravo_cid',
-]);
+import {
+  isSinanClinicalFieldKey,
+  shouldShowSinanDadosClinicosBlock,
+  stripSinanClinicalFieldsFromSections,
+} from '../utils/sinanClinicalFields';
+import { schemaUsesNotificacao } from '../utils/notificacaoScopeDefaults';
 
 const CLINICA_RADIO_OPTIONS = [
   { value: '1', label: 'Sim' },
@@ -302,32 +299,32 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   }, []);
   const isUploading = uploadingCount > 0;
 
+  const isSinanNotificacaoForm = context === 'sinan' && schemaUsesNotificacao(schema);
+
   // Quando "Configurar Colunas Fixas" está ativo, exibir apenas os campos marcados como coluna fixa
   const sectionsToRender = React.useMemo(() => {
+    let sections = schema.sections ?? [];
+    if (!isSinanNotificacaoForm) {
+      sections = stripSinanClinicalFieldsFromSections(sections);
+    }
+
     // `fixedColumnsConfig.enabled` foi pensado para a tela de configuração de colunas fixas.
     // Para evitar formulários “vazios” quando ninguém marcou `isFixedColumn`,
     // só aplicamos o filtro se existir pelo menos 1 campo marcado como fixo.
     const enabled = !!schema.fixedColumnsConfig?.enabled;
-    const hasAnyFixedField = schema.sections?.some((s) => s.fields?.some((f) => f.isFixedColumn === true));
+    const hasAnyFixedField = sections.some((s) => s.fields?.some((f) => f.isFixedColumn === true));
     const useFixedOnly = enabled && hasAnyFixedField;
-    if (!useFixedOnly) return schema.sections;
-    return schema.sections
+    if (!useFixedOnly) return sections;
+    return sections
       .map((section) => ({
         ...section,
         fields: section.fields.filter((f) => f.isFixedColumn === true),
       }))
       .filter((section) => section.fields.length > 0)
       .sort((a, b) => a.order - b.order);
-  }, [schema]);
+  }, [schema, isSinanNotificacaoForm]);
 
-  /** Dados clínicos (layout assistido) só quando ativados em Campos Fixos. */
-  const hasClinicaFixedFields = React.useMemo(
-    () =>
-      schema.sections?.some((s) =>
-        s.fields?.some((f) => f.isFixedColumn === true && CLINICA_LAYOUT_KEYS.has(f.key))
-      ) ?? false,
-    [schema]
-  );
+  const showSinanDadosClinicosBlock = shouldShowSinanDadosClinicosBlock(schema, context);
 
   const [pageIndex, setPageIndex] = useState(0);
   useEffect(() => {
@@ -1300,12 +1297,11 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
 
       {(pageMode ? (currentSection ? [currentSection] : []) : sectionsToRender).map((section) => {
           const isLegacyClinicaSection =
-            hasClinicaFixedFields &&
-            context === 'sinan' &&
+            showSinanDadosClinicosBlock &&
             !pageMode &&
             section.fields.length > 0 &&
-            section.fields.some((f) => CLINICA_LAYOUT_KEYS.has(f.key)) &&
-            section.fields.every((f) => CLINICA_LAYOUT_KEYS.has(f.key));
+            section.fields.some((f) => isSinanClinicalFieldKey(f.key)) &&
+            section.fields.every((f) => isSinanClinicalFieldKey(f.key));
           if (isLegacyClinicaSection) {
             return null;
           }
@@ -1485,7 +1481,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                     );
                   }
                   if (IDENTIFICACAO_BLOCK_KEYS.has(field.key)) return null;
-                  if (hasClinicaFixedFields && CLINICA_LAYOUT_KEYS.has(field.key)) return null;
+                  if (showSinanDadosClinicosBlock && isSinanClinicalFieldKey(field.key)) return null;
                   if (field.key === 'paciente.pais_nascimento') return null;
                   if (section.id === 'detalhamento' && field.key === 'detalhamento.complementar_descricao') {
                     const parentVal = getValue('detalhamento.complementar_descricao');
@@ -1585,7 +1581,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           );
         })}
 
-      {context === 'sinan' && !pageMode && hasClinicaFixedFields ? (
+      {!pageMode && showSinanDadosClinicosBlock ? (
         <div className="mb-6">
           <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
             <div className="bg-blue-600 px-4 py-3 flex items-center gap-3 rounded-t-xl">

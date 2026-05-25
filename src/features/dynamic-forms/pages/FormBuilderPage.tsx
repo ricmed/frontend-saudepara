@@ -13,6 +13,7 @@ import { ImportExcelModal } from '../components/ImportExcelModal';
 import { FieldSourceConfig } from '../components/FieldSourceConfig';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 import { clampNoteInRange, normalizeScalePointLabelRows } from '@/utils/linearScaleNote';
+import { resolveFormRendererContext } from '../utils/sinanClinicalFields';
 
 function getLinearScaleBoundsInt(f: FormField): { loB: number; hiB: number } {
   const loB = Math.min(Math.floor(f.min ?? 1), Math.floor(f.max ?? 5));
@@ -3113,6 +3114,7 @@ export const FormBuilderPage: React.FC = () => {
                         readOnly={previewMode === 'readonly'}
                         showTitle={false}
                         showActions={false}
+                        context={resolveFormRendererContext(formKey, schema)}
                       />
                     )}
                   </div>

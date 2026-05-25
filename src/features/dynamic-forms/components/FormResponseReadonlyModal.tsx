@@ -1,6 +1,7 @@
 import React from 'react';
 import { FormRenderer } from './FormRenderer';
 import { getStatusUi } from '../utils/formResponsesListUtils';
+import { resolveFormRendererContext } from '../utils/sinanClinicalFields';
 
 type Props = {
   open: boolean;
@@ -56,7 +57,7 @@ export const FormResponseReadonlyModal: React.FC<Props> = ({
                 readOnly={true}
                 showActions={false}
                 showTitle={false}
-                context="sinan"
+                context={resolveFormRendererContext(undefined, activeSchema)}
                 pageMode={false}
                 showProgress={false}
                 className="w-full max-w-none mx-0 p-0 bg-transparent rounded-none shadow-none"

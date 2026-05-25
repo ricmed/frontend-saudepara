@@ -16,6 +16,7 @@ import {
   schemaUsesNotificacao,
   type NotificacaoEscopo,
 } from '../utils/notificacaoScopeDefaults';
+import { resolveFormRendererContext } from '../utils/sinanClinicalFields';
 
 export const DynamicFormPage: React.FC = () => {
   const { agravo, id } = useParams<{ agravo: string; id?: string }>(); // param name kept for route compatibility
@@ -375,6 +376,7 @@ export const DynamicFormPage: React.FC = () => {
           saveDraftLabel={isEditMode ? 'Salvar Alterações' : 'Salvar Rascunho'}
           cancelLabel={isViewMode ? "Fechar" : "Cancelar"}
           readOnly={isViewMode}
+          context={resolveFormRendererContext(agravo, formVersion.schema_json)}
           monitorOperRegionalCrsScope={
             agravo === 'MONITOR_OPER_REGIONAL' ? monitorOperRegionalCrsScope : null
           }
