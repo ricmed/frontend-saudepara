@@ -95,7 +95,6 @@ import {
   shouldShowSinanDadosClinicosBlock,
   stripSinanClinicalFieldsFromSections,
 } from '../utils/sinanClinicalFields';
-import { schemaUsesNotificacao } from '../utils/notificacaoScopeDefaults';
 
 const CLINICA_RADIO_OPTIONS = [
   { value: '1', label: 'Sim' },
@@ -148,7 +147,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   className,
   showTitle = true,
   showActions = true,
-  context = 'sinan',
+  context = 'general',
   pageMode = false,
   showProgress = false,
   monitorOperRegionalCrsScope = null,
@@ -299,12 +298,15 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   }, []);
   const isUploading = uploadingCount > 0;
 
-  const isSinanNotificacaoForm = context === 'sinan' && schemaUsesNotificacao(schema);
+  const showSinanDadosClinicosBlock = React.useMemo(
+    () => shouldShowSinanDadosClinicosBlock(schema),
+    [schema]
+  );
 
   // Quando "Configurar Colunas Fixas" está ativo, exibir apenas os campos marcados como coluna fixa
   const sectionsToRender = React.useMemo(() => {
     let sections = schema.sections ?? [];
-    if (!isSinanNotificacaoForm) {
+    if (!showSinanDadosClinicosBlock) {
       sections = stripSinanClinicalFieldsFromSections(sections);
     }
 
@@ -322,9 +324,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       }))
       .filter((section) => section.fields.length > 0)
       .sort((a, b) => a.order - b.order);
-  }, [schema, isSinanNotificacaoForm]);
-
-  const showSinanDadosClinicosBlock = shouldShowSinanDadosClinicosBlock(schema, context);
+  }, [schema, showSinanDadosClinicosBlock]);
 
   const [pageIndex, setPageIndex] = useState(0);
   useEffect(() => {
@@ -602,7 +602,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     return Array.isArray(raw) ? raw.map((v) => String(v)) : [];
   }, [formData, getValue]);
   useEffect(() => {
-    if (context !== 'sinan') return;
+    if (!showSinanDadosClinicosBlock) return;
     let cancelled = false;
     const load = async () => {
       try {
@@ -619,9 +619,9 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [context]);
+  }, [showSinanDadosClinicosBlock]);
   useEffect(() => {
-    if (context !== 'sinan') return;
+    if (!showSinanDadosClinicosBlock) return;
     let cancelled = false;
     const load = async () => {
       try {
@@ -638,7 +638,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [context, clinicaAgravosSelecionados.join(',')]);
+  }, [showSinanDadosClinicosBlock, clinicaAgravosSelecionados.join(',')]);
   const clinicaAgravoSelectOptions = React.useMemo(
     () => clinicaAgravoOptions.map((item) => ({ value: item.value, label: item.label })),
     [clinicaAgravoOptions],
@@ -654,7 +654,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   }, [formData, getValue]);
   const clinicaTemOutroSintoma = clinicaSintomasSelecionados.includes(SINTOMA_OUTRO_ID);
   useEffect(() => {
-    if (context !== 'sinan') return;
+    if (!showSinanDadosClinicosBlock) return;
     const sintomaIds = clinicaSintomasSelecionados.filter((id) => id !== SINTOMA_OUTRO_ID);
     if (sintomaIds.length === 0) {
       setClinicaAgravosRankeados([]);
@@ -678,7 +678,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [context, clinicaSintomasSelecionados.join(',')]);
+  }, [showSinanDadosClinicosBlock, clinicaSintomasSelecionados.join(',')]);
 
   // Mapeamento por key: garante tipo/opções corretos mesmo quando o schema vem com type "text" do banco
   const getResolvedField = (field: any) => {

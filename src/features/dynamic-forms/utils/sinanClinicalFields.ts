@@ -30,12 +30,11 @@ export function schemaHasActivatedSinanClinicalFields(
   );
 }
 
-export function shouldShowSinanDadosClinicosBlock(
-  schema: FormSchema,
-  context: 'sinan' | 'general' | 'public'
-): boolean {
-  if (context !== 'sinan') return false;
-  if (!schemaUsesNotificacao(schema)) return false;
+/**
+ * Bloco assistido "Dados clínicos" só existe se Campos Fixos marcou `isFixedColumn` no schema.
+ * Ignora context (evita bundle antigo + context=sinan exibir bloco fantasma).
+ */
+export function shouldShowSinanDadosClinicosBlock(schema: FormSchema): boolean {
   return schemaHasActivatedSinanClinicalFields(schema);
 }
 
