@@ -3,21 +3,22 @@ import type { FormSchema } from '@/services/FormService';
 import { useFormRenderer } from '../hooks/useFormRenderer';
 import { TextField, DateField, NumberField, TextareaField, CheckboxField, CurrencyField, AccountingField } from './FormFields';
 import { SelectField, SelectSearchField, CodeListSelectField, CodeListSearchField, ApiSelectField, ApiSelectSearchField, CboSearchField, CnaeSearchField, DseiPoloAldeiaFields } from './SelectFields';
-import { 
-  CheckboxGroupField, 
-  RadioGroupField, 
-  MultiSelectField, 
-  TimeField, 
-  DateTimeField, 
-  EmailField, 
-  PhoneField, 
-  CPFField, 
+import {
+  CheckboxGroupField,
+  RadioGroupField,
+  MultiSelectField,
+  TimeField,
+  DateTimeField,
+  EmailField,
+  PhoneField,
+  CPFField,
   CEPField,
   CNSField,
   PassaporteField,
   IdadeField,
   InternationalPhoneField
 } from './AdvancedFields';
+import { AgravoMultiSelectField } from './AgravoMultiSelectField';
 import type { CepFoundDetail } from './AdvancedFields';
 import {
   FileUploadField,
@@ -595,7 +596,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   >([]);
   const [clinicaLoadingAgravos, setClinicaLoadingAgravos] = useState(false);
   const [clinicaLoadingSintomas, setClinicaLoadingSintomas] = useState(false);
-  const [clinicaLoadingRanking, setClinicaLoadingRanking] = useState(false);
+  const [, setClinicaLoadingRanking] = useState(false);
   const [clinicaAgravosRankeados, setClinicaAgravosRankeados] = useState<SyndromicAgravoRanking[]>([]);
   const clinicaAgravosSelecionados = React.useMemo(() => {
     const raw = getValue('clinica.agravos_notificados');
@@ -639,10 +640,6 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       cancelled = true;
     };
   }, [showSinanDadosClinicosBlock, clinicaAgravosSelecionados.join(',')]);
-  const clinicaAgravoSelectOptions = React.useMemo(
-    () => clinicaAgravoOptions.map((item) => ({ value: item.value, label: item.label })),
-    [clinicaAgravoOptions],
-  );
   const clinicaSintomaOptions = React.useMemo(() => {
     const base = clinicaSintomaBaseOptions;
     const hasOutro = base.some((item) => item.value === SINTOMA_OUTRO_ID);
@@ -1593,43 +1590,11 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                 <div className="md:col-span-2">
                   <MultiSelectField
                     field={buildClinicaMultiSelectField(
-                      'clinica.agravos_notificados',
-                      'Doenças/agravos notificados',
-                      clinicaLoadingAgravos
-                        ? 'Carregando agravos...'
-                        : 'Selecione um ou mais agravos. A lista de sintomas será sugerida automaticamente.',
-                      clinicaAgravoSelectOptions,
-                    ) as any}
-                    value={getValue('clinica.agravos_notificados')}
-                    onChange={(val: any) => {
-                      const selectedIds = Array.isArray(val) ? val.map((item) => String(item)) : [];
-                      setValue('clinica.agravos_notificados', selectedIds);
-                      const cids = Array.from(
-                        new Set(
-                          clinicaAgravoOptions
-                            .filter((item) => selectedIds.includes(item.value))
-                            .flatMap((item) => item.cid10Lista)
-                            .map((cid) => String(cid).trim())
-                            .filter(Boolean),
-                        ),
-                      );
-                      setValue('agravo_cid', cids.length > 0 ? cids.join('; ') : undefined);
-                    }}
-                    error={getError('clinica.agravos_notificados')}
-                    required
-                    disabled={readOnly || clinicaLoadingAgravos}
-                    getValue={getValue}
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <MultiSelectField
-                    field={buildClinicaMultiSelectField(
                       'clinica.sinais_sintomas',
                       'Sinais e sintomas',
                       clinicaLoadingSintomas
                         ? 'Carregando sintomas...'
-                        : 'Sugestão baseada nos agravos selecionados, sem bloquear sintomas fora da lista.',
+                        : 'Selecione os sinais e sintomas. Os agravos compatíveis serão rankeados automaticamente abaixo.',
                       clinicaSintomaOptions,
                     ) as any}
                     value={getValue('clinica.sinais_sintomas')}
@@ -1646,6 +1611,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                     getValue={getValue}
                   />
                 </div>
+
                 {clinicaTemOutroSintoma ? (
                   <div className="md:col-span-2">
                     <div className="mb-4">
@@ -1663,6 +1629,39 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                     </div>
                   </div>
                 ) : null}
+
+                <div className="md:col-span-2">
+                  <AgravoMultiSelectField
+                    label="Doenças/agravos notificados"
+                    helpText={
+                      clinicaLoadingAgravos
+                        ? 'Carregando agravos...'
+                        : clinicaSintomasSelecionados.length > 0
+                          ? 'Agravos compatíveis aparecem no topo ordenados por %. Clique em 🩺 para ver os sintomas de cada doença.'
+                          : 'Selecione sintomas acima para ver os agravos rankeados por compatibilidade.'
+                    }
+                    value={clinicaAgravosSelecionados}
+                    onChange={(selectedIds) => {
+                      setValue('clinica.agravos_notificados', selectedIds);
+                      const cids = Array.from(
+                        new Set(
+                          clinicaAgravoOptions
+                            .filter((item) => selectedIds.includes(item.value))
+                            .flatMap((item) => item.cid10Lista)
+                            .map((cid) => String(cid).trim())
+                            .filter(Boolean),
+                        ),
+                      );
+                      setValue('agravo_cid', cids.length > 0 ? cids.join('; ') : undefined);
+                    }}
+                    agravoOptions={clinicaAgravoOptions}
+                    agravosRanking={clinicaAgravosRankeados}
+                    sintomasSelecionados={clinicaSintomasSelecionados}
+                    error={getError('clinica.agravos_notificados')}
+                    required
+                    disabled={readOnly || clinicaLoadingAgravos}
+                  />
+                </div>
                 <div className="md:col-span-2">
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1684,40 +1683,6 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                     ) : null}
                   </div>
                 </div>
-                <div className="md:col-span-2">
-                  <div className="rounded-md border border-indigo-100 bg-indigo-50/60 px-3 py-2">
-                    <p className="text-xs text-indigo-900/80">
-                      Sugestão assistiva: os CIDs são preenchidos automaticamente pelos agravos selecionados.
-                    </p>
-                    {clinicaLoadingRanking ? (
-                      <p className="text-xs text-indigo-800 mt-2">Calculando compatibilidade...</p>
-                    ) : clinicaAgravosRankeados.length > 0 ? (
-                      <div className="mt-2 space-y-1">
-                        {clinicaAgravosRankeados.slice(0, 5).map((item) => (
-                          <div
-                            key={item.value}
-                            className="flex items-start justify-between gap-2 text-xs text-indigo-900"
-                          >
-                            <div className="min-w-0">
-                              <p className="font-medium truncate">{item.label}</p>
-                              <p className="text-indigo-800/80">
-                                {item.matchedSymptomsCount} sintoma(s) compatível(is)
-                              </p>
-                            </div>
-                            <span className="shrink-0 rounded-full bg-indigo-200 px-2 py-0.5 font-semibold">
-                              {item.compatibility}%
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-indigo-800 mt-2">
-                        Selecione sinais e sintomas para ver a compatibilidade dos agravos.
-                      </p>
-                    )}
-                  </div>
-                </div>
-
                 <div className="min-w-0">
                   <DateField
                     field={{

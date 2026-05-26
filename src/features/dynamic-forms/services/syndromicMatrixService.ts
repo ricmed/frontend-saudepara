@@ -53,6 +53,29 @@ export async function fetchSyndromicSintomas(agravoIds: string[]): Promise<Syndr
   }));
 }
 
+export interface SyndromicSintomaDetail {
+  value: string;
+  label: string;
+  categoria: string;
+  sinalAlarme: boolean;
+  sinalGravidade: boolean;
+}
+
+export async function fetchSyndromicSintomasByAgravo(agravoId: string): Promise<SyndromicSintomaDetail[]> {
+  const response = await axios.get(`${API_ROOT}/syndromic-matrix/sintomas/by-agravo`, {
+    params: { agravoId },
+    withCredentials: true,
+  });
+  const data = Array.isArray(response.data) ? response.data : [];
+  return data.map((item: any) => ({
+    value: String(item.value),
+    label: String(item.label),
+    categoria: String(item.categoria ?? ''),
+    sinalAlarme: Boolean(item.sinalAlarme),
+    sinalGravidade: Boolean(item.sinalGravidade),
+  }));
+}
+
 export async function fetchSyndromicAgravosRanking(
   sintomaIds: string[],
 ): Promise<SyndromicAgravoRanking[]> {

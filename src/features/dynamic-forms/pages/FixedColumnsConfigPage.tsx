@@ -144,6 +144,15 @@ const FixedColumnsConfigPage: React.FC = () => {
     }
   };
 
+  const handleMarkAll = () => {
+    if (!data) return;
+    setSelectedFields(new Set(data.fields.filter(f => f.hasFixedColumn).map(f => f.key)));
+  };
+
+  const handleUnmarkAll = () => {
+    setSelectedFields(new Set());
+  };
+
   const handleAutoMark = async () => {
     try {
       setSaving(true);
@@ -394,15 +403,34 @@ const FixedColumnsConfigPage: React.FC = () => {
                   {selectedFields.size} de {data.totalAvailable} em busca rápida
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={handleAutoMark}
-                disabled={saving}
-                className="w-full sm:w-auto px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium transition-colors"
-              >
-                <Wand2 className="h-4 w-4 shrink-0" />
-                Marcar o que o sistema recomenda
-              </button>
+              <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={handleMarkAll}
+                  disabled={saving}
+                  className="flex-1 sm:flex-none px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium transition-colors"
+                >
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  Marcar todos
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUnmarkAll}
+                  disabled={saving}
+                  className="flex-1 sm:flex-none px-4 py-2.5 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium transition-colors"
+                >
+                  Desmarcar todos
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAutoMark}
+                  disabled={saving}
+                  className="flex-1 sm:flex-none px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium transition-colors"
+                >
+                  <Wand2 className="h-4 w-4 shrink-0" />
+                  Marcar o que o sistema recomenda
+                </button>
+              </div>
             </div>
           </div>
         </div>
