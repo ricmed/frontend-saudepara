@@ -2,8 +2,13 @@
 import { useState, useCallback, useMemo } from 'react';
 import type { UseApiOptions, UseApiReturn } from '../types/admin.types';
 
-const USE_INTERNAL_AUTH = (import.meta as any).env?.VITE_USE_INTERNAL_AUTH === 'true';
-const API_BASE = USE_INTERNAL_AUTH ? '/api/auth/admin' : '/api-auth/admin';
+export const USE_INTERNAL_AUTH = (import.meta as any).env?.VITE_USE_INTERNAL_AUTH === 'true';
+export const ADMIN_API_BASE = USE_INTERNAL_AUTH ? '/api/auth/admin' : '/api-auth/admin';
+const API_BASE = ADMIN_API_BASE;
+
+/** Monta URL do admin (auth interno ou Keycloak legado). */
+export const adminUrl = (path: string) =>
+  `${ADMIN_API_BASE}${path.startsWith('/') ? path : `/${path}`}`;
 
 interface ApiRequestOptions extends RequestInit {
   endpoint: string;

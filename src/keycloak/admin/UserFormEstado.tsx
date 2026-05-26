@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/keycloak/AuthProvider';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
-import { useRoles } from './hooks/useAdminApi';
+import { useRoles, useUsers } from './hooks/useAdminApi';
 import { AdminHeader } from './components/AdminHeader';
 import Footer from '@/features/desktop/components/Footer';
 import { SideMenu } from '@/features/home/components/SideMenu';
@@ -180,6 +180,11 @@ interface UserFormData {
   roles: string[];
 }
 
+const ESTADO_ASSIGNABLE_ROLES = [
+  { id: 'notificador', name: 'notificador', description: 'Notificador de fichas e formulários' },
+  { id: 'comunicacao.dae', name: 'comunicacao.dae', description: 'Comunicação DAE' },
+] as const;
+
 const UserFormEstado: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -194,7 +199,10 @@ const UserFormEstado: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const { listRoles, addUserRoles, removeUserRoles, getUserRoles } = useRoles();
+  const { getUser, updateUser, resetPassword } = useUsers();
   const [availableRoleReps, setAvailableRoleReps] = useState<any[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(true);
+  const [rolesLoadError, setRolesLoadError] = useState<string | null>(null);
   
   // Estados para dados de dropdowns
   const [estabelecimentos, setEstabelecimentos] = useState<Array<{id: number; nome: string; cnes?: string; municipio?: string}>>([]);
@@ -224,15 +232,26 @@ const UserFormEstado: React.FC = () => {
   const adminEstadoNome = 'Estado do Administrador'; // TODO: buscar nome real do estado
 
   useEffect(() => {
-    // Carregar representações das roles para poder atribuir via API (/users/:id/roles)
+    const allow = new Set(['notificador', 'comunicacao.dae']);
     (async () => {
+      setRolesLoading(true);
+      setRolesLoadError(null);
       try {
         const all = await listRoles();
-        const allow = new Set(['notificador', 'comunicacao.dae']);
-        setAvailableRoleReps(Array.isArray(all) ? all.filter((r: any) => allow.has(r?.name)) : []);
+        const filtered = Array.isArray(all)
+          ? all.filter((r: { name?: string }) => allow.has(String(r?.name || '')))
+          : [];
+        setAvailableRoleReps(
+          filtered.length > 0 ? filtered : [...ESTADO_ASSIGNABLE_ROLES],
+        );
       } catch (e) {
-        console.warn('⚠️ Não foi possível carregar roles disponíveis', e);
-        setAvailableRoleReps([]);
+        console.warn('Não foi possível carregar roles disponíveis', e);
+        setAvailableRoleReps([...ESTADO_ASSIGNABLE_ROLES]);
+        setRolesLoadError(
+          'Lista do servidor indisponível. Você ainda pode selecionar notificador e comunicacao.dae.',
+        );
+      } finally {
+        setRolesLoading(false);
       }
     })();
   }, [listRoles]);
@@ -254,16 +273,7 @@ const UserFormEstado: React.FC = () => {
       setLoading(true);
       console.log('🔄 Carregando dados do usuário para edição...');
       
-      const response = await fetch(`/api-auth/admin/users/${userId}`, {
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro HTTP: ${response.status}`);
-      }
-
-      const userData = await response.json();
+      const userData = await getUser(userId);
       console.log('📝 Dados do usuário carregados:', userData);
 
       let selectedRoles: string[] = [];
@@ -475,6 +485,15 @@ const UserFormEstado: React.FC = () => {
       newErrors.municipioId = 'Município é obrigatório para nível de acesso Município';
     }
 
+    if (!isEditMode && (!formData.roles || formData.roles.length === 0)) {
+      newErrors.roles = 'Selecione ao menos uma role (notificador e/ou comunicacao.dae)';
+    }
+
+    if (!adminEstadoId || adminEstadoId <= 0) {
+      newErrors.nivelAcesso =
+        'Seu usuário administrador não está vinculado a um estado. Peça ao suporte para configurar o escopo.';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -507,55 +526,10 @@ const UserFormEstado: React.FC = () => {
           emailVerified: formData.emailVerified
         };
 
-        const response = await fetch(`/api-auth/admin/users/${id}`, {
-          method: 'PUT',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updateData)
-        });
+        await updateUser(id, updateData);
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error('❌ Erro ao atualizar usuário:', errorData);
-          
-          // Mensagem de erro amigável
-          let errorMessage = 'Erro ao atualizar usuário';
-          
-          if (errorData.details && Array.isArray(errorData.details) && errorData.details.length > 0) {
-            errorMessage = errorData.details[0].message;
-            
-            // Destacar o campo com erro
-            const errorField = errorData.details[0].field;
-            if (errorField) {
-              setErrors(prev => ({
-                ...prev,
-                [errorField]: errorData.details[0].message
-              }));
-            }
-          } else if (errorData.error) {
-            errorMessage = errorData.error;
-          } else if (errorData.details) {
-            errorMessage = errorData.details;
-          }
-          
-          throw new Error(errorMessage);
-        }
-
-        // Se senha foi informada, atualizar também
         if (formData.password) {
-          const resetRes = await fetch(`/api-auth/admin/users/${id}/reset-password`, {
-            method: 'PUT',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              password: formData.password,
-              temporary: formData.temporaryPassword
-            })
-          });
-          if (!resetRes.ok) {
-            const errData = await resetRes.json().catch(() => ({}));
-            throw new Error(errData?.error || 'Erro ao redefinir senha');
-          }
+          await resetPassword(id, formData.password, formData.temporaryPassword);
         }
 
         // 🔥 HARD DELETE: Limpar todos os acessos existentes antes de criar novos
@@ -827,12 +801,25 @@ const UserFormEstado: React.FC = () => {
                 Selecione uma ou mais roles para este usuário.
               </p>
 
+              {rolesLoadError && (
+                <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+                  {rolesLoadError}
+                </p>
+              )}
+
               <div className="space-y-3">
-                {availableRoleReps.length === 0 ? (
-                  <p className="text-sm text-gray-500">Nenhuma role disponível ou carregando...</p>
+                {rolesLoading ? (
+                  <p className="text-sm text-gray-500">Carregando roles...</p>
+                ) : availableRoleReps.length === 0 ? (
+                  <p className="text-sm text-red-600">
+                    Nenhuma role disponível. Recarregue a página ou contate o suporte.
+                  </p>
                 ) : (
-                  availableRoleReps.map((role: any) => (
-                    <label key={role.name} className="flex items-start gap-3 cursor-pointer">
+                  availableRoleReps.map((role: { name: string; description?: string }) => (
+                    <label
+                      key={role.name}
+                      className="flex items-start gap-3 cursor-pointer rounded-lg border border-gray-200 p-3 hover:bg-gray-50"
+                    >
                       <input
                         type="checkbox"
                         checked={formData.roles.includes(role.name)}
