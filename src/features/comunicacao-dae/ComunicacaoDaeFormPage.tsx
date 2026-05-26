@@ -327,6 +327,12 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       }
       
       setComunicacaoCompleta(data);
+
+      if (isOnline) {
+        ComunicacaoDaeService.marcarComoLida(comunicacaoId).catch(() => {
+          /* não bloqueia visualização */
+        });
+      }
       
       const dataConvertida = convertUTCToLocalDateTime(data.data_comunicacao);
       

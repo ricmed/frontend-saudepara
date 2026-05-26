@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, FileText, Calendar, MapPin, Filter, X, Trash2, Edit, Eye, Menu, Download, ChevronDown, Search, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, Wifi, WifiOff, BarChart2 } from 'lucide-react';
-import ComunicacaoDaeService, { ComunicacaoDae, ComunicacaoDaeFilters } from '@/services/ComunicacaoDaeService';
+import ComunicacaoDaeService, {
+  ComunicacaoDae,
+  ComunicacaoDaeFilters,
+  StatusLeituraFiltro,
+} from '@/services/ComunicacaoDaeService';
 import { SideMenu } from '@/features/home/components/SideMenu';
 import { usuarioGestaoService } from '@/services/UsuarioGestaoService'; // 🔒 Importar service de permissões
 import { useOfflineSystem } from '@/hooks/useOfflineSystem';
@@ -90,9 +94,12 @@ const ComunicacaoDaePage: React.FC = () => {
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: null, direction: null });
   const [sortedComunicacoes, setSortedComunicacoes] = useState<ComunicacaoDae[]>([]);
 
+  // Filtro de leitura (por usuário)
+  const [statusLeituraFilter, setStatusLeituraFilter] = useState<StatusLeituraFiltro>('todas');
+
   useEffect(() => {
     loadComunicacoes();
-  }, [currentPage, filters, itemsPerPage]);
+  }, [currentPage, filters, itemsPerPage, statusLeituraFilter]);
 
   // Fechar dropdown de pesquisa ao clicar fora
   useEffect(() => {
@@ -178,6 +185,10 @@ const ComunicacaoDaePage: React.FC = () => {
       } catch (permError) {
         // Silenciar erro de permissões
       }
+
+      if (statusLeituraFilter !== 'todas') {
+        filtrosComPermissoes.status_leitura = statusLeituraFilter;
+      }
       
       const response = await ComunicacaoDaeService.getAll(currentPage, itemsPerPage, filtrosComPermissoes);
       setComunicacoes(response.data || []);
@@ -189,6 +200,55 @@ const ComunicacaoDaePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const isComunicacaoNaoLida = (comunicacao: ComunicacaoDae) => comunicacao.lida === false;
+
+  const getLinhaClasses = (comunicacao: ComunicacaoDae, index: number) => {
+    const cursor = 'cursor-pointer';
+    if (isComunicacaoNaoLida(comunicacao)) {
+      return `${cursor} bg-sky-50/90 hover:bg-sky-100/80 border-l-4 border-l-blue-500`;
+    }
+    return `${cursor} transition-colors duration-150 hover:bg-blue-50/50 ${
+      index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
+    }`;
+  };
+
+  const handleLinhaKeyDown = (
+    e: React.KeyboardEvent,
+    id: number,
+  ) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleVisualizar(id);
+    }
+  };
+
+  const pararPropagacaoAcao = (e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation();
+  };
+
+  const marcarComunicacaoLidaLocal = (id: number) => {
+    const patch = (lista: ComunicacaoDae[]) =>
+      lista.map((c) =>
+        Number(c.id_comunicacao) === id ? { ...c, lida: true } : c
+      );
+    setComunicacoes(patch);
+  };
+
+  const handleVisualizar = (id: number) => {
+    marcarComunicacaoLidaLocal(id);
+    if (isOnline) {
+      ComunicacaoDaeService.marcarComoLida(id).catch(() => {
+        /* falha silenciosa — form tentará novamente ao abrir */
+      });
+    }
+    navigate(`/private/comunicacao-dae/${id}`);
+  };
+
+  const handleStatusLeituraChange = (value: StatusLeituraFiltro) => {
+    setStatusLeituraFilter(value);
+    setCurrentPage(1);
   };
 
   const handleDelete = async (id: number) => {
@@ -458,7 +518,7 @@ const ComunicacaoDaePage: React.FC = () => {
 
           {/* Barra de Filtros e Pesquisa */}
           <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
@@ -476,6 +536,32 @@ const ComunicacaoDaePage: React.FC = () => {
                 )}
                 <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showFilters ? 'rotate-180' : ''}`} />
               </button>
+              <div
+                className="inline-flex rounded-lg overflow-hidden border border-blue-400/60 bg-blue-500/30"
+                role="group"
+                aria-label="Filtrar por leitura"
+              >
+                {(
+                  [
+                    { value: 'todas' as const, label: 'Todas' },
+                    { value: 'nao_lidas' as const, label: 'Não lidas' },
+                    { value: 'lidas' as const, label: 'Lidas' },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => handleStatusLeituraChange(opt.value)}
+                    className={`px-3 py-2 text-sm font-medium transition-colors ${
+                      statusLeituraFilter === opt.value
+                        ? 'bg-white text-blue-700'
+                        : 'text-white hover:bg-blue-600/50'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Barra de Pesquisa */}
@@ -692,11 +778,26 @@ const ComunicacaoDaePage: React.FC = () => {
               {/* Mobile: Cards */}
               <div className="block md:hidden divide-y divide-gray-100">
                 {sortedComunicacoes.map((comunicacao) => (
-                  <div key={comunicacao.id_comunicacao} className="p-4">
+                  <div
+                    key={comunicacao.id_comunicacao}
+                    role="button"
+                    tabIndex={0}
+                    title="Clique para abrir a ficha"
+                    className={`p-4 cursor-pointer ${
+                      isComunicacaoNaoLida(comunicacao)
+                        ? 'bg-sky-50 border-l-4 border-l-blue-500 hover:bg-sky-100/80'
+                        : 'hover:bg-blue-50/50'
+                    }`}
+                    onClick={() => handleVisualizar(Number(comunicacao.id_comunicacao))}
+                    onKeyDown={(e) => handleLinhaKeyDown(e, Number(comunicacao.id_comunicacao))}
+                  >
                     <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 pointer-events-none">
                         <div className="flex items-center gap-2 mb-2">
-                          <span className="text-sm font-bold text-blue-600">
+                          {isComunicacaoNaoLida(comunicacao) && (
+                            <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" title="Não lida" />
+                          )}
+                          <span className={`text-sm font-bold text-blue-600 ${isComunicacaoNaoLida(comunicacao) ? 'font-extrabold' : ''}`}>
                             #{comunicacao.id_comunicacao}
                           </span>
                           <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${getOrigemBadgeColor(comunicacao.origem_tipo)}`}>
@@ -704,7 +805,7 @@ const ComunicacaoDaePage: React.FC = () => {
                           </span>
                         </div>
 
-                        <p className="text-sm font-semibold text-gray-900 truncate">
+                        <p className={`text-sm truncate ${isComunicacaoNaoLida(comunicacao) ? 'font-bold text-gray-900' : 'font-semibold text-gray-900'}`}>
                           {comunicacao.nome_paciente || 'Não informado'}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
@@ -723,24 +824,31 @@ const ComunicacaoDaePage: React.FC = () => {
                         </span>
                       </div>
 
-                      <div className="flex flex-col gap-1">
+                      <div
+                        className="flex flex-col gap-1 pointer-events-auto"
+                        onClick={pararPropagacaoAcao}
+                        onKeyDown={pararPropagacaoAcao}
+                      >
                         <button
-                          onClick={() => navigate(`/private/comunicacao-dae/${comunicacao.id_comunicacao}`)}
-                          className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors touch-manipulation"
+                          type="button"
+                          onClick={() => handleVisualizar(Number(comunicacao.id_comunicacao))}
+                          className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors touch-manipulation cursor-pointer"
                           title="Visualizar"
                         >
                           <Eye className="w-5 h-5" />
                         </button>
                         <button
+                          type="button"
                           onClick={() => navigate(`/private/comunicacao-dae/editar/${comunicacao.id_comunicacao}`)}
-                          className="p-2.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors touch-manipulation"
+                          className="p-2.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors touch-manipulation cursor-pointer"
                           title="Editar"
                         >
                           <Edit className="w-5 h-5" />
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleDelete(Number(comunicacao.id_comunicacao))}
-                          className="p-2.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors touch-manipulation"
+                          className="p-2.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors touch-manipulation cursor-pointer"
                           title="Excluir"
                         >
                           <Trash2 className="w-5 h-5" />
@@ -840,14 +948,22 @@ const ComunicacaoDaePage: React.FC = () => {
                     {sortedComunicacoes.map((comunicacao, index) => (
                       <tr 
                         key={comunicacao.id_comunicacao} 
-                        className={`transition-colors duration-150 hover:bg-blue-50/50 ${
-                          index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
-                        }`}
+                        className={getLinhaClasses(comunicacao, index)}
+                        role="button"
+                        tabIndex={0}
+                        title="Clique para abrir a ficha"
+                        onClick={() => handleVisualizar(Number(comunicacao.id_comunicacao))}
+                        onKeyDown={(e) => handleLinhaKeyDown(e, Number(comunicacao.id_comunicacao))}
                       >
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-bold text-blue-600">
-                            #{comunicacao.id_comunicacao}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            {isComunicacaoNaoLida(comunicacao) && (
+                              <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" title="Não lida" />
+                            )}
+                            <span className={`text-sm font-bold text-blue-600 ${isComunicacaoNaoLida(comunicacao) ? 'font-extrabold' : ''}`}>
+                              #{comunicacao.id_comunicacao}
+                            </span>
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                           <div className="flex items-center">
@@ -862,7 +978,7 @@ const ComunicacaoDaePage: React.FC = () => {
                           })()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-medium text-gray-900">
+                          <span className={`text-sm text-gray-900 ${isComunicacaoNaoLida(comunicacao) ? 'font-bold' : 'font-medium'}`}>
                             {comunicacao.nome_paciente}
                           </span>
                         </td>
@@ -889,25 +1005,32 @@ const ComunicacaoDaePage: React.FC = () => {
                             {comunicacao.comunicacao_dae_anexo?.length || 0}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <td
+                          className="px-6 py-4 whitespace-nowrap text-right"
+                          onClick={pararPropagacaoAcao}
+                          onKeyDown={pararPropagacaoAcao}
+                        >
                           <div className="flex items-center justify-end space-x-2">
                             <button
-                              onClick={() => navigate(`/private/comunicacao-dae/${comunicacao.id_comunicacao}`)}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              type="button"
+                              onClick={() => handleVisualizar(Number(comunicacao.id_comunicacao))}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                               title="Visualizar"
                             >
                               <Eye className="w-5 h-5" />
                             </button>
                             <button
+                              type="button"
                               onClick={() => navigate(`/private/comunicacao-dae/editar/${comunicacao.id_comunicacao}`)}
-                              className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                              className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
                               title="Editar"
                             >
                               <Edit className="w-5 h-5" />
                             </button>
                             <button
+                              type="button"
                               onClick={() => handleDelete(Number(comunicacao.id_comunicacao))}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                               title="Excluir"
                             >
                               <Trash2 className="w-5 h-5" />

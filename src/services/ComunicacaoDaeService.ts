@@ -17,10 +17,15 @@ export interface ComunicacaoDaeAnexo {
   updated_at: string;
 }
 
+export type StatusLeituraFiltro = 'todas' | 'lidas' | 'nao_lidas';
+
 export interface ComunicacaoDae {
   id_comunicacao: number;
   data_comunicacao: string;
   nome_paciente: string;
+  /** Indica se o usuário autenticado já abriu esta ficha. */
+  lida?: boolean;
+  lido_em?: string;
   observacao_descricao?: string;
   digitador?: string;
   telefone_digitador?: string;
@@ -77,6 +82,7 @@ export interface ComunicacaoDaeFilters {
   estabelecimento_id?: number;
   sortKey?: string;
   sortDir?: 'asc' | 'desc';
+  status_leitura?: StatusLeituraFiltro;
 }
 
 export interface CreateComunicacaoDaeData {
@@ -128,6 +134,19 @@ class ComunicacaoDaeService {
       params: { page, limit, ...filters },
       withCredentials: true
     });
+    return response.data;
+  }
+
+  /**
+   * Marca comunicação como lida para o usuário autenticado (idempotente).
+   */
+  async marcarComoLida(id: number): Promise<{ lida: boolean; lido_em: string }> {
+    this.assertValidId(id, 'ID da comunicação');
+    const response = await axios.post(
+      `${API_URL}/comunicacao-dae/${id}/marcar-lido`,
+      {},
+      { withCredentials: true }
+    );
     return response.data;
   }
 
