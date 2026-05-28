@@ -413,7 +413,7 @@ const UserFormEstado: React.FC = () => {
       if (response.ok) {
         const municipiosDoEstado = await response.json();
         const municipiosFormatados = municipiosDoEstado.map((mun: any) => ({
-          id: mun.idtipo_municipio,
+          id: mun.id ?? mun.idtipo_municipio,
           nome: mun.descricao
         }));
         setMunicipios(municipiosFormatados);
@@ -1120,7 +1120,10 @@ const UserFormEstado: React.FC = () => {
                       <select
                         id="municipioId"
                         value={formData.municipioId || ''}
-                        onChange={(e) => handleInputChange('municipioId', Number(e.target.value) || undefined)}
+                        onChange={(e) => {
+                          const value = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                          handleInputChange('municipioId', value);
+                        }}
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                           errors.municipioId ? 'border-red-500' : 'border-gray-300'
                         }`}

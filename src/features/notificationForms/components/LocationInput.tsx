@@ -82,6 +82,10 @@ const LocationInput: React.FC<LocationInputProps> = ({
   
   // Reference for the last parent value (when this component is a municipality)
   const lastParentValueRef = useRef<string>("");
+  const inFlightMunicipioEstadoRef = useRef<string>("");
+  const municipioOptionsCacheRef = useRef<Map<string, LocationOption[]>>(new Map());
+  const lastFetchByIdKeyRef = useRef<string>("");
+  const inFlightFetchByIdKeyRef = useRef<string>("");
 
   const debugLog = (message: string, data?: any) => {
     if (debug) {
@@ -135,41 +139,38 @@ const LocationInput: React.FC<LocationInputProps> = ({
   // Reset selection when parent value changes (for municipalities)
   useEffect(() => {
     if (isMunicipioInput && parentValue !== undefined) {
-      debugLog(`State value changed to: ${parentValue}`);
+      const parentNorm = String(parentValue ?? '').trim();
+      debugLog(`State value changed to: ${parentNorm}`);
       
       // Avoid processing if parent value hasn't changed
-      if (lastParentValueRef.current === parentValue) {
+      if (lastParentValueRef.current === parentNorm) {
         debugLog(`Ignoring update - state value hasn't changed`);
         return;
       }
       
       // Update reference to new parent value
-      lastParentValueRef.current = parentValue;
+      lastParentValueRef.current = parentNorm;
 
       // Campo travado (ex.: município fixo por vínculo): não limpar valor ao sincronizar UF
       if (disabled) {
-        if (parentValue) {
-          fetchMunicipiosByEstado(parentValue);
+        if (parentNorm) {
+          fetchMunicipiosByEstado(parentNorm);
         }
         return;
       }
       
-      // Clear current selection
-      if (value) {
-        onChange("");
-      }
-      
+      // Limpa apenas estado visual local; não força onChange aqui para evitar loop
+      // quando parentValue oscila durante sincronizações UF <-> estado.
       setSelectedOption(null);
       setSearchQuery("");
       setDisplayValue("");
       setIsManuallyEditing(false);
-      
-      // Clear options immediately
-      setLocalOptions([]);
-      
+
       // Only fetch municipalities if a state is selected
-      if (parentValue) {
-        fetchMunicipiosByEstado(parentValue);
+      if (parentNorm) {
+        fetchMunicipiosByEstado(parentNorm);
+      } else {
+        setLocalOptions([]);
       }
     }
   }, [parentValue, isMunicipioInput, disabled]);
@@ -234,6 +235,19 @@ const LocationInput: React.FC<LocationInputProps> = ({
   // Improved function to fetch municipalities
   const fetchMunicipiosByEstado = async (estadoId: string) => {
     if (!apiEndpoint || !estadoId) return;
+    const estadoKey = String(estadoId);
+
+    const cached = municipioOptionsCacheRef.current.get(estadoKey);
+    if (cached) {
+      setLocalOptions(cached);
+      return;
+    }
+
+    if (inFlightMunicipioEstadoRef.current === estadoKey) {
+      debugLog(`Skipping duplicate municipality request for state ${estadoKey}`);
+      return;
+    }
+    inFlightMunicipioEstadoRef.current = estadoKey;
     
     // Cancel any previous request
     if (abortControllerRef.current) {
@@ -300,6 +314,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
       // Check if we're still processing the same state
       if (lastParentValueRef.current === estadoId) {
         const normalizedMunicipios = normalizeOptions(municipios);
+        municipioOptionsCacheRef.current.set(estadoKey, normalizedMunicipios);
         setLocalOptions(normalizedMunicipios);
       } else {
         debugLog(`State changed during request, discarding results`);
@@ -323,6 +338,9 @@ const LocationInput: React.FC<LocationInputProps> = ({
       // Only update state if we're still processing the same state
       if (lastParentValueRef.current === estadoId) {
         setIsLoading(false);
+      }
+      if (inFlightMunicipioEstadoRef.current === estadoKey) {
+        inFlightMunicipioEstadoRef.current = "";
       }
     }
   };
@@ -566,17 +584,35 @@ const LocationInput: React.FC<LocationInputProps> = ({
     
     const loadSelectedOption = async () => {
       if (value) {
+        const selectedId = selectedOption ? String(selectedOption[idField]) : '';
+        if (selectedId && selectedId === String(value)) {
+          const label = optionLabel(selectedOption as LocationOption);
+          if (displayValue !== label) setDisplayValue(label);
+          return;
+        }
+
         // First try to find in local options
         const foundOption = localOptions.find(opt => String(opt[idField]) === String(value));
         
         if (foundOption) {
           debugLog(`Option found locally: ${foundOption.descricao}`);
-          setSelectedOption(foundOption);
-          setDisplayValue(optionLabel(foundOption));
+          if (String(selectedOption?.[idField] ?? '') !== String(foundOption[idField])) {
+            setSelectedOption(foundOption);
+          }
+          const label = optionLabel(foundOption);
+          if (displayValue !== label) setDisplayValue(label);
+          lastFetchByIdKeyRef.current = "";
         } else if (apiEndpoint) {
+          const fetchKey = `${apiEndpoint}|${idField}|${value}`;
+          if (lastFetchByIdKeyRef.current === fetchKey || inFlightFetchByIdKeyRef.current === fetchKey) {
+            return;
+          }
+          inFlightFetchByIdKeyRef.current = fetchKey;
+          lastFetchByIdKeyRef.current = fetchKey;
           // If not found locally, fetch from API
           debugLog(`Fetching option by ID from API: ${value}`);
           const option = await fetchById(value);
+          inFlightFetchByIdKeyRef.current = "";
           
           if (option) {
             setSelectedOption(option);
@@ -589,6 +625,8 @@ const LocationInput: React.FC<LocationInputProps> = ({
         }
       } else if (value === "") {
         // Clear selection when value is explicitly empty
+        lastFetchByIdKeyRef.current = "";
+        inFlightFetchByIdKeyRef.current = "";
         setSelectedOption(null);
         setDisplayValue("");
       }

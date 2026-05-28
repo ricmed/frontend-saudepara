@@ -93,6 +93,29 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
     });
   }, [schema]);
 
+  // Aplica defaultValue do schema quando o campo estiver vazio.
+  // Importante para selects/textos pré-definidos (ex.: tipo_notificacao, agravo/CID).
+  useEffect(() => {
+    setFormData((prev) => {
+      const next = { ...prev };
+      let changed = false;
+
+      for (const section of schema.sections || []) {
+        for (const field of section.fields || []) {
+          const hasDefault = (field as any).defaultValue !== undefined && (field as any).defaultValue !== null;
+          if (!hasDefault) continue;
+          const current = get(next, field.key);
+          if (current === undefined || current === null || String(current).trim() === '') {
+            set(next, field.key, (field as any).defaultValue);
+            changed = true;
+          }
+        }
+      }
+
+      return changed ? next : prev;
+    });
+  }, [schema]);
+
   // Sempre notificar mudanças de dados (útil para preview/sandbox e debug)
   useEffect(() => {
     if (!onDataChange) return;
@@ -314,6 +337,15 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
       const racaCor = String(getValue('paciente.raca_cor') ?? '');
       const situacaoRua = String(getValue('paciente.situacao_rua') ?? '');
       const privadoLiberdade = String(getValue('paciente.privado_liberdade') ?? '');
+      const isHepatiteCriancaHBV = String(schema?.agravo ?? '').trim().toUpperCase() === 'HEPATITE_CRIANCA_HBV';
+      const hasDataNascimento = Boolean(getValue('paciente.data_nascimento'));
+      const idadeRaw = getValue('paciente.idade');
+      const hasIdade = !(idadeRaw === undefined || idadeRaw === null || String(idadeRaw).trim() === '');
+
+      // Ficha HBV criança: quando não souber data de nascimento, idade é obrigatória.
+      // Se informar idade, data de nascimento deixa de ser obrigatória (e vice-versa).
+      if (isHepatiteCriancaHBV && key === 'paciente.data_nascimento') return !hasIdade;
+      if (isHepatiteCriancaHBV && key === 'paciente.idade') return !hasDataNascimento;
 
       // Data da notificação: sempre obrigatória
       if (key === 'notificacao.dt_notificacao') return true;
@@ -325,6 +357,7 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
       if (key === 'paciente.cpf') return estrangeiro === '2';
       // CNS obrigatório quando CPF não preenchido e não é estrangeiro
       if (key === 'paciente.cns') {
+        if (isHepatiteCriancaHBV) return false;
         const cpfDigits = String(getValue('paciente.cpf') ?? '').replace(/\D/g, '');
         return estrangeiro !== '1' && cpfDigits.length < 11;
       }
@@ -383,7 +416,7 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
 
       return fieldRequired[key] === true;
     },
-    [fieldRequired, getValue]
+    [fieldRequired, getValue, schema]
   );
 
   const isFieldDisabled = useCallback(
@@ -501,6 +534,20 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
         const meses = Number(value);
         if (!Number.isNaN(meses) && meses > 120 * 12) {
           setError(field.key, 'A idade não pode ser superior a 120 anos.');
+          return false;
+        }
+      }
+
+      if (field.key === 'mae.idade' && value != null && value !== '') {
+        const meses = Number(value);
+        if (Number.isNaN(meses)) return true;
+        const anos = Math.floor(meses / 12);
+        if (anos < 10) {
+          setError(field.key, 'A idade da mãe deve ser de no mínimo 10 anos.');
+          return false;
+        }
+        if (anos > 65) {
+          setError(field.key, 'A idade da mãe deve ser de no máximo 65 anos.');
           return false;
         }
       }

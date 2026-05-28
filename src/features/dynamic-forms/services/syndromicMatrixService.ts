@@ -11,7 +11,30 @@ export interface SyndromicAgravoOption {
 
 export interface SyndromicSintomaOption {
   value: string;
+  /** Termo oficial da ficha (valor exibido e persistido via id). */
   label: string;
+  termoOficial?: string;
+  /** Aliases apenas para busca. */
+  aliases?: string[];
+  /** @deprecated use aliases */
+  sinonimos?: string[];
+  observacao?: string;
+}
+
+function mapSintomaOption(item: Record<string, unknown>): SyndromicSintomaOption {
+  const termoOficial = String(item.termoOficial ?? item.label ?? '');
+  const aliasesRaw = item.aliases ?? item.sinonimos;
+  const aliases = Array.isArray(aliasesRaw)
+    ? aliasesRaw.map((v) => String(v)).filter(Boolean)
+    : undefined;
+  return {
+    value: String(item.value),
+    label: termoOficial,
+    termoOficial,
+    aliases,
+    sinonimos: aliases,
+    observacao: item.observacao != null ? String(item.observacao) : undefined,
+  };
 }
 
 export interface SyndromicAgravoRanking {
@@ -47,15 +70,13 @@ export async function fetchSyndromicSintomas(agravoIds: string[]): Promise<Syndr
     withCredentials: true,
   });
   const data = Array.isArray(response.data) ? response.data : [];
-  return data.map((item: any) => ({
-    value: String(item.value),
-    label: String(item.label),
-  }));
+  return data.map((item: any) => mapSintomaOption(item));
 }
 
 export interface SyndromicSintomaDetail {
   value: string;
   label: string;
+  sinonimos?: string[];
   categoria: string;
   sinalAlarme: boolean;
   sinalGravidade: boolean;
@@ -68,8 +89,7 @@ export async function fetchSyndromicSintomasByAgravo(agravoId: string): Promise<
   });
   const data = Array.isArray(response.data) ? response.data : [];
   return data.map((item: any) => ({
-    value: String(item.value),
-    label: String(item.label),
+    ...mapSintomaOption(item),
     categoria: String(item.categoria ?? ''),
     sinalAlarme: Boolean(item.sinalAlarme),
     sinalGravidade: Boolean(item.sinalGravidade),

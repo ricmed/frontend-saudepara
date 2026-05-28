@@ -23,12 +23,14 @@ export function schemaUsesNotificacao(schema: { sections?: Array<{ fields?: Arra
 }
 
 export function escopoFromAccess(access: Record<string, any> | null, isAdmin: boolean): NotificacaoEscopo {
-  if (isAdmin || !access) return 'livre';
+  if (!access) return isAdmin ? 'livre' : 'livre';
   const n = String(access.nivel ?? access.nivel_acesso ?? '').toLowerCase();
+  // Quando existir vínculo explícito (estado/município/unidade), ele prevalece
+  // mesmo para usuários com role admin.
   if (n === 'estado' && access.estadoId) return 'estado';
   if (n === 'municipio' && access.municipioId) return 'municipio';
   if ((n === 'unidade' || n === 'estabelecimento') && access.estabelecimentoId) return 'unidade';
-  return 'livre';
+  return isAdmin ? 'livre' : 'livre';
 }
 
 /**
@@ -83,8 +85,17 @@ export async function buildNotificacaoPrefillFromAccess(
     }
 
     if (escopo === 'estado' && access.estadoId) {
+      let uf = '';
+      try {
+        const h = await usuarioGestaoService.getHierarquiaCompleta();
+        const estado = (h?.estados || []).find((e: any) => Number(e.id) === Number(access.estadoId));
+        uf = String(estado?.sigla ?? '').toUpperCase().slice(0, 2);
+      } catch {
+        uf = '';
+      }
       return {
         estado_id: Number(access.estadoId),
+        uf_notificacao: uf,
       };
     }
   } catch (e) {

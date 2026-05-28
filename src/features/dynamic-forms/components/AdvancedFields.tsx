@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { FormField } from '@/services/FormService';
 import { getLocalDateTime, convertUTCToLocalDateTime } from '@/utils/timezoneUtils';
-import { searchMatches } from '@/utils/searchUtils';
+import { getMatchingSynonym, searchMatches, searchMatchesWithSynonyms } from '@/utils/searchUtils';
 import DatabaseService from '@/services/DatabaseService';
 import { Search, X, Check } from 'lucide-react';
 import { getMunicipioBandeiraPathBase } from '@/utils/municipioBandeiraPa';
@@ -37,6 +37,9 @@ interface AdvancedFieldProps {
   getValue?: (key: string) => any;
   /** Persiste valor em outra chave (ex.: texto da opção “Outro” em radio, select em cartões ou checkbox-group). */
   setValue?: (key: string, value: any) => void;
+  wrapperClassName?: string;
+  reserveCharCountSpace?: boolean;
+  compact?: boolean;
 }
 
 // ========== CHECKBOX GROUP (múltiplos checkboxes) ==========
@@ -446,6 +449,13 @@ export const MultiSelectField: React.FC<AdvancedFieldProps> = ({
       const mapped = data.map((item: any) => ({
         value: String(item.value ?? item.idtipo_municipio ?? item.id ?? item.codigo ?? ''),
         label: String(item.label ?? item.descricao ?? item.nome ?? item.name ?? item.text ?? item.value ?? ''),
+        termoOficial: String(item.termoOficial ?? item.label ?? ''),
+        aliases: Array.isArray(item.aliases ?? item.sinonimos)
+          ? (item.aliases ?? item.sinonimos).map((v: unknown) => String(v)).filter(Boolean)
+          : undefined,
+        sinonimos: Array.isArray(item.sinonimos ?? item.aliases)
+          ? (item.sinonimos ?? item.aliases).map((v: unknown) => String(v)).filter(Boolean)
+          : undefined,
       })).filter((o: any) => o.value && o.label);
 
       setOptions(mapped);
@@ -476,9 +486,32 @@ export const MultiSelectField: React.FC<AdvancedFieldProps> = ({
     }
   };
 
-  const filteredOptions = options.filter(option =>
-    searchMatches(option.label, searchTerm)
-  );
+  const filteredOptions = options
+    .filter((option) =>
+      searchTerm === ''
+        ? true
+        : searchMatchesWithSynonyms(
+            {
+              label: option.label,
+              termoOficial: option.termoOficial ?? option.label,
+              aliases: option.aliases ?? option.sinonimos,
+              sinonimos: option.sinonimos,
+            },
+            searchTerm,
+          ),
+    )
+    .map((option) => ({
+      ...option,
+      matchingSynonym: getMatchingSynonym(
+        {
+          label: option.label,
+          termoOficial: option.termoOficial ?? option.label,
+          aliases: option.aliases ?? option.sinonimos,
+          sinonimos: option.sinonimos,
+        },
+        searchTerm,
+      ),
+    }));
 
   const allOptionValues = useMemo(
     () => options.map((o) => o.value).filter((v) => v !== '' && v != null),
@@ -567,55 +600,75 @@ export const MultiSelectField: React.FC<AdvancedFieldProps> = ({
           filteredOptions.map((option) => {
             const isSelected = selectedValues.includes(option.value);
             const bandeiraBase = showMunicipioBandeiraPa ? getMunicipioBandeiraPathBase(option.label) : '';
+            const helpButton =
+              'helpButton' in option && option.helpButton ? option.helpButton : null;
             return (
-              <label
+              <div
                 key={option.value}
                 className={`
-                  flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200
-                  ${disabled || field.disabled ? 'opacity-60 cursor-not-allowed' : ''}
+                  flex items-start gap-2 p-4 rounded-xl transition-all duration-200
+                  ${disabled || field.disabled ? 'opacity-60' : ''}
                   ${isSelected
                     ? 'bg-blue-50 border-2 border-blue-500 shadow-md scale-[1.02]'
                     : 'bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-sm'
                   }
                 `}
               >
-                <div className="flex items-center h-6 mt-0.5 flex-shrink-0">
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => handleToggle(option.value)}
-                    disabled={disabled || field.disabled}
-                    className="w-6 h-6 rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer"
-                  />
-                </div>
-                <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
-                  <span
-                    className={`flex items-center gap-2 min-w-0 text-sm font-medium transition-colors leading-relaxed ${
-                      isSelected ? 'text-blue-900' : 'text-gray-900'
-                    }`}
-                  >
-                    {showMunicipioBandeiraPa && bandeiraBase ? (
-                      <img
-                        src={`${bandeiraBase}.jpg`}
-                        alt={`Bandeira de ${option.label}`}
-                        className="w-9 h-6 shrink-0 object-cover rounded border border-gray-200 shadow-sm"
-                        onError={(e) => {
-                          const target = e.currentTarget;
-                          if (target.src.endsWith('.jpg')) {
-                            target.src = `${bandeiraBase}.png`;
-                          } else {
-                            target.style.display = 'none';
-                          }
-                        }}
-                      />
+                <label
+                  className={`flex flex-1 items-start gap-3 min-w-0 cursor-pointer ${
+                    disabled || field.disabled ? 'cursor-not-allowed' : ''
+                  }`}
+                >
+                  <div className="flex items-center h-6 mt-0.5 flex-shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => handleToggle(option.value)}
+                      disabled={disabled || field.disabled}
+                      className="w-6 h-6 rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
+                    <span
+                      className={`flex items-center gap-2 min-w-0 text-sm font-medium transition-colors leading-relaxed ${
+                        isSelected ? 'text-blue-900' : 'text-gray-900'
+                      }`}
+                    >
+                      {showMunicipioBandeiraPa && bandeiraBase ? (
+                        <img
+                          src={`${bandeiraBase}.jpg`}
+                          alt={`Bandeira de ${option.label}`}
+                          className="w-9 h-6 shrink-0 object-cover rounded border border-gray-200 shadow-sm"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            if (target.src.endsWith('.jpg')) {
+                              target.src = `${bandeiraBase}.png`;
+                            } else {
+                              target.style.display = 'none';
+                            }
+                          }}
+                        />
+                      ) : null}
+                      <span className="min-w-0">
+                        <span className="block truncate">{option.label}</span>
+                        {'matchingSynonym' in option && option.matchingSynonym ? (
+                          <span className="block text-xs text-blue-600 mt-0.5 truncate">
+                            encontrado por: &quot;{option.matchingSynonym}&quot;
+                          </span>
+                        ) : null}
+                      </span>
+                    </span>
+                    {isSelected ? (
+                      <Check className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
                     ) : null}
-                    <span className="min-w-0 truncate">{option.label}</span>
-                  </span>
-                  {isSelected && (
-                    <Check className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                  )}
-                </div>
-              </label>
+                  </div>
+                </label>
+                {helpButton ? (
+                  <div className="flex-shrink-0 mt-0.5" onClick={(e) => e.stopPropagation()}>
+                    {helpButton}
+                  </div>
+                ) : null}
+              </div>
             );
           })
         )}
@@ -983,18 +1036,40 @@ export const IdadeField: React.FC<IdadeFieldProps> = ({
   onBlur,
   calculadaPorDataNascimento = false,
 }) => {
+  const somenteAnos = Boolean((field as { somenteAnos?: boolean }).somenteAnos);
+  const idadeMinAnos =
+    typeof (field as { idadeMinAnos?: number }).idadeMinAnos === 'number'
+      ? (field as { idadeMinAnos: number }).idadeMinAnos
+      : 0;
+  const idadeMaxAnos =
+    typeof (field as { idadeMaxAnos?: number }).idadeMaxAnos === 'number'
+      ? (field as { idadeMaxAnos: number }).idadeMaxAnos
+      : IDADE_MAX_ANOS;
   const meses = value != null && value !== '' ? Number(value) : undefined;
   const isAnos = (m: number) => m >= 12;
   const [unidade, setUnidade] = useState<'anos' | 'meses'>(() =>
-    meses !== undefined ? (isAnos(meses) ? 'anos' : 'meses') : 'anos'
+    somenteAnos ? 'anos' : meses !== undefined ? (isAnos(meses) ? 'anos' : 'meses') : 'anos'
   );
+  const [erroMinIdade, setErroMinIdade] = useState(false);
   const [erroMaxIdade, setErroMaxIdade] = useState(false);
   const [erroMaxMeses, setErroMaxMeses] = useState(false);
+  /** Após blur com 0–9: próximo dígito substitui o valor (não concatena). */
+  const [substituirProximoDigito, setSubstituirProximoDigito] = useState(false);
+  const idadeAnosRestrita = somenteAnos && idadeMinAnos > 0;
   const displayAnos = meses !== undefined ? Math.floor(meses / 12) : '';
   const displayMeses = meses !== undefined ? meses % 12 : '';
-  const inputValue = unidade === 'anos' ? (displayAnos !== '' ? String(displayAnos) : '') : (displayMeses !== '' ? String(displayMeses) : '');
+  const unidadeEfetiva = somenteAnos ? 'anos' : unidade;
+  const inputValue =
+    unidadeEfetiva === 'anos'
+      ? displayAnos !== ''
+        ? String(displayAnos)
+        : ''
+      : displayMeses !== ''
+        ? String(displayMeses)
+        : '';
 
   const handleUnidadeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setErroMinIdade(false);
     setErroMaxIdade(false);
     setErroMaxMeses(false);
     const u = e.target.value as 'anos' | 'meses';
@@ -1005,28 +1080,90 @@ export const IdadeField: React.FC<IdadeFieldProps> = ({
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const validateIdadeAnos = (num: number): boolean => {
+    if (num < idadeMinAnos) {
+      setErroMinIdade(true);
+      setErroMaxIdade(false);
+      return false;
+    }
+    if (num > idadeMaxAnos) {
+      setErroMaxIdade(true);
+      setErroMinIdade(false);
+      return false;
+    }
+    setErroMinIdade(false);
     setErroMaxIdade(false);
+    return true;
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setErroMaxMeses(false);
-    const raw = e.target.value.replace(/\D/g, '');
+    let raw = e.target.value.replace(/\D/g, '');
+
     if (raw === '') {
+      setErroMinIdade(false);
+      setErroMaxIdade(false);
+      setSubstituirProximoDigito(false);
       onChange(undefined);
       return;
     }
-    const num = parseInt(raw, 10);
-    if (unidade === 'anos') {
-      if (num > IDADE_MAX_ANOS) {
+
+    if (idadeAnosRestrita) {
+      if (substituirProximoDigito) {
+        raw = raw.slice(-1);
+        setSubstituirProximoDigito(false);
+      }
+      if (raw.length > 2) {
+        raw = raw.slice(0, 2);
+      }
+
+      const num = parseInt(raw, 10);
+      if (num > idadeMaxAnos) {
         setErroMaxIdade(true);
+        setErroMinIdade(false);
         return;
       }
+
       onChange(num * 12);
+      if (num >= idadeMinAnos && num <= idadeMaxAnos) {
+        setErroMinIdade(false);
+        setErroMaxIdade(false);
+      } else {
+        setErroMaxIdade(false);
+      }
+      return;
+    }
+
+    const num = parseInt(raw, 10);
+    if (unidadeEfetiva === 'anos') {
+      onChange(num * 12);
+      if (num >= idadeMinAnos && num <= idadeMaxAnos) {
+        setErroMinIdade(false);
+        setErroMaxIdade(false);
+      }
     } else {
       if (num > 11) {
         setErroMaxMeses(true);
         return;
       }
+      setErroMaxMeses(false);
       onChange(num);
     }
+  };
+
+  const handleIdadeBlur = () => {
+    if (unidadeEfetiva === 'anos' && meses !== undefined && meses !== '') {
+      const anos = Math.floor(Number(meses) / 12);
+      const ok = validateIdadeAnos(anos);
+      if (idadeAnosRestrita && !ok && anos < idadeMinAnos) {
+        setSubstituirProximoDigito(true);
+      } else {
+        setSubstituirProximoDigito(false);
+      }
+    } else {
+      setSubstituirProximoDigito(false);
+    }
+    onBlur?.();
   };
 
   const locked = disabled || field.disabled || calculadaPorDataNascimento;
@@ -1067,35 +1204,47 @@ export const IdadeField: React.FC<IdadeFieldProps> = ({
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
       <div className="flex items-center gap-2">
-        <select
-          value={unidade}
-          onChange={handleUnidadeChange}
-          disabled={disabled || field.disabled}
-          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-        >
-          <option value="anos">Anos</option>
-          <option value="meses">Meses</option>
-        </select>
+        {!somenteAnos ? (
+          <select
+            value={unidade}
+            onChange={handleUnidadeChange}
+            disabled={disabled || field.disabled}
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          >
+            <option value="anos">Anos</option>
+            <option value="meses">Meses</option>
+          </select>
+        ) : (
+          <span className="px-3 py-2 text-sm text-gray-600 shrink-0">Anos</span>
+        )}
         <input
-          type="number"
+          type={idadeAnosRestrita ? 'text' : 'number'}
+          inputMode="numeric"
           value={inputValue}
           onChange={handleInputChange}
-          onBlur={onBlur}
-          placeholder={unidade === 'anos' ? 'Anos' : 'Meses'}
-          min={0}
-          max={unidade === 'anos' ? IDADE_MAX_ANOS : 11}
+          onBlur={handleIdadeBlur}
+          placeholder={unidadeEfetiva === 'anos' ? 'Anos' : 'Meses'}
+          min={!idadeAnosRestrita && unidadeEfetiva === 'anos' ? 0 : undefined}
+          max={!idadeAnosRestrita && unidadeEfetiva === 'anos' ? idadeMaxAnos : !idadeAnosRestrita ? 11 : undefined}
+          maxLength={idadeAnosRestrita ? 2 : undefined}
+          step={idadeAnosRestrita ? undefined : 1}
           disabled={disabled || field.disabled}
           className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
             error ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
-          } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+          } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''} ${
+            idadeAnosRestrita ? '' : '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none'
+          }`}
         />
       </div>
       {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
-      {(error || erroMaxIdade || erroMaxMeses) && (
+      {(error || erroMinIdade || erroMaxIdade || erroMaxMeses) && (
         <p className="text-red-500 text-sm mt-1">
-          {erroMaxIdade && 'A idade não pode ser superior a 120 anos.'}
+          {erroMinIdade &&
+            `A idade não pode ser inferior a ${idadeMinAnos} ${idadeMinAnos === 1 ? 'ano' : 'anos'}.`}
+          {erroMaxIdade &&
+            `A idade não pode ser superior a ${idadeMaxAnos} ${idadeMaxAnos === 1 ? 'ano' : 'anos'}.`}
           {erroMaxMeses && 'Quando a unidade é meses, o valor não pode ser superior a 11.'}
-          {!erroMaxIdade && !erroMaxMeses && error}
+          {!erroMinIdade && !erroMaxIdade && !erroMaxMeses && error}
         </p>
       )}
     </div>
@@ -1169,6 +1318,10 @@ export const CEPField: React.FC<AdvancedFieldProps & { onCepFound?: (detail: Cep
   onCepFound,
 }) => {
   const [loading, setLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const lastResolvedCepRef = useRef<string>('');
+  const lastRequestedCepRef = useRef<string>('');
 
   const formatCEP = (val: string) => {
     const cleaned = val.replace(/\D/g, '');
@@ -1180,15 +1333,29 @@ export const CEPField: React.FC<AdvancedFieldProps & { onCepFound?: (detail: Cep
     onChange(formatted);
 
     const cleanedCEP = formatted.replace(/\D/g, '');
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
     if (cleanedCEP.length === 8) {
-      fetchAddress(cleanedCEP);
+      // Evita rajada de requisições ao editar/reeditar CEP.
+      debounceRef.current = setTimeout(() => {
+        void fetchAddress(cleanedCEP);
+      }, 280);
     }
   };
 
   const fetchAddress = async (cep: string) => {
+    if (cep.length !== 8) return;
+    if (lastResolvedCepRef.current === cep) return;
+    if (lastRequestedCepRef.current === cep && loading) return;
     try {
+      if (abortRef.current) abortRef.current.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      lastRequestedCepRef.current = cep;
       setLoading(true);
-      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`, { signal: controller.signal });
       const data = await response.json();
       
       if (!data.erro) {
@@ -1202,13 +1369,22 @@ export const CEPField: React.FC<AdvancedFieldProps & { onCepFound?: (detail: Cep
         };
         if (onCepFound) onCepFound(detail);
         window.dispatchEvent(new CustomEvent('cep-found', { detail }));
+        lastResolvedCepRef.current = cep;
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return;
       console.error('Erro ao buscar CEP:', err);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (abortRef.current) abortRef.current.abort();
+    };
+  }, []);
 
   return (
     <div className="mb-4">
@@ -1250,19 +1426,34 @@ export const InternationalPhoneField: React.FC<AdvancedFieldProps> = ({
   error,
   required,
   disabled,
+  wrapperClassName,
+  reserveCharCountSpace,
+  compact,
 }) => {
+  const label = (
+    <>
+      {field.label}
+      {required && <span className="text-red-500 ml-1">*</span>}
+    </>
+  );
   return (
-    <div className="mb-4">
+    <div className={wrapperClassName ?? 'mb-4'}>
       <PhoneInput
         value={value || ''}
         onChange={onChange}
         name={field.key}
-        label={field.label}
+        label={label}
         placeholder={field.placeholder || 'Digite o telefone'}
         className={error ? 'border-red-500' : ''}
+        compact={compact}
+        disabled={disabled || field.disabled}
       />
       {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
-      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+      {error ? (
+        <p className="text-red-500 text-sm mt-1">{error}</p>
+      ) : reserveCharCountSpace ? (
+        <div className="min-h-5 mt-1" aria-hidden="true" />
+      ) : null}
     </div>
   );
 };

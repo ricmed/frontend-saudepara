@@ -49,20 +49,22 @@ const FieldHelp: React.FC<{ helpText: string; label: string }> = ({ helpText, la
   );
 };
 
-export const TextField: React.FC<TextFieldProps> = ({
+export const TextField: React.FC<TextFieldProps & { showCharCount?: boolean; wrapperClassName?: string }> = ({
   field,
   value,
   onChange,
   error,
   required,
   disabled,
+  showCharCount = true,
+  wrapperClassName,
 }) => {
   const maxLength = field.maxLength || 1500;
   const currentLength = (value || '').length;
   const inputId = getFieldInputId(field);
   
   return (
-    <div className="mb-4">
+    <div className={wrapperClassName ?? 'mb-4'}>
       <div className="flex items-center gap-2 mb-1">
         <label htmlFor={inputId} className="block text-sm font-medium text-gray-700">
           {field.label}
@@ -84,13 +86,15 @@ export const TextField: React.FC<TextFieldProps> = ({
             : 'border-gray-300 focus:ring-blue-500'
         } ${disabled || field.disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
       />
-      <div className="flex justify-between items-center mt-1">
+      <div className="flex justify-between items-center mt-1 min-h-5">
         {error && <p className="text-red-500 text-sm">{error}</p>}
-        <p className={`text-xs ml-auto ${
-          currentLength > maxLength * 0.9 ? 'text-orange-600' : 'text-gray-500'
-        }`}>
-          {currentLength}/{maxLength} caracteres
-        </p>
+        {showCharCount ? (
+          <p className={`text-xs ml-auto ${
+            currentLength > maxLength * 0.9 ? 'text-orange-600' : 'text-gray-500'
+          }`}>
+            {currentLength}/{maxLength} caracteres
+          </p>
+        ) : null}
       </div>
     </div>
   );

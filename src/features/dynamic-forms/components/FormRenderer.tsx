@@ -19,6 +19,7 @@ import {
   InternationalPhoneField
 } from './AdvancedFields';
 import { AgravoMultiSelectField } from './AgravoMultiSelectField';
+import SyndromicSintomaHelpButton from './SyndromicSintomaHelpButton';
 import type { CepFoundDetail } from './AdvancedFields';
 import {
   FileUploadField,
@@ -37,9 +38,11 @@ import { EstabelecimentoNotificacao } from './EstabelecimentoNotificacao';
 import UnidadeNotificadoraField from '@/features/notificationForms/components/UnidadeNotificadoraField';
 import { EstadoMunicipioResidencia } from './EstadoMunicipioResidencia';
 import { TableField } from './TableField';
+import MiniMapa, { type MiniMapaResolvedAddress } from '@/features/maps/leaflet/components/MiniMapa';
 import { ClipboardList, Calendar, DollarSign, Target, Activity, Shield, Leaf, BarChart3, Wrench, Users } from 'lucide-react';
 import { convertLocalDateTimeToUTC } from '@/utils/timezoneUtils';
 import FormService from '@/services/FormService';
+import { usuarioGestaoService } from '@/services/UsuarioGestaoService';
 import type { MonitorOperRegionalScopePayload } from '../types/monitorOperRegionalScope';
 import type { NotificacaoEscopo } from '../utils/notificacaoScopeDefaults';
 import { validateCPF } from '@/utils/cpfValidator';
@@ -73,6 +76,11 @@ const RESIDENCIA_BLOCK_KEYS = new Set([
   'residencia.numero',
   'residencia.complemento',
   'residencia.telefone',
+  'residencia.ponto_referencia',
+  'residencia.pais',
+  'residencia.geolocalizacao',
+  'residencia.geo_campo_1',
+  'residencia.geo_campo_2',
 ]);
 
 /** Campos do bloco Identificação renderizados em layout customizado; Sexo ao nascimento fica ao lado de Idade; os demais (orientação sexual, etc.) renderizam no grid após o bloco */
@@ -91,6 +99,14 @@ const IDENTIFICACAO_BLOCK_KEYS = new Set([
   'paciente.pais_nascimento_id',
 ]);
 
+const IMUNIZACAO_MAE_LAYOUT_KEYS = new Set([
+  'mae.imunizacao_hepatite_b_completa',
+  'mae.imunizacao_hepatite_b_incompleta',
+  'mae.imunizacao_hepatite_a_completa',
+  'mae.imunizacao_hepatite_a_incompleta',
+  'mae.confirmacao_carteira',
+]);
+
 import {
   isSinanClinicalFieldKey,
   shouldShowSinanDadosClinicosBlock,
@@ -104,6 +120,102 @@ const CLINICA_RADIO_OPTIONS = [
 ];
 
 const SINTOMA_OUTRO_ID = '__outro_especifique__';
+const UF_SIGLA_TO_IBGE: Record<string, string> = {
+  AC: '12', AL: '27', AP: '16', AM: '13', BA: '29', CE: '23', DF: '53', ES: '32', GO: '52',
+  MA: '21', MT: '51', MS: '50', MG: '31', PA: '15', PB: '25', PR: '41', PE: '26', PI: '22',
+  RJ: '33', RN: '24', RS: '43', RO: '11', RR: '14', SC: '42', SP: '35', SE: '28', TO: '17',
+};
+const IBGE_TO_UF_SIGLA: Record<string, string> = Object.fromEntries(
+  Object.entries(UF_SIGLA_TO_IBGE).map(([k, v]) => [v, k]),
+);
+const UF_MAP_CENTER: Record<string, { lat: number; lng: number }> = {
+  AC: { lat: -9.0238, lng: -70.8120 },
+  AL: { lat: -9.5713, lng: -36.7820 },
+  AP: { lat: 1.4140, lng: -51.7700 },
+  AM: { lat: -3.4168, lng: -65.8561 },
+  BA: { lat: -12.5797, lng: -41.7007 },
+  CE: { lat: -5.4984, lng: -39.3206 },
+  DF: { lat: -15.7998, lng: -47.8645 },
+  ES: { lat: -19.1834, lng: -40.3089 },
+  GO: { lat: -15.8270, lng: -49.8362 },
+  MA: { lat: -4.9609, lng: -45.2744 },
+  MT: { lat: -12.6819, lng: -56.9211 },
+  MS: { lat: -20.7722, lng: -54.7852 },
+  MG: { lat: -18.5122, lng: -44.5550 },
+  PA: { lat: -3.4168, lng: -52.0000 },
+  PB: { lat: -7.2399, lng: -36.7820 },
+  PR: { lat: -24.8902, lng: -51.5500 },
+  PE: { lat: -8.8137, lng: -36.9541 },
+  PI: { lat: -7.7183, lng: -42.7289 },
+  RJ: { lat: -22.9068, lng: -43.1729 },
+  RN: { lat: -5.4026, lng: -36.9541 },
+  RS: { lat: -30.0346, lng: -51.2177 },
+  RO: { lat: -10.9472, lng: -62.8278 },
+  RR: { lat: 2.7376, lng: -62.0751 },
+  SC: { lat: -27.2423, lng: -50.2189 },
+  SP: { lat: -23.5505, lng: -46.6333 },
+  SE: { lat: -10.5741, lng: -37.3857 },
+  TO: { lat: -10.1753, lng: -48.2982 },
+};
+
+const normalizeAddressText = (value: string): string =>
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const UF_NAME_TO_SIGLA: Record<string, string> = {
+  ACRE: 'AC',
+  ALAGOAS: 'AL',
+  AMAPA: 'AP',
+  AMAZONAS: 'AM',
+  BAHIA: 'BA',
+  CEARA: 'CE',
+  'DISTRITO FEDERAL': 'DF',
+  'ESPIRITO SANTO': 'ES',
+  GOIAS: 'GO',
+  MARANHAO: 'MA',
+  'MATO GROSSO': 'MT',
+  'MATO GROSSO DO SUL': 'MS',
+  'MINAS GERAIS': 'MG',
+  PARA: 'PA',
+  PARAIBA: 'PB',
+  PARANA: 'PR',
+  PERNAMBUCO: 'PE',
+  PIAUI: 'PI',
+  'RIO DE JANEIRO': 'RJ',
+  'RIO GRANDE DO NORTE': 'RN',
+  'RIO GRANDE DO SUL': 'RS',
+  RONDONIA: 'RO',
+  RORAIMA: 'RR',
+  'SANTA CATARINA': 'SC',
+  'SAO PAULO': 'SP',
+  SERGIPE: 'SE',
+  TOCANTINS: 'TO',
+};
+
+const resolveUfSigla = (value: string | undefined): string => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const normalized = normalizeAddressText(raw);
+  if (normalized.length === 2 && UF_SIGLA_TO_IBGE[normalized]) return normalized;
+
+  const digits = normalized.replace(/\D/g, '');
+  if (digits) {
+    const fromIbge = IBGE_TO_UF_SIGLA[digits.slice(0, 2)];
+    if (fromIbge) return fromIbge;
+  }
+
+  const fromName = UF_NAME_TO_SIGLA[normalized];
+  if (fromName) return fromName;
+
+  const siglaMatch = normalized.match(/\b(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)\b/);
+  if (siglaMatch?.[1]) return siglaMatch[1];
+
+  return '';
+};
 
 interface FormRendererProps {
   schema: FormSchema;
@@ -169,6 +281,8 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     }),
     []
   );
+  const isHepatiteCriancaHBV =
+    String(schema.agravo || '').toUpperCase() === 'HEPATITE_CRIANCA_HBV';
 
   const initialDataWithDefaults = React.useMemo(() => {
     const pac = initialData?.paciente ?? {};
@@ -298,30 +412,312 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     setUploadingCount(c => Math.max(0, c + (uploading ? 1 : -1)));
   }, []);
   const isUploading = uploadingCount > 0;
+  const hierarquiaCacheRef = useRef<any | null>(null);
+  const municipiosPorEstadoCacheRef = useRef<Map<number, any[]>>(new Map());
+  const lastResolveMunicipioKeyRef = useRef<string>('');
+  const municipioCenterCacheRef = useRef<Map<string, { lat: number; lng: number }>>(new Map());
+  const lastMunicipioCenterSignatureRef = useRef<string>('');
+  const [pendingResidenciaMapAddress, setPendingResidenciaMapAddress] = useState<MiniMapaResolvedAddress | null>(null);
+
+  const matchMunicipioIbgeCodigo = (cod: string | undefined, ibgeNorm: string): boolean => {
+    if (cod == null || !ibgeNorm) return false;
+    const c = String(cod).replace(/\D/g, '');
+    if (!c) return false;
+    if (c === ibgeNorm) return true;
+    if (ibgeNorm.length === 7 && c.length === 6 && ibgeNorm.slice(0, 6) === c) return true;
+    if (ibgeNorm.length === 6 && c.length === 7 && ibgeNorm === c.slice(0, 6)) return true;
+    return false;
+  };
+
+  const resolveResidenciaMunicipioFromAddress = useCallback(
+    async (
+      ufSigla: string | undefined,
+      municipioNome?: string | undefined,
+      ibgeCodigo?: string | undefined,
+    ) => {
+      if (!ufSigla) return;
+      const ibgeNorm = ibgeCodigo ? String(ibgeCodigo).replace(/\D/g, '') : '';
+      const rawMunicipio = String(municipioNome || '').trim();
+      if (!rawMunicipio && !ibgeNorm) return;
+      try {
+        const ufNorm = resolveUfSigla(ufSigla) || normalizeAddressText(ufSigla);
+        const normalizeMunicipioCandidate = (raw: string): string => {
+          return normalizeAddressText(raw)
+            .replace(/^MUNICIPIO DE\s+/, '')
+            .replace(/^CIDADE DE\s+/, '')
+            .replace(/\s*[-,/]\s*[A-Z]{2}$/, '')
+            .trim();
+        };
+        const municipioCandidates = rawMunicipio
+          ? Array.from(
+              new Set(
+                [
+                  rawMunicipio,
+                  rawMunicipio.split(',')[0] || '',
+                  rawMunicipio.split('-')[0] || '',
+                  rawMunicipio.split('/')[0] || '',
+                ]
+                  .map((v) => normalizeMunicipioCandidate(v))
+                  .filter(Boolean),
+              ),
+            )
+          : [];
+        if (!ufNorm) return;
+        const signature = `${ufNorm}|${ibgeNorm}|${municipioCandidates.join('|')}`;
+        if (lastResolveMunicipioKeyRef.current === signature) return;
+        lastResolveMunicipioKeyRef.current = signature;
+
+        const h =
+          hierarquiaCacheRef.current ??
+          (await usuarioGestaoService.getHierarquiaCompleta().then((data) => {
+            hierarquiaCacheRef.current = data;
+            return data;
+          }));
+        const estados = Array.isArray((h as any)?.estados) ? (h as any).estados : [];
+        const ibgeUf = UF_SIGLA_TO_IBGE[ufNorm];
+        const estado = estados.find((e: any) => {
+          const sigla = normalizeAddressText(String(e?.sigla || ''));
+          return sigla === ufNorm || (ibgeUf && sigla === ibgeUf);
+        });
+        if (!estado?.id) return;
+
+        const estadoId = Number(estado.id);
+        const currentEstadoId = Number(getValue('residencia.estado_id'));
+        if (currentEstadoId !== estadoId) {
+          setValue('residencia.estado_id', estadoId);
+        }
+        const ufExibir =
+          IBGE_TO_UF_SIGLA[String(estado.sigla ?? '').trim()] ??
+          (String(estado.sigla ?? '').length === 2 ? String(estado.sigla) : ufNorm);
+        if (ufExibir && String(getValue('residencia.uf') ?? '').trim().toUpperCase() !== ufExibir) {
+          setValue('residencia.uf', ufExibir);
+        }
+
+        const municipios =
+          municipiosPorEstadoCacheRef.current.get(estadoId) ??
+          (await usuarioGestaoService.getMunicipiosPorEstado(estadoId).then((data) => {
+            const list = Array.isArray(data) ? data : [];
+            municipiosPorEstadoCacheRef.current.set(estadoId, list);
+            return list;
+          }));
+        const list = Array.isArray(municipios) ? municipios : [];
+
+        let selected: any;
+        if (ibgeNorm) {
+          selected = list.find((m: any) =>
+            matchMunicipioIbgeCodigo(String(m?.codigo ?? m?.codigo_ibge ?? ''), ibgeNorm),
+          );
+        }
+        if (!selected && municipioCandidates.length) {
+          const exact = list.find((m: any) => {
+            const desc = normalizeMunicipioCandidate(String(m?.descricao || ''));
+            return municipioCandidates.some((cand) => desc === cand);
+          });
+          selected = exact
+            ? exact
+            : list.find((m: any) => {
+                const desc = normalizeMunicipioCandidate(String(m?.descricao || ''));
+                return municipioCandidates.some(
+                  (cand) =>
+                    desc.includes(cand) ||
+                    cand.includes(desc) ||
+                    desc.startsWith(cand) ||
+                    cand.startsWith(desc),
+                );
+              });
+        }
+        if (!selected) return;
+
+        const municipioId = Number(selected.id ?? selected.idtipo_municipio);
+        const codigo = String(selected.codigo ?? selected.codigo_ibge ?? '').replace(/\D/g, '');
+        if (Number.isFinite(municipioId) && municipioId > 0) {
+          const currentId = Number(getValue('residencia.municipio_id'));
+          if (currentId !== municipioId) setValue('residencia.municipio_id', municipioId);
+        }
+        if (codigo) {
+          const currentIbge = String(getValue('residencia.municipio_ibge') ?? '').replace(/\D/g, '');
+          if (currentIbge !== codigo) setValue('residencia.municipio_ibge', codigo);
+        }
+      } catch {
+        // Falha de matching não deve interromper preenchimento manual.
+      }
+    },
+    [getValue, setValue],
+  );
+
+  const applyPendingResidenciaMapAddress = useCallback(
+    (address: MiniMapaResolvedAddress | null) => {
+      if (!address) return;
+      const ufValue = resolveUfSigla(address.estadoUf) || resolveUfSigla(address.formattedAddress);
+      if (address.cep) setValue('residencia.cep', String(address.cep).replace(/\D/g, '').slice(0, 8));
+      if (ufValue) setValue('residencia.uf', ufValue);
+      if (address.logradouro) setValue('residencia.logradouro', normalizeMaiusculo(address.logradouro));
+      if (address.bairro) setValue('residencia.bairro', normalizeMaiusculo(address.bairro));
+      if (address.numero) setValue('residencia.numero', String(address.numero));
+
+      const municipioFromFormatted = (() => {
+        const formatted = String(address.formattedAddress || '').trim();
+        if (!formatted || !ufValue) return '';
+        const ufRegex = new RegExp(`,\\s*([^,]+?)\\s*[-/]\\s*${ufValue}\\b`, 'i');
+        const match = formatted.match(ufRegex);
+        return String(match?.[1] || '').trim();
+      })();
+
+      const municipioCandidate = String(address.municipio || municipioFromFormatted || '').trim();
+      if (municipioCandidate) {
+        void resolveResidenciaMunicipioFromAddress(ufValue || String(getValue('residencia.uf') || ''), municipioCandidate);
+      }
+
+      if (address.paisCodigo === 'BR') {
+        setValue('residencia.pais', '105');
+      } else if (address.paisCodigo && address.paisCodigo !== 'BR') {
+        setValue('residencia.uf', 'EX');
+        // Endereço estrangeiro não deve manter vínculo com estado/município brasileiro.
+        setValue('residencia.estado_id', undefined);
+        setValue('residencia.municipio_id', undefined);
+        setValue('residencia.municipio_ibge', '');
+      }
+    },
+    [getValue, resolveResidenciaMunicipioFromAddress, setValue],
+  );
+
+  const resolveResidenciaMapCenterFromMunicipio = useCallback(
+    async (ufSigla: string | undefined, municipioIdRaw: any) => {
+      const municipioId = Number(municipioIdRaw);
+      if (!Number.isFinite(municipioId) || municipioId <= 0) return;
+      const ufNorm = normalizeAddressText(String(ufSigla || ''));
+      if (!ufNorm) return;
+      const signature = `${municipioId}|${ufNorm}`;
+      if (lastMunicipioCenterSignatureRef.current === signature) return;
+      lastMunicipioCenterSignatureRef.current = signature;
+
+      const cached = municipioCenterCacheRef.current.get(signature);
+      if (cached) {
+        setValue('residencia.geolocalizacao', {
+          latitude: cached.lat,
+          longitude: cached.lng,
+          source: 'auto-municipio',
+          timestamp: new Date().toISOString(),
+        });
+        setValue('residencia.geo_campo_1', String(cached.lat));
+        setValue('residencia.geo_campo_2', String(cached.lng));
+        return;
+      }
+
+      try {
+        const estadoIbge = UF_SIGLA_TO_IBGE[ufNorm];
+        let municipioNome = '';
+        if (estadoIbge) {
+          const h =
+            hierarquiaCacheRef.current ??
+            (await usuarioGestaoService.getHierarquiaCompleta().then((data) => {
+              hierarquiaCacheRef.current = data;
+              return data;
+            }));
+          const estados = Array.isArray((h as any)?.estados) ? (h as any).estados : [];
+          const estado = estados.find((e: any) => String(e?.sigla || '') === estadoIbge || String(e?.codigo || '') === estadoIbge);
+          if (estado?.id) {
+            const estadoId = Number(estado.id);
+            const municipios =
+              municipiosPorEstadoCacheRef.current.get(estadoId) ??
+              (await usuarioGestaoService.getMunicipiosPorEstado(estadoId).then((data) => {
+                const list = Array.isArray(data) ? data : [];
+                municipiosPorEstadoCacheRef.current.set(estadoId, list);
+                return list;
+              }));
+            const selected = (municipios || []).find((m: any) => Number(m?.id ?? m?.idtipo_municipio) === municipioId);
+            municipioNome = String(selected?.descricao || '').trim();
+          }
+        }
+        if (!municipioNome) {
+          const mun = await usuarioGestaoService.getMunicipioComEstado(municipioId);
+          municipioNome = String((mun as any)?.descricao || '').trim();
+        }
+        if (!municipioNome) return;
+
+        const mapboxKey =
+          localStorage.getItem('sp.ui.map.mapbox-api-key.v1') ||
+          localStorage.getItem('mapbox-api-key') ||
+          '';
+        let lat: number | null = null;
+        let lng: number | null = null;
+
+        if (mapboxKey) {
+          const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+            `${municipioNome}, ${ufNorm}, Brasil`,
+          )}.json?access_token=${encodeURIComponent(mapboxKey)}&autocomplete=false&limit=1&language=pt-BR&country=BR`;
+          const response = await fetch(endpoint);
+          if (response.ok) {
+            const payload = await response.json();
+            const feature = Array.isArray(payload?.features) ? payload.features[0] : null;
+            const center = Array.isArray(feature?.center) ? feature.center : null;
+            if (center && center.length >= 2) {
+              lng = Number(center[0]);
+              lat = Number(center[1]);
+            }
+          }
+        }
+
+        // Fallback sem rede externa/CORS: centro da UF para manter o mapa útil.
+        if (!Number.isFinite(lat as number) || !Number.isFinite(lng as number)) {
+          const fallback = UF_MAP_CENTER[ufNorm];
+          if (!fallback) return;
+          lat = fallback.lat;
+          lng = fallback.lng;
+        }
+
+        municipioCenterCacheRef.current.set(signature, { lat: Number(lat), lng: Number(lng) });
+        setValue('residencia.geolocalizacao', {
+          latitude: Number(lat),
+          longitude: Number(lng),
+          source: 'auto-municipio',
+          timestamp: new Date().toISOString(),
+        });
+        setValue('residencia.geo_campo_1', String(lat));
+        setValue('residencia.geo_campo_2', String(lng));
+      } catch {
+        // Falha de centralização automática não deve quebrar o preenchimento manual.
+      }
+    },
+    [setValue],
+  );
+
+  const residenciaUfForMapCenter = String(getValue('residencia.uf') ?? '');
+  const residenciaMunicipioIdForMapCenter = getValue('residencia.municipio_id');
+  useEffect(() => {
+    const ufRaw = String(residenciaUfForMapCenter ?? '').trim().toUpperCase();
+    const ufNorm = ufRaw.length === 2 ? ufRaw : IBGE_TO_UF_SIGLA[String(ufRaw).replace(/\D/g, '')] ?? '';
+    const municipioId = residenciaMunicipioIdForMapCenter;
+    if (!ufNorm || !municipioId) return;
+    void resolveResidenciaMapCenterFromMunicipio(ufNorm, municipioId);
+  }, [residenciaMunicipioIdForMapCenter, residenciaUfForMapCenter, resolveResidenciaMapCenterFromMunicipio]);
 
   const showSinanDadosClinicosBlock = React.useMemo(
     () => shouldShowSinanDadosClinicosBlock(schema),
     [schema]
   );
 
-  // Quando "Configurar Colunas Fixas" está ativo, exibir apenas os campos marcados como coluna fixa
+    // Colunas fixas servem para persistência/indexação.
+    // A UI só deve limitar para "somente fixos" quando explicitamente configurado no schema.
   const sectionsToRender = React.useMemo(() => {
     let sections = schema.sections ?? [];
-    if (!showSinanDadosClinicosBlock) {
+    // Só remove campos clínicos quando NÃO for ficha SINAN.
+    // Em fichas SINAN customizadas (como HBV criança), campos como agravo_cid
+    // podem existir na seção 1 e devem continuar visíveis.
+    if (context !== 'sinan' && !showSinanDadosClinicosBlock) {
       sections = stripSinanClinicalFieldsFromSections(sections);
     }
 
-    // `fixedColumnsConfig.enabled` foi pensado para a tela de configuração de colunas fixas.
-    // Para evitar formulários “vazios” quando ninguém marcou `isFixedColumn`,
-    // só aplicamos o filtro se existir pelo menos 1 campo marcado como fixo.
-    const enabled = !!schema.fixedColumnsConfig?.enabled;
-    const hasAnyFixedField = sections.some((s) => s.fields?.some((f) => f.isFixedColumn === true));
-    const useFixedOnly = enabled && hasAnyFixedField;
-    if (!useFixedOnly) return sections;
+    // Mantém comportamento antigo apenas se um schema pedir de forma explícita.
+    // Retrocompatibilidade: aceita `showOnlyFixedInForm` e alias `fixedOnly`.
+    const cfg = (schema.fixedColumnsConfig || {}) as any;
+    const useFixedOnly = cfg.showOnlyFixedInForm === true || cfg.fixedOnly === true;
+    if (!useFixedOnly) return sections.sort((a, b) => a.order - b.order);
+
     return sections
       .map((section) => ({
         ...section,
-        fields: section.fields.filter((f) => f.isFixedColumn === true),
+        fields: (section.fields || []).filter((f) => f.isFixedColumn === true),
       }))
       .filter((section) => section.fields.length > 0)
       .sort((a, b) => a.order - b.order);
@@ -564,7 +960,15 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       key: string,
       label: string,
       helpText: string,
-      options: Array<{ value: string; label: string }>,
+      options: Array<{
+        value: string;
+        label: string;
+        termoOficial?: string;
+        aliases?: string[];
+        sinonimos?: string[];
+        observacao?: string;
+        helpButton?: React.ReactNode;
+      }>,
     ) => ({
       key,
       label,
@@ -592,7 +996,14 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     Array<{ value: string; label: string; cid10Lista: string[] }>
   >([]);
   const [clinicaSintomaBaseOptions, setClinicaSintomaBaseOptions] = useState<
-    Array<{ value: string; label: string }>
+    Array<{
+      value: string;
+      label: string;
+      termoOficial?: string;
+      aliases?: string[];
+      sinonimos?: string[];
+      observacao?: string;
+    }>
   >([]);
   const [clinicaLoadingAgravos, setClinicaLoadingAgravos] = useState(false);
   const [clinicaLoadingSintomas, setClinicaLoadingSintomas] = useState(false);
@@ -641,15 +1052,54 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     };
   }, [showSinanDadosClinicosBlock, clinicaAgravosSelecionados.join(',')]);
   const clinicaSintomaOptions = React.useMemo(() => {
-    const base = clinicaSintomaBaseOptions;
-    const hasOutro = base.some((item) => item.value === SINTOMA_OUTRO_ID);
-    return hasOutro ? base : [...base, { value: SINTOMA_OUTRO_ID, label: 'Outro, especifique' }];
+    const withHelp = clinicaSintomaBaseOptions.map((item) => {
+      const aliases = item.aliases ?? item.sinonimos ?? [];
+      return {
+        ...item,
+        helpButton:
+          aliases.length > 0 ? (
+            <SyndromicSintomaHelpButton
+              termoOficial={item.termoOficial ?? item.label}
+              aliases={aliases}
+              observacao={item.observacao}
+            />
+          ) : undefined,
+      };
+    });
+    const hasOutro = withHelp.some((item) => item.value === SINTOMA_OUTRO_ID);
+    return hasOutro
+      ? withHelp
+      : [...withHelp, { value: SINTOMA_OUTRO_ID, label: 'Outro, especifique' }];
   }, [clinicaSintomaBaseOptions]);
   const clinicaSintomasSelecionados = React.useMemo(() => {
     const raw = getValue('clinica.sinais_sintomas');
     return Array.isArray(raw) ? raw.map((v) => String(v)) : [];
   }, [formData, getValue]);
   const clinicaTemOutroSintoma = clinicaSintomasSelecionados.includes(SINTOMA_OUTRO_ID);
+  useEffect(() => {
+    if (!showSinanDadosClinicosBlock) return;
+    const hasAgravoDoencaField = (schema.sections || []).some((s) =>
+      (s.fields || []).some((f) => f.key === 'notificacao.agravo_doenca')
+    );
+    if (!hasAgravoDoencaField) return;
+    const nomes = clinicaAgravoOptions
+      .filter((item) => clinicaAgravosSelecionados.includes(item.value))
+      .map((item) => item.label?.trim())
+      .filter(Boolean) as string[];
+    if (nomes.length === 0) return;
+    const nextText = nomes.join('; ');
+    const current = String(getValue('notificacao.agravo_doenca') ?? '').trim();
+    if (current !== nextText) {
+      setValue('notificacao.agravo_doenca', nextText);
+    }
+  }, [
+    showSinanDadosClinicosBlock,
+    schema,
+    clinicaAgravoOptions,
+    clinicaAgravosSelecionados,
+    getValue,
+    setValue,
+  ]);
   useEffect(() => {
     if (!showSinanDadosClinicosBlock) return;
     const sintomaIds = clinicaSintomasSelecionados.filter((id) => id !== SINTOMA_OUTRO_ID);
@@ -963,8 +1413,10 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           <IdadeField
             {...commonProps}
             onBlur={() => validateField(resolved)}
-            calculadaPorDataNascimento={hasDataNascimento}
-            disabled={disabled || hasDataNascimento}
+            calculadaPorDataNascimento={
+              resolved.key === 'paciente.idade' && hasDataNascimento
+            }
+            disabled={disabled || (resolved.key === 'paciente.idade' && hasDataNascimento)}
           />
         );
       case 'textarea':
@@ -996,7 +1448,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           (resolved as { apiSelectEndpoint?: string }).apiSelectEndpoint ||
           (resolved as { dataSource?: string }).dataSource === 'api'
         ) {
-          if (resolved.key === 'paciente.ocupacao_cbo') {
+          if (resolved.key === 'paciente.ocupacao_cbo' || resolved.key === 'mae.ocupacao_cbo') {
             return <CboSearchField {...commonProps} />;
           }
           if (resolved.key === 'paciente.atividade_cnae') {
@@ -1238,6 +1690,20 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       case 'signature':
         return <SignatureField {...commonProps} />;
       case 'geolocation':
+        if (resolved.key === 'residencia.geolocalizacao') {
+          return (
+            <GeoLocationField
+              {...commonProps}
+              onChange={(val: any) => {
+                setValue(resolved.key, val);
+                const lat = val?.latitude != null ? String(val.latitude) : '';
+                const lng = val?.longitude != null ? String(val.longitude) : '';
+                setValue('residencia.geo_campo_1', lat || undefined);
+                setValue('residencia.geo_campo_2', lng || undefined);
+              }}
+            />
+          );
+        }
         return <GeoLocationField {...commonProps} />;
       case 'autocomplete':
         return <AutocompleteField {...commonProps} />;
@@ -1293,6 +1759,20 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       ) : null}
 
       {(pageMode ? (currentSection ? [currentSection] : []) : sectionsToRender).map((section) => {
+          const useHepatiteLayout = isHepatiteCriancaHBV && section.id === 'section_dados_gerais';
+          // Layout com mapa/colunas só na ficha HBV criança (seção dedicada). Fichas SINAN padrão
+          // ("Dados do indivíduo") mantêm grid simples, sem o bloco largo de endereço.
+          const useEnhancedResidenciaBlock =
+            isHepatiteCriancaHBV && section.id === 'section_dados_residencia';
+          const hepatiteSpanClass = (key: string): string => {
+            if (!useHepatiteLayout) return '';
+            if (key === 'notificacao.tipo_notificacao') return 'lg:col-span-4';
+            if (key === 'notificacao.agravo_doenca') return 'lg:col-span-6 lg:col-start-1';
+            if (key === 'agravo_cid') return 'lg:col-span-3';
+            if (key === 'notificacao.dt_notificacao') return 'lg:col-span-3';
+            if (key === 'clinica.data_inicio_sintomas') return 'lg:col-span-4 lg:col-start-1';
+            return '';
+          };
           const isLegacyClinicaSection =
             showSinanDadosClinicosBlock &&
             !pageMode &&
@@ -1301,6 +1781,17 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             section.fields.every((f) => isSinanClinicalFieldKey(f.key));
           if (isLegacyClinicaSection) {
             return null;
+          }
+          if (isHepatiteCriancaHBV && section.id === 'section_dados_complementares_caso') {
+            return (
+              <div key={section.id} className="mb-4">
+                <div className="rounded-lg border border-gray-200 bg-gray-100 px-4 py-3 text-center">
+                  <h2 className="text-base sm:text-lg font-semibold text-gray-800">
+                    Dados Complementares do Caso
+                  </h2>
+                </div>
+              </div>
+            );
           }
           const sortedFields = [...section.fields].sort((a, b) => a.order - b.order);
           const firstNotificationField = sortedFields.find(
@@ -1337,7 +1828,13 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                   </h2>
                 </div>
                 <div className="p-4 rounded-b-xl">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div
+                    className={
+                      useHepatiteLayout
+                        ? 'grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-12'
+                        : 'grid grid-cols-1 md:grid-cols-2 gap-4'
+                    }
+                  >
                   {section.description ? (
                     <div className="md:col-span-2 text-sm text-gray-600 mb-1">{section.description}</div>
                   ) : null}
@@ -1350,12 +1847,65 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                     </div>
                   ) : null}
                 {sortedFields.map((field) => {
+                  if (field.key === 'notificacao.agravo_doenca') {
+                    const val = String(getValue(field.key) ?? '');
+                    return (
+                      <div key={field.key} className={useHepatiteLayout ? hepatiteSpanClass(field.key) : 'md:col-span-2'}>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          {field.label}
+                          {isFieldRequired(field.key) ? <span className="text-red-500 ml-1">*</span> : null}
+                        </label>
+                        <textarea
+                          value={val}
+                          onChange={(event) => setValue(field.key, event.target.value)}
+                          rows={1}
+                          disabled={readOnly || field.disabled}
+                          className={`w-full px-3 py-2 border rounded-md resize-none leading-6 ${
+                            readOnly || field.disabled
+                              ? 'bg-gray-100 cursor-not-allowed border-gray-300'
+                              : 'border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500'
+                          }`}
+                        />
+                        {(field as any).hint ? <p className="text-xs text-gray-500 mt-1">{(field as any).hint}</p> : null}
+                      </div>
+                    );
+                  }
+                  if (field.key === 'agravo_cid' && field.disabled) {
+                    const val = String(getValue(field.key) ?? '');
+                    return (
+                      <div key={field.key} className={hepatiteSpanClass(field.key)}>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          {field.label}
+                          {isFieldRequired(field.key) ? <span className="text-red-500 ml-1">*</span> : null}
+                        </label>
+                        <input
+                          type="text"
+                          value={val}
+                          onChange={(event) => setValue(field.key, event.target.value)}
+                          disabled
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
+                        />
+                        {(field as any).hint ? <p className="text-xs text-gray-500 mt-1">{(field as any).hint}</p> : null}
+                      </div>
+                    );
+                  }
+                  if (field.key === 'notificacao.tipo_notificacao' && useHepatiteLayout) {
+                    const content = renderField(field);
+                    if (content == null) return null;
+                    return (
+                      <div key={field.key} className={hepatiteSpanClass(field.key)}>
+                        {content}
+                      </div>
+                    );
+                  }
                   // Bloco único: Estabelecimento de saúde de notificação (UF, Município, Estabelecimento). Data da notificação fica em Dados do paciente.
                   if (firstNotificationField && field.key === firstNotificationField.key) {
                     return (
-                      <div key="notificacao-estabelecimento-block" className="md:col-span-2">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-3">Estabelecimento de saúde de notificação</h3>
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1.35fr)] md:items-start md:gap-3">
+                      <div
+                        key="notificacao-estabelecimento-block"
+                        className={useHepatiteLayout ? 'lg:col-span-12 mt-1' : 'md:col-span-2'}
+                      >
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1.3fr)] md:items-start md:gap-3">
                           <EstadoMunicipioNotificacao
                             getValue={getValue}
                             setValue={setValue}
@@ -1382,7 +1932,11 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                     return null;
                   }
                   const firstResidenciaField = sortedFields.find((f) => RESIDENCIA_BLOCK_KEYS.has(f.key));
-                  if (firstResidenciaField && field.key === firstResidenciaField.key) {
+                  if (
+                    useEnhancedResidenciaBlock &&
+                    firstResidenciaField &&
+                    field.key === firstResidenciaField.key
+                  ) {
                     const cepField = sortedFields.find((f) => f.key === 'residencia.cep');
                     const bairroField = sortedFields.find((f) => f.key === 'residencia.bairro');
                     const logradouroField = sortedFields.find((f) => f.key === 'residencia.logradouro');
@@ -1390,73 +1944,375 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                     const numeroField = sortedFields.find((f) => f.key === 'residencia.numero');
                     const complementoField = sortedFields.find((f) => f.key === 'residencia.complemento');
                     const telefoneField = sortedFields.find((f) => f.key === 'residencia.telefone');
-                    const handleCepFound = (detail: CepFoundDetail) => {
-                      setValue('residencia.uf', detail.uf ?? '');
-                      setValue('residencia.municipio_ibge', detail.ibge ?? '');
-                      setValue('residencia.logradouro', normalizeMaiusculo(detail.logradouro ?? ''));
-                      setValue('residencia.bairro', normalizeMaiusculo(detail.bairro ?? ''));
+                    const pontoReferenciaField = sortedFields.find((f) => f.key === 'residencia.ponto_referencia');
+                    const paisResidenciaField = sortedFields.find((f) => f.key === 'residencia.pais');
+                    const geoLocationField = sortedFields.find((f) => f.key === 'residencia.geolocalizacao');
+                    const geoCampo1Field = sortedFields.find((f) => f.key === 'residencia.geo_campo_1');
+                    const geoCampo2Field = sortedFields.find((f) => f.key === 'residencia.geo_campo_2');
+                    const geoValue = getValue('residencia.geolocalizacao');
+                    const geoCampo1Value = getValue('residencia.geo_campo_1');
+                    const geoCampo2Value = getValue('residencia.geo_campo_2');
+                    const parseCoord = (val: any): number | null => {
+                      const raw = String(val ?? '').replace(',', '.').trim();
+                      if (!raw) return null;
+                      const n = Number(raw);
+                      return Number.isFinite(n) ? n : null;
                     };
-                    return (
-                      <div key="residencia-block" className="md:col-span-2">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-3">Endereço de residência</h3>
-                        <div className="space-y-4">
-                          {cepField && (
-                            <CEPField
-                              field={getResolvedField(cepField)}
-                              value={getValue(cepField.key)}
-                              onChange={(v) => setValue(cepField.key, v)}
-                              error={getError(cepField.key)}
-                              required={isFieldRequired(cepField.key)}
-                              disabled={readOnly}
-                              onCepFound={handleCepFound}
-                            />
-                          )}
-                          <EstadoMunicipioResidencia
-                            getValue={getValue}
-                            setValue={setValue}
+                    const isValidCoordPair = (lat: number | null, lng: number | null): lat is number =>
+                      lat != null && lng != null && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+                    const latFromGeo =
+                      geoValue?.latitude != null ? Number(geoValue.latitude) : parseCoord(geoCampo1Value);
+                    const lngFromGeo =
+                      geoValue?.longitude != null ? Number(geoValue.longitude) : parseCoord(geoCampo2Value);
+                    const ufRaw = String(getValue('residencia.uf') ?? '').trim().toUpperCase();
+                    const ufNorm =
+                      ufRaw.length === 2
+                        ? ufRaw
+                        : IBGE_TO_UF_SIGLA[String(ufRaw).replace(/\D/g, '')] ?? '';
+                    const residenciaEstadoId = getValue('residencia.estado_id');
+                    const residenciaMunicipioId = getValue('residencia.municipio_id');
+                    const lockPaisBrasil =
+                      ((ufNorm && ufNorm !== 'EX') || residenciaEstadoId || residenciaMunicipioId) ? true : false;
+                    const resolvedPaisResidenciaField = paisResidenciaField
+                      ? getResolvedField(paisResidenciaField)
+                      : null;
+                    const fallbackCenter = UF_MAP_CENTER[ufNorm];
+                    const mapLat = isValidCoordPair(latFromGeo, lngFromGeo) ? latFromGeo : (fallbackCenter?.lat ?? null);
+                    const mapLng = isValidCoordPair(latFromGeo, lngFromGeo) ? lngFromGeo : (fallbackCenter?.lng ?? null);
+                    const googleMapsUrl =
+                      mapLat != null && mapLng != null ? `https://www.google.com/maps?q=${mapLat},${mapLng}` : null;
+                    const setGeoPoint = (
+                      lat: number,
+                      lng: number,
+                      source: 'manual-map' | 'manual-search' | 'manual-gps' | 'auto-municipio' = 'manual-map',
+                    ) => {
+                      setValue('residencia.geolocalizacao', {
+                        latitude: lat,
+                        longitude: lng,
+                        source,
+                        timestamp: new Date().toISOString(),
+                      });
+                      setValue('residencia.geo_campo_1', String(lat));
+                      setValue('residencia.geo_campo_2', String(lng));
+                    };
+                    const handleCepFound = (detail: CepFoundDetail) => {
+                      const uf = detail.uf ?? '';
+                      const ibge = detail.ibge ? String(detail.ibge).replace(/\D/g, '') : '';
+                      if (uf) setValue('residencia.uf', uf);
+                      if (ibge) setValue('residencia.municipio_ibge', ibge);
+                      if (detail.logradouro) {
+                        setValue('residencia.logradouro', normalizeMaiusculo(detail.logradouro));
+                      }
+                      if (detail.bairro) {
+                        setValue('residencia.bairro', normalizeMaiusculo(detail.bairro));
+                      }
+                      if (uf && (detail.localidade || ibge)) {
+                        lastResolveMunicipioKeyRef.current = '';
+                        void resolveResidenciaMunicipioFromAddress(uf, detail.localidade, ibge);
+                      }
+                    };
+                    const residenciaCell = 'min-w-0 [&>div]:mb-0';
+                    const addressFieldsColumn = (
+                      <div className="space-y-4">
+                        {cepField && (
+                          <CEPField
+                            field={getResolvedField(cepField)}
+                            value={getValue(cepField.key)}
+                            onChange={(v) => setValue(cepField.key, v)}
+                            error={getError(cepField.key)}
+                            required={isFieldRequired(cepField.key)}
                             disabled={readOnly}
-                            error={getError('residencia.uf') || getError('residencia.municipio_ibge')}
-                            required={isFieldRequired('residencia.uf') || isFieldRequired('residencia.municipio_ibge')}
+                            onCepFound={handleCepFound}
                           />
-                          {bairroField && (
-                            <div className="min-w-0">
-                              {renderField(getResolvedField(bairroField))}
-                            </div>
-                          )}
-                          {logradouroField && (
-                            <div className="min-w-0">
-                              {renderField(getResolvedField(logradouroField))}
-                            </div>
-                          )}
-                          {zonaField && (
-                            <div className="min-w-0">
-                              {renderField(getResolvedField(zonaField))}
-                            </div>
-                          )}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {numeroField && (
-                              <div className="min-w-0">
-                                {renderField(getResolvedField(numeroField))}
-                              </div>
-                            )}
-                            {complementoField && (
-                              <div className="min-w-0">
-                                {renderField(getResolvedField(complementoField))}
-                              </div>
-                            )}
+                        )}
+                        <EstadoMunicipioResidencia
+                          getValue={getValue}
+                          setValue={setValue}
+                          disabled={readOnly}
+                          error={getError('residencia.uf') || getError('residencia.municipio_ibge')}
+                          required={isFieldRequired('residencia.uf') || isFieldRequired('residencia.municipio_ibge')}
+                        />
+                        {bairroField && (
+                          <div className={residenciaCell}>
+                            {renderField(getResolvedField(bairroField))}
                           </div>
-                          {telefoneField && (
-                            <div className="min-w-0">
-                              {renderField(getResolvedField(telefoneField))}
+                        )}
+                        {logradouroField && (
+                          <div className={residenciaCell}>
+                            {renderField(getResolvedField(logradouroField))}
+                          </div>
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {numeroField && (
+                            <div className={residenciaCell}>
+                              {renderField(getResolvedField(numeroField))}
+                            </div>
+                          )}
+                          {complementoField && (
+                            <div className={residenciaCell}>
+                              {renderField(getResolvedField(complementoField))}
                             </div>
                           )}
                         </div>
                       </div>
                     );
+                    const telefoneBlock = telefoneField ? (
+                      <div className={residenciaCell}>
+                        <InternationalPhoneField
+                          field={getResolvedField(telefoneField)}
+                          value={getValue(telefoneField.key)}
+                          onChange={(v) => setValue(telefoneField.key, v)}
+                          error={getError(telefoneField.key)}
+                          required={isFieldRequired(telefoneField.key)}
+                          disabled={readOnly}
+                          wrapperClassName=""
+                        />
+                      </div>
+                    ) : null;
+                    const pontoReferenciaBlock = pontoReferenciaField ? (
+                      <div className={residenciaCell}>
+                        <TextField
+                          field={getResolvedField(pontoReferenciaField)}
+                          value={getValue(pontoReferenciaField.key)}
+                          onChange={(v) => setValue(pontoReferenciaField.key, v)}
+                          error={getError(pontoReferenciaField.key)}
+                          required={isFieldRequired(pontoReferenciaField.key)}
+                          disabled={readOnly}
+                          wrapperClassName=""
+                        />
+                      </div>
+                    ) : null;
+                    const zonaBlock = zonaField ? (
+                      <div className={residenciaCell}>
+                        {renderField(getResolvedField(zonaField))}
+                      </div>
+                    ) : null;
+                    const paisResidenciaControl = resolvedPaisResidenciaField ? (
+                      <div className={residenciaCell}>
+                        <ApiSelectSearchField
+                          field={resolvedPaisResidenciaField}
+                          value={getValue('residencia.pais')}
+                          onChange={(val: any) => {
+                            const paisValue = String(val ?? '');
+                            setValue('residencia.pais', paisValue || undefined);
+                            if (paisValue && paisValue !== '105') {
+                              setValue('residencia.uf', 'EX');
+                              setValue('residencia.estado_id', undefined);
+                              setValue('residencia.municipio_id', undefined);
+                              setValue('residencia.municipio_ibge', '');
+                            }
+                          }}
+                          error={getError('residencia.pais')}
+                          required={isFieldRequired('residencia.pais')}
+                          disabled={readOnly || lockPaisBrasil}
+                          getValue={getValue}
+                          context={context}
+                        />
+                      </div>
+                    ) : null;
+                    const geoRow = (geoCampo1Field || geoCampo2Field) ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                        {geoCampo1Field && (
+                          <div className={residenciaCell}>
+                            {renderField(getResolvedField(geoCampo1Field))}
+                          </div>
+                        )}
+                        {geoCampo2Field && (
+                          <div className={residenciaCell}>
+                            {renderField(getResolvedField(geoCampo2Field))}
+                          </div>
+                        )}
+                      </div>
+                    ) : null;
+                    const mapBlock = geoLocationField ? (
+                          <div className="min-w-0">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  {geoLocationField.label}
+                                </label>
+                                {(geoLocationField as any).hint ? (
+                                  <p className="text-xs text-gray-500 mb-2">{(geoLocationField as any).hint}</p>
+                                ) : null}
+                                <div className="mb-2 flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={readOnly}
+                                    onClick={() => {
+                                      if (!navigator.geolocation) return;
+                                      navigator.geolocation.getCurrentPosition(
+                                        (position) => {
+                                          setGeoPoint(position.coords.latitude, position.coords.longitude, 'manual-gps');
+                                        },
+                                        () => {},
+                                        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+                                      );
+                                    }}
+                                    className="px-3 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                                  >
+                                    Usar minha localização
+                                  </button>
+                                  <a
+                                    href={googleMapsUrl || '#'}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(event) => {
+                                      if (!googleMapsUrl) event.preventDefault();
+                                    }}
+                                    className={`px-3 py-1.5 text-xs rounded ${
+                                      googleMapsUrl
+                                        ? 'bg-green-600 text-white hover:bg-green-700'
+                                        : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                    }`}
+                                  >
+                                    Ver no Google Maps
+                                  </a>
+                                  <button
+                                    type="button"
+                                    disabled={readOnly}
+                                    onClick={() => {
+                                      setValue('residencia.geolocalizacao', undefined);
+                                      setValue('residencia.geo_campo_1', undefined);
+                                      setValue('residencia.geo_campo_2', undefined);
+                                      setPendingResidenciaMapAddress(null);
+                                    }}
+                                    className="px-3 py-1.5 text-xs rounded bg-gray-600 text-white hover:bg-gray-700 disabled:opacity-50"
+                                  >
+                                    Limpar ponto
+                                  </button>
+                                </div>
+                                {pendingResidenciaMapAddress ? (
+                                  <div className="mb-3 p-3 border border-blue-200 bg-blue-50 rounded-md">
+                                    <p className="text-xs font-semibold text-blue-900 mb-1">
+                                      Sugestão do mapa pronta para aplicar
+                                    </p>
+                                    <p className="text-xs text-blue-800 mb-2">
+                                      {pendingResidenciaMapAddress.formattedAddress || 'Local selecionado no mapa'}
+                                    </p>
+                                    <p className="text-[11px] text-blue-700 mb-3">
+                                      Os campos de endereço só serão alterados quando você clicar em
+                                      {' '}
+                                      <span className="font-semibold">Aplicar endereço do mapa</span>.
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                      <button
+                                        type="button"
+                                        disabled={readOnly}
+                                        onClick={() => {
+                                          applyPendingResidenciaMapAddress(pendingResidenciaMapAddress);
+                                          setPendingResidenciaMapAddress(null);
+                                        }}
+                                        className="px-3 py-1.5 text-xs rounded-md bg-blue-700 text-white hover:bg-blue-800 disabled:opacity-50"
+                                      >
+                                        Aplicar endereço do mapa
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setPendingResidenciaMapAddress(null)}
+                                        className="px-3 py-1.5 text-xs rounded-md bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+                                      >
+                                        Descartar sugestão
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : null}
+                                <MiniMapa
+                                  initialLat={mapLat != null ? String(mapLat) : undefined}
+                                  initialLng={mapLng != null ? String(mapLng) : undefined}
+                                  onLocationSelect={(lat: number, lng: number, meta) => {
+                                    setGeoPoint(lat, lng, meta?.source ?? 'manual-map');
+                                  }}
+                                  onAddressResolved={(address) => {
+                                    setPendingResidenciaMapAddress(address);
+                                  }}
+                                  className="h-[360px] w-full"
+                                />
+                          </div>
+                    ) : null;
+                    const residenciaPairRow = (left: React.ReactNode, right: React.ReactNode) =>
+                      left || right ? (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+                          <div className="min-w-0">{left}</div>
+                          <div className="min-w-0">{right}</div>
+                        </div>
+                      ) : null;
+                    return (
+                      <div key="residencia-block" className="md:col-span-2">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-3">Endereço de residência</h3>
+                        <div className="space-y-4">
+                          {residenciaPairRow(addressFieldsColumn, mapBlock)}
+                          {residenciaPairRow(telefoneBlock, geoRow)}
+                          {residenciaPairRow(pontoReferenciaBlock, zonaBlock)}
+                          {paisResidenciaControl ? (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+                              <div className="min-w-0">{paisResidenciaControl}</div>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
                   }
-                  if (RESIDENCIA_BLOCK_KEYS.has(field.key)) return null;
+                  if (useEnhancedResidenciaBlock && RESIDENCIA_BLOCK_KEYS.has(field.key)) return null;
+                  if (
+                    isHepatiteCriancaHBV &&
+                    section.id === 'section_imunizacao_mae' &&
+                    field.key === 'mae.imunizacao_hepatite_b_completa'
+                  ) {
+                    const imunizacaoCell = 'min-w-0 [&>div]:mb-0';
+                    const hbCompleta = sortedFields.find((f) => f.key === 'mae.imunizacao_hepatite_b_completa');
+                    const hbIncompleta = sortedFields.find((f) => f.key === 'mae.imunizacao_hepatite_b_incompleta');
+                    const haCompleta = sortedFields.find((f) => f.key === 'mae.imunizacao_hepatite_a_completa');
+                    const haIncompleta = sortedFields.find((f) => f.key === 'mae.imunizacao_hepatite_a_incompleta');
+                    const confirmacaoCarteira = sortedFields.find((f) => f.key === 'mae.confirmacao_carteira');
+                    return (
+                      <div key="imunizacao-mae-bloco" className="md:col-span-2 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {hbCompleta ? (
+                            <div className={imunizacaoCell}>{renderField(hbCompleta)}</div>
+                          ) : null}
+                          {hbIncompleta ? (
+                            <div className={imunizacaoCell}>{renderField(hbIncompleta)}</div>
+                          ) : null}
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {haCompleta ? (
+                            <div className={imunizacaoCell}>{renderField(haCompleta)}</div>
+                          ) : null}
+                          {haIncompleta ? (
+                            <div className={imunizacaoCell}>{renderField(haIncompleta)}</div>
+                          ) : null}
+                        </div>
+                        {confirmacaoCarteira ? (
+                          <div className={imunizacaoCell}>{renderField(confirmacaoCarteira)}</div>
+                        ) : null}
+                      </div>
+                    );
+                  }
+                  if (isHepatiteCriancaHBV && section.id === 'section_imunizacao_mae' && IMUNIZACAO_MAE_LAYOUT_KEYS.has(field.key)) {
+                    return null;
+                  }
                   // Bloco Paciente - Identificação: quando Sim, Passaporte e País (ao lado) surgem embaixo de CNS/É estrangeiro e empurram Nome/Nome social pra baixo. País oculto quando Não; sem pré-seleção Brasil.
                   if (dtNotificacaoField && field.key === 'notificacao.dt_notificacao') {
+                    const hasIdentificationGroupFields = Boolean(
+                      cpfField ||
+                        cnsField ||
+                        estrangeiroField ||
+                        nomeField ||
+                        nomeSocialField ||
+                        nomeMaeField ||
+                        dataNascimentoField ||
+                        idadeField ||
+                        sexoField ||
+                        passaporteField ||
+                        paisField
+                    );
+                    if (!hasIdentificationGroupFields) {
+                      const content = renderField(field);
+                      if (content == null) return null;
+                      return (
+                        <div key={field.key} className={hepatiteSpanClass(field.key)}>
+                          {content}
+                        </div>
+                      );
+                    }
                     const estrangeiroSim = getValue('paciente.e_estrangeiro') === '1';
                     return (
                       <div key="identificacao-block" className="md:col-span-2">
@@ -1477,7 +2333,11 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                       </div>
                     );
                   }
-                  if (IDENTIFICACAO_BLOCK_KEYS.has(field.key)) return null;
+                  // Só oculta os campos do bloco de Identificação quando o bloco foi
+                  // efetivamente montado nesta seção (dt_notificacao presente na seção atual).
+                  // Em formulários customizados (ex.: HBV criança), esses campos podem estar
+                  // em outra seção e não devem sumir da tela.
+                  if (dtNotificacaoField && IDENTIFICACAO_BLOCK_KEYS.has(field.key)) return null;
                   if (showSinanDadosClinicosBlock && isSinanClinicalFieldKey(field.key)) return null;
                   if (field.key === 'paciente.pais_nascimento') return null;
                   if (section.id === 'detalhamento' && field.key === 'detalhamento.complementar_descricao') {
@@ -1594,7 +2454,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                       'Sinais e sintomas',
                       clinicaLoadingSintomas
                         ? 'Carregando sintomas...'
-                        : 'Selecione os sinais e sintomas. Os agravos compatíveis serão rankeados automaticamente abaixo.',
+                        : 'Selecione os sinais e sintomas (busca por nome ou sinônimo). Os agravos compatíveis serão rankeados automaticamente abaixo.',
                       clinicaSintomaOptions,
                     ) as any}
                     value={getValue('clinica.sinais_sintomas')}

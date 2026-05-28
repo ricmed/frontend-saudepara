@@ -424,9 +424,11 @@ interface PhoneInputProps {
   name: string;
   placeholder?: string;
   className?: string;
-  label?: string;
+  label?: React.ReactNode;
   defaultCountry?: string; // Novo: país padrão (código ISO)
   debug?: boolean; // Nova prop para habilitar logs de debug
+  compact?: boolean;
+  disabled?: boolean;
 }
 
 const PhoneInput: React.FC<PhoneInputProps> = ({
@@ -439,7 +441,9 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
   className = "",
   label = "Contato Telefônico",
   defaultCountry = "BR", // Brasil como padrão
-  debug = false
+  debug = false,
+  compact = false,
+  disabled = false,
 }) => {
   // Habilitar logs para debug se solicitado
   phoneLogger.enable = debug;
@@ -1018,18 +1022,23 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
     }
   }, [selectedCountry, internalPhoneNumber, displayNumber, debug, totalChars, isExceeding]);
 
+  const controlSize = compact
+    ? 'min-h-[38px] px-3 py-2 text-sm'
+    : 'min-h-[42px] px-3 py-2 text-sm';
+
   return (
     <div className="w-full">
       {label && (
-        <label className="block mb-2 font-medium text-gray-700">{label}</label>
+        <label className="block mb-1 text-sm font-medium text-gray-700">{label}</label>
       )}
-      <div className="flex">
+      <div className="flex w-full items-stretch">
         {/* Seletor de código de país */}
         <button
           ref={buttonRef}
           type="button"
           onClick={toggleDropdown}
-          className="flex items-center h-full px-4 py-3 bg-gray-50 border border-gray-200 border-r-0 rounded-l-lg hover:bg-gray-100 transition-colors"
+          disabled={disabled}
+          className={`flex shrink-0 items-center ${controlSize} bg-gray-50 border border-gray-300 border-r-0 rounded-l-md hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
           aria-label="Selecionar código de país"
         >
           {selectedCountry && (
@@ -1056,7 +1065,8 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
           value={displayNumber}
           onChange={handlePhoneChange}
           placeholder={placeholder}
-          className={`flex-1 p-3 border border-gray-200 rounded-r-lg text-sm ${className}`}
+          disabled={disabled}
+          className={`flex-1 w-full ${controlSize} border border-gray-300 rounded-r-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed ${className}`}
           aria-label="Número de telefone (sem DDI)"
         />
 

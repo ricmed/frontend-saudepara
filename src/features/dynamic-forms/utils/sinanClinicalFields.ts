@@ -31,11 +31,26 @@ export function schemaHasActivatedSinanClinicalFields(
 }
 
 /**
+ * Detecta seção clínica "legada": seção composta apenas por chaves clínicas SINAN.
+ * Essa assinatura é usada para exibir o bloco assistido completo de Dados Clínicos.
+ */
+function hasLegacySinanClinicalSection(schema: FormSchema | null | undefined): boolean {
+  if (!schema?.sections?.length) return false;
+  return schema.sections.some((section) => {
+    const fields = Array.isArray(section.fields) ? section.fields : [];
+    if (fields.length === 0) return false;
+    return fields.every((field) => isSinanClinicalFieldKey(String(field.key || '')));
+  });
+}
+
+/**
  * Bloco assistido "Dados clínicos" só existe se Campos Fixos marcou `isFixedColumn` no schema.
  * Ignora context (evita bundle antigo + context=sinan exibir bloco fantasma).
  */
 export function shouldShowSinanDadosClinicosBlock(schema: FormSchema): boolean {
-  return schemaHasActivatedSinanClinicalFields(schema);
+  // Evita "injetar" Dados Clínicos completos em formulários customizados
+  // que usam apenas 1-2 campos clínicos isolados (ex.: criança exposta HBV).
+  return schemaHasActivatedSinanClinicalFields(schema) && hasLegacySinanClinicalSection(schema);
 }
 
 export function resolveFormRendererContext(
