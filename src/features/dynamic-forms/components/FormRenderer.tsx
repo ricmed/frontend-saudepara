@@ -66,6 +66,12 @@ const NOTIFICATION_ESTABELECIMENTO_KEYS = new Set([
   'notificacao.unidade_id',
 ]);
 
+/** UF + município de residência (LocationInput); renderizados em bloco único fora da ficha HBV. */
+const RESIDENCIA_UF_MUNICIPIO_KEYS = new Set([
+  'residencia.uf',
+  'residencia.municipio_ibge',
+]);
+
 const RESIDENCIA_BLOCK_KEYS = new Set([
   'residencia.cep',
   'residencia.uf',
@@ -1190,6 +1196,26 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     return withPlaceholder;
   };
 
+  const handleResidenciaCepFound = useCallback(
+    (detail: CepFoundDetail) => {
+      const uf = detail.uf ?? '';
+      const ibge = detail.ibge ? String(detail.ibge).replace(/\D/g, '') : '';
+      if (uf) setValue('residencia.uf', uf);
+      if (ibge) setValue('residencia.municipio_ibge', ibge);
+      if (detail.logradouro) {
+        setValue('residencia.logradouro', normalizeMaiusculo(detail.logradouro));
+      }
+      if (detail.bairro) {
+        setValue('residencia.bairro', normalizeMaiusculo(detail.bairro));
+      }
+      if (uf && (detail.localidade || ibge)) {
+        lastResolveMunicipioKeyRef.current = '';
+        void resolveResidenciaMunicipioFromAddress(uf, detail.localidade, ibge);
+      }
+    },
+    [resolveResidenciaMunicipioFromAddress, setValue],
+  );
+
   const renderField = (field: any) => {
     const resolved = getResolvedField(field);
     // Em formulários gerais/públicos, ocultar campos específicos de paciente/SINAN
@@ -1215,6 +1241,20 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
 
     if (!visible) {
       return null;
+    }
+
+    if (resolved.key === 'residencia.cep') {
+      return (
+        <CEPField
+          field={{ ...resolved, type: 'cep' }}
+          value={value}
+          onChange={(val: any) => setValue(resolved.key, val)}
+          error={error}
+          required={required}
+          disabled={disabled}
+          onCepFound={handleResidenciaCepFound}
+        />
+      );
     }
 
     if (resolved.type === 'estabelecimento-search') {
@@ -1684,7 +1724,12 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       case 'passaporte':
         return <PassaporteField {...commonProps} onBlur={() => validateField(resolved)} />;
       case 'cep':
-        return <CEPField {...commonProps} />;
+        return (
+          <CEPField
+            {...commonProps}
+            onCepFound={resolved.key === 'residencia.cep' ? handleResidenciaCepFound : undefined}
+          />
+        );
       case 'file':
         return <FileUploadField {...commonProps} onUploadingChange={handleUploadingChange} />;
       case 'signature':
@@ -1931,6 +1976,31 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                   if (NOTIFICATION_LOCATION_KEYS.has(field.key) || NOTIFICATION_ESTABELECIMENTO_KEYS.has(field.key)) {
                     return null;
                   }
+                  const firstResidenciaUfMunField = sortedFields.find((f) =>
+                    RESIDENCIA_UF_MUNICIPIO_KEYS.has(f.key),
+                  );
+                  if (
+                    !useEnhancedResidenciaBlock &&
+                    firstResidenciaUfMunField &&
+                    field.key === firstResidenciaUfMunField.key
+                  ) {
+                    return (
+                      <div key="residencia-uf-mun-block" className="md:col-span-2">
+                        <EstadoMunicipioResidencia
+                          getValue={getValue}
+                          setValue={setValue}
+                          disabled={readOnly}
+                          error={getError('residencia.uf') || getError('residencia.municipio_ibge')}
+                          required={
+                            isFieldRequired('residencia.uf') || isFieldRequired('residencia.municipio_ibge')
+                          }
+                        />
+                      </div>
+                    );
+                  }
+                  if (!useEnhancedResidenciaBlock && RESIDENCIA_UF_MUNICIPIO_KEYS.has(field.key)) {
+                    return null;
+                  }
                   const firstResidenciaField = sortedFields.find((f) => RESIDENCIA_BLOCK_KEYS.has(f.key));
                   if (
                     useEnhancedResidenciaBlock &&
@@ -1995,22 +2065,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                       setValue('residencia.geo_campo_1', String(lat));
                       setValue('residencia.geo_campo_2', String(lng));
                     };
-                    const handleCepFound = (detail: CepFoundDetail) => {
-                      const uf = detail.uf ?? '';
-                      const ibge = detail.ibge ? String(detail.ibge).replace(/\D/g, '') : '';
-                      if (uf) setValue('residencia.uf', uf);
-                      if (ibge) setValue('residencia.municipio_ibge', ibge);
-                      if (detail.logradouro) {
-                        setValue('residencia.logradouro', normalizeMaiusculo(detail.logradouro));
-                      }
-                      if (detail.bairro) {
-                        setValue('residencia.bairro', normalizeMaiusculo(detail.bairro));
-                      }
-                      if (uf && (detail.localidade || ibge)) {
-                        lastResolveMunicipioKeyRef.current = '';
-                        void resolveResidenciaMunicipioFromAddress(uf, detail.localidade, ibge);
-                      }
-                    };
+                    const handleCepFound = handleResidenciaCepFound;
                     const residenciaCell = 'min-w-0 [&>div]:mb-0';
                     const addressFieldsColumn = (
                       <div className="space-y-4">
