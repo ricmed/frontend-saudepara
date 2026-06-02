@@ -103,6 +103,8 @@ export interface FormSchema {
   agravo: string;
   /** Título exibido para quem está preenchendo (ex.: "Cadastro de Pessoas"). */
   title?: string;
+  /** Abas do formulário (opcional). Seções referenciam `tab` pelo id da aba. */
+  tabs?: FormTab[];
   sections: FormSection[];
   rules?: FormRule[];
   validations?: FormValidation[];
@@ -120,9 +122,17 @@ export interface FormSchema {
   };
 }
 
+export interface FormTab {
+  id: string;
+  label: string;
+  order: number;
+}
+
 export interface FormSection {
   id: string;
   title: string;
+  /** Id da aba (`schema.tabs[].id`) quando o formulário usa layout com abas. */
+  tab?: string;
   /** Nome do ícone (lucide) para o cabeçalho da seção. Ex.: 'clipboard-list' */
   icon?: string;
   /** Texto de orientação abaixo do título (ex.: regras de exibição condicional) */
@@ -147,6 +157,8 @@ export interface FormField {
   codeList?: string;
   /** Endpoint para carregar opções (ex: 'tipo-pais/select'). Resposta esperada: array com idtipo_pais e descricao ou value/label. */
   apiSelectEndpoint?: string;
+  /** Códigos (value) omitidos no select deste campo; demais formulários não são afetados. */
+  apiSelectExcludeCodigos?: string[];
   /** Chaves do formulário para enviar como query params na API (ex.: ["crs_id"] ou ["cabecalho.crs_id"]). */
   apiSelectEndpointParams?: string[];
   options?: Array<{ value: string; label: string }>;
@@ -229,6 +241,10 @@ export interface FormField {
   doseRowTiles?: boolean;
   /** Oculta rótulo visual do campo (sr-only), mantendo acessibilidade. */
   hideLabel?: boolean;
+  /** Número do campo na ficha SINAN impressa (ex.: `58`, `58.1`); metadado do schema, não exibido na UI. */
+  sinanCampo?: string;
+  /** Quando true, exibe o `value` da opção com separador delicado (`1 · Sim`) na UI. */
+  sinanOptionCodes?: boolean;
   /** Date: controles −/+ mais compactos e sem margem inferior extra. */
   denseControls?: boolean;
   /** Com `denseControls`: rótulo/input um pouco maiores (linhas HBV dose). */

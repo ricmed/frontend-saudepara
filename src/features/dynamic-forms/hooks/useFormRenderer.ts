@@ -8,6 +8,13 @@ import {
 import { evaluateRules, createDefaultFieldStates } from '@/utils/rulesEngine';
 import { validateCPF } from '@/utils/cpfValidator';
 import { validateCNS } from '@/utils/cnsValidator';
+import {
+  calcularIdadeMesesFromBirthDate,
+  CRIANCA_EXPOSTA_HBV_IDADE_ERRO,
+  isHepatiteCriancaHBVForm,
+  isIdadeValidaCriancaExpostaHBV,
+} from '../utils/hepatiteCriancaHbvLimits';
+import { SEXO_NASCIMENTO_INTERSEXO_CODIGO } from '../utils/apiSelectOptionFilters';
 import { validatePassaporte } from '@/utils/passaporteValidator';
 
 /** Agrupa campos da seção detalhamento do monitor operacional por tipo de atividade. */
@@ -36,9 +43,11 @@ interface UseFormRendererProps {
   schema: FormSchema;
   initialData?: Record<string, any>;
   onDataChange?: (data: Record<string, any>) => void;
+  /** Chave do formulário na rota (ex.: HEPATITE_CRIANCA_HBV); reforça detecção quando o schema no banco não traz `agravo`. */
+  formKey?: string;
 }
 
-export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseFormRendererProps) => {
+export const useFormRenderer = ({ schema, initialData = {}, onDataChange, formKey }: UseFormRendererProps) => {
   const [formData, setFormData] = useState<Record<string, any>>(initialData);
   const [fieldVisibility, setFieldVisibility] = useState<Record<string, boolean>>({});
   const [fieldRequired, setFieldRequired] = useState<Record<string, boolean>>({});
@@ -337,15 +346,33 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
       const racaCor = String(getValue('paciente.raca_cor') ?? '');
       const situacaoRua = String(getValue('paciente.situacao_rua') ?? '');
       const privadoLiberdade = String(getValue('paciente.privado_liberdade') ?? '');
-      const isHepatiteCriancaHBV = String(schema?.agravo ?? '').trim().toUpperCase() === 'HEPATITE_CRIANCA_HBV';
+      const isHepatiteCriancaHBV = isHepatiteCriancaHBVForm({ schema, formKey });
       const hasDataNascimento = Boolean(getValue('paciente.data_nascimento'));
       const idadeRaw = getValue('paciente.idade');
       const hasIdade = !(idadeRaw === undefined || idadeRaw === null || String(idadeRaw).trim() === '');
 
-      // Ficha HBV criança: quando não souber data de nascimento, idade é obrigatória.
-      // Se informar idade, data de nascimento deixa de ser obrigatória (e vice-versa).
-      if (isHepatiteCriancaHBV && key === 'paciente.data_nascimento') return !hasIdade;
-      if (isHepatiteCriancaHBV && key === 'paciente.idade') return !hasDataNascimento;
+      // Ficha HBV criança: regras específicas (não herdar SINAN genérico de CPF/estrangeiro).
+      if (isHepatiteCriancaHBV) {
+        if (key === 'paciente.data_nascimento') return !hasIdade;
+        if (key === 'paciente.idade') return !hasDataNascimento;
+        if (key === 'crianca_hbv.numero_sinan_mae') return false;
+        if (key === 'paciente.cpf' || key === 'paciente.cns') return false;
+        if (
+          key === 'paciente.nome' ||
+          key === 'paciente.nome_mae' ||
+          key === 'paciente.sexo' ||
+          key === 'paciente.raca_cor'
+        ) {
+          return true;
+        }
+        // Na prática, CEP/bairro/logradouro costumam ser preenchidos depois ou via CEP; UF+município bastam para localizar.
+        const residenciaObrigatoria = new Set([
+          'residencia.uf',
+          'residencia.municipio_ibge',
+        ]);
+        if (residenciaObrigatoria.has(key)) return true;
+        if (key.startsWith('residencia.')) return false;
+      }
 
       // Data da notificação: sempre obrigatória
       if (key === 'notificacao.dt_notificacao') return true;
@@ -353,11 +380,10 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
       if (key === 'paciente.nome') return true;
       // Nome da mãe: sempre obrigatório
       if (key === 'paciente.nome_mae') return true;
-      // CPF obrigatório só quando É Estrangeiro = NÃO (2)
-      if (key === 'paciente.cpf') return estrangeiro === '2';
+      // CPF obrigatório só quando É Estrangeiro = NÃO (2) — fichas SINAN com campo estrangeiro
+      if (key === 'paciente.cpf' && !isHepatiteCriancaHBV) return estrangeiro === '2';
       // CNS obrigatório quando CPF não preenchido e não é estrangeiro
-      if (key === 'paciente.cns') {
-        if (isHepatiteCriancaHBV) return false;
+      if (key === 'paciente.cns' && !isHepatiteCriancaHBV) {
         const cpfDigits = String(getValue('paciente.cpf') ?? '').replace(/\D/g, '');
         return estrangeiro !== '1' && cpfDigits.length < 11;
       }
@@ -416,7 +442,7 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
 
       return fieldRequired[key] === true;
     },
-    [fieldRequired, getValue, schema]
+    [fieldRequired, formKey, getValue, schema]
   );
 
   const isFieldDisabled = useCallback(
@@ -540,10 +566,26 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
         }
       }
 
-      // Idade em meses: máximo 120 anos (1440 meses)
+      if (
+        isHepatiteCriancaHBVValidate &&
+        field.key === 'paciente.sexo' &&
+        value != null &&
+        value !== '' &&
+        String(value) === SEXO_NASCIMENTO_INTERSEXO_CODIGO
+      ) {
+        setError(field.key, 'Intersexo não se aplica a esta ficha. Selecione Masculino, Feminino ou Ignorado.');
+        return false;
+      }
+
       if (field.key === 'paciente.idade' && value != null && value !== '') {
         const meses = Number(value);
-        if (!Number.isNaN(meses) && meses > 120 * 12) {
+        if (Number.isNaN(meses)) return true;
+        if (isHepatiteCriancaHBVValidate) {
+          if (!isIdadeValidaCriancaExpostaHBV(meses)) {
+            setError(field.key, CRIANCA_EXPOSTA_HBV_IDADE_ERRO);
+            return false;
+          }
+        } else if (meses > 120 * 12) {
           setError(field.key, 'A idade não pode ser superior a 120 anos.');
           return false;
         }
@@ -563,22 +605,17 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
         }
       }
 
-      // Data de nascimento: idade calculada não pode ser superior a 120 anos
       if (field.key === 'paciente.data_nascimento' && value) {
-        try {
-          const birth = new Date(value);
-          const today = new Date();
-          let anos = today.getFullYear() - birth.getFullYear();
-          let meses = today.getMonth() - birth.getMonth();
-          if (meses < 0 || (meses === 0 && today.getDate() < birth.getDate())) anos--;
-          if (today.getDate() < birth.getDate()) meses--;
-          const totalMeses = anos * 12 + meses;
-          if (totalMeses > 120 * 12) {
-            setError(field.key, 'A idade calculada não pode ser superior a 120 anos.');
+        const totalMeses = calcularIdadeMesesFromBirthDate(String(value));
+        if (totalMeses === undefined) return true;
+        if (isHepatiteCriancaHBVValidate) {
+          if (!isIdadeValidaCriancaExpostaHBV(totalMeses)) {
+            setError(field.key, CRIANCA_EXPOSTA_HBV_IDADE_ERRO);
             return false;
           }
-        } catch {
-          // ignore invalid date
+        } else if (totalMeses > 120 * 12) {
+          setError(field.key, 'A idade calculada não pode ser superior a 120 anos.');
+          return false;
         }
       }
 
@@ -603,7 +640,7 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
       clearError(field.key);
       return true;
     },
-    [getValue, isFieldRequired, isFieldVisible, setError, clearError]
+    [formKey, getValue, isFieldRequired, isFieldVisible, schema, setError, clearError]
   );
 
   const validateAll = useCallback(() => {

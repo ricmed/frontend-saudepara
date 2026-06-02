@@ -1,6 +1,7 @@
 import React from 'react';
 import { Check, HelpCircle, X } from 'lucide-react';
 import type { FormField } from '@/services/FormService';
+import { renderDynamicFieldLabel } from '../utils/sinanFichaUi';
 
 function getFieldInputId(field: FormField) {
   const key = (field.key || field.label || 'field').toString();
@@ -66,10 +67,12 @@ export const TextField: React.FC<TextFieldProps & { showCharCount?: boolean; wra
   return (
     <div className={wrapperClassName ?? 'mb-4'}>
       <div className="flex items-center gap-2 mb-1">
-        <label htmlFor={inputId} className="block text-sm font-medium text-gray-700">
-          {field.label}
-          {required && <span className="text-red-500 ml-1">*</span>}
-        </label>
+        {renderDynamicFieldLabel({
+          field,
+          required,
+          htmlFor: inputId,
+          className: 'block text-sm font-medium text-gray-700',
+        })}
         {field.helpText && <FieldHelp helpText={field.helpText} label={field.label} />}
       </div>
       <input
@@ -153,9 +156,12 @@ export const DateField: React.FC<TextFieldProps> = ({
 
   return (
     <div className={dense ? 'mb-0' : 'mb-4'}>
-      <label
-        htmlFor={inputId}
-        className={`block font-medium text-gray-700 ${
+      {renderDynamicFieldLabel({
+        field,
+        required,
+        htmlFor: inputId,
+        hideLabel: field.hideLabel,
+        className: `block font-medium text-gray-700 ${
           dense
             ? denseLarge
               ? 'mb-1 text-sm'
@@ -163,11 +169,8 @@ export const DateField: React.FC<TextFieldProps> = ({
                 ? 'mb-0.5 text-[11px] leading-tight'
                 : 'mb-0.5 text-xs'
             : 'mb-1 text-sm'
-        }`}
-      >
-        {field.label}
-        {required && <span className="text-red-500 ml-1">*</span>}
-      </label>
+        }`,
+      })}
       <div className={`flex ${dense ? 'min-w-0 gap-1.5' : 'gap-2'}`}>
         <button
           type="button"
@@ -279,10 +282,12 @@ export const NumberField: React.FC<TextFieldProps> = ({
   
   return (
     <div className="mb-4">
-      <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
-        {field.label}
-        {required && <span className="text-red-500 ml-1">*</span>}
-      </label>
+      {renderDynamicFieldLabel({
+        field,
+        required,
+        htmlFor: inputId,
+        className: 'block text-sm font-medium text-gray-700 mb-1',
+      })}
       {showStepper ? (
         <div className="flex gap-2">
           <button
@@ -441,10 +446,12 @@ const MoneyFieldBase: React.FC<TextFieldProps & { variant: MoneyFieldVariant }> 
 
   return (
     <div className="mb-4">
-      <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
-        {field.label}
-        {required && <span className="text-red-500 ml-1">*</span>}
-      </label>
+      {renderDynamicFieldLabel({
+        field,
+        required,
+        htmlFor: inputId,
+        className: 'block text-sm font-medium text-gray-700 mb-1',
+      })}
       <div className="flex items-stretch">
         <span className="inline-flex items-center px-3 rounded-l-md border border-gray-300 bg-gray-50 text-gray-700 text-sm">
           R$
@@ -522,10 +529,12 @@ export const TextareaField: React.FC<TextFieldProps> = ({
   return (
     <div className="mb-4">
       <div className="flex items-center gap-2 mb-1">
-        <label htmlFor={inputId} className="block text-sm font-medium text-gray-700">
-          {field.label}
-          {required && <span className="text-red-500 ml-1">*</span>}
-        </label>
+        {renderDynamicFieldLabel({
+          field,
+          required,
+          htmlFor: inputId,
+          className: 'block text-sm font-medium text-gray-700',
+        })}
         {field.helpText && <FieldHelp helpText={field.helpText} label={field.label} />}
       </div>
       <textarea

@@ -5,7 +5,9 @@ import FormService, { type FormVersion } from '@/services/FormService';
 import FormSubmissionService from '@/services/FormSubmissionService';
 import { useAuth } from '@/keycloak/AuthProvider';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
-import { FileEdit, Eye, FileSpreadsheet, FileText } from 'lucide-react';
+import { FileEdit, Eye, FileSpreadsheet, FileText, Download, Loader2 } from 'lucide-react';
+import { exportDynamicFormPdf } from '../utils/dynamicFormPdfExport';
+import { isHepatiteCriancaHBVForm } from '../utils/hepatiteCriancaHbvLimits';
 import axios from 'axios';
 import { getApiRoot } from '@/config/apiOrigin';
 import type { MonitorOperRegionalScopePayload } from '../types/monitorOperRegionalScope';
@@ -32,6 +34,8 @@ export const DynamicFormPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [liveFormData, setLiveFormData] = useState<Record<string, unknown>>({});
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [monitorOperRegionalCrsScope, setMonitorOperRegionalCrsScope] =
     useState<MonitorOperRegionalScopePayload | null>(null);
   const [notificacaoEscopo, setNotificacaoEscopo] = useState<NotificacaoEscopo>('livre');
@@ -113,6 +117,7 @@ export const DynamicFormPage: React.FC = () => {
       if (id) {
         const submission = await FormSubmissionService.getSubmissionById(Number(id));
         setInitialData(submission.data_json);
+        setLiveFormData(submission.data_json ?? {});
       } else {
         // Nova notificação: pré-preencher data da notificação com a data atual
         const hoje = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
@@ -153,6 +158,7 @@ export const DynamicFormPage: React.FC = () => {
 
         base.notificacao = { ...(base.notificacao || {}), ...prefill };
         setInitialData(base);
+        setLiveFormData(base);
       }
     } catch (err: any) {
       console.error('Erro ao carregar formulário:', err);
@@ -323,6 +329,36 @@ export const DynamicFormPage: React.FC = () => {
     }
   };
 
+  const isHepatiteCriancaHBV =
+    agravo === 'HEPATITE_CRIANCA_HBV' ||
+    isHepatiteCriancaHBVForm({ schema: formVersion.schema_json, formKey: agravo });
+
+  const handleExportFichaPdf = async () => {
+    if (!formVersion) return;
+    try {
+      setExportingPdf(true);
+      await exportDynamicFormPdf(
+        formVersion.schema_json,
+        liveFormData,
+        {
+          title: formVersion.form?.nome || formVersion.schema_json.title || 'Ficha de notificação',
+          subtitle: 'Criança exposta ao HBV / HCV — SES-PA',
+          submissionId: id ? Number(id) : undefined,
+          statusLabel: isViewMode ? 'Visualização' : isEditMode ? 'Edição' : 'Nova notificação',
+        },
+      );
+    } catch (err) {
+      console.error('Erro ao exportar PDF da ficha:', err);
+      alert(
+        err instanceof Error && err.message
+          ? err.message
+          : 'Não foi possível gerar o PDF. Tente novamente.',
+      );
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   const isEntomologia = agravo === 'ENTOMOLOGIA_LARVAS';
   const exportActions = isEntomologia && isViewMode && id ? (
     <div className="flex gap-2">
@@ -343,6 +379,21 @@ export const DynamicFormPage: React.FC = () => {
         Exportar PDF
       </button>
     </div>
+  ) : isHepatiteCriancaHBV ? (
+    <button
+      type="button"
+      onClick={handleExportFichaPdf}
+      disabled={exportingPdf || saving}
+      className="inline-flex items-center gap-2 rounded-md border border-white/50 bg-white/95 px-4 py-2 text-sm font-medium text-blue-700 shadow-sm transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
+      title="Baixar ficha em PDF"
+    >
+      {exportingPdf ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <Download className="h-4 w-4" />
+      )}
+      {exportingPdf ? 'Gerando PDF…' : 'Baixar PDF'}
+    </button>
   ) : undefined;
 
   return (
@@ -364,11 +415,13 @@ export const DynamicFormPage: React.FC = () => {
         )}
 
         <FormRenderer
+          formKey={agravo}
           schema={{
             ...formVersion.schema_json,
             title: formVersion.form?.nome || formVersion.schema_json.title,
           }}
           initialData={initialData}
+          onDataChange={setLiveFormData}
           onSubmit={handleSubmit}
           onSaveDraft={isViewMode ? undefined : handleSaveDraft}
           onCancel={handleCancel}

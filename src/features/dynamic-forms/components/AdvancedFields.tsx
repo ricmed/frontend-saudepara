@@ -17,6 +17,11 @@ import {
   radioChoiceOtherTextKey,
 } from '@/features/dynamic-forms/utils/radioChoiceOther';
 import { optionsChoiceGridClass } from '@/features/dynamic-forms/utils/optionsChoiceGridClass';
+import {
+  renderDynamicFieldLabel,
+  renderDynamicOptionLabel,
+} from '@/features/dynamic-forms/utils/sinanFichaUi';
+import { filterApiSelectOptionsForField } from '@/features/dynamic-forms/utils/apiSelectOptionFilters';
 
 const API_ROOT = getRuntimeApiRoot();
 
@@ -114,10 +119,12 @@ export const CheckboxGroupField: React.FC<AdvancedFieldProps> = ({
   if (loading) {
     return (
       <div className="mb-4">
-        <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-2">
-          {field.label}
-          {required && <span className="text-red-500 ml-1">*</span>}
-        </label>
+        {renderDynamicFieldLabel({
+          field,
+          required,
+          htmlFor: inputId,
+          className: 'block text-sm font-medium text-gray-700 mb-2',
+        })}
         <p className="text-sm text-gray-500">Carregando opções...</p>
       </div>
     );
@@ -162,11 +169,7 @@ export const CheckboxGroupField: React.FC<AdvancedFieldProps> = ({
                 />
               </div>
               <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
-                <span className={`text-sm font-medium transition-colors leading-relaxed ${
-                  isSelected ? 'text-blue-900' : 'text-gray-900'
-                }`}>
-                  {option.label}
-                </span>
+                {renderDynamicOptionLabel({ option, field, selected: isSelected })}
                 {isSelected && (
                   <Check className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
                 )}
@@ -275,10 +278,12 @@ export const RadioGroupField: React.FC<AdvancedFieldProps> = ({
   if (loading) {
     return (
       <div className="mb-4">
-        <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-2">
-          {field.label}
-          {required && <span className="text-red-500 ml-1">*</span>}
-        </label>
+        {renderDynamicFieldLabel({
+          field,
+          required,
+          htmlFor: inputId,
+          className: 'block text-sm font-medium text-gray-700 mb-2',
+        })}
         <p className="text-sm text-gray-500">Carregando opções...</p>
       </div>
     );
@@ -300,17 +305,15 @@ export const RadioGroupField: React.FC<AdvancedFieldProps> = ({
 
   return (
     <div className={tightTiles ? 'mb-0' : 'mb-4'}>
-      <label
-        htmlFor={inputId}
-        className={
-          hideLabel
-            ? 'sr-only'
-            : `block font-medium text-gray-700 ${compactTiles ? 'text-xs mb-1' : 'text-sm mb-2'}`
-        }
-      >
-        {field.label}
-        {required && <span className="text-red-500 ml-1">*</span>}
-      </label>
+      {renderDynamicFieldLabel({
+        field,
+        required,
+        htmlFor: inputId,
+        hideLabel,
+        className: hideLabel
+          ? ''
+          : `block font-medium text-gray-700 ${compactTiles ? 'text-xs mb-1' : 'text-sm mb-2'}`,
+      })}
       {field.helpText && (
         <p className="text-xs text-gray-500 mb-2">{field.helpText}</p>
       )}
@@ -414,19 +417,15 @@ export const RadioGroupField: React.FC<AdvancedFieldProps> = ({
                 <span
                   className={
                     compactTiles
-                      ? `text-xs font-medium ${isSelected ? 'text-blue-900' : 'text-gray-900'}`
+                      ? 'inline-flex min-w-0'
                       : doseRowTiles || inlineTiles
-                        ? `min-w-0 font-medium ${
-                            doseRowStacked
-                              ? `${naoReagenteCompact ? 'text-[13px]' : 'text-sm'} leading-tight whitespace-nowrap`
-                              : 'text-sm leading-snug'
-                          } ${isSelected ? 'text-blue-900' : 'text-gray-900'}`
-                        : `text-sm font-medium transition-colors leading-relaxed ${
-                            isSelected ? 'text-blue-900' : 'text-gray-900'
+                        ? `min-w-0 inline-flex ${
+                            doseRowStacked ? `${naoReagenteCompact ? 'text-[13px]' : 'text-sm'}` : 'text-sm'
                           }`
+                        : 'inline-flex min-w-0'
                   }
                 >
-                  {option.label}
+                  {renderDynamicOptionLabel({ option, field, selected: isSelected })}
                 </span>
                 {!tightTiles && isSelected && (
                   <Check className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
@@ -550,7 +549,7 @@ export const MultiSelectField: React.FC<AdvancedFieldProps> = ({
           : undefined,
       })).filter((o: any) => o.value && o.label);
 
-      setOptions(mapped);
+      setOptions(filterApiSelectOptionsForField(mapped, field, value));
     } catch (error) {
       console.error('Erro ao carregar opções da API:', error);
       setOptions([]);
@@ -1137,6 +1136,10 @@ export const IdadeField: React.FC<IdadeFieldProps> = ({
     typeof (field as { idadeMaxAnos?: number }).idadeMaxAnos === 'number'
       ? (field as { idadeMaxAnos: number }).idadeMaxAnos
       : IDADE_MAX_ANOS;
+  const idadeMaxMesesCampo =
+    typeof (field as { idadeMaxMeses?: number }).idadeMaxMeses === 'number'
+      ? (field as { idadeMaxMeses: number }).idadeMaxMeses
+      : 11;
   const meses = value != null && value !== '' ? Number(value) : undefined;
   const isAnos = (m: number) => m >= 12;
   const [unidade, setUnidade] = useState<'anos' | 'meses'>(() =>
@@ -1234,7 +1237,7 @@ export const IdadeField: React.FC<IdadeFieldProps> = ({
         setErroMaxIdade(false);
       }
     } else {
-      if (num > 11) {
+      if (num > idadeMaxMesesCampo) {
         setErroMaxMeses(true);
         return;
       }
@@ -1317,7 +1320,13 @@ export const IdadeField: React.FC<IdadeFieldProps> = ({
           onBlur={handleIdadeBlur}
           placeholder={unidadeEfetiva === 'anos' ? 'Anos' : 'Meses'}
           min={!idadeAnosRestrita && unidadeEfetiva === 'anos' ? 0 : undefined}
-          max={!idadeAnosRestrita && unidadeEfetiva === 'anos' ? idadeMaxAnos : !idadeAnosRestrita ? 11 : undefined}
+          max={
+            !idadeAnosRestrita && unidadeEfetiva === 'anos'
+              ? idadeMaxAnos
+              : !idadeAnosRestrita
+                ? idadeMaxMesesCampo
+                : undefined
+          }
           maxLength={idadeAnosRestrita ? 2 : undefined}
           step={idadeAnosRestrita ? undefined : 1}
           disabled={disabled || field.disabled}
@@ -1335,7 +1344,8 @@ export const IdadeField: React.FC<IdadeFieldProps> = ({
             `A idade não pode ser inferior a ${idadeMinAnos} ${idadeMinAnos === 1 ? 'ano' : 'anos'}.`}
           {erroMaxIdade &&
             `A idade não pode ser superior a ${idadeMaxAnos} ${idadeMaxAnos === 1 ? 'ano' : 'anos'}.`}
-          {erroMaxMeses && 'Quando a unidade é meses, o valor não pode ser superior a 11.'}
+          {erroMaxMeses &&
+            `Quando a unidade é meses, o valor não pode ser superior a ${idadeMaxMesesCampo}.`}
           {!erroMinIdade && !erroMaxIdade && !erroMaxMeses && error}
         </p>
       )}

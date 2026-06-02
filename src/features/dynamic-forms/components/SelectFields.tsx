@@ -12,6 +12,12 @@ import {
   DF_CHOICE_WITH_TEXT_DEFAULT_VALUE,
   radioChoiceOtherTextKey,
 } from '@/features/dynamic-forms/utils/radioChoiceOther';
+import { filterApiSelectOptionsForField } from '@/features/dynamic-forms/utils/apiSelectOptionFilters';
+import {
+  formatOptionLabelPlain,
+  renderDynamicFieldLabel,
+  renderDynamicOptionLabel,
+} from '@/features/dynamic-forms/utils/sinanFichaUi';
 
 function getFieldInputId(field: FormField) {
   const key = (field.key || field.label || 'field').toString();
@@ -73,10 +79,12 @@ const SingleSelectTiles: React.FC<{
 
   return (
     <div className="mb-4">
-      <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
-        {field.label}
-        {required && <span className="text-red-500 ml-1">*</span>}
-      </label>
+      {renderDynamicFieldLabel({
+        field,
+        required,
+        htmlFor: inputId,
+        className: 'block text-sm font-medium text-gray-700 mb-1',
+      })}
       {field.helpText && <p className="text-xs text-gray-500 mb-2">{field.helpText}</p>}
       {loading ? (
         <p className="text-sm text-gray-500">Carregando...</p>
@@ -118,13 +126,7 @@ const SingleSelectTiles: React.FC<{
                     />
                   </div>
                   <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
-                    <span
-                      className={`text-sm font-medium transition-colors leading-relaxed ${
-                        isSelected ? 'text-blue-900' : 'text-gray-900'
-                      }`}
-                    >
-                      {option.label}
-                    </span>
+                    {renderDynamicOptionLabel({ option, field, selected: isSelected })}
                     {isSelected && <Check className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />}
                   </div>
                 </label>
@@ -386,10 +388,14 @@ export const ApiSelectField: React.FC<SelectFieldProps> = ({
         const { data } = await axios.get<any[]>(url, { withCredentials: true, params });
         if (cancelled) return;
         const list = Array.isArray(data) ? data : [];
-        const opts = list.map((item: any) => {
-          const o = mapApiItemToSearchableOption(item);
-          return { value: o.value, label: o.label };
-        });
+        const opts = filterApiSelectOptionsForField(
+          list.map((item: any) => {
+            const o = mapApiItemToSearchableOption(item);
+            return { value: o.value, label: o.label };
+          }),
+          field,
+          value,
+        );
         setOptions(opts);
       } catch (e) {
         if (!cancelled) setOptions([]);
@@ -404,6 +410,8 @@ export const ApiSelectField: React.FC<SelectFieldProps> = ({
     JSON.stringify((field as any).apiSelectEndpointParams || []),
     JSON.stringify((field as FormField & { apiSelectStaticParams?: Record<string, string> }).apiSelectStaticParams || {}),
     ...(((field as any).apiSelectEndpointParams || []) as string[]).map((k: string) => getValue?.(k)),
+    value,
+    JSON.stringify((field as FormField & { apiSelectExcludeCodigos?: string[] }).apiSelectExcludeCodigos || []),
   ]);
 
   return (
@@ -425,10 +433,12 @@ export const ApiSelectField: React.FC<SelectFieldProps> = ({
         />
       ) : (
         <>
-          <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
-            {field.label}
-            {required && <span className="text-red-500 ml-1">*</span>}
-          </label>
+          {renderDynamicFieldLabel({
+            field,
+            required,
+            htmlFor: inputId,
+            className: 'block text-sm font-medium text-gray-700 mb-1',
+          })}
           <select
             id={inputId}
             value={value ?? ''}
@@ -441,7 +451,7 @@ export const ApiSelectField: React.FC<SelectFieldProps> = ({
             <option value="">{loading ? 'Carregando...' : 'Selecione...'}</option>
             {options.map((opt) => (
               <option key={opt.value} value={opt.value}>
-                {opt.label}
+                {formatOptionLabelPlain(opt, field)}
               </option>
             ))}
           </select>
@@ -511,7 +521,15 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
           : (data?.data && Array.isArray(data.data))
             ? data.data
             : [];
-        setOptions(list.map((item: any) => mapApiItemToSearchableOption(item)));
+        const mapped = list.map((item: any) => mapApiItemToSearchableOption(item));
+        const allowed = new Set(
+          filterApiSelectOptionsForField(
+            mapped.map((o) => ({ value: o.value, label: o.label })),
+            field,
+            value,
+          ).map((o) => o.value),
+        );
+        setOptions(mapped.filter((o) => allowed.has(o.value)));
       } catch (e) {
         if (!cancelled) setOptions([]);
       } finally {
@@ -528,6 +546,8 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
     staticKey,
     JSON.stringify(paramsKeys),
     JSON.stringify(field.options || []),
+    JSON.stringify((field as FormField & { apiSelectExcludeCodigos?: string[] }).apiSelectExcludeCodigos || []),
+    value,
     ...paramDeps,
   ]);
 
@@ -535,7 +555,8 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
   const filteredOptions = options.filter(
     (opt) => !normalizedSearch || opt.searchHaystack.includes(normalizedSearch)
   );
-  const selectedLabel = value ? options.find((o) => o.value === String(value))?.label : '';
+  const selectedOption = value ? options.find((o) => o.value === String(value)) : undefined;
+  const selectedLabel = selectedOption ? formatOptionLabelPlain(selectedOption, field) : '';
   const legacyTextValue =
     value != null &&
     String(value).trim() !== '' &&
@@ -573,7 +594,9 @@ export const ApiSelectSearchField: React.FC<SelectFieldProps> = ({
           }}
           className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
         >
-          {useMaiusculoSemAcento ? normalizeMaiusculoSemAcento(opt.label) : opt.label}
+          {useMaiusculoSemAcento
+            ? normalizeMaiusculoSemAcento(formatOptionLabelPlain(opt, field))
+            : renderDynamicOptionLabel({ option: opt, field })}
         </div>
       ))}
     </>
@@ -693,7 +716,8 @@ export const CboSearchField: React.FC<SelectFieldProps> = ({
     return () => clearTimeout(t);
   }, [searchTerm, showDropdown]);
 
-  const selectedLabel = value ? options.find((o) => o.value === value)?.label : '';
+  const selectedOption = value ? options.find((o) => o.value === value) : undefined;
+  const selectedLabel = selectedOption ? formatOptionLabelPlain(selectedOption, field) : '';
   const displayValue = showDropdown
     ? searchTerm
     : (normalizeMaiusculoSemAcento((displayLabel || selectedLabel || '')) || (loading && value ? 'Carregando...' : ''));
@@ -820,7 +844,8 @@ export const CnaeSearchField: React.FC<SelectFieldProps> = ({
     return () => clearTimeout(t);
   }, [searchTerm, showDropdown]);
 
-  const selectedLabel = value ? options.find((o) => o.value === value)?.label : '';
+  const selectedOption = value ? options.find((o) => o.value === value) : undefined;
+  const selectedLabel = selectedOption ? formatOptionLabelPlain(selectedOption, field) : '';
   const displayValue = showDropdown
     ? searchTerm
     : (normalizeMaiusculoSemAcento((displayLabel || selectedLabel || '')) || (loading && value ? 'Carregando...' : ''));
@@ -970,7 +995,7 @@ export const SelectField: React.FC<SelectFieldProps> = ({
             <option value="">{loading ? 'Carregando...' : 'Selecione...'}</option>
             {options.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.label}
+                {formatOptionLabelPlain(option, field)}
               </option>
             ))}
           </select>
@@ -1031,7 +1056,11 @@ export const SelectSearchField: React.FC<SelectFieldProps> = ({
   );
 
   const selectedOption = options.find(opt => opt.value === value);
-  const displayValue = showDropdown ? searchTerm : (selectedOption?.label ?? '');
+  const displayValue = showDropdown
+    ? searchTerm
+    : selectedOption
+      ? formatOptionLabelPlain(selectedOption, field)
+      : '';
 
   const handleSelect = (option: { value: string; label: string }) => {
     onChange(option.value);
@@ -1047,7 +1076,7 @@ export const SelectSearchField: React.FC<SelectFieldProps> = ({
   };
 
   const handleFocus = () => {
-    if (selectedOption?.label) setSearchTerm(selectedOption.label);
+    if (selectedOption) setSearchTerm(formatOptionLabelPlain(selectedOption, field));
     setShowDropdown(true);
   };
 
@@ -1087,7 +1116,7 @@ export const SelectSearchField: React.FC<SelectFieldProps> = ({
                   onClick={() => handleSelect(option)}
                   className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
                 >
-                  {option.label}
+                  {renderDynamicOptionLabel({ option, field })}
                 </div>
               ))
             )}
@@ -1136,7 +1165,8 @@ function SearchableSelect({
   const filteredOptions = options.filter(
     (opt) => !normalizedSearch || normalizeForSearch(opt.label).includes(normalizedSearch)
   );
-  const selectedLabel = value ? options.find((o) => o.value === value)?.label : '';
+  const selectedOption = value ? options.find((o) => o.value === value) : undefined;
+  const selectedLabel = selectedOption ? formatOptionLabelPlain(selectedOption) : '';
   const displayValue = showDropdown ? searchTerm : (loading && value ? 'Carregando...' : selectedLabel);
 
   return (
@@ -1179,7 +1209,7 @@ function SearchableSelect({
                     }}
                     className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
                   >
-                    {opt.label}
+                    {renderDynamicOptionLabel({ option: opt })}
                   </div>
                 ))
               )}

@@ -89,6 +89,12 @@ export const EstadoMunicipioNotificacao: React.FC<EstadoMunicipioNotificacaoProp
     }
   }, [estadoId, estados, getValue, setValue]);
 
+  const clearEstabelecimento = useCallback(() => {
+    setValue('notificacao.unidade_id', undefined);
+    setValue('notificacao.estabelecimento', undefined);
+    setValue('notificacao.estabelecimento_cnes', undefined);
+  }, [setValue]);
+
   const handleUfChange = useCallback(
     (value: string) => {
       const id = value ? Number(value) : undefined;
@@ -97,14 +103,19 @@ export const EstadoMunicipioNotificacao: React.FC<EstadoMunicipioNotificacaoProp
       setValue('notificacao.uf_notificacao', estado?.sigla ?? ''); // sigla = codigo UF (backend armazena código; front exibe nome)
       setValue('notificacao.municipio_id', undefined);
       setValue('notificacao.municipio_notificacao_ibge', '');
+      clearEstabelecimento();
     },
-    [estados, setValue]
+    [clearEstabelecimento, estados, setValue],
   );
 
   const handleMunicipioChange = useCallback(
     (value: string) => {
       const id = value ? Number(value) : undefined;
+      const prev = getValue('notificacao.municipio_id');
       setValue('notificacao.municipio_id', id);
+      if (String(prev ?? '') !== String(id ?? '')) {
+        clearEstabelecimento();
+      }
       if (id) {
         usuarioGestaoService
           .getMunicipioComEstado(id)
@@ -117,7 +128,7 @@ export const EstadoMunicipioNotificacao: React.FC<EstadoMunicipioNotificacaoProp
         setValue('notificacao.municipio_notificacao_ibge', '');
       }
     },
-    [setValue]
+    [clearEstabelecimento, getValue, setValue],
   );
 
   const ufDisabled = disabled || lockUf;
@@ -138,7 +149,7 @@ export const EstadoMunicipioNotificacao: React.FC<EstadoMunicipioNotificacaoProp
     <div className="min-w-0">
       <LocationInput
         name="uf"
-        label={required ? 'UF da Notificação *' : 'UF da Notificação'}
+        label="UF da Notificação"
         value={estadoValue}
         onChange={handleUfChange}
         placeholder={ufPlaceholder}
@@ -155,7 +166,7 @@ export const EstadoMunicipioNotificacao: React.FC<EstadoMunicipioNotificacaoProp
     <div className="min-w-0">
       <LocationInput
         name="municipio"
-        label={required ? 'Município da Notificação *' : 'Município da Notificação'}
+        label="Município da Notificação"
         value={municipioValue}
         onChange={handleMunicipioChange}
         placeholder={munPlaceholder}

@@ -1,20 +1,14 @@
 import React from 'react';
 import type { FormField } from '@/services/FormService';
 
-const LAB_CELL = 'min-w-0 w-full [&>div]:mb-0';
-const DATE_ROW_WRAP =
-  'w-full min-w-0 max-w-full shrink-0 sm:w-[13.5rem] [&_label]:text-sm [&_input]:min-w-[6.5rem] [&_input]:text-sm [&_button]:px-1.5 [&_button]:text-sm';
+import {
+  LAB_CELL,
+  LabMarkerRow,
+  type RenderLabFn,
+} from '@/features/dynamic-forms/components/criancaLabPanelLayout';
+
 const CARD =
   'overflow-hidden rounded-lg border border-[#06b6d4]/25 bg-[#06b6d4]/[0.06] p-3 sm:p-4 space-y-3';
-
-const DATE_FIELD_OPTS: Partial<FormField> = {
-  denseControls: true,
-};
-
-const LAB_MARKER_RADIO_OPTS: Partial<FormField> = {
-  doseRowTiles: true,
-  gridCols: 1,
-};
 
 const KEYS = {
   antiHcv: 'crianca.acomp.anti_hcv',
@@ -24,29 +18,10 @@ const KEYS = {
   hcvRnaData: 'crianca.acomp.hcv_rna_data',
 } as const;
 
-type RenderLabFn = (key: string, overrides?: Partial<FormField>) => React.ReactNode;
+export const CRIANCA_ACOMP_SOROLOGIA_MARKER_KEYS = new Set<string>([KEYS.antiHcv, KEYS.hcvRna]);
 
 function isReagentePositivo(value: unknown): boolean {
   return String(value ?? '').trim() === '1';
-}
-
-function LabMarkerRow({
-  renderLab,
-  resultKey,
-  dateKey,
-}: {
-  renderLab: RenderLabFn;
-  resultKey: string;
-  dateKey: string;
-}) {
-  return (
-    <div className="grid max-w-full grid-cols-1 items-start gap-2 sm:grid-cols-[minmax(0,1fr)_13.5rem] sm:items-center sm:gap-2.5">
-      <div className={`${LAB_CELL} min-w-0`}>{renderLab(resultKey, LAB_MARKER_RADIO_OPTS)}</div>
-      <div className={`${DATE_ROW_WRAP} sm:flex sm:flex-col sm:justify-center`}>
-        {renderLab(dateKey, DATE_FIELD_OPTS)}
-      </div>
-    </div>
-  );
 }
 
 export interface CriancaAcompanhamentoHcvPanelProps {

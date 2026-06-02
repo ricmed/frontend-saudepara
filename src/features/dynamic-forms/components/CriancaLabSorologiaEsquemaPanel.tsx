@@ -1,25 +1,26 @@
 import React from 'react';
 import type { FormField } from '@/services/FormService';
 
-const LAB_CELL = 'min-w-0 w-full [&>div]:mb-0';
-/** Data ao lado do radio: largura fixa; tipografia alinhada aos radios (text-sm). */
-const DATE_ROW_WRAP =
-  'w-full min-w-0 max-w-full shrink-0 sm:w-[13.5rem] [&_label]:text-sm [&_input]:min-w-[6.5rem] [&_input]:text-sm [&_button]:px-1.5 [&_button]:text-sm';
+import {
+  DATE_FIELD_OPTS,
+  DATE_ROW_WRAP,
+  LAB_CELL,
+  LabMarkerRow,
+  MARKER_ROW_GRID,
+  type RenderLabFn,
+} from '@/features/dynamic-forms/components/criancaLabPanelLayout';
+
 const CARD =
   'overflow-hidden rounded-lg border border-[#3b5bdb]/20 bg-[#3b5bdb]/[0.05] p-3 sm:p-4 space-y-3';
 
-const DATE_FIELD_OPTS: Partial<FormField> = {
-  denseControls: true,
-};
-
-/** ALT: data no tamanho padrão do formulário (sem dense / sem coluna estreita). */
-const ALT_DATE_WRAP = 'w-full min-w-0 shrink-0 sm:w-auto sm:max-w-md [&>div]:mb-0';
-
-/** Marcador + data na mesma linha — 1 coluna de tiles para não sobrepor os rótulos. */
-const LAB_MARKER_RADIO_OPTS: Partial<FormField> = {
-  doseRowTiles: true,
-  gridCols: 1,
-};
+export const CRIANCA_LAB_SOROLOGIA_MARKER_KEYS = new Set([
+  'crianca.lab.esquema1.hbsag',
+  'crianca.lab.esquema1.anti_hbs',
+  'crianca.lab.esquema1.hbv_dna',
+  'crianca.lab.esquema2.hbsag',
+  'crianca.lab.esquema2.anti_hbs',
+  'crianca.lab.esquema2.hbv_dna',
+]);
 
 export type CriancaLabEsquemaPrefix = 'crianca.lab.esquema1' | 'crianca.lab.esquema2';
 
@@ -35,32 +36,9 @@ const keysFor = (prefix: CriancaLabEsquemaPrefix) => ({
   altData: `${prefix}.alt_data`,
 });
 
-type RenderLabFn = (key: string, overrides?: Partial<FormField>) => React.ReactNode;
-
 /** Sorologia/molecular: valor 1 = Reagente/Positivo (carga viral só nesse caso). */
 function isReagentePositivo(value: unknown): boolean {
   return String(value ?? '').trim() === '1';
-}
-
-function LabMarkerRow({
-  renderLab,
-  resultKey,
-  dateKey,
-  radioOpts,
-}: {
-  renderLab: RenderLabFn;
-  resultKey: string;
-  dateKey: string;
-  radioOpts: Partial<FormField>;
-}) {
-  return (
-    <div className="grid max-w-full grid-cols-1 items-start gap-2 sm:grid-cols-[minmax(0,1fr)_13.5rem] sm:items-center sm:gap-2.5">
-      <div className={`${LAB_CELL} min-w-0`}>{renderLab(resultKey, radioOpts)}</div>
-      <div className={`${DATE_ROW_WRAP} sm:flex sm:flex-col sm:justify-center`}>
-        {renderLab(dateKey, DATE_FIELD_OPTS)}
-      </div>
-    </div>
-  );
 }
 
 export interface CriancaLabSorologiaEsquemaPanelProps {
@@ -97,28 +75,13 @@ export const CriancaLabSorologiaEsquemaPanel: React.FC<CriancaLabSorologiaEsquem
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
         <div className={CARD}>
           <p className="text-xs font-semibold uppercase tracking-wide text-[#364fc7]">Sorologia</p>
-          <LabMarkerRow
-            renderLab={renderLab}
-            resultKey={k.hbsag}
-            dateKey={k.hbsagData}
-            radioOpts={LAB_MARKER_RADIO_OPTS}
-          />
-          <LabMarkerRow
-            renderLab={renderLab}
-            resultKey={k.antiHbs}
-            dateKey={k.antiHbsData}
-            radioOpts={LAB_MARKER_RADIO_OPTS}
-          />
+          <LabMarkerRow renderLab={renderLab} resultKey={k.hbsag} dateKey={k.hbsagData} />
+          <LabMarkerRow renderLab={renderLab} resultKey={k.antiHbs} dateKey={k.antiHbsData} />
         </div>
 
         <div className={CARD}>
           <p className="text-xs font-semibold uppercase tracking-wide text-[#364fc7]">HBV-DNA</p>
-          <LabMarkerRow
-            renderLab={renderLab}
-            resultKey={k.hbvDna}
-            dateKey={k.hbvDnaData}
-            radioOpts={LAB_MARKER_RADIO_OPTS}
-          />
+          <LabMarkerRow renderLab={renderLab} resultKey={k.hbvDna} dateKey={k.hbvDnaData} />
           {hbvDnaReagente ? (
             <div className={`${LAB_CELL} min-w-0 max-w-md`}>
               {renderLab(k.hbvDnaQuantificacao, { helpText: undefined })}
@@ -139,11 +102,11 @@ export const CriancaLabSorologiaEsquemaPanel: React.FC<CriancaLabSorologiaEsquem
           ALT (alanina aminotransferase)
         </p>
         <div className="space-y-1">
-          <div className="grid max-w-full grid-cols-1 items-start gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-4">
+          <div className={MARKER_ROW_GRID}>
             <div className={`${LAB_CELL} min-w-0`}>
               {renderLab(k.alt, { helpText: undefined })}
             </div>
-            <div className={ALT_DATE_WRAP}>{renderLab(k.altData)}</div>
+            <div className={DATE_ROW_WRAP}>{renderLab(k.altData, DATE_FIELD_OPTS)}</div>
           </div>
           {altDef?.helpText ? (
             <p className="text-xs text-gray-500">{altDef.helpText}</p>

@@ -226,7 +226,7 @@ export const EstadoMunicipioResidencia: React.FC<EstadoMunicipioResidenciaProps>
       <div>
         <LocationInput
           name="uf_residencia"
-          label={required ? 'UF de residência *' : 'UF de residência'}
+          label="UF de residência"
           value={estadoValue}
           onChange={handleUfChange}
           placeholder="Pesquise por código ou nome (ex.: 15, PA)"
@@ -240,7 +240,7 @@ export const EstadoMunicipioResidencia: React.FC<EstadoMunicipioResidenciaProps>
       <div>
         <LocationInput
           name="municipio_residencia"
-          label={required ? 'Município de residência *' : 'Município de residência'}
+          label="Município de residência"
           value={municipioValue}
           onChange={handleMunicipioChange}
           placeholder={estadoValue ? 'Pesquise por código ou nome (ex.: 150140, Belém)' : 'Selecione primeiro a UF'}

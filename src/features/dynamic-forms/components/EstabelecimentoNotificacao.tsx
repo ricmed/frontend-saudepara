@@ -1,13 +1,12 @@
 /**
- * Estabelecimento da Notificação — mesma lógica do Notification Forms (UnidadeNotificadoraField)
- * com pesquisa; permite escolher qualquer estabelecimento (~11k). Preenche automaticamente:
+ * Estabelecimento da Notificação — restrito ao município selecionado (mesma lógica de
+ * local de nascimento / investigador). Preenche automaticamente:
  * - notificacao.estabelecimento = nome do estabelecimento (vai pro banco em estabelecimento_nome)
- * - notificacao.estabelecimento_cnes = id_unidade = CNES do estabelecimento
+ * - notificacao.estabelecimento_cnes = CNES do estabelecimento
  * - notificacao.unidade_id = idestabelecimento (FK opcional, para relação)
  */
 import React, { useCallback } from 'react';
-import UnidadeNotificadoraField from '@/features/notificationForms/components/UnidadeNotificadoraField';
-import { usuarioGestaoService } from '@/services/UsuarioGestaoService';
+import { EstabelecimentoPorMunicipioField } from './EstabelecimentoPorMunicipioField';
 
 interface EstabelecimentoNotificacaoProps {
   getValue: (key: string) => any;
@@ -27,46 +26,26 @@ export const EstabelecimentoNotificacao: React.FC<EstabelecimentoNotificacaoProp
   required = false,
   lockEstablishment = false,
 }) => {
-  const unidadeId = getValue('notificacao.unidade_id');
-  const value = unidadeId != null && unidadeId !== '' ? String(unidadeId) : '';
-
-  const handleChange = useCallback(
-    (newValue: string) => {
-      const id = newValue ? Number(newValue) : undefined;
+  const handleUnidadeChange = useCallback(
+    (id: number | undefined, meta?: { nome?: string; cnes?: string }) => {
       setValue('notificacao.unidade_id', id ?? undefined);
-      if (id) {
-        usuarioGestaoService
-          .getEstabelecimentoComHierarquia(id)
-          .then((est: any) => {
-            const nome = est?.nome ?? '';
-            const cnes = est?.cnes ?? '';
-            setValue('notificacao.estabelecimento', nome || undefined);
-            setValue('notificacao.estabelecimento_cnes', cnes || undefined);
-          })
-          .catch(() => {
-            setValue('notificacao.estabelecimento', undefined);
-            setValue('notificacao.estabelecimento_cnes', undefined);
-          });
-      } else {
-        setValue('notificacao.estabelecimento', undefined);
-        setValue('notificacao.estabelecimento_cnes', undefined);
-      }
+      setValue('notificacao.estabelecimento', meta?.nome ?? undefined);
+      setValue('notificacao.estabelecimento_cnes', meta?.cnes ?? undefined);
     },
-    [setValue]
+    [setValue],
   );
 
   return (
-    <div className="min-w-0">
-      <UnidadeNotificadoraField
-        value={value}
-        onChange={handleChange}
-        label={required ? 'Estabelecimento *' : 'Estabelecimento'}
-        placeholder="CNES ou nome (mín. 3 caracteres)"
-        disabled={disabled || lockEstablishment}
-        allowAllEstablishments
-        hasError={!!error}
-        errorMessage={error}
-      />
-    </div>
+    <EstabelecimentoPorMunicipioField
+      municipioId={getValue('notificacao.municipio_id')}
+      unidadeId={getValue('notificacao.unidade_id')}
+      onUnidadeChange={handleUnidadeChange}
+      disabled={disabled || lockEstablishment}
+      error={error}
+      required={required}
+      label={required ? 'Estabelecimento *' : 'Estabelecimento'}
+      municipioObrigatorioMessage="Selecione primeiro o município"
+      denyOutsideMessage="Selecione uma unidade do município escolhido."
+    />
   );
 };
