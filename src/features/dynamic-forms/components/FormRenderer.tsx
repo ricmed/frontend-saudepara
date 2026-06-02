@@ -37,6 +37,32 @@ import { EstadoMunicipioNotificacao } from './EstadoMunicipioNotificacao';
 import { EstabelecimentoNotificacao } from './EstabelecimentoNotificacao';
 import UnidadeNotificadoraField from '@/features/notificationForms/components/UnidadeNotificadoraField';
 import { EstadoMunicipioResidencia } from './EstadoMunicipioResidencia';
+import { EstadoMunicipioPrenatal } from './EstadoMunicipioPrenatal';
+import { EstabelecimentoPrenatal } from './EstabelecimentoPrenatal';
+import { EstadoMunicipioNascimento } from './EstadoMunicipioNascimento';
+import { EstabelecimentoNascimento } from './EstabelecimentoNascimento';
+import { CriancaVacinaDoseRow } from './CriancaVacinaDoseRow';
+import {
+  CriancaLabSorologiaEsquemaPanel,
+  CRIANCA_LAB_ESQUEMA1_FIRST_KEY,
+  CRIANCA_LAB_LAYOUT_KEYS,
+  CRIANCA_LAB_DEPRECATED_KEYS,
+} from './CriancaLabSorologiaEsquemaPanel';
+import {
+  CriancaAcompanhamentoHcvPanel,
+  CRIANCA_ACOMP_FIRST_KEY,
+  CRIANCA_ACOMP_LAYOUT_KEYS,
+} from './CriancaAcompanhamentoHcvPanel';
+import {
+  CriancaConclusaoPanel,
+  CRIANCA_CONCLUSAO_FIRST_KEY,
+  CRIANCA_CONCLUSAO_LAYOUT_KEYS,
+} from './CriancaConclusaoPanel';
+import {
+  InvestigadorDadosPanel,
+  CRIANCA_INVESTIGADOR_FIRST_KEY,
+  CRIANCA_INVESTIGADOR_LAYOUT_KEYS,
+} from './InvestigadorDadosPanel';
 import { TableField } from './TableField';
 import MiniMapa, { type MiniMapaResolvedAddress } from '@/features/maps/leaflet/components/MiniMapa';
 import { ClipboardList, Calendar, DollarSign, Target, Activity, Shield, Leaf, BarChart3, Wrench, Users } from 'lucide-react';
@@ -112,6 +138,200 @@ const IMUNIZACAO_MAE_LAYOUT_KEYS = new Set([
   'mae.imunizacao_hepatite_a_incompleta',
   'mae.confirmacao_carteira',
 ]);
+
+const LAB_MAE_CAMPO37_KEYS = new Set([
+  'mae.lab.sorologia_reagente_hepatite_b',
+  'mae.lab.sorologia_reagente_hepatite_c',
+]);
+
+const MAE_LAB_HBV_WHEN_KEYS = [
+  'mae.lab.hepatite_b_quando_antes_prenatal',
+  'mae.lab.hepatite_b_quando_durante_prenatal',
+  'mae.lab.hepatite_b_quando_maternidade',
+] as const;
+
+const MAE_LAB_HCV_WHEN_KEYS = [
+  'mae.lab.hepatite_c_quando_antes_prenatal',
+  'mae.lab.hepatite_c_quando_durante_prenatal',
+  'mae.lab.hepatite_c_quando_maternidade',
+] as const;
+
+const LAB_MAE_CAMPO38_KEYS = new Set([...MAE_LAB_HBV_WHEN_KEYS, ...MAE_LAB_HCV_WHEN_KEYS]);
+
+const LAB_MAE_QUANDO_ROWS: Array<{
+  label: string;
+  hbvKey: string;
+  hcvKey: string;
+}> = [
+  {
+    label: 'Antes do Pré-natal',
+    hbvKey: 'mae.lab.hepatite_b_quando_antes_prenatal',
+    hcvKey: 'mae.lab.hepatite_c_quando_antes_prenatal',
+  },
+  {
+    label: 'Durante o Pré-natal',
+    hbvKey: 'mae.lab.hepatite_b_quando_durante_prenatal',
+    hcvKey: 'mae.lab.hepatite_c_quando_durante_prenatal',
+  },
+  {
+    label: 'Maternidade',
+    hbvKey: 'mae.lab.hepatite_b_quando_maternidade',
+    hcvKey: 'mae.lab.hepatite_c_quando_maternidade',
+  },
+];
+
+const LAB_MAE_CAMPO39_KEYS = new Set([
+  'mae.lab.hbv_hbsag',
+  'mae.lab.hbv_anti_hbc_total',
+  'mae.lab.hbv_anti_hbc_igm',
+  'mae.lab.hbv_hbeag',
+  'mae.lab.hbv_anti_hbe',
+  'mae.lab.hbv_anti_hbs',
+  'mae.lab.hbv_dna',
+]);
+
+const LAB_MAE_CAMPO40_KEYS = new Set(['mae.lab.hcv_anti_hcv', 'mae.lab.hcv_rna']);
+
+const LAB_MAE_LAYOUT_KEYS = new Set([
+  ...LAB_MAE_CAMPO37_KEYS,
+  ...LAB_MAE_CAMPO38_KEYS,
+  ...LAB_MAE_CAMPO39_KEYS,
+  ...LAB_MAE_CAMPO40_KEYS,
+]);
+
+const CRIANCA_ANTECEDENTES_LAYOUT_KEYS = new Set([
+  'crianca.numero_dnv',
+  'crianca.nascimento_uf',
+  'crianca.nascimento_estado_id',
+  'crianca.nascimento_municipio_ibge',
+  'crianca.nascimento_municipio_id',
+  'crianca.hospital_nascimento_unidade_id',
+  'crianca.hospital_nascimento_cnes',
+  'crianca.hospital_nascimento_nome',
+  'crianca.vacina_hepatite_b_maternidade_antes_24h',
+  'crianca.vacina_hepatite_b_maternidade_apos_24h',
+  'crianca.vacina_hepatite_b_dose_1',
+  'crianca.vacina_hepatite_b_dose_1_data',
+  'crianca.vacina_hepatite_b_dose_2',
+  'crianca.vacina_hepatite_b_dose_2_data',
+  'crianca.vacina_hepatite_b_dose_3',
+  'crianca.vacina_hepatite_b_dose_3_data',
+  'crianca.vacina_hepatite_b_dose_4',
+  'crianca.vacina_hepatite_b_dose_4_data',
+  'crianca.imunoglobulina_hbig',
+  'crianca.imunoglobulina_hbig_data',
+  'crianca.vacina_hepatite_a',
+]);
+
+const CRIANCA_DOSE_ROWS: { simKey: string; dataKey: string; label: string }[] = [
+  { simKey: 'crianca.vacina_hepatite_b_dose_1', dataKey: 'crianca.vacina_hepatite_b_dose_1_data', label: '1ª dose' },
+  { simKey: 'crianca.vacina_hepatite_b_dose_2', dataKey: 'crianca.vacina_hepatite_b_dose_2_data', label: '2ª dose' },
+  { simKey: 'crianca.vacina_hepatite_b_dose_3', dataKey: 'crianca.vacina_hepatite_b_dose_3_data', label: '3ª dose' },
+  { simKey: 'crianca.vacina_hepatite_b_dose_4', dataKey: 'crianca.vacina_hepatite_b_dose_4_data', label: '4ª dose' },
+];
+
+const PRENATAL_LAYOUT_KEYS = new Set([
+  'prenatal.fez_prenatal',
+  'prenatal.uf',
+  'prenatal.estado_id',
+  'prenatal.municipio_ibge',
+  'prenatal.municipio_id',
+  'prenatal.unidade_id',
+  'prenatal.estabelecimento_cnes',
+  'prenatal.estabelecimento_nome',
+  'prenatal.endereco',
+  'prenatal.telefone',
+  'prenatal.tratamento_hepatite_b',
+  'prenatal.prevencao_transmissao_vertical_b',
+  'prenatal.medicamento_utilizado',
+  'prenatal.familia_portadora_hepatite_b',
+  'prenatal.familia_portadora_hepatite_c',
+]);
+
+type LabMaePanelVariant = 'neutral' | 'quando' | 'hbv' | 'hcv';
+
+/** Paleta DAE: primary #3b5bdb, barras #5eafc6 / #06b6d4, rótulos #1e6f8c (ComunicacaoDaeDashboard). */
+const LAB_MAE_HBV_SURFACE =
+  'rounded-md border border-[#3b5bdb]/20 bg-[#3b5bdb]/[0.06] px-2 py-1';
+const LAB_MAE_HCV_SURFACE =
+  'rounded-md border border-[#06b6d4]/25 bg-[#06b6d4]/[0.08] px-2 py-1';
+
+const LAB_MAE_PANEL_STYLES: Record<
+  LabMaePanelVariant,
+  { container: string; badge: string; title: string; subtitle: string }
+> = {
+  neutral: {
+    container: 'border border-gray-200 bg-white',
+    badge: 'bg-gray-200 text-gray-800',
+    title: 'text-gray-900',
+    subtitle: 'text-gray-600',
+  },
+  quando: {
+    container:
+      'border border-gray-200 bg-[#5eafc6]/[0.12] border-l-4 border-l-[#5eafc6] shadow-sm',
+    badge: 'bg-[#5eafc6]/35 text-[#1e6f8c] ring-1 ring-[#06b6d4]/20',
+    title: 'text-gray-900',
+    subtitle: 'text-gray-600',
+  },
+  hbv: {
+    container:
+      'border border-[#3b5bdb]/25 bg-[#3b5bdb]/[0.06] border-l-4 border-l-[#3b5bdb] shadow-sm',
+    badge: 'bg-[#3b5bdb]/15 text-[#364fc7] ring-1 ring-[#3b5bdb]/20',
+    title: 'text-[#364fc7]',
+    subtitle: 'text-gray-600',
+  },
+  hcv: {
+    container:
+      'border border-[#06b6d4]/30 bg-[#06b6d4]/[0.08] border-l-4 border-l-[#06b6d4] shadow-sm',
+    badge: 'bg-[#5eafc6]/40 text-[#1e6f8c] ring-1 ring-[#06b6d4]/25',
+    title: 'text-[#1e6f8c]',
+    subtitle: 'text-gray-600',
+  },
+};
+
+function LabMaePanel({
+  step,
+  title,
+  subtitle,
+  tag,
+  variant,
+  children,
+}: {
+  step: number;
+  title: string;
+  subtitle?: string;
+  tag?: string;
+  variant: LabMaePanelVariant;
+  children: React.ReactNode;
+}) {
+  const styles = LAB_MAE_PANEL_STYLES[variant];
+  return (
+    <div className={`rounded-lg p-4 sm:p-5 ${styles.container}`}>
+      <div className="flex flex-wrap items-start gap-2 sm:gap-3 mb-4">
+        <span
+          className={`inline-flex h-7 min-w-[1.75rem] items-center justify-center rounded-full px-2 text-xs font-bold ${styles.badge}`}
+          aria-hidden
+        >
+          {step}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className={`text-sm font-semibold ${styles.title}`}>{title}</h3>
+            {tag ? (
+              <span
+                className={`inline-flex rounded-md px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${styles.badge}`}
+              >
+                {tag}
+              </span>
+            ) : null}
+          </div>
+          {subtitle ? <p className={`mt-1 text-xs sm:text-sm ${styles.subtitle}`}>{subtitle}</p> : null}
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
 
 import {
   isSinanClinicalFieldKey,
@@ -1297,6 +1517,12 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       textProps = { ...commonProps, onChange: (val: any) => setValue(resolved.key, normalizeMaiusculo(val)) };
     } else if (isResidenciaNumero) {
       textProps = { ...commonProps, onChange: (val: any) => setValue(resolved.key, normalizeNumeroSN(val)) };
+    } else if (resolved.key === 'crianca.numero_dnv') {
+      textProps = {
+        ...commonProps,
+        onChange: (val: any) =>
+          setValue(resolved.key, String(val ?? '').replace(/\D/g, '').slice(0, 9)),
+      };
     }
 
     const isDataNascimento = resolved.key === 'paciente.data_nascimento';
@@ -1353,6 +1579,9 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
         }
         if (resolved.key === 'paciente.polo_base' || resolved.key === 'paciente.aldeia') {
           return null;
+        }
+        if (resolved.key === 'crianca.numero_dnv') {
+          return <TextField {...textProps} showCharCount={false} wrapperClassName="mb-0" />;
         }
         return <TextField {...textProps} />;
       case 'date':
@@ -2342,6 +2571,498 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                     );
                   }
                   if (isHepatiteCriancaHBV && section.id === 'section_imunizacao_mae' && IMUNIZACAO_MAE_LAYOUT_KEYS.has(field.key)) {
+                    return null;
+                  }
+                  if (
+                    isHepatiteCriancaHBV &&
+                    section.id === 'section_dados_laboratoriais_mae' &&
+                    field.key === 'mae.lab.sorologia_reagente_hepatite_b'
+                  ) {
+                    const labCell = 'min-w-0 [&>div]:mb-0';
+                    const fieldByKey = (key: string) => sortedFields.find((f) => f.key === key);
+                    const renderLab = (key: string) => {
+                      const def = fieldByKey(key);
+                      return def ? renderField(def) : null;
+                    };
+                    const renderQuandoCell = (key: string) => {
+                      if (!isFieldVisible(key)) {
+                        return <span className="text-sm text-gray-400">—</span>;
+                      }
+                      return renderLab(key);
+                    };
+                    const hbvMarkers = sortedFields.filter((f) => LAB_MAE_CAMPO39_KEYS.has(f.key));
+                    const hcvMarkers = sortedFields.filter((f) => LAB_MAE_CAMPO40_KEYS.has(f.key));
+                    const showQuando =
+                      MAE_LAB_HBV_WHEN_KEYS.some((k) => isFieldVisible(k)) ||
+                      MAE_LAB_HCV_WHEN_KEYS.some((k) => isFieldVisible(k));
+                    const showHbvMarkers = hbvMarkers.some((f) => isFieldVisible(f.key));
+                    const showHcvMarkers = hcvMarkers.some((f) => isFieldVisible(f.key));
+                    const showColB = isFieldVisible('mae.lab.hepatite_b_quando_antes_prenatal');
+                    const showColC = isFieldVisible('mae.lab.hepatite_c_quando_antes_prenatal');
+
+                    const markerStep = showQuando ? 3 : 2;
+
+                    return (
+                      <div key="lab-mae-bloco" className="md:col-span-2 space-y-4">
+                        <LabMaePanel
+                          step={1}
+                          variant="neutral"
+                          title="Mãe apresentou sorologia reagente para"
+                          subtitle="Informe Sim ou Não para cada vírus antes de detalhar momento e exames."
+                        >
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className={`${labCell} ${LAB_MAE_HBV_SURFACE}`}>
+                              {renderLab('mae.lab.sorologia_reagente_hepatite_b')}
+                            </div>
+                            <div className={`${labCell} ${LAB_MAE_HCV_SURFACE}`}>
+                              {renderLab('mae.lab.sorologia_reagente_hepatite_c')}
+                            </div>
+                          </div>
+                        </LabMaePanel>
+                        {showQuando ? (
+                          <LabMaePanel
+                            step={2}
+                            variant="quando"
+                            title="Quando"
+                            subtitle="Marque Sim nos momentos em que a sorologia foi reagente para cada vírus."
+                          >
+                            <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+                              <table className="min-w-full text-sm">
+                                <thead>
+                                  <tr className="text-left text-gray-700">
+                                    <th className="px-3 py-2 font-medium w-[28%] bg-slate-100/80">Momento</th>
+                                    {showColB ? (
+                                      <th className="px-3 py-2 font-medium bg-[#3b5bdb]/10 text-[#364fc7]">
+                                        Hepatite B (HBsAg Reagente)
+                                      </th>
+                                    ) : null}
+                                    {showColC ? (
+                                      <th className="px-3 py-2 font-medium bg-[#5eafc6]/35 text-[#1e6f8c]">
+                                        Hepatite C (Anti-HCV Reagente)
+                                      </th>
+                                    ) : null}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {LAB_MAE_QUANDO_ROWS.map((row) => (
+                                    <tr key={row.label} className="border-t border-slate-100 align-top">
+                                      <td className="px-3 py-3 font-medium text-gray-800 bg-slate-50/50">
+                                        {row.label}
+                                      </td>
+                                      {showColB ? (
+                                        <td className="px-3 py-2 bg-[#3b5bdb]/[0.04]">
+                                          {renderQuandoCell(row.hbvKey)}
+                                        </td>
+                                      ) : null}
+                                      {showColC ? (
+                                        <td className="px-3 py-2 bg-[#06b6d4]/[0.06]">
+                                          {renderQuandoCell(row.hcvKey)}
+                                        </td>
+                                      ) : null}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </LabMaePanel>
+                        ) : null}
+                        {showHbvMarkers ? (
+                          <LabMaePanel
+                            step={markerStep}
+                            variant="hbv"
+                            tag="Vírus B"
+                            title="Marcadores HBV"
+                            subtitle="Resultado de cada exame laboratorial da hepatite B."
+                          >
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                              {hbvMarkers.map((f) =>
+                                isFieldVisible(f.key) ? (
+                                  <div
+                                    key={f.key}
+                                    className={`${labCell} ${LAB_MAE_HBV_SURFACE} bg-white/70`}
+                                  >
+                                    {renderField(f)}
+                                  </div>
+                                ) : null,
+                              )}
+                            </div>
+                          </LabMaePanel>
+                        ) : null}
+                        {showHcvMarkers ? (
+                          <LabMaePanel
+                            step={markerStep}
+                            variant="hcv"
+                            tag="Vírus C"
+                            title="Marcadores HCV"
+                            subtitle="Resultado de cada exame laboratorial da hepatite C."
+                          >
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                              {hcvMarkers.map((f) =>
+                                isFieldVisible(f.key) ? (
+                                  <div
+                                    key={f.key}
+                                    className={`${labCell} ${LAB_MAE_HCV_SURFACE} bg-white/70`}
+                                  >
+                                    {renderField(f)}
+                                  </div>
+                                ) : null,
+                              )}
+                            </div>
+                          </LabMaePanel>
+                        ) : null}
+                      </div>
+                    );
+                  }
+                  if (isHepatiteCriancaHBV && section.id === 'section_dados_laboratoriais_mae' && LAB_MAE_LAYOUT_KEYS.has(field.key)) {
+                    return null;
+                  }
+                  if (
+                    isHepatiteCriancaHBV &&
+                    section.id === 'section_antecedentes_epidemiologicos_crianca' &&
+                    field.key === 'crianca.numero_dnv'
+                  ) {
+                    const criancaCell = 'min-w-0 [&>div]:mb-0';
+                    const fieldByKey = (key: string) => sortedFields.find((f) => f.key === key);
+                    const renderCrianca = (key: string) => {
+                      const def = fieldByKey(key);
+                      return def ? renderField(def) : null;
+                    };
+                    return (
+                      <div key="crianca-antecedentes-bloco" className="md:col-span-2 space-y-4">
+                        <LabMaePanel
+                          step={1}
+                          variant="neutral"
+                          title="Declaração de Nascido Vivo"
+                          subtitle="Número da DNV com 9 dígitos (8 + dígito verificador)."
+                        >
+                          <div className="max-w-sm">{renderCrianca('crianca.numero_dnv')}</div>
+                        </LabMaePanel>
+                        <LabMaePanel
+                          step={2}
+                          variant="quando"
+                          title="Local de nascimento"
+                          subtitle="UF, município e hospital onde ocorreu o nascimento."
+                        >
+                          <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)] md:items-start [&_label]:mb-2 [&_label]:min-h-[2.5rem] [&_label]:flex [&_label]:items-end [&_label]:leading-snug">
+                            <EstadoMunicipioNascimento
+                              getValue={getValue}
+                              setValue={setValue}
+                              disabled={readOnly}
+                              error={
+                                getError('crianca.nascimento_municipio_id') ||
+                                getError('crianca.nascimento_uf')
+                              }
+                            />
+                            <div className="min-w-0 self-start md:col-span-1">
+                              <EstabelecimentoNascimento
+                                getValue={getValue}
+                                setValue={setValue}
+                                disabled={readOnly}
+                                error={
+                                  getError('crianca.hospital_nascimento_unidade_id') ||
+                                  getError('crianca.hospital_nascimento_cnes')
+                                }
+                              />
+                            </div>
+                          </div>
+                        </LabMaePanel>
+                        <LabMaePanel
+                          step={3}
+                          variant="hbv"
+                          title="Vacina para Hepatite B na maternidade"
+                          subtitle="Informe se a vacina foi aplicada antes ou após 24h de vida."
+                        >
+                          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div className={criancaCell}>
+                              {renderCrianca('crianca.vacina_hepatite_b_maternidade_antes_24h')}
+                            </div>
+                            <div className={criancaCell}>
+                              {renderCrianca('crianca.vacina_hepatite_b_maternidade_apos_24h')}
+                            </div>
+                          </div>
+                        </LabMaePanel>
+                        <LabMaePanel
+                          step={4}
+                          variant="hbv"
+                          title="Vacina para Hepatite B"
+                          subtitle="Para cada dose: Sim/Não se foi aplicada e data (dd/mm/aaaa)."
+                        >
+                          <div className="space-y-3">
+                            {CRIANCA_DOSE_ROWS.map(({ simKey, dataKey, label }) => {
+                              const simDef = fieldByKey(simKey);
+                              const dataDef = fieldByKey(dataKey);
+                              if (!simDef || !dataDef) return null;
+                              return (
+                                <CriancaVacinaDoseRow
+                                  key={simKey}
+                                  doseLabel={label}
+                                  simField={simDef}
+                                  dataField={dataDef}
+                                  getValue={getValue}
+                                  setValue={setValue}
+                                  getError={getError}
+                                  disabled={readOnly}
+                                />
+                              );
+                            })}
+                          </div>
+                        </LabMaePanel>
+                        <LabMaePanel
+                          step={5}
+                          variant="hbv"
+                          title="Imunoglobulina hiperimune Hepatite B"
+                          subtitle="Se foi aplicada e data da aplicação."
+                        >
+                          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-end">
+                            <div className={criancaCell}>{renderCrianca('crianca.imunoglobulina_hbig')}</div>
+                            <div className={criancaCell}>{renderCrianca('crianca.imunoglobulina_hbig_data')}</div>
+                          </div>
+                        </LabMaePanel>
+                        <LabMaePanel
+                          step={6}
+                          variant="neutral"
+                          title="Vacina para Hepatite A"
+                          subtitle="Indique se a criança recebeu a vacina."
+                        >
+                          <div className={`max-w-md ${criancaCell}`}>
+                            {renderCrianca('crianca.vacina_hepatite_a')}
+                          </div>
+                        </LabMaePanel>
+                      </div>
+                    );
+                  }
+                  if (
+                    isHepatiteCriancaHBV &&
+                    section.id === 'section_antecedentes_epidemiologicos_crianca' &&
+                    CRIANCA_ANTECEDENTES_LAYOUT_KEYS.has(field.key)
+                  ) {
+                    return null;
+                  }
+                  if (
+                    isHepatiteCriancaHBV &&
+                    section.id === 'section_dados_laboratoriais_crianca' &&
+                    field.key === CRIANCA_LAB_ESQUEMA1_FIRST_KEY
+                  ) {
+                    const fieldByKey = (key: string) => sortedFields.find((f) => f.key === key);
+                    const renderLab = (key: string) => {
+                      const def = fieldByKey(key);
+                      return def ? renderField(def) : null;
+                    };
+                    const showEsquema2 =
+                      isFieldVisible('crianca.lab.registrar_esquema_2') &&
+                      String(getValue('crianca.lab.registrar_esquema_2') ?? '') === '1';
+
+                    return (
+                      <div key="crianca-lab-bloco" className="md:col-span-2 space-y-4">
+                        <LabMaePanel
+                          step={1}
+                          variant="hbv"
+                          title="Sorologia pós-vacinação — 1º Esquema Vacinal"
+                          subtitle="Data da coleta e resultados da sorologia (HBsAg e Anti-HBs), 30-60 dias da terceira dose de vacina da Hepatite B (1º Esquema Vacinal)."
+                        >
+                          <CriancaLabSorologiaEsquemaPanel
+                            esquema={1}
+                            fieldByKey={fieldByKey}
+                            renderField={renderField}
+                            getValue={getValue}
+                            readOnly={readOnly}
+                          />
+                        </LabMaePanel>
+                        <LabMaePanel
+                          step={2}
+                          variant="neutral"
+                          title="Repetição do esquema vacinal"
+                          subtitle="Marque Sim para registrar o laboratório do 2º esquema, após preencher o 1º esquema acima."
+                        >
+                          <div className="max-w-lg">{renderLab('crianca.lab.registrar_esquema_2')}</div>
+                        </LabMaePanel>
+                        {showEsquema2 ? (
+                          <LabMaePanel
+                            step={3}
+                            variant="hbv"
+                            title="Sorologia pós-vacinação — 2º Esquema Vacinal"
+                            subtitle="Data da coleta e resultados da sorologia (HBsAg e Anti-HBs), 30-60 dias da terceira dose de vacina da Hepatite B (2º Esquema Vacinal)."
+                          >
+                            <CriancaLabSorologiaEsquemaPanel
+                              esquema={2}
+                              fieldByKey={fieldByKey}
+                              renderField={renderField}
+                              getValue={getValue}
+                              readOnly={readOnly}
+                            />
+                          </LabMaePanel>
+                        ) : null}
+                      </div>
+                    );
+                  }
+                  if (
+                    isHepatiteCriancaHBV &&
+                    section.id === 'section_dados_laboratoriais_crianca' &&
+                    (CRIANCA_LAB_LAYOUT_KEYS.has(field.key) ||
+                      CRIANCA_LAB_DEPRECATED_KEYS.has(field.key))
+                  ) {
+                    return null;
+                  }
+                  if (
+                    isHepatiteCriancaHBV &&
+                    section.id === 'section_acompanhamento_crianca' &&
+                    field.key === CRIANCA_ACOMP_FIRST_KEY
+                  ) {
+                    const fieldByKey = (key: string) => sortedFields.find((f) => f.key === key);
+                    return (
+                      <div key="crianca-acomp-bloco" className="md:col-span-2 space-y-4">
+                        <LabMaePanel
+                          step={1}
+                          variant="hcv"
+                          title="Avaliação laboratorial — Hepatite C"
+                          subtitle="Anti-HCV e HCV-RNA na avaliação de acompanhamento da criança (18 meses de idade)."
+                        >
+                          <CriancaAcompanhamentoHcvPanel
+                            fieldByKey={fieldByKey}
+                            renderField={renderField}
+                            getValue={getValue}
+                            readOnly={readOnly}
+                          />
+                        </LabMaePanel>
+                      </div>
+                    );
+                  }
+                  if (
+                    isHepatiteCriancaHBV &&
+                    section.id === 'section_acompanhamento_crianca' &&
+                    CRIANCA_ACOMP_LAYOUT_KEYS.has(field.key)
+                  ) {
+                    return null;
+                  }
+                  if (
+                    isHepatiteCriancaHBV &&
+                    section.id === 'section_conclusao' &&
+                    field.key === CRIANCA_CONCLUSAO_FIRST_KEY
+                  ) {
+                    const fieldByKey = (key: string) => sortedFields.find((f) => f.key === key);
+                    return (
+                      <div key="crianca-conclusao-bloco" className="md:col-span-2">
+                        <CriancaConclusaoPanel fieldByKey={fieldByKey} renderField={renderField} readOnly={readOnly} />
+                      </div>
+                    );
+                  }
+                  if (
+                    isHepatiteCriancaHBV &&
+                    section.id === 'section_conclusao' &&
+                    CRIANCA_CONCLUSAO_LAYOUT_KEYS.has(field.key)
+                  ) {
+                    return null;
+                  }
+                  if (
+                    isHepatiteCriancaHBV &&
+                    section.id === 'section_dados_investigador' &&
+                    field.key === CRIANCA_INVESTIGADOR_FIRST_KEY
+                  ) {
+                    const fieldByKey = (key: string) => sortedFields.find((f) => f.key === key);
+                    return (
+                      <div key="crianca-investigador-bloco" className="md:col-span-2">
+                        <InvestigadorDadosPanel
+                          fieldByKey={fieldByKey}
+                          renderField={renderField}
+                          getValue={getValue}
+                          setValue={setValue}
+                          getError={getError}
+                          readOnly={readOnly}
+                        />
+                      </div>
+                    );
+                  }
+                  if (
+                    isHepatiteCriancaHBV &&
+                    section.id === 'section_dados_investigador' &&
+                    CRIANCA_INVESTIGADOR_LAYOUT_KEYS.has(field.key)
+                  ) {
+                    return null;
+                  }
+                  if (
+                    isHepatiteCriancaHBV &&
+                    section.id === 'section_dados_prenatal' &&
+                    field.key === 'prenatal.fez_prenatal'
+                  ) {
+                    const prenatalCell = 'min-w-0 [&>div]:mb-0';
+                    const fieldByKey = (key: string) => sortedFields.find((f) => f.key === key);
+                    const renderPrenatal = (key: string) => {
+                      const def = fieldByKey(key);
+                      return def ? renderField(def) : null;
+                    };
+                    const showLocal = isFieldVisible('prenatal.endereco');
+                    return (
+                      <div key="prenatal-bloco" className="md:col-span-2 space-y-4">
+                        <LabMaePanel
+                          step={1}
+                          variant="neutral"
+                          title="Fez Pré-Natal"
+                          subtitle="Informe se a gestante realizou acompanhamento de pré-natal."
+                        >
+                          <div className="max-w-md">{renderPrenatal('prenatal.fez_prenatal')}</div>
+                        </LabMaePanel>
+                        {showLocal ? (
+                          <LabMaePanel
+                            step={2}
+                            variant="quando"
+                            title="Local de realização do pré-natal"
+                            subtitle="UF, município, unidade de saúde, endereço e telefone do serviço."
+                          >
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1.3fr)] md:items-start [&_label]:mb-2 [&_label]:min-h-[2.5rem] [&_label]:flex [&_label]:items-end [&_label]:leading-snug">
+                              <EstadoMunicipioPrenatal
+                                getValue={getValue}
+                                setValue={setValue}
+                                disabled={readOnly}
+                                error={getError('prenatal.municipio_id') || getError('prenatal.uf')}
+                              />
+                              <div className="min-w-0 self-start">
+                                <EstabelecimentoPrenatal
+                                  getValue={getValue}
+                                  setValue={setValue}
+                                  disabled={readOnly}
+                                  error={
+                                    getError('prenatal.unidade_id') ||
+                                    getError('prenatal.estabelecimento_cnes')
+                                  }
+                                />
+                              </div>
+                            </div>
+                            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                              <div className={prenatalCell}>{renderPrenatal('prenatal.endereco')}</div>
+                              <div className={prenatalCell}>{renderPrenatal('prenatal.telefone')}</div>
+                            </div>
+                          </LabMaePanel>
+                        ) : null}
+                        <LabMaePanel
+                          step={showLocal ? 3 : 2}
+                          variant="neutral"
+                          title="Antecedentes relacionados à hepatite"
+                          subtitle="Tratamento, prevenção da transmissão vertical, medicamentos e histórico familiar."
+                        >
+                          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div className={`${prenatalCell} ${LAB_MAE_HBV_SURFACE}`}>
+                              {renderPrenatal('prenatal.tratamento_hepatite_b')}
+                            </div>
+                            <div className={`${prenatalCell} ${LAB_MAE_HCV_SURFACE}`}>
+                              {renderPrenatal('prenatal.prevencao_transmissao_vertical_b')}
+                            </div>
+                          </div>
+                          <div className={`mt-4 ${prenatalCell}`}>
+                            {renderPrenatal('prenatal.medicamento_utilizado')}
+                          </div>
+                          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div className={`${prenatalCell} ${LAB_MAE_HBV_SURFACE}`}>
+                              {renderPrenatal('prenatal.familia_portadora_hepatite_b')}
+                            </div>
+                            <div className={`${prenatalCell} ${LAB_MAE_HCV_SURFACE}`}>
+                              {renderPrenatal('prenatal.familia_portadora_hepatite_c')}
+                            </div>
+                          </div>
+                        </LabMaePanel>
+                      </div>
+                    );
+                  }
+                  if (isHepatiteCriancaHBV && section.id === 'section_dados_prenatal' && PRENATAL_LAYOUT_KEYS.has(field.key)) {
                     return null;
                   }
                   // Bloco Paciente - Identificação: quando Sim, Passaporte e País (ao lado) surgem embaixo de CNS/É estrangeiro e empurram Nome/Nome social pra baixo. País oculto quando Não; sem pré-seleção Brasil.

@@ -502,6 +502,17 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange }: UseF
         return false;
       }
 
+      if (field.key === 'crianca.numero_dnv' && value) {
+        const digits = String(value).replace(/\D/g, '');
+        if (digits.length !== 9) {
+          setError(
+            field.key,
+            'O número da DNV deve ter 9 dígitos (8 números + 1 dígito verificador).',
+          );
+          return false;
+        }
+      }
+
       // Validação de CPF por dígitos verificadores (impede CPF digitado ao acaso)
       if (field.type === 'cpf' && value) {
         const digits = String(value).replace(/\D/g, '');

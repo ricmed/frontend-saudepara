@@ -291,9 +291,23 @@ export const RadioGroupField: React.FC<AdvancedFieldProps> = ({
     }
   };
 
+  const compactTiles = field.compactTiles === true;
+  const doseRowTiles = !compactTiles && field.doseRowTiles === true;
+  const doseRowStacked = doseRowTiles && field.gridCols === 1;
+  const inlineTiles = !compactTiles && !doseRowTiles && field.inlineTiles === true;
+  const hideLabel = field.hideLabel === true;
+  const tightTiles = compactTiles || inlineTiles || doseRowTiles;
+
   return (
-    <div className="mb-4">
-      <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-2">
+    <div className={tightTiles ? 'mb-0' : 'mb-4'}>
+      <label
+        htmlFor={inputId}
+        className={
+          hideLabel
+            ? 'sr-only'
+            : `block font-medium text-gray-700 ${compactTiles ? 'text-xs mb-1' : 'text-sm mb-2'}`
+        }
+      >
         {field.label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
@@ -305,38 +319,116 @@ export const RadioGroupField: React.FC<AdvancedFieldProps> = ({
           Alguma opção usa o mesmo valor interno da opção com texto; altere o valor dessa opção ou o valor interno nas configurações do campo.
         </p>
       )}
-      <div className={optionsChoiceGridClass(field)}>
+      <div
+        className={
+          compactTiles
+            ? 'grid grid-cols-2 gap-1.5'
+            : doseRowTiles
+              ? `grid w-full ${
+                  doseRowStacked ? 'grid-cols-1 gap-1' : 'grid-cols-2 gap-2'
+                }`
+              : inlineTiles
+                ? 'inline-grid w-max grid-cols-2 gap-2'
+                : optionsChoiceGridClass(field)
+        }
+      >
         {options.map((option) => {
           const isSelected = value === option.value;
+          const naoReagenteCompact =
+            doseRowStacked &&
+            (option.value === '2' || String(option.label).toLowerCase().includes('não reagente'));
           return (
             <label
               key={option.value}
-              className={`
+              className={
+                compactTiles
+                  ? `flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1.5 transition-colors ${
+                      disabled || field.disabled ? 'cursor-not-allowed opacity-60' : ''
+                    } ${
+                      isSelected
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 bg-white hover:border-blue-300'
+                    }`
+                  : doseRowTiles
+                    ? `flex min-w-0 w-full cursor-pointer items-center border-2 transition-colors ${
+                        doseRowStacked
+                          ? 'gap-2 rounded-md px-2.5 py-2 justify-start'
+                          : 'gap-2 rounded-lg px-2.5 py-2 justify-center'
+                      } ${disabled || field.disabled ? 'cursor-not-allowed opacity-60' : ''} ${
+                        isSelected
+                          ? 'border-blue-500 bg-blue-50 shadow-sm'
+                          : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/50'
+                      }`
+                    : inlineTiles
+                      ? `flex cursor-pointer items-center gap-2 rounded-lg border-2 px-3 py-2.5 transition-colors ${
+                          disabled || field.disabled ? 'cursor-not-allowed opacity-60' : ''
+                        } ${
+                          isSelected
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 bg-white hover:border-blue-300'
+                        }`
+                      : `
                 flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200
                 ${disabled || field.disabled ? 'opacity-60 cursor-not-allowed' : ''}
-                ${isSelected
-                  ? 'bg-blue-50 border-2 border-blue-500 shadow-md scale-[1.02]'
-                  : 'bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-sm'
+                ${
+                  isSelected
+                    ? 'bg-blue-50 border-2 border-blue-500 shadow-md scale-[1.02]'
+                    : 'bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-sm'
                 }
-              `}
+              `
+              }
             >
-              <div className="flex items-center h-6 mt-0.5 flex-shrink-0">
+              <div
+                className={
+                  tightTiles
+                    ? 'flex shrink-0 items-center'
+                    : 'flex items-center h-6 mt-0.5 flex-shrink-0'
+                }
+              >
                 <input
                   type="radio"
                   name={field.key}
                   checked={isSelected}
                   onChange={() => selectMain(option.value)}
                   disabled={disabled || field.disabled}
-                  className="w-6 h-6 rounded-full border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer"
+                  className={
+                    compactTiles
+                      ? 'h-3.5 w-3.5 text-blue-600'
+                      : doseRowTiles
+                        ? doseRowStacked
+                          ? 'h-3.5 w-3.5 shrink-0 text-blue-600'
+                          : 'h-5 w-5 rounded-full border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0'
+                        : inlineTiles
+                          ? 'h-4 w-4 text-blue-600'
+                          : 'w-6 h-6 rounded-full border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer'
+                  }
                 />
               </div>
-              <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
-                <span className={`text-sm font-medium transition-colors leading-relaxed ${
-                  isSelected ? 'text-blue-900' : 'text-gray-900'
-                }`}>
+              <div
+                className={
+                  tightTiles
+                    ? 'min-w-0'
+                    : 'flex-1 min-w-0 flex items-start justify-between gap-2'
+                }
+              >
+                <span
+                  className={
+                    compactTiles
+                      ? `text-xs font-medium ${isSelected ? 'text-blue-900' : 'text-gray-900'}`
+                      : doseRowTiles || inlineTiles
+                        ? `min-w-0 font-medium ${
+                            doseRowStacked
+                              ? `${naoReagenteCompact ? 'text-[13px]' : 'text-sm'} leading-tight whitespace-nowrap`
+                              : 'text-sm leading-snug'
+                          } ${isSelected ? 'text-blue-900' : 'text-gray-900'}`
+                        : `text-sm font-medium transition-colors leading-relaxed ${
+                            isSelected ? 'text-blue-900' : 'text-gray-900'
+                          }`
+                  }
+                >
                   {option.label}
                 </span>
-                {isSelected && (
+                {!tightTiles && isSelected && (
                   <Check className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
                 )}
               </div>

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { listarEstabelecimentosPorMunicipio } from '@/services/estabelecimentoPorMunicipio';
 
 // Configurações das APIs
 const USE_INTERNAL_AUTH = (import.meta as any).env?.VITE_USE_INTERNAL_AUTH === 'true';
@@ -996,25 +997,15 @@ class UsuarioGestaoService {
   }
 
   /**
-   * Buscar estabelecimentos por município
+   * Buscar estabelecimentos por município (padrão: somente ativos).
+   * Para incluir inativos, use `listarEstabelecimentosPorMunicipio` ou passe `{ incluirInativos: true }`.
    */
-  async getEstabelecimentosPorMunicipio(municipioId: number) {
+  async getEstabelecimentosPorMunicipio(
+    municipioId: number,
+    options?: { incluirInativos?: boolean },
+  ) {
     try {
-      const apiUrl = `${BACKEND_API_URL}/api/estabelecimentos/municipio/${municipioId}`;
-      console.log('🌐 URL da API para busca de estabelecimentos por município:', apiUrl);
-      
-      const response = await axios.get(apiUrl, {
-        headers: {
-          'Accept': 'application/json'
-        },
-        withCredentials: true
-      });
-      // Formatar para o padrão esperado pelo frontend
-      return response.data.map((est: any) => ({
-        id: est.idestabelecimento,
-        nome: est.nome || `Estabelecimento ${est.cnes}`, // Fallback para nome vazio
-        cnes: est.cnes || undefined
-      }));
+      return await listarEstabelecimentosPorMunicipio(municipioId, options);
     } catch (error) {
       console.error('Erro ao buscar estabelecimentos por município:', error);
       throw new Error(this.getErrorMessage(error, 'Erro ao buscar estabelecimentos'));

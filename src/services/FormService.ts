@@ -221,6 +221,20 @@ export interface FormField {
   };
   /** Número de colunas do grid para opções em `checkbox-group`, `radio` e `select` em modo cartões (padrão 2). Omitir em `select` para lista suspensa nativa. */
   gridCols?: number;
+  /** Radio: tiles pequenos (px-2), grid 2 colunas. */
+  compactTiles?: boolean;
+  /** Radio: tiles médios em grid com largura do conteúdo (linhas HBV dose). */
+  inlineTiles?: boolean;
+  /** Radio: quase padrão (p-3, h-5), grid 2 colunas preenchendo o pai — linhas HBV dose. */
+  doseRowTiles?: boolean;
+  /** Oculta rótulo visual do campo (sr-only), mantendo acessibilidade. */
+  hideLabel?: boolean;
+  /** Date: controles −/+ mais compactos e sem margem inferior extra. */
+  denseControls?: boolean;
+  /** Com `denseControls`: rótulo/input um pouco maiores (linhas HBV dose). */
+  denseControlsLargeText?: boolean;
+  /** Com `denseControls`: rótulo/input menores (painel laboratorial criança). */
+  denseControlsSmallText?: boolean;
   /**
    * `radio`, `select` em cartões (`gridCols` 1–3) ou `checkbox-group`: opção extra com campo de texto (estilo Google Forms).
    * O texto é salvo em `radioChoiceOtherTextKey(key)`; no `radio`/`select` o valor da escolha segue sendo `choiceWithTextValue`;

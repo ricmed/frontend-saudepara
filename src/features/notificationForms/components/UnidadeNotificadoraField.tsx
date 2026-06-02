@@ -45,6 +45,11 @@ interface UnidadeNotificadoraFieldProps {
   allowAllEstablishments?: boolean;
   /** Somente leitura: não abre busca nem limpa (ex.: usuário vinculado à unidade). */
   disabled?: boolean;
+  /**
+   * Com `allowedOptions`: ao focar, exibe a lista pré-carregada sem exigir 3 caracteres.
+   * Padrão false — mantém o comportamento atual dos demais fluxos.
+   */
+  expandAllowedOptionsOnFocus?: boolean;
 }
 
 const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
@@ -65,7 +70,10 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   denyOutsideMessage = "Unidade não permitida para o seu perfil",
   allowAllEstablishments = false,
   disabled = false,
+  expandAllowedOptionsOnFocus = false,
 }) => {
+  const usePreloadedAllowedList =
+    expandAllowedOptionsOnFocus && Boolean(allowedOptions?.length);
   const [unidadesNotificadoras, setUnidadesNotificadoras] = useState<Estabelecimento[]>([]);
   const [loadingUnidades, setLoadingUnidades] = useState(false);
   const [errorUnidades, setErrorUnidades] = useState<string | null>(null);
@@ -149,8 +157,8 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
       setLoadingUnidades(true);
       setErrorUnidades(null);
       
-      // Sempre exigir 3+ chars pra abrir resultados
-      if (searchTerm.length < 3) {
+      // Sempre exigir 3+ chars pra abrir resultados (exceto lista pré-carregada)
+      if (!usePreloadedAllowedList && searchTerm.length < 3) {
         setUnidadesNotificadoras([]);
         setLoadingUnidades(false);
         setErrorUnidades(searchTerm.length > 0
@@ -655,10 +663,14 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   useEffect(() => {
     if (isDropdownOpen) {
       updateDropdownPosition();
-      
-      // Não buscar dados ao abrir o dropdown, apenas mostrar mensagem
-      setErrorUnidades("Digite pelo menos 3 caracteres para ver as unidades");
-      setUnidadesNotificadoras([]);
+
+      if (usePreloadedAllowedList) {
+        setErrorUnidades(null);
+        fetchUnidadesNotificadoras(searchQuery);
+      } else {
+        setErrorUnidades("Digite pelo menos 3 caracteres para ver as unidades");
+        setUnidadesNotificadoras([]);
+      }
       
       // Track window resize
       window.addEventListener('resize', updateDropdownPosition);
@@ -670,18 +682,19 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
         window.removeEventListener('scroll', updateDropdownPosition);
       };
     }
-  }, [isDropdownOpen]);
-  
-  // Debounce for search - only search with 3+ characters
+  }, [isDropdownOpen, usePreloadedAllowedList]);
+
+  // Debounce for search
   useEffect(() => {
-    if (isDropdownOpen && searchQuery.length >= 3) {
+    const minLen = usePreloadedAllowedList ? 0 : 3;
+    if (isDropdownOpen && searchQuery.length >= minLen) {
       const timer = setTimeout(() => {
         fetchUnidadesNotificadoras(searchQuery);
       }, 300);
-      
+
       return () => clearTimeout(timer);
     }
-  }, [searchQuery, isDropdownOpen]);
+  }, [searchQuery, isDropdownOpen, usePreloadedAllowedList]);
 
   // 🎯 AUTO-SELEÇÃO: Para usuários de nível "unidade" com apenas 1 estabelecimento permitido
   useEffect(() => {
@@ -771,8 +784,10 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
     // Clear search query when focusing
     setSearchQuery("");
     
-    // Open dropdown
     setIsDropdownOpen(true);
+    if (usePreloadedAllowedList) {
+      fetchUnidadesNotificadoras('');
+    }
   };
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -791,19 +806,20 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
     
     setSearchQuery(query);
     
-    // Show appropriate message based on query length
-    if (query.length > 0 && query.length < 3) {
+    const minLen = usePreloadedAllowedList ? 0 : 3;
+
+    if (!usePreloadedAllowedList && query.length > 0 && query.length < 3) {
       setErrorUnidades("Digite pelo menos 3 caracteres para pesquisar");
-      // Limpar a lista com menos de 3 caracteres
       setUnidadesNotificadoras([]);
-    } else if (query.length >= 3 && isDropdownOpen) {
-      // Only fetch new results when we have 3+ characters
+    } else if (query.length >= minLen && isDropdownOpen) {
       setErrorUnidades(null);
       fetchUnidadesNotificadoras(query);
-    } else if (query.length === 0 && isDropdownOpen) {
-      // Mensagem para campo vazio
+    } else if (query.length === 0 && isDropdownOpen && !usePreloadedAllowedList) {
       setErrorUnidades("Digite pelo menos 3 caracteres para ver as unidades");
       setUnidadesNotificadoras([]);
+    } else if (query.length === 0 && isDropdownOpen && usePreloadedAllowedList) {
+      setErrorUnidades(null);
+      fetchUnidadesNotificadoras('');
     }
   };
 
@@ -854,16 +870,13 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
     setUnidadesNotificadoras([]);
   };
 
-  // Filter results client-side - modificado para exigir 3+ caracteres sempre
   const filteredUnidades = useMemo(() => {
-    if (searchQuery.length < 3) {
-      // Não mostrar nenhuma unidade com menos de 3 caracteres
+    const minLen = usePreloadedAllowedList ? 0 : 3;
+    if (searchQuery.length < minLen) {
       return [];
-    } else {
-      // Apenas mostrar resultados com 3+ caracteres
-      return unidadesNotificadoras;
     }
-  }, [unidadesNotificadoras, searchQuery]);
+    return unidadesNotificadoras;
+  }, [unidadesNotificadoras, searchQuery, usePreloadedAllowedList]);
   
   // Renderiza o dropdown em um portal fora da hierarquia DOM - using filteredUnidades
   const renderDropdown = () => {
