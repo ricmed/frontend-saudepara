@@ -41,3 +41,21 @@ export function calcularIdadeMesesFromBirthDate(birthDate: string | Date): numbe
 export function isIdadeValidaCriancaExpostaHBV(meses: number): boolean {
   return !Number.isNaN(meses) && meses >= 0 && meses <= CRIANCA_EXPOSTA_HBV_MAX_IDADE_MESES;
 }
+
+/** Exibição da idade em meses (ficha criança exposta: sempre meses até 24). */
+export function formatIdadeMesesParaExibicao(
+  meses: number,
+  options?: { sempreMesesAte?: number },
+): string {
+  const m = Math.floor(Number(meses));
+  if (Number.isNaN(m)) return '';
+  const limite = options?.sempreMesesAte;
+  if (limite != null && m <= limite) {
+    return `${m} ${m === 1 ? 'mês' : 'meses'}`;
+  }
+  if (m < 12) {
+    return `${m} ${m === 1 ? 'mês' : 'meses'}`;
+  }
+  const anos = Math.floor(m / 12);
+  return `${anos} ${anos === 1 ? 'ano' : 'anos'}`;
+}

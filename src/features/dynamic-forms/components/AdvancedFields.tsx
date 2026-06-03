@@ -17,6 +17,7 @@ import {
   radioChoiceOtherTextKey,
 } from '@/features/dynamic-forms/utils/radioChoiceOther';
 import { optionsChoiceGridClass } from '@/features/dynamic-forms/utils/optionsChoiceGridClass';
+import { formatIdadeMesesParaExibicao } from '@/features/dynamic-forms/utils/hepatiteCriancaHbvLimits';
 import {
   renderDynamicFieldLabel,
   renderDynamicOptionLabel,
@@ -1268,11 +1269,11 @@ export const IdadeField: React.FC<IdadeFieldProps> = ({
   ) : null;
 
   if (locked && meses !== undefined && meses !== '') {
-    const anos = Math.floor(Number(meses) / 12);
-    const mes = Number(meses) % 12;
-    const texto = Number(meses) < 12
-      ? `${meses} ${Number(meses) === 1 ? 'mês' : 'meses'}`
-      : `${anos} ${anos === 1 ? 'ano' : 'anos'}`;
+    const sempreMesesAte =
+      calculadaPorDataNascimento && typeof idadeMaxMesesCampo === 'number' && idadeMaxMesesCampo <= 24
+        ? idadeMaxMesesCampo
+        : undefined;
+    const texto = formatIdadeMesesParaExibicao(Number(meses), { sempreMesesAte });
     return (
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">

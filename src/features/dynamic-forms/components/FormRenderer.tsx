@@ -554,27 +554,16 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     const idadeAtual = pac.idade;
     const hasIdade = idadeAtual !== undefined && idadeAtual !== null && idadeAtual !== '';
     let idadeMeses: number | undefined;
-    if (dataNasc && !hasIdade) {
-      try {
-        const birth = new Date(dataNasc);
-        const today = new Date();
-        let anos = today.getFullYear() - birth.getFullYear();
-        let meses = today.getMonth() - birth.getMonth();
-        if (meses < 0 || (meses === 0 && today.getDate() < birth.getDate())) {
-          anos--;
-          meses += 12;
-        }
-        if (today.getDate() < birth.getDate()) meses--;
-        idadeMeses = anos * 12 + meses;
-        if (idadeMeses < 0) idadeMeses = undefined;
-      } catch {
-        idadeMeses = undefined;
-      }
+    if (dataNasc) {
+      idadeMeses = calcularIdadeMesesFromBirthDate(String(dataNasc));
     } else if (hasIdade) {
       const n = Number(idadeAtual);
       if (!Number.isNaN(n)) {
-        if (n > 150) idadeMeses = n;
-        else idadeMeses = n * 12;
+        if (isHepatiteCriancaHBV || n > 150) {
+          idadeMeses = n;
+        } else {
+          idadeMeses = n * 12;
+        }
       }
     }
     const estrangeiroVal = pac.e_estrangeiro;
