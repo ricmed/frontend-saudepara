@@ -473,6 +473,7 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange, formKe
 
   const validateField = useCallback(
     (field: FormField) => {
+      const isHepatiteCriancaHBVValidate = isHepatiteCriancaHBVForm({ schema, formKey });
       const value = getValue(field.key);
       const isRequired = isFieldRequired(field.key);
       const isVisible = isFieldVisible(field.key);
