@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FormRenderer } from '../components/FormRenderer';
 import FormService, { type FormVersion } from '@/services/FormService';
 import FormSubmissionService from '@/services/FormSubmissionService';
 import { useAuth } from '@/keycloak/AuthProvider';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
-import { FileEdit, Eye, FileSpreadsheet, FileText, Download, Loader2 } from 'lucide-react';
+import { FileEdit, Eye, FileSpreadsheet, FileText, Download, Loader2, Printer } from 'lucide-react';
 import { exportDynamicFormPdf } from '../utils/dynamicFormPdfExport';
 import { isHepatiteCriancaHBVForm } from '../utils/hepatiteCriancaHbvLimits';
+import { relayFichaPrintData } from '../utils/fichaPrintChannel';
 import axios from 'axios';
 import { getApiRoot } from '@/config/apiOrigin';
 import type { MonitorOperRegionalScopePayload } from '../types/monitorOperRegionalScope';
@@ -28,6 +29,7 @@ export const DynamicFormPage: React.FC = () => {
   // Detectar modo: nova, editar ou visualizar
   const isViewMode = window.location.pathname.includes('/visualizar/');
   const isEditMode = window.location.pathname.includes('/editar/');
+  const listBackPath = agravo ? `/private/formularios/${agravo}` : '/private/formularios';
   
   const [formVersion, setFormVersion] = useState<FormVersion | null>(null);
   const [initialData, setInitialData] = useState<Record<string, any>>({});
@@ -36,6 +38,7 @@ export const DynamicFormPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [liveFormData, setLiveFormData] = useState<Record<string, unknown>>({});
   const [exportingPdf, setExportingPdf] = useState(false);
+  const printRelayCleanupRef = useRef<(() => void) | null>(null);
   const [monitorOperRegionalCrsScope, setMonitorOperRegionalCrsScope] =
     useState<MonitorOperRegionalScopePayload | null>(null);
   const [notificacaoEscopo, setNotificacaoEscopo] = useState<NotificacaoEscopo>('livre');
@@ -63,6 +66,12 @@ export const DynamicFormPage: React.FC = () => {
   useEffect(() => {
     loadForm();
   }, [agravo, id, user?.id, user?.sub, authLoading]);
+
+  useEffect(() => {
+    return () => {
+      printRelayCleanupRef.current?.();
+    };
+  }, []);
 
   const loadForm = async () => {
     if (!agravo) return;
@@ -230,7 +239,7 @@ export const DynamicFormPage: React.FC = () => {
 
       alert(shouldSubmit ? 'Formulário enviado com sucesso!' : 'Rascunho salvo com sucesso!');
       if (shouldSubmit || id) {
-        navigate(-1);
+        navigate(listBackPath);
       }
     } catch (err: any) {
       console.error('Erro ao salvar formulário:', err);
@@ -242,7 +251,7 @@ export const DynamicFormPage: React.FC = () => {
   };
 
   const handleCancel = () => {
-    navigate(-1);
+    navigate(listBackPath);
   };
 
   if (loading) {
@@ -253,6 +262,7 @@ export const DynamicFormPage: React.FC = () => {
         icon={isViewMode ? <Eye className="h-8 w-8" /> : <FileEdit className="h-8 w-8" />}
         variant="desktop"
         showBottomNav={false}
+        backPath={listBackPath}
       >
         <div className="flex items-center justify-center min-h-[50vh]">
           <div className="text-center">
@@ -272,13 +282,14 @@ export const DynamicFormPage: React.FC = () => {
         icon={<FileEdit className="h-8 w-8" />}
         variant="desktop"
         showBottomNav={false}
+        backPath={listBackPath}
       >
         <div className="flex items-center justify-center min-h-[50vh]">
           <div className="text-center max-w-md p-6 bg-red-50 border border-red-200 rounded-lg">
             <h2 className="text-xl font-bold text-red-800 mb-2">Erro</h2>
             <p className="text-red-600 mb-4">{error}</p>
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigate(listBackPath)}
               className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
             >
               Voltar
@@ -296,6 +307,7 @@ export const DynamicFormPage: React.FC = () => {
         icon={<FileEdit className="h-8 w-8" />}
         variant="desktop"
         showBottomNav={false}
+        backPath={listBackPath}
       >
         <div className="flex items-center justify-center min-h-[50vh]">
           <div className="text-center">
@@ -359,6 +371,21 @@ export const DynamicFormPage: React.FC = () => {
     }
   };
 
+  const handleOpenPrintView = () => {
+    if (!agravo) return;
+    printRelayCleanupRef.current?.();
+    const channelId = crypto.randomUUID();
+    printRelayCleanupRef.current = relayFichaPrintData(channelId, () => liveFormData);
+    const formFrom = isViewMode ? 'visualizar' : isEditMode ? 'editar' : 'nova';
+    const channelQuery = `channel=${encodeURIComponent(channelId)}&from=${encodeURIComponent(formFrom)}`;
+    const path = id
+      ? `/private/formularios/${agravo}/imprimir/${id}?${channelQuery}`
+      : `/private/formularios/${agravo}/imprimir?${channelQuery}`;
+    window.open(path, '_blank', 'noopener,noreferrer');
+  };
+
+  const pdfExportBusy = exportingPdf;
+
   const isEntomologia = agravo === 'ENTOMOLOGIA_LARVAS';
   const exportActions = isEntomologia && isViewMode && id ? (
     <div className="flex gap-2">
@@ -380,20 +407,32 @@ export const DynamicFormPage: React.FC = () => {
       </button>
     </div>
   ) : isHepatiteCriancaHBV ? (
-    <button
-      type="button"
-      onClick={handleExportFichaPdf}
-      disabled={exportingPdf || saving}
-      className="inline-flex items-center gap-2 rounded-md border border-white/50 bg-white/95 px-4 py-2 text-sm font-medium text-blue-700 shadow-sm transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
-      title="Baixar ficha em PDF"
-    >
-      {exportingPdf ? (
-        <Loader2 className="h-4 w-4 animate-spin" />
-      ) : (
-        <Download className="h-4 w-4" />
-      )}
-      {exportingPdf ? 'Gerando PDF…' : 'Baixar PDF'}
-    </button>
+    <div className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={handleOpenPrintView}
+        disabled={pdfExportBusy || saving}
+        className="inline-flex items-center gap-2 rounded-md border border-white/50 bg-white/95 px-4 py-2 text-sm font-medium text-blue-700 shadow-sm transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
+        title="Abre a ficha em nova aba para imprimir ou salvar como PDF pelo navegador"
+      >
+        <Printer className="h-4 w-4" />
+        Imprimir ficha
+      </button>
+      <button
+        type="button"
+        onClick={handleExportFichaPdf}
+        disabled={pdfExportBusy || saving}
+        className="inline-flex items-center gap-2 rounded-md border border-white/40 bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
+        title="Relatório tabular com todos os campos do schema"
+      >
+        {exportingPdf ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Download className="h-4 w-4" />
+        )}
+        {exportingPdf ? 'Gerando PDF…' : 'PDF resumo'}
+      </button>
+    </div>
   ) : undefined;
 
   return (
@@ -404,6 +443,7 @@ export const DynamicFormPage: React.FC = () => {
       variant="desktop"
       showBottomNav={false}
       headerActions={exportActions}
+      backPath={listBackPath}
     >
         {saving && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

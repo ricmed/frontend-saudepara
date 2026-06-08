@@ -119,6 +119,20 @@ import {
   maternidadeHbvHbigRealizado,
 } from '../utils/hepatiteCriancaMaternidadeHbvHbig';
 import { HepatiteTipoExposicaoSelector } from './HepatiteTipoExposicaoSelector';
+function withPrintBlock(printLayoutMode: boolean, className?: string): string | undefined {
+  const merged = [className, printLayoutMode ? 'ficha-print-block' : ''].filter(Boolean).join(' ');
+  return merged || undefined;
+}
+
+function withPrintSection(printLayoutMode: boolean, className?: string): string | undefined {
+  const merged = [className, printLayoutMode ? 'ficha-print-section' : ''].filter(Boolean).join(' ');
+  return merged || undefined;
+}
+
+function withPrintField(printLayoutMode: boolean, className?: string): string | undefined {
+  const merged = [className, printLayoutMode ? 'ficha-print-field' : ''].filter(Boolean).join(' ');
+  return merged || undefined;
+}
 import { applySinanFichaToField } from '../utils/sinanFichaUi';
 import { SEXO_NASCIMENTO_INTERSEXO_CODIGO } from '../utils/apiSelectOptionFilters';
 import {
@@ -544,6 +558,8 @@ interface FormRendererProps {
   notificacaoEscopo?: NotificacaoEscopo;
   /** Chave do formulário (rota); usada para regras específicas da ficha HBV criança. */
   formKey?: string;
+  /** Expande todas as abas/seções visíveis (visualização para impressão). */
+  printLayoutMode?: boolean;
 }
 
 export const FormRenderer: React.FC<FormRendererProps> = ({
@@ -566,6 +582,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   showProgress = false,
   monitorOperRegionalCrsScope = null,
   notificacaoEscopo = 'livre',
+  printLayoutMode = false,
 }) => {
   const sectionIconMap: Record<string, React.ComponentType<{ className?: string }>> = React.useMemo(
     () => ({
@@ -1142,12 +1159,34 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   }, [sortedFormTabs]);
 
   const sectionsForDisplay = React.useMemo(() => {
+    if (printLayoutMode && sortedFormTabs?.length) {
+      return sectionsToRender;
+    }
     if (!sortedFormTabs?.length || !activeTabId) return sectionsToRender;
     return sectionsToRender.filter((section) => {
       const tab = section.tab;
       return !tab || tab === activeTabId;
     });
-  }, [sectionsToRender, sortedFormTabs, activeTabId]);
+  }, [sectionsToRender, sortedFormTabs, activeTabId, printLayoutMode]);
+
+  const printTabLabelById = React.useMemo(() => {
+    if (!sortedFormTabs?.length) return new Map<string, string>();
+    return new Map(sortedFormTabs.map((tab) => [tab.id, tab.label]));
+  }, [sortedFormTabs]);
+
+  const printFirstSectionByTab = React.useMemo(() => {
+    const firstIds = new Set<string>();
+    if (!printLayoutMode) return firstIds;
+    let lastTab: string | undefined;
+    for (const section of sectionsForDisplay) {
+      const tab = section.tab;
+      if (tab && tab !== lastTab) {
+        firstIds.add(section.id);
+        lastTab = tab;
+      }
+    }
+    return firstIds;
+  }, [sectionsForDisplay, printLayoutMode]);
 
   const focusTabForFirstError = useCallback(() => {
     if (!sortedFormTabs?.length) return;
@@ -2301,7 +2340,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     }
   };
 
-  const tabbedFormLayout = Boolean(sortedFormTabs && !pageMode);
+  const tabbedFormLayout = Boolean(sortedFormTabs && !pageMode && !printLayoutMode);
 
   return (
     <form
@@ -2309,7 +2348,9 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       className={`max-w-5xl mx-auto p-6 bg-white rounded-lg shadow ${className ?? ''}`.trim()}
     >
       {showTitle ? (
-        <h1 className="text-2xl font-bold mb-6 text-gray-800">{schema.title || schema.agravo}</h1>
+        <h1 className={withPrintBlock(printLayoutMode, 'text-2xl font-bold mb-6 text-gray-800')}>
+          {schema.title || schema.agravo}
+        </h1>
       ) : null}
 
       {pageMode && showProgress ? (
@@ -2400,14 +2441,29 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             (section as any).icon && sectionIconMap[(section as any).icon]
               ? sectionIconMap[(section as any).icon]
               : undefined;
+          const tabExportHeader =
+            printLayoutMode && section.tab && printFirstSectionByTab.has(section.id) ? (
+              <div
+                key={`tab-heading-${section.tab}`}
+                className="mb-4 mt-6 border-b-2 border-blue-200 pb-2 first:mt-0 ficha-print-tab-heading"
+              >
+                <h2 className="text-lg font-bold text-blue-800">
+                  {printTabLabelById.get(section.tab) ?? section.tab}
+                </h2>
+              </div>
+            ) : null;
           return (
-            <div key={section.id} className="mb-6">
-              <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-                <FormSectionHeader
-                  title={section.title}
-                  icon={sectionIcon}
-                />
-                <div className="rounded-b-xl p-4">
+            <React.Fragment key={section.id}>
+            <div className={withPrintSection(printLayoutMode, 'mb-6')}>
+              {tabExportHeader}
+              <div className="rounded-xl border border-gray-200 bg-white shadow-sm ficha-print-section-card">
+                <div className="ficha-print-section-header">
+                  <FormSectionHeader
+                    title={section.title}
+                    icon={sectionIcon}
+                  />
+                </div>
+                <div className="rounded-b-xl p-4 ficha-print-section-body">
                   <div
                     className={
                       useHepatiteLayout
@@ -2431,7 +2487,10 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                     return (
                       <div
                         key={field.key}
-                        className={`${useHepatiteLayout ? 'lg:col-span-12' : 'md:col-span-2'} mb-1`}
+                        className={withPrintField(
+                          printLayoutMode,
+                          `${useHepatiteLayout ? 'lg:col-span-12' : 'md:col-span-2'} mb-1`,
+                        )}
                       >
                         <HepatiteTipoExposicaoSelector
                           value={String(getValue(field.key) ?? '')}
@@ -3120,7 +3179,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                       return def ? renderField(def) : null;
                     };
                     return (
-                      <div key="crianca-nascimento-bloco" className="md:col-span-2 space-y-4">
+                      <div key="crianca-nascimento-bloco" className={withPrintBlock(printLayoutMode, 'md:col-span-2 space-y-4')}>
                         <LabMaePanel
                           step={1}
                           variant="neutral"
@@ -3231,7 +3290,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                     const criancaCell = 'min-w-0 [&>div]:mb-0';
                     const fieldByKey = (key: string) => sortedFields.find((f) => f.key === key);
                     return (
-                      <div key="crianca-vacina-doses-bloco" className="md:col-span-2 space-y-4">
+                      <div key="crianca-vacina-doses-bloco" className={withPrintBlock(printLayoutMode, 'md:col-span-2 space-y-4')}>
                         <LabMaePanel
                           step={1}
                           variant="hbv"
@@ -3287,7 +3346,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                       String(getValue('crianca.lab.registrar_esquema_2') ?? '') === '1';
 
                     return (
-                      <div key="crianca-lab-bloco" className="md:col-span-2 space-y-4">
+                      <div key="crianca-lab-bloco" className={withPrintBlock(printLayoutMode, 'md:col-span-2 space-y-4')}>
                         <LabMaePanel
                           step={1}
                           variant="hbv"
@@ -3346,7 +3405,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                   ) {
                     const fieldByKey = (key: string) => sortedFields.find((f) => f.key === key);
                     return (
-                      <div key="crianca-acomp-bloco" className="md:col-span-2 space-y-4">
+                      <div key="crianca-acomp-bloco" className={withPrintBlock(printLayoutMode, 'md:col-span-2 space-y-4')}>
                         <LabMaePanel
                           step={1}
                           variant="hcv"
@@ -3377,7 +3436,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                   ) {
                     const fieldByKey = (key: string) => sortedFields.find((f) => f.key === key);
                     return (
-                      <div key="crianca-conclusao-bloco" className="md:col-span-2">
+                      <div key="crianca-conclusao-bloco" className={withPrintBlock(printLayoutMode, 'md:col-span-2')}>
                         <CriancaConclusaoPanel fieldByKey={fieldByKey} renderField={renderField} readOnly={readOnly} />
                       </div>
                     );
@@ -3396,7 +3455,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                   ) {
                     const fieldByKey = (key: string) => sortedFields.find((f) => f.key === key);
                     return (
-                      <div key="crianca-investigador-bloco" className="md:col-span-2">
+                      <div key="crianca-investigador-bloco" className={withPrintBlock(printLayoutMode, 'md:col-span-2')}>
                         <InvestigadorDadosPanel
                           fieldByKey={fieldByKey}
                           renderField={renderField}
@@ -3544,18 +3603,66 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                     return (
                       <div key="identificacao-block" className="md:col-span-2">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5 items-start">
-                          {dtNotificacaoField && <div className="min-w-0">{renderField(dtNotificacaoField)}</div>}
-                          {cpfField && <div className="min-w-0">{renderField(cpfField)}</div>}
-                          {cnsField && <div className="min-w-0">{renderField(cnsField)}</div>}
-                          {estrangeiroField && <div className="min-w-0">{renderField(estrangeiroField)}</div>}
-                          {estrangeiroSim && passaporteField && <div className="min-w-0">{renderField(passaporteField)}</div>}
-                          {estrangeiroSim && paisField && <div className="min-w-0">{renderField(paisField)}</div>}
-                          {nomeField && <div className="min-w-0">{renderField(nomeField)}</div>}
-                          {nomeSocialField && <div className="min-w-0">{renderField(nomeSocialField)}</div>}
-                          {nomeMaeField && <div className="min-w-0">{renderField(nomeMaeField)}</div>}
-                          {dataNascimentoField && <div className="min-w-0">{renderField(dataNascimentoField)}</div>}
-                          {idadeField && <div className="min-w-0">{renderField(idadeField)}</div>}
-                          {sexoField && <div className="min-w-0">{renderField(sexoField)}</div>}
+                          {dtNotificacaoField && (
+                            <div className="min-w-0">
+                              {renderField(dtNotificacaoField)}
+                            </div>
+                          )}
+                          {cpfField && (
+                            <div className="min-w-0">
+                              {renderField(cpfField)}
+                            </div>
+                          )}
+                          {cnsField && (
+                            <div className="min-w-0">
+                              {renderField(cnsField)}
+                            </div>
+                          )}
+                          {estrangeiroField && (
+                            <div className="min-w-0">
+                              {renderField(estrangeiroField)}
+                            </div>
+                          )}
+                          {estrangeiroSim && passaporteField && (
+                            <div className="min-w-0">
+                              {renderField(passaporteField)}
+                            </div>
+                          )}
+                          {estrangeiroSim && paisField && (
+                            <div className="min-w-0">
+                              {renderField(paisField)}
+                            </div>
+                          )}
+                          {nomeField && (
+                            <div className="min-w-0">
+                              {renderField(nomeField)}
+                            </div>
+                          )}
+                          {nomeSocialField && (
+                            <div className="min-w-0">
+                              {renderField(nomeSocialField)}
+                            </div>
+                          )}
+                          {nomeMaeField && (
+                            <div className="min-w-0">
+                              {renderField(nomeMaeField)}
+                            </div>
+                          )}
+                          {dataNascimentoField && (
+                            <div className="min-w-0">
+                              {renderField(dataNascimentoField)}
+                            </div>
+                          )}
+                          {idadeField && (
+                            <div className="min-w-0">
+                              {renderField(idadeField)}
+                            </div>
+                          )}
+                          {sexoField && (
+                            <div className="min-w-0">
+                              {renderField(sexoField)}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -3644,15 +3751,16 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                   return (
                     <div
                       key={field.key}
-                      className={
+                      className={withPrintField(
+                        printLayoutMode,
                         field.key === 'detalhamento.avaliacao_como' ||
                         field.key === 'detalhamento.complementar_pop_coberta' ||
                         /^(imp_epi|imp_san|imp_amb)\./.test(field.key)
                           ? 'md:col-span-2'
                           : isFullWidth(field.type) && !isHalfWidthDescription(field)
                             ? 'md:col-span-2'
-                            : ''
-                      }
+                            : '',
+                      )}
                     >
                       {content}
                     </div>
@@ -3662,6 +3770,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                 </div>
               </div>
             </div>
+            </React.Fragment>
           );
         });
 

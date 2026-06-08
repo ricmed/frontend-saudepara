@@ -58,6 +58,7 @@ import NhePage from '@/features/comunicacao-dae/NhePage';
 import CievsPage from '@/features/comunicacao-dae/CievsPage';
 import CrsPage from '@/features/comunicacao-dae/CrsPage';
 import { DynamicFormPage } from '@/features/dynamic-forms/pages/DynamicFormPage';
+import { DynamicFormPrintPage } from '@/features/dynamic-forms/pages/DynamicFormPrintPage';
 import { FormsListPage } from '@/features/dynamic-forms/pages/FormsListPage';
 import FormBuilderPage from '@/features/dynamic-forms/pages/FormBuilderPage';
 import FixedColumnsConfigPage from '@/features/dynamic-forms/pages/FixedColumnsConfigPage';
@@ -203,6 +204,8 @@ export const getPrivateAppRoutes = () => {
           />
           <Route path="/private/formularios/:agravo/relatorio/*" element={<MonitorOperRegionalReportPage />} />
           <Route path="/private/formularios/:agravo" element={<FormSubmissionsListPage />} />
+          <Route path="/private/formularios/:agravo/imprimir/:id" element={<DynamicFormPrintPage />} />
+          <Route path="/private/formularios/:agravo/imprimir" element={<DynamicFormPrintPage />} />
           <Route path="/private/formularios/:agravo/nova" element={<DynamicFormPage />} />
           <Route path="/private/formularios/:agravo/editar/:id" element={<DynamicFormPage />} />
           <Route path="/private/formularios/:agravo/visualizar/:id" element={<DynamicFormPage />} />
