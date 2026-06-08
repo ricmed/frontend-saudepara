@@ -92,6 +92,8 @@ export const HEPATITE_CRIANCA_HBV_SINAN_CAMPO_BY_KEY: Readonly<Record<string, st
   'crianca.nascimento_municipio_ibge': '52',
   'crianca.hospital_nascimento_cnes': '53',
   'crianca.vacina_hepatite_b_maternidade': '54',
+  'crianca.maternidade_hbv_hbig_nao_realizado_qual': '54',
+  'crianca.maternidade_vacina_hbv_data': '54',
   'crianca.imunoglobulina_hbig': '54',
   'crianca.imunoglobulina_hbig_data': '54',
   'crianca.vacina_hepatite_a': '54',
@@ -127,7 +129,10 @@ export const HEPATITE_CRIANCA_HBV_SINAN_CAMPO_BY_KEY: Readonly<Record<string, st
   'crianca.lab.esquema2.alt': '58.1',
   'crianca.lab.esquema2.alt_data': '58.1',
 
-  // 59 Acompanhamento (HCV — 18 meses)
+  // 59 Acompanhamento (HCV — 3-6 meses e 18 meses)
+  'crianca.acomp.m3_6.hcv_rna': '59.1',
+  'crianca.acomp.m3_6.hcv_rna_data': '59.1',
+  'crianca.acomp.m3_6.hcv_rna_quantificacao': '59.1',
   'crianca.acomp.anti_hcv': '59',
   'crianca.acomp.anti_hcv_data': '59',
   'crianca.acomp.hcv_rna': '59',

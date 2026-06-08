@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { get, set } from 'lodash';
+import { get, set, unset } from 'lodash';
 import type { FormSchema } from '@/services/FormService';
 import { useFormRenderer } from '../hooks/useFormRenderer';
 import { TextField, DateField, NumberField, TextareaField, CheckboxField, CurrencyField, AccountingField } from './FormFields';
@@ -76,6 +76,11 @@ import FormService from '@/services/FormService';
 import { usuarioGestaoService } from '@/services/UsuarioGestaoService';
 import type { MonitorOperRegionalScopePayload } from '../types/monitorOperRegionalScope';
 import type { NotificacaoEscopo } from '../utils/notificacaoScopeDefaults';
+import {
+  canShowHepatiteResidenciaMap,
+  shouldHideNotificacaoEstabelecimentoInView,
+} from '../utils/hepatiteCriancaGestaoAccess';
+import useUserPermissions from '@/hooks/useUserPermissions';
 import { validateCPF } from '@/utils/cpfValidator';
 import { validateCNS } from '@/utils/cnsValidator';
 import {
@@ -85,6 +90,35 @@ import {
   isHepatiteCriancaHBVForm,
   isIdadeValidaCriancaExpostaHBV,
 } from '../utils/hepatiteCriancaHbvLimits';
+import {
+  agravoCidHintPorTipoExposicao,
+  agravoCidPorTipoExposicao,
+  agravoDoencaHintPorTipoExposicao,
+  agravoDoencaPorTipoExposicao,
+  HEPATITE_CRIANCA_HBV_ONLY_SECTIONS,
+  HEPATITE_CRIANCA_HCV_ONLY_SECTIONS,
+  TIPO_EXPOSICAO_HEPATITE_KEY,
+  tipoExposicaoMostraHbv,
+  tipoExposicaoMostraHcv,
+} from '../utils/hepatiteCriancaExposicao';
+import {
+  maeLabHbvQuandoRequiresCoreMarkers,
+  maeLabHbvQuandoSomenteMaternidade,
+} from '../utils/hepatiteCriancaMaeLabRequired';
+import {
+  buildHepBDoseScheduleUpdates,
+  isIsoDate,
+  suggestFirstHepBDoseFromMaternidade,
+} from '../utils/hepatiteCriancaVacinaHepBSchedule';
+import { shouldShowCriancaLabEsquema2Repeticao } from '../utils/criancaLabEsquema2Repeticao';
+import {
+  MATERNIDADE_HBV_HBIG_KEY,
+  MATERNIDADE_NAO_REALIZADO_QUAL_KEY,
+  MATERNIDADE_VACINA_DATA_KEY,
+  maternidadeHbvHbigNaoRealizado,
+  maternidadeHbvHbigRealizado,
+} from '../utils/hepatiteCriancaMaternidadeHbvHbig';
+import { HepatiteTipoExposicaoSelector } from './HepatiteTipoExposicaoSelector';
 import { applySinanFichaToField } from '../utils/sinanFichaUi';
 import { SEXO_NASCIMENTO_INTERSEXO_CODIGO } from '../utils/apiSelectOptionFilters';
 import {
@@ -153,9 +187,9 @@ const MAE_AGRAVOS_DST_LAYOUT_KEYS = new Set([
 ]);
 
 const IMUNIZACAO_MAE_LAYOUT_KEYS = new Set([
+  'mae.imunizacao_hepatite_a_completa',
   'mae.imunizacao_hepatite_b_completa',
   'mae.imunizacao_hepatite_b_incompleta',
-  'mae.imunizacao_hepatite_a_completa',
   'mae.imunizacao_hepatite_a_incompleta',
   'mae.confirmacao_carteira',
 ]);
@@ -224,7 +258,6 @@ const CRIANCA_VACINA_HBV_MATERNIDADE_OPTIONS = [
   { value: '1', label: 'Antes de 24h' },
   { value: '2', label: 'Após 24h' },
   { value: '4', label: 'Não realizado' },
-  { value: '9', label: 'Ignorado' },
 ] as const;
 
 const CRIANCA_VACINA_HBV_MATERNIDADE_LEGACY_KEYS = [
@@ -242,11 +275,14 @@ const CRIANCA_NASCIMENTO_LAYOUT_KEYS = new Set([
   'crianca.hospital_nascimento_cnes',
   'crianca.hospital_nascimento_nome',
   'crianca.vacina_hepatite_b_maternidade',
+  'crianca.maternidade_hbv_hbig_nao_realizado_qual',
+  'crianca.maternidade_vacina_hbv_data',
   ...CRIANCA_VACINA_HBV_MATERNIDADE_LEGACY_KEYS,
   'crianca.imunoglobulina_hbig',
   'crianca.imunoglobulina_hbig_data',
-  'crianca.vacina_hepatite_a',
 ]);
+
+const CRIANCA_VACINA_HEPATITE_A_LAYOUT_KEYS = new Set(['crianca.vacina_hepatite_a']);
 
 const CRIANCA_VACINA_ANTECEDENTES_LAYOUT_KEYS = new Set([
   'crianca.vacina_hepatite_b_dose_1',
@@ -260,7 +296,7 @@ const CRIANCA_VACINA_ANTECEDENTES_LAYOUT_KEYS = new Set([
 ]);
 
 const CRIANCA_DOSE_ROWS: { simKey: string; dataKey: string; label: string }[] = [
-  { simKey: 'crianca.vacina_hepatite_b_dose_1', dataKey: 'crianca.vacina_hepatite_b_dose_1_data', label: '1ª dose' },
+  { simKey: 'crianca.vacina_hepatite_b_dose_1', dataKey: 'crianca.vacina_hepatite_b_dose_1_data', label: '1ª dose (maternidade)' },
   { simKey: 'crianca.vacina_hepatite_b_dose_2', dataKey: 'crianca.vacina_hepatite_b_dose_2_data', label: '2ª dose' },
   { simKey: 'crianca.vacina_hepatite_b_dose_3', dataKey: 'crianca.vacina_hepatite_b_dose_3_data', label: '3ª dose' },
   { simKey: 'crianca.vacina_hepatite_b_dose_4', dataKey: 'crianca.vacina_hepatite_b_dose_4_data', label: '4ª dose' },
@@ -547,6 +583,18 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     []
   );
   const isHepatiteCriancaHBV = isHepatiteCriancaHBVForm({ schema, formKey });
+  const { isEstado, isAdmin, isEstabelecimento } = useUserPermissions();
+  const showHepatiteResidenciaMap =
+    isHepatiteCriancaHBV && canShowHepatiteResidenciaMap({ isEstado, isAdmin });
+  const hideNotificacaoEstabelecimento =
+    isHepatiteCriancaHBV &&
+    shouldHideNotificacaoEstabelecimentoInView({
+      readOnly,
+      notificacaoEscopo,
+      isEstabelecimento,
+      isEstado,
+      isAdmin,
+    });
 
   const initialDataWithDefaults = React.useMemo(() => {
     const pac = initialData?.paciente ?? {};
@@ -595,6 +643,20 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
         else if (antes === '9' || apos === '9') migrated = '9';
         else if (antes === '2' && apos === '2') migrated = '4';
         if (migrated) set(merged, newKey, migrated);
+      }
+
+      const tipoExposicao = get(merged, TIPO_EXPOSICAO_HEPATITE_KEY);
+      const nextAgravo = agravoDoencaPorTipoExposicao(tipoExposicao);
+      const nextCid = agravoCidPorTipoExposicao(tipoExposicao);
+      if (nextAgravo) {
+        set(merged, 'notificacao.agravo_doenca', nextAgravo);
+      } else {
+        unset(merged, 'notificacao.agravo_doenca');
+      }
+      if (nextCid) {
+        set(merged, 'agravo_cid', nextCid);
+      } else {
+        unset(merged, 'agravo_cid');
       }
     }
     return merged;
@@ -646,6 +708,72 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     setValue('cabecalho.crs_id', String(monitorOperRegionalCrsScope.readonlyCrs.id));
     crsReadonlySyncedRef.current = true;
   }, [monitorOperRegionalCrsScope, getValue, setValue]);
+
+  const hepBAutoDatesRef = useRef<Partial<Record<string, string>>>({});
+  useEffect(() => {
+    if (!isHepatiteCriancaHBV || readOnly) return;
+
+    const birthRaw = getValue('paciente.data_nascimento');
+    const maternidadeVac = getValue(MATERNIDADE_HBV_HBIG_KEY);
+    let anchorRaw = getValue('crianca.vacina_hepatite_b_dose_1_data');
+
+    const maternidadeVacinaData = getValue(MATERNIDADE_VACINA_DATA_KEY);
+    if (
+      (!anchorRaw || String(anchorRaw).trim() === '') &&
+      isIsoDate(String(maternidadeVacinaData ?? ''))
+    ) {
+      setValue('crianca.vacina_hepatite_b_dose_1_data', String(maternidadeVacinaData));
+      anchorRaw = maternidadeVacinaData;
+    }
+
+    if (
+      (!anchorRaw || String(anchorRaw).trim() === '') &&
+      isIsoDate(String(birthRaw ?? ''))
+    ) {
+      const suggestedFirst = suggestFirstHepBDoseFromMaternidade(String(birthRaw), maternidadeVac);
+      if (suggestedFirst) {
+        setValue('crianca.vacina_hepatite_b_dose_1_data', suggestedFirst);
+        anchorRaw = suggestedFirst;
+      }
+    }
+
+    const anchor = anchorRaw != null ? String(anchorRaw) : '';
+    if (!isIsoDate(anchor)) return;
+
+    const { updates } = buildHepBDoseScheduleUpdates({
+      anchorIso: anchor,
+      getValue,
+      lastAutoByKey: hepBAutoDatesRef.current,
+    });
+
+    for (const [key, value] of Object.entries(updates)) {
+      setValue(key, value);
+      hepBAutoDatesRef.current[key] = value;
+    }
+  }, [
+    isHepatiteCriancaHBV,
+    readOnly,
+    formData,
+    getValue,
+    setValue,
+  ]);
+
+  useEffect(() => {
+    if (!isHepatiteCriancaHBV || readOnly) return;
+
+    const tipo = getValue(TIPO_EXPOSICAO_HEPATITE_KEY);
+    const nextAgravo = agravoDoencaPorTipoExposicao(tipo);
+    const nextCid = agravoCidPorTipoExposicao(tipo);
+    const curAgravo = String(getValue('notificacao.agravo_doenca') ?? '').trim();
+    const curCid = String(getValue('agravo_cid') ?? '').trim();
+
+    if (curAgravo !== nextAgravo) {
+      setValue('notificacao.agravo_doenca', nextAgravo || undefined);
+    }
+    if (curCid !== nextCid) {
+      setValue('agravo_cid', nextCid || undefined);
+    }
+  }, [isHepatiteCriancaHBV, readOnly, formData, getValue, setValue]);
 
   // Auto-preencher dados do paciente via base interna (CPF/CNS).
   // Não sobrescreve campos já preenchidos manualmente.
@@ -2203,6 +2331,18 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
 
       {(() => {
         const sectionNodes = (pageMode ? (currentSection ? [currentSection] : []) : sectionsForDisplay).map((section) => {
+          if (isHepatiteCriancaHBV) {
+            const tipoExposicao = getValue(TIPO_EXPOSICAO_HEPATITE_KEY);
+            if (HEPATITE_CRIANCA_HBV_ONLY_SECTIONS.has(section.id) && !tipoExposicaoMostraHbv(tipoExposicao)) {
+              return null;
+            }
+            if (HEPATITE_CRIANCA_HCV_ONLY_SECTIONS.has(section.id) && !tipoExposicaoMostraHcv(tipoExposicao)) {
+              return null;
+            }
+            if (section.id === 'section_dados_laboratoriais_mae' && !tipoExposicao) {
+              return null;
+            }
+          }
           const useHepatiteLayout = isHepatiteCriancaHBV && section.id === 'section_dados_gerais';
           // Layout com mapa/colunas só na ficha HBV criança (seção dedicada). Fichas SINAN padrão
           // ("Dados do indivíduo") mantêm grid simples, sem o bloco largo de endereço.
@@ -2210,6 +2350,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             isHepatiteCriancaHBV && section.id === 'section_dados_residencia';
           const hepatiteSpanClass = (key: string): string => {
             if (!useHepatiteLayout) return '';
+            if (key === TIPO_EXPOSICAO_HEPATITE_KEY) return 'lg:col-span-12';
             if (key === 'notificacao.tipo_notificacao') return 'lg:col-span-4';
             if (key === 'notificacao.agravo_doenca') return 'lg:col-span-6 lg:col-start-1';
             if (key === 'agravo_cid') return 'lg:col-span-3';
@@ -2286,8 +2427,29 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                     </div>
                   ) : null}
                 {sortedFields.map((field) => {
+                  if (isHepatiteCriancaHBV && field.key === TIPO_EXPOSICAO_HEPATITE_KEY) {
+                    return (
+                      <div
+                        key={field.key}
+                        className={`${useHepatiteLayout ? 'lg:col-span-12' : 'md:col-span-2'} mb-1`}
+                      >
+                        <HepatiteTipoExposicaoSelector
+                          value={String(getValue(field.key) ?? '')}
+                          onChange={(val) => setValue(field.key, val)}
+                          disabled={readOnly || field.disabled}
+                          required={isFieldRequired(field.key)}
+                          error={getError(field.key)}
+                          hint={(field as { hint?: string }).hint}
+                        />
+                      </div>
+                    );
+                  }
                   if (field.key === 'notificacao.agravo_doenca') {
                     const val = String(getValue(field.key) ?? '');
+                    const agravoHint =
+                      isHepatiteCriancaHBV && useHepatiteLayout
+                        ? agravoDoencaHintPorTipoExposicao()
+                        : (field as { hint?: string }).hint;
                     return (
                       <div key={field.key} className={useHepatiteLayout ? hepatiteSpanClass(field.key) : 'md:col-span-2'}>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -2305,12 +2467,17 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                               : 'border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500'
                           }`}
                         />
-                        {(field as any).hint ? <p className="text-xs text-gray-500 mt-1">{(field as any).hint}</p> : null}
+                        {agravoHint ? <p className="text-xs text-gray-500 mt-1">{agravoHint}</p> : null}
                       </div>
                     );
                   }
                   if (field.key === 'agravo_cid' && field.disabled) {
                     const val = String(getValue(field.key) ?? '');
+                    const tipoExposicaoAgravo = getValue(TIPO_EXPOSICAO_HEPATITE_KEY);
+                    const cidHint =
+                      isHepatiteCriancaHBV && useHepatiteLayout
+                        ? agravoCidHintPorTipoExposicao(tipoExposicaoAgravo)
+                        : (field as { hint?: string }).hint;
                     return (
                       <div key={field.key} className={hepatiteSpanClass(field.key)}>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -2324,7 +2491,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                           disabled
                           className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
                         />
-                        {(field as any).hint ? <p className="text-xs text-gray-500 mt-1">{(field as any).hint}</p> : null}
+                        {cidHint ? <p className="text-xs text-gray-500 mt-1">{cidHint}</p> : null}
                       </div>
                     );
                   }
@@ -2339,6 +2506,19 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                   }
                   // Bloco único: Estabelecimento de saúde de notificação (UF, Município, Estabelecimento). Data da notificação fica em Dados do paciente.
                   if (firstNotificationField && field.key === firstNotificationField.key) {
+                    if (hideNotificacaoEstabelecimento) {
+                      return (
+                        <div
+                          key="notificacao-estabelecimento-restrito"
+                          className={useHepatiteLayout ? 'lg:col-span-12 mt-1' : 'md:col-span-2'}
+                        >
+                          <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                            Dados da unidade notificadora disponíveis apenas para gestão municipal, regional e
+                            estadual.
+                          </div>
+                        </div>
+                      );
+                    }
                     return (
                       <div
                         key="notificacao-estabelecimento-block"
@@ -2573,7 +2753,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                         )}
                       </div>
                     ) : null;
-                    const mapBlock = geoLocationField ? (
+                    const mapBlock = geoLocationField && showHepatiteResidenciaMap ? (
                           <div className="min-w-0">
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                   {geoLocationField.label}
@@ -2686,9 +2866,17 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                     return (
                       <div key="residencia-block" className="md:col-span-2">
                         <h3 className="text-sm font-semibold text-gray-700 mb-3">Endereço de residência</h3>
+                        {!showHepatiteResidenciaMap ? (
+                          <p className="mb-3 text-xs text-gray-500">
+                            O mapa de georreferenciamento em tempo real está disponível apenas para usuários de gestão
+                            estadual. Preencha o endereço manualmente ou via CEP.
+                          </p>
+                        ) : null}
                         <div className="space-y-4">
                           {residenciaPairRow(addressFieldsColumn, mapBlock)}
-                          {residenciaPairRow(telefoneBlock, geoRow)}
+                          {showHepatiteResidenciaMap
+                            ? residenciaPairRow(telefoneBlock, geoRow)
+                            : telefoneBlock ? <div className="min-w-0">{telefoneBlock}</div> : null}
                           {residenciaPairRow(pontoReferenciaBlock, zonaBlock)}
                           {paisResidenciaControl ? (
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
@@ -2735,32 +2923,20 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                   if (
                     isHepatiteCriancaHBV &&
                     section.id === 'section_imunizacao_mae' &&
-                    field.key === 'mae.imunizacao_hepatite_b_completa'
+                    field.key === 'mae.imunizacao_hepatite_a_completa'
                   ) {
                     const imunizacaoCell = 'min-w-0 [&>div]:mb-0';
-                    const hbCompleta = sortedFields.find((f) => f.key === 'mae.imunizacao_hepatite_b_completa');
-                    const hbIncompleta = sortedFields.find((f) => f.key === 'mae.imunizacao_hepatite_b_incompleta');
                     const haCompleta = sortedFields.find((f) => f.key === 'mae.imunizacao_hepatite_a_completa');
-                    const haIncompleta = sortedFields.find((f) => f.key === 'mae.imunizacao_hepatite_a_incompleta');
+                    const hbCompleta = sortedFields.find((f) => f.key === 'mae.imunizacao_hepatite_b_completa');
                     const confirmacaoCarteira = sortedFields.find((f) => f.key === 'mae.confirmacao_carteira');
                     return (
                       <div key="imunizacao-mae-bloco" className="md:col-span-2 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {hbCompleta ? (
-                            <div className={imunizacaoCell}>{renderField(hbCompleta)}</div>
-                          ) : null}
-                          {hbIncompleta ? (
-                            <div className={imunizacaoCell}>{renderField(hbIncompleta)}</div>
-                          ) : null}
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {haCompleta ? (
-                            <div className={imunizacaoCell}>{renderField(haCompleta)}</div>
-                          ) : null}
-                          {haIncompleta ? (
-                            <div className={imunizacaoCell}>{renderField(haIncompleta)}</div>
-                          ) : null}
-                        </div>
+                        {haCompleta ? (
+                          <div className={imunizacaoCell}>{renderField(haCompleta)}</div>
+                        ) : null}
+                        {hbCompleta ? (
+                          <div className={imunizacaoCell}>{renderField(hbCompleta)}</div>
+                        ) : null}
                         {confirmacaoCarteira ? (
                           <div className={imunizacaoCell}>{renderField(confirmacaoCarteira)}</div>
                         ) : null}
@@ -2773,9 +2949,13 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                   if (
                     isHepatiteCriancaHBV &&
                     section.id === 'section_dados_laboratoriais_mae' &&
-                    field.key === 'mae.lab.sorologia_reagente_hepatite_b'
+                    field.key ===
+                      (tipoExposicaoMostraHbv(getValue(TIPO_EXPOSICAO_HEPATITE_KEY))
+                        ? 'mae.lab.sorologia_reagente_hepatite_b'
+                        : 'mae.lab.sorologia_reagente_hepatite_c')
                   ) {
                     const labCell = 'min-w-0 [&>div]:mb-0';
+                    const tipoExposicao = getValue(TIPO_EXPOSICAO_HEPATITE_KEY);
                     const fieldByKey = (key: string) => sortedFields.find((f) => f.key === key);
                     const renderLab = (key: string) => {
                       const def = fieldByKey(key);
@@ -2794,10 +2974,19 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                       MAE_LAB_HCV_WHEN_KEYS.some((k) => isFieldVisible(k));
                     const showHbvMarkers = hbvMarkers.some((f) => isFieldVisible(f.key));
                     const showHcvMarkers = hcvMarkers.some((f) => isFieldVisible(f.key));
-                    const showColB = isFieldVisible('mae.lab.hepatite_b_quando_antes_prenatal');
-                    const showColC = isFieldVisible('mae.lab.hepatite_c_quando_antes_prenatal');
+                    const showColB = tipoExposicaoMostraHbv(tipoExposicao);
+                    const showColC = tipoExposicaoMostraHcv(tipoExposicao);
 
                     const markerStep = showQuando ? 3 : 2;
+                    const hbvMarkersSubtitle = (() => {
+                      if (maeLabHbvQuandoSomenteMaternidade(getValue)) {
+                        return 'Na maternidade, todos os marcadores são facultativos (resultado pode não existir antes da alta).';
+                      }
+                      if (maeLabHbvQuandoRequiresCoreMarkers(getValue)) {
+                        return 'Obrigatórios neste cenário: HBsAg e HBV-DNA. Os demais marcadores HBV são facultativos.';
+                      }
+                      return 'Somente HBsAg e HBV-DNA podem ser obrigatórios (antes/durante pré-natal). Demais marcadores são facultativos.';
+                    })();
 
                     return (
                       <div key="lab-mae-bloco" className="md:col-span-2 space-y-4">
@@ -2807,13 +2996,19 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                           title="Mãe apresentou sorologia reagente para"
                           subtitle="Informe Sim ou Não para cada vírus antes de detalhar momento e exames."
                         >
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className={`${labCell} ${LAB_MAE_HBV_SURFACE}`}>
-                              {renderLab('mae.lab.sorologia_reagente_hepatite_b')}
-                            </div>
-                            <div className={`${labCell} ${LAB_MAE_HCV_SURFACE}`}>
-                              {renderLab('mae.lab.sorologia_reagente_hepatite_c')}
-                            </div>
+                          <div
+                            className={`grid gap-4 ${showColB && showColC ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 max-w-md'}`}
+                          >
+                            {showColB ? (
+                              <div className={`${labCell} ${LAB_MAE_HBV_SURFACE}`}>
+                                {renderLab('mae.lab.sorologia_reagente_hepatite_b')}
+                              </div>
+                            ) : null}
+                            {showColC ? (
+                              <div className={`${labCell} ${LAB_MAE_HCV_SURFACE}`}>
+                                {renderLab('mae.lab.sorologia_reagente_hepatite_c')}
+                              </div>
+                            ) : null}
                           </div>
                         </LabMaePanel>
                         {showQuando ? (
@@ -2869,7 +3064,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                             variant="hbv"
                             tag="Vírus B"
                             title="Marcadores HBV"
-                            subtitle="Resultado de cada exame laboratorial da hepatite B."
+                            subtitle={hbvMarkersSubtitle}
                           >
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               {hbvMarkers.map((f) =>
@@ -2963,37 +3158,32 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                             </div>
                           </div>
                         </LabMaePanel>
-                        <LabMaePanel
-                          step={3}
-                          variant="hbv"
-                          title="Vacina para Hepatite B na maternidade"
-                          subtitle="Antes ou após 24h de vida, não realizado ou ignorado."
-                        >
-                          <div className={`max-w-md ${criancaCell}`}>
-                            {renderCrianca('crianca.vacina_hepatite_b_maternidade')}
-                          </div>
-                        </LabMaePanel>
-                        <LabMaePanel
-                          step={4}
-                          variant="hbv"
-                          title="Imunoglobulina hiperimune Hepatite B"
-                          subtitle="Se foi aplicada e data da aplicação."
-                        >
-                          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-end">
-                            <div className={criancaCell}>{renderCrianca('crianca.imunoglobulina_hbig')}</div>
-                            <div className={criancaCell}>{renderCrianca('crianca.imunoglobulina_hbig_data')}</div>
-                          </div>
-                        </LabMaePanel>
-                        <LabMaePanel
-                          step={5}
-                          variant="neutral"
-                          title="Vacina para Hepatite A"
-                          subtitle="Indique se a criança recebeu a vacina."
-                        >
-                          <div className={`max-w-md ${criancaCell}`}>
-                            {renderCrianca('crianca.vacina_hepatite_a')}
-                          </div>
-                        </LabMaePanel>
+                        {tipoExposicaoMostraHbv(getValue(TIPO_EXPOSICAO_HEPATITE_KEY)) ? (
+                          <LabMaePanel
+                            step={3}
+                            variant="hbv"
+                            title="Vacina para Hepatite B + Imunoglobulina Hepatite B na maternidade"
+                            subtitle="Antes ou após 24h de vida, ou não realizado (informe o que faltou). Informe as datas de administração quando aplicável."
+                          >
+                            <div className={`max-w-2xl space-y-4 ${criancaCell}`}>
+                              {renderCrianca(MATERNIDADE_HBV_HBIG_KEY)}
+                              {maternidadeHbvHbigNaoRealizado(getValue(MATERNIDADE_HBV_HBIG_KEY)) &&
+                              isFieldVisible(MATERNIDADE_NAO_REALIZADO_QUAL_KEY) ? (
+                                <div className="max-w-lg">{renderCrianca(MATERNIDADE_NAO_REALIZADO_QUAL_KEY)}</div>
+                              ) : null}
+                              {maternidadeHbvHbigRealizado(getValue(MATERNIDADE_HBV_HBIG_KEY)) ? (
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-end">
+                                  {isFieldVisible(MATERNIDADE_VACINA_DATA_KEY) ? (
+                                    <div className={criancaCell}>{renderCrianca(MATERNIDADE_VACINA_DATA_KEY)}</div>
+                                  ) : null}
+                                  {isFieldVisible('crianca.imunoglobulina_hbig_data') ? (
+                                    <div className={criancaCell}>{renderCrianca('crianca.imunoglobulina_hbig_data')}</div>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                            </div>
+                          </LabMaePanel>
+                        ) : null}
                       </div>
                     );
                   }
@@ -3001,6 +3191,35 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                     isHepatiteCriancaHBV &&
                     section.id === 'section_dados_nascimento_crianca' &&
                     CRIANCA_NASCIMENTO_LAYOUT_KEYS.has(field.key)
+                  ) {
+                    return null;
+                  }
+                  if (
+                    isHepatiteCriancaHBV &&
+                    section.id === 'section_vacina_hepatite_a_acomp' &&
+                    field.key === 'crianca.vacina_hepatite_a'
+                  ) {
+                    const vacinaCell = 'min-w-0 [&>div]:mb-0';
+                    const fieldDef = sortedFields.find((f) => f.key === 'crianca.vacina_hepatite_a');
+                    return (
+                      <div key="vacina-hepatite-a-acomp" className="md:col-span-2">
+                        <LabMaePanel
+                          step={1}
+                          variant="neutral"
+                          title="Vacina para Hepatite A"
+                          subtitle="Realizada no acompanhamento até 15 meses de idade (não na maternidade)."
+                        >
+                          <div className={`max-w-md ${vacinaCell}`}>
+                            {fieldDef ? renderField(fieldDef) : null}
+                          </div>
+                        </LabMaePanel>
+                      </div>
+                    );
+                  }
+                  if (
+                    isHepatiteCriancaHBV &&
+                    section.id === 'section_vacina_hepatite_a_acomp' &&
+                    CRIANCA_VACINA_HEPATITE_A_LAYOUT_KEYS.has(field.key)
                   ) {
                     return null;
                   }
@@ -3017,7 +3236,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                           step={1}
                           variant="hbv"
                           title="Vacina para Hepatite B"
-                          subtitle="Para cada dose: Sim/Não se foi aplicada e data (dd/mm/aaaa)."
+                          subtitle="1ª dose na maternidade; doses seguintes com datas previstas em 2, 4 e 6 meses (acompanhamento — calendário fixo, independente do PNI)."
                         >
                           <div className="space-y-3">
                             {CRIANCA_DOSE_ROWS.map(({ simKey, dataKey, label }) => {
@@ -3059,7 +3278,11 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                       const def = fieldByKey(key);
                       return def ? renderField(def) : null;
                     };
+                    const showEsquema2Repeticao = shouldShowCriancaLabEsquema2Repeticao(
+                      getValue('crianca.lab.esquema1.anti_hbs'),
+                    );
                     const showEsquema2 =
+                      showEsquema2Repeticao &&
                       isFieldVisible('crianca.lab.registrar_esquema_2') &&
                       String(getValue('crianca.lab.registrar_esquema_2') ?? '') === '1';
 
@@ -3079,14 +3302,16 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                             readOnly={readOnly}
                           />
                         </LabMaePanel>
-                        <LabMaePanel
-                          step={2}
-                          variant="neutral"
-                          title="Repetição do esquema vacinal"
-                          subtitle="Marque Sim para registrar o laboratório do 2º esquema, após preencher o 1º esquema acima."
-                        >
-                          <div className="max-w-lg">{renderLab('crianca.lab.registrar_esquema_2')}</div>
-                        </LabMaePanel>
+                        {showEsquema2Repeticao ? (
+                          <LabMaePanel
+                            step={2}
+                            variant="neutral"
+                            title="Repetição do esquema vacinal"
+                            subtitle="Disponível porque Anti-HBs do 1º esquema foi Não reagente. Marque Sim para registrar o laboratório do 2º esquema."
+                          >
+                            <div className="max-w-lg">{renderLab('crianca.lab.registrar_esquema_2')}</div>
+                          </LabMaePanel>
+                        ) : null}
                         {showEsquema2 ? (
                           <LabMaePanel
                             step={3}
@@ -3126,7 +3351,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                           step={1}
                           variant="hcv"
                           title="Avaliação laboratorial — Hepatite C"
-                          subtitle="Anti-HCV e HCV-RNA na avaliação de acompanhamento da criança (18 meses de idade)."
+                          subtitle="HCV-RNA entre 3 e 6 meses; Anti-HCV e HCV-RNA complementares aos 18 meses."
                         >
                           <CriancaAcompanhamentoHcvPanel
                             fieldByKey={fieldByKey}
@@ -3202,6 +3427,9 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                       return def ? renderField(def) : null;
                     };
                     const showLocal = isFieldVisible('prenatal.endereco');
+                    const tipoExposicaoPrenatal = getValue(TIPO_EXPOSICAO_HEPATITE_KEY);
+                    const showPrenatalHbv = tipoExposicaoMostraHbv(tipoExposicaoPrenatal);
+                    const showPrenatalHcv = tipoExposicaoMostraHcv(tipoExposicaoPrenatal);
                     return (
                       <div key="prenatal-bloco" className="md:col-span-2 space-y-4">
                         <LabMaePanel
@@ -3248,26 +3476,38 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                           step={showLocal ? 3 : 2}
                           variant="neutral"
                           title="Antecedentes relacionados à hepatite"
-                          subtitle="Tratamento, prevenção da transmissão vertical, medicamentos e histórico familiar."
+                          subtitle="Tratamento, prevenção da transmissão vertical e histórico familiar. Medicamentos: texto livre e opcional."
                         >
-                          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div className={`${prenatalCell} ${LAB_MAE_HBV_SURFACE}`}>
-                              {renderPrenatal('prenatal.tratamento_hepatite_b')}
-                            </div>
-                            <div className={`${prenatalCell} ${LAB_MAE_HCV_SURFACE}`}>
-                              {renderPrenatal('prenatal.prevencao_transmissao_vertical_b')}
-                            </div>
+                          <div
+                            className={`grid gap-4 ${showPrenatalHbv && showPrenatalHcv ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 max-w-md'}`}
+                          >
+                            {showPrenatalHbv ? (
+                              <div className={`${prenatalCell} ${LAB_MAE_HBV_SURFACE}`}>
+                                {renderPrenatal('prenatal.tratamento_hepatite_b')}
+                              </div>
+                            ) : null}
+                            {showPrenatalHbv ? (
+                              <div className={`${prenatalCell} ${LAB_MAE_HBV_SURFACE}`}>
+                                {renderPrenatal('prenatal.prevencao_transmissao_vertical_b')}
+                              </div>
+                            ) : null}
                           </div>
-                          <div className={`mt-4 ${prenatalCell}`}>
+                          <div className={`mt-4 max-w-3xl ${prenatalCell}`}>
                             {renderPrenatal('prenatal.medicamento_utilizado')}
                           </div>
-                          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div className={`${prenatalCell} ${LAB_MAE_HBV_SURFACE}`}>
-                              {renderPrenatal('prenatal.familia_portadora_hepatite_b')}
-                            </div>
-                            <div className={`${prenatalCell} ${LAB_MAE_HCV_SURFACE}`}>
-                              {renderPrenatal('prenatal.familia_portadora_hepatite_c')}
-                            </div>
+                          <div
+                            className={`mt-4 grid gap-4 ${showPrenatalHbv && showPrenatalHcv ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 max-w-md'}`}
+                          >
+                            {showPrenatalHbv ? (
+                              <div className={`${prenatalCell} ${LAB_MAE_HBV_SURFACE}`}>
+                                {renderPrenatal('prenatal.familia_portadora_hepatite_b')}
+                              </div>
+                            ) : null}
+                            {showPrenatalHcv ? (
+                              <div className={`${prenatalCell} ${LAB_MAE_HCV_SURFACE}`}>
+                                {renderPrenatal('prenatal.familia_portadora_hepatite_c')}
+                              </div>
+                            ) : null}
                           </div>
                         </LabMaePanel>
                       </div>

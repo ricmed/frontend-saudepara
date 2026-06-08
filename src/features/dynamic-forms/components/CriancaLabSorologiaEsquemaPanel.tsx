@@ -9,6 +9,7 @@ import {
   MARKER_ROW_GRID,
   type RenderLabFn,
 } from '@/features/dynamic-forms/components/criancaLabPanelLayout';
+import { shouldShowCriancaLabAlt } from '@/features/dynamic-forms/utils/criancaLabAltVisibility';
 
 const CARD =
   'overflow-hidden rounded-lg border border-[#3b5bdb]/20 bg-[#3b5bdb]/[0.05] p-3 sm:p-4 space-y-3';
@@ -67,6 +68,7 @@ export const CriancaLabSorologiaEsquemaPanel: React.FC<CriancaLabSorologiaEsquem
   };
 
   const hbvDnaReagente = isReagentePositivo(getValue(k.hbvDna));
+  const hbsagReagente = shouldShowCriancaLabAlt(getValue(k.hbsag));
   const hbvDnaQuantDef = fieldByKey(k.hbvDnaQuantificacao);
   const altDef = fieldByKey(k.alt);
 
@@ -97,22 +99,29 @@ export const CriancaLabSorologiaEsquemaPanel: React.FC<CriancaLabSorologiaEsquem
         </div>
       </div>
 
-      <div className={`${CARD} max-w-2xl`}>
-        <p className="text-xs font-semibold uppercase tracking-wide text-[#364fc7]">
-          ALT (alanina aminotransferase)
-        </p>
-        <div className="space-y-1">
-          <div className={MARKER_ROW_GRID}>
-            <div className={`${LAB_CELL} min-w-0`}>
-              {renderLab(k.alt, { helpText: undefined })}
+      {hbsagReagente ? (
+        <div className={`${CARD} max-w-2xl`}>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#364fc7]">
+            ALT (alanina aminotransferase)
+          </p>
+          <div className="space-y-1">
+            <div className={MARKER_ROW_GRID}>
+              <div className={`${LAB_CELL} min-w-0`}>
+                {renderLab(k.alt, { helpText: undefined })}
+              </div>
+              <div className={DATE_ROW_WRAP}>{renderLab(k.altData, DATE_FIELD_OPTS)}</div>
             </div>
-            <div className={DATE_ROW_WRAP}>{renderLab(k.altData, DATE_FIELD_OPTS)}</div>
+            {altDef?.helpText ? (
+              <p className="text-xs text-gray-500">{altDef.helpText}</p>
+            ) : null}
           </div>
-          {altDef?.helpText ? (
-            <p className="text-xs text-gray-500">{altDef.helpText}</p>
-          ) : null}
         </div>
-      </div>
+      ) : (
+        <p className="text-xs text-gray-500 max-w-2xl">
+          ALT (TGP): exibida automaticamente quando HBsAg for Reagente/Positivo. Se Anti-HBs for não reagente
+          sem HBsAg reagente, não é necessário informar ALT.
+        </p>
+      )}
     </div>
   );
 };

@@ -14,6 +14,17 @@ import {
   isHepatiteCriancaHBVForm,
   isIdadeValidaCriancaExpostaHBV,
 } from '../utils/hepatiteCriancaHbvLimits';
+import { isMaeLabHbvMarkerRequired } from '../utils/hepatiteCriancaMaeLabRequired';
+import {
+  TIPO_EXPOSICAO_AMBOS,
+  TIPO_EXPOSICAO_HEPATITE_KEY,
+  TIPO_EXPOSICAO_HBV,
+} from '../utils/hepatiteCriancaExposicao';
+import {
+  MATERNIDADE_HBV_HBIG_KEY,
+  MATERNIDADE_NAO_REALIZADO_QUAL_KEY,
+  maternidadeHbvHbigNaoRealizado,
+} from '../utils/hepatiteCriancaMaternidadeHbvHbig';
 import { SEXO_NASCIMENTO_INTERSEXO_CODIGO } from '../utils/apiSelectOptionFilters';
 import { validatePassaporte } from '@/utils/passaporteValidator';
 
@@ -353,6 +364,7 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange, formKe
 
       // Ficha HBV criança: regras específicas (não herdar SINAN genérico de CPF/estrangeiro).
       if (isHepatiteCriancaHBV) {
+        if (key === 'notificacao.tipo_exposicao_hepatite') return true;
         if (key === 'paciente.data_nascimento') return !hasIdade;
         if (key === 'paciente.idade') return !hasDataNascimento;
         if (key === 'crianca_hbv.numero_sinan_mae') return false;
@@ -372,6 +384,22 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange, formKe
         ]);
         if (residenciaObrigatoria.has(key)) return true;
         if (key.startsWith('residencia.')) return false;
+        if (key.startsWith('mae.lab.hbv_')) {
+          return isMaeLabHbvMarkerRequired(key, getValue);
+        }
+        if (key.startsWith('mae.lab.hcv_')) return false;
+        if (key === 'prenatal.medicamento_utilizado') return false;
+        if (key === MATERNIDADE_NAO_REALIZADO_QUAL_KEY) {
+          return maternidadeHbvHbigNaoRealizado(getValue(MATERNIDADE_HBV_HBIG_KEY));
+        }
+        if (key === 'notificacao.agravo_doenca') {
+          const tipo = String(getValue(TIPO_EXPOSICAO_HEPATITE_KEY) ?? '').trim();
+          return tipo !== '';
+        }
+        if (key === 'agravo_cid') {
+          const tipo = String(getValue(TIPO_EXPOSICAO_HEPATITE_KEY) ?? '').trim();
+          return tipo === TIPO_EXPOSICAO_HBV || tipo === TIPO_EXPOSICAO_AMBOS;
+        }
       }
 
       // Data da notificação: sempre obrigatória
