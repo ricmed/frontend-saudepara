@@ -155,4 +155,40 @@ describe('useFormRenderer', () => {
     expect(result.current.isFieldRequired('paciente.cpf')).toBe(false);
     expect(result.current.isFieldRequired('paciente.cns')).toBe(false);
   });
+
+  it('HEPATITE_CRIANCA_HBV: dados do investigador são obrigatórios', () => {
+    const schema: FormSchema = {
+      agravo: 'HEPATITE_CRIANCA_HBV',
+      sections: [
+        {
+          id: 's1',
+          title: 'Investigador',
+          order: 1,
+          fields: [
+            { key: 'investigador.municipio_id', type: 'number', label: 'Município', order: 1, hidden: true },
+            { key: 'investigador.unidade_id', type: 'number', label: 'CNES', order: 2, hidden: true },
+            { key: 'investigador.nome', type: 'text', label: 'Nome', order: 3 },
+            { key: 'investigador.funcao', type: 'text', label: 'Função', order: 4 },
+          ],
+        },
+      ],
+    };
+    const { result } = renderHook(() =>
+      useFormRenderer({ schema, formKey: 'HEPATITE_CRIANCA_HBV', initialData: {} }),
+    );
+
+    expect(result.current.isFieldRequired('investigador.municipio_id')).toBe(true);
+    expect(result.current.isFieldRequired('investigador.unidade_id')).toBe(true);
+    expect(result.current.isFieldRequired('investigador.nome')).toBe(true);
+    expect(result.current.isFieldRequired('investigador.funcao')).toBe(true);
+    expect(result.current.isFieldVisible('investigador.municipio_id')).toBe(true);
+    expect(result.current.isFieldVisible('investigador.unidade_id')).toBe(true);
+
+    let valid = true;
+    act(() => {
+      valid = result.current.validateAll();
+    });
+    expect(valid).toBe(false);
+    expect(result.current.getError('investigador.nome')).toMatch(/obrigatório/i);
+  });
 });

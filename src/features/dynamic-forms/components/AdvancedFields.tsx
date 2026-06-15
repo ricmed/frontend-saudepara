@@ -19,6 +19,10 @@ import {
 import { optionsChoiceGridClass } from '@/features/dynamic-forms/utils/optionsChoiceGridClass';
 import { formatIdadeMesesParaExibicao } from '@/features/dynamic-forms/utils/hepatiteCriancaHbvLimits';
 import {
+  getIdadeFieldDefaultUnidade,
+  isIdadeMesesComoTotal,
+} from '@/features/dynamic-forms/utils/idadeFieldConfig';
+import {
   renderDynamicFieldLabel,
   renderDynamicOptionLabel,
 } from '@/features/dynamic-forms/utils/sinanFichaUi';
@@ -1129,6 +1133,7 @@ export const IdadeField: React.FC<IdadeFieldProps> = ({
   calculadaPorDataNascimento = false,
 }) => {
   const somenteAnos = Boolean((field as { somenteAnos?: boolean }).somenteAnos);
+  const somenteMeses = Boolean((field as { somenteMeses?: boolean }).somenteMeses);
   const idadeMinAnos =
     typeof (field as { idadeMinAnos?: number }).idadeMinAnos === 'number'
       ? (field as { idadeMinAnos: number }).idadeMinAnos
@@ -1142,9 +1147,14 @@ export const IdadeField: React.FC<IdadeFieldProps> = ({
       ? (field as { idadeMaxMeses: number }).idadeMaxMeses
       : 11;
   const meses = value != null && value !== '' ? Number(value) : undefined;
-  const isAnos = (m: number) => m >= 12;
+  const fieldSchema = field as {
+    somenteAnos?: boolean;
+    somenteMeses?: boolean;
+    idadeMaxMeses?: number;
+  };
+  const mesesComoTotal = isIdadeMesesComoTotal(fieldSchema, idadeMaxMesesCampo);
   const [unidade, setUnidade] = useState<'anos' | 'meses'>(() =>
-    somenteAnos ? 'anos' : meses !== undefined ? (isAnos(meses) ? 'anos' : 'meses') : 'anos'
+    getIdadeFieldDefaultUnidade(fieldSchema, idadeMaxMesesCampo, meses),
   );
   const [erroMinIdade, setErroMinIdade] = useState(false);
   const [erroMaxIdade, setErroMaxIdade] = useState(false);
@@ -1153,8 +1163,13 @@ export const IdadeField: React.FC<IdadeFieldProps> = ({
   const [substituirProximoDigito, setSubstituirProximoDigito] = useState(false);
   const idadeAnosRestrita = somenteAnos && idadeMinAnos > 0;
   const displayAnos = meses !== undefined ? Math.floor(meses / 12) : '';
-  const displayMeses = meses !== undefined ? meses % 12 : '';
-  const unidadeEfetiva = somenteAnos ? 'anos' : unidade;
+  const unidadeEfetiva = somenteAnos ? 'anos' : somenteMeses ? 'meses' : unidade;
+  const displayMeses =
+    meses !== undefined
+      ? mesesComoTotal && unidadeEfetiva === 'meses'
+        ? meses
+        : meses % 12
+      : '';
   const inputValue =
     unidadeEfetiva === 'anos'
       ? displayAnos !== ''
@@ -1172,7 +1187,7 @@ export const IdadeField: React.FC<IdadeFieldProps> = ({
     setUnidade(u);
     if (meses !== undefined) {
       if (u === 'anos') onChange(Math.floor(meses / 12) * 12);
-      else onChange(meses % 12);
+      else onChange(mesesComoTotal ? meses : meses % 12);
     }
   };
 
@@ -1270,7 +1285,9 @@ export const IdadeField: React.FC<IdadeFieldProps> = ({
 
   if (locked && meses !== undefined && meses !== '') {
     const sempreMesesAte =
-      calculadaPorDataNascimento && typeof idadeMaxMesesCampo === 'number' && idadeMaxMesesCampo <= 24
+      (calculadaPorDataNascimento || somenteMeses) &&
+      typeof idadeMaxMesesCampo === 'number' &&
+      idadeMaxMesesCampo <= 24
         ? idadeMaxMesesCampo
         : undefined;
     const texto = formatIdadeMesesParaExibicao(Number(meses), { sempreMesesAte });
@@ -1300,7 +1317,7 @@ export const IdadeField: React.FC<IdadeFieldProps> = ({
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
       <div className="flex items-center gap-2">
-        {!somenteAnos ? (
+        {!somenteAnos && !somenteMeses ? (
           <select
             value={unidade}
             onChange={handleUnidadeChange}
@@ -1311,7 +1328,9 @@ export const IdadeField: React.FC<IdadeFieldProps> = ({
             <option value="meses">Meses</option>
           </select>
         ) : (
-          <span className="px-3 py-2 text-sm text-gray-600 shrink-0">Anos</span>
+          <span className="px-3 py-2 text-sm text-gray-600 shrink-0">
+            {somenteAnos ? 'Anos' : 'Meses'}
+          </span>
         )}
         <input
           type={idadeAnosRestrita ? 'text' : 'number'}

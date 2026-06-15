@@ -15,6 +15,11 @@ import {
   isIdadeValidaCriancaExpostaHBV,
 } from '../utils/hepatiteCriancaHbvLimits';
 import { isMaeLabHbvMarkerRequired } from '../utils/hepatiteCriancaMaeLabRequired';
+import { isMaeSorologiaReagenteRequired } from '../utils/hepatiteCriancaMaeSorologiaRequired';
+import {
+  isHepatiteInvestigadorRequiredKey,
+  HEPATITE_INVESTIGADOR_VISIBLE_KEYS,
+} from '../utils/hepatiteCriancaInvestigadorRequired';
 import {
   TIPO_EXPOSICAO_AMBOS,
   TIPO_EXPOSICAO_HEPATITE_KEY,
@@ -23,6 +28,7 @@ import {
 import {
   MATERNIDADE_HBV_HBIG_KEY,
   MATERNIDADE_NAO_REALIZADO_QUAL_KEY,
+  isMaternidadeHbvHbigRequired,
   maternidadeHbvHbigNaoRealizado,
 } from '../utils/hepatiteCriancaMaternidadeHbvHbig';
 import { SEXO_NASCIMENTO_INTERSEXO_CODIGO } from '../utils/apiSelectOptionFilters';
@@ -343,9 +349,12 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange, formKe
           if (area !== 'vigilancia_ambiental_trabalhador') return false;
         }
       }
+      if (isHepatiteCriancaHBVForm({ schema, formKey }) && HEPATITE_INVESTIGADOR_VISIBLE_KEYS.has(key)) {
+        return true;
+      }
       return fieldVisibility[key] !== false;
     },
-    [fieldVisibility, getValue, schema]
+    [fieldVisibility, formKey, getValue, schema]
   );
 
   const isFieldRequired = useCallback(
@@ -384,6 +393,7 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange, formKe
         ]);
         if (residenciaObrigatoria.has(key)) return true;
         if (key.startsWith('residencia.')) return false;
+        if (isMaeSorologiaReagenteRequired(key, getValue)) return true;
         if (key.startsWith('mae.lab.hbv_')) {
           return isMaeLabHbvMarkerRequired(key, getValue);
         }
@@ -391,6 +401,9 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange, formKe
         if (key === 'prenatal.medicamento_utilizado') return false;
         if (key === MATERNIDADE_NAO_REALIZADO_QUAL_KEY) {
           return maternidadeHbvHbigNaoRealizado(getValue(MATERNIDADE_HBV_HBIG_KEY));
+        }
+        if (key === MATERNIDADE_HBV_HBIG_KEY) {
+          return isMaternidadeHbvHbigRequired(getValue);
         }
         if (key === 'notificacao.agravo_doenca') {
           const tipo = String(getValue(TIPO_EXPOSICAO_HEPATITE_KEY) ?? '').trim();
@@ -400,6 +413,7 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange, formKe
           const tipo = String(getValue(TIPO_EXPOSICAO_HEPATITE_KEY) ?? '').trim();
           return tipo === TIPO_EXPOSICAO_HBV || tipo === TIPO_EXPOSICAO_AMBOS;
         }
+        if (isHepatiteInvestigadorRequiredKey(key)) return true;
       }
 
       // Data da notificação: sempre obrigatória

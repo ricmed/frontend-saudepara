@@ -3053,7 +3053,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                           step={1}
                           variant="neutral"
                           title="Mãe apresentou sorologia reagente para"
-                          subtitle="Informe Sim ou Não para cada vírus antes de detalhar momento e exames."
+                          subtitle="Obrigatório informar Sim ou Não para cada vírus visível antes de detalhar momento e exames."
                         >
                           <div
                             className={`grid gap-4 ${showColB && showColC ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 max-w-md'}`}
@@ -3222,7 +3222,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                             step={3}
                             variant="hbv"
                             title="Vacina para Hepatite B + Imunoglobulina Hepatite B na maternidade"
-                            subtitle="Antes ou após 24h de vida, ou não realizado (informe o que faltou). Informe as datas de administração quando aplicável."
+                            subtitle="Obrigatório: antes ou após 24h de vida, ou não realizado (informe o que faltou). Informe as datas de administração quando aplicável."
                           >
                             <div className={`max-w-2xl space-y-4 ${criancaCell}`}>
                               {renderCrianca(MATERNIDADE_HBV_HBIG_KEY)}
@@ -3462,6 +3462,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                           getValue={getValue}
                           setValue={setValue}
                           getError={getError}
+                          isFieldRequired={isFieldRequired}
                           readOnly={readOnly}
                         />
                       </div>

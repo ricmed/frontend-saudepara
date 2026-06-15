@@ -33,6 +33,7 @@ export interface InvestigadorDadosPanelProps {
   getValue: (key: string) => unknown;
   setValue: (key: string, value: unknown) => void;
   getError: (key: string) => string | undefined;
+  isFieldRequired?: (key: string) => boolean;
   readOnly?: boolean;
 }
 
@@ -42,6 +43,7 @@ export const InvestigadorDadosPanel: React.FC<InvestigadorDadosPanelProps> = ({
   getValue,
   setValue,
   getError,
+  isFieldRequired,
   readOnly,
 }) => {
   const render = (key: string) => {
@@ -57,12 +59,14 @@ export const InvestigadorDadosPanel: React.FC<InvestigadorDadosPanelProps> = ({
           setValue={setValue}
           disabled={readOnly}
           error={getError(KEYS.municipioId)}
+          required={isFieldRequired?.(KEYS.municipioId) ?? false}
         />
         <EstabelecimentoInvestigador
           getValue={getValue}
           setValue={setValue}
           disabled={readOnly}
           error={getError(KEYS.unidadeId) || getError(KEYS.estabelecimentoCnes)}
+          required={isFieldRequired?.(KEYS.unidadeId) ?? false}
         />
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
