@@ -50,6 +50,7 @@
     "papaparse": "^5.5.2",
     "pdf-lib": "^1.17.1",
     "prop-types": "^15.8.1",
+    "qrcode.react": "^4.2.0",
     "react": "18.2.0",
     "react-csv": "^2.2.2",
     "react-dom": "18.2.0",

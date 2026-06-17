@@ -27,6 +27,7 @@ import {
   Hospital,
   ClipboardList,
   Settings,
+  QrCode,
 } from "lucide-react";
 
 interface SideMenuProps {
@@ -178,6 +179,16 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       label: t("educationalMaterials.title") || "Materiais Educativos",
       onClick: () => {
         navigate("/materiais-educativos");
+        onClose();
+      },
+    },
+    
+    // Gerador de QR Code - acesso público
+    {
+      icon: <QrCode />,
+      label: "Gerador de QR Code",
+      onClick: () => {
+        navigate("/gerador-qrcode");
         onClose();
       },
     },
