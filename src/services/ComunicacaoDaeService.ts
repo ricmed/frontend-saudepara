@@ -26,6 +26,12 @@ export interface ComunicacaoDaeLeitura {
   lido_em: string;
 }
 
+export interface ComunicacaoDaeLeituraResumo {
+  todas: number;
+  nao_lidas: number;
+  lidas: number;
+}
+
 export interface ComunicacaoDae {
   id_comunicacao: number;
   data_comunicacao: string;
@@ -159,9 +165,9 @@ class ComunicacaoDaeService {
   }
 
   /**
-   * Conta comunicações não lidas pelo usuário autenticado.
+   * Resumo de leitura: total, não lidas e lidas pelo usuário autenticado.
    */
-  async getContagemNaoLidas(estabelecimento_id?: number): Promise<{ total: number }> {
+  async getResumoLeitura(estabelecimento_id?: number): Promise<ComunicacaoDaeLeituraResumo> {
     const response = await axios.get(`${API_URL}/comunicacao-dae/leitura/contagem`, {
       params: {
         ...(estabelecimento_id ? { estabelecimento_id } : {}),

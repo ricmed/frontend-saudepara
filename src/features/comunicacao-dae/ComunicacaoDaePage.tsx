@@ -21,7 +21,7 @@ import {
 } from './components/listDocumentExporters';
 import { formatComunicacaoDaeAgravoNomes } from '@/features/comunicacao-dae/comunicacaoDaeAgravoUtils';
 import { notifyComunicacaoDaeLeituraAtualizada } from '@/features/comunicacao-dae/comunicacaoDaeLeituraEvents';
-import { useComunicacaoDaeNaoLidas } from '@/features/comunicacao-dae/hooks/useComunicacaoDaeNaoLidas';
+import { useComunicacaoDaeLeituraResumo } from '@/features/comunicacao-dae/hooks/useComunicacaoDaeLeituraResumo';
 import { calcularSemanaEpidemiologica } from '@/utils/timezoneUtils';
 import { offlineDataManager } from '@/services/offlineDataManager';
 
@@ -103,9 +103,9 @@ const ComunicacaoDaePage: React.FC = () => {
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: null, direction: null });
   const [sortedComunicacoes, setSortedComunicacoes] = useState<ComunicacaoDae[]>([]);
 
-  // Filtro de leitura (por usuário) — padrão: caixa de não lidas
-  const [statusLeituraFilter, setStatusLeituraFilter] = useState<StatusLeituraFiltro>('nao_lidas');
-  const { naoLidas: totalNaoLidas } = useComunicacaoDaeNaoLidas();
+  // Filtro de leitura (por usuário)
+  const [statusLeituraFilter, setStatusLeituraFilter] = useState<StatusLeituraFiltro>('todas');
+  const { resumo: leituraResumo } = useComunicacaoDaeLeituraResumo();
 
   const loadComunicacoes = useCallback(async () => {
     try {
@@ -459,14 +459,14 @@ const ComunicacaoDaePage: React.FC = () => {
                 </div>
                 <p className="text-sm text-blue-100 mt-0.5">
                   Gerenciar Doenças, Agravos e Eventos
-                  {totalNaoLidas > 0 && (
+                  {leituraResumo.nao_lidas > 0 && (
                     <button
                       type="button"
                       onClick={() => handleStatusLeituraChange('nao_lidas')}
                       className="ml-2 inline-flex items-center rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold text-white hover:bg-white/30 transition-colors"
                       title="Ver comunicações não lidas"
                     >
-                      {totalNaoLidas} não lida{totalNaoLidas === 1 ? '' : 's'}
+                      {leituraResumo.nao_lidas} não lida{leituraResumo.nao_lidas === 1 ? '' : 's'}
                     </button>
                   )}
                   {pendingData.comunicacoes_dae && pendingData.comunicacoes_dae > 0 && (
@@ -620,9 +620,9 @@ const ComunicacaoDaePage: React.FC = () => {
               >
                 {(
                   [
-                    { value: 'todas' as const, label: 'Todas' },
-                    { value: 'nao_lidas' as const, label: totalNaoLidas > 0 ? `Não lidas (${totalNaoLidas})` : 'Não lidas' },
-                    { value: 'lidas' as const, label: 'Lidas' },
+                    { value: 'todas' as const, label: `Todas (${leituraResumo.todas})` },
+                    { value: 'nao_lidas' as const, label: `Não lidas (${leituraResumo.nao_lidas})` },
+                    { value: 'lidas' as const, label: `Lidas (${leituraResumo.lidas})` },
                   ] as const
                 ).map((opt) => (
                   <button

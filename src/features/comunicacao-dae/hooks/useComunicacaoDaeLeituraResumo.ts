@@ -1,8 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/keycloak/AuthProvider';
-import ComunicacaoDaeService from '@/services/ComunicacaoDaeService';
+import ComunicacaoDaeService, { ComunicacaoDaeLeituraResumo } from '@/services/ComunicacaoDaeService';
 import { usuarioGestaoService } from '@/services/UsuarioGestaoService';
 import { COMUNICACAO_DAE_LEITURA_ATUALIZADA } from '@/features/comunicacao-dae/comunicacaoDaeLeituraEvents';
+
+const RESUMO_VAZIO: ComunicacaoDaeLeituraResumo = {
+  todas: 0,
+  nao_lidas: 0,
+  lidas: 0,
+};
 
 function hasComunicacaoDaeRole(roles: string[] | undefined): boolean {
   if (!roles?.length) return false;
@@ -15,14 +21,14 @@ function hasComunicacaoDaeRole(roles: string[] | undefined): boolean {
   );
 }
 
-export function useComunicacaoDaeNaoLidas(enabled = true) {
+export function useComunicacaoDaeLeituraResumo(enabled = true) {
   const { user } = useAuth();
-  const [naoLidas, setNaoLidas] = useState(0);
+  const [resumo, setResumo] = useState<ComunicacaoDaeLeituraResumo>(RESUMO_VAZIO);
   const canUse = enabled && hasComunicacaoDaeRole(user?.roles);
 
   const refresh = useCallback(async () => {
     if (!canUse) {
-      setNaoLidas(0);
+      setResumo(RESUMO_VAZIO);
       return;
     }
 
@@ -37,10 +43,10 @@ export function useComunicacaoDaeNaoLidas(enabled = true) {
         /* escopo opcional */
       }
 
-      const { total } = await ComunicacaoDaeService.getContagemNaoLidas(estabelecimentoId);
-      setNaoLidas(total);
+      const data = await ComunicacaoDaeService.getResumoLeitura(estabelecimentoId);
+      setResumo(data);
     } catch {
-      /* falha silenciosa — badge é auxiliar */
+      /* falha silenciosa — contadores são auxiliares */
     }
   }, [canUse]);
 
@@ -66,5 +72,11 @@ export function useComunicacaoDaeNaoLidas(enabled = true) {
     };
   }, [refresh]);
 
-  return { naoLidas, refresh };
+  return { resumo, refresh };
+}
+
+/** @deprecated Use useComunicacaoDaeLeituraResumo */
+export function useComunicacaoDaeNaoLidas(enabled = true) {
+  const { resumo, refresh } = useComunicacaoDaeLeituraResumo(enabled);
+  return { naoLidas: resumo.nao_lidas, refresh };
 }
