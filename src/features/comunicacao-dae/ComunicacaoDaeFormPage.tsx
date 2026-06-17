@@ -41,6 +41,8 @@ import {
 } from './components/formDocumentExporters';
 import { useComunicacaoDaeForm } from './hooks/useComunicacaoDaeForm';
 import { useComunicacaoDaeValidation } from './hooks/useComunicacaoDaeValidation';
+import ComunicacaoDaeLeiturasPanel from './components/ComunicacaoDaeLeiturasPanel';
+import { notifyComunicacaoDaeLeituraAtualizada } from './comunicacaoDaeLeituraEvents';
 
 // Função para normalizar texto (remover acentos e converter para maiúsculas)
 const normalizeText = (text: string): string => {
@@ -50,6 +52,32 @@ const normalizeText = (text: string): string => {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "") // Remove acentos
     .toUpperCase();
+};
+
+type ComunicacaoDaeSaveResult = { offlineId?: string; comunicacaoId?: number };
+
+const getComunicacaoDaeSaveAlert = (
+  result: ComunicacaoDaeSaveResult,
+  mode: 'create' | 'update',
+  withAnexos: boolean,
+): string => {
+  const savedOnline = Boolean(result.comunicacaoId);
+  if (withAnexos) {
+    if (savedOnline) {
+      return mode === 'create'
+        ? '✅ Comunicação criada e anexos enviados!'
+        : '✅ Comunicação e anexos atualizados!';
+    }
+    return '📱 Comunicação e anexos salvos offline! Serão sincronizados quando voltar online.';
+  }
+  if (savedOnline) {
+    return mode === 'create'
+      ? '✅ Comunicação criada com sucesso!'
+      : '✅ Comunicação atualizada com sucesso!';
+  }
+  return mode === 'create'
+    ? '📱 Comunicação salva offline! Será sincronizada quando voltar online.'
+    : '📱 Comunicação atualizada offline! Será sincronizada quando voltar online.';
 };
 
 const ComunicacaoDaeFormPage: React.FC = () => {
@@ -329,9 +357,13 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       setComunicacaoCompleta(data);
 
       if (isOnline) {
-        ComunicacaoDaeService.marcarComoLida(comunicacaoId).catch(() => {
-          /* não bloqueia visualização */
-        });
+        ComunicacaoDaeService.marcarComoLida(comunicacaoId)
+          .then(() => {
+            notifyComunicacaoDaeLeituraAtualizada();
+          })
+          .catch(() => {
+            /* não bloqueia visualização */
+          });
       }
       
       const dataConvertida = convertUTCToLocalDateTime(data.data_comunicacao);
@@ -443,48 +475,37 @@ const ComunicacaoDaeFormPage: React.FC = () => {
         const formDataWithId = { ...formPayload, id: Number(id), id_comunicacao: Number(id) };
         const result = await syncService.saveComunicacaoDae(formDataWithId, true);
         console.log('✅ Comunicação atualizada!');
-        
-        // Salvar anexos se houver
-        if (fichaFiles.length > 0 || relatorioFiles.length > 0) {
-          if (isOnline && result.comunicacaoId) {
-            // Upload direto se online
+
+        const hasAnexos = fichaFiles.length > 0 || relatorioFiles.length > 0;
+        if (hasAnexos) {
+          if (result.comunicacaoId) {
             await uploadAnexos(result.comunicacaoId);
-            alert('✅ Comunicação e anexos atualizados!');
           } else if (result.offlineId) {
-            // Salvar anexos offline
             await saveAnexosOffline(result.offlineId, result.comunicacaoId);
-            alert('📱 Comunicação e anexos salvos offline! Serão sincronizados quando voltar online.');
           }
-        } else {
-          alert(isOnline ? '✅ Comunicação atualizada com sucesso!' : '📱 Comunicação atualizada offline!');
         }
+        alert(getComunicacaoDaeSaveAlert(result, 'update', hasAnexos));
       } else {
         // Criar nova comunicação
         console.log('➕ Criando nova comunicação...');
         const result = await syncService.saveComunicacaoDae(formPayload, false);
         console.log('✅ Comunicação criada!');
-        
-        // Salvar anexos se houver
-        if (fichaFiles.length > 0 || relatorioFiles.length > 0) {
-          if (isOnline && result.comunicacaoId) {
-            // Upload direto se online
+
+        const hasAnexos = fichaFiles.length > 0 || relatorioFiles.length > 0;
+        if (hasAnexos) {
+          if (result.comunicacaoId) {
             await uploadAnexos(result.comunicacaoId);
-            alert('✅ Comunicação criada e anexos enviados!');
           } else if (result.offlineId) {
-            // Salvar anexos offline
             await saveAnexosOffline(result.offlineId, result.comunicacaoId);
-            alert('📱 Comunicação e anexos salvos offline! Serão sincronizados quando voltar online.');
           }
-        } else {
-          alert(isOnline ? '✅ Comunicação criada com sucesso!' : '📱 Comunicação salva offline!');
         }
+        alert(getComunicacaoDaeSaveAlert(result, 'create', hasAnexos));
       }
 
       console.log('🔄 Redirecionando para lista de comunicações...');
-      
-      // Pequeno delay para o usuário ver a mensagem
+
       setTimeout(() => {
-        navigate('/private/comunicacao-dae');
+        navigate('/private/comunicacao-dae', { state: { refreshList: true } });
       }, 1500);
       
     } catch (err: any) {
@@ -964,6 +985,15 @@ const ComunicacaoDaeFormPage: React.FC = () => {
           showForceSync={true}
           className="mb-4"
         />
+
+        {isEditMode && id && Number(id) > 0 && (
+          <div className="mb-6">
+            <ComunicacaoDaeLeiturasPanel
+              comunicacaoId={Number(id)}
+              isOnline={isOnline}
+            />
+          </div>
+        )}
         
         {/* Mensagem de Erro */}
         {error && (

@@ -158,6 +158,22 @@ export default defineConfig(({ mode }) => {
             }
           },
           
+          // Comunicação DAE: nunca cachear — listagem deve refletir salvamentos imediatamente
+          {
+            urlPattern: /^https:\/\/app-api(?:\.hml)?\.saude\.pa\.gov\.br\/api\/comunicacao-dae.*$/i,
+            handler: 'NetworkOnly',
+            options: {
+              cacheName: 'comunicacao-dae-api-network-only',
+            },
+          },
+          {
+            urlPattern: /^https:\/\/app(?:\.hml)?\.saude\.pa\.gov\.br\/api\/comunicacao-dae.*$/i,
+            handler: 'NetworkOnly',
+            options: {
+              cacheName: 'comunicacao-dae-app-network-only',
+            },
+          },
+
           {
             // essa rota genérica de paciente continua existindo, mas o check-cpf já foi "capturado" acima
             urlPattern: /^https:\/\/app-api(?:\.hml)?\.saude\.pa\.gov\.br\/api\/(notificacao|paciente).*$/i,

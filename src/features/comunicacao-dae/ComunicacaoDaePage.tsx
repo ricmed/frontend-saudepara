@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Plus, FileText, Calendar, MapPin, Filter, X, Trash2, Edit, Eye, Menu, Download, ChevronDown, Search, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, Wifi, WifiOff, BarChart2 } from 'lucide-react';
 import ComunicacaoDaeService, {
   ComunicacaoDae,
@@ -20,7 +20,10 @@ import {
   exportarComunicacoesDaeListaWord,
 } from './components/listDocumentExporters';
 import { formatComunicacaoDaeAgravoNomes } from '@/features/comunicacao-dae/comunicacaoDaeAgravoUtils';
+import { notifyComunicacaoDaeLeituraAtualizada } from '@/features/comunicacao-dae/comunicacaoDaeLeituraEvents';
+import { useComunicacaoDaeNaoLidas } from '@/features/comunicacao-dae/hooks/useComunicacaoDaeNaoLidas';
 import { calcularSemanaEpidemiologica } from '@/utils/timezoneUtils';
+import { offlineDataManager } from '@/services/offlineDataManager';
 
 // Tipos para pesquisa
 type SearchField = 'all' | 'nome_paciente' | 'origem' | 'unidade_notificadora' | 'dae' | 'municipio';
@@ -55,8 +58,14 @@ const searchFields = [
   { value: 'municipio' as SearchField, label: 'Município' },
 ];
 
+type ComunicacaoDaePageLocationState = {
+  refreshList?: boolean;
+};
+
 const ComunicacaoDaePage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const loadComunicacoesRef = useRef<() => void>(() => {});
   
   // ✅ Hook do sistema offline
   const {
@@ -94,12 +103,103 @@ const ComunicacaoDaePage: React.FC = () => {
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: null, direction: null });
   const [sortedComunicacoes, setSortedComunicacoes] = useState<ComunicacaoDae[]>([]);
 
-  // Filtro de leitura (por usuário)
-  const [statusLeituraFilter, setStatusLeituraFilter] = useState<StatusLeituraFiltro>('todas');
+  // Filtro de leitura (por usuário) — padrão: caixa de não lidas
+  const [statusLeituraFilter, setStatusLeituraFilter] = useState<StatusLeituraFiltro>('nao_lidas');
+  const { naoLidas: totalNaoLidas } = useComunicacaoDaeNaoLidas();
+
+  const loadComunicacoes = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      if (!isOnline) {
+        const allOffline = await offlineDataManager.getComunicacoesDaeForOfflineList();
+        const start = (currentPage - 1) * itemsPerPage;
+        const pageSlice = allOffline.slice(start, start + itemsPerPage);
+        setComunicacoes(pageSlice);
+        setTotal(allOffline.length);
+        setTotalPages(Math.max(1, Math.ceil(allOffline.length / itemsPerPage)));
+        if (allOffline.length === 0) {
+          setError('Nenhuma comunicação DAE disponível offline. Baixe os dados no Gerenciamento Offline.');
+        }
+        return;
+      }
+
+      let filtrosComPermissoes = { ...filters };
+
+      try {
+        const userAccess = await usuarioGestaoService.getUserAccess();
+
+        if (userAccess) {
+          if (userAccess.isEstabelecimento && userAccess.estabelecimentoId) {
+            filtrosComPermissoes.estabelecimento_id = userAccess.estabelecimentoId;
+          }
+        }
+      } catch {
+        // Silenciar erro de permissões
+      }
+
+      if (statusLeituraFilter !== 'todas') {
+        filtrosComPermissoes.status_leitura = statusLeituraFilter;
+      }
+
+      const response = await ComunicacaoDaeService.getAll(currentPage, itemsPerPage, filtrosComPermissoes);
+      setComunicacoes(response.data || []);
+      setTotal(response.pagination?.total || 0);
+      setTotalPages(response.pagination?.pages || 1);
+    } catch (err: any) {
+      try {
+        const allOffline = await offlineDataManager.getComunicacoesDaeForOfflineList();
+        if (allOffline.length > 0) {
+          const start = (currentPage - 1) * itemsPerPage;
+          const pageSlice = allOffline.slice(start, start + itemsPerPage);
+          setComunicacoes(pageSlice);
+          setTotal(allOffline.length);
+          setTotalPages(Math.max(1, Math.ceil(allOffline.length / itemsPerPage)));
+          setError('Sem conexão com o servidor — exibindo dados salvos no dispositivo.');
+          return;
+        }
+      } catch {
+        /* fallback falhou */
+      }
+      setError(err.response?.data?.message || 'Erro ao carregar comunicações');
+      console.error('Erro ao carregar comunicações:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, filters, itemsPerPage, statusLeituraFilter, isOnline]);
+
+  useEffect(() => {
+    loadComunicacoesRef.current = loadComunicacoes;
+  }, [loadComunicacoes]);
 
   useEffect(() => {
     loadComunicacoes();
-  }, [currentPage, filters, itemsPerPage, statusLeituraFilter]);
+  }, [loadComunicacoes]);
+
+  // Recarregar ao voltar do formulário (após salvar)
+  useEffect(() => {
+    const state = location.state as ComunicacaoDaePageLocationState | null;
+    if (state?.refreshList) {
+      loadComunicacoes();
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, location.pathname, loadComunicacoes, navigate]);
+
+  // Recarregar quando o usuário volta à aba (evita lista stale)
+  useEffect(() => {
+    const refreshIfVisible = () => {
+      if (document.visibilityState === 'visible') {
+        loadComunicacoesRef.current();
+      }
+    };
+    window.addEventListener('focus', refreshIfVisible);
+    document.addEventListener('visibilitychange', refreshIfVisible);
+    return () => {
+      window.removeEventListener('focus', refreshIfVisible);
+      document.removeEventListener('visibilitychange', refreshIfVisible);
+    };
+  }, []);
 
   // Fechar dropdown de pesquisa ao clicar fora
   useEffect(() => {
@@ -165,43 +265,6 @@ const ComunicacaoDaePage: React.FC = () => {
     setSortedComunicacoes(filteredComunicacoes);
   }, [filteredComunicacoes]);
 
-  const loadComunicacoes = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // 🔒 BUSCAR PERMISSÕES DO USUÁRIO
-      let filtrosComPermissoes = { ...filters };
-      
-      try {
-        const userAccess = await usuarioGestaoService.getUserAccess();
-        
-        if (userAccess) {
-          // Se o usuário tem acesso apenas a um estabelecimento, aplicar filtro
-          if (userAccess.isEstabelecimento && userAccess.estabelecimentoId) {
-            filtrosComPermissoes.estabelecimento_id = userAccess.estabelecimentoId;
-          }
-        }
-      } catch (permError) {
-        // Silenciar erro de permissões
-      }
-
-      if (statusLeituraFilter !== 'todas') {
-        filtrosComPermissoes.status_leitura = statusLeituraFilter;
-      }
-      
-      const response = await ComunicacaoDaeService.getAll(currentPage, itemsPerPage, filtrosComPermissoes);
-      setComunicacoes(response.data || []);
-      setTotal(response.pagination?.total || 0);
-      setTotalPages(response.pagination?.pages || 1);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Erro ao carregar comunicações');
-      console.error('Erro ao carregar comunicações:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const isComunicacaoNaoLida = (comunicacao: ComunicacaoDae) => comunicacao.lida === false;
 
   const getLinhaClasses = (comunicacao: ComunicacaoDae, index: number) => {
@@ -239,9 +302,13 @@ const ComunicacaoDaePage: React.FC = () => {
   const handleVisualizar = (id: number) => {
     marcarComunicacaoLidaLocal(id);
     if (isOnline) {
-      ComunicacaoDaeService.marcarComoLida(id).catch(() => {
-        /* falha silenciosa — form tentará novamente ao abrir */
-      });
+      ComunicacaoDaeService.marcarComoLida(id)
+        .then(() => {
+          notifyComunicacaoDaeLeituraAtualizada();
+        })
+        .catch(() => {
+          /* falha silenciosa — form tentará novamente ao abrir */
+        });
     }
     navigate(`/private/comunicacao-dae/${id}`);
   };
@@ -392,6 +459,16 @@ const ComunicacaoDaePage: React.FC = () => {
                 </div>
                 <p className="text-sm text-blue-100 mt-0.5">
                   Gerenciar Doenças, Agravos e Eventos
+                  {totalNaoLidas > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handleStatusLeituraChange('nao_lidas')}
+                      className="ml-2 inline-flex items-center rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold text-white hover:bg-white/30 transition-colors"
+                      title="Ver comunicações não lidas"
+                    >
+                      {totalNaoLidas} não lida{totalNaoLidas === 1 ? '' : 's'}
+                    </button>
+                  )}
                   {pendingData.comunicacoes_dae && pendingData.comunicacoes_dae > 0 && (
                     <span className="ml-2 text-yellow-200">
                       • {pendingData.comunicacoes_dae} pendente(s)
@@ -544,7 +621,7 @@ const ComunicacaoDaePage: React.FC = () => {
                 {(
                   [
                     { value: 'todas' as const, label: 'Todas' },
-                    { value: 'nao_lidas' as const, label: 'Não lidas' },
+                    { value: 'nao_lidas' as const, label: totalNaoLidas > 0 ? `Não lidas (${totalNaoLidas})` : 'Não lidas' },
                     { value: 'lidas' as const, label: 'Lidas' },
                   ] as const
                 ).map((opt) => (

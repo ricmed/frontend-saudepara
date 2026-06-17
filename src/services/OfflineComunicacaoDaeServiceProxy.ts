@@ -102,7 +102,7 @@ export const OfflineComunicacaoDaeServiceProxy = {
   async getDaeOptions() {
     return this.getOptionsWithOfflineSupport(
       async () => {
-        const response = await DaeService.getAll(1, 100);
+        const response = await DaeService.getAll(1, 500);
         return response.data;
       },
       'daes'

@@ -19,7 +19,8 @@ import {
   Menu,
   Users,
   Shield,
-  Zap
+  Zap,
+  FileText
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { offlineDataManager } from '@/services/offlineDataManager';
@@ -50,15 +51,20 @@ const OfflineManagementPage: React.FC = () => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [currentDownload, setCurrentDownload] = useState('');
-  const [pendingSync, setPendingSync] = useState({ notificacoes: 0, pacientes: 0 });
+  const [pendingSync, setPendingSync] = useState({ notificacoes: 0, pacientes: 0, comunicacoes_dae: 0 });
   const [pendingNotifications, setPendingNotifications] = useState<any[]>([]); // ✅ NOVO: Lista detalhada de notificações pendentes
-  const [activeTab, setActiveTab] = useState<'overview' | 'patients' | 'sources' | 'notifications' | 'sync' | 'pin'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'patients' | 'sources' | 'notifications' | 'comunicacao-dae' | 'sync' | 'pin'>('overview');
   
   // ✅ NOVO: Estados para download de notificações
   const [notificationsStats, setNotificationsStats] = useState<any>(null);
   const [notificationsDownloading, setNotificationsDownloading] = useState(false);
   const [notificationsProgress, setNotificationsProgress] = useState(0);
   const [notificationsPhase, setNotificationsPhase] = useState('');
+
+  const [daeStats, setDaeStats] = useState<any>(null);
+  const [daeDownloading, setDaeDownloading] = useState(false);
+  const [daeProgress, setDaeProgress] = useState(0);
+  const [daePhase, setDaePhase] = useState('');
   const [isSyncPaused, setIsSyncPaused] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -105,12 +111,14 @@ const OfflineManagementPage: React.FC = () => {
     loadPendingSync();
     loadPatientsStats();
     loadNotificationsStats();
+    loadDaeStats();
     
     const interval = setInterval(() => {
       loadStats();
       loadPendingSync();
       loadPatientsStats();
       loadNotificationsStats();
+      loadDaeStats();
     }, 10000);
     
     return () => clearInterval(interval);
@@ -128,7 +136,11 @@ const OfflineManagementPage: React.FC = () => {
   const loadPendingSync = async () => {
     try {
       const pending = await syncService.getPendingCount();
-      setPendingSync(pending);
+      setPendingSync({
+        notificacoes: pending.notificacoes,
+        pacientes: pending.pacientes,
+        comunicacoes_dae: pending.comunicacoes_dae || 0,
+      });
       
       // ✅ NOVO: Carregar lista detalhada de notificações pendentes
       const pendingNotifs = await indexedDBService.getPendingNotificacoes();
@@ -210,6 +222,108 @@ const OfflineManagementPage: React.FC = () => {
     }
   };
 
+  const loadDaeStats = async () => {
+    try {
+      const stats = await offlineDataManager.getComunicacoesDaeOfflineStats();
+      setDaeStats(stats);
+    } catch (error) {
+      console.error('Erro ao carregar stats de comunicação DAE:', error);
+      setDaeStats({
+        cached: 0,
+        pending: 0,
+        total: 0,
+        formOptions: { daes: 0, nhes: 0, cievs: 0, crs: 0 },
+      });
+    }
+  };
+
+  const handleDownloadDaeFormOptions = async () => {
+    if (!isOnline) {
+      toast.error('❌ Sem conexão com a internet');
+      return;
+    }
+
+    setDaeDownloading(true);
+    setDaeProgress(0);
+    setDaePhase('Atualizando opções do formulário...');
+
+    try {
+      const result = await offlineDataManager.downloadDaeFormOptions((progress, current) => {
+        setDaeProgress(progress);
+        setDaePhase(current);
+      });
+
+      await loadDaeStats();
+      await loadStats();
+
+      if (result.success) {
+        toast.success(`✅ Opções DAE atualizadas (${result.totalRecords} registros)`);
+      } else {
+        throw new Error(result.error || 'Erro desconhecido');
+      }
+    } catch (error: any) {
+      toast.error(`❌ Erro: ${error.message || 'Erro ao baixar opções DAE'}`);
+    } finally {
+      setDaeDownloading(false);
+      setTimeout(() => {
+        setDaeProgress(0);
+        setDaePhase('');
+      }, 3000);
+    }
+  };
+
+  const handleDownloadComunicacoesDae = async (limit: number = 200) => {
+    if (!isOnline) {
+      toast.error('❌ Sem conexão com a internet');
+      return;
+    }
+
+    setDaeDownloading(true);
+    setDaeProgress(0);
+    setDaePhase('Iniciando...');
+
+    try {
+      const result = await offlineDataManager.downloadComunicacoesDaeForOfflineViewing({
+        limit,
+        encrypt: true,
+        onProgress: (progress, current) => {
+          setDaeProgress(progress);
+          setDaePhase(current);
+        },
+      });
+
+      await loadDaeStats();
+
+      if (result.success) {
+        toast.success(`✅ ${result.count} comunicações DAE baixadas para visualização offline`);
+      } else {
+        throw new Error(result.error || 'Erro desconhecido');
+      }
+    } catch (error: any) {
+      toast.error(`❌ Erro: ${error.message || 'Erro desconhecido'}`);
+      setDaePhase('Erro!');
+    } finally {
+      setDaeDownloading(false);
+      setTimeout(() => {
+        setDaeProgress(0);
+        setDaePhase('');
+      }, 3000);
+    }
+  };
+
+  const handleClearComunicacoesDaeCache = async () => {
+    if (window.confirm('⚠️ Limpar cache de comunicações DAE? Registros pendentes de sincronização serão preservados.')) {
+      try {
+        await offlineDataManager.clearComunicacoesDaeCache();
+        await loadDaeStats();
+        toast.success('✅ Cache de comunicações DAE limpo');
+      } catch (error) {
+        console.error('Erro ao limpar cache DAE:', error);
+        toast.error('❌ Erro ao limpar cache');
+      }
+    }
+  };
+
   const handleDownloadAll = async () => {
     if (!isOnline) {
       toast.error('❌ Sem conexão com a internet');
@@ -227,6 +341,7 @@ const OfflineManagementPage: React.FC = () => {
         }
       );
       await loadStats();
+      await loadDaeStats();
       toast.success('✅ Download concluído com sucesso');
     } catch (error) {
       toast.error('Erro no download dos dados');
@@ -610,6 +725,7 @@ const OfflineManagementPage: React.FC = () => {
               { id: 'overview', label: 'Visão Geral', icon: BarChart3 },
               { id: 'patients', label: 'Base de Pacientes', icon: Users },
               { id: 'notifications', label: 'Notificações', icon: Download },
+              { id: 'comunicacao-dae', label: 'Comunicação DAE', icon: FileText },
               { id: 'sources', label: 'Todas as Fontes', icon: Database },
               { id: 'sync', label: 'Sincronização', icon: RefreshCw },
               { id: 'pin', label: 'Login Offline (PIN)', icon: Shield }
@@ -1165,6 +1281,134 @@ const OfflineManagementPage: React.FC = () => {
           </div>
         )}
 
+        {/* Comunicação DAE Tab */}
+        {activeTab === 'comunicacao-dae' && (
+          <div className="space-y-6">
+            {daeStats && (
+              <div className="bg-white p-6 rounded-xl shadow-sm border">
+                <h2 className="text-lg font-semibold mb-4 text-gray-900 flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-indigo-600" />
+                  Status de Comunicação DAE Offline
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="bg-indigo-50 p-4 rounded-lg">
+                    <div className="text-2xl font-bold text-indigo-600 mb-1">{daeStats.cached.toLocaleString()}</div>
+                    <div className="text-sm text-indigo-700">Comunicações baixadas para visualização</div>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg">
+                    <div className="text-2xl font-bold text-orange-600 mb-1">{daeStats.pending.toLocaleString()}</div>
+                    <div className="text-sm text-orange-700">Criadas offline (aguardando sync)</div>
+                  </div>
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <div className="text-2xl font-bold text-purple-600 mb-1">{daeStats.total.toLocaleString()}</div>
+                    <div className="text-sm text-purple-700">Total visível no modo offline</div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="text-sm font-medium text-gray-800 mb-2">Opções do formulário (cache local)</p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm text-gray-600">
+                    <span>DAEs: <strong>{daeStats.formOptions.daes}</strong></span>
+                    <span>NHEs: <strong>{daeStats.formOptions.nhes}</strong></span>
+                    <span>CIEVS: <strong>{daeStats.formOptions.cievs}</strong></span>
+                    <span>CRS: <strong>{daeStats.formOptions.crs}</strong></span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {daeDownloading && (
+              <div className="p-6 bg-indigo-50 rounded-xl border border-indigo-200">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="font-medium text-indigo-900 flex items-center gap-2">
+                    <RefreshCw className="h-5 w-5 animate-spin" />
+                    {daePhase}
+                  </span>
+                  <span className="text-indigo-700 font-bold">{Math.round(daeProgress)}%</span>
+                </div>
+                <div className="w-full bg-indigo-200 rounded-full h-3">
+                  <div
+                    className="bg-indigo-600 h-3 rounded-full transition-all duration-300"
+                    style={{ width: `${daeProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white p-6 rounded-xl shadow-sm border">
+              <h3 className="text-lg font-semibold mb-4 text-gray-900">Opções de Download</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 border-2 border-indigo-200 rounded-lg">
+                  <p className="text-sm text-gray-600 mb-4">
+                    Atualiza <strong>agravos (DAE)</strong>, NHE, CIEVS e CRS para o formulário offline.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleDownloadDaeFormOptions}
+                    disabled={daeDownloading || !isOnline}
+                    className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    Atualizar opções do formulário
+                  </button>
+                </div>
+
+                <div className="p-4 border-2 border-blue-200 rounded-lg">
+                  <p className="text-sm text-gray-600 mb-4">
+                    Baixa as <strong>200 comunicações mais recentes</strong> para consulta offline.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadComunicacoesDae(200)}
+                    disabled={daeDownloading || !isOnline}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    Baixar 200 comunicações
+                  </button>
+                </div>
+
+                <div className="p-4 border-2 border-green-200 rounded-lg">
+                  <p className="text-sm text-gray-600 mb-4">
+                    Baixa até <strong>500 comunicações</strong> (recomendado antes de períodos sem internet).
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadComunicacoesDae(500)}
+                    disabled={daeDownloading || !isOnline}
+                    className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                  >
+                    Baixar 500 comunicações
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-gray-200 flex flex-wrap gap-4">
+                <button
+                  type="button"
+                  onClick={handleClearComunicacoesDaeCache}
+                  disabled={daeDownloading}
+                  className="px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50"
+                >
+                  Limpar cache de listagem
+                </button>
+                <button
+                  type="button"
+                  onClick={loadDaeStats}
+                  disabled={daeDownloading}
+                  className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50"
+                >
+                  Atualizar status
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200 text-sm text-yellow-800 space-y-1">
+              <p>• Baixe as <strong>opções do formulário</strong> após atualizar agravos na portaria (ex.: SRAG).</p>
+              <p>• A <strong>listagem offline</strong> é separada: use os botões de comunicações acima.</p>
+              <p>• Comunicações criadas offline aparecem na lista e sincronizam quando voltar online.</p>
+            </div>
+          </div>
+        )}
+
         {/* Sources Tab */}
         {activeTab === 'sources' && (
           <div className="space-y-6">
@@ -1324,7 +1568,7 @@ const OfflineManagementPage: React.FC = () => {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-orange-50 p-6 rounded-xl border border-orange-200">
                   <div className="flex items-center gap-3 mb-3">
                     <Clock className="h-5 w-5 text-orange-600" />
@@ -1350,9 +1594,22 @@ const OfflineManagementPage: React.FC = () => {
                     Pacientes criados offline aguardando sincronização
                   </p>
                 </div>
+
+                <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-200">
+                  <div className="flex items-center gap-3 mb-3">
+                    <FileText className="h-5 w-5 text-indigo-600" />
+                    <span className="font-medium text-indigo-900">Comunicações DAE Pendentes</span>
+                  </div>
+                  <div className="text-2xl font-bold text-indigo-900 mb-2">
+                    {pendingSync.comunicacoes_dae}
+                  </div>
+                  <p className="text-sm text-indigo-700">
+                    Comunicações DAE salvas offline aguardando sincronização
+                  </p>
+                </div>
               </div>
 
-              {(pendingSync.notificacoes + pendingSync.pacientes) > 0 && (
+              {(pendingSync.notificacoes + pendingSync.pacientes + pendingSync.comunicacoes_dae) > 0 && (
                 <div className="mt-6 p-4 bg-yellow-50 rounded-xl border border-yellow-200">
                   <div className="flex items-center gap-2 mb-2">
                     <AlertTriangle className="h-5 w-5 text-yellow-600" />

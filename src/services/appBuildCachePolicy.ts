@@ -49,6 +49,9 @@ export async function runIndexedDbCachePolicyIfNewBuild(): Promise<void> {
     await clearRefetchableClientCaches();
     localStorage.setItem(STORAGE_KEY, current);
     console.info('[app-build] Caches do cliente alinhados à versão:', current);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('cache-updated'));
+    }
   } catch (e) {
     console.warn('[app-build] Política de cache pós-deploy ignorada:', e);
   }

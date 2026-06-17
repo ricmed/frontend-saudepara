@@ -19,6 +19,13 @@ export interface ComunicacaoDaeAnexo {
 
 export type StatusLeituraFiltro = 'todas' | 'lidas' | 'nao_lidas';
 
+export interface ComunicacaoDaeLeitura {
+  user_id: string;
+  username: string;
+  nome: string;
+  lido_em: string;
+}
+
 export interface ComunicacaoDae {
   id_comunicacao: number;
   data_comunicacao: string;
@@ -131,8 +138,9 @@ class ComunicacaoDaeService {
     filters?: ComunicacaoDaeFilters
   ): Promise<ComunicacaoDaeListResponse> {
     const response = await axios.get(`${API_URL}/comunicacao-dae`, {
-      params: { page, limit, ...filters },
-      withCredentials: true
+      params: { page, limit, ...filters, _t: Date.now() },
+      withCredentials: true,
+      headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
     });
     return response.data;
   }
@@ -148,6 +156,33 @@ class ComunicacaoDaeService {
       { withCredentials: true }
     );
     return response.data;
+  }
+
+  /**
+   * Conta comunicações não lidas pelo usuário autenticado.
+   */
+  async getContagemNaoLidas(estabelecimento_id?: number): Promise<{ total: number }> {
+    const response = await axios.get(`${API_URL}/comunicacao-dae/leitura/contagem`, {
+      params: {
+        ...(estabelecimento_id ? { estabelecimento_id } : {}),
+        _t: Date.now(),
+      },
+      withCredentials: true,
+      headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+    });
+    return response.data;
+  }
+
+  /**
+   * Lista quem visualizou a comunicação e quando.
+   */
+  async getLeituras(id: number): Promise<ComunicacaoDaeLeitura[]> {
+    this.assertValidId(id, 'ID da comunicação');
+    const response = await axios.get(`${API_URL}/comunicacao-dae/${id}/leituras`, {
+      withCredentials: true,
+      headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+    });
+    return response.data?.data ?? [];
   }
 
   /**

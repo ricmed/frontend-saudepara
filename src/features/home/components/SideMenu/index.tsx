@@ -8,6 +8,7 @@ import useUserPermissions from '@/hooks/useUserPermissions';
 import UserProfileHeader from "@/keycloak/components/UserProfileHeader";
 import ChatSuporteModal from '@/features/chat/components/ChatSuporteModal';
 import { useChatSuporte } from '@/features/chat/hooks/useChatSuporte';
+import { useComunicacaoDaeNaoLidas } from '@/features/comunicacao-dae/hooks/useComunicacaoDaeNaoLidas';
 import {
   FileText,
   ChartSpline,
@@ -46,6 +47,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
   
   // ✅ NOVO: Chat de suporte
   const { isOpen: isChatOpen, abrirChat, fecharChat, mensagensNaoLidas } = useChatSuporte();
+  const { naoLidas: comunicacoesDaeNaoLidas } = useComunicacaoDaeNaoLidas();
 
   // Função para verificar se o usuário é admin (incluindo admins hierárquicos)
   const isAdmin = () => {
@@ -150,6 +152,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       icon: <FileText />,
       label: "Comunicação DAE",
       onClick: () => navigate("/private/comunicacao-dae"),
+      badge: comunicacoesDaeNaoLidas > 0 ? comunicacoesDaeNaoLidas : undefined,
     }] : []),
     
     // ✅ NOVO: Gerenciamento Offline - disponível para todos os usuários logados

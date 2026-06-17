@@ -2,6 +2,11 @@ import { PacienteService } from '@/services/PacienteService';
 import { NotificacaoService } from '@/services/NotificacaoService';
 import indexedDBService from '@/services/indexedDB';
 import encryptionService from '@/services/encryptionService'; // ✅ NOVO: Criptografia
+import { getRuntimeApiRoot } from '@/config/runtimeApiBase';
+import {
+  mapPendingComunicacaoDaeToListItem,
+  mergeComunicacoesDaeForOfflineList,
+} from '@/features/comunicacao-dae/comunicacaoDaeOfflineList';
 import { toast } from 'react-toastify';
 import axios from 'axios';
 
@@ -19,23 +24,23 @@ export interface PatientsDataSource extends DataSource {
   estimatedPatients?: number;
 }
 
-// Função helper para chamadas diretas à API
+// Função helper para chamadas diretas à API (usa origem correta em HML/prod)
 const createDirectApiFetch = (endpoint: string, limit?: number) => {
   return async () => {
-    const server = import.meta.env.VITE_API_SERVER;
-    const port = import.meta.env.VITE_API_PORT;
-    const url = limit 
-      ? `${server}:${port}/api/${endpoint}?limit=${limit}`
-      : `${server}:${port}/api/${endpoint}`;
-    
-    // ✅ CORRIGIDO: Adicionar credenciais para autenticação
+    const base = getRuntimeApiRoot();
+    const url = limit
+      ? `${base}/${endpoint}?page=1&limit=${limit}`
+      : `${base}/${endpoint}`;
+
     const response = await fetch(url, {
-      credentials: 'include', // Incluir cookies de autenticação
+      credentials: 'include',
       headers: {
-        'Content-Type': 'application/json'
-      }
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
+      },
     });
-    
+
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     return data?.data || data || [];
@@ -220,36 +225,36 @@ class OfflineDataManager {
       category: 'administrative'
     },
 
-    // ===== DADOS DO FORMULÁRIO DAE (Prioridade 2) =====
+    // ===== DADOS DO FORMULÁRIO DAE (Prioridade 1 — necessários para criar comunicação offline) =====
     { 
       key: 'daes', 
-      name: 'DAE - Diretorias de Atenção Especializada', 
-      fetchFn: createDirectApiFetch('dae', 100), 
-      priority: 2, 
+      name: 'DAE - Doenças, Agravos e Eventos', 
+      fetchFn: createDirectApiFetch('dae', 500), 
+      priority: 1, 
       estimatedSize: 50,
       category: 'administrative'
     },
     { 
       key: 'crs', 
       name: 'CRS - Centros Regionais de Saúde', 
-      fetchFn: createDirectApiFetch('crs', 100), 
-      priority: 2, 
+      fetchFn: createDirectApiFetch('crs', 500), 
+      priority: 1, 
       estimatedSize: 30,
       category: 'administrative'
     },
     { 
       key: 'nhes', 
       name: 'NHE - Núcleos Hospitalares de Epidemiologia', 
-      fetchFn: createDirectApiFetch('nhe', 100), 
-      priority: 2, 
+      fetchFn: createDirectApiFetch('nhe', 500), 
+      priority: 1, 
       estimatedSize: 80,
       category: 'administrative'
     },
     { 
       key: 'cievs', 
       name: 'CIEVS - Centros de Informação em Vigilância', 
-      fetchFn: createDirectApiFetch('cievs', 100), 
-      priority: 2, 
+      fetchFn: createDirectApiFetch('cievs', 500), 
+      priority: 1, 
       estimatedSize: 20,
       category: 'administrative'
     },
@@ -587,8 +592,8 @@ class OfflineDataManager {
         limit: 200, // Baixar 200 mais recentes
         encrypt: true,
         onProgress: (subProg, subCurr) => {
-          // Mapear progresso de 95% a 100%
-          const scaledProg = 95 + (subProg * 0.05);
+          // Mapear progresso de 95% a 97%
+          const scaledProg = 95 + (subProg * 0.02);
           onProgress?.(scaledProg, `Notificações: ${subCurr}`, result.success + 1, result.success + 1);
         }
       });
@@ -598,7 +603,27 @@ class OfflineDataManager {
       }
     } catch (error) {
       console.error('❌ Erro ao baixar notificações no download completo:', error);
-      // Não falhar o download completo se notificações falharem
+    }
+
+    // 3. Baixar comunicações DAE para visualização offline
+    try {
+      console.log('📥 Baixando comunicações DAE para visualização offline...');
+      onProgress?.(97, 'Baixando comunicações DAE...', result.success, result.success + 1);
+
+      const daeListResult = await this.downloadComunicacoesDaeForOfflineViewing({
+        limit: 500,
+        encrypt: true,
+        onProgress: (subProg, subCurr) => {
+          const scaledProg = 97 + (subProg * 0.03);
+          onProgress?.(scaledProg, `Comunicações DAE: ${subCurr}`, result.success + 1, result.success + 1);
+        },
+      });
+
+      if (daeListResult.success) {
+        console.log(`✅ ${daeListResult.count} comunicações DAE incluídas no download completo`);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao baixar comunicações DAE no download completo:', error);
     }
     
     onProgress?.(100, 'Concluído!', result.success + 1, result.success + 1);
@@ -902,7 +927,7 @@ class OfflineDataManager {
     }
   }
 
-  // ✅ NOVO: Limpar cache de notificações
+  // ✅ Limpar cache de notificações
   async clearNotificacoesCache(): Promise<void> {
     try {
       const emptyCache: any = { encrypted: false, data: [] };
@@ -910,6 +935,177 @@ class OfflineDataManager {
       console.log('🗑️ Cache de notificações limpo');
     } catch (error) {
       console.error('Erro ao limpar cache de notificações:', error);
+    }
+  }
+
+  // ===== COMUNICAÇÃO DAE OFFLINE =====
+
+  async downloadComunicacoesDaeForOfflineViewing(
+    options: {
+      limit?: number;
+      encrypt?: boolean;
+      onProgress?: (progress: number, current: string) => void;
+    } = {},
+  ): Promise<{ success: boolean; count: number; encrypted: boolean; error?: string }> {
+    const { limit = 200, encrypt = true, onProgress } = options;
+
+    try {
+      onProgress?.(10, 'Iniciando download de comunicações DAE...');
+
+      const ComunicacaoDaeService = (await import('@/services/ComunicacaoDaeService')).default;
+
+      let allComunicacoes: any[] = [];
+      let page = 1;
+      const pageSize = 100;
+      const maxPages = Math.ceil(limit / pageSize);
+
+      for (let i = 0; i < maxPages; i++) {
+        const response = await ComunicacaoDaeService.getAll(page, pageSize);
+        if (response?.data?.length) {
+          allComunicacoes = [...allComunicacoes, ...response.data];
+          const progressPct = 10 + ((i + 1) / maxPages) * 60;
+          onProgress?.(progressPct, `${allComunicacoes.length}/${limit} comunicações...`);
+
+          if (allComunicacoes.length >= limit) {
+            allComunicacoes = allComunicacoes.slice(0, limit);
+            break;
+          }
+          page++;
+        } else {
+          break;
+        }
+      }
+
+      onProgress?.(75, 'Salvando no cache local...');
+
+      let dataToSave: unknown = allComunicacoes;
+      let isEncrypted = false;
+
+      if (encrypt && allComunicacoes.length > 0) {
+        const encryptedData = await encryptionService.encrypt(allComunicacoes);
+        dataToSave = { encrypted: true, data: encryptedData, downloadedAt: Date.now() };
+        isEncrypted = true;
+      } else {
+        dataToSave = { encrypted: false, data: allComunicacoes, downloadedAt: Date.now() };
+      }
+
+      await indexedDBService.saveOpcoes('comunicacoes-dae-cache', dataToSave);
+
+      onProgress?.(100, 'Download concluído!');
+
+      return {
+        success: true,
+        count: allComunicacoes.length,
+        encrypted: isEncrypted,
+      };
+    } catch (error) {
+      console.error('❌ Erro no download de comunicações DAE:', error);
+      return {
+        success: false,
+        count: 0,
+        encrypted: false,
+        error: error instanceof Error ? error.message : 'Erro desconhecido',
+      };
+    }
+  }
+
+  async getComunicacoesDaeFromCache(): Promise<any[]> {
+    try {
+      const cachedWrapper: any = await indexedDBService.getOpcoes('comunicacoes-dae-cache');
+
+      if (!cachedWrapper) {
+        return [];
+      }
+
+      if (typeof cachedWrapper === 'object' && !Array.isArray(cachedWrapper) && 'encrypted' in cachedWrapper) {
+        if (cachedWrapper.encrypted === true && typeof cachedWrapper.data === 'string') {
+          return await encryptionService.decrypt(cachedWrapper.data);
+        }
+        if (cachedWrapper.encrypted === false) {
+          return Array.isArray(cachedWrapper.data) ? cachedWrapper.data : [];
+        }
+      }
+
+      return Array.isArray(cachedWrapper) ? cachedWrapper : [];
+    } catch (error) {
+      console.error('❌ Erro ao obter comunicações DAE do cache:', error);
+      return [];
+    }
+  }
+
+  async getComunicacoesDaeForOfflineList(): Promise<any[]> {
+    const cached = await this.getComunicacoesDaeFromCache();
+    const pendingRows = await indexedDBService.getPendingComunicacoesDae();
+    const daesCache = (await indexedDBService.getOpcoes('daes')) || [];
+
+    const pending = pendingRows.map((row) => mapPendingComunicacaoDaeToListItem(row, daesCache));
+    return mergeComunicacoesDaeForOfflineList(cached, pending);
+  }
+
+  async getComunicacoesDaeOfflineStats(): Promise<{
+    cached: number;
+    pending: number;
+    total: number;
+    formOptions: { daes: number; nhes: number; cievs: number; crs: number };
+  }> {
+    const cached = await this.getComunicacoesDaeFromCache();
+    const pending = await indexedDBService.getPendingComunicacoesDae();
+    const [daes, nhes, cievs, crs] = await Promise.all([
+      indexedDBService.getOpcoes('daes'),
+      indexedDBService.getOpcoes('nhes'),
+      indexedDBService.getOpcoes('cievs'),
+      indexedDBService.getOpcoes('crs'),
+    ]);
+
+    return {
+      cached: cached.length,
+      pending: pending.length,
+      total: cached.length + pending.length,
+      formOptions: {
+        daes: daes?.length ?? 0,
+        nhes: nhes?.length ?? 0,
+        cievs: cievs?.length ?? 0,
+        crs: crs?.length ?? 0,
+      },
+    };
+  }
+
+  async downloadDaeFormOptions(
+    onProgress?: (progress: number, current: string) => void,
+  ): Promise<{ success: boolean; totalRecords: number; error?: string }> {
+    const keys = ['daes', 'nhes', 'cievs', 'crs'] as const;
+    let totalRecords = 0;
+
+    try {
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        const source = this.dataSources.find((s) => s.key === key);
+        if (!source) continue;
+
+        onProgress?.(((i + 1) / keys.length) * 100, source.name);
+        const data = await source.fetchFn();
+        if (data?.length) {
+          await indexedDBService.saveOpcoes(key, data);
+          totalRecords += data.length;
+        }
+      }
+
+      return { success: true, totalRecords };
+    } catch (error) {
+      return {
+        success: false,
+        totalRecords,
+        error: error instanceof Error ? error.message : 'Erro desconhecido',
+      };
+    }
+  }
+
+  async clearComunicacoesDaeCache(): Promise<void> {
+    try {
+      await indexedDBService.saveOpcoes('comunicacoes-dae-cache', { encrypted: false, data: [] });
+      console.log('🗑️ Cache de comunicações DAE limpo');
+    } catch (error) {
+      console.error('Erro ao limpar cache de comunicações DAE:', error);
     }
   }
 
@@ -928,6 +1124,8 @@ class OfflineDataManager {
         console.error(`Erro ao limpar ${source.key}:`, error);
       }
     }
+    await this.clearNotificacoesCache();
+    await this.clearComunicacoesDaeCache();
     toast.success('🗑️ Dados offline limpos!');
   }
 

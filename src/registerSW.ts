@@ -1,8 +1,9 @@
 import { registerSW } from 'virtual:pwa-register';
 
+const SW_UPDATE_INTERVAL_MS = 15 * 60 * 1000;
+
 export function registerServiceWorker() {
   // Em E2E/CI, o service worker pode causar cache/intercept e travar testes.
-  // Usamos flag de build para desabilitar quando necessário.
   const disableSw = (import.meta as any).env?.VITE_DISABLE_SW === 'true';
   if (disableSw) return;
 
@@ -11,28 +12,37 @@ export function registerServiceWorker() {
     return;
   }
 
-  const updateSW = registerSW({
-    onNeedRefresh() {
-      const shouldUpdate = window.confirm(
-        'Uma nova versão do aplicativo está disponível. Deseja atualizar agora?'
-      );
-      if (shouldUpdate) {
-        void updateSW(true);
-      }
-    },
+  // registerType: 'autoUpdate' no vite.config — sem onNeedRefresh o app recarrega sozinho
+  // quando há nova versão (skipWaiting + clientsClaim já estão no Workbox).
+  registerSW({
+    immediate: true,
 
     onOfflineReady() {
-      // Sem toast — uso offline segue disponível sem aviso na tela.
+      // Uso offline disponível; sem toast para não poluir a tela.
     },
 
     onRegistered(registration) {
-      console.log('Service Worker registrado com sucesso:', registration);
+      if (!registration) return;
 
-      if (registration) {
-        setInterval(() => {
-          registration.update();
-        }, 60 * 60 * 1000);
-      }
+      console.log('Service Worker registrado:', registration.scope);
+
+      const checkForUpdates = () => {
+        registration.update().catch(() => undefined);
+      };
+
+      // Ao registrar, ao focar a aba e ao voltar à página visível
+      checkForUpdates();
+
+      const onVisible = () => {
+        if (document.visibilityState === 'visible') {
+          checkForUpdates();
+        }
+      };
+
+      document.addEventListener('visibilitychange', onVisible);
+      window.addEventListener('focus', checkForUpdates);
+
+      window.setInterval(checkForUpdates, SW_UPDATE_INTERVAL_MS);
     },
 
     onRegisterError(error) {
