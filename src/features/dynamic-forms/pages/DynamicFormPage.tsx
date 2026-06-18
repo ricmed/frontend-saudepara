@@ -201,16 +201,16 @@ export const DynamicFormPage: React.FC = () => {
     try {
       setSaving(true);
 
+      let savedId = id ? Number(id) : null;
+
       if (id) {
-        // Atualizar submission existente
         await FormSubmissionService.updateSubmission(
           Number(id),
           { data_json: data },
           userId
         );
 
-        const result = await FormSubmissionService.submitSubmission(Number(id), userId);
-        console.log('Resultado submitSubmission:', result);
+        await FormSubmissionService.submitSubmission(Number(id), userId);
       } else {
         const submission = await FormSubmissionService.createSubmission({
           form_version_id: formVersion.id,
@@ -219,12 +219,18 @@ export const DynamicFormPage: React.FC = () => {
           created_offline: false,
         });
 
-        const result = await FormSubmissionService.submitSubmission(submission.id, userId);
-        console.log('Resultado submitSubmission:', result);
+        savedId = submission.id;
+        await FormSubmissionService.submitSubmission(submission.id, userId);
+      }
+
+      setInitialData(data);
+      setLiveFormData(data);
+
+      if (!id && savedId != null && agravo) {
+        navigate(`/private/formularios/${agravo}/editar/${savedId}`, { replace: true });
       }
 
       alert('Formulário salvo com sucesso!');
-      navigate(listBackPath);
     } catch (err: any) {
       console.error('Erro ao salvar formulário:', err);
       const errorMsg = err?.response?.data?.message || err?.message || 'Erro desconhecido';

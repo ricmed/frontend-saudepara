@@ -286,7 +286,7 @@ export const DesfechoAlertasTab: React.FC<Props> = ({ charts }) => {
                         type="button"
                         onClick={() =>
                           navigate(
-                            `/private/formularios/${HEPATITE_CRIANCA_HBV_FORM_KEY}/visualizar/${caso.id}`,
+                            `/private/formularios/${HEPATITE_CRIANCA_HBV_FORM_KEY}/editar/${caso.id}`,
                           )
                         }
                         className="text-blue-600 hover:text-blue-800 font-medium text-xs whitespace-nowrap"
