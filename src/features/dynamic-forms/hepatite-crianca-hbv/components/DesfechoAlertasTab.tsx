@@ -6,8 +6,6 @@ import {
   CartesianGrid,
   Cell,
   LabelList,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -120,41 +118,34 @@ export const DesfechoAlertasTab: React.FC<Props> = ({ charts }) => {
           {charts.evolucaoCaso.length === 0 ? (
             <p className="text-sm text-gray-500 py-12 text-center">Nenhuma evolução informada</p>
           ) : (
-            <div id="hepatite-desfecho-evolucao" className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-              <ResponsiveContainer width="100%" height={260}>
-                <PieChart>
-                  <Pie
-                    data={charts.evolucaoCaso}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={90}
-                    label={({ name, percent }) =>
-                      `${String(name).slice(0, 12)}${String(name).length > 12 ? '…' : ''} ${(percent * 100).toFixed(0)}%`
-                    }
-                  >
+            <div id="hepatite-desfecho-evolucao">
+              <ResponsiveContainer
+                width="100%"
+                height={Math.max(300, charts.evolucaoCaso.length * 44)}
+              >
+                <BarChart
+                  data={charts.evolucaoCaso}
+                  layout="vertical"
+                  margin={{ top: 8, right: 40, left: 4, bottom: 8 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                  <XAxis type="number" allowDecimals={false} fontSize={12} />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={200}
+                    fontSize={11}
+                    tick={{ fill: '#374151' }}
+                  />
+                  <Tooltip formatter={(v: number) => [`${v} caso(s)`, 'Total']} />
+                  <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={24}>
                     {charts.evolucaoCaso.map((_, i) => (
                       <Cell key={i} fill={EVOLUCAO_COLORS[i % EVOLUCAO_COLORS.length]} />
                     ))}
-                  </Pie>
-                  <Tooltip formatter={(v: number) => [`${v} caso(s)`, 'Total']} />
-                </PieChart>
+                    <LabelList dataKey="value" position="right" style={{ fontSize: 12, fontWeight: 600 }} />
+                  </Bar>
+                </BarChart>
               </ResponsiveContainer>
-              <ul className="space-y-2 text-sm">
-                {charts.evolucaoCaso.map((item, i) => (
-                  <li key={item.name} className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-2 min-w-0">
-                      <span
-                        className="w-3 h-3 rounded-full shrink-0"
-                        style={{ backgroundColor: EVOLUCAO_COLORS[i % EVOLUCAO_COLORS.length] }}
-                      />
-                      <span className="truncate text-gray-700">{item.name}</span>
-                    </span>
-                    <span className="font-semibold text-gray-900 shrink-0">{item.value}</span>
-                  </li>
-                ))}
-              </ul>
             </div>
           )}
         </div>
