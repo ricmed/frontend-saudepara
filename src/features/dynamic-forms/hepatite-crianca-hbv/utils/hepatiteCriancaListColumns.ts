@@ -178,7 +178,7 @@ export function getHepatiteCriancaListColumnSpecs(): HepatiteCriancaListColSpec[
     },
     {
       id: 'sinan_mae',
-      label: 'SINAN mãe',
+      label: 'Notif. mãe SINAN',
       tdClassName: 'whitespace-nowrap',
       format: (r) => r.sinanMae,
       sortValue: (r) => r.sinanMae,

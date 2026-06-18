@@ -238,7 +238,7 @@ export const DesfechoAlertasTab: React.FC<Props> = ({ charts }) => {
               <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Ficha</th>
-                  <th className="px-4 py-3 font-semibold">SINAN mãe</th>
+                  <th className="px-4 py-3 font-semibold">Notif. mãe SINAN</th>
                   <th className="px-4 py-3 font-semibold">Exposição</th>
                   <th className="px-4 py-3 font-semibold">Idade</th>
                   <th className="px-4 py-3 font-semibold">Município</th>
