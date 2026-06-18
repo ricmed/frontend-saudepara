@@ -1,4 +1,5 @@
 import type { FormSchema } from '@/services/FormService';
+import type { FieldValidationError } from './formValidationTypes';
 
 /** Limite epidemiológico (NT 11/2025 MS): criança exposta = RN ou até 24 meses. */
 export const CRIANCA_EXPOSTA_HBV_MAX_IDADE_MESES = 24;
@@ -40,6 +41,48 @@ export function calcularIdadeMesesFromBirthDate(birthDate: string | Date): numbe
 
 export function isIdadeValidaCriancaExpostaHBV(meses: number): boolean {
   return !Number.isNaN(meses) && meses >= 0 && meses <= CRIANCA_EXPOSTA_HBV_MAX_IDADE_MESES;
+}
+
+function readPacienteBirthDate(formData: Record<string, unknown>): string | undefined {
+  const paciente = formData.paciente;
+  if (!paciente || typeof paciente !== 'object') return undefined;
+  const record = paciente as Record<string, unknown>;
+  const raw = record.data_nascimento ?? record.dt_nascimento;
+  if (raw == null || raw === '') return undefined;
+  return String(raw);
+}
+
+/** Valida idade em meses e data de nascimento para a ficha criança exposta. */
+export function collectHepatiteCriancaExpostaAgeErrors(
+  formData: Record<string, unknown>,
+): FieldValidationError[] {
+  const errors: FieldValidationError[] = [];
+
+  const idadeRaw = (formData.paciente as Record<string, unknown> | undefined)?.idade;
+  if (idadeRaw != null && idadeRaw !== '') {
+    const meses = Number(idadeRaw);
+    if (!Number.isNaN(meses) && !isIdadeValidaCriancaExpostaHBV(meses)) {
+      errors.push({
+        field: 'paciente.idade',
+        message: CRIANCA_EXPOSTA_HBV_IDADE_ERRO,
+        code: 'INVALID_HEPATITE_CRIANCA_IDADE',
+      });
+    }
+  }
+
+  const birthRaw = readPacienteBirthDate(formData);
+  if (birthRaw) {
+    const totalMeses = calcularIdadeMesesFromBirthDate(birthRaw);
+    if (totalMeses !== undefined && !isIdadeValidaCriancaExpostaHBV(totalMeses)) {
+      errors.push({
+        field: 'paciente.data_nascimento',
+        message: CRIANCA_EXPOSTA_HBV_IDADE_ERRO,
+        code: 'INVALID_HEPATITE_CRIANCA_IDADE',
+      });
+    }
+  }
+
+  return errors;
 }
 
 /** Exibição da idade em meses (ficha criança exposta: sempre meses até 24). */

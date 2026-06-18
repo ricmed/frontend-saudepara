@@ -55,7 +55,7 @@ export const EstabelecimentoNascimento: React.FC<EstabelecimentoNascimentoProps>
         : 'CNES ou nome do hospital';
 
   return (
-    <div className="min-w-0">
+    <div className="min-w-0" data-field-key="crianca.hospital_nascimento_unidade_id">
       <UnidadeNotificadoraField
         value={value}
         onChange={handleChange}

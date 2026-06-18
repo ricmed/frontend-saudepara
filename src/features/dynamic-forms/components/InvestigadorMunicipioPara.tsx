@@ -93,7 +93,7 @@ export const InvestigadorMunicipioPara: React.FC<InvestigadorMunicipioParaProps>
   );
 
   return (
-    <div className="min-w-0">
+    <div className="min-w-0" data-field-key="investigador.municipio_id">
       <LocationInput
         name="municipio_investigador"
         label={required ? 'Município (Pará) *' : 'Município (Pará)'}

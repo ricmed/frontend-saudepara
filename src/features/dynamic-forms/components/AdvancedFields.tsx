@@ -1446,8 +1446,9 @@ export const CEPField: React.FC<AdvancedFieldProps & { onCepFound?: (detail: Cep
   const lastRequestedCepRef = useRef<string>('');
 
   const formatCEP = (val: string) => {
-    const cleaned = val.replace(/\D/g, '');
-    return cleaned.replace(/(\d{5})(\d{0,3})/, '$1-$2');
+    const cleaned = val.replace(/\D/g, '').slice(0, 8);
+    if (cleaned.length <= 5) return cleaned;
+    return `${cleaned.slice(0, 5)}-${cleaned.slice(5)}`;
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1455,6 +1456,10 @@ export const CEPField: React.FC<AdvancedFieldProps & { onCepFound?: (detail: Cep
     onChange(formatted);
 
     const cleanedCEP = formatted.replace(/\D/g, '');
+    if (cleanedCEP.length < 8) {
+      lastResolvedCepRef.current = '';
+      lastRequestedCepRef.current = '';
+    }
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
       debounceRef.current = null;

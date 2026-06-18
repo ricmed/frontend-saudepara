@@ -17,6 +17,9 @@ import {
 import { isMaeLabHbvMarkerRequired } from '../utils/hepatiteCriancaMaeLabRequired';
 import { isMaeSorologiaReagenteRequired } from '../utils/hepatiteCriancaMaeSorologiaRequired';
 import {
+  collectHepatiteCriancaFormValidationErrorsFromSchema,
+} from '../utils/hepatiteCriancaCollectValidationErrors';
+import {
   isHepatiteInvestigadorRequiredKey,
   HEPATITE_INVESTIGADOR_VISIBLE_KEYS,
 } from '../utils/hepatiteCriancaInvestigadorRequired';
@@ -513,21 +516,19 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange, formKe
     [errors]
   );
 
-  const validateField = useCallback(
-    (field: FormField) => {
+  const getFieldValidationError = useCallback(
+    (field: FormField): string | undefined => {
       const isHepatiteCriancaHBVValidate = isHepatiteCriancaHBVForm({ schema, formKey });
       const value = getValue(field.key);
       const isRequired = isFieldRequired(field.key);
       const isVisible = isFieldVisible(field.key);
 
       if (!isVisible) {
-        clearError(field.key);
-        return true;
+        return undefined;
       }
 
       if (isRequired && (!value || value === '')) {
-        setError(field.key, `${field.label} é obrigatório`);
-        return false;
+        return `${field.label} é obrigatório`;
       }
 
       if (field.choiceWithText) {
@@ -540,8 +541,7 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange, formKe
         if (field.type === 'checkbox-group') {
           const arr = Array.isArray(value) ? value : [];
           if (arr.includes(sentinel) && isRequired && (!otherTxt || !String(otherTxt).trim())) {
-            setError(field.key, `Preencha o texto da opção "${hint}"`);
-            return false;
+            return `Preencha o texto da opção "${hint}"`;
           }
         } else {
           const selectWithTiles =
@@ -549,63 +549,49 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange, formKe
             (field.gridCols === 1 || field.gridCols === 2 || field.gridCols === 3);
           if (field.type === 'radio' || selectWithTiles) {
             if (String(value ?? '') === sentinel && isRequired && (!otherTxt || !String(otherTxt).trim())) {
-              setError(field.key, `Preencha o texto da opção "${hint}"`);
-              return false;
+              return `Preencha o texto da opção "${hint}"`;
             }
           }
         }
       }
 
       if (field.minLength && String(value).length < field.minLength) {
-        setError(field.key, `${field.label} deve ter no mínimo ${field.minLength} caracteres`);
-        return false;
+        return `${field.label} deve ter no mínimo ${field.minLength} caracteres`;
       }
 
       if (field.maxLength && String(value).length > field.maxLength) {
-        setError(field.key, `${field.label} deve ter no máximo ${field.maxLength} caracteres`);
-        return false;
+        return `${field.label} deve ter no máximo ${field.maxLength} caracteres`;
       }
 
       if (field.pattern && !new RegExp(field.pattern).test(String(value))) {
-        setError(field.key, `${field.label} está em formato inválido`);
-        return false;
+        return `${field.label} está em formato inválido`;
       }
 
       if (field.key === 'crianca.numero_dnv' && value) {
         const digits = String(value).replace(/\D/g, '');
         if (digits.length !== 9) {
-          setError(
-            field.key,
-            'O número da DNV deve ter 9 dígitos (8 números + 1 dígito verificador).',
-          );
-          return false;
+          return 'O número da DNV deve ter 9 dígitos (8 números + 1 dígito verificador).';
         }
       }
 
-      // Validação de CPF por dígitos verificadores (impede CPF digitado ao acaso)
       if (field.type === 'cpf' && value) {
         const digits = String(value).replace(/\D/g, '');
         if (digits.length === 11 && !validateCPF(String(value))) {
-          setError(field.key, 'CPF inválido. Verifique os números.');
-          return false;
+          return 'CPF inválido. Verifique os números.';
         }
       }
 
-      // Validação de CNS por algoritmo oficial (impede CNS digitado ao acaso)
       if (field.type === 'cns' && value) {
         const digits = String(value).replace(/\D/g, '');
         if (digits.length === 15 && !validateCNS(String(value))) {
-          setError(field.key, 'CNS inválido. Verifique os números.');
-          return false;
+          return 'CNS inválido. Verifique os números.';
         }
       }
 
-      // Validação de passaporte (2 letras + 6 dígitos, ex.: AB123456)
       if (field.key === 'paciente.passaporte' && value) {
         const trimmed = String(value).trim();
         if (trimmed.length > 0 && !validatePassaporte(trimmed)) {
-          setError(field.key, 'Use 2 letras e 6 dígitos (ex.: AB123456).');
-          return false;
+          return 'Use 2 letras e 6 dígitos (ex.: AB123456).';
         }
       }
 
@@ -616,89 +602,117 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange, formKe
         value !== '' &&
         String(value) === SEXO_NASCIMENTO_INTERSEXO_CODIGO
       ) {
-        setError(field.key, 'Intersexo não se aplica a esta ficha. Selecione Masculino, Feminino ou Ignorado.');
-        return false;
+        return 'Intersexo não se aplica a esta ficha. Selecione Masculino, Feminino ou Ignorado.';
       }
 
       if (field.key === 'paciente.idade' && value != null && value !== '') {
         const meses = Number(value);
-        if (Number.isNaN(meses)) return true;
+        if (Number.isNaN(meses)) return undefined;
         if (isHepatiteCriancaHBVValidate) {
           if (!isIdadeValidaCriancaExpostaHBV(meses)) {
-            setError(field.key, CRIANCA_EXPOSTA_HBV_IDADE_ERRO);
-            return false;
+            return CRIANCA_EXPOSTA_HBV_IDADE_ERRO;
           }
         } else if (meses > 120 * 12) {
-          setError(field.key, 'A idade não pode ser superior a 120 anos.');
-          return false;
+          return 'A idade não pode ser superior a 120 anos.';
         }
       }
 
       if (field.key === 'mae.idade' && value != null && value !== '') {
         const meses = Number(value);
-        if (Number.isNaN(meses)) return true;
+        if (Number.isNaN(meses)) return undefined;
         const anos = Math.floor(meses / 12);
         if (anos < 10) {
-          setError(field.key, 'A idade da mãe deve ser de no mínimo 10 anos.');
-          return false;
+          return 'A idade da mãe deve ser de no mínimo 10 anos.';
         }
         if (anos > 65) {
-          setError(field.key, 'A idade da mãe deve ser de no máximo 65 anos.');
-          return false;
+          return 'A idade da mãe deve ser de no máximo 65 anos.';
         }
       }
 
       if (field.key === 'paciente.data_nascimento' && value) {
         const totalMeses = calcularIdadeMesesFromBirthDate(String(value));
-        if (totalMeses === undefined) return true;
+        if (totalMeses === undefined) return undefined;
         if (isHepatiteCriancaHBVValidate) {
           if (!isIdadeValidaCriancaExpostaHBV(totalMeses)) {
-            setError(field.key, CRIANCA_EXPOSTA_HBV_IDADE_ERRO);
-            return false;
+            return CRIANCA_EXPOSTA_HBV_IDADE_ERRO;
           }
         } else if (totalMeses > 120 * 12) {
-          setError(field.key, 'A idade calculada não pode ser superior a 120 anos.');
-          return false;
+          return 'A idade calculada não pode ser superior a 120 anos.';
         }
       }
 
-      // Tabela: validação de coluna total (ex.: Frequência Relativa ~100%)
       const tableVal = field.tableValidations;
       if (field.type === 'table' && tableVal?.totalColumnKey && Array.isArray(value) && value.length > 0) {
         const { totalColumnKey, totalMin = 99, totalMax = 101, message } = tableVal;
         const badRow = value.findIndex((row: Record<string, any>) => {
           const v = Number(row?.[totalColumnKey]);
-          if (Number.isNaN(v)) return true; // vazio ou inválido conta como erro
+          if (Number.isNaN(v)) return true;
           return v < totalMin || v > totalMax;
         });
         if (badRow !== -1) {
-          setError(
-            field.key,
-            message ?? `Na linha ${badRow + 1}: o total deve estar entre ${totalMin}% e ${totalMax}%.`
-          );
-          return false;
+          return message ?? `Na linha ${badRow + 1}: o total deve estar entre ${totalMin}% e ${totalMax}%.`;
         }
       }
 
+      return undefined;
+    },
+    [formKey, getValue, isFieldRequired, isFieldVisible, schema],
+  );
+
+  const validateField = useCallback(
+    (field: FormField) => {
+      const message = getFieldValidationError(field);
+      if (message) {
+        setError(field.key, message);
+        return false;
+      }
       clearError(field.key);
       return true;
     },
-    [formKey, getValue, isFieldRequired, isFieldVisible, schema, setError, clearError]
+    [getFieldValidationError, setError, clearError],
   );
 
+  const buildFieldVisibilityMap = useCallback((): Record<string, boolean> => {
+    const visible: Record<string, boolean> = {};
+    for (const section of schema.sections ?? []) {
+      for (const field of section.fields ?? []) {
+        if (field?.key) {
+          visible[field.key] = isFieldVisible(field.key);
+        }
+      }
+    }
+    return visible;
+  }, [isFieldVisible, schema.sections]);
+
   const validateAll = useCallback(() => {
-    let isValid = true;
+    const nextErrors: Record<string, string> = {};
 
     schema.sections.forEach((section) => {
       section.fields.forEach((field) => {
-        if (!validateField(field)) {
-          isValid = false;
+        const message = getFieldValidationError(field);
+        if (message) {
+          nextErrors[field.key] = message;
         }
       });
     });
 
-    return isValid;
-  }, [schema, validateField]);
+    if (isHepatiteCriancaHBVForm({ schema, formKey })) {
+      const visible = buildFieldVisibilityMap();
+      const extraErrors = collectHepatiteCriancaFormValidationErrorsFromSchema(
+        formData,
+        visible,
+        schema.sections,
+      );
+      for (const err of extraErrors) {
+        if (visible[err.field] !== false) {
+          nextErrors[err.field] = err.message;
+        }
+      }
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  }, [buildFieldVisibilityMap, formData, formKey, getFieldValidationError, schema]);
 
   const reset = useCallback(() => {
     setFormData(initialData);

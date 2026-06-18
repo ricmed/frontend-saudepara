@@ -1,3 +1,5 @@
+import { get } from 'lodash';
+import type { FieldValidationError } from './formValidationTypes';
 import {
   TIPO_EXPOSICAO_HEPATITE_KEY,
   tipoExposicaoMostraHbv,
@@ -51,4 +53,29 @@ export function maternidadeHbvHbigNaoRealizado(maternidadeCode: unknown): boolea
 
 export function isMaternidadeNaoRealizadoQualRequired(maternidadeCode: unknown): boolean {
   return maternidadeHbvHbigNaoRealizado(maternidadeCode);
+}
+
+const DEFAULT_MATERNIDADE_LABEL =
+  'Vacina para Hepatite B + Imunoglobulina Hepatite B na maternidade';
+
+/** Campo 54 — obrigatório quando o tipo de exposição inclui HBV. */
+export function collectHepatiteCriancaMaternidadeHbvErrors(
+  formData: Record<string, unknown>,
+  visible: Record<string, boolean> = {},
+  fieldLabels: Record<string, string> = {},
+): FieldValidationError[] {
+  if (!tipoExposicaoMostraHbv(get(formData, TIPO_EXPOSICAO_HEPATITE_KEY))) return [];
+  if (visible[MATERNIDADE_HBV_HBIG_KEY] === false) return [];
+
+  const value = get(formData, MATERNIDADE_HBV_HBIG_KEY);
+  if (isMaternidadeHbvHbigInformado(value)) return [];
+
+  const label = fieldLabels[MATERNIDADE_HBV_HBIG_KEY] ?? DEFAULT_MATERNIDADE_LABEL;
+  return [
+    {
+      field: MATERNIDADE_HBV_HBIG_KEY,
+      message: `${label} é obrigatório`,
+      code: 'REQUIRED',
+    },
+  ];
 }

@@ -29,6 +29,7 @@ export const EstabelecimentoInvestigador: React.FC<EstabelecimentoInvestigadorPr
   );
 
   return (
+    <div data-field-key="investigador.unidade_id">
     <EstabelecimentoPorMunicipioField
       municipioId={getValue('investigador.municipio_id')}
       unidadeId={getValue('investigador.unidade_id')}
@@ -38,5 +39,6 @@ export const EstabelecimentoInvestigador: React.FC<EstabelecimentoInvestigadorPr
       error={error}
       required={required}
     />
+    </div>
   );
 };

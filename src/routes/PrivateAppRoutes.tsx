@@ -76,6 +76,9 @@ const NotificationForm = lazy(() => import('@/features/notificationForms/Notific
 const ComunicacaoDaePage = lazy(() => import('@/features/comunicacao-dae/ComunicacaoDaePage'));
 const ComunicacaoDaeDashboard = lazy(() => import('@/features/comunicacao-dae/ComunicacaoDaeDashboard'));
 const ComunicacaoDaeFormPage = lazy(() => import('@/features/comunicacao-dae/ComunicacaoDaeFormPage'));
+const HepatiteCriancaHbvDashboardPage = lazy(
+  () => import('@/features/dynamic-forms/hepatite-crianca-hbv/HepatiteCriancaHbvDashboardPage'),
+);
 
 const ProtectedLayout = () => {
   return (
@@ -203,6 +206,7 @@ export const getPrivateAppRoutes = () => {
             }
           />
           <Route path="/private/formularios/:agravo/relatorio/*" element={<MonitorOperRegionalReportPage />} />
+          <Route path="/private/formularios/:agravo/dashboard" element={<HepatiteCriancaHbvDashboardPage />} />
           <Route path="/private/formularios/:agravo" element={<FormSubmissionsListPage />} />
           <Route path="/private/formularios/:agravo/imprimir/:id" element={<DynamicFormPrintPage />} />
           <Route path="/private/formularios/:agravo/imprimir" element={<DynamicFormPrintPage />} />

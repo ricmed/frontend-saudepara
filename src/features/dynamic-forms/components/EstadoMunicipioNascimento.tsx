@@ -78,7 +78,7 @@ export const EstadoMunicipioNascimento: React.FC<EstadoMunicipioNascimentoProps>
 
   return (
     <>
-      <div>
+      <div data-field-key="crianca.nascimento_municipio_id">
         <label className="mb-2 flex min-h-[2.5rem] items-end text-sm font-medium text-gray-700">
           {required ? 'UF de nascimento *' : 'UF de nascimento'}
         </label>

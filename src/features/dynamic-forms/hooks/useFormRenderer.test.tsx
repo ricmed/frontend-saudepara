@@ -3,6 +3,8 @@ import { describe, it, expect } from 'vitest';
 import type { FormSchema } from '@/services/FormService';
 import { useFormRenderer } from './useFormRenderer';
 import { CRIANCA_EXPOSTA_HBV_IDADE_ERRO } from '../utils/hepatiteCriancaHbvLimits';
+import { MAE_SOROLOGIA_REAGENTE_HBV_KEY } from '../utils/hepatiteCriancaMaeSorologiaRequired';
+import { MATERNIDADE_HBV_HBIG_KEY } from '../utils/hepatiteCriancaMaternidadeHbvHbig';
 
 function schemaWithFields(
   fields: FormSchema['sections'][0]['fields'],
@@ -190,5 +192,58 @@ describe('useFormRenderer', () => {
     });
     expect(valid).toBe(false);
     expect(result.current.getError('investigador.nome')).toMatch(/obrigatório/i);
+  });
+
+  it('HEPATITE_CRIANCA_HBV: validateAll rejeita sorologia sem Sim/Não e maternidade inválida', () => {
+    const schema: FormSchema = {
+      agravo: 'HEPATITE_CRIANCA_HBV',
+      sections: [
+        {
+          id: 's1',
+          title: 'Lab',
+          order: 1,
+          fields: [
+            {
+              key: 'notificacao.tipo_exposicao_hepatite',
+              type: 'radio',
+              label: 'Tipo exposição',
+              order: 1,
+              required: true,
+            },
+            {
+              key: MAE_SOROLOGIA_REAGENTE_HBV_KEY,
+              type: 'radio',
+              label: 'Sorologia HBV',
+              order: 2,
+            },
+            {
+              key: MATERNIDADE_HBV_HBIG_KEY,
+              type: 'radio',
+              label: 'Vacina maternidade',
+              order: 3,
+            },
+          ],
+        },
+      ],
+    };
+    const { result } = renderHook(() =>
+      useFormRenderer({
+        schema,
+        formKey: 'HEPATITE_CRIANCA_HBV',
+        initialData: {
+          notificacao: { tipo_exposicao_hepatite: '1' },
+          mae: { lab: { sorologia_reagente_hepatite_b: '9' } },
+          crianca: { vacina_hepatite_b_maternidade: '3' },
+        },
+      }),
+    );
+
+    let valid = true;
+    act(() => {
+      valid = result.current.validateAll();
+    });
+    expect(valid).toBe(false);
+    expect(result.current.getError(MAE_SOROLOGIA_REAGENTE_HBV_KEY)).toMatch(/Sim ou Não/i);
+    expect(result.current.getError(MATERNIDADE_HBV_HBIG_KEY)).toMatch(/obrigatório/i);
   });
 });

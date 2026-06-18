@@ -3,7 +3,18 @@ import { useParams, useNavigate } from 'react-router-dom';
 import FormService, { type Form } from '@/services/FormService';
 import FormSubmissionService, { type FormSubmission } from '@/services/FormSubmissionService';
 import FormResponsesService from '@/services/FormResponsesService';
-import { Plus, Edit, Trash2, FileText, BarChart3, FileSpreadsheet, Download, Columns2 } from 'lucide-react';
+import { Plus, Edit, Trash2, FileText, BarChart2, BarChart3, FileSpreadsheet, Download, Columns2 } from 'lucide-react';
+import { HEPATITE_CRIANCA_HBV_FORM_KEY } from '../hepatite-crianca-hbv/constants';
+import {
+  buildHepatiteCriancaSummaryById,
+  getHepatiteCriancaListColumnSpecs,
+  getHepatiteDefaultVisibleListColIds,
+  readHepatiteListColSelection,
+  writeHepatiteListColSelection,
+  type HepatiteCriancaListColSpec,
+  type HepatiteCriancaListSummary,
+} from '../hepatite-crianca-hbv/utils/hepatiteCriancaListColumns';
+import { loadMunicipioLabelMaps, type MunicipioLabelMaps } from '../hepatite-crianca-hbv/utils/municipioIbgeLabels';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 import {
   MONITOR_OPER_REGIONAL_KEY,
@@ -36,10 +47,15 @@ type ResponseRow = {
 };
 
 const LIST_SORT_MONITOR = 'm:';
+const LIST_SORT_HEPATITE = 'h:';
 const LIST_SORT_FIELD = 'f:';
 
 function buildListSortMonitorKey(colId: string) {
   return `${LIST_SORT_MONITOR}${colId}`;
+}
+
+function buildListSortHepatiteKey(colId: string) {
+  return `${LIST_SORT_HEPATITE}${colId}`;
 }
 
 function buildListSortFieldKey(fieldKey: string) {
@@ -48,11 +64,13 @@ function buildListSortFieldKey(fieldKey: string) {
 
 function parseListSortKey(key: string):
   | { type: 'monitor'; colId: string }
+  | { type: 'hepatite'; colId: string }
   | { type: 'field'; fieldKey: string }
   | { type: 'submitted_at' }
   | null {
   if (key === 'submitted_at') return { type: 'submitted_at' };
   if (key.startsWith(LIST_SORT_MONITOR)) return { type: 'monitor', colId: key.slice(LIST_SORT_MONITOR.length) };
+  if (key.startsWith(LIST_SORT_HEPATITE)) return { type: 'hepatite', colId: key.slice(LIST_SORT_HEPATITE.length) };
   if (key.startsWith(LIST_SORT_FIELD)) return { type: 'field', fieldKey: key.slice(LIST_SORT_FIELD.length) };
   return null;
 }
@@ -63,6 +81,8 @@ function getListSortComparableValue(
   opts: {
     monitorSummaryById: Map<number, MonitorOperSubmissionSummary>;
     monitorColById: Map<string, MonitorOperListColSpec>;
+    hepatiteSummaryById: Map<number, HepatiteCriancaListSummary>;
+    hepatiteColById: Map<string, HepatiteCriancaListColSpec>;
     crsLabels: Record<string, string>;
     activeSchema: unknown;
     responseMaps: ResponseListLabelMaps;
@@ -80,6 +100,12 @@ function getListSortComparableValue(
     if (typeof v === 'number' && Number.isFinite(v)) return v;
     if (typeof v === 'boolean') return v ? 1 : 0;
     return String(v);
+  }
+  if (p.type === 'hepatite') {
+    const sum = opts.hepatiteSummaryById.get(row.id);
+    const spec = opts.hepatiteColById.get(p.colId);
+    if (!sum || !spec) return '';
+    return spec.sortValue(sum);
   }
   const sum = opts.monitorSummaryById.get(row.id);
   if (!sum) return '';
@@ -174,6 +200,11 @@ export const FormSubmissionsListPage: React.FC = () => {
   const [showListColPicker, setShowListColPicker] = useState(false);
   const [listColQuery, setListColQuery] = useState('');
   const [visibleMonitorColIds, setVisibleMonitorColIds] = useState<string[]>([]);
+  const [visibleHepatiteColIds, setVisibleHepatiteColIds] = useState<string[]>([]);
+  const [hepatiteMunicipioMaps, setHepatiteMunicipioMaps] = useState<MunicipioLabelMaps>({
+    byIbge: {},
+    byId: {},
+  });
   const [listSort, setListSort] = useState<{ key: string | null; order: 'asc' | 'desc' }>({
     key: null,
     order: 'asc',
@@ -181,6 +212,8 @@ export const FormSubmissionsListPage: React.FC = () => {
   const listColPickerRef = useRef<HTMLDivElement | null>(null);
 
   const isMonitorOperList = agravo?.toUpperCase() === MONITOR_OPER_REGIONAL_KEY;
+  const isHepatiteCriancaList = agravo?.toUpperCase() === HEPATITE_CRIANCA_HBV_FORM_KEY;
+  const isCustomList = isMonitorOperList || isHepatiteCriancaList;
   const activeSchema = useMemo(() => resolveActiveSchema(form), [form]);
   const refMapsNeeded = useMemo(() => collectSchemaReferenceMapsNeeded(activeSchema), [activeSchema]);
   const municipioById = useMunicipioLabelByIdMap(refMapsNeeded.municipio);
@@ -215,6 +248,38 @@ export const FormSubmissionsListPage: React.FC = () => {
     return m;
   }, [monitorListCols]);
 
+  const hepatiteListCols = useMemo(
+    () => (isHepatiteCriancaList ? getHepatiteCriancaListColumnSpecs() : []),
+    [isHepatiteCriancaList],
+  );
+
+  const hepatiteSummaryById = useMemo(
+    () =>
+      isHepatiteCriancaList
+        ? buildHepatiteCriancaSummaryById(rows, hepatiteMunicipioMaps)
+        : new Map<number, HepatiteCriancaListSummary>(),
+    [isHepatiteCriancaList, rows, hepatiteMunicipioMaps],
+  );
+
+  const visibleHepatiteCols = useMemo(
+    () => hepatiteListCols.filter((c) => visibleHepatiteColIds.includes(c.id)),
+    [hepatiteListCols, visibleHepatiteColIds],
+  );
+
+  const hepatiteColById = useMemo(() => {
+    const m = new Map<string, HepatiteCriancaListColSpec>();
+    for (const c of hepatiteListCols) m.set(c.id, c);
+    return m;
+  }, [hepatiteListCols]);
+
+  const sheetHepatiteSummaryById = useMemo(
+    () =>
+      isHepatiteCriancaList
+        ? buildHepatiteCriancaSummaryById(sheetPreviewRows, hepatiteMunicipioMaps)
+        : new Map<number, HepatiteCriancaListSummary>(),
+    [isHepatiteCriancaList, sheetPreviewRows, hepatiteMunicipioMaps],
+  );
+
   const handleListSortChange = useCallback((key: string) => {
     setListSort((prev) => {
       if (prev.key !== key) return { key, order: 'asc' };
@@ -226,13 +291,32 @@ export const FormSubmissionsListPage: React.FC = () => {
     const sk = listSort.key;
     if (!sk) return rows;
     const dir = listSort.order;
-    const opts = { monitorSummaryById, monitorColById, crsLabels: crsByIdMap, activeSchema, responseMaps: responseLabelMaps };
+    const opts = {
+      monitorSummaryById,
+      monitorColById,
+      hepatiteSummaryById,
+      hepatiteColById,
+      crsLabels: crsByIdMap,
+      activeSchema,
+      responseMaps: responseLabelMaps,
+    };
     return [...rows].sort((a, b) => {
       const va = getListSortComparableValue(a, sk, opts);
       const vb = getListSortComparableValue(b, sk, opts);
       return compareFormListValues(va, vb, dir);
     });
-  }, [rows, listSort.key, listSort.order, monitorSummaryById, monitorColById, crsByIdMap, activeSchema, responseLabelMaps]);
+  }, [
+    rows,
+    listSort.key,
+    listSort.order,
+    monitorSummaryById,
+    monitorColById,
+    hepatiteSummaryById,
+    hepatiteColById,
+    crsByIdMap,
+    activeSchema,
+    responseLabelMaps,
+  ]);
 
   const sheetMonitorSummaryById = useMemo(
     () => (isMonitorOperList ? buildMonitorOperSummaryById(sheetPreviewRows) : new Map()),
@@ -243,13 +327,32 @@ export const FormSubmissionsListPage: React.FC = () => {
     const sk = listSort.key;
     if (!sk || sheetPreviewRows.length === 0) return sheetPreviewRows;
     const dir = listSort.order;
-    const opts = { monitorSummaryById: sheetMonitorSummaryById, monitorColById, crsLabels: crsByIdMap, activeSchema, responseMaps: responseLabelMaps };
+    const opts = {
+      monitorSummaryById: sheetMonitorSummaryById,
+      monitorColById,
+      hepatiteSummaryById: sheetHepatiteSummaryById,
+      hepatiteColById,
+      crsLabels: crsByIdMap,
+      activeSchema,
+      responseMaps: responseLabelMaps,
+    };
     return [...sheetPreviewRows].sort((a, b) => {
       const va = getListSortComparableValue(a, sk, opts);
       const vb = getListSortComparableValue(b, sk, opts);
       return compareFormListValues(va, vb, dir);
     });
-  }, [sheetPreviewRows, listSort.key, listSort.order, sheetMonitorSummaryById, monitorColById, crsByIdMap, activeSchema, responseLabelMaps]);
+  }, [
+    sheetPreviewRows,
+    listSort.key,
+    listSort.order,
+    sheetMonitorSummaryById,
+    sheetHepatiteSummaryById,
+    monitorColById,
+    hepatiteColById,
+    crsByIdMap,
+    activeSchema,
+    responseLabelMaps,
+  ]);
 
   useEffect(() => {
     if (!isMonitorOperList) {
@@ -264,6 +367,31 @@ export const FormSubmissionsListPage: React.FC = () => {
     const def = getMonitorOperDefaultVisibleListColIds(allowedIds);
     setVisibleMonitorColIds(fromStore.length > 0 ? fromStore : def);
   }, [agravo, isMonitorOperList]);
+
+  useEffect(() => {
+    if (!isHepatiteCriancaList) {
+      setVisibleHepatiteColIds([]);
+      return;
+    }
+    const cols = getHepatiteCriancaListColumnSpecs();
+    const allowedIds = cols.map((c) => c.id);
+    const allowed = new Set(allowedIds);
+    const stored = readHepatiteListColSelection();
+    const fromStore = (stored ?? []).filter((id) => allowed.has(id));
+    const def = getHepatiteDefaultVisibleListColIds(allowedIds);
+    setVisibleHepatiteColIds(fromStore.length > 0 ? fromStore : def);
+  }, [agravo, isHepatiteCriancaList]);
+
+  useEffect(() => {
+    if (!isHepatiteCriancaList) return;
+    let cancelled = false;
+    loadMunicipioLabelMaps().then((maps) => {
+      if (!cancelled) setHepatiteMunicipioMaps(maps);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isHepatiteCriancaList]);
 
   useEffect(() => {
     if (!showListColPicker) return;
@@ -491,6 +619,17 @@ export const FormSubmissionsListPage: React.FC = () => {
               Relatório
             </button>
           )}
+          {isHepatiteCriancaList && (
+            <button
+              type="button"
+              data-testid="hepatite-crianca-dashboard"
+              onClick={() => navigate(`/private/formularios/${HEPATITE_CRIANCA_HBV_FORM_KEY}/dashboard`)}
+              className="p-2 sm:w-auto sm:inline-flex sm:items-center sm:justify-center sm:space-x-2 sm:px-4 sm:py-2.5 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-200 shadow-md font-medium"
+            >
+              <BarChart2 className="w-5 h-5" />
+              <span className="hidden sm:inline">Dashboard</span>
+            </button>
+          )}
           {exportHeader}
           <button
             type="button"
@@ -537,12 +676,12 @@ export const FormSubmissionsListPage: React.FC = () => {
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-visible">
-          {isMonitorOperList && listTotal > 0 ? (
+          {isCustomList && listTotal > 0 ? (
             <div className="flex flex-wrap items-center justify-end gap-2 border-b border-gray-200 bg-gray-100 px-3 py-2">
               <div className="relative z-30" ref={listColPickerRef}>
                 <button
                   type="button"
-                  data-testid="monitor-oper-list-columns"
+                  data-testid={isMonitorOperList ? 'monitor-oper-list-columns' : 'hepatite-crianca-list-columns'}
                   onClick={() =>
                     setShowListColPicker((v) => {
                       const next = !v;
@@ -578,9 +717,15 @@ export const FormSubmissionsListPage: React.FC = () => {
                         type="button"
                         className="rounded border px-2 py-1 text-xs hover:bg-gray-50"
                         onClick={() => {
-                          const next = getMonitorOperDefaultVisibleListColIds(monitorListCols.map((c) => c.id));
-                          setVisibleMonitorColIds(next);
-                          writeMonitorOperListColSelection(next);
+                          if (isMonitorOperList) {
+                            const next = getMonitorOperDefaultVisibleListColIds(monitorListCols.map((c) => c.id));
+                            setVisibleMonitorColIds(next);
+                            writeMonitorOperListColSelection(next);
+                          } else {
+                            const next = getHepatiteDefaultVisibleListColIds(hepatiteListCols.map((c) => c.id));
+                            setVisibleHepatiteColIds(next);
+                            writeHepatiteListColSelection(next);
+                          }
                         }}
                       >
                         Relevantes
@@ -589,23 +734,31 @@ export const FormSubmissionsListPage: React.FC = () => {
                         type="button"
                         className="rounded border px-2 py-1 text-xs hover:bg-gray-50"
                         onClick={() => {
-                          const next = monitorListCols.map((c) => c.id);
-                          setVisibleMonitorColIds(next);
-                          writeMonitorOperListColSelection(next);
+                          if (isMonitorOperList) {
+                            const next = monitorListCols.map((c) => c.id);
+                            setVisibleMonitorColIds(next);
+                            writeMonitorOperListColSelection(next);
+                          } else {
+                            const next = hepatiteListCols.map((c) => c.id);
+                            setVisibleHepatiteColIds(next);
+                            writeHepatiteListColSelection(next);
+                          }
                         }}
                       >
                         Todas
                       </button>
                     </div>
                     <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-lg border border-gray-100">
-                      {monitorListCols
+                      {(isMonitorOperList ? monitorListCols : hepatiteListCols)
                         .filter((c) => {
                           const q = listColQuery.trim().toLowerCase();
                           if (!q) return true;
                           return `${c.label} ${c.id}`.toLowerCase().includes(q);
                         })
                         .map((c) => {
-                          const checked = visibleMonitorColIds.includes(c.id);
+                          const visibleIds = isMonitorOperList ? visibleMonitorColIds : visibleHepatiteColIds;
+                          const allCols = isMonitorOperList ? monitorListCols : hepatiteListCols;
+                          const checked = visibleIds.includes(c.id);
                           return (
                             <label
                               key={c.id}
@@ -616,13 +769,18 @@ export const FormSubmissionsListPage: React.FC = () => {
                                 className="mt-0.5"
                                 checked={checked}
                                 onChange={(e) => {
-                                  const next = new Set(visibleMonitorColIds);
+                                  const next = new Set(visibleIds);
                                   if (e.target.checked) next.add(c.id);
                                   else next.delete(c.id);
-                                  let arr = monitorListCols.map((x) => x.id).filter((id) => next.has(id));
+                                  const arr = allCols.map((x) => x.id).filter((id) => next.has(id));
                                   if (arr.length === 0) return;
-                                  setVisibleMonitorColIds(arr);
-                                  writeMonitorOperListColSelection(arr);
+                                  if (isMonitorOperList) {
+                                    setVisibleMonitorColIds(arr);
+                                    writeMonitorOperListColSelection(arr);
+                                  } else {
+                                    setVisibleHepatiteColIds(arr);
+                                    writeHepatiteListColSelection(arr);
+                                  }
                                 }}
                               />
                               <span className="min-w-0 text-sm text-gray-900">{c.label}</span>
@@ -655,7 +813,21 @@ export const FormSubmissionsListPage: React.FC = () => {
                           titleAttr={c.label}
                         />
                       ))
-                    : genericKeyFields.map((f, idx) => (
+                    : isHepatiteCriancaList
+                      ? visibleHepatiteCols.map((c) => (
+                          <FormListSortableTh
+                            key={c.id}
+                            label={c.label}
+                            sortKey={buildListSortHepatiteKey(c.id)}
+                            activeKey={listSort.key}
+                            sortOrder={listSort.order}
+                            onSort={handleListSortChange}
+                            thClassName={`${c.thClassName ?? 'text-left'} whitespace-nowrap`.trim()}
+                            titleAttr={c.label}
+                            hiddenLg={c.hiddenLg}
+                          />
+                        ))
+                      : genericKeyFields.map((f, idx) => (
                         <FormListSortableTh
                           key={f.key}
                           label={f.label}
@@ -700,6 +872,20 @@ export const FormSubmissionsListPage: React.FC = () => {
                             <td
                               key={c.id}
                               className={`px-3 lg:px-4 xl:px-6 py-3 align-middle text-sm text-gray-900 ${c.tdClassName ?? ''}`}
+                              title={text}
+                            >
+                              {text}
+                            </td>
+                          );
+                        })
+                      ) : isHepatiteCriancaList ? (
+                        visibleHepatiteCols.map((c) => {
+                          const sum = hepatiteSummaryById.get(r.id);
+                          const text = sum ? c.format(sum) : '—';
+                          return (
+                            <td
+                              key={c.id}
+                              className={`px-3 lg:px-4 xl:px-6 py-3 align-middle text-sm text-gray-900 ${c.hiddenLg ? 'hidden lg:table-cell' : ''} ${c.tdClassName ?? ''}`}
                               title={text}
                             >
                               {text}

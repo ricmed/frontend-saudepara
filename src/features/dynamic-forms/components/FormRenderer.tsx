@@ -44,6 +44,13 @@ import { EstadoMunicipioNascimento } from './EstadoMunicipioNascimento';
 import { EstabelecimentoNascimento } from './EstabelecimentoNascimento';
 import { CriancaVacinaDoseRow } from './CriancaVacinaDoseRow';
 import { FORM_TAB_PANEL_ANIMATE_CLASS, FormTabBar } from './FormTabBar';
+import DynamicFormErrorSummary from './DynamicFormErrorSummary';
+import {
+  buildDynamicFormFieldMeta,
+  buildOrderedFormErrors,
+  getFirstOrderedErrorKey,
+  scrollToDynamicFormField,
+} from '../utils/dynamicFormFieldNav';
 import { FormSectionHeader } from './FormSectionHeader';
 import {
   CriancaLabSorologiaEsquemaPanel,
@@ -685,6 +692,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     isFieldVisible,
     isFieldRequired,
     isFieldDisabled,
+    errors,
     getError,
     setError,
     clearError,
@@ -1188,19 +1196,51 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     return firstIds;
   }, [sectionsForDisplay, printLayoutMode]);
 
-  const focusTabForFirstError = useCallback(() => {
-    if (!sortedFormTabs?.length) return;
-    for (const section of sectionsToRender) {
-      for (const field of section.fields || []) {
-        if (!field?.key) continue;
-        if (getError(field.key)) {
-          const tab = section.tab;
-          if (tab) setActiveTabId(tab);
-          return;
-        }
+  const fieldMetaByKey = React.useMemo(() => buildDynamicFormFieldMeta(schema), [schema]);
+
+  const orderedFormErrors = React.useMemo(
+    () => buildOrderedFormErrors(errors, schema, fieldMetaByKey),
+    [errors, schema, fieldMetaByKey],
+  );
+
+  const [showValidationSummary, setShowValidationSummary] = useState(false);
+  const submitValidationScrollRef = useRef(false);
+
+  const navigateToFormField = useCallback(
+    (fieldKey: string) => {
+      const meta = fieldMetaByKey.get(fieldKey);
+      const tabId = meta?.tabId;
+      const needsTabSwitch = Boolean(tabId && sortedFormTabs?.length && tabId !== activeTabId);
+      if (needsTabSwitch && tabId) {
+        setActiveTabId(tabId);
       }
+      const delay = needsTabSwitch ? 150 : 50;
+      window.setTimeout(() => {
+        scrollToDynamicFormField(fieldKey, meta?.label);
+      }, delay);
+    },
+    [activeTabId, fieldMetaByKey, sortedFormTabs],
+  );
+
+  useEffect(() => {
+    if (Object.keys(errors).length === 0) {
+      setShowValidationSummary(false);
+      return;
     }
-  }, [getError, sectionsToRender, sortedFormTabs]);
+    if (!submitValidationScrollRef.current) return;
+    submitValidationScrollRef.current = false;
+
+    const firstKey = getFirstOrderedErrorKey(errors, schema);
+    if (firstKey) {
+      navigateToFormField(firstKey);
+    }
+    window.requestAnimationFrame(() => {
+      document.getElementById('dynamic-form-error-summary')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+  }, [errors, navigateToFormField, schema]);
 
   const [pageIndex, setPageIndex] = useState(0);
   useEffect(() => {
@@ -1369,11 +1409,13 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     if (readOnly || isUploading) return;
 
     if (validateAll()) {
+      setShowValidationSummary(false);
       // Converter datetime fields antes de enviar
       const dataToSubmit = convertDateTimeFieldsToUTC(formData, schema);
       onSubmit?.(dataToSubmit);
     } else {
-      focusTabForFirstError();
+      setShowValidationSummary(true);
+      submitValidationScrollRef.current = true;
     }
   };
 
@@ -2351,6 +2393,14 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
         <h1 className={withPrintBlock(printLayoutMode, 'text-2xl font-bold mb-6 text-gray-800')}>
           {schema.title || schema.agravo}
         </h1>
+      ) : null}
+
+      {showValidationSummary && orderedFormErrors.length > 0 ? (
+        <DynamicFormErrorSummary
+          errors={orderedFormErrors}
+          onFieldClick={navigateToFormField}
+          showTabNames={tabbedFormLayout}
+        />
       ) : null}
 
       {pageMode && showProgress ? (
