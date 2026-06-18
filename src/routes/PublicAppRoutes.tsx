@@ -30,6 +30,7 @@ import FaleConoscoPage from '@/features/contact/FaleConoscoPage';
 import AscomPage from '@/features/contact/AscomPage';
 import OuvidoriaPage from '@/features/contact/OuvidoriaPage';
 import { PublicDynamicFormPage } from '@/features/dynamic-forms/pages/PublicDynamicFormPage';
+import QrCodeGeneratorPage from '@/features/qrcode/pages/QrCodeGeneratorPage';
 
 const ChatAdminDashboard = lazy(() => import('@/features/chat/pages/ChatAdminDashboard'));
 const DesktopPage = lazy(() => import('@/features/desktop/DesktopPage'));
@@ -45,6 +46,7 @@ export const getPublicAppRoutes = () => {
     <>
       <Route path="/" element={<DesktopPage />} />
       <Route path="/teste" element={<HomePage />} />
+      <Route path="/gerador-qrcode" element={<QrCodeGeneratorPage />} />
       <Route path="/f/:slug" element={<PublicDynamicFormPage />} />
       <Route path="/mapa" element={<MapaLeaflet />} />
       <Route path="/mapa-google" element={<MapaPage />} />
