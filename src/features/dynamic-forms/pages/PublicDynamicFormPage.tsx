@@ -217,7 +217,6 @@ export const PublicDynamicFormPage: React.FC = () => {
           showTitle={false}
           initialData={editingSubmissionId != null ? formInitialData : {}}
           onSubmit={handleSubmit}
-          onSaveDraft={undefined}
           onCancel={undefined}
           submitLabel={editingSubmissionId != null ? 'Salvar alterações' : 'Enviar'}
           readOnly={false}

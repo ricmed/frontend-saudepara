@@ -45,6 +45,7 @@ import { EstabelecimentoNascimento } from './EstabelecimentoNascimento';
 import { CriancaVacinaDoseRow } from './CriancaVacinaDoseRow';
 import { FORM_TAB_PANEL_ANIMATE_CLASS, FormTabBar } from './FormTabBar';
 import DynamicFormErrorSummary from './DynamicFormErrorSummary';
+import { FormActionBar } from './FormActionBar';
 import {
   buildDynamicFormFieldMeta,
   buildOrderedFormErrors,
@@ -541,17 +542,21 @@ interface FormRendererProps {
   initialData?: Record<string, any>;
   onDataChange?: (data: Record<string, any>) => void;
   onSubmit?: (data: Record<string, any>) => void;
-  onSaveDraft?: (data: Record<string, any>) => void;
   onCancel?: () => void;
+  onClear?: () => void;
   submitLabel?: string;
-  saveDraftLabel?: string;
   cancelLabel?: string;
+  /** id do <form> para botões de ação no header da página. */
+  formId?: string;
+  saving?: boolean;
+  /** Impressão / exportação no rodapé (abaixo dos botões principais). */
+  footerExtraActions?: React.ReactNode;
   readOnly?: boolean;
   /** Classe extra para o container do form (útil quando embutido em modais). */
   className?: string;
   /** Exibe o título (nome/código) dentro do renderer. */
   showTitle?: boolean;
-  /** Oculta a barra de ações (Enviar / Salvar rascunho / Cancelar) mantendo o formulário interativo. */
+  /** Oculta a barra de ações (Salvar / Limpar / Cancelar) mantendo o formulário interativo. */
   showActions?: boolean;
   /** Contexto do formulário para ocultar campos específicos do SINAN em formulários gerais/públicos. */
   context?: 'sinan' | 'general' | 'public';
@@ -575,11 +580,13 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   initialData = {},
   onDataChange,
   onSubmit,
-  onSaveDraft,
   onCancel,
-  submitLabel = 'Enviar',
-  saveDraftLabel = 'Salvar Rascunho',
+  onClear,
+  submitLabel = 'Salvar',
   cancelLabel = 'Cancelar',
+  formId = 'dynamic-form',
+  saving = false,
+  footerExtraActions,
   readOnly = false,
   className,
   showTitle = true,
@@ -699,6 +706,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     validateAll,
     validateField,
     formData,
+    reset,
   } = useFormRenderer({
     schema,
     formKey,
@@ -1419,15 +1427,14 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     }
   };
 
-  const handleSaveDraft = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (readOnly || isUploading) return;
-
-    // Converter datetime fields antes de salvar rascunho também
-    const dataToSave = convertDateTimeFieldsToUTC(formData, schema);
-    onSaveDraft?.(dataToSave);
-  };
+  const handleClearForm = useCallback(() => {
+    if (onClear) {
+      onClear();
+      return;
+    }
+    if (!window.confirm('Tem certeza que deseja limpar todos os campos do formulário?')) return;
+    reset();
+  }, [onClear, reset]);
 
   // Tipos que devem ocupar a linha inteira (não ficar na metade do grid)
   const fullWidthTypes = new Set([
@@ -2386,6 +2393,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
 
   return (
     <form
+      id={formId}
       onSubmit={handleSubmit}
       className={`max-w-5xl mx-auto p-6 bg-white rounded-lg shadow ${className ?? ''}`.trim()}
     >
@@ -4028,72 +4036,69 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
         </div>
       ) : null}
 
-      {!readOnly && showActions && (
-        <div className="flex gap-4 justify-end mt-6 pt-6 border-t">
-          {isUploading && (
-            <p className="mr-auto text-sm text-amber-700 flex items-center gap-2">
+      {(showActions || footerExtraActions) && (
+        <div className="mt-6 border-t border-gray-200 pt-6">
+          {!readOnly && showActions && isUploading ? (
+            <p className="mb-4 text-center text-sm text-amber-700 flex items-center justify-center gap-2">
               <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
               Processando arquivo… Aguarde antes de enviar ou sair da página.
             </p>
-          )}
-          {onCancel && (
-            <button
-              type="button"
-              onClick={onCancel}
-              disabled={isUploading}
-              className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {cancelLabel}
-            </button>
-          )}
-          {onSaveDraft && (
-            <button
-              type="button"
-              onClick={handleSaveDraft}
-              disabled={isUploading}
-              className="px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saveDraftLabel}
-            </button>
-          )}
-          {pageMode ? (
-            <>
-              <button
-                type="button"
-                onClick={goPrev}
-                disabled={isUploading || pageIndex <= 0}
-                className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Anterior
-              </button>
-              {pageIndex >= totalPages - 1 ? (
-                <button
-                  type="submit"
-                  disabled={isUploading}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isUploading ? 'Aguarde...' : submitLabel}
-                </button>
-              ) : (
+          ) : null}
+          {!readOnly && showActions ? (
+            pageMode ? (
+              <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
                 <button
                   type="button"
-                  onClick={goNext}
-                  disabled={isUploading}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={goPrev}
+                  disabled={isUploading || saving || pageIndex <= 0}
+                  className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Próximo
+                  Anterior
                 </button>
-              )}
-            </>
-          ) : (
-            <button
-              type="submit"
-              disabled={isUploading}
-              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isUploading ? 'Aguarde...' : submitLabel}
-            </button>
-          )}
+                {pageIndex >= totalPages - 1 ? (
+                  <button
+                    type="submit"
+                    disabled={isUploading || saving}
+                    className="inline-flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isUploading || saving ? 'Aguarde...' : submitLabel}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={goNext}
+                    disabled={isUploading || saving}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Próximo
+                  </button>
+                )}
+              </div>
+            ) : (
+              <FormActionBar
+                formId={formId}
+                saveLabel={submitLabel}
+                cancelLabel={cancelLabel}
+                saving={saving}
+                disabled={isUploading}
+                onCancel={onCancel}
+                onClear={handleClearForm}
+                placement="footer"
+                extraActions={footerExtraActions}
+              />
+            )
+          ) : readOnly && onCancel ? (
+            <FormActionBar
+              formId={formId}
+              cancelLabel={cancelLabel}
+              readOnly
+              onCancel={onCancel}
+              placement="footer"
+              extraActions={footerExtraActions}
+            />
+          ) : footerExtraActions ? (
+            <div className="flex flex-wrap items-center justify-center gap-2">{footerExtraActions}</div>
+          ) : null}
         </div>
       )}
     </form>
