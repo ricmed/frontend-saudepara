@@ -115,6 +115,7 @@ import {
 } from '../utils/hepatiteCriancaMaeLabRequired';
 import {
   buildHepBDoseScheduleUpdates,
+  isHepBScheduledDoseDateKey,
   isIsoDate,
   suggestFirstHepBDoseFromMaternidade,
 } from '../utils/hepatiteCriancaVacinaHepBSchedule';
@@ -1789,6 +1790,10 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           ? withPlaceholder.options
           : [...CRIANCA_VACINA_HBV_MATERNIDADE_OPTIONS];
       return { ...withPlaceholder, type: 'select', options, gridCols: undefined };
+    }
+
+    if (isHepatiteCriancaHBV && isHepBScheduledDoseDateKey(withPlaceholder.key)) {
+      return { ...withPlaceholder, allowFutureDate: true };
     }
 
     return withPlaceholder;

@@ -58,7 +58,12 @@ export const CriancaVacinaDoseRow: React.FC<CriancaVacinaDoseRowProps> = ({
           style={{ width: DOSE_DATE_WIDTH, maxWidth: DOSE_DATE_WIDTH }}
         >
           <DateField
-            field={{ ...dataField, denseControls: true, denseControlsLargeText: true }}
+            field={{
+              ...dataField,
+              allowFutureDate: true,
+              denseControls: true,
+              denseControlsLargeText: true,
+            }}
             value={dataValue}
             onChange={(val) => setValue(dataField.key, val)}
             error={getError(dataField.key)}

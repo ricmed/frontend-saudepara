@@ -3,6 +3,8 @@ import {
   addMonthsToIsoDate,
   buildHepBDoseScheduleUpdates,
   computeHepBDoseScheduleFromFirstDose,
+  isHepBScheduledDoseDateKey,
+  maxScheduledHepBDoseDateIso,
   suggestFirstHepBDoseFromMaternidade,
 } from './hepatiteCriancaVacinaHepBSchedule';
 
@@ -58,5 +60,19 @@ describe('buildHepBDoseScheduleUpdates', () => {
       lastAutoByKey: {},
     });
     expect(updates['crianca.vacina_hepatite_b_dose_2_data']).toBeUndefined();
+  });
+});
+
+describe('isHepBScheduledDoseDateKey', () => {
+  it('identifica apenas as quatro datas de dose HBV', () => {
+    expect(isHepBScheduledDoseDateKey('crianca.vacina_hepatite_b_dose_2_data')).toBe(true);
+    expect(isHepBScheduledDoseDateKey('notificacao.dt_notificacao')).toBe(false);
+  });
+});
+
+describe('maxScheduledHepBDoseDateIso', () => {
+  it('projeta limite 24 meses à frente', () => {
+    const ref = new Date(2026, 5, 18);
+    expect(maxScheduledHepBDoseDateIso(ref)).toBe('2028-06-18');
   });
 });

@@ -8,6 +8,20 @@ export const HEP_B_DOSE_DATA_KEYS = [
   'crianca.vacina_hepatite_b_dose_4_data',
 ] as const;
 
+const HEP_B_DOSE_DATA_KEY_SET = new Set<string>(HEP_B_DOSE_DATA_KEYS);
+
+/** Datas previstas de acompanhamento vacinal — podem ser futuras (calendário 0/2/4/6 meses). */
+export function isHepBScheduledDoseDateKey(key: string): boolean {
+  return HEP_B_DOSE_DATA_KEY_SET.has(key);
+}
+
+/** Limite superior razoável para dose prevista (24 meses à frente). */
+export function maxScheduledHepBDoseDateIso(reference = new Date()): string {
+  const d = new Date(reference);
+  d.setMonth(d.getMonth() + 24);
+  return d.toISOString().slice(0, 10);
+}
+
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function isIsoDate(value: unknown): value is string {

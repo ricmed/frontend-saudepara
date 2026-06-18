@@ -165,6 +165,8 @@ export interface FormField {
   placeholder?: string;
   /** Para campo `date`: inicia com a data atual (usuário pode editar normalmente). */
   defaultCurrentDate?: boolean;
+  /** Para campo `date`: permite datas futuras (ex.: doses previstas de vacina HBV). */
+  allowFutureDate?: boolean;
   mask?: string;
   min?: number;
   max?: number;

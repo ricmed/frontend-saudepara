@@ -2,6 +2,7 @@ import React from 'react';
 import { Check, HelpCircle, X } from 'lucide-react';
 import type { FormField } from '@/services/FormService';
 import { renderDynamicFieldLabel } from '../utils/sinanFichaUi';
+import { maxScheduledHepBDoseDateIso } from '../utils/hepatiteCriancaVacinaHepBSchedule';
 
 function getFieldInputId(field: FormField) {
   const key = (field.key || field.label || 'field').toString();
@@ -112,8 +113,10 @@ export const DateField: React.FC<TextFieldProps> = ({
   disabled,
 }) => {
   const today = new Date().toISOString().split('T')[0];
-  // Usa field.max apenas se for uma string de data válida, caso contrário usa today
-  const maxDate = (typeof field.max === 'string' && field.max.match(/^\d{4}-\d{2}-\d{2}$/)) ? field.max : today;
+  const allowFutureDate = field.allowFutureDate === true;
+  const explicitMax =
+    typeof field.max === 'string' && field.max.match(/^\d{4}-\d{2}-\d{2}$/) ? field.max : undefined;
+  const maxDate = allowFutureDate ? explicitMax ?? maxScheduledHepBDoseDateIso() : explicitMax ?? today;
 
   const incrementDate = () => {
     // Se não houver valor, define como hoje
@@ -126,11 +129,9 @@ export const DateField: React.FC<TextFieldProps> = ({
     const currentDate = new Date(value + 'T12:00:00');
     const maxDateObj = new Date(maxDate + 'T12:00:00');
     
-    // Só incrementa se a data atual for menor que a máxima
     if (currentDate < maxDateObj) {
       currentDate.setDate(currentDate.getDate() + 1);
-      const newDate = currentDate.toISOString().split('T')[0];
-      onChange(newDate);
+      onChange(currentDate.toISOString().split('T')[0]);
     }
   };
 
