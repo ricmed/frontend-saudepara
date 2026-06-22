@@ -136,6 +136,54 @@ describe('useFormRenderer', () => {
     );
   });
 
+  it('HEPATITE_CRIANCA_HBV: validateAll aceita apenas idade em meses sem data de nascimento', () => {
+    const schema: FormSchema = {
+      agravo: 'HEPATITE_CRIANCA_HBV',
+      sections: [
+        {
+          id: 's1',
+          title: 'Paciente',
+          order: 1,
+          fields: [
+            {
+              key: 'paciente.data_nascimento',
+              type: 'date',
+              label: 'Data de Nascimento',
+              order: 1,
+              required: true,
+            },
+            { key: 'paciente.idade', type: 'idade', label: 'Idade', order: 2, required: false },
+            { key: 'paciente.nome', type: 'text', label: 'Nome', order: 3, required: true },
+          ],
+        },
+      ],
+    };
+    const { result } = renderHook(() =>
+      useFormRenderer({
+        schema,
+        formKey: 'HEPATITE_CRIANCA_HBV',
+        initialData: {
+          paciente: { idade: 9, nome: 'Criança Teste' },
+          investigador: {
+            municipio_id: 150140,
+            unidade_id: 42,
+            nome: 'Investigador Teste',
+            funcao: 'Enfermeiro',
+          },
+        },
+      }),
+    );
+
+    expect(result.current.isFieldRequired('paciente.data_nascimento')).toBe(false);
+    expect(result.current.isFieldRequired('paciente.idade')).toBe(true);
+
+    let valid = true;
+    act(() => {
+      valid = result.current.validateAll();
+    });
+    expect(valid).toBe(true);
+  });
+
   it('HEPATITE_CRIANCA_HBV: CPF e CNS não são obrigatórios', () => {
     const schema: FormSchema = {
       agravo: 'HEPATITE_CRIANCA_HBV',

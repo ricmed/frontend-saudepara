@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { PainelLateral } from "./components/PainelLateral";
 import { MapaContainer } from "./components/MapaContainer";
 import { BotoesControle } from "./components/BotoesControle";
@@ -63,6 +63,31 @@ const MapaLeaflet: React.FC = () => {
     naturezaSelecionada,
     qualificacaoSelecionada
   );
+
+  // Ordenar por distância do usuário (mais próximo primeiro)
+  // Quando a localização não está disponível, mantém a ordem original
+  const sortedFilteredPlaces = useMemo(() => {
+    if (!userLocation) return filteredPlaces;
+
+    const haversineM = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+      const R = 6371000;
+      const dLat = (lat2 - lat1) * (Math.PI / 180);
+      const dLng = (lng2 - lng1) * (Math.PI / 180);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * (Math.PI / 180)) *
+          Math.cos(lat2 * (Math.PI / 180)) *
+          Math.sin(dLng / 2) *
+          Math.sin(dLng / 2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    return [...filteredPlaces].sort(
+      (a, b) =>
+        haversineM(userLocation.lat, userLocation.lng, a.lat, a.lng) -
+        haversineM(userLocation.lat, userLocation.lng, b.lat, b.lng)
+    );
+  }, [filteredPlaces, userLocation]);
 
   // Hook de Roteamento
   const { routeState, clearRoute } = useRouting();
@@ -538,7 +563,7 @@ const MapaLeaflet: React.FC = () => {
           naturezaSelecionada={naturezaSelecionada}
           tipoEstabelecimentoSelecionado={tipoEstabelecimentoSelecionado}
           searchRadius={searchRadius}
-          filteredPlaces={filteredPlaces}
+          filteredPlaces={sortedFilteredPlaces}
           visibleCount={visibleCount}
           onHabilitacaoChange={setHabilitacaoSelecionada}
           onQualificacaoChange={setQualificacaoSelecionada}
@@ -556,7 +581,7 @@ const MapaLeaflet: React.FC = () => {
           <MapaContainer
               center={mapCenter}
               userLocation={userLocation}
-              filteredPlaces={filteredPlaces}
+              filteredPlaces={sortedFilteredPlaces}
               selectedMarker={selectedMarker}
               visibleCount={visibleCount}
               qualificacaoSelecionada={qualificacaoSelecionada}
@@ -569,15 +594,15 @@ const MapaLeaflet: React.FC = () => {
             {/* Overlay para seleção de servidor de mapa */}
             <MapProviderOverlay />
 
-            {/* Legenda de qualificações - canto inferior esquerdo */}
+            {/* Legenda de tipos de estabelecimento - canto inferior esquerdo */}
             {/* Versão mobile - compacta */}
             <div className="absolute bottom-20 left-2 z-[400] md:hidden">
-              <LegendaQualificacoes mobile={true} />
+              <LegendaQualificacoes mobile={true} places={sortedFilteredPlaces} />
             </div>
             
             {/* Versão desktop - completa */}
             <div className="hidden md:block absolute bottom-24 left-4 z-[400]">
-              <LegendaQualificacoes mobile={false} />
+              <LegendaQualificacoes mobile={false} places={sortedFilteredPlaces} />
             </div>
 
             {/* Botões de controle */}

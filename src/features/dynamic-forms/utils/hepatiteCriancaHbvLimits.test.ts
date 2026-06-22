@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   calcularIdadeMesesFromBirthDate,
-  formatIdadeMesesParaExibicao,
+  collectHepatiteCriancaExpostaAgeErrors,
+  CRIANCA_EXPOSTA_HBV_IDADE_OU_NASCIMENTO_ERRO,
   CRIANCA_EXPOSTA_HBV_MAX_IDADE_MESES,
+  formatIdadeMesesParaExibicao,
 } from './hepatiteCriancaHbvLimits';
 
 describe('formatIdadeMesesParaExibicao', () => {
@@ -31,5 +33,17 @@ describe('calcularIdadeMesesFromBirthDate + exibição HBV', () => {
     });
     expect(texto).toMatch(/mês|meses/);
     expect(texto).not.toMatch(/ano/);
+  });
+});
+
+describe('collectHepatiteCriancaExpostaAgeErrors', () => {
+  it('aceita apenas idade em meses', () => {
+    expect(collectHepatiteCriancaExpostaAgeErrors({ paciente: { idade: 6 } })).toEqual([]);
+  });
+
+  it('exige idade ou data de nascimento quando ambos ausentes', () => {
+    const errors = collectHepatiteCriancaExpostaAgeErrors({ paciente: {} });
+    expect(errors).toHaveLength(2);
+    expect(errors.every((e) => e.message === CRIANCA_EXPOSTA_HBV_IDADE_OU_NASCIMENTO_ERRO)).toBe(true);
   });
 });

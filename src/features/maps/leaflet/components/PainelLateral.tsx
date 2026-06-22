@@ -78,8 +78,12 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
   void habilitacaoSelecionada;
   void onHabilitacaoChange;
   void onSearch;
-  void naturezaSelecionada; // Temporariamente não usado
-  void onNaturezaChange; // Temporariamente não usado
+  void naturezaSelecionada;
+  void onNaturezaChange;
+  void searchRadius;
+  void qualificacaoSelecionada;
+  void onQualificacaoChange;
+  void tiposQualificacoes;
 
   // Filtrar estabelecimentos baseado no texto de pesquisa
   const searchFilteredPlaces = useMemo(() => {
@@ -193,23 +197,7 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
           </select>
         </div> */}
 
-        {/* Seletor de qualificação COP 30 */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Qualificação COP 30
-          </label>
-          <select
-            value={qualificacaoSelecionada}
-            onChange={(e) => onQualificacaoChange(e.target.value)}
-            className="w-full p-3 text-sm border border-gray-300 rounded-lg shadow-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            {tiposQualificacoes.map((qualificacao) => (
-              <option key={qualificacao.id} value={qualificacao.nome}>
-                {qualificacao.nome}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* Seletor de qualificação COP 30 - REMOVIDO */}
 
         {/* Seletor de natureza - TEMPORARIAMENTE OCULTO */}
         {/* <div className="mb-4">
@@ -264,9 +252,9 @@ export const PainelLateral: React.FC<PainelLateralProps> = ({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               <p className="text-sm">
-                {searchText 
+                {searchText
                   ? `Nenhum estabelecimento encontrado para "${searchText}"`
-                  : `Nenhum estabelecimento encontrado no raio de ${searchRadius / 1000} km.`
+                  : 'Nenhum estabelecimento encontrado com os filtros selecionados.'
                 }
               </p>
             </div>

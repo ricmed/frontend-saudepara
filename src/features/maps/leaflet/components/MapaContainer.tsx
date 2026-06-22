@@ -4,7 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import { Local, LatLngLiteral } from '../types';
 import { TILE_OPTIONS } from '../config/tileProviders';
 import { useMapProvider } from '../contexts/MapProviderContext';
-import { getPrimeiraQualificacaoCOP30 } from '../utils/qualificacoesCOP30';
+import { getTipoEstabelecimentoConfig } from '../utils/tiposEstabelecimentoConfig';
 
 // Fix para ícones do Leaflet no Webpack/Vite
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
@@ -330,38 +330,22 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
           qualificacoes: local.qualificacoes
         });
 
-        // Buscar configuração da qualificação COP 30
-        // Se uma qualificação específica está selecionada, usar ela
-        // Senão, usar a primeira qualificação COP 30 do estabelecimento
-        let qualConfig;
-        
-        if (qualificacaoSelecionada && 
-            qualificacaoSelecionada !== "todas" && 
-            qualificacaoSelecionada !== "Todas as Qualificações") {
-          // Buscar a configuração da qualificação selecionada
-          qualConfig = getPrimeiraQualificacaoCOP30([qualificacaoSelecionada]);
-        } else {
-          // Usar a primeira qualificação do estabelecimento
-          qualConfig = getPrimeiraQualificacaoCOP30(local.qualificacoes);
-        }
-        
-        // Se encontrou qualificação COP 30, usar suas cores e letra
-        // Senão, usar configuração padrão
-        const markerColor = qualConfig?.cor || '#999999';
-        const textColor = qualConfig?.textColor || '#FFFFFF';
-        const markerLetra = qualConfig?.letra || '?';
+        // Colorir marcador pelo tipo de estabelecimento
+        const tipoConfig = getTipoEstabelecimentoConfig(local.tipoEstabelecimento);
+        const markerColor = tipoConfig.cor;
+        const textColor = tipoConfig.textColor;
+        const markerLetra = tipoConfig.sigla;
         
         // Debug para primeiro item
         if (index === 0) {
           console.log(`🎨 Configuração do marcador - ${local.nome}:`, {
-            qualificacoes: local.qualificacoes,
-            qualificacaoSelecionada,
-            qualConfig,
+            tipo: local.tipoEstabelecimento,
             cor: markerColor,
-            letra: markerLetra
+            sigla: markerLetra
           });
         }
         
+        const siglaFontSize = markerLetra.length <= 2 ? '9px' : markerLetra.length === 3 ? '7px' : '6px';
         const markerIcon = L.divIcon({
           html: `
             <div style="
@@ -374,12 +358,13 @@ export const MapaContainer: React.FC<MapaContainerProps> = ({
               display: flex;
               align-items: center;
               justify-content: center;
-              font-size: 8px;
+              font-size: ${siglaFontSize};
               font-weight: bold;
               color: ${textColor};
               cursor: pointer;
+              letter-spacing: -0.5px;
             ">
-              ${markerLetra}
+              ${markerLetra.length > 4 ? markerLetra.slice(0, 4) : markerLetra}
             </div>
           `,
           iconSize: [30, 30],
