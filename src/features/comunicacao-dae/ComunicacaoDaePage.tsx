@@ -95,6 +95,8 @@ const ComunicacaoDaePage: React.FC = () => {
 
   // Pesquisa
   const [searchParams, setSearchParams] = useState<SearchParams>({ term: '', field: 'all' });
+  // debouncedSearch reflete searchParams após 400 ms — é o que é enviado ao backend
+  const [debouncedSearch, setDebouncedSearch] = useState<SearchParams>({ term: '', field: 'all' });
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
   const searchDropdownRef = useRef<HTMLDivElement>(null);
   const [filteredComunicacoes, setFilteredComunicacoes] = useState<ComunicacaoDae[]>([]);
@@ -143,7 +145,15 @@ const ComunicacaoDaePage: React.FC = () => {
         filtrosComPermissoes.status_leitura = statusLeituraFilter;
       }
 
-      const response = await ComunicacaoDaeService.getAll(currentPage, itemsPerPage, filtrosComPermissoes);
+      const searchFilters =
+        debouncedSearch.term.length >= 3
+          ? { search: debouncedSearch.term, search_field: debouncedSearch.field }
+          : {};
+
+      const response = await ComunicacaoDaeService.getAll(currentPage, itemsPerPage, {
+        ...filtrosComPermissoes,
+        ...searchFilters,
+      });
       setComunicacoes(response.data || []);
       setTotal(response.pagination?.total || 0);
       setTotalPages(response.pagination?.pages || 1);
@@ -167,7 +177,7 @@ const ComunicacaoDaePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, filters, itemsPerPage, statusLeituraFilter, isOnline]);
+  }, [currentPage, filters, itemsPerPage, statusLeituraFilter, isOnline, debouncedSearch]);
 
   useEffect(() => {
     loadComunicacoesRef.current = loadComunicacoes;
@@ -212,8 +222,25 @@ const ComunicacaoDaePage: React.FC = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Aplicar filtro de pesquisa
+  // Debounce: propaga searchParams ao backend após 400 ms (ignora digitação intermediária)
   useEffect(() => {
+    // Aguarda o usuário digitar pelo menos 3 caracteres antes de disparar
+    if (searchParams.term.length > 0 && searchParams.term.length < 3) return;
+    const timeout = setTimeout(() => {
+      setDebouncedSearch(searchParams);
+      setCurrentPage(1);
+    }, 400);
+    return () => clearTimeout(timeout);
+  }, [searchParams]);
+
+  // Quando online: o backend já filtrou — passa comunicacoes diretamente.
+  // Quando offline: aplica filtro client-side na página carregada do cache.
+  useEffect(() => {
+    if (isOnline) {
+      setFilteredComunicacoes(comunicacoes);
+      return;
+    }
+
     if (!searchParams.term || searchParams.term.length < 3) {
       setFilteredComunicacoes(comunicacoes);
       return;
@@ -257,7 +284,7 @@ const ComunicacaoDaePage: React.FC = () => {
     });
 
     setFilteredComunicacoes(filtered);
-  }, [searchParams, comunicacoes]);
+  }, [searchParams, comunicacoes, isOnline]);
 
   // Ordenação deve ser aplicada no backend (antes da paginação).
   // Aqui mantemos apenas a lista filtrada (pesquisa local na página).
@@ -373,8 +400,11 @@ const ComunicacaoDaePage: React.FC = () => {
       let dataToExport: ComunicacaoDae[] = [];
 
       if (type === 'all') {
-        // Buscar todas as comunicações com filtros aplicados
-        const response = await ComunicacaoDaeService.getAll(1, 9999, filters);
+        const exportSearchFilters =
+          debouncedSearch.term.length >= 3
+            ? { search: debouncedSearch.term, search_field: debouncedSearch.field }
+            : {};
+        const response = await ComunicacaoDaeService.getAll(1, 9999, { ...filters, ...exportSearchFilters });
         dataToExport = response.data;
       } else {
         // Usar página atual

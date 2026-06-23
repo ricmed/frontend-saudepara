@@ -96,6 +96,8 @@ export interface ComunicacaoDaeFilters {
   sortKey?: string;
   sortDir?: 'asc' | 'desc';
   status_leitura?: StatusLeituraFiltro;
+  search?: string;
+  search_field?: string;
 }
 
 export interface CreateComunicacaoDaeData {
