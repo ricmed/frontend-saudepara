@@ -573,6 +573,12 @@ interface FormRendererProps {
   formKey?: string;
   /** Expande todas as abas/seções visíveis (visualização para impressão). */
   printLayoutMode?: boolean;
+  /**
+   * IDs de seções que devem ser ocultadas do respondente público.
+   * Apenas respeitado quando context="public" — em fichas SINAN não tem efeito.
+   * Os campos obrigatórios de seções ocultas são ignorados na validação.
+   */
+  hiddenSectionIds?: string[];
 }
 
 export const FormRenderer: React.FC<FormRendererProps> = ({
@@ -598,6 +604,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   monitorOperRegionalCrsScope = null,
   notificacaoEscopo = 'livre',
   printLayoutMode = false,
+  hiddenSectionIds,
 }) => {
   const sectionIconMap: Record<string, React.ComponentType<{ className?: string }>> = React.useMemo(
     () => ({
@@ -1145,6 +1152,13 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       sections = stripSinanClinicalFieldsFromSections(sections);
     }
 
+    // Ocultar seções selecionadas pelo criador (somente em context="public").
+    // Em fichas SINAN isso não é aplicado.
+    if (context === 'public' && hiddenSectionIds?.length) {
+      const hiddenSet = new Set(hiddenSectionIds);
+      sections = sections.filter((s) => !hiddenSet.has(s.id));
+    }
+
     // Mantém comportamento antigo apenas se um schema pedir de forma explícita.
     // Retrocompatibilidade: aceita `showOnlyFixedInForm` e alias `fixedOnly`.
     const cfg = (schema.fixedColumnsConfig || {}) as any;
@@ -1158,7 +1172,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       }))
       .filter((section) => section.fields.length > 0)
       .sort((a, b) => a.order - b.order);
-  }, [schema, showSinanDadosClinicosBlock]);
+  }, [schema, showSinanDadosClinicosBlock, context, hiddenSectionIds]);
 
   const sortedFormTabs = React.useMemo(() => {
     const tabs = schema.tabs;
@@ -1260,7 +1274,26 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   const currentSection = pageMode ? sectionsToRender[Math.min(pageIndex, sectionsToRender.length - 1)] : null;
 
   const validateCurrentPage = () => {
-    if (!pageMode || !currentSection) return validateAll();
+    if (!pageMode || !currentSection) {
+      // Em context="public" com seções ocultas: validar apenas as seções visíveis
+      // (sectionsToRender já exclui as ocultas). Campos obrigatórios de seções
+      // ocultas não devem impedir o envio.
+      if (context === 'public' && hiddenSectionIds?.length) {
+        let ok = true;
+        for (const section of sectionsToRender) {
+          const sortedFields = [...(section.fields || [])].sort((a, b) => a.order - b.order);
+          for (const f of sortedFields) {
+            if (!f) continue;
+            if (!isFieldVisible(f.key)) continue;
+            if (isFieldDisabled(f.key)) continue;
+            const valid = validateField(f as any);
+            if (!valid) ok = false;
+          }
+        }
+        return ok;
+      }
+      return validateAll();
+    }
     let ok = true;
     const sortedFields = [...(currentSection.fields || [])].sort((a, b) => a.order - b.order);
     for (const f of sortedFields) {

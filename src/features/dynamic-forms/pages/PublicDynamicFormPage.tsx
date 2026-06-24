@@ -123,7 +123,11 @@ export const PublicDynamicFormPage: React.FC = () => {
   const confirmationMsg = (payload?.form?.confirmation_message ?? '').trim();
   const allowEditAfterSubmit = Boolean(payload?.form?.allow_edit_after_submit);
   const oneResponsePerUser = Boolean((payload?.form as any)?.one_response_per_user);
-  const formPageMode = Boolean((payload?.version?.ui_json as any)?.page_mode ?? true);
+  const formUiJson = (payload?.version?.ui_json as any) ?? {};
+  const formPageMode = Boolean(formUiJson.page_mode ?? true);
+  const hiddenSectionIds: string[] = Array.isArray(formUiJson.hidden_sections)
+    ? (formUiJson.hidden_sections as unknown[]).filter((v): v is string => typeof v === 'string')
+    : [];
 
   // Redirecionar após envio (quando configurado)
   useEffect(() => {
@@ -435,6 +439,7 @@ export const PublicDynamicFormPage: React.FC = () => {
           context="public"
           pageMode={isReadonly ? false : formPageMode}
           showProgress={!isReadonly && formPageMode}
+          hiddenSectionIds={isReadonly ? [] : hiddenSectionIds}
         />
       </div>
     </div>

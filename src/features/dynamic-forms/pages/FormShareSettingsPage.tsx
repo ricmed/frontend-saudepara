@@ -7,7 +7,7 @@ import FormAclService, { type FormAclItem, type FormAclRole, type UserPick } fro
 import { useAuth } from '@/keycloak/AuthProvider';
 import {
   Copy, Plus, Shield, FileText, Lock, Globe, Link2,
-  ChevronDown, ChevronUp, Users, Check, Settings, LayoutList, AlignJustify,
+  ChevronDown, ChevronUp, Users, Check, Settings, LayoutList, AlignJustify, Eye, EyeOff,
 } from 'lucide-react';
 
 type Visibility = 'PRIVATE' | 'UNLISTED' | 'PUBLIC';
@@ -49,6 +49,8 @@ export const FormShareSettingsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pageMode, setPageMode] = useState(true);
+  const [hiddenSections, setHiddenSections] = useState<string[]>([]);
+  const [availableSections, setAvailableSections] = useState<Array<{ id: string; title: string; order: number }>>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showRevokedLinks, setShowRevokedLinks] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -104,7 +106,16 @@ export const FormShareSettingsPage: React.FC = () => {
       const activeVer = f.active_version_id
         ? f.versions?.find((v) => v.id === f.active_version_id)
         : f.versions?.[0];
-      setPageMode(Boolean((activeVer?.ui_json as any)?.page_mode ?? true));
+      const uiJson = (activeVer?.ui_json as any) ?? {};
+      setPageMode(Boolean(uiJson.page_mode ?? true));
+      setHiddenSections(Array.isArray(uiJson.hidden_sections) ? uiJson.hidden_sections : []);
+
+      const secs: Array<{ id: string; title: string; order: number }> =
+        ((activeVer?.schema_json as any)?.sections ?? [])
+          .filter((s: any) => s?.id)
+          .map((s: any) => ({ id: String(s.id), title: String(s.title || s.id), order: Number(s.order ?? 0) }))
+          .sort((a: any, b: any) => a.order - b.order);
+      setAvailableSections(secs);
 
       setScheduleOpenAt(toLocalInputValue((f as any).open_at ?? null));
       setScheduleCloseAt(toLocalInputValue((f as any).close_at ?? null));
@@ -155,6 +166,21 @@ export const FormShareSettingsPage: React.FC = () => {
       setSaving(true);
       await FormService.updateMyFormPageMode(formId, value);
       setPageMode(value);
+    } catch (e: any) {
+      alert(e?.response?.data?.message || e?.message || 'Erro ao salvar');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleSectionVisibility = async (sectionId: string) => {
+    const next = hiddenSections.includes(sectionId)
+      ? hiddenSections.filter((id) => id !== sectionId)
+      : [...hiddenSections, sectionId];
+    try {
+      setSaving(true);
+      await FormService.updateMyFormHiddenSections(formId, next);
+      setHiddenSections(next);
     } catch (e: any) {
       alert(e?.response?.data?.message || e?.message || 'Erro ao salvar');
     } finally {
@@ -358,6 +384,51 @@ export const FormShareSettingsPage: React.FC = () => {
                 </button>
               </div>
           </div>
+
+          {/* ── Seções visíveis ao público ────────────────────── */}
+          {availableSections.length > 1 && (
+            <div className="bg-white rounded-xl shadow p-6">
+              <h2 className="text-base font-semibold text-gray-900 mb-1">Seções visíveis ao público</h2>
+              <p className="text-sm text-gray-500 mb-4">
+                Escolha quais partes do formulário aparecem para quem responde.
+                Seções ocultas podem ser liberadas depois — campos obrigatórios nelas não bloqueiam o envio enquanto estiverem ocultos.
+              </p>
+              <div className="space-y-2">
+                {availableSections.map((sec) => {
+                  const hidden = hiddenSections.includes(sec.id);
+                  return (
+                    <button
+                      key={sec.id}
+                      type="button"
+                      disabled={saving}
+                      onClick={() => toggleSectionVisibility(sec.id)}
+                      className={`w-full flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors disabled:opacity-50
+                        ${hidden
+                          ? 'border-gray-200 bg-gray-50 text-gray-400'
+                          : 'border-green-200 bg-green-50 text-gray-800'
+                        }`}
+                    >
+                      {hidden
+                        ? <EyeOff className="h-4 w-4 shrink-0 text-gray-400" />
+                        : <Eye className="h-4 w-4 shrink-0 text-green-600" />
+                      }
+                      <span className="flex-1 text-sm font-medium">{sec.title}</span>
+                      <span className={`text-xs font-semibold ${hidden ? 'text-gray-400' : 'text-green-700'}`}>
+                        {hidden ? 'Oculta' : 'Visível'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {hiddenSections.length > 0 && (
+                <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  {hiddenSections.length === availableSections.length
+                    ? 'Todas as seções estão ocultas — o formulário não exibirá nenhum campo ao público.'
+                    : `${hiddenSections.length} seção(ões) oculta(s). Os campos obrigatórios delas não bloquearão o envio.`}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* ── Link de compartilhamento ──────────────────────── */}
           {currentVisibility !== 'PRIVATE' && (

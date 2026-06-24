@@ -421,6 +421,11 @@ class FormService {
     return response.data;
   }
 
+  async updateMyFormHiddenSections(id: number, hidden_sections: string[]): Promise<{ hidden_sections: string[] }> {
+    const response = await api.patch(`/forms/me/${id}/hidden-sections`, { hidden_sections });
+    return response.data;
+  }
+
   async deleteMyForm(id: number): Promise<void> {
     await api.delete(`/forms/me/${id}`);
   }
