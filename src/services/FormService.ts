@@ -15,13 +15,15 @@ const api = axios.create({
   withCredentials: true // ✅ Envia cookies de autenticação automaticamente
 });
 
-// Instância para rotas públicas (sem /api)
+// Instância para rotas públicas — sem credenciais para não forçar CORS preflight
+// com credentials em browsers que tratam isso de forma restritiva (Safari, Firefox).
 const publicApi = axios.create({
   baseURL: PUBLIC_API_URL,
   timeout: 60000,
   headers: {
     'Content-Type': 'application/json'
   },
+  withCredentials: false,
 });
 
 // Types
@@ -411,6 +413,11 @@ class FormService {
     }
   ): Promise<Form> {
     const response = await api.put(`/forms/me/${id}`, data);
+    return response.data;
+  }
+
+  async updateMyFormPageMode(id: number, page_mode: boolean): Promise<{ page_mode: boolean }> {
+    const response = await api.patch(`/forms/me/${id}/page-mode`, { page_mode });
     return response.data;
   }
 

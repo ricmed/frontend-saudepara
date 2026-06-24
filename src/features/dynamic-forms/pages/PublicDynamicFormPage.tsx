@@ -54,6 +54,7 @@ export const PublicDynamicFormPage: React.FC = () => {
   const redirectUrl = (payload?.form?.redirect_url ?? '').trim();
   const confirmationMsg = (payload?.form?.confirmation_message ?? '').trim();
   const allowEditAfterSubmit = Boolean(payload?.form?.allow_edit_after_submit);
+  const formPageMode = Boolean((payload?.version?.ui_json as any)?.page_mode ?? true);
 
   useEffect(() => {
     if (!submitted || !redirectUrl) return;
@@ -222,8 +223,8 @@ export const PublicDynamicFormPage: React.FC = () => {
           readOnly={false}
           showActions={true}
           context="public"
-          pageMode={true}
-          showProgress={true}
+          pageMode={formPageMode}
+          showProgress={formPageMode}
         />
       </div>
     </div>

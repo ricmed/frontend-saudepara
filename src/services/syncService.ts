@@ -32,25 +32,24 @@ class SyncService {
   constructor() {
     this.isOnline = navigator.onLine;
     
-    // 🆕 Restaurar preferência de modo offline do localStorage
-    const savedOfflineMode = localStorage.getItem(this.FORCE_OFFLINE_KEY) ?? localStorage.getItem(this.LEGACY_FORCE_OFFLINE_KEY);
-    
-    // ✅ GARANTIR que padrão seja ONLINE (false) se não houver valor salvo
-    if (savedOfflineMode === null || savedOfflineMode === undefined) {
-      this.isOfflineModeForced = false;
-      localStorage.setItem(this.FORCE_OFFLINE_KEY, 'false'); // Inicializar como false
-      localStorage.removeItem(this.LEGACY_FORCE_OFFLINE_KEY);
-      console.log('🌐 Modo online PADRÃO ativado (primeira inicialização)');
-    } else {
-      this.isOfflineModeForced = savedOfflineMode === 'true';
-      localStorage.setItem(this.FORCE_OFFLINE_KEY, this.isOfflineModeForced ? 'true' : 'false');
-      localStorage.removeItem(this.LEGACY_FORCE_OFFLINE_KEY);
+    // Restaurar preferência de modo offline do localStorage.
+    // Envolvido em try/catch porque Safari/Firefox em modo privado (e browsers com
+    // armazenamento restrito) lançam SecurityError ao acessar localStorage —
+    // o que travaria toda a aplicação antes do React montar.
+    try {
+      const savedOfflineMode = localStorage.getItem(this.FORCE_OFFLINE_KEY) ?? localStorage.getItem(this.LEGACY_FORCE_OFFLINE_KEY);
       
-      if (this.isOfflineModeForced) {
-        console.log('📵 Modo offline forçado ATIVADO (restaurado do localStorage)');
+      if (savedOfflineMode === null || savedOfflineMode === undefined) {
+        this.isOfflineModeForced = false;
+        localStorage.setItem(this.FORCE_OFFLINE_KEY, 'false');
+        localStorage.removeItem(this.LEGACY_FORCE_OFFLINE_KEY);
       } else {
-        console.log('🌐 Modo online ativado (restaurado do localStorage)');
+        this.isOfflineModeForced = savedOfflineMode === 'true';
+        localStorage.setItem(this.FORCE_OFFLINE_KEY, this.isOfflineModeForced ? 'true' : 'false');
+        localStorage.removeItem(this.LEGACY_FORCE_OFFLINE_KEY);
       }
+    } catch {
+      this.isOfflineModeForced = false;
     }
     
     this.setupEventListeners();

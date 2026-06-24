@@ -85,6 +85,7 @@ export const FormBuilderPage: React.FC = () => {
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formKey, setFormKey] = useState('');
+  const [existingUiJson, setExistingUiJson] = useState<Record<string, unknown>>({});
   const [categoria, setCategoria] = useState('notificacao');
   const [categoriasDisponiveis, setCategoriasDisponiveis] = useState<Array<{ key: string; label: string }>>([]);
   const [schema, setSchema] = useState<FormSchema>({
@@ -214,6 +215,9 @@ export const FormBuilderPage: React.FC = () => {
         const activeVersion = form.versions.find(v => v.id === form.active_version_id);
         if (activeVersion && activeVersion.schema_json) {
           setSchema(activeVersion.schema_json);
+        }
+        if (activeVersion?.ui_json) {
+          setExistingUiJson(activeVersion.ui_json as Record<string, unknown>);
         }
       }
     } catch (err) {
@@ -746,7 +750,7 @@ export const FormBuilderPage: React.FC = () => {
 
     const version = await FormService.createVersion(formId, {
       schema_json: schemaToSave,
-      ui_json: {},
+      ui_json: existingUiJson,
       rules_json: {},
       published_by: userId
     });

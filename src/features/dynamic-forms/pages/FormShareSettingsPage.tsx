@@ -7,7 +7,7 @@ import FormAclService, { type FormAclItem, type FormAclRole, type UserPick } fro
 import { useAuth } from '@/keycloak/AuthProvider';
 import {
   Copy, Plus, Shield, FileText, Lock, Globe, Link2,
-  ChevronDown, ChevronUp, Users, Check, Settings,
+  ChevronDown, ChevronUp, Users, Check, Settings, LayoutList, AlignJustify,
 } from 'lucide-react';
 
 type Visibility = 'PRIVATE' | 'UNLISTED' | 'PUBLIC';
@@ -48,6 +48,7 @@ export const FormShareSettingsPage: React.FC = () => {
   const [selectedRole, setSelectedRole] = useState<FormAclRole>('VIEWER');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [pageMode, setPageMode] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showRevokedLinks, setShowRevokedLinks] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -99,6 +100,12 @@ export const FormShareSettingsPage: React.FC = () => {
       setForm(f);
       setLinks(l);
       setAcl(a);
+
+      const activeVer = f.active_version_id
+        ? f.versions?.find((v) => v.id === f.active_version_id)
+        : f.versions?.[0];
+      setPageMode(Boolean((activeVer?.ui_json as any)?.page_mode ?? true));
+
       setScheduleOpenAt(toLocalInputValue((f as any).open_at ?? null));
       setScheduleCloseAt(toLocalInputValue((f as any).close_at ?? null));
       setMaxSubs((f as any).max_submissions != null ? String((f as any).max_submissions) : '');
@@ -140,6 +147,19 @@ export const FormShareSettingsPage: React.FC = () => {
       if (suggested) patch.slug = suggested;
     }
     await update(patch);
+  };
+
+  const changePageMode = async (value: boolean) => {
+    if (value === pageMode) return;
+    try {
+      setSaving(true);
+      await FormService.updateMyFormPageMode(formId, value);
+      setPageMode(value);
+    } catch (e: any) {
+      alert(e?.response?.data?.message || e?.message || 'Erro ao salvar');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const createLink = async () => {
@@ -286,6 +306,57 @@ export const FormShareSettingsPage: React.FC = () => {
                 );
               })}
             </div>
+          </div>
+
+          {/* ── Visualização: layout das seções ───────────────── */}
+          <div className="bg-white rounded-xl shadow p-6">
+              <h2 className="text-base font-semibold text-gray-900 mb-1">Exibição das seções</h2>
+              <p className="text-sm text-gray-500 mb-4">Como as seções do formulário aparecem para quem responde.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => changePageMode(true)}
+                  className={`relative flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all text-center
+                    ${pageMode
+                      ? 'border-blue-600 bg-blue-50 text-blue-700'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  {pageMode && (
+                    <span className="absolute top-2 right-2">
+                      <Check className="h-4 w-4 text-blue-600" />
+                    </span>
+                  )}
+                  <span className={pageMode ? 'text-blue-600' : 'text-gray-400'}>
+                    <LayoutList className="h-5 w-5" />
+                  </span>
+                  <span className="text-sm font-semibold">Seção por seção</span>
+                  <span className="text-xs leading-tight">Uma seção por vez, com botões de avançar e voltar</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => changePageMode(false)}
+                  className={`relative flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all text-center
+                    ${!pageMode
+                      ? 'border-blue-600 bg-blue-50 text-blue-700'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  {!pageMode && (
+                    <span className="absolute top-2 right-2">
+                      <Check className="h-4 w-4 text-blue-600" />
+                    </span>
+                  )}
+                  <span className={!pageMode ? 'text-blue-600' : 'text-gray-400'}>
+                    <AlignJustify className="h-5 w-5" />
+                  </span>
+                  <span className="text-sm font-semibold">Página única</span>
+                  <span className="text-xs leading-tight">Todas as seções visíveis de uma vez</span>
+                </button>
+              </div>
           </div>
 
           {/* ── Link de compartilhamento ──────────────────────── */}
