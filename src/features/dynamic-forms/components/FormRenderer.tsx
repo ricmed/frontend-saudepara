@@ -1221,10 +1221,21 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
 
   const fieldMetaByKey = React.useMemo(() => buildDynamicFormFieldMeta(schema), [schema]);
 
-  const orderedFormErrors = React.useMemo(
-    () => buildOrderedFormErrors(errors, schema, fieldMetaByKey),
-    [errors, schema, fieldMetaByKey],
-  );
+  const orderedFormErrors = React.useMemo(() => {
+    const all = buildOrderedFormErrors(errors, schema, fieldMetaByKey);
+    // Em formulários públicos com seções ocultas, remover do resumo os erros de
+    // campos pertencentes a seções que o respondente não pode ver.
+    if (context === 'public' && hiddenSectionIds?.length) {
+      const visibleKeys = new Set<string>();
+      for (const sec of sectionsToRender) {
+        for (const f of sec.fields ?? []) {
+          if (f?.key) visibleKeys.add(f.key);
+        }
+      }
+      return all.filter((e) => visibleKeys.has(e.key));
+    }
+    return all;
+  }, [errors, schema, fieldMetaByKey, context, hiddenSectionIds, sectionsToRender]);
 
   const [showValidationSummary, setShowValidationSummary] = useState(false);
   const submitValidationScrollRef = useRef(false);
@@ -1273,26 +1284,31 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   const totalPages = pageMode ? Math.max(1, sectionsToRender.length) : 1;
   const currentSection = pageMode ? sectionsToRender[Math.min(pageIndex, sectionsToRender.length - 1)] : null;
 
+  /**
+   * Valida apenas as seções atualmente visíveis (sectionsToRender já exclui as ocultas).
+   * Usado em context="public" quando há seções ocultas para não bloquear o envio com
+   * campos obrigatórios de seções que o respondente não pode ver.
+   */
+  const validateVisibleSectionsOnly = React.useCallback((): boolean => {
+    let ok = true;
+    for (const section of sectionsToRender) {
+      const sortedFields = [...(section.fields || [])].sort((a, b) => a.order - b.order);
+      for (const f of sortedFields) {
+        if (!f) continue;
+        if (!isFieldVisible(f.key)) continue;
+        if (isFieldDisabled(f.key)) continue;
+        const valid = validateField(f as any);
+        if (!valid) ok = false;
+      }
+    }
+    return ok;
+  }, [sectionsToRender, isFieldVisible, isFieldDisabled, validateField]);
+
+  const usePublicHiddenValidation = context === 'public' && !!hiddenSectionIds?.length;
+
   const validateCurrentPage = () => {
     if (!pageMode || !currentSection) {
-      // Em context="public" com seções ocultas: validar apenas as seções visíveis
-      // (sectionsToRender já exclui as ocultas). Campos obrigatórios de seções
-      // ocultas não devem impedir o envio.
-      if (context === 'public' && hiddenSectionIds?.length) {
-        let ok = true;
-        for (const section of sectionsToRender) {
-          const sortedFields = [...(section.fields || [])].sort((a, b) => a.order - b.order);
-          for (const f of sortedFields) {
-            if (!f) continue;
-            if (!isFieldVisible(f.key)) continue;
-            if (isFieldDisabled(f.key)) continue;
-            const valid = validateField(f as any);
-            if (!valid) ok = false;
-          }
-        }
-        return ok;
-      }
-      return validateAll();
+      return usePublicHiddenValidation ? validateVisibleSectionsOnly() : validateAll();
     }
     let ok = true;
     const sortedFields = [...(currentSection.fields || [])].sort((a, b) => a.order - b.order);
@@ -1450,7 +1466,11 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     
     if (readOnly || isUploading) return;
 
-    if (validateAll()) {
+    // Em formulários públicos com seções ocultas, validar apenas as seções visíveis.
+    // validateAll() checaria campos de seções que o respondente não pode ver.
+    const isValid = usePublicHiddenValidation ? validateVisibleSectionsOnly() : validateAll();
+
+    if (isValid) {
       setShowValidationSummary(false);
       // Converter datetime fields antes de enviar
       const dataToSubmit = convertDateTimeFieldsToUTC(formData, schema);
