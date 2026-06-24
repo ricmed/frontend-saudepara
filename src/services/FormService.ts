@@ -502,6 +502,21 @@ class FormService {
     }
   }
 
+  /** Busca os dados de uma submissão pública pelo ID (armazenado no localStorage do respondente). */
+  async getPublicSubmission(
+    slug: string,
+    submissionId: number,
+    token?: string | null,
+  ): Promise<{ id: number; submitted_at: string | null; data_json: Record<string, any> }> {
+    const params: Record<string, string> = {};
+    if (token) params.t = token;
+    const response = await publicApi.get(
+      `/api/public/forms/${encodeURIComponent(slug)}/submissions/${submissionId}`,
+      { params },
+    );
+    return response.data;
+  }
+
   // Buscar formulário público por slug (usa token `t` quando UNLISTED)
   async getPublicForm(slug: string, token?: string | null): Promise<PublicFormPayload> {
     const params: Record<string, string> = {};
