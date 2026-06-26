@@ -347,6 +347,77 @@ const FieldTypePicker: React.FC<{
   );
 };
 
+// ─── Menu de ações técnicas (somente admins) ────────────────────────────────
+
+const DevActionsMenu: React.FC<{
+  onExportJSON: () => void;
+  onImportJSON: () => void;
+  /** "down" para header (padrão), "up" para rodapé */
+  direction?: 'down' | 'up';
+}> = ({ onExportJSON, onImportJSON, direction = 'down' }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const keyHandler = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('keydown', keyHandler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('keydown', keyHandler);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        className={`px-3 py-2 rounded-md flex items-center gap-1.5 text-sm transition-colors ${
+          open ? 'bg-gray-200 text-gray-800' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+        }`}
+        title="Ações técnicas: exportar / importar JSON e planilha"
+      >
+        <Code className="h-4 w-4" />
+        <span>Dev</span>
+        <ChevronDown className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div
+          className={`absolute right-0 z-50 bg-white border border-gray-200 rounded-xl shadow-xl min-w-[210px] py-1 ${
+            direction === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'
+          }`}
+        >
+          <p className="px-3 pt-2 pb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+            Ações técnicas
+          </p>
+          <button
+            type="button"
+            onClick={() => { onExportJSON(); setOpen(false); }}
+            className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-50 text-gray-700"
+          >
+            <Download className="h-4 w-4 text-blue-500" />
+            Exportar JSON
+          </button>
+          <button
+            type="button"
+            onClick={() => { onImportJSON(); setOpen(false); }}
+            className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-50 text-gray-700"
+          >
+            <Upload className="h-4 w-4 text-blue-500" />
+            Importar JSON
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Main builder component ──────────────────────────────────────────────────
 
 export const FormBuilderPage: React.FC = () => {
@@ -1635,24 +1706,12 @@ export const FormBuilderPage: React.FC = () => {
       backPath={isGeneralBuilder ? '/private/meus-formularios' : '/private/formularios-admin'}
       headerActions={
         <div className="flex flex-wrap items-center justify-center gap-2">
-          <button
-            type="button"
-            onClick={handleExportJSON}
-            className="px-3 py-2 text-white bg-blue-500 hover:bg-blue-600 rounded-md flex items-center gap-2"
-            title="Exportar formulário como JSON"
-          >
-            <Download className="h-4 w-4" />
-            Exportar
-          </button>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="px-3 py-2 text-white bg-blue-500 hover:bg-blue-600 rounded-md flex items-center gap-2"
-            title="Importar formulário de JSON"
-          >
-            <Upload className="h-4 w-4" />
-            Importar
-          </button>
+          {canSeeAdvanced && (
+            <DevActionsMenu
+              onExportJSON={handleExportJSON}
+              onImportJSON={() => fileInputRef.current?.click()}
+            />
+          )}
           <button
             type="button"
             onClick={() => setImportExcelOpen(true)}
@@ -3229,24 +3288,13 @@ export const FormBuilderPage: React.FC = () => {
             )}
 
             <div className="bg-white rounded-lg shadow border border-gray-100 px-4 py-4 flex flex-wrap items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={handleExportJSON}
-                className="px-3 py-2 text-white bg-blue-500 hover:bg-blue-600 rounded-md flex items-center gap-2 text-sm"
-                title="Exportar formulário como JSON"
-              >
-                <Download className="h-4 w-4" />
-                Exportar
-              </button>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="px-3 py-2 text-white bg-blue-500 hover:bg-blue-600 rounded-md flex items-center gap-2 text-sm"
-                title="Importar formulário de JSON"
-              >
-                <Upload className="h-4 w-4" />
-                Importar
-              </button>
+              {canSeeAdvanced && (
+                <DevActionsMenu
+                  onExportJSON={handleExportJSON}
+                  onImportJSON={() => fileInputRef.current?.click()}
+                  direction="up"
+                />
+              )}
               <button
                 type="button"
                 onClick={() => setImportExcelOpen(true)}
@@ -3254,7 +3302,7 @@ export const FormBuilderPage: React.FC = () => {
                 title="Importar formulário de planilha Excel"
               >
                 <Upload className="h-4 w-4" />
-                Excel
+                Importar Planilha
               </button>
               <button
                 type="button"
