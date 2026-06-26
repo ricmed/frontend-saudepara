@@ -6,7 +6,7 @@ import { useAuth } from '@/keycloak/AuthProvider';
 import FormService, { type FormSchema, type FormSection, type FormField, type FormRule, type RuleCondition, type RuleAction, type TableColumnDef, type XlsFormPreview } from '@/services/FormService';
 import DatabaseService, { type TableColumn } from '@/services/DatabaseService';
 import { getRuntimeApiRoot } from '@/config/runtimeApiBase';
-import { Plus, Trash2, Save, Eye, Settings, GripVertical, X, Download, Upload, ChevronUp, ChevronDown, Code, FileEdit, Check, Copy, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Save, Eye, Settings, GripVertical, X, Download, Upload, ChevronUp, ChevronDown, Code, FileEdit, Check, Copy } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { ClipboardList, Calendar, DollarSign, Target, Activity, Shield, Leaf, BarChart3, Wrench, Users } from 'lucide-react';
 import dynamicIconImports from 'lucide-react/dynamicIconImports';
@@ -433,12 +433,6 @@ export const FormBuilderPage: React.FC = () => {
   // ── Dirty / autosave ──────────────────────────────────────────────────────
   // null = não inicializado ainda (carregando form existente ou montando novo)
   const [lastSavedState, setLastSavedState] = useState<string | null>(null);
-  const [pendingDraft, setPendingDraft] = useState<{
-    savedAt: string;
-    formName: string; formDescription: string;
-    formKey: string; categoria: string; schema: FormSchema;
-  } | null>(null);
-  // skipBlockerRef: garante que navigate após save bem-sucedido não dispare beforeunload
   const skipBlockerRef = useRef(false);
   // ──────────────────────────────────────────────────────────────────────────
 
@@ -544,9 +538,6 @@ export const FormBuilderPage: React.FC = () => {
     );
   }, [lastSavedState, formName, formDescription, formKey, categoria, schema]);
 
-  // Chave do localStorage para este formulário
-  const draftKey = id ? `form-draft-${id}` : 'form-draft-new';
-
   useEffect(() => {
     if (id) {
       loadForm();
@@ -564,14 +555,6 @@ export const FormBuilderPage: React.FC = () => {
     setLastSavedState(
       JSON.stringify({ formName: '', formDescription: '', formKey: '', categoria: initialCategoria, schema: { agravo: '', sections: [] } })
     );
-    // Verificar rascunho salvo
-    try {
-      const raw = localStorage.getItem('form-draft-new');
-      if (raw) {
-        const d = JSON.parse(raw);
-        if (d?.savedAt && d?.schema) setPendingDraft(d);
-      }
-    } catch { /* ignore */ }
   }, []); // Só no mount
 
   // ── Bloquear fechamento de aba com alterações não salvas ─────────────────
@@ -584,20 +567,6 @@ export const FormBuilderPage: React.FC = () => {
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirty]);
-
-  // ── Autosave para localStorage (debounce 5s após última mudança) ─────────
-  useEffect(() => {
-    if (!isDirty || lastSavedState === null) return;
-    const timer = setTimeout(() => {
-      try {
-        localStorage.setItem(draftKey, JSON.stringify({
-          savedAt: new Date().toISOString(),
-          formName, formDescription, formKey, categoria, schema,
-        }));
-      } catch { /* quota errors: ignorar silenciosamente */ }
-    }, 5_000);
-    return () => clearTimeout(timer);
-  }, [isDirty, formName, formDescription, formKey, categoria, schema]);
 
   const makeFormKeyFromName = (name: string) => {
     const raw = String(name || '').trim();
@@ -685,15 +654,6 @@ export const FormBuilderPage: React.FC = () => {
       // Definir snapshot "limpo" com os valores exatos da API
       const snap = JSON.stringify({ formName: nome, formDescription: descricao, formKey: fKey, categoria: cat, schema: loadedSchema });
       setLastSavedState(snap);
-
-      // Verificar se há rascunho local mais recente que o estado carregado
-      try {
-        const raw = localStorage.getItem(`form-draft-${id}`);
-        if (raw) {
-          const d = JSON.parse(raw);
-          if (d?.savedAt && d?.schema) setPendingDraft(d);
-        }
-      } catch { /* ignore */ }
     } catch (err) {
       console.error('Erro ao carregar formulário:', err);
       toast.error('Erro ao carregar formulário');
@@ -1240,9 +1200,8 @@ export const FormBuilderPage: React.FC = () => {
       const result = await persistFormAndPublish();
       if (!result) return;
 
-      // Marcar como limpo e limpar rascunho ANTES de navegar
+      // Marcar como limpo
       setLastSavedState(JSON.stringify({ formName, formDescription, formKey, categoria, schema }));
-      try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
       skipBlockerRef.current = true;
 
       toast.success('Formulário salvo e publicado com sucesso!');
@@ -1863,45 +1822,6 @@ export const FormBuilderPage: React.FC = () => {
         </div>
       }
     >
-      {/* ── Banner de rascunho salvo automaticamente ────────────────────── */}
-      {pendingDraft && (
-        <div className="mb-4 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm">
-          <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0" />
-          <span className="flex-1 text-amber-800">
-            Rascunho salvo automaticamente em{' '}
-            <strong>
-              {new Date(pendingDraft.savedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-            </strong>
-            . Deseja restaurá-lo?
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              setFormName(pendingDraft.formName);
-              setFormDescription(pendingDraft.formDescription);
-              setFormKey(pendingDraft.formKey);
-              setCategoria(pendingDraft.categoria);
-              setSchema(pendingDraft.schema);
-              setPendingDraft(null);
-              try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
-            }}
-            className="px-3 py-1 text-xs bg-amber-600 text-white rounded-md hover:bg-amber-700 flex-shrink-0"
-          >
-            Restaurar
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setPendingDraft(null);
-              try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
-            }}
-            className="px-3 py-1 text-xs text-amber-700 border border-amber-300 rounded-md hover:bg-amber-100 flex-shrink-0"
-          >
-            Descartar
-          </button>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Configurações Gerais */}
           <div className="lg:col-span-1">
