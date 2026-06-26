@@ -1,12 +1,13 @@
 import React, { Suspense, useMemo, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useBlocker } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '@/keycloak/AuthProvider';
 import FormService, { type FormSchema, type FormSection, type FormField, type FormRule, type RuleCondition, type RuleAction, type TableColumnDef, type XlsFormPreview } from '@/services/FormService';
 import DatabaseService, { type TableColumn } from '@/services/DatabaseService';
 import { getRuntimeApiRoot } from '@/config/runtimeApiBase';
-import { Plus, Trash2, Save, Eye, Settings, GripVertical, X, Download, Upload, ChevronUp, ChevronDown, Code, FileEdit, Check, Copy } from 'lucide-react';
+import { Plus, Trash2, Save, Eye, Settings, GripVertical, X, Download, Upload, ChevronUp, ChevronDown, Code, FileEdit, Check, Copy, AlertTriangle } from 'lucide-react';
+import { toast } from 'react-toastify';
 import { ClipboardList, Calendar, DollarSign, Target, Activity, Shield, Leaf, BarChart3, Wrench, Users } from 'lucide-react';
 import dynamicIconImports from 'lucide-react/dynamicIconImports';
 import { FormRenderer } from '../components/FormRenderer';
@@ -426,6 +427,20 @@ export const FormBuilderPage: React.FC = () => {
   const { user } = useAuth();
   const isGeneralBuilder = typeof window !== 'undefined' && window.location.pathname.includes('/private/meus-formularios/');
   const [loading, setLoading] = useState(false);
+
+  // ── Dirty / autosave ──────────────────────────────────────────────────────
+  // null = não inicializado ainda (carregando form existente ou montando novo)
+  const [lastSavedState, setLastSavedState] = useState<string | null>(null);
+  const [pendingDraft, setPendingDraft] = useState<{
+    savedAt: string;
+    formName: string; formDescription: string;
+    formKey: string; categoria: string; schema: FormSchema;
+  } | null>(null);
+  const [blockerModal, setBlockerModal] = useState(false);
+  // Usado para pular o blocker durante navigate programático após save bem-sucedido
+  const skipBlockerRef = useRef(false);
+  // ──────────────────────────────────────────────────────────────────────────
+
   const canSeeAdvanced = Array.isArray((user as any)?.roles) && (user as any).roles.includes('admin');
   const [showTechnicalNames, setShowTechnicalNames] = useState(false);
   const [rulesSimpleMode, setRulesSimpleMode] = useState(true);
@@ -528,6 +543,56 @@ export const FormBuilderPage: React.FC = () => {
     setBuilderTipoEstadoOptions([]);
   }, [id]);
 
+  // ── Inicializar snapshot "salvo" para formulários NOVOS ───────────────────
+  useEffect(() => {
+    if (id) return; // formulários existentes são inicializados no loadForm
+    const initialCategoria = isGeneralBuilder ? 'eventos_inscricoes' : 'notificacao';
+    setLastSavedState(
+      JSON.stringify({ formName: '', formDescription: '', formKey: '', categoria: initialCategoria, schema: { agravo: '', sections: [] } })
+    );
+    // Verificar rascunho salvo
+    try {
+      const raw = localStorage.getItem('form-draft-new');
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d?.savedAt && d?.schema) setPendingDraft(d);
+      }
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Só no mount
+
+  // ── Bloquear fechamento de aba com alterações não salvas ─────────────────
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
+  // ── Blocker para navegação interna (React Router) ────────────────────────
+  const blocker = useBlocker(() => isDirty && !skipBlockerRef.current);
+  useEffect(() => {
+    if (blocker.state === 'blocked') setBlockerModal(true);
+  }, [blocker.state]);
+
+  // ── Autosave para localStorage (debounce 5s após última mudança) ─────────
+  useEffect(() => {
+    if (!isDirty || lastSavedState === null) return;
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(draftKey, JSON.stringify({
+          savedAt: new Date().toISOString(),
+          formName, formDescription, formKey, categoria, schema,
+        }));
+      } catch { /* quota errors: ignorar silenciosamente */ }
+    }, 5_000);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDirty, formName, formDescription, formKey, categoria, schema]);
+
   const makeFormKeyFromName = (name: string) => {
     const raw = String(name || '').trim();
     if (!raw) return '';
@@ -556,6 +621,17 @@ export const FormBuilderPage: React.FC = () => {
       setCategoria('eventos_inscricoes');
     }
   }, [isGeneralBuilder, id]);
+
+  // isDirty: true quando o estado atual difere do último save/load
+  const isDirty = useMemo(() => {
+    if (lastSavedState === null) return false;
+    return (
+      JSON.stringify({ formName, formDescription, formKey, categoria, schema }) !== lastSavedState
+    );
+  }, [lastSavedState, formName, formDescription, formKey, categoria, schema]);
+
+  // Chave do localStorage para este formulário
+  const draftKey = id ? `form-draft-${id}` : 'form-draft-new';
 
   const loadCategorias = async () => {
     try {
@@ -587,27 +663,45 @@ export const FormBuilderPage: React.FC = () => {
     try {
       setLoading(true);
       const form = await FormService.getFormById(parseInt(id!));
-      setFormName(form.nome);
-      setFormDescription(form.descricao || '');
-      setFormKey(form.form_key);
-      setCategoria(form.categoria || (isGeneralBuilder ? 'eventos_inscricoes' : 'notificacao'));
+
+      const nome = form.nome;
+      const descricao = form.descricao || '';
+      const fKey = form.form_key;
+      const cat = form.categoria || (isGeneralBuilder ? 'eventos_inscricoes' : 'notificacao');
+
+      setFormName(nome);
+      setFormDescription(descricao);
+      setFormKey(fKey);
+      setCategoria(cat);
       setActiveVersionId(
         form.active_version_id != null ? Number(form.active_version_id) : null
       );
 
-      // Buscar versão ativa e carregar o schema
+      let loadedSchema: FormSchema = { agravo: '', sections: [] };
       if (form.active_version_id && form.versions) {
         const activeVersion = form.versions.find(v => v.id === form.active_version_id);
-        if (activeVersion && activeVersion.schema_json) {
-          setSchema(activeVersion.schema_json);
-        }
+        if (activeVersion?.schema_json) loadedSchema = activeVersion.schema_json;
         if (activeVersion?.ui_json) {
           setExistingUiJson(activeVersion.ui_json as Record<string, unknown>);
         }
       }
+      setSchema(loadedSchema);
+
+      // Definir snapshot "limpo" com os valores exatos da API
+      const snap = JSON.stringify({ formName: nome, formDescription: descricao, formKey: fKey, categoria: cat, schema: loadedSchema });
+      setLastSavedState(snap);
+
+      // Verificar se há rascunho local mais recente que o estado carregado
+      try {
+        const raw = localStorage.getItem(`form-draft-${id}`);
+        if (raw) {
+          const d = JSON.parse(raw);
+          if (d?.savedAt && d?.schema) setPendingDraft(d);
+        }
+      } catch { /* ignore */ }
     } catch (err) {
       console.error('Erro ao carregar formulário:', err);
-      alert('Erro ao carregar formulário');
+      toast.error('Erro ao carregar formulário');
     } finally {
       setLoading(false);
     }
@@ -622,7 +716,7 @@ export const FormBuilderPage: React.FC = () => {
       setAvailableTables(tables);
     } catch (error) {
       console.error('Erro ao carregar tabelas:', error);
-      alert('Erro ao carregar tabelas do banco de dados. Verifique se o backend está rodando.');
+      toast.error('Erro ao carregar tabelas do banco de dados. Verifique se o backend está rodando.');
     } finally {
       setLoadingTables(false);
     }
@@ -1065,7 +1159,7 @@ export const FormBuilderPage: React.FC = () => {
   const persistFormAndPublish = async (): Promise<{ formId: number; versionId: number } | null> => {
     const userId = user?.sub || user?.id;
     if (!userId) {
-      alert('Usuário não autenticado');
+      toast.error('Usuário não autenticado');
       console.error('user object:', user);
       return null;
     }
@@ -1076,7 +1170,7 @@ export const FormBuilderPage: React.FC = () => {
       (isGeneralBuilder ? `FORM_${Date.now().toString(36).toUpperCase()}`.slice(0, 50) : '');
 
     if (!computedKey && !id) {
-      alert('Informe um código do formulário (form_key).');
+      toast.error('Informe um código do formulário (form_key).');
       return null;
     }
 
@@ -1088,11 +1182,11 @@ export const FormBuilderPage: React.FC = () => {
       created_by: userId
     };
     if (!formData.nome) {
-      alert('Informe o nome do formulário.');
+      toast.error('Informe o nome do formulário.');
       return null;
     }
     if (!formData.categoria) {
-      alert('Selecione uma categoria para o formulário no painel à esquerda antes de salvar.');
+      toast.error('Selecione uma categoria para o formulário antes de salvar.');
       return null;
     }
 
@@ -1151,12 +1245,17 @@ export const FormBuilderPage: React.FC = () => {
       const result = await persistFormAndPublish();
       if (!result) return;
 
-      alert('Formulário salvo e publicado com sucesso!');
+      // Marcar como limpo e limpar rascunho ANTES de navegar
+      setLastSavedState(JSON.stringify({ formName, formDescription, formKey, categoria, schema }));
+      try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
+      skipBlockerRef.current = true;
+
+      toast.success('Formulário salvo e publicado com sucesso!');
       navigate(isGeneralBuilder ? '/private/meus-formularios' : '/private/formularios-admin');
     } catch (err: any) {
       console.error('Erro ao salvar:', err);
       const errorMsg = err?.response?.data?.message || err?.message || 'Erro desconhecido';
-      alert(`Erro ao salvar formulário: ${errorMsg}`);
+      toast.error(`Erro ao salvar formulário: ${errorMsg}`);
     } finally {
       setLoading(false);
     }
@@ -1180,7 +1279,7 @@ export const FormBuilderPage: React.FC = () => {
     } catch (err: any) {
       console.error('Erro ao preparar campos fixos:', err);
       const errorMsg = err?.response?.data?.message || err?.message || 'Erro desconhecido';
-      alert(`Não foi possível abrir campos fixos: ${errorMsg}`);
+      toast.error(`Não foi possível abrir campos fixos: ${errorMsg}`);
     } finally {
       setLoading(false);
     }
@@ -1222,7 +1321,7 @@ export const FormBuilderPage: React.FC = () => {
 
         // Validar estrutura básica
         if (!importedData.schema || !importedData.metadata) {
-          alert('Arquivo JSON inválido! Deve conter "schema" e "metadata".');
+          toast.error('Arquivo JSON inválido! Deve conter "schema" e "metadata".');
           return;
         }
 
@@ -1233,10 +1332,10 @@ export const FormBuilderPage: React.FC = () => {
         setCategoria(importedData.metadata.categoria || 'notificacao');
         setSchema(importedData.schema);
 
-        alert('Formulário importado com sucesso!');
+        toast.success('Formulário importado com sucesso!');
       } catch (err) {
         console.error('Erro ao importar JSON:', err);
-        alert('Erro ao ler arquivo JSON. Verifique se o formato está correto.');
+        toast.error('Erro ao ler arquivo JSON. Verifique se o formato está correto.');
       }
     };
     reader.readAsText(file);
@@ -1730,11 +1829,21 @@ export const FormBuilderPage: React.FC = () => {
             <Eye className="h-4 w-4" />
             Preview
           </button>
+          {isDirty && (
+            <span className="flex items-center gap-1 text-xs text-amber-600 px-1 select-none">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse inline-block" />
+              Não salvo
+            </span>
+          )}
           <button
             type="button"
             onClick={handleSave}
             disabled={loading}
-            className="px-4 py-2 bg-white text-blue-600 hover:bg-blue-50 rounded-md flex items-center gap-2 font-medium border border-blue-200 disabled:opacity-50"
+            className={`px-4 py-2 rounded-md flex items-center gap-2 font-medium border disabled:opacity-50 transition-colors ${
+              isDirty
+                ? 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
+                : 'bg-white text-blue-600 hover:bg-blue-50 border-blue-200'
+            }`}
           >
             <Save className="h-4 w-4" />
             Salvar
@@ -1742,6 +1851,45 @@ export const FormBuilderPage: React.FC = () => {
         </div>
       }
     >
+      {/* ── Banner de rascunho salvo automaticamente ────────────────────── */}
+      {pendingDraft && (
+        <div className="mb-4 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm">
+          <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+          <span className="flex-1 text-amber-800">
+            Rascunho salvo automaticamente em{' '}
+            <strong>
+              {new Date(pendingDraft.savedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </strong>
+            . Deseja restaurá-lo?
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setFormName(pendingDraft.formName);
+              setFormDescription(pendingDraft.formDescription);
+              setFormKey(pendingDraft.formKey);
+              setCategoria(pendingDraft.categoria);
+              setSchema(pendingDraft.schema);
+              setPendingDraft(null);
+              try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
+            }}
+            className="px-3 py-1 text-xs bg-amber-600 text-white rounded-md hover:bg-amber-700 flex-shrink-0"
+          >
+            Restaurar
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setPendingDraft(null);
+              try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
+            }}
+            className="px-3 py-1 text-xs text-amber-700 border border-amber-300 rounded-md hover:bg-amber-100 flex-shrink-0"
+          >
+            Descartar
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Configurações Gerais */}
           <div className="lg:col-span-1">
@@ -3317,10 +3465,14 @@ export const FormBuilderPage: React.FC = () => {
                 type="button"
                 onClick={handleSave}
                 disabled={loading}
-                className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-md flex items-center gap-2 text-sm font-medium disabled:opacity-50"
+                className={`px-4 py-2 rounded-md flex items-center gap-2 text-sm font-medium disabled:opacity-50 transition-colors ${
+                  isDirty
+                    ? 'bg-amber-600 text-white hover:bg-amber-700'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
               >
                 <Save className="h-4 w-4" />
-                Salvar
+                {isDirty ? 'Salvar*' : 'Salvar'}
               </button>
             </div>
           </div>
@@ -3454,6 +3606,37 @@ export const FormBuilderPage: React.FC = () => {
         onClose={() => setImportExcelOpen(false)}
         onSchema={handleImportFromExcel}
       />
+
+      {/* ── Modal: confirmar saída com alterações não salvas ────────────── */}
+      {blockerModal && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6">
+            <div className="flex items-center gap-3 mb-3">
+              <AlertTriangle className="h-6 w-6 text-amber-500 flex-shrink-0" />
+              <h3 className="text-lg font-semibold text-gray-900">Alterações não salvas</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-6">
+              Você tem alterações não salvas. Se sair agora, elas serão perdidas.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => { blocker.reset?.(); setBlockerModal(false); }}
+                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Continuar editando
+              </button>
+              <button
+                type="button"
+                onClick={() => { blocker.proceed?.(); setBlockerModal(false); }}
+                className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700"
+              >
+                Sair sem salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppPageLayout>
   );
 };
