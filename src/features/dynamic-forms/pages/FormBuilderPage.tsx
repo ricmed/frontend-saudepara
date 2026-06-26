@@ -14,6 +14,23 @@ import { FieldSourceConfig } from '../components/FieldSourceConfig';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 import { clampNoteInRange, normalizeScalePointLabelRows } from '@/utils/linearScaleNote';
 import { resolveFormRendererContext } from '../utils/sinanClinicalFields';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 function getLinearScaleBoundsInt(f: FormField): { loB: number; hiB: number } {
   const loB = Math.min(Math.floor(f.min ?? 1), Math.floor(f.max ?? 5));
@@ -73,6 +90,87 @@ const LinearBoundedNoteInput: React.FC<{
   );
 };
 
+// ─── Drag & Drop helpers ────────────────────────────────────────────────────
+
+const FieldDragHandleCtx = React.createContext<ReturnType<typeof useSortable> | null>(null);
+const SectionDragHandleCtx = React.createContext<ReturnType<typeof useSortable> | null>(null);
+
+const SortableFieldItem: React.FC<{ id: string; children: React.ReactNode }> = ({ id, children }) => {
+  const sortable = useSortable({ id });
+  const { setNodeRef, transform, transition, isDragging } = sortable;
+  return (
+    <FieldDragHandleCtx.Provider value={sortable}>
+      <div
+        ref={setNodeRef}
+        style={{
+          transform: CSS.Transform.toString(transform),
+          transition,
+          opacity: isDragging ? 0.4 : 1,
+          position: isDragging ? 'relative' : undefined,
+          zIndex: isDragging ? 10 : undefined,
+        }}
+      >
+        {children}
+      </div>
+    </FieldDragHandleCtx.Provider>
+  );
+};
+
+const FieldDragHandle: React.FC = () => {
+  const sortable = React.useContext(FieldDragHandleCtx);
+  return (
+    <button
+      type="button"
+      {...(sortable?.listeners ?? {})}
+      {...(sortable?.attributes ?? {})}
+      className="p-1 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing rounded touch-none"
+      title="Arrastar para reordenar"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <GripVertical className="h-4 w-4" />
+    </button>
+  );
+};
+
+const SortableSectionItem: React.FC<{ id: string; children: React.ReactNode }> = ({ id, children }) => {
+  const sortable = useSortable({ id });
+  const { setNodeRef, transform, transition, isDragging } = sortable;
+  return (
+    <SectionDragHandleCtx.Provider value={sortable}>
+      <div
+        ref={setNodeRef}
+        style={{
+          transform: CSS.Transform.toString(transform),
+          transition,
+          opacity: isDragging ? 0.5 : 1,
+          position: isDragging ? 'relative' : undefined,
+          zIndex: isDragging ? 20 : undefined,
+        }}
+      >
+        {children}
+      </div>
+    </SectionDragHandleCtx.Provider>
+  );
+};
+
+const SectionDragHandle: React.FC = () => {
+  const sortable = React.useContext(SectionDragHandleCtx);
+  return (
+    <button
+      type="button"
+      {...(sortable?.listeners ?? {})}
+      {...(sortable?.attributes ?? {})}
+      className="p-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing rounded touch-none flex-shrink-0"
+      title="Arrastar seção para reordenar"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <GripVertical className="h-5 w-5" />
+    </button>
+  );
+};
+
+// ─── Main builder component ──────────────────────────────────────────────────
+
 export const FormBuilderPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
@@ -104,6 +202,44 @@ export const FormBuilderPage: React.FC = () => {
   const [activeVersionId, setActiveVersionId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importExcelOpen, setImportExcelOpen] = useState(false);
+
+  const sectionSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const fieldSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleSectionDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const fromIdx = schema.sections.findIndex((s) => s.id === String(active.id));
+    const toIdx = schema.sections.findIndex((s) => s.id === String(over.id));
+    if (fromIdx < 0 || toIdx < 0) return;
+    const newSections = arrayMove([...schema.sections], fromIdx, toIdx);
+    newSections.forEach((s, i) => (s.order = i + 1));
+    setSchema({ ...schema, sections: newSections });
+    if (activeSection === fromIdx) setActiveSection(toIdx);
+  };
+
+  const handleFieldDragEnd = (sectionIdx: number) => (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const fields = schema.sections[sectionIdx]?.fields ?? [];
+    const fromIdx = fields.findIndex((f) => f.key === String(active.id));
+    const toIdx = fields.findIndex((f) => f.key === String(over.id));
+    if (fromIdx < 0 || toIdx < 0) return;
+    const newSections = [...schema.sections];
+    const newFields = arrayMove([...fields], fromIdx, toIdx);
+    newFields.forEach((f, i) => (f.order = i + 1));
+    newSections[sectionIdx] = { ...newSections[sectionIdx], fields: newFields };
+    setSchema({ ...schema, sections: newSections });
+    if (activeField?.sectionIdx === sectionIdx && activeField.fieldIdx === fromIdx) {
+      setActiveField({ sectionIdx, fieldIdx: toIdx });
+    }
+  };
 
   // Estados para configuração de banco de dados
   const [availableTables, setAvailableTables] = useState<string[]>([]);
@@ -1641,17 +1777,22 @@ export const FormBuilderPage: React.FC = () => {
                 </button>
               </div>
             ) : (
-              <>
-                {schema.sections.map((section, sectionIdx) => (
-                  <React.Fragment key={section.id}>
-                    <div
-                      key={section.id}
-                      className="bg-white rounded-lg shadow"
-                    >
+              <DndContext
+                sensors={sectionSensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleSectionDragEnd}
+              >
+                <SortableContext
+                  items={schema.sections.map((s) => s.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {schema.sections.map((section, sectionIdx) => (
+                    <SortableSectionItem key={section.id} id={section.id}>
+                      <div className="bg-white rounded-lg shadow">
                   {/* Cabeçalho da Seção */}
                   <div className="bg-blue-50 px-4 py-3 border-b border-blue-100 flex items-center justify-between">
                     <div className="flex items-center gap-2 flex-1">
-                      <GripVertical className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                      <SectionDragHandle />
                       {activeSection === sectionIdx ? (
                         <div className="flex items-center gap-2 flex-1">
                           <input
@@ -1718,17 +1859,25 @@ export const FormBuilderPage: React.FC = () => {
                         <span className="text-sm">Nenhum campo nesta seção</span>
                       </div>
                     ) : (
-                      <>
-                        {section.fields.map((field, fieldIdx) => (
-                          <React.Fragment key={field.key}>
-                            <div
-                              className={`border rounded-lg p-3 ${
-                                activeField?.sectionIdx === sectionIdx && activeField?.fieldIdx === fieldIdx
-                                  ? 'border-blue-500 bg-blue-50'
-                                  : 'border-gray-200'
-                              }`}
-                              onClick={() => setActiveField({ sectionIdx, fieldIdx })}
-                            >
+                      <DndContext
+                        sensors={fieldSensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleFieldDragEnd(sectionIdx)}
+                      >
+                        <SortableContext
+                          items={section.fields.map((f) => f.key)}
+                          strategy={verticalListSortingStrategy}
+                        >
+                          {section.fields.map((field, fieldIdx) => (
+                            <SortableFieldItem key={field.key} id={field.key}>
+                              <div
+                                className={`border rounded-lg p-3 ${
+                                  activeField?.sectionIdx === sectionIdx && activeField?.fieldIdx === fieldIdx
+                                    ? 'border-blue-500 bg-blue-50'
+                                    : 'border-gray-200'
+                                }`}
+                                onClick={() => setActiveField({ sectionIdx, fieldIdx })}
+                              >
                           <div className="grid grid-cols-12 gap-3">
                             <div className={showTechnicalNames ? 'col-span-4' : 'col-span-7'}>
                               <label className="text-xs text-gray-600">Label</label>
@@ -1769,6 +1918,7 @@ export const FormBuilderPage: React.FC = () => {
                               </select>
                             </div>
                             <div className="col-span-3 flex items-end gap-1">
+                              <FieldDragHandle />
                               {canSeeAdvanced ? (
                                 <button
                                   type="button"
@@ -2440,15 +2590,17 @@ export const FormBuilderPage: React.FC = () => {
                             )}
                           </div>
                         </div>
-                            </React.Fragment>
-                        ))}
-                      </>
+                            </SortableFieldItem>
+                          ))}
+                        </SortableContext>
+                      </DndContext>
                     )}
                   </div>
                 </div>
-                  </React.Fragment>
-                ))}
-              </>
+                    </SortableSectionItem>
+                  ))}
+                </SortableContext>
+              </DndContext>
             )}
             </>
             )}
