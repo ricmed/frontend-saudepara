@@ -1,6 +1,6 @@
 import React, { Suspense, useMemo, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useParams, useNavigate, useBlocker } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '@/keycloak/AuthProvider';
 import FormService, { type FormSchema, type FormSection, type FormField, type FormRule, type RuleCondition, type RuleAction, type TableColumnDef, type XlsFormPreview } from '@/services/FormService';
@@ -436,8 +436,7 @@ export const FormBuilderPage: React.FC = () => {
     formName: string; formDescription: string;
     formKey: string; categoria: string; schema: FormSchema;
   } | null>(null);
-  const [blockerModal, setBlockerModal] = useState(false);
-  // Usado para pular o blocker durante navigate programático após save bem-sucedido
+  // skipBlockerRef: garante que navigate após save bem-sucedido não dispare beforeunload
   const skipBlockerRef = useRef(false);
   // ──────────────────────────────────────────────────────────────────────────
 
@@ -533,6 +532,18 @@ export const FormBuilderPage: React.FC = () => {
       .catch(() => setBuilderTipoEstadoOptions([]));
   };
 
+  // isDirty: true quando o estado atual difere do último save/load
+  // Declarado antes dos effects para evitar TDZ com useBlocker
+  const isDirty = useMemo(() => {
+    if (lastSavedState === null) return false;
+    return (
+      JSON.stringify({ formName, formDescription, formKey, categoria, schema }) !== lastSavedState
+    );
+  }, [lastSavedState, formName, formDescription, formKey, categoria, schema]);
+
+  // Chave do localStorage para este formulário
+  const draftKey = id ? `form-draft-${id}` : 'form-draft-new';
+
   useEffect(() => {
     if (id) {
       loadForm();
@@ -571,12 +582,6 @@ export const FormBuilderPage: React.FC = () => {
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirty]);
-
-  // ── Blocker para navegação interna (React Router) ────────────────────────
-  const blocker = useBlocker(() => isDirty && !skipBlockerRef.current);
-  useEffect(() => {
-    if (blocker.state === 'blocked') setBlockerModal(true);
-  }, [blocker.state]);
 
   // ── Autosave para localStorage (debounce 5s após última mudança) ─────────
   useEffect(() => {
@@ -621,17 +626,6 @@ export const FormBuilderPage: React.FC = () => {
       setCategoria('eventos_inscricoes');
     }
   }, [isGeneralBuilder, id]);
-
-  // isDirty: true quando o estado atual difere do último save/load
-  const isDirty = useMemo(() => {
-    if (lastSavedState === null) return false;
-    return (
-      JSON.stringify({ formName, formDescription, formKey, categoria, schema }) !== lastSavedState
-    );
-  }, [lastSavedState, formName, formDescription, formKey, categoria, schema]);
-
-  // Chave do localStorage para este formulário
-  const draftKey = id ? `form-draft-${id}` : 'form-draft-new';
 
   const loadCategorias = async () => {
     try {
@@ -2084,15 +2078,50 @@ export const FormBuilderPage: React.FC = () => {
             {activeTab === 'fields' && (
               <>
             {schema.sections.length === 0 ? (
-              <div className="bg-white rounded-lg shadow p-12 text-center">
-                <p className="text-gray-500 mb-4">Nenhuma seção criada ainda</p>
+              <div className="bg-white rounded-xl shadow border-2 border-dashed border-blue-100 p-10 text-center">
+                {/* Ícone */}
+                <div className="flex justify-center mb-5">
+                  <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center">
+                    <ClipboardList className="h-8 w-8 text-blue-400" />
+                  </div>
+                </div>
+
+                {/* Título */}
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">
+                  Seu formulário está em branco
+                </h3>
+                <p className="text-sm text-gray-500 mb-7 max-w-sm mx-auto">
+                  Comece criando uma seção. Dentro de cada seção você adiciona os campos
+                  (texto, data, seleção e muito mais).
+                </p>
+
+                {/* Botão CTA principal */}
                 <button
                   onClick={addSection}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 inline-flex items-center gap-2"
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 inline-flex items-center gap-2 text-base font-medium shadow-sm transition-colors"
                 >
-                  <Plus className="h-4 w-4" />
-                  Criar Primeira Seção
+                  <Plus className="h-5 w-5" />
+                  Adicionar primeira seção
                 </button>
+
+                {/* Passos guiados */}
+                <div className="mt-10 grid grid-cols-3 gap-4 text-left max-w-lg mx-auto">
+                  {[
+                    { num: '1', title: 'Crie uma seção', desc: 'Agrupe perguntas relacionadas' },
+                    { num: '2', title: 'Adicione campos', desc: 'Texto, data, seleção e mais' },
+                    { num: '3', title: 'Visualize e salve', desc: 'Use o Preview antes de publicar' },
+                  ].map(({ num, title, desc }) => (
+                    <div key={num} className="flex gap-2.5 items-start">
+                      <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
+                        {num}
+                      </span>
+                      <div>
+                        <p className="text-xs font-semibold text-gray-700">{title}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : (
               <DndContext
@@ -3607,36 +3636,6 @@ export const FormBuilderPage: React.FC = () => {
         onSchema={handleImportFromExcel}
       />
 
-      {/* ── Modal: confirmar saída com alterações não salvas ────────────── */}
-      {blockerModal && (
-        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6">
-            <div className="flex items-center gap-3 mb-3">
-              <AlertTriangle className="h-6 w-6 text-amber-500 flex-shrink-0" />
-              <h3 className="text-lg font-semibold text-gray-900">Alterações não salvas</h3>
-            </div>
-            <p className="text-sm text-gray-600 mb-6">
-              Você tem alterações não salvas. Se sair agora, elas serão perdidas.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                type="button"
-                onClick={() => { blocker.reset?.(); setBlockerModal(false); }}
-                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Continuar editando
-              </button>
-              <button
-                type="button"
-                onClick={() => { blocker.proceed?.(); setBlockerModal(false); }}
-                className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700"
-              >
-                Sair sem salvar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </AppPageLayout>
   );
 };
