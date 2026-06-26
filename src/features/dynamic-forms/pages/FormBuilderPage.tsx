@@ -1,4 +1,5 @@
 import React, { Suspense, useMemo, useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '@/keycloak/AuthProvider';
@@ -166,6 +167,183 @@ const SectionDragHandle: React.FC = () => {
     >
       <GripVertical className="h-5 w-5" />
     </button>
+  );
+};
+
+// ─── Dados estáticos de tipos de campo ──────────────────────────────────────
+
+const fieldTypeGroups = [
+  {
+    label: 'Básicos',
+    options: [
+      { value: 'text', label: '📝 Texto' },
+      { value: 'textarea', label: '📄 Texto longo' },
+      { value: 'number', label: '🔢 Número' },
+      { value: 'currency', label: '💰 Moeda (R$)' },
+      { value: 'accounting', label: '🧾 Contábil (R$)' },
+      { value: 'date', label: '📅 Data' },
+      { value: 'month', label: '📅 Mês/Ano (input mês)' },
+      { value: 'month-year', label: '📅 Mês/Ano (select + ano)' },
+      { value: 'datetime', label: '🕐 Data e hora' },
+      { value: 'time', label: '⏰ Hora' },
+    ],
+  },
+  {
+    label: 'Contato / Documentos',
+    options: [
+      { value: 'email', label: '📧 E-mail' },
+      { value: 'phone', label: '📱 Telefone' },
+      { value: 'international-phone', label: '🌍 Tel. internacional' },
+      { value: 'cpf', label: '🆔 CPF' },
+      { value: 'cns', label: '🏥 Cartão SUS (CNS)' },
+      { value: 'passaporte', label: '🛂 Passaporte' },
+      { value: 'cep', label: '📮 CEP' },
+      { value: 'idade', label: '🎂 Idade' },
+    ],
+  },
+  {
+    label: 'Escolha / Opções',
+    options: [
+      { value: 'checkbox', label: '☑️ Sim / Não' },
+      { value: 'checkbox-group', label: '☑️ Múltiplas caixas' },
+      { value: 'radio', label: '🔘 Uma resposta' },
+      { value: 'select', label: '📋 Seleção' },
+      { value: 'select-search', label: '🔍 Seleção c/ busca' },
+      { value: 'multi-select', label: '📋 Seleção múltipla' },
+      { value: 'autocomplete', label: '🔍 Autocomplete' },
+    ],
+  },
+  {
+    label: 'Anexos',
+    options: [
+      { value: 'file', label: '📁 Arquivo' },
+      { value: 'signature', label: '✍️ Assinatura' },
+    ],
+  },
+  {
+    label: 'Avançados',
+    options: [
+      { value: 'geolocation', label: '🌍 Geolocalização' },
+      { value: 'color', label: '🎨 Cor' },
+      { value: 'slider', label: '🎚️ Slider' },
+      { value: 'rating', label: '⭐ Estrelas' },
+      { value: 'linear_scale', label: '📊 Escala linear' },
+      { value: 'address', label: '🏠 Endereço completo' },
+      { value: 'google-address', label: '🗺️ End. Google Maps' },
+      { value: 'table', label: '📊 Tabela / Grid' },
+    ],
+  },
+  {
+    label: 'SINAN / Especiais',
+    options: [
+      { value: 'estabelecimento-search', label: '🏥 Estabelecimento (CNES)' },
+    ],
+  },
+] as const;
+
+// ─── Seletor visual de tipo de campo ────────────────────────────────────────
+
+const FieldTypePicker: React.FC<{
+  value: string;
+  onChange: (type: string) => void;
+}> = ({ value, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
+  const [dropStyle, setDropStyle] = useState<React.CSSProperties>({});
+
+  const flat = fieldTypeGroups.flatMap((g) => g.options);
+  const current = flat.find((t) => t.value === value);
+  const [emoji = '', ...rest] = (current?.label ?? value).split(' ');
+  const name = rest.join(' ') || value;
+
+  const openPicker = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const dropW = 296;
+      const rawLeft = rect.left;
+      const left = Math.max(8, Math.min(rawLeft, window.innerWidth - dropW - 8));
+      setDropStyle({ top: rect.bottom + 4, left, width: dropW });
+    }
+    setOpen((v) => !v);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onMouse = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (!(btnRef.current?.contains(t) ?? false) && !(dropRef.current?.contains(t) ?? false)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onMouse);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onMouse);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={openPicker}
+        className={`w-full px-2 py-1 text-xs border rounded flex items-center gap-1 bg-white text-left transition-colors ${
+          open ? 'border-blue-400 ring-1 ring-blue-300' : 'border-gray-300 hover:border-gray-400'
+        }`}
+        title={current?.label ?? value}
+      >
+        <span className="text-base leading-none flex-shrink-0" aria-hidden>{emoji}</span>
+        <span className="flex-1 truncate text-gray-700">{name}</span>
+        <ChevronDown className={`h-3 w-3 flex-shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open &&
+        createPortal(
+          <div
+            ref={dropRef}
+            style={{ ...dropStyle, position: 'fixed', zIndex: 9999, maxHeight: 360 }}
+            className="bg-white border border-gray-200 rounded-xl shadow-2xl overflow-y-auto"
+          >
+            {fieldTypeGroups.map((group) => (
+              <div key={group.label}>
+                <p className="px-3 pt-3 pb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider sticky top-0 bg-white border-b border-gray-100">
+                  {group.label}
+                </p>
+                <div className="p-2 grid grid-cols-2 gap-1">
+                  {group.options.map((type) => {
+                    const [ico = '', ...typeRest] = type.label.split(' ');
+                    return (
+                      <button
+                        key={type.value}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onChange(type.value);
+                          setOpen(false);
+                        }}
+                        className={`text-left px-2 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-colors ${
+                          type.value === value
+                            ? 'bg-blue-50 text-blue-800 font-semibold ring-1 ring-blue-200'
+                            : 'hover:bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        <span className="text-base leading-none flex-shrink-0" aria-hidden>{ico}</span>
+                        <span className="truncate">{typeRest.join(' ')}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>,
+          document.body,
+        )}
+    </>
   );
 };
 
@@ -1136,73 +1314,6 @@ export const FormBuilderPage: React.FC = () => {
     return undefined;
   };
 
-  const fieldTypeGroups = [
-    {
-      label: 'Básicos',
-      options: [
-        { value: 'text', label: '📝 Texto' },
-        { value: 'textarea', label: '📄 Texto longo' },
-        { value: 'number', label: '🔢 Número' },
-        { value: 'currency', label: '💰 Moeda (R$)' },
-        { value: 'accounting', label: '🧾 Contábil (R$)' },
-        { value: 'date', label: '📅 Data' },
-        { value: 'month', label: '📅 Mês/Ano (input mês)' },
-        { value: 'month-year', label: '📅 Mês/Ano (select + ano)' },
-        { value: 'datetime', label: '🕐 Data e hora' },
-        { value: 'time', label: '⏰ Hora' },
-      ],
-    },
-    {
-      label: 'Contato / Documentos',
-      options: [
-        { value: 'email', label: '📧 E-mail' },
-        { value: 'phone', label: '📱 Telefone' },
-        { value: 'international-phone', label: '🌍 Telefone internacional' },
-        { value: 'cpf', label: '🆔 CPF' },
-        { value: 'cns', label: '🏥 Cartão SUS (CNS)' },
-        { value: 'passaporte', label: '🛂 Passaporte' },
-        { value: 'cep', label: '📮 CEP' },
-        { value: 'idade', label: '🎂 Idade' },
-      ],
-    },
-    {
-      label: 'Escolha / Opções',
-      options: [
-        { value: 'checkbox', label: '☑️ Checkbox (sim/não)' },
-        { value: 'checkbox-group', label: '☑️ Grupo de checkboxes' },
-        { value: 'radio', label: '📋 Múltipla escolha (uma resposta)' },
-        { value: 'select', label: '📋 Seleção' },
-        { value: 'select-search', label: '🔍 Seleção com busca' },
-        { value: 'multi-select', label: '📋 Seleção múltipla' },
-        { value: 'autocomplete', label: '🔍 Autocomplete' },
-      ],
-    },
-    {
-      label: 'Anexos / Confirmação',
-      options: [
-        { value: 'file', label: '📁 Upload de arquivo' },
-        { value: 'signature', label: '✍️ Assinatura' },
-      ],
-    },
-    {
-      label: 'Avançados',
-      options: [
-        { value: 'geolocation', label: '🌍 Geolocalização' },
-        { value: 'color', label: '🎨 Seletor de cor' },
-        { value: 'slider', label: '🎚️ Slider' },
-        { value: 'rating', label: '⭐ Avaliação (estrelas)' },
-        { value: 'linear_scale', label: '📊 Escala linear' },
-        { value: 'address', label: '🏠 Endereço completo' },
-        { value: 'google-address', label: '🗺️ Endereço (Google Maps)' },
-        { value: 'table', label: '📊 Tabela / Grid' },
-      ],
-    },
-    {
-      label: 'SINAN / Especiais',
-      options: [{ value: 'estabelecimento-search', label: '🏥 Estabelecimento (CNES) — busca' }],
-    },
-  ] as const;
-
   const fieldTypesFlat = fieldTypeGroups.flatMap((g) => g.options);
 
   const allLucideIconNames = useMemo(() => Object.keys(dynamicIconImports).sort(), []);
@@ -1901,21 +2012,10 @@ export const FormBuilderPage: React.FC = () => {
                             )}
                             <div className="col-span-2">
                               <label className="text-xs text-gray-600">Tipo</label>
-                              <select
+                              <FieldTypePicker
                                 value={field.type}
-                                onChange={(e) => updateField(sectionIdx, fieldIdx, { type: e.target.value as any })}
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                              >
-                                {fieldTypeGroups.map((group) => (
-                                  <optgroup key={group.label} label={group.label}>
-                                    {group.options.map((type) => (
-                                      <option key={type.value} value={type.value}>
-                                        {type.label}
-                                      </option>
-                                    ))}
-                                  </optgroup>
-                                ))}
-                              </select>
+                                onChange={(t) => updateField(sectionIdx, fieldIdx, { type: t as any })}
+                              />
                             </div>
                             <div className="col-span-3 flex items-end gap-1">
                               <FieldDragHandle />
