@@ -12,6 +12,8 @@ import { ClipboardList, Calendar, DollarSign, Target, Activity, Shield, Leaf, Ba
 import dynamicIconImports from 'lucide-react/dynamicIconImports';
 import { FormRenderer } from '../components/FormRenderer';
 import { ImportExcelModal } from '../components/ImportExcelModal';
+import { TemplateGalleryModal } from '../components/TemplateGalleryModal';
+import type { FormTemplate } from '../data/formTemplates';
 import { FieldSourceConfig } from '../components/FieldSourceConfig';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 import { clampNoteInRange, normalizeScalePointLabelRows } from '@/utils/linearScaleNote';
@@ -465,6 +467,7 @@ export const FormBuilderPage: React.FC = () => {
   const [activeVersionId, setActiveVersionId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importExcelOpen, setImportExcelOpen] = useState(false);
+  const [templateGalleryOpen, setTemplateGalleryOpen] = useState(false);
 
   const sectionSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -569,7 +572,6 @@ export const FormBuilderPage: React.FC = () => {
         if (d?.savedAt && d?.schema) setPendingDraft(d);
       }
     } catch { /* ignore */ }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Só no mount
 
   // ── Bloquear fechamento de aba com alterações não salvas ─────────────────
@@ -595,7 +597,6 @@ export const FormBuilderPage: React.FC = () => {
       } catch { /* quota errors: ignorar silenciosamente */ }
     }, 5_000);
     return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDirty, formName, formDescription, formKey, categoria, schema]);
 
   const makeFormKeyFromName = (name: string) => {
@@ -1368,6 +1369,23 @@ export const FormBuilderPage: React.FC = () => {
     setSchema(populatedSchema);
   };
 
+  const handleApplyTemplate = (template: FormTemplate) => {
+    const regeneratedSections = template.schema.sections.map((sec) => ({
+      ...sec,
+      id: `s${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    }));
+    setSchema({ ...template.schema, sections: regeneratedSections });
+    if (!formName || formName === 'Novo Formulário' || formName === '') {
+      setFormName(template.name);
+    }
+    if (!formDescription) {
+      setFormDescription(template.description);
+    }
+    if (isGeneralBuilder && !categoria) {
+      setCategoria(template.category);
+    }
+  };
+
   // ========== FUNÇÕES DE REGRAS ==========
 
   const addRule = () => {
@@ -2095,14 +2113,22 @@ export const FormBuilderPage: React.FC = () => {
                   (texto, data, seleção e muito mais).
                 </p>
 
-                {/* Botão CTA principal */}
-                <button
-                  onClick={addSection}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 inline-flex items-center gap-2 text-base font-medium shadow-sm transition-colors"
-                >
-                  <Plus className="h-5 w-5" />
-                  Adicionar primeira seção
-                </button>
+                {/* CTAs */}
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <button
+                    onClick={() => setTemplateGalleryOpen(true)}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 inline-flex items-center gap-2 text-base font-medium shadow-sm transition-colors"
+                  >
+                    ✨ Escolher um template
+                  </button>
+                  <button
+                    onClick={addSection}
+                    className="px-6 py-3 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 inline-flex items-center gap-2 text-base font-medium transition-colors"
+                  >
+                    <Plus className="h-5 w-5" />
+                    Começar do zero
+                  </button>
+                </div>
 
                 {/* Passos guiados */}
                 <div className="mt-10 grid grid-cols-3 gap-4 text-left max-w-lg mx-auto">
@@ -3634,6 +3660,12 @@ export const FormBuilderPage: React.FC = () => {
         open={importExcelOpen}
         onClose={() => setImportExcelOpen(false)}
         onSchema={handleImportFromExcel}
+      />
+
+      <TemplateGalleryModal
+        open={templateGalleryOpen}
+        onClose={() => setTemplateGalleryOpen(false)}
+        onApply={handleApplyTemplate}
       />
 
     </AppPageLayout>
