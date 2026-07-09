@@ -842,17 +842,25 @@ class SyncService {
           await indexedDBService.updateComunicacaoDaeSyncStatus(comunicacao.offlineId, 'synced');
           syncedCount++;
           
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error(`❌ Erro ao sincronizar comunicação DAE ${comunicacao.offlineId}:`, error);
-          
-          // Marcar como erro
+
+          const accessDenied = axios.isAxiosError(error) && error.response?.status === 403;
+          const errorMessage = accessDenied
+            ? 'Acesso negado pelo servidor. A comunicação foi preservada no dispositivo e não será reenviada automaticamente.'
+            : error instanceof Error
+              ? error.message
+              : 'Erro desconhecido';
+
           await indexedDBService.updateComunicacaoDaeSyncStatus(
             comunicacao.offlineId,
             'error',
             {
-              message: error.message || 'Erro desconhecido',
+              message: errorMessage,
               timestamp: Date.now(),
-              lastError: error.toString()
+              lastError: error instanceof Error ? error.toString() : errorMessage,
+              retryable: !accessDenied,
+              statusCode: accessDenied ? 403 : undefined,
             }
           );
           errorCount++;
@@ -1485,6 +1493,11 @@ class SyncService {
           return { comunicacaoId: result.id_comunicacao };
         }
       } catch (error) {
+        if (axios.isAxiosError(error) && error.response?.status === 403) {
+          throw new Error(
+            'Acesso negado pelo servidor. A comunicação não foi colocada na fila de sincronização.',
+          );
+        }
         console.warn('Falha online, salvando comunicação DAE offline:', error);
         this.isAuthenticated = false;
       }

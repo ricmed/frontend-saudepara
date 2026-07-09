@@ -7,8 +7,18 @@ import {
   mapPendingComunicacaoDaeToListItem,
   mergeComunicacoesDaeForOfflineList,
 } from '@/features/comunicacao-dae/comunicacaoDaeOfflineList';
+import ComunicacaoDaeService, {
+  ComunicacaoDae,
+  getComunicacaoDaeApiErrorMessage,
+  isComunicacaoDaeForbiddenError,
+} from '@/services/ComunicacaoDaeService';
+import {
+  createComunicacaoDaeCacheEnvelope,
+  getAuthenticatedUserIdentifier,
+  isComunicacaoDaeCacheEnvelopeForOwner,
+} from '@/services/comunicacaoDaeOfflineScope';
 import { toast } from 'react-toastify';
-import axios from 'axios';
+import axios from '@/utils/axiosRetry';
 
 export interface DataSource {
   key: string;
@@ -621,6 +631,8 @@ class OfflineDataManager {
 
       if (daeListResult.success) {
         console.log(`✅ ${daeListResult.count} comunicações DAE incluídas no download completo`);
+      } else {
+        toast.error(`Comunicações DAE não foram baixadas: ${daeListResult.error}`);
       }
     } catch (error) {
       console.error('❌ Erro ao baixar comunicações DAE no download completo:', error);
@@ -948,13 +960,21 @@ class OfflineDataManager {
     } = {},
   ): Promise<{ success: boolean; count: number; encrypted: boolean; error?: string }> {
     const { limit = 200, encrypt = true, onProgress } = options;
+    const ownerId = getAuthenticatedUserIdentifier();
+
+    if (!ownerId) {
+      return {
+        success: false,
+        count: 0,
+        encrypted: false,
+        error: 'Não foi possível identificar o usuário autenticado para proteger o cache DAE.',
+      };
+    }
 
     try {
       onProgress?.(10, 'Iniciando download de comunicações DAE...');
 
-      const ComunicacaoDaeService = (await import('@/services/ComunicacaoDaeService')).default;
-
-      let allComunicacoes: any[] = [];
+      let allComunicacoes: ComunicacaoDae[] = [];
       let page = 1;
       const pageSize = 100;
       const maxPages = Math.ceil(limit / pageSize);
@@ -978,18 +998,22 @@ class OfflineDataManager {
 
       onProgress?.(75, 'Salvando no cache local...');
 
-      let dataToSave: unknown = allComunicacoes;
+      let cachedData: unknown = allComunicacoes;
       let isEncrypted = false;
 
       if (encrypt && allComunicacoes.length > 0) {
-        const encryptedData = await encryptionService.encrypt(allComunicacoes);
-        dataToSave = { encrypted: true, data: encryptedData, downloadedAt: Date.now() };
+        cachedData = await encryptionService.encrypt(allComunicacoes);
         isEncrypted = true;
-      } else {
-        dataToSave = { encrypted: false, data: allComunicacoes, downloadedAt: Date.now() };
       }
 
-      await indexedDBService.saveOpcoes('comunicacoes-dae-cache', dataToSave);
+      if (getAuthenticatedUserIdentifier() !== ownerId) {
+        throw new Error('O usuário autenticado mudou durante o download. O cache DAE não foi salvo.');
+      }
+
+      await indexedDBService.saveOpcoes(
+        'comunicacoes-dae-cache',
+        createComunicacaoDaeCacheEnvelope(ownerId, cachedData, isEncrypted),
+      );
 
       onProgress?.(100, 'Download concluído!');
 
@@ -1004,29 +1028,46 @@ class OfflineDataManager {
         success: false,
         count: 0,
         encrypted: false,
-        error: error instanceof Error ? error.message : 'Erro desconhecido',
+        error: isComunicacaoDaeForbiddenError(error)
+          ? getComunicacaoDaeApiErrorMessage(
+              error,
+              'Acesso negado ao download offline das comunicações DAE.',
+            )
+          : getComunicacaoDaeApiErrorMessage(
+              error,
+              'Erro ao baixar comunicações DAE para uso offline.',
+            ),
       };
     }
   }
 
-  async getComunicacoesDaeFromCache(): Promise<any[]> {
+  async getComunicacoesDaeFromCache(): Promise<ComunicacaoDae[]> {
+    const ownerId = getAuthenticatedUserIdentifier();
+    if (!ownerId) {
+      return [];
+    }
+
     try {
-      const cachedWrapper: any = await indexedDBService.getOpcoes('comunicacoes-dae-cache');
+      const cachedWrapper = await indexedDBService.getOpcoes<unknown>('comunicacoes-dae-cache');
 
       if (!cachedWrapper) {
         return [];
       }
 
-      if (typeof cachedWrapper === 'object' && !Array.isArray(cachedWrapper) && 'encrypted' in cachedWrapper) {
-        if (cachedWrapper.encrypted === true && typeof cachedWrapper.data === 'string') {
-          return await encryptionService.decrypt(cachedWrapper.data);
-        }
-        if (cachedWrapper.encrypted === false) {
-          return Array.isArray(cachedWrapper.data) ? cachedWrapper.data : [];
-        }
+      if (!isComunicacaoDaeCacheEnvelopeForOwner(cachedWrapper, ownerId)) {
+        await indexedDBService.saveOpcoes(
+          'comunicacoes-dae-cache',
+          createComunicacaoDaeCacheEnvelope(ownerId, [], false),
+        );
+        return [];
       }
 
-      return Array.isArray(cachedWrapper) ? cachedWrapper : [];
+      const data =
+        cachedWrapper.encrypted && typeof cachedWrapper.data === 'string'
+          ? await encryptionService.decrypt(cachedWrapper.data)
+          : cachedWrapper.data;
+
+      return Array.isArray(data) ? (data as ComunicacaoDae[]) : [];
     } catch (error) {
       console.error('❌ Erro ao obter comunicações DAE do cache:', error);
       return [];
@@ -1102,7 +1143,11 @@ class OfflineDataManager {
 
   async clearComunicacoesDaeCache(): Promise<void> {
     try {
-      await indexedDBService.saveOpcoes('comunicacoes-dae-cache', { encrypted: false, data: [] });
+      const ownerId = getAuthenticatedUserIdentifier();
+      await indexedDBService.saveOpcoes(
+        'comunicacoes-dae-cache',
+        createComunicacaoDaeCacheEnvelope(ownerId ?? '', [], false),
+      );
       console.log('🗑️ Cache de comunicações DAE limpo');
     } catch (error) {
       console.error('Erro ao limpar cache de comunicações DAE:', error);

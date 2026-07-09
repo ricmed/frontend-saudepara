@@ -1,6 +1,7 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { FormData } from '@/features/notificationForms/types/index2';
 import { deviceIdService } from './deviceIdService'; // ✅ NOVO: Import do serviço de Device ID
+import { getAuthenticatedUserIdentifier } from './comunicacaoDaeOfflineScope';
 
 // ✅ CORRIGIDO: Interface melhorada para distinguir dados
 interface NotificacaoDatabase extends DBSchema {
@@ -37,7 +38,7 @@ interface NotificacaoDatabase extends DBSchema {
     key: string;
     value: {
       tipo: string;
-      data: any[];
+      data: any;
       timestamp: number;
     };
   };
@@ -90,6 +91,7 @@ interface NotificacaoDatabase extends DBSchema {
       id?: number; // ID do servidor (se já foi sincronizado)
       offlineId: string; // ID único offline
       deviceId: string; // ID do dispositivo
+      ownerId?: string;
       formData: any; // Dados do formulário
       syncStatus: 'pending' | 'syncing' | 'synced' | 'error';
       timestamp: number;
@@ -670,6 +672,10 @@ export class IndexedDBService {
     try {
       const formDataCopy = JSON.parse(JSON.stringify(formData));
       const deviceId = await deviceIdService.getDeviceId();
+      const ownerId = getAuthenticatedUserIdentifier();
+      if (!ownerId) {
+        throw new Error('Usuário autenticado não identificado para salvar a comunicação DAE offline.');
+      }
       
       let offlineId: string;
       let existingComunicacao: any = null;
@@ -678,8 +684,13 @@ export class IndexedDBService {
         offlineId = (formDataCopy as any).offline_id || (formDataCopy as any).offlineId;
         existingComunicacao = await this.db!.get('comunicacoes_dae', offlineId);
         
-        if (existingComunicacao && !isEdit) {
-          console.warn(`⚠️ Comunicação DAE com offlineId ${offlineId} já existe! Atualizando.`);
+        if (existingComunicacao) {
+          if (existingComunicacao.ownerId !== ownerId) {
+            throw new Error('Esta comunicação offline pertence a outro usuário.');
+          }
+          if (!isEdit) {
+            console.warn(`⚠️ Comunicação DAE com offlineId ${offlineId} já existe! Atualizando.`);
+          }
         }
       } else {
         offlineId = await deviceIdService.generateOfflineId();
@@ -692,6 +703,7 @@ export class IndexedDBService {
         if (existingComunicacao) {
           comunicacao = {
             ...existingComunicacao,
+            ownerId,
             formData: formDataCopy,
             timestamp: Date.now(),
             syncStatus: 'pending' as const,
@@ -702,6 +714,7 @@ export class IndexedDBService {
             id,
             offlineId,
             deviceId,
+            ownerId,
             formData: formDataCopy,
             syncStatus: 'pending' as const,
             timestamp: Date.now(),
@@ -716,6 +729,7 @@ export class IndexedDBService {
         comunicacao = {
           offlineId,
           deviceId,
+          ownerId,
           formData: formDataCopy,
           syncStatus: 'pending' as const,
           timestamp: Date.now(),
@@ -740,7 +754,10 @@ export class IndexedDBService {
   async getPendingComunicacoesDae(): Promise<any[]> {
     await this.init();
     try {
-      return await this.db!.getAllFromIndex('comunicacoes_dae', 'by-sync-status', 'pending');
+      const ownerId = getAuthenticatedUserIdentifier();
+      if (!ownerId) return [];
+      const pending = await this.db!.getAllFromIndex('comunicacoes_dae', 'by-sync-status', 'pending');
+      return pending.filter((item) => item.ownerId === ownerId);
     } catch (error) {
       console.error('Erro ao buscar comunicações DAE pendentes:', error);
       return [];
@@ -750,7 +767,10 @@ export class IndexedDBService {
   async getErrorComunicacoesDae(): Promise<any[]> {
     await this.init();
     try {
-      return await this.db!.getAllFromIndex('comunicacoes_dae', 'by-sync-status', 'error');
+      const ownerId = getAuthenticatedUserIdentifier();
+      if (!ownerId) return [];
+      const failed = await this.db!.getAllFromIndex('comunicacoes_dae', 'by-sync-status', 'error');
+      return failed.filter((item) => item.ownerId === ownerId);
     } catch (error) {
       console.error('Erro ao buscar comunicações DAE com erro:', error);
       return [];
@@ -1514,17 +1534,17 @@ export class IndexedDBService {
     }
   }
 
-  async saveOpcoes(tipo: string, data: any[]): Promise<void> {
+  async saveOpcoes(tipo: string, data: unknown): Promise<void> {
     await this.init();
     await this.db!.put('opcoes', { tipo, data, timestamp: Date.now() });
   }
 
-  async getOpcoes(tipo: string): Promise<any[] | null> {
+  async getOpcoes<T = any[]>(tipo: string): Promise<T | null> {
     await this.init();
     const opcoes = await this.db!.get('opcoes', tipo);
     
     if (opcoes && (Date.now() - opcoes.timestamp) < CACHE_DURATION) {
-      return opcoes.data;
+      return opcoes.data as T;
     }
     
     return null;

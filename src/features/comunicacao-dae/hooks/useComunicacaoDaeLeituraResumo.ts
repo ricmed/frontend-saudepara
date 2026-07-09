@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/keycloak/AuthProvider';
-import ComunicacaoDaeService, { ComunicacaoDaeLeituraResumo } from '@/services/ComunicacaoDaeService';
-import { usuarioGestaoService } from '@/services/UsuarioGestaoService';
+import ComunicacaoDaeService, {
+  ComunicacaoDaeLeituraResumo,
+  isComunicacaoDaeForbiddenError,
+} from '@/services/ComunicacaoDaeService';
 import { COMUNICACAO_DAE_LEITURA_ATUALIZADA } from '@/features/comunicacao-dae/comunicacaoDaeLeituraEvents';
 
 const RESUMO_VAZIO: ComunicacaoDaeLeituraResumo = {
@@ -33,20 +35,13 @@ export function useComunicacaoDaeLeituraResumo(enabled = true) {
     }
 
     try {
-      let estabelecimentoId: number | undefined;
-      try {
-        const userAccess = await usuarioGestaoService.getUserAccess();
-        if (userAccess?.isEstabelecimento && userAccess.estabelecimentoId) {
-          estabelecimentoId = userAccess.estabelecimentoId;
-        }
-      } catch {
-        /* escopo opcional */
-      }
-
-      const data = await ComunicacaoDaeService.getResumoLeitura(estabelecimentoId);
+      const data = await ComunicacaoDaeService.getResumoLeitura();
       setResumo(data);
-    } catch {
-      /* falha silenciosa — contadores são auxiliares */
+    } catch (error) {
+      setResumo(RESUMO_VAZIO);
+      if (isComunicacaoDaeForbiddenError(error)) {
+        console.warn('Acesso negado ao resumo de leitura das comunicações DAE.');
+      }
     }
   }, [canUse]);
 

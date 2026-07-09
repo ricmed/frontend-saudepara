@@ -5,9 +5,10 @@ import ComunicacaoDaeService, {
   ComunicacaoDae,
   ComunicacaoDaeFilters,
   StatusLeituraFiltro,
+  getComunicacaoDaeApiErrorMessage,
+  isComunicacaoDaeForbiddenError,
 } from '@/services/ComunicacaoDaeService';
 import { SideMenu } from '@/features/home/components/SideMenu';
-import { usuarioGestaoService } from '@/services/UsuarioGestaoService'; // 🔒 Importar service de permissões
 import { useOfflineSystem } from '@/hooks/useOfflineSystem';
 import ConnectionStatus from '@/components/ConnectionStatus';
 import {
@@ -127,22 +128,10 @@ const ComunicacaoDaePage: React.FC = () => {
         return;
       }
 
-      let filtrosComPermissoes = { ...filters };
-
-      try {
-        const userAccess = await usuarioGestaoService.getUserAccess();
-
-        if (userAccess) {
-          if (userAccess.isEstabelecimento && userAccess.estabelecimentoId) {
-            filtrosComPermissoes.estabelecimento_id = userAccess.estabelecimentoId;
-          }
-        }
-      } catch {
-        // Silenciar erro de permissões
-      }
+      const functionalFilters = { ...filters };
 
       if (statusLeituraFilter !== 'todas') {
-        filtrosComPermissoes.status_leitura = statusLeituraFilter;
+        functionalFilters.status_leitura = statusLeituraFilter;
       }
 
       const searchFilters =
@@ -151,13 +140,26 @@ const ComunicacaoDaePage: React.FC = () => {
           : {};
 
       const response = await ComunicacaoDaeService.getAll(currentPage, itemsPerPage, {
-        ...filtrosComPermissoes,
+        ...functionalFilters,
         ...searchFilters,
       });
       setComunicacoes(response.data || []);
       setTotal(response.pagination?.total || 0);
       setTotalPages(response.pagination?.pages || 1);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      if (isComunicacaoDaeForbiddenError(err)) {
+        setComunicacoes([]);
+        setTotal(0);
+        setTotalPages(1);
+        setError(
+          getComunicacaoDaeApiErrorMessage(
+            err,
+            'Acesso negado às comunicações DAE para o usuário autenticado.',
+          ),
+        );
+        return;
+      }
+
       try {
         const allOffline = await offlineDataManager.getComunicacoesDaeForOfflineList();
         if (allOffline.length > 0) {
@@ -172,7 +174,7 @@ const ComunicacaoDaePage: React.FC = () => {
       } catch {
         /* fallback falhou */
       }
-      setError(err.response?.data?.message || 'Erro ao carregar comunicações');
+      setError(getComunicacaoDaeApiErrorMessage(err, 'Erro ao carregar comunicações'));
       console.error('Erro ao carregar comunicações:', err);
     } finally {
       setLoading(false);
@@ -435,9 +437,16 @@ const ComunicacaoDaePage: React.FC = () => {
       }
 
       setShowExportMenu(false);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Erro ao exportar:', err);
-      setError('Erro ao exportar dados');
+      setError(
+        isComunicacaoDaeForbiddenError(err)
+          ? getComunicacaoDaeApiErrorMessage(
+              err,
+              'Acesso negado à exportação das comunicações DAE.',
+            )
+          : getComunicacaoDaeApiErrorMessage(err, 'Erro ao exportar dados'),
+      );
     }
   };
 

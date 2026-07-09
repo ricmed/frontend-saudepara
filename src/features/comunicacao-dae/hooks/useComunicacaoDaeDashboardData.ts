@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
 import ComunicacaoDaeService, {
   ComunicacaoDae,
-  ComunicacaoDaeFilters
+  getComunicacaoDaeApiErrorMessage,
+  isComunicacaoDaeForbiddenError,
 } from '@/services/ComunicacaoDaeService';
 import CrsService, { Crs } from '@/services/CrsService';
 import NheService, { Nhe } from '@/services/NheService';
 import CievsService, { Cievs } from '@/services/CievsService';
-import { usuarioGestaoService } from '@/services/UsuarioGestaoService';
 import { LocalizacaoMapa, LocalizacaoTipo } from '@/features/dashboard/components/MapaDashboardDAE';
 
 export const useComunicacaoDaeDashboardData = () => {
   const [loading, setLoading] = useState(true);
   const [comunicacoes, setComunicacoes] = useState<ComunicacaoDae[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [isRestrictedOriginView, setIsRestrictedOriginView] = useState(false);
+  const isRestrictedOriginView = false;
   const [crsList, setCrsList] = useState<Crs[]>([]);
   const [nheList, setNheList] = useState<Nhe[]>([]);
   const [cievsList, setCievsList] = useState<Cievs[]>([]);
@@ -25,21 +25,8 @@ export const useComunicacaoDaeDashboardData = () => {
       setLoading(true);
       setError(null);
 
-      const filtrosComPermissoes: ComunicacaoDaeFilters = {};
-      let restrictedOriginView = false;
-      try {
-        const userAccess = await usuarioGestaoService.getUserAccess();
-        if (userAccess?.isEstabelecimento && userAccess.estabelecimentoId) {
-          filtrosComPermissoes.estabelecimento_id = userAccess.estabelecimentoId;
-          restrictedOriginView = true;
-        }
-      } catch {
-        // Em caso de falha ao buscar permissões, mantém fallback sem filtro.
-      }
-      setIsRestrictedOriginView(restrictedOriginView);
-
       const [comunicacoesRes, crsRes, nheRes, cievsRes] = await Promise.all([
-        ComunicacaoDaeService.getAll(1, 9999, filtrosComPermissoes),
+        ComunicacaoDaeService.getAll(1, 9999),
         CrsService.getAll(1, 9999),
         NheService.getAll(1, 9999),
         CievsService.getAll(1, 9999)
@@ -51,7 +38,14 @@ export const useComunicacaoDaeDashboardData = () => {
       setCievsList(cievsRes.data || []);
       setLastUpdate(new Date().toLocaleString('pt-BR'));
     } catch (err) {
-      setError('Erro ao carregar dados do dashboard');
+      setError(
+        isComunicacaoDaeForbiddenError(err)
+          ? getComunicacaoDaeApiErrorMessage(
+              err,
+              'Acesso negado aos dados do dashboard DAE para o usuário autenticado.',
+            )
+          : getComunicacaoDaeApiErrorMessage(err, 'Erro ao carregar dados do dashboard'),
+      );
       console.error('Erro ao carregar dados:', err);
     } finally {
       setLoading(false);

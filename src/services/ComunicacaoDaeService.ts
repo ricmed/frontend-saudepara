@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios from '@/utils/axiosRetry';
 
 const API_URL = '/api';
 
@@ -92,7 +92,6 @@ export interface ComunicacaoDaeFilters {
   id_municipio_residencia?: number;
   data_inicio?: string;
   data_fim?: string;
-  estabelecimento_id?: number;
   sortKey?: string;
   sortDir?: 'asc' | 'desc';
   status_leitura?: StatusLeituraFiltro;
@@ -169,12 +168,9 @@ class ComunicacaoDaeService {
   /**
    * Resumo de leitura: total, não lidas e lidas pelo usuário autenticado.
    */
-  async getResumoLeitura(estabelecimento_id?: number): Promise<ComunicacaoDaeLeituraResumo> {
+  async getResumoLeitura(): Promise<ComunicacaoDaeLeituraResumo> {
     const response = await axios.get(`${API_URL}/comunicacao-dae/leitura/contagem`, {
-      params: {
-        ...(estabelecimento_id ? { estabelecimento_id } : {}),
-        _t: Date.now(),
-      },
+      params: { _t: Date.now() },
       withCredentials: true,
       headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
     });
@@ -302,6 +298,26 @@ class ComunicacaoDaeService {
     link.remove();
     window.URL.revokeObjectURL(url);
   }
+}
+
+export function isComunicacaoDaeForbiddenError(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 403;
+}
+
+export function getComunicacaoDaeApiErrorMessage(error: unknown, fallback: string): string {
+  if (!axios.isAxiosError(error)) {
+    return error instanceof Error ? error.message : fallback;
+  }
+
+  const payload = error.response?.data;
+  if (typeof payload === 'object' && payload !== null) {
+    const message = Reflect.get(payload, 'message') ?? Reflect.get(payload, 'error');
+    if (typeof message === 'string' && message.trim()) {
+      return message;
+    }
+  }
+
+  return fallback;
 }
 
 export default new ComunicacaoDaeService();

@@ -16,8 +16,16 @@ import {
   Wifi,
   WifiOff
 } from 'lucide-react';
-import axios from 'axios';
-import ComunicacaoDaeService, { CreateComunicacaoDaeData, OrigemTipo, TipoAnexo, ComunicacaoDae, ComunicacaoDaeAnexo } from '@/services/ComunicacaoDaeService';
+import axios from '@/utils/axiosRetry';
+import ComunicacaoDaeService, {
+  CreateComunicacaoDaeData,
+  OrigemTipo,
+  TipoAnexo,
+  ComunicacaoDae,
+  ComunicacaoDaeAnexo,
+  getComunicacaoDaeApiErrorMessage,
+  isComunicacaoDaeForbiddenError,
+} from '@/services/ComunicacaoDaeService';
 import DaeService, { Dae } from '@/services/DaeService';
 import NheService, { Nhe } from '@/services/NheService';
 import CievsService, { Cievs } from '@/services/CievsService';
@@ -31,6 +39,7 @@ import { useOfflineSystem } from '@/hooks/useOfflineSystem';
 import { OfflineComunicacaoDaeServiceProxy } from '@/services/OfflineComunicacaoDaeServiceProxy';
 import ConnectionStatus from '@/components/ConnectionStatus';
 import indexedDBService from '@/services/indexedDB';
+import { offlineDataManager } from '@/services/offlineDataManager';
 import { getLocalDateTime, convertUTCToLocalDateTime, calcularSemanaEpidemiologica } from '@/utils/timezoneUtils';
 import { useAuth } from '@/keycloak/AuthProvider';
 import { getRuntimeApiRoot } from '@/config/runtimeApiBase';
@@ -338,19 +347,29 @@ const ComunicacaoDaeFormPage: React.FC = () => {
     try {
       setLoadingData(true);
       
-      // ✅ ONLINE: API primeiro, cache como fallback
       let data: ComunicacaoDae;
-      try {
-        data = await ComunicacaoDaeService.getById(comunicacaoId);
-      } catch (err) {
-        // ✅ FALLBACK: Tentar buscar do cache offline
-        const cachedData = await indexedDBService.getOpcoes('comunicacoes_dae');
-        const comunicacaoOffline = cachedData?.find((c: any) => c.id_comunicacao === comunicacaoId);
-        
-        if (comunicacaoOffline) {
-          data = comunicacaoOffline;
-        } else {
-          throw new Error('Comunicação não encontrada na API nem no cache offline');
+
+      const loadFromAuthorizedCache = async (): Promise<ComunicacaoDae> => {
+        const cachedData = await offlineDataManager.getComunicacoesDaeFromCache();
+        const cachedComunicacao = cachedData.find(
+          (item) => Number(item.id_comunicacao) === comunicacaoId,
+        );
+        if (!cachedComunicacao) {
+          throw new Error('Comunicação não disponível no cache offline deste usuário.');
+        }
+        return cachedComunicacao;
+      };
+
+      if (!isOnline) {
+        data = await loadFromAuthorizedCache();
+      } else {
+        try {
+          data = await ComunicacaoDaeService.getById(comunicacaoId);
+        } catch (err) {
+          if (isComunicacaoDaeForbiddenError(err) || (axios.isAxiosError(err) && err.response)) {
+            throw err;
+          }
+          data = await loadFromAuthorizedCache();
         }
       }
       
@@ -438,8 +457,15 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       if (data.comunicacao_dae_anexo) {
         setAnexos(data.comunicacao_dae_anexo);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Erro ao carregar comunicação');
+    } catch (err: unknown) {
+      setError(
+        isComunicacaoDaeForbiddenError(err)
+          ? getComunicacaoDaeApiErrorMessage(
+              err,
+              'Acesso negado a esta comunicação DAE para o usuário autenticado.',
+            )
+          : getComunicacaoDaeApiErrorMessage(err, 'Erro ao carregar comunicação'),
+      );
     } finally {
       setLoadingData(false);
     }
