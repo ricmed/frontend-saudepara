@@ -710,13 +710,6 @@ const ComunicacaoDaePage: React.FC = () => {
     });
   };
 
-  const formatDateCompact = (dateString: string) =>
-    new Date(dateString).toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: '2-digit',
-    });
-
   const thClass =
     'px-2 py-3 text-left text-[10px] lg:text-xs font-semibold text-gray-700 uppercase tracking-wide';
   const tdClass = 'px-2 py-3 text-xs lg:text-sm align-middle max-w-0';
@@ -1542,7 +1535,7 @@ const ComunicacaoDaePage: React.FC = () => {
                           </div>
                         </td>
                         <td className={`${tdClass} text-gray-600`} style={{ width: columnWidths.data_comunicacao }} title={formatDate(comunicacao.data_comunicacao)}>
-                          <span className="truncate block">{formatDateCompact(comunicacao.data_comunicacao)}</span>
+                          <span className="truncate block">{formatDate(comunicacao.data_comunicacao)}</span>
                         </td>
                         <td className={`${tdClass} text-gray-600`} style={{ width: columnWidths.semana_epidemiologica }} title={seLabel}>
                           <span className="truncate block">{seLabel}</span>
