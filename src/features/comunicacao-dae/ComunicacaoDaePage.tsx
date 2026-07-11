@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Plus, FileText, Calendar, MapPin, Filter, X, Trash2, Edit, Eye, Menu, Download, ChevronDown, Search, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, Wifi, WifiOff, BarChart2, Archive, ArchiveRestore } from 'lucide-react';
+import { Plus, FileText, Calendar, Filter, X, Trash2, Edit, Eye, Menu, Download, ChevronDown, Search, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, Wifi, WifiOff, BarChart2, Archive, ArchiveRestore } from 'lucide-react';
 import ComunicacaoDaeService, {
   ComunicacaoDae,
   ComunicacaoDaeFilters,
@@ -23,6 +23,11 @@ import {
 } from './components/listDocumentExporters';
 import { formatComunicacaoDaeAgravoNomes } from '@/features/comunicacao-dae/comunicacaoDaeAgravoUtils';
 import { useComunicacaoDaeLeituraResumo } from '@/features/comunicacao-dae/hooks/useComunicacaoDaeLeituraResumo';
+import {
+  DaeTableColumnId,
+  DAE_TABLE_COLUMN_ORDER,
+  useResizableTableColumns,
+} from '@/features/comunicacao-dae/hooks/useResizableTableColumns';
 import { calcularSemanaEpidemiologica } from '@/utils/timezoneUtils';
 import { offlineDataManager } from '@/services/offlineDataManager';
 
@@ -68,7 +73,9 @@ const ComunicacaoDaePage: React.FC = () => {
   const location = useLocation();
   const loadComunicacoesRef = useRef<() => void>(() => {});
   const lastFetchAtRef = useRef(0);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
   const MIN_LIST_REFRESH_MS = 5000;
+  const { columnWidths, totalWidth, startResize } = useResizableTableColumns(tableContainerRef);
   
   // ✅ Hook do sistema offline
   const {
@@ -506,6 +513,54 @@ const ComunicacaoDaePage: React.FC = () => {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const formatDateCompact = (dateString: string) =>
+    new Date(dateString).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit',
+    });
+
+  const thClass =
+    'px-2 py-3 text-left text-[10px] lg:text-xs font-semibold text-gray-700 uppercase tracking-wide';
+  const tdClass = 'px-2 py-3 text-xs lg:text-sm align-middle max-w-0';
+  const tdTruncate = `${tdClass} truncate`;
+
+  const renderColumnResizeHandle = (columnId: DaeTableColumnId) => (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Redimensionar coluna"
+      className="absolute right-0 top-0 z-10 h-full w-2 -mr-1 cursor-col-resize touch-none hover:bg-blue-400/30 active:bg-blue-500/40"
+      onMouseDown={(event) => startResize(columnId, event)}
+      onClick={pararPropagacaoAcao}
+    />
+  );
+
+  const renderSortableHeader = (
+    columnId: DaeTableColumnId,
+    label: string,
+    sortKey: SortableField,
+    options?: { title?: string; align?: 'left' | 'center' },
+  ) => {
+    const alignClass = options?.align === 'center' ? 'text-center' : 'text-left';
+    const justifyClass = options?.align === 'center' ? 'justify-center' : '';
+    return (
+      <th
+        key={columnId}
+        style={{ width: columnWidths[columnId] }}
+        className={`${thClass} ${alignClass} relative cursor-pointer hover:bg-gray-200/60 transition-colors select-none`}
+        onClick={() => handleSort(sortKey)}
+        title={options?.title ?? label}
+      >
+        <div className={`flex items-center gap-1 min-w-0 ${justifyClass}`}>
+          <span className="truncate">{label}</span>
+          {renderSortIcon(sortKey)}
+        </div>
+        {renderColumnResizeHandle(columnId)}
+      </th>
+    );
   };
 
   const getOrigemBadgeColor = (tipo: string) => {
@@ -1112,93 +1167,57 @@ const ComunicacaoDaePage: React.FC = () => {
                 ))}
               </div>
 
-              {/* Desktop: Tabela */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
+              {/* Desktop: Tabela com colunas redimensionáveis */}
+              <div ref={tableContainerRef} className="hidden md:block w-full overflow-x-auto">
+                <table
+                  className="table-fixed divide-y divide-gray-200"
+                  style={{ width: totalWidth, minWidth: '100%' }}
+                >
+                  <colgroup>
+                    {DAE_TABLE_COLUMN_ORDER.map((colId) => (
+                      <col key={colId} style={{ width: columnWidths[colId] }} />
+                    ))}
+                  </colgroup>
                   <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                     <tr>
-                      <th 
-                        className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200/60 transition-colors"
-                        onClick={() => handleSort('id_comunicacao')}
+                      {renderSortableHeader('id_comunicacao', 'Nº', 'id_comunicacao', { title: 'Nº Comunicação' })}
+                      {renderSortableHeader('data_comunicacao', 'Data', 'data_comunicacao')}
+                      {renderSortableHeader('semana_epidemiologica', 'SE', 'semana_epidemiologica', {
+                        title: 'Semana epidemiológica',
+                      })}
+                      {renderSortableHeader('nome_paciente', 'Paciente', 'nome_paciente')}
+                      {renderSortableHeader('origem_tipo', 'Origem', 'origem_tipo')}
+                      {renderSortableHeader('unidade_notificadora', 'Unidade', 'unidade_notificadora', {
+                        title: 'Unidade notificadora',
+                      })}
+                      {renderSortableHeader('dae', 'DAE', 'dae')}
+                      {renderSortableHeader('municipio', 'Município', 'municipio')}
+                      <th
+                        style={{ width: columnWidths.anexos }}
+                        className={`${thClass} relative`}
+                        title="Anexos"
                       >
-                        <div className="flex items-center gap-2">
-                          <span>Nº Comunicação</span>
-                          {renderSortIcon('id_comunicacao')}
-                        </div>
+                        <span className="truncate block">Anex.</span>
+                        {renderColumnResizeHandle('anexos')}
                       </th>
                       <th
-                        className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200/60 transition-colors"
-                        onClick={() => handleSort('data_comunicacao')}
+                        style={{ width: columnWidths.acoes }}
+                        className={`${thClass} relative text-center`}
                       >
-                        <div className="flex items-center gap-2">
-                          <span>Data</span>
-                          {renderSortIcon('data_comunicacao')}
-                        </div>
-                      </th>
-                      <th
-                        className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200/60 transition-colors"
-                        onClick={() => handleSort('semana_epidemiologica')}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span>SE</span>
-                          {renderSortIcon('semana_epidemiologica')}
-                        </div>
-                      </th>
-                      <th
-                        className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200/60 transition-colors"
-                        onClick={() => handleSort('nome_paciente')}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span>Paciente</span>
-                          {renderSortIcon('nome_paciente')}
-                        </div>
-                      </th>
-                      <th 
-                        className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200/60 transition-colors"
-                        onClick={() => handleSort('origem_tipo')}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span>Origem</span>
-                          {renderSortIcon('origem_tipo')}
-                        </div>
-                      </th>
-                      <th 
-                        className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200/60 transition-colors"
-                        onClick={() => handleSort('unidade_notificadora')}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span>Unidade notificadora</span>
-                          {renderSortIcon('unidade_notificadora')}
-                        </div>
-                      </th>
-                      <th
-                        className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200/60 transition-colors"
-                        onClick={() => handleSort('dae')}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span>DAE</span>
-                          {renderSortIcon('dae')}
-                        </div>
-                      </th>
-                      <th 
-                        className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200/60 transition-colors"
-                        onClick={() => handleSort('municipio')}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span>Município</span>
-                          {renderSortIcon('municipio')}
-                        </div>
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                        Anexos
-                      </th>
-                      <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                        Ações
+                        <span className="block w-full text-center">Ações</span>
+                        {renderColumnResizeHandle('acoes')}
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-100">
-                    {sortedComunicacoes.map((comunicacao, index) => (
+                    {sortedComunicacoes.map((comunicacao, index) => {
+                      const daeNomes = formatComunicacaoDaeAgravoNomes(comunicacao);
+                      const unidadeNome = comunicacao.origem?.nome || '-';
+                      const municipioNome = comunicacao.tipo_municipio?.descricao || '-';
+                      const se = calcularSemanaEpidemiologica(comunicacao.data_comunicacao);
+                      const seLabel = se ? `SE ${se.semana.toString().padStart(2, '0')}/${se.ano}` : '-';
+
+                      return (
                       <tr 
                         key={comunicacao.id_comunicacao} 
                         className={getLinhaClasses(comunicacao, index)}
@@ -1208,62 +1227,63 @@ const ComunicacaoDaePage: React.FC = () => {
                         onClick={() => handleVisualizar(Number(comunicacao.id_comunicacao))}
                         onKeyDown={(e) => handleLinhaKeyDown(e, Number(comunicacao.id_comunicacao))}
                       >
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
+                        <td className={tdClass} style={{ width: columnWidths.id_comunicacao }}>
+                          <div className="flex items-center gap-1 min-w-0">
                             {isComunicacaoNaoLida(comunicacao) && (
-                              <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" title="Não lida" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0" title="Não lida" />
                             )}
-                            <span className={`text-sm font-bold text-blue-600 ${isComunicacaoNaoLida(comunicacao) ? 'font-extrabold' : ''}`}>
+                            <span
+                              className={`truncate font-bold text-blue-600 ${isComunicacaoNaoLida(comunicacao) ? 'font-extrabold' : ''}`}
+                              title={`#${comunicacao.id_comunicacao}`}
+                            >
                               #{comunicacao.id_comunicacao}
                             </span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          <div className="flex items-center">
-                            <Calendar className="w-4 h-4 mr-2 text-gray-400" />
-                            {formatDate(comunicacao.data_comunicacao)}
-                          </div>
+                        <td className={`${tdClass} text-gray-600`} style={{ width: columnWidths.data_comunicacao }} title={formatDate(comunicacao.data_comunicacao)}>
+                          <span className="truncate block">{formatDateCompact(comunicacao.data_comunicacao)}</span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {(() => {
-                            const se = calcularSemanaEpidemiologica(comunicacao.data_comunicacao);
-                            return se ? `SE ${se.semana.toString().padStart(2, '0')}/${se.ano}` : '-';
-                          })()}
+                        <td className={`${tdClass} text-gray-600`} style={{ width: columnWidths.semana_epidemiologica }} title={seLabel}>
+                          <span className="truncate block">{seLabel}</span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`text-sm text-gray-900 ${isComunicacaoNaoLida(comunicacao) ? 'font-bold' : 'font-medium'}`}>
+                        <td className={tdTruncate} style={{ width: columnWidths.nome_paciente }} title={comunicacao.nome_paciente}>
+                          <span className={`truncate block text-gray-900 ${isComunicacaoNaoLida(comunicacao) ? 'font-bold' : 'font-medium'}`}>
                             {comunicacao.nome_paciente}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getOrigemBadgeColor(comunicacao.origem_tipo)}`}>
+                        <td className={tdClass} style={{ width: columnWidths.origem_tipo }}>
+                          <span
+                            className={`inline-block max-w-full truncate px-1.5 py-0.5 text-[10px] lg:text-xs font-semibold rounded-full ${getOrigemBadgeColor(comunicacao.origem_tipo)}`}
+                            title={comunicacao.origem_tipo}
+                          >
                             {comunicacao.origem_tipo}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                          {comunicacao.origem?.nome || '-'}
+                        <td className={tdTruncate} style={{ width: columnWidths.unidade_notificadora }} title={unidadeNome}>
+                          <span className="truncate block text-gray-700">{unidadeNome}</span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600 max-w-[320px] whitespace-normal break-words">
-                          {formatComunicacaoDaeAgravoNomes(comunicacao)}
+                        <td className={tdTruncate} style={{ width: columnWidths.dae }} title={daeNomes}>
+                          <span className="truncate block text-gray-600">{daeNomes}</span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          <div className="flex items-center">
-                            <MapPin className="w-4 h-4 mr-2 text-gray-400" />
-                            {comunicacao.tipo_municipio?.descricao || '-'}
-                          </div>
+                        <td className={tdTruncate} style={{ width: columnWidths.municipio }} title={municipioNome}>
+                          <span className="truncate block text-gray-600">{municipioNome}</span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            <FileText className="w-3 h-3 mr-1.5" />
+                        <td className={tdClass} style={{ width: columnWidths.anexos }}>
+                          <span
+                            className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] lg:text-xs font-medium bg-blue-100 text-blue-800"
+                            title={`${comunicacao.comunicacao_dae_anexo?.length || 0} anexo(s)`}
+                          >
+                            <FileText className="w-3 h-3 mr-0.5 shrink-0" />
                             {comunicacao.comunicacao_dae_anexo?.length || 0}
                           </span>
                         </td>
                         <td
-                          className="px-6 py-4 whitespace-nowrap text-right"
+                          className={`${tdClass} text-center`}
+                          style={{ width: columnWidths.acoes }}
                           onClick={pararPropagacaoAcao}
                           onKeyDown={pararPropagacaoAcao}
                         >
-                          <div className="flex items-center justify-end space-x-2">
+                          <div className="flex items-center justify-center gap-1 flex-wrap">
                             <button
                               type="button"
                               onClick={() => handleVisualizar(Number(comunicacao.id_comunicacao))}
@@ -1312,7 +1332,8 @@ const ComunicacaoDaePage: React.FC = () => {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
