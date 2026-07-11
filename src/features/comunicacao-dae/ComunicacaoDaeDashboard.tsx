@@ -64,6 +64,8 @@ const ComunicacaoDaeDashboard: React.FC = () => {
     cievsList,
     localizacoes,
     lastUpdate,
+    visibilidade,
+    setVisibilidade,
     loadAllData,
     loadLocalizacoes
   } = useComunicacaoDaeDashboardData();
@@ -304,6 +306,32 @@ const ComunicacaoDaeDashboard: React.FC = () => {
 
               {/* Botões de Ação */}
               <div className="flex flex-wrap justify-end gap-2" data-export-menu>
+                <div
+                  className="inline-flex rounded-lg overflow-hidden border border-white/30 bg-white/10"
+                  role="group"
+                  aria-label="Filtrar por arquivamento"
+                >
+                  {(
+                    [
+                      { value: 'ativas' as const, label: 'Ativas' },
+                      { value: 'todas' as const, label: 'Ativas + arquivadas' },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setVisibilidade(opt.value)}
+                      className={`px-3 py-2 text-xs sm:text-sm font-medium transition-colors ${
+                        visibilidade === opt.value
+                          ? 'bg-white text-blue-700'
+                          : 'text-white hover:bg-white/20'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+
                 <button
                   onClick={refreshDashboardData}
                   disabled={loading}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import ComunicacaoDaeService, {
   ComunicacaoDae,
+  VisibilidadeArquivamentoFiltro,
   getComunicacaoDaeApiErrorMessage,
   isComunicacaoDaeForbiddenError,
 } from '@/services/ComunicacaoDaeService';
@@ -12,6 +13,7 @@ import { LocalizacaoMapa, LocalizacaoTipo } from '@/features/dashboard/component
 export const useComunicacaoDaeDashboardData = () => {
   const [loading, setLoading] = useState(true);
   const [comunicacoes, setComunicacoes] = useState<ComunicacaoDae[]>([]);
+  const [visibilidade, setVisibilidade] = useState<VisibilidadeArquivamentoFiltro>('ativas');
   const [error, setError] = useState<string | null>(null);
   const isRestrictedOriginView = false;
   const [crsList, setCrsList] = useState<Crs[]>([]);
@@ -26,7 +28,9 @@ export const useComunicacaoDaeDashboardData = () => {
       setError(null);
 
       const [comunicacoesRes, crsRes, nheRes, cievsRes] = await Promise.all([
-        ComunicacaoDaeService.getAll(1, 9999),
+        ComunicacaoDaeService.getAll(1, 9999, {
+          visibilidade: visibilidade === 'todas' ? 'todas' : undefined,
+        }),
         CrsService.getAll(1, 9999),
         NheService.getAll(1, 9999),
         CievsService.getAll(1, 9999)
@@ -50,7 +54,7 @@ export const useComunicacaoDaeDashboardData = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [visibilidade]);
 
   const loadLocalizacoes = useCallback(
     async (comunicacoesData: ComunicacaoDae[], filteredComunicacoes?: ComunicacaoDae[]) => {
@@ -134,6 +138,8 @@ export const useComunicacaoDaeDashboardData = () => {
   return {
     loading,
     comunicacoes,
+    visibilidade,
+    setVisibilidade,
     error,
     isRestrictedOriginView,
     crsList,

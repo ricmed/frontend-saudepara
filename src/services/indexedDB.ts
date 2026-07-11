@@ -1164,7 +1164,9 @@ export class IndexedDBService {
         console.warn('Erro ao buscar anexos pendentes:', error);
       }
 
-      console.log(`📊 Pendentes: ${pendingNotificacoes.length} notificações, ${errorNotificacoes.length} com erro, ${unsyncedPacientes.length} pacientes locais, ${unsyncedEstabelecimentos.length} estabelecimentos, ${unsyncedComunicacoesDae.length} comunicações DAE, ${unsyncedAnexos.length} anexos`);
+      if (import.meta.env.DEV) {
+        console.log(`📊 Pendentes: ${pendingNotificacoes.length} notificações, ${errorNotificacoes.length} com erro, ${unsyncedPacientes.length} pacientes locais, ${unsyncedEstabelecimentos.length} estabelecimentos, ${unsyncedComunicacoesDae.length} comunicações DAE, ${unsyncedAnexos.length} anexos`);
+      }
       
       return {
         notificacoes: pendingNotificacoes.length,
@@ -1352,17 +1354,13 @@ export class IndexedDBService {
 
     let pending: any[] = [];
 
-    // Preferir índice para evitar varredura completa em dispositivos com muito dado.
+    // Índice `by-sincronizado` usa string ('false'/'true'), não boolean.
     try {
-      const pendingByBoolean = await this.db!.getAllFromIndex('notificacoes', 'by-sincronizado', false as any);
-      pending = pendingByBoolean;
-
-      if (pending.length === 0) {
-        const pendingByString = await this.db!.getAllFromIndex('notificacoes', 'by-sincronizado', 'false' as any);
-        pending = pendingByString;
-      }
+      pending = await this.db!.getAllFromIndex('notificacoes', 'by-sincronizado', 'false');
     } catch (indexError) {
-      console.warn('⚠️ Falha ao buscar pendentes por índice; aplicando fallback por varredura:', indexError);
+      if (import.meta.env.DEV) {
+        console.warn('⚠️ Falha ao buscar pendentes por índice; aplicando fallback por varredura:', indexError);
+      }
       const allNotificacoes = await this.db!.getAll('notificacoes');
       pending = allNotificacoes.filter(item => {
         const sincronizado = (item as any).sincronizado;
@@ -1371,7 +1369,6 @@ export class IndexedDBService {
     }
 
     pending.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-    console.log(`📋 [INDEXEDDB] Notificações pendentes de sincronização: ${pending.length}`);
 
     return pending.map(item => ({
       id: item.id as number, 

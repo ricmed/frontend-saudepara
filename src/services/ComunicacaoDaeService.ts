@@ -18,6 +18,7 @@ export interface ComunicacaoDaeAnexo {
 }
 
 export type StatusLeituraFiltro = 'todas' | 'lidas' | 'nao_lidas';
+export type VisibilidadeArquivamentoFiltro = 'ativas' | 'todas' | 'arquivadas';
 
 export interface ComunicacaoDaeLeitura {
   user_id: string;
@@ -39,6 +40,9 @@ export interface ComunicacaoDae {
   /** Indica se o usuário autenticado já abriu esta ficha. */
   lida?: boolean;
   lido_em?: string;
+  /** Indica se o usuário autenticado arquivou esta ficha. */
+  arquivada?: boolean;
+  arquivada_em?: string;
   observacao_descricao?: string;
   digitador?: string;
   telefone_digitador?: string;
@@ -95,6 +99,7 @@ export interface ComunicacaoDaeFilters {
   sortKey?: string;
   sortDir?: 'asc' | 'desc';
   status_leitura?: StatusLeituraFiltro;
+  visibilidade?: VisibilidadeArquivamentoFiltro;
   search?: string;
   search_field?: string;
 }
@@ -159,6 +164,32 @@ class ComunicacaoDaeService {
     this.assertValidId(id, 'ID da comunicação');
     const response = await axios.post(
       `${API_URL}/comunicacao-dae/${id}/marcar-lido`,
+      {},
+      { withCredentials: true }
+    );
+    return response.data;
+  }
+
+  /**
+   * Arquiva comunicação para o usuário autenticado (idempotente).
+   */
+  async arquivar(id: number): Promise<{ arquivada: boolean; arquivada_em: string }> {
+    this.assertValidId(id, 'ID da comunicação');
+    const response = await axios.post(
+      `${API_URL}/comunicacao-dae/${id}/arquivar`,
+      {},
+      { withCredentials: true }
+    );
+    return response.data;
+  }
+
+  /**
+   * Remove arquivamento da comunicação para o usuário autenticado.
+   */
+  async desarquivar(id: number): Promise<{ arquivada: boolean }> {
+    this.assertValidId(id, 'ID da comunicação');
+    const response = await axios.post(
+      `${API_URL}/comunicacao-dae/${id}/desarquivar`,
       {},
       { withCredentials: true }
     );

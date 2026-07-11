@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/keycloak/AuthProvider';
 import ComunicacaoDaeService, {
   ComunicacaoDaeLeituraResumo,
@@ -27,6 +27,8 @@ export function useComunicacaoDaeLeituraResumo(enabled = true) {
   const { user } = useAuth();
   const [resumo, setResumo] = useState<ComunicacaoDaeLeituraResumo>(RESUMO_VAZIO);
   const canUse = enabled && hasComunicacaoDaeRole(user?.roles);
+  const lastRefreshAtRef = useRef(0);
+  const MIN_REFRESH_MS = 5000;
 
   const refresh = useCallback(async () => {
     if (!canUse) {
@@ -37,6 +39,7 @@ export function useComunicacaoDaeLeituraResumo(enabled = true) {
     try {
       const data = await ComunicacaoDaeService.getResumoLeitura();
       setResumo(data);
+      lastRefreshAtRef.current = Date.now();
     } catch (error) {
       setResumo(RESUMO_VAZIO);
       if (isComunicacaoDaeForbiddenError(error)) {
@@ -45,15 +48,20 @@ export function useComunicacaoDaeLeituraResumo(enabled = true) {
     }
   }, [canUse]);
 
+  const refreshIfStale = useCallback(() => {
+    if (Date.now() - lastRefreshAtRef.current < MIN_REFRESH_MS) return;
+    void refresh();
+  }, [refresh]);
+
   useEffect(() => {
-    refresh();
+    void refresh();
 
     const interval = window.setInterval(refresh, 60_000);
-    const onFocus = () => refresh();
+    const onFocus = () => refreshIfStale();
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') refresh();
+      if (document.visibilityState === 'visible') refreshIfStale();
     };
-    const onLeituraAtualizada = () => refresh();
+    const onLeituraAtualizada = () => refreshIfStale();
 
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisibility);
@@ -65,7 +73,7 @@ export function useComunicacaoDaeLeituraResumo(enabled = true) {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener(COMUNICACAO_DAE_LEITURA_ATUALIZADA, onLeituraAtualizada);
     };
-  }, [refresh]);
+  }, [refresh, refreshIfStale]);
 
   return { resumo, refresh };
 }

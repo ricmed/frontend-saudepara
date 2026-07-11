@@ -14,7 +14,8 @@ import {
   Loader,
   ChevronDown,
   Wifi,
-  WifiOff
+  WifiOff,
+  ArchiveRestore,
 } from 'lucide-react';
 import axios from '@/utils/axiosRetry';
 import ComunicacaoDaeService, {
@@ -100,7 +101,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
     isOnline,
     pendingData,
     getOfflineStatusMessage
-  } = useOfflineSystem();
+  } = useOfflineSystem({ includePeriodicRefresh: false });
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -123,6 +124,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
 
   // Dados adicionais para exibição
   const [comunicacaoCompleta, setComunicacaoCompleta] = useState<ComunicacaoDae | null>(null);
+  const isArquivada = Boolean(comunicacaoCompleta?.arquivada);
 
   // Listas para selects
   const [daes, setDaes] = useState<Dae[]>([]);
@@ -473,6 +475,11 @@ const ComunicacaoDaeFormPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isArquivada) {
+      setError('Comunicação arquivada. Desarquive para editar.');
+      return;
+    }
     
     // ✅ PROTEÇÃO: Prevenir múltiplas submissões
     if (loading || uploadingAnexo) {
@@ -790,6 +797,25 @@ const ComunicacaoDaeFormPage: React.FC = () => {
     };
   };
 
+  const handleDesarquivar = async () => {
+    if (!id || !isOnline) {
+      setError('Desarquivar requer conexão com o servidor.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      await ComunicacaoDaeService.desarquivar(Number(id));
+      const data = await ComunicacaoDaeService.getById(Number(id));
+      setComunicacaoCompleta(data);
+    } catch (err: unknown) {
+      setError(getComunicacaoDaeApiErrorMessage(err, 'Erro ao desarquivar comunicação'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleExportDocumento = async (tipo: 'pdf' | 'word') => {
     try {
       setIsExportMenuOpen(false);
@@ -918,20 +944,33 @@ const ComunicacaoDaeFormPage: React.FC = () => {
 
           {/* Linha 2: Botões de Ação */}
           <div className="flex items-center justify-end gap-2 flex-wrap">
-            <button
-              type="submit"
-              form="comunicacao-form"
-              disabled={loading || uploadingAnexo || !!exportingDocument}
-              className="p-2 sm:w-auto sm:inline-flex sm:items-center sm:justify-center sm:gap-2 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed shadow-sm border border-transparent"
-              title="Salvar"
-            >
-              {loading || uploadingAnexo ? (
-                <Loader className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              <span className="hidden sm:inline">{isEditMode ? 'Atualizar' : 'Salvar'}</span>
-            </button>
+            {!isArquivada ? (
+              <button
+                type="submit"
+                form="comunicacao-form"
+                disabled={loading || uploadingAnexo || !!exportingDocument}
+                className="p-2 sm:w-auto sm:inline-flex sm:items-center sm:justify-center sm:gap-2 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed shadow-sm border border-transparent"
+                title="Salvar"
+              >
+                {loading || uploadingAnexo ? (
+                  <Loader className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                <span className="hidden sm:inline">{isEditMode ? 'Atualizar' : 'Salvar'}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleDesarquivar}
+                disabled={loading || !!exportingDocument}
+                className="p-2 sm:w-auto sm:inline-flex sm:items-center sm:justify-center sm:gap-2 sm:px-4 sm:py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed shadow-sm border border-transparent"
+                title="Desarquivar para editar"
+              >
+                <ArchiveRestore className="h-4 w-4" />
+                <span className="hidden sm:inline">Desarquivar</span>
+              </button>
+            )}
 
             <div ref={exportMenuRef} className="relative">
               <button
@@ -1048,6 +1087,12 @@ const ComunicacaoDaeFormPage: React.FC = () => {
         )}
 
         <form id="comunicacao-form" onSubmit={handleSubmit} className="space-y-6">
+          {isArquivada && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Esta comunicação está arquivada na sua visão. Você pode visualizar e exportar, mas precisa desarquivar para editar.
+            </div>
+          )}
+
           
           {/* Seção: Origem e Localização */}
           <div className={cardClass}>
@@ -1676,32 +1721,36 @@ const ComunicacaoDaeFormPage: React.FC = () => {
 
           {/* Rodapé com botões de ação CENTRALIZADOS */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 pt-6 border-t border-gray-200 mt-8 mb-8">
-            <button
-              type="submit"
-              disabled={loading || uploadingAnexo}
-              className="inline-flex items-center px-6 py-2.5 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px] justify-center w-full sm:w-auto"
-            >
-              {loading || uploadingAnexo ? (
-                 <>
-                   <Loader className="w-5 h-5 mr-2 animate-spin" />
-                   Processando...
-                 </>
-              ) : (
-                <>
-                  <Save className="w-5 h-5 mr-2" />
-                  {isEditMode ? 'Salvar Alterações' : 'Salvar'}
-                </>
-              )}
-            </button>
+            {!isArquivada && (
+              <button
+                type="submit"
+                disabled={loading || uploadingAnexo}
+                className="inline-flex items-center px-6 py-2.5 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px] justify-center w-full sm:w-auto"
+              >
+                {loading || uploadingAnexo ? (
+                   <>
+                     <Loader className="w-5 h-5 mr-2 animate-spin" />
+                     Processando...
+                   </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5 mr-2" />
+                    {isEditMode ? 'Salvar Alterações' : 'Salvar'}
+                  </>
+                )}
+              </button>
+            )}
 
-            <button
-              type="button"
-              onClick={handleClearForm}
-              className="inline-flex items-center px-6 py-2.5 border border-transparent text-base font-medium rounded-md text-white bg-gray-500 hover:bg-gray-600 shadow-sm min-w-[120px] justify-center w-full sm:w-auto"
-            >
-              <Trash2 className="w-5 h-5 mr-2" />
-              Limpar
-            </button>
+            {!isArquivada && (
+              <button
+                type="button"
+                onClick={handleClearForm}
+                className="inline-flex items-center px-6 py-2.5 border border-transparent text-base font-medium rounded-md text-white bg-gray-500 hover:bg-gray-600 shadow-sm min-w-[120px] justify-center w-full sm:w-auto"
+              >
+                <Trash2 className="w-5 h-5 mr-2" />
+                Limpar
+              </button>
+            )}
 
             <button
               type="button"

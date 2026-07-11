@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Plus, FileText, Calendar, MapPin, Filter, X, Trash2, Edit, Eye, Menu, Download, ChevronDown, Search, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, Wifi, WifiOff, BarChart2 } from 'lucide-react';
+import { Plus, FileText, Calendar, MapPin, Filter, X, Trash2, Edit, Eye, Menu, Download, ChevronDown, Search, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, Wifi, WifiOff, BarChart2, Archive, ArchiveRestore } from 'lucide-react';
 import ComunicacaoDaeService, {
   ComunicacaoDae,
   ComunicacaoDaeFilters,
   StatusLeituraFiltro,
+  VisibilidadeArquivamentoFiltro,
   getComunicacaoDaeApiErrorMessage,
   isComunicacaoDaeForbiddenError,
 } from '@/services/ComunicacaoDaeService';
@@ -21,7 +22,6 @@ import {
   exportarComunicacoesDaeListaWord,
 } from './components/listDocumentExporters';
 import { formatComunicacaoDaeAgravoNomes } from '@/features/comunicacao-dae/comunicacaoDaeAgravoUtils';
-import { notifyComunicacaoDaeLeituraAtualizada } from '@/features/comunicacao-dae/comunicacaoDaeLeituraEvents';
 import { useComunicacaoDaeLeituraResumo } from '@/features/comunicacao-dae/hooks/useComunicacaoDaeLeituraResumo';
 import { calcularSemanaEpidemiologica } from '@/utils/timezoneUtils';
 import { offlineDataManager } from '@/services/offlineDataManager';
@@ -67,13 +67,15 @@ const ComunicacaoDaePage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const loadComunicacoesRef = useRef<() => void>(() => {});
+  const lastFetchAtRef = useRef(0);
+  const MIN_LIST_REFRESH_MS = 5000;
   
   // ✅ Hook do sistema offline
   const {
     isOnline,
     pendingData,
     getOfflineStatusMessage
-  } = useOfflineSystem();
+  } = useOfflineSystem({ includePeriodicRefresh: false });
   
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [comunicacoes, setComunicacoes] = useState<ComunicacaoDae[]>([]);
@@ -108,6 +110,7 @@ const ComunicacaoDaePage: React.FC = () => {
 
   // Filtro de leitura (por usuário)
   const [statusLeituraFilter, setStatusLeituraFilter] = useState<StatusLeituraFiltro>('todas');
+  const [visibilidadeFilter, setVisibilidadeFilter] = useState<VisibilidadeArquivamentoFiltro>('ativas');
   const { resumo: leituraResumo } = useComunicacaoDaeLeituraResumo();
 
   const loadComunicacoes = useCallback(async () => {
@@ -122,6 +125,7 @@ const ComunicacaoDaePage: React.FC = () => {
         setComunicacoes(pageSlice);
         setTotal(allOffline.length);
         setTotalPages(Math.max(1, Math.ceil(allOffline.length / itemsPerPage)));
+        lastFetchAtRef.current = Date.now();
         if (allOffline.length === 0) {
           setError('Nenhuma comunicação DAE disponível offline. Baixe os dados no Gerenciamento Offline.');
         }
@@ -132,6 +136,10 @@ const ComunicacaoDaePage: React.FC = () => {
 
       if (statusLeituraFilter !== 'todas') {
         functionalFilters.status_leitura = statusLeituraFilter;
+      }
+
+      if (visibilidadeFilter !== 'ativas') {
+        functionalFilters.visibilidade = visibilidadeFilter;
       }
 
       const searchFilters =
@@ -146,6 +154,7 @@ const ComunicacaoDaePage: React.FC = () => {
       setComunicacoes(response.data || []);
       setTotal(response.pagination?.total || 0);
       setTotalPages(response.pagination?.pages || 1);
+      lastFetchAtRef.current = Date.now();
     } catch (err: unknown) {
       if (isComunicacaoDaeForbiddenError(err)) {
         setComunicacoes([]);
@@ -179,7 +188,7 @@ const ComunicacaoDaePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, filters, itemsPerPage, statusLeituraFilter, isOnline, debouncedSearch]);
+  }, [currentPage, filters, itemsPerPage, statusLeituraFilter, visibilidadeFilter, isOnline, debouncedSearch]);
 
   useEffect(() => {
     loadComunicacoesRef.current = loadComunicacoes;
@@ -198,12 +207,12 @@ const ComunicacaoDaePage: React.FC = () => {
     }
   }, [location.state, location.pathname, loadComunicacoes, navigate]);
 
-  // Recarregar quando o usuário volta à aba (evita lista stale)
+  // Recarregar quando o usuário volta à aba (evita lista stale, com debounce)
   useEffect(() => {
     const refreshIfVisible = () => {
-      if (document.visibilityState === 'visible') {
-        loadComunicacoesRef.current();
-      }
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastFetchAtRef.current < MIN_LIST_REFRESH_MS) return;
+      loadComunicacoesRef.current();
     };
     window.addEventListener('focus', refreshIfVisible);
     document.addEventListener('visibilitychange', refreshIfVisible);
@@ -330,21 +339,49 @@ const ComunicacaoDaePage: React.FC = () => {
 
   const handleVisualizar = (id: number) => {
     marcarComunicacaoLidaLocal(id);
-    if (isOnline) {
-      ComunicacaoDaeService.marcarComoLida(id)
-        .then(() => {
-          notifyComunicacaoDaeLeituraAtualizada();
-        })
-        .catch(() => {
-          /* falha silenciosa — form tentará novamente ao abrir */
-        });
-    }
+    // A ficha também marca leitura ao abrir — evita POST duplicado na navegação.
     navigate(`/private/comunicacao-dae/${id}`);
   };
 
   const handleStatusLeituraChange = (value: StatusLeituraFiltro) => {
     setStatusLeituraFilter(value);
     setCurrentPage(1);
+  };
+
+  const handleVisibilidadeChange = (value: VisibilidadeArquivamentoFiltro) => {
+    setVisibilidadeFilter(value);
+    setCurrentPage(1);
+  };
+
+  const handleArquivar = async (id: number) => {
+    if (!isOnline) {
+      setError('Arquivar comunicações requer conexão com o servidor.');
+      return;
+    }
+    if (!confirm('Arquivar esta comunicação? Ela sairá da sua lista de ativas, mas poderá ser consultada depois.')) {
+      return;
+    }
+
+    try {
+      await ComunicacaoDaeService.arquivar(id);
+      loadComunicacoes();
+    } catch (err: unknown) {
+      setError(getComunicacaoDaeApiErrorMessage(err, 'Erro ao arquivar comunicação'));
+    }
+  };
+
+  const handleDesarquivar = async (id: number) => {
+    if (!isOnline) {
+      setError('Desarquivar comunicações requer conexão com o servidor.');
+      return;
+    }
+
+    try {
+      await ComunicacaoDaeService.desarquivar(id);
+      loadComunicacoes();
+    } catch (err: unknown) {
+      setError(getComunicacaoDaeApiErrorMessage(err, 'Erro ao desarquivar comunicação'));
+    }
   };
 
   const handleDelete = async (id: number) => {
@@ -397,7 +434,11 @@ const ComunicacaoDaePage: React.FC = () => {
       <ArrowDown className="h-4 w-4 text-blue-600" />;
   };
 
-  const handleExport = async (format: 'csv' | 'excel' | 'pdf' | 'word', type: 'page' | 'all') => {
+  const handleExport = async (
+    format: 'csv' | 'excel' | 'pdf' | 'word',
+    type: 'page' | 'all',
+    scope: VisibilidadeArquivamentoFiltro = 'ativas',
+  ) => {
     try {
       let dataToExport: ComunicacaoDae[] = [];
 
@@ -406,16 +447,23 @@ const ComunicacaoDaePage: React.FC = () => {
           debouncedSearch.term.length >= 3
             ? { search: debouncedSearch.term, search_field: debouncedSearch.field }
             : {};
-        const response = await ComunicacaoDaeService.getAll(1, 9999, { ...filters, ...exportSearchFilters });
+        const exportVisibilidade =
+          scope === 'ativas' ? {} : { visibilidade: scope };
+        const response = await ComunicacaoDaeService.getAll(1, 9999, {
+          ...filters,
+          ...exportSearchFilters,
+          ...exportVisibilidade,
+        });
         dataToExport = response.data;
       } else {
-        // Usar página atual
         dataToExport = comunicacoes;
       }
 
-      const filename = type === 'all' 
-        ? 'comunicacoes_dae_completo' 
-        : `comunicacoes_dae_pagina_${currentPage}`;
+      const scopeLabel =
+        scope === 'todas' ? 'completo' : scope === 'arquivadas' ? 'arquivadas' : 'ativas';
+      const filename = type === 'all'
+        ? `comunicacoes_dae_${scopeLabel}`
+        : `comunicacoes_dae_pagina_${currentPage}_${scopeLabel}`;
 
       // Converter para formato de exportação
       const exportData = dataToExport as ComunicacaoDaeExportData[];
@@ -571,41 +619,78 @@ const ComunicacaoDaePage: React.FC = () => {
                         <span className="text-sm font-medium">Word (.docx)</span>
                       </button>
 
-                      {/* Exportar Tudo */}
+                      {/* Exportar Tudo — Ativas */}
                       <div className="px-3 py-2 bg-gray-50 border-t border-b border-gray-200 mt-1">
-                        <span className="text-xs font-semibold text-gray-700 uppercase">Exportação Completa</span>
+                        <span className="text-xs font-semibold text-gray-700 uppercase">Exportação completa — ativas</span>
                       </div>
                       <button
                         type="button"
-                        onClick={() => handleExport('csv', 'all')}
+                        onClick={() => handleExport('csv', 'all', 'ativas')}
                         className="w-full px-4 py-2.5 text-left text-gray-700 hover:bg-blue-50 flex items-center space-x-3 transition-colors"
                       >
                         <FileSpreadsheet className="w-4 h-4 text-green-600" />
-                        <span className="text-sm font-medium">CSV Completo</span>
+                        <span className="text-sm font-medium">CSV</span>
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleExport('excel', 'all')}
+                        onClick={() => handleExport('excel', 'all', 'ativas')}
                         className="w-full px-4 py-2.5 text-left text-gray-700 hover:bg-blue-50 flex items-center space-x-3 transition-colors"
                       >
                         <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                        <span className="text-sm font-medium">Excel Completo</span>
+                        <span className="text-sm font-medium">Excel</span>
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleExport('pdf', 'all')}
+                        onClick={() => handleExport('pdf', 'all', 'ativas')}
                         className="w-full px-4 py-2.5 text-left text-gray-700 hover:bg-blue-50 flex items-center space-x-3 transition-colors"
                       >
                         <FileText className="w-4 h-4 text-red-600" />
-                        <span className="text-sm font-medium">PDF Completo</span>
+                        <span className="text-sm font-medium">PDF</span>
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleExport('word', 'all')}
+                        onClick={() => handleExport('word', 'all', 'ativas')}
                         className="w-full px-4 py-2.5 text-left text-gray-700 hover:bg-blue-50 flex items-center space-x-3 transition-colors"
                       >
                         <FileText className="w-4 h-4 text-indigo-600" />
-                        <span className="text-sm font-medium">Word Completo (.docx)</span>
+                        <span className="text-sm font-medium">Word (.docx)</span>
+                      </button>
+
+                      {/* Exportar Tudo — Ativas + arquivadas */}
+                      <div className="px-3 py-2 bg-gray-50 border-t border-b border-gray-200 mt-1">
+                        <span className="text-xs font-semibold text-gray-700 uppercase">Exportação completa — ativas + arquivadas</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleExport('csv', 'all', 'todas')}
+                        className="w-full px-4 py-2.5 text-left text-gray-700 hover:bg-blue-50 flex items-center space-x-3 transition-colors"
+                      >
+                        <FileSpreadsheet className="w-4 h-4 text-green-600" />
+                        <span className="text-sm font-medium">CSV</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleExport('excel', 'all', 'todas')}
+                        className="w-full px-4 py-2.5 text-left text-gray-700 hover:bg-blue-50 flex items-center space-x-3 transition-colors"
+                      >
+                        <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                        <span className="text-sm font-medium">Excel</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleExport('pdf', 'all', 'todas')}
+                        className="w-full px-4 py-2.5 text-left text-gray-700 hover:bg-blue-50 flex items-center space-x-3 transition-colors"
+                      >
+                        <FileText className="w-4 h-4 text-red-600" />
+                        <span className="text-sm font-medium">PDF</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleExport('word', 'all', 'todas')}
+                        className="w-full px-4 py-2.5 text-left text-gray-700 hover:bg-blue-50 flex items-center space-x-3 transition-colors"
+                      >
+                        <FileText className="w-4 h-4 text-indigo-600" />
+                        <span className="text-sm font-medium">Word (.docx)</span>
                       </button>
                     </div>
                   </div>
@@ -670,6 +755,32 @@ const ComunicacaoDaePage: React.FC = () => {
                     onClick={() => handleStatusLeituraChange(opt.value)}
                     className={`px-3 py-2 text-sm font-medium transition-colors ${
                       statusLeituraFilter === opt.value
+                        ? 'bg-white text-blue-700'
+                        : 'text-white hover:bg-blue-600/50'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <div
+                className="inline-flex rounded-lg overflow-hidden border border-blue-400/60 bg-blue-500/30"
+                role="group"
+                aria-label="Filtrar por arquivamento"
+              >
+                {(
+                  [
+                    { value: 'ativas' as const, label: 'Ativas' },
+                    { value: 'todas' as const, label: 'Ativas + arquivadas' },
+                    { value: 'arquivadas' as const, label: 'Arquivadas' },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => handleVisibilidadeChange(opt.value)}
+                    className={`px-3 py-2 text-sm font-medium transition-colors ${
+                      visibilidadeFilter === opt.value
                         ? 'bg-white text-blue-700'
                         : 'text-white hover:bg-blue-600/50'
                     }`}
@@ -919,6 +1030,11 @@ const ComunicacaoDaePage: React.FC = () => {
                           <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${getOrigemBadgeColor(comunicacao.origem_tipo)}`}>
                             {comunicacao.origem_tipo}
                           </span>
+                          {comunicacao.arquivada && (
+                            <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-gray-200 text-gray-700">
+                              Arquivada
+                            </span>
+                          )}
                         </div>
 
                         <p className={`text-sm truncate ${isComunicacaoNaoLida(comunicacao) ? 'font-bold text-gray-900' : 'font-semibold text-gray-900'}`}>
@@ -953,14 +1069,35 @@ const ComunicacaoDaePage: React.FC = () => {
                         >
                           <Eye className="w-5 h-5" />
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/private/comunicacao-dae/editar/${comunicacao.id_comunicacao}`)}
-                          className="p-2.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors touch-manipulation cursor-pointer"
-                          title="Editar"
-                        >
-                          <Edit className="w-5 h-5" />
-                        </button>
+                        {!comunicacao.arquivada && (
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/private/comunicacao-dae/editar/${comunicacao.id_comunicacao}`)}
+                            className="p-2.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors touch-manipulation cursor-pointer"
+                            title="Editar"
+                          >
+                            <Edit className="w-5 h-5" />
+                          </button>
+                        )}
+                        {comunicacao.arquivada ? (
+                          <button
+                            type="button"
+                            onClick={() => handleDesarquivar(Number(comunicacao.id_comunicacao))}
+                            className="p-2.5 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors touch-manipulation cursor-pointer"
+                            title="Desarquivar"
+                          >
+                            <ArchiveRestore className="w-5 h-5" />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleArquivar(Number(comunicacao.id_comunicacao))}
+                            className="p-2.5 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors touch-manipulation cursor-pointer"
+                            title="Arquivar"
+                          >
+                            <Archive className="w-5 h-5" />
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => handleDelete(Number(comunicacao.id_comunicacao))}
@@ -1135,14 +1272,35 @@ const ComunicacaoDaePage: React.FC = () => {
                             >
                               <Eye className="w-5 h-5" />
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => navigate(`/private/comunicacao-dae/editar/${comunicacao.id_comunicacao}`)}
-                              className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
-                              title="Editar"
-                            >
-                              <Edit className="w-5 h-5" />
-                            </button>
+                            {!comunicacao.arquivada && (
+                              <button
+                                type="button"
+                                onClick={() => navigate(`/private/comunicacao-dae/editar/${comunicacao.id_comunicacao}`)}
+                                className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                                title="Editar"
+                              >
+                                <Edit className="w-5 h-5" />
+                              </button>
+                            )}
+                            {comunicacao.arquivada ? (
+                              <button
+                                type="button"
+                                onClick={() => handleDesarquivar(Number(comunicacao.id_comunicacao))}
+                                className="p-2 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
+                                title="Desarquivar"
+                              >
+                                <ArchiveRestore className="w-5 h-5" />
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleArquivar(Number(comunicacao.id_comunicacao))}
+                                className="p-2 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
+                                title="Arquivar"
+                              >
+                                <Archive className="w-5 h-5" />
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => handleDelete(Number(comunicacao.id_comunicacao))}

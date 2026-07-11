@@ -78,6 +78,13 @@ axios.interceptors.response.use(
         return Promise.reject(error);
       }
 
+      const method = String(originalRequest.method ?? 'get').toLowerCase();
+      const url = String(originalRequest.url ?? '');
+      // Leituras GET da Comunicação DAE: não re-tentar — evita tempestade de 429 na lista.
+      if (method === 'get' && url.includes('/comunicacao-dae')) {
+        return Promise.reject(error);
+      }
+
       originalRequest._retry = true;
       
       // Pegar o tempo de retry do header Retry-After (se disponível) ou usar 30 segundos
