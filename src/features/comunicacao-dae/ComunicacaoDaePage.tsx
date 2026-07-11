@@ -75,7 +75,6 @@ const ComunicacaoDaePage: React.FC = () => {
   const lastFetchAtRef = useRef(0);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const MIN_LIST_REFRESH_MS = 5000;
-  const { columnWidths, totalWidth, startResize } = useResizableTableColumns(tableContainerRef);
   
   // ✅ Hook do sistema offline
   const {
@@ -119,6 +118,11 @@ const ComunicacaoDaePage: React.FC = () => {
   const [statusLeituraFilter, setStatusLeituraFilter] = useState<StatusLeituraFiltro>('todas');
   const [visibilidadeFilter, setVisibilidadeFilter] = useState<VisibilidadeArquivamentoFiltro>('ativas');
   const { resumo: leituraResumo } = useComunicacaoDaeLeituraResumo();
+
+  const { columnWidths, totalWidth, startResize } = useResizableTableColumns(
+    tableContainerRef,
+    loading || filteredComunicacoes.length === 0 ? 0 : filteredComunicacoes.length,
+  );
 
   const loadComunicacoes = useCallback(async () => {
     try {
@@ -532,9 +536,13 @@ const ComunicacaoDaePage: React.FC = () => {
       role="separator"
       aria-orientation="vertical"
       aria-label="Redimensionar coluna"
-      className="absolute right-0 top-0 z-10 h-full w-2 -mr-1 cursor-col-resize touch-none hover:bg-blue-400/30 active:bg-blue-500/40"
+      data-col-resize=""
+      className="absolute right-0 top-0 z-10 h-full w-2 -mr-1 cursor-col-resize touch-none select-none hover:bg-blue-400/30 active:bg-blue-500/40"
       onMouseDown={(event) => startResize(columnId, event)}
-      onClick={pararPropagacaoAcao}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
     />
   );
 
@@ -1056,7 +1064,7 @@ const ComunicacaoDaePage: React.FC = () => {
         ) : (
           <>
             {/* Tabela de Comunicações */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200/60 overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200/60 overflow-hidden md:overflow-visible">
               {/* Mobile: Cards */}
               <div className="block md:hidden divide-y divide-gray-100">
                 {sortedComunicacoes.map((comunicacao) => (
