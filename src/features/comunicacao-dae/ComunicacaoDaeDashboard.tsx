@@ -734,7 +734,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-lg font-medium text-gray-900">Casos por Semana Epidemiológica</h3>
-                  <p className="text-sm text-gray-600">Distribuição das comunicações por semana epidemiológica</p>
+                  <p className="text-sm text-gray-600">Clique nas barras para filtrar por semana epidemiológica</p>
                 </div>
               </div>
               <ChartExportMenu
@@ -786,7 +786,23 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                         `${props.payload.name} / ${props.payload.ano}`,
                       ]}
                     />
-                    <Bar dataKey="value" fill="#5eafc6" radius={[4, 4, 0, 0]} animationDuration={800}>
+                    <Bar
+                      dataKey="value"
+                      cursor="pointer"
+                      onClick={(data) =>
+                        data?.id && toggleFilter('semana_epidemiologica', data.id, ctrlPressedRef.current)
+                      }
+                      radius={[4, 4, 0, 0]}
+                      animationDuration={800}
+                    >
+                      {dadosSemanaEpidemiologica.map((entry, index) => (
+                        <Cell
+                          key={`se-cell-${index}`}
+                          fill={getCellColor(entry.id, activeFilters.semana_epidemiologica, '#5eafc6')}
+                          stroke={isFilterActive(entry.id, activeFilters.semana_epidemiologica) ? '#000' : 'none'}
+                          strokeWidth={isFilterActive(entry.id, activeFilters.semana_epidemiologica) ? 2 : 0}
+                        />
+                      ))}
                       <LabelList
                         dataKey="value"
                         position="top"
@@ -1690,7 +1706,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                 <li>• <strong>Clique no card "Total"</strong> para ver a lista completa de comunicações</li>
                 <li>• <strong>Clique nos cards</strong> CRS/NHE/CIEVS para filtrar por tipo de origem</li>
                 <li>• <strong>Use os filtros de período e horário</strong> para analisar intervalos específicos de tempo</li>
-                <li>• <strong>Clique nos gráficos</strong> de municípios (ocorrência/residência) ou DAE para aplicar filtros específicos</li>
+                <li>• <strong>Clique nos gráficos</strong> de municípios (ocorrência/residência), DAE ou semana epidemiológica para aplicar filtros específicos</li>
                 <li>• <strong>Todos os gráficos são interconectados</strong> - refletem os filtros ativos simultaneamente</li>
                 <li>• <strong>Passe o mouse sobre os pontos</strong> do gráfico temporal para ver valores absolutos e porcentagens</li>
                 <li>• <strong>Use "Limpar Todos os Filtros"</strong> para resetar e ver todos os dados novamente</li>

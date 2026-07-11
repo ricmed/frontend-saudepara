@@ -3,18 +3,17 @@ import { ComunicacaoDae } from '@/services/ComunicacaoDaeService';
 import { Crs } from '@/services/CrsService';
 import { Nhe } from '@/services/NheService';
 import { Cievs } from '@/services/CievsService';
-import {
-  getComunicacaoDaeAgravoIds,
-  matchesDaeDashboardFilter,
-} from '@/features/comunicacao-dae/comunicacaoDaeAgravoUtils';
+import { getComunicacaoDaeAgravoIds } from '@/features/comunicacao-dae/comunicacaoDaeAgravoUtils';
 import { buildOrigemStats, getOrigemSeriesKey } from '@/features/comunicacao-dae/utils/origemPresentation';
-import { calcularSemanaEpidemiologica } from '@/utils/timezoneUtils';
 import { ActiveFilters } from '@/features/comunicacao-dae/hooks/useComunicacaoDaeDashboardFilters';
+import { applyDashboardCrossFilters, getSemanaEpidemiologicaKey } from '@/features/comunicacao-dae/utils/comunicacaoDaeDashboardFilterUtils';
+import { calcularSemanaEpidemiologica } from '@/utils/timezoneUtils';
 
 interface ChartDataItem {
   name: string;
   value: number;
-  id?: number;
+  id?: number | string;
+  ano?: number;
 }
 
 type OrigemTipo = 'CRS' | 'NHE' | 'CIEVS';
@@ -36,6 +35,17 @@ type UseComunicacaoDaeDashboardChartsArgs = {
   nheList: Nhe[];
   cievsList: Cievs[];
 };
+
+function getCrossFilterSource(
+  comunicacoesFiltradas: ComunicacaoDae[],
+  dadosFiltrados: ComunicacaoDae[],
+  activeFilters: ActiveFilters,
+  except?: keyof ActiveFilters,
+) {
+  return except && activeFilters[except]
+    ? applyDashboardCrossFilters(comunicacoesFiltradas, activeFilters, except)
+    : dadosFiltrados;
+}
 
 export const useComunicacaoDaeDashboardCharts = ({
   comunicacoes,
@@ -97,12 +107,19 @@ export const useComunicacaoDaeDashboardCharts = ({
   }, [dadosFiltrados]);
 
   const dadosSemanaEpidemiologica = useMemo(() => {
+    const source = getCrossFilterSource(
+      comunicacoesFiltradas,
+      dadosFiltrados,
+      activeFilters,
+      'semana_epidemiologica',
+    );
     const seMap = new Map<string, { semana: number; ano: number; value: number }>();
 
-    dadosFiltrados.forEach(c => {
+    source.forEach((c) => {
+      const key = getSemanaEpidemiologicaKey(c.data_comunicacao);
       const se = calcularSemanaEpidemiologica(c.data_comunicacao);
-      if (!se) return;
-      const key = `${se.ano}-${se.semana.toString().padStart(2, '0')}`;
+      if (!key || !se) return;
+
       if (!seMap.has(key)) {
         seMap.set(key, { semana: se.semana, ano: se.ano, value: 0 });
       }
@@ -111,24 +128,23 @@ export const useComunicacaoDaeDashboardCharts = ({
 
     return Array.from(seMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([, d]) => ({
+      .map(([key, d]) => ({
+        id: key,
         name: `SE ${d.semana.toString().padStart(2, '0')}`,
         ano: d.ano,
         value: d.value,
       }));
-  }, [dadosFiltrados]);
+  }, [comunicacoesFiltradas, dadosFiltrados, activeFilters]);
 
   const dadosMunicipios = useMemo(() => {
-    const excludingMunicipio = activeFilters.municipio_id
-      ? comunicacoesFiltradas.filter(c =>
-          (!activeFilters.origem_tipo || c.origem_tipo === activeFilters.origem_tipo) &&
-          (!activeFilters.origem_id || c.origem_id === activeFilters.origem_id) &&
-          matchesDaeDashboardFilter(c, activeFilters.dae_id) &&
-          (!activeFilters.municipio_residencia_id || c.id_municipio_residencia === activeFilters.municipio_residencia_id)
-        )
-      : dadosFiltrados;
+    const source = getCrossFilterSource(
+      comunicacoesFiltradas,
+      dadosFiltrados,
+      activeFilters,
+      'municipio_id',
+    );
 
-    const counts = excludingMunicipio.reduce((acc, com) => {
+    const counts = source.reduce((acc, com) => {
       const municipio = com.tipo_municipio?.descricao || 'Não informado';
       const id = com.id_municipio_ocorrencia;
       const key = `${id}_${municipio}`;
@@ -143,16 +159,14 @@ export const useComunicacaoDaeDashboardCharts = ({
   }, [comunicacoesFiltradas, activeFilters, dadosFiltrados]);
 
   const dadosMunicipiosResidencia = useMemo(() => {
-    const excludingMunicipioResidencia = activeFilters.municipio_residencia_id
-      ? comunicacoesFiltradas.filter(c =>
-          (!activeFilters.origem_tipo || c.origem_tipo === activeFilters.origem_tipo) &&
-          (!activeFilters.origem_id || c.origem_id === activeFilters.origem_id) &&
-          matchesDaeDashboardFilter(c, activeFilters.dae_id) &&
-          (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id)
-        )
-      : dadosFiltrados;
+    const source = getCrossFilterSource(
+      comunicacoesFiltradas,
+      dadosFiltrados,
+      activeFilters,
+      'municipio_residencia_id',
+    );
 
-    const counts = excludingMunicipioResidencia.reduce((acc, com) => {
+    const counts = source.reduce((acc, com) => {
       const municipio = com.tipo_municipio_residencia?.descricao || 'Não informado';
       const id = com.id_municipio_residencia;
       const key = `${id}_${municipio}`;
@@ -167,16 +181,14 @@ export const useComunicacaoDaeDashboardCharts = ({
   }, [comunicacoesFiltradas, activeFilters, dadosFiltrados]);
 
   const dadosDae = useMemo(() => {
-    const excludingDae = activeFilters.dae_id
-      ? comunicacoesFiltradas.filter(c =>
-          (!activeFilters.origem_tipo || c.origem_tipo === activeFilters.origem_tipo) &&
-          (!activeFilters.origem_id || c.origem_id === activeFilters.origem_id) &&
-          (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id) &&
-          (!activeFilters.municipio_residencia_id || c.id_municipio_residencia === activeFilters.municipio_residencia_id)
-        )
-      : dadosFiltrados;
+    const source = getCrossFilterSource(
+      comunicacoesFiltradas,
+      dadosFiltrados,
+      activeFilters,
+      'dae_id',
+    );
 
-    const counts = excludingDae.reduce((acc, com) => {
+    const counts = source.reduce((acc, com) => {
       const ids = getComunicacaoDaeAgravoIds(com);
       for (const agravoId of ids) {
         const nome =
@@ -228,16 +240,14 @@ export const useComunicacaoDaeDashboardCharts = ({
       }
     }
 
-    const excludingOrigemId = activeFilters.origem_id
-      ? comunicacoesFiltradas.filter(c =>
-          c.origem_tipo === 'CRS' &&
-          matchesDaeDashboardFilter(c, activeFilters.dae_id) &&
-          (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id) &&
-          (!activeFilters.municipio_residencia_id || c.id_municipio_residencia === activeFilters.municipio_residencia_id)
-        )
-      : comunicacoesFiltradas.filter(c => c.origem_tipo === 'CRS');
+    const source = getCrossFilterSource(
+      comunicacoesFiltradas,
+      dadosFiltrados,
+      activeFilters,
+      activeFilters.origem_id ? 'origem_id' : undefined,
+    ).filter(c => c.origem_tipo === 'CRS');
 
-    const counts = excludingOrigemId.reduce((acc, com) => {
+    const counts = source.reduce((acc, com) => {
       const crsName = crsMap.get(com.origem_id) || `CRS ${com.origem_id}`;
       if (!acc[crsName]) {
         acc[crsName] = { name: crsName, value: 0, id: com.origem_id };
@@ -247,7 +257,7 @@ export const useComunicacaoDaeDashboardCharts = ({
     }, {} as Record<string, ChartDataItem>);
 
     return Object.values(counts).sort((a, b) => b.value - a.value);
-  }, [comunicacoesFiltradas, activeFilters.origem_tipo, activeFilters.origem_id, activeFilters.dae_id, activeFilters.municipio_id, activeFilters.municipio_residencia_id, crsMap]);
+  }, [comunicacoesFiltradas, activeFilters, dadosFiltrados, crsMap]);
 
   const dadosNhe = useMemo(() => {
     if (activeFilters.origem_tipo && activeFilters.origem_tipo !== 'NHE') {
@@ -264,16 +274,14 @@ export const useComunicacaoDaeDashboardCharts = ({
       }
     }
 
-    const excludingOrigemId = activeFilters.origem_id
-      ? comunicacoesFiltradas.filter(c =>
-          c.origem_tipo === 'NHE' &&
-          matchesDaeDashboardFilter(c, activeFilters.dae_id) &&
-          (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id) &&
-          (!activeFilters.municipio_residencia_id || c.id_municipio_residencia === activeFilters.municipio_residencia_id)
-        )
-      : comunicacoesFiltradas.filter(c => c.origem_tipo === 'NHE');
+    const source = getCrossFilterSource(
+      comunicacoesFiltradas,
+      dadosFiltrados,
+      activeFilters,
+      activeFilters.origem_id ? 'origem_id' : undefined,
+    ).filter(c => c.origem_tipo === 'NHE');
 
-    const counts = excludingOrigemId.reduce((acc, com) => {
+    const counts = source.reduce((acc, com) => {
       const nheName = nheMap.get(com.origem_id) || `NHE ${com.origem_id}`;
       if (!acc[nheName]) {
         acc[nheName] = { name: nheName, value: 0, id: com.origem_id };
@@ -283,7 +291,7 @@ export const useComunicacaoDaeDashboardCharts = ({
     }, {} as Record<string, ChartDataItem>);
 
     return Object.values(counts).sort((a, b) => b.value - a.value).slice(0, 10);
-  }, [comunicacoesFiltradas, activeFilters.origem_tipo, activeFilters.origem_id, activeFilters.dae_id, activeFilters.municipio_id, activeFilters.municipio_residencia_id, nheMap]);
+  }, [comunicacoesFiltradas, activeFilters, dadosFiltrados, nheMap]);
 
   const dadosCievs = useMemo(() => {
     if (activeFilters.origem_tipo && activeFilters.origem_tipo !== 'CIEVS') {
@@ -300,16 +308,14 @@ export const useComunicacaoDaeDashboardCharts = ({
       }
     }
 
-    const excludingOrigemId = activeFilters.origem_id
-      ? comunicacoesFiltradas.filter(c =>
-          c.origem_tipo === 'CIEVS' &&
-          matchesDaeDashboardFilter(c, activeFilters.dae_id) &&
-          (!activeFilters.municipio_id || c.id_municipio_ocorrencia === activeFilters.municipio_id) &&
-          (!activeFilters.municipio_residencia_id || c.id_municipio_residencia === activeFilters.municipio_residencia_id)
-        )
-      : comunicacoesFiltradas.filter(c => c.origem_tipo === 'CIEVS');
+    const source = getCrossFilterSource(
+      comunicacoesFiltradas,
+      dadosFiltrados,
+      activeFilters,
+      activeFilters.origem_id ? 'origem_id' : undefined,
+    ).filter(c => c.origem_tipo === 'CIEVS');
 
-    const counts = excludingOrigemId.reduce((acc, com) => {
+    const counts = source.reduce((acc, com) => {
       const cievsName = cievsMap.get(com.origem_id) || `CIEVS ${com.origem_id}`;
       if (!acc[cievsName]) {
         acc[cievsName] = { name: cievsName, value: 0, id: com.origem_id };
@@ -319,7 +325,7 @@ export const useComunicacaoDaeDashboardCharts = ({
     }, {} as Record<string, ChartDataItem>);
 
     return Object.values(counts).sort((a, b) => b.value - a.value);
-  }, [comunicacoesFiltradas, activeFilters.origem_tipo, activeFilters.origem_id, activeFilters.dae_id, activeFilters.municipio_id, activeFilters.municipio_residencia_id, cievsMap]);
+  }, [comunicacoesFiltradas, activeFilters, dadosFiltrados, cievsMap]);
 
   return {
     stats,

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ComunicacaoDae } from '@/services/ComunicacaoDaeService';
-import { matchesDaeDashboardFilter } from '@/features/comunicacao-dae/comunicacaoDaeAgravoUtils';
+import { applyDashboardCrossFilters } from '@/features/comunicacao-dae/utils/comunicacaoDaeDashboardFilterUtils';
 
 export interface ActiveFilters {
   origem_tipo: string | string[] | null;
@@ -8,6 +8,7 @@ export interface ActiveFilters {
   dae_id: number | number[] | null;
   municipio_id: number | number[] | null;
   municipio_residencia_id: number | number[] | null;
+  semana_epidemiologica: string | string[] | null;
 }
 
 export const useComunicacaoDaeDashboardFilters = (
@@ -19,6 +20,7 @@ export const useComunicacaoDaeDashboardFilters = (
     dae_id: null,
     municipio_id: null,
     municipio_residencia_id: null,
+    semana_epidemiologica: null,
   });
   const [dataInicio, setDataInicio] = useState<string>('');
   const [dataFim, setDataFim] = useState<string>('');
@@ -32,6 +34,7 @@ export const useComunicacaoDaeDashboardFilters = (
       dae_id: null,
       municipio_id: null,
       municipio_residencia_id: null,
+      semana_epidemiologica: null,
     });
     setDataInicio('');
     setDataFim('');
@@ -124,31 +127,10 @@ export const useComunicacaoDaeDashboardFilters = (
     return baseColor + '4D';
   };
 
-  const dadosFiltrados = useMemo(() => {
-    let filtered = [...comunicacoesFiltradas];
-
-    if (activeFilters.origem_tipo) {
-      filtered = filtered.filter((c) => matchesFilter(c.origem_tipo, activeFilters.origem_tipo));
-    }
-    if (activeFilters.origem_id) {
-      filtered = filtered.filter((c) => matchesFilter(c.origem_id, activeFilters.origem_id));
-    }
-    if (activeFilters.dae_id) {
-      filtered = filtered.filter((c) => matchesDaeDashboardFilter(c, activeFilters.dae_id));
-    }
-    if (activeFilters.municipio_id) {
-      filtered = filtered.filter((c) =>
-        matchesFilter(c.id_municipio_ocorrencia, activeFilters.municipio_id)
-      );
-    }
-    if (activeFilters.municipio_residencia_id) {
-      filtered = filtered.filter((c) =>
-        matchesFilter(c.id_municipio_residencia, activeFilters.municipio_residencia_id)
-      );
-    }
-
-    return filtered;
-  }, [comunicacoesFiltradas, activeFilters]);
+  const dadosFiltrados = useMemo(
+    () => applyDashboardCrossFilters(comunicacoesFiltradas, activeFilters),
+    [comunicacoesFiltradas, activeFilters],
+  );
 
   const toggleFilter = useCallback(
     (filterKey: keyof ActiveFilters, value: any, multiSelect = false) => {

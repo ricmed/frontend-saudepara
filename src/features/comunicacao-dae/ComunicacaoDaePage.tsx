@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Plus, FileText, Calendar, Filter, X, Trash2, Edit, Eye, Menu, Download, ChevronDown, Search, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, Wifi, WifiOff, BarChart2, Archive, ArchiveRestore } from 'lucide-react';
+import { Plus, FileText, Calendar, Filter, X, Trash2, Edit, Eye, Menu, Download, ChevronDown, Search, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, Wifi, WifiOff, BarChart2, Archive, ArchiveRestore, CheckSquare, Square, Loader2 } from 'lucide-react';
 import ComunicacaoDaeService, {
   ComunicacaoDae,
   ComunicacaoDaeFilters,
@@ -118,6 +118,11 @@ const ComunicacaoDaePage: React.FC = () => {
   const [statusLeituraFilter, setStatusLeituraFilter] = useState<StatusLeituraFiltro>('todas');
   const [visibilidadeFilter, setVisibilidadeFilter] = useState<VisibilidadeArquivamentoFiltro>('ativas');
   const { resumo: leituraResumo } = useComunicacaoDaeLeituraResumo();
+
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const selectAllPageRef = useRef<HTMLInputElement>(null);
 
   const { columnWidths, totalWidth, startResize } = useResizableTableColumns(
     tableContainerRef,
@@ -316,12 +321,26 @@ const ComunicacaoDaePage: React.FC = () => {
 
   const isComunicacaoNaoLida = (comunicacao: ComunicacaoDae) => comunicacao.lida === false;
 
+  const getComunicacaoId = (comunicacao: ComunicacaoDae) => Number(comunicacao.id_comunicacao);
+
+  const isComunicacaoArquivada = (comunicacao: ComunicacaoDae) => {
+    if (comunicacao.arquivada === true) return true;
+    if (comunicacao.arquivada === false) return false;
+    return visibilidadeFilter === 'arquivadas';
+  };
+
+  const isComunicacaoAtiva = (comunicacao: ComunicacaoDae) => !isComunicacaoArquivada(comunicacao);
+
   const getLinhaClasses = (comunicacao: ComunicacaoDae, index: number) => {
-    const cursor = 'cursor-pointer';
+    const id = getComunicacaoId(comunicacao);
+    const isSelected = selectedIds.has(id);
+    const cursor = isSelectionMode ? 'cursor-pointer' : 'cursor-pointer';
+    const selectedClass = isSelected ? 'ring-2 ring-inset ring-blue-400 bg-blue-50/80' : '';
+
     if (isComunicacaoNaoLida(comunicacao)) {
-      return `${cursor} bg-sky-50/90 hover:bg-sky-100/80 border-l-4 border-l-blue-500`;
+      return `${cursor} ${selectedClass} bg-sky-50/90 hover:bg-sky-100/80 border-l-4 border-l-blue-500`;
     }
-    return `${cursor} transition-colors duration-150 hover:bg-blue-50/50 ${
+    return `${cursor} ${selectedClass} transition-colors duration-150 hover:bg-blue-50/50 ${
       index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
     }`;
   };
@@ -332,7 +351,7 @@ const ComunicacaoDaePage: React.FC = () => {
   ) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      handleVisualizar(id);
+      handleRowActivation(id);
     }
   };
 
@@ -405,6 +424,178 @@ const ComunicacaoDaePage: React.FC = () => {
       alert(err.response?.data?.message || 'Erro ao excluir comunicação');
     }
   };
+
+  const pageComunicacaoIds = sortedComunicacoes.map(getComunicacaoId);
+  const selectedCount = selectedIds.size;
+  const selectedOnPageCount = pageComunicacaoIds.filter((id) => selectedIds.has(id)).length;
+  const allPageSelected = pageComunicacaoIds.length > 0 && selectedOnPageCount === pageComunicacaoIds.length;
+  const somePageSelected = selectedOnPageCount > 0 && !allPageSelected;
+
+  const selectedComunicacoes = sortedComunicacoes.filter((c) => selectedIds.has(getComunicacaoId(c)));
+  const selectedArquivaveisCount = selectedComunicacoes.filter(isComunicacaoAtiva).length;
+  const selectedArquivadasCount = selectedComunicacoes.filter(isComunicacaoArquivada).length;
+
+  useEffect(() => {
+    const el = selectAllPageRef.current;
+    if (el) {
+      el.indeterminate = somePageSelected;
+    }
+  }, [somePageSelected]);
+
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      const visible = new Set(pageComunicacaoIds);
+      const next = new Set([...prev].filter((id) => visible.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [pageComunicacaoIds.join(',')]);
+
+  const toggleSelectionMode = () => {
+    setIsSelectionMode((prev) => {
+      if (prev) {
+        setSelectedIds(new Set());
+      }
+      return !prev;
+    });
+  };
+
+  const toggleSelectedId = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleSelectAllPage = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) {
+        pageComunicacaoIds.forEach((id) => next.delete(id));
+      } else {
+        pageComunicacaoIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleRowActivation = (id: number) => {
+    if (isSelectionMode) {
+      toggleSelectedId(id);
+      return;
+    }
+    handleVisualizar(id);
+  };
+
+  const runBulkAction = async (
+    ids: number[],
+    action: (id: number) => Promise<void>,
+    actionLabel: string,
+  ) => {
+    if (ids.length === 0) return;
+
+    setBulkActionLoading(true);
+    setError(null);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const id of ids) {
+      try {
+        await action(id);
+        successCount += 1;
+      } catch {
+        failCount += 1;
+      }
+    }
+
+    setBulkActionLoading(false);
+    setSelectedIds(new Set());
+    loadComunicacoes();
+
+    if (failCount > 0) {
+      setError(
+        `${successCount} comunicação(ões) ${actionLabel} com sucesso. ${failCount} falharam.`,
+      );
+    }
+  };
+
+  const handleBulkArquivar = async () => {
+    if (!isOnline) {
+      setError('Arquivar comunicações requer conexão com o servidor.');
+      return;
+    }
+
+    const ids = selectedComunicacoes
+      .filter(isComunicacaoAtiva)
+      .map(getComunicacaoId);
+
+    if (ids.length === 0) return;
+
+    if (
+      !confirm(
+        `Arquivar ${ids.length} comunicação(ões)? Elas sairão da sua lista de ativas, mas poderão ser consultadas depois.`,
+      )
+    ) {
+      return;
+    }
+
+    await runBulkAction(ids, (id) => ComunicacaoDaeService.arquivar(id).then(() => undefined), 'arquivada(s)');
+  };
+
+  const handleBulkDesarquivar = async () => {
+    if (!isOnline) {
+      setError('Desarquivar comunicações requer conexão com o servidor.');
+      return;
+    }
+
+    const ids = selectedComunicacoes
+      .filter(isComunicacaoArquivada)
+      .map(getComunicacaoId);
+
+    if (ids.length === 0) return;
+
+    if (
+      !confirm(
+        `Desarquivar ${ids.length} comunicação(ões)? Elas voltarão para sua lista de ativas.`,
+      )
+    ) {
+      return;
+    }
+
+    await runBulkAction(
+      ids,
+      (id) => ComunicacaoDaeService.desarquivar(id).then(() => undefined),
+      'desarquivada(s)',
+    );
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+
+    if (!confirm(`Tem certeza que deseja excluir ${ids.length} comunicação(ões)?`)) return;
+
+    await runBulkAction(ids, (id) => ComunicacaoDaeService.delete(id), 'excluída(s)');
+  };
+
+  const renderSelectionCheckbox = (id: number, className = '') => (
+    <input
+      type="checkbox"
+      checked={selectedIds.has(id)}
+      onChange={() => toggleSelectedId(id)}
+      onClick={pararPropagacaoAcao}
+      onKeyDown={pararPropagacaoAcao}
+      aria-label={`Selecionar comunicação ${id}`}
+      className={`h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer ${className}`}
+    />
+  );
 
   const handleApplyFilters = () => {
     setFilters(tempFilters);
@@ -800,6 +991,21 @@ const ComunicacaoDaePage: React.FC = () => {
                 )}
                 <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showFilters ? 'rotate-180' : ''}`} />
               </button>
+
+              <button
+                type="button"
+                onClick={toggleSelectionMode}
+                disabled={bulkActionLoading || sortedComunicacoes.length === 0}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isSelectionMode
+                    ? 'bg-white text-blue-700 ring-2 ring-white/80'
+                    : 'bg-blue-500 text-white hover:bg-blue-700'
+                }`}
+                title={isSelectionMode ? 'Sair do modo de seleção' : 'Selecionar várias comunicações'}
+              >
+                {isSelectionMode ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                <span className="font-medium">{isSelectionMode ? 'Cancelar seleção' : 'Selecionar'}</span>
+              </button>
               <div
                 className="inline-flex rounded-lg overflow-hidden border border-blue-400/60 bg-blue-500/30"
                 role="group"
@@ -1063,25 +1269,88 @@ const ComunicacaoDaePage: React.FC = () => {
           </div>
         ) : (
           <>
+            {isSelectionMode && (
+              <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+                <span className="text-sm font-medium text-blue-900">
+                  {selectedCount === 0
+                    ? 'Marque os itens ou use o quadrado no cabeçalho para selecionar todos desta página.'
+                    : `${selectedCount} selecionado(s) nesta página`}
+                </span>
+
+                {selectedCount > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 ml-auto">
+                    {selectedArquivaveisCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleBulkArquivar}
+                        disabled={bulkActionLoading || !isOnline}
+                        className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-slate-600 text-white hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {bulkActionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
+                        Arquivar ({selectedArquivaveisCount})
+                      </button>
+                    )}
+                    {selectedArquivadasCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleBulkDesarquivar}
+                        disabled={bulkActionLoading || !isOnline}
+                        className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {bulkActionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArchiveRestore className="w-4 h-4" />}
+                        Desarquivar ({selectedArquivadasCount})
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleBulkDelete}
+                      disabled={bulkActionLoading}
+                      className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {bulkActionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                      Excluir ({selectedCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={clearSelection}
+                      disabled={bulkActionLoading}
+                      className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Limpar seleção
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Tabela de Comunicações */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200/60 overflow-hidden md:overflow-visible">
               {/* Mobile: Cards */}
               <div className="block md:hidden divide-y divide-gray-100">
-                {sortedComunicacoes.map((comunicacao) => (
+                {sortedComunicacoes.map((comunicacao) => {
+                  const comunicacaoId = getComunicacaoId(comunicacao);
+                  return (
                   <div
                     key={comunicacao.id_comunicacao}
                     role="button"
                     tabIndex={0}
-                    title="Clique para abrir a ficha"
+                    title={isSelectionMode ? 'Clique para selecionar' : 'Clique para abrir a ficha'}
                     className={`p-4 cursor-pointer ${
+                      selectedIds.has(comunicacaoId) ? 'ring-2 ring-inset ring-blue-400 bg-blue-50/80' : ''
+                    } ${
                       isComunicacaoNaoLida(comunicacao)
                         ? 'bg-sky-50 border-l-4 border-l-blue-500 hover:bg-sky-100/80'
                         : 'hover:bg-blue-50/50'
                     }`}
-                    onClick={() => handleVisualizar(Number(comunicacao.id_comunicacao))}
-                    onKeyDown={(e) => handleLinhaKeyDown(e, Number(comunicacao.id_comunicacao))}
+                    onClick={() => handleRowActivation(comunicacaoId)}
+                    onKeyDown={(e) => handleLinhaKeyDown(e, comunicacaoId)}
                   >
                     <div className="flex items-start justify-between gap-3">
+                      {isSelectionMode && (
+                        <div className="pt-1 shrink-0" onClick={pararPropagacaoAcao} onKeyDown={pararPropagacaoAcao}>
+                          {renderSelectionCheckbox(comunicacaoId)}
+                        </div>
+                      )}
                       <div className="min-w-0 flex-1 pointer-events-none">
                         <div className="flex items-center gap-2 mb-2">
                           {isComunicacaoNaoLida(comunicacao) && (
@@ -1172,22 +1441,36 @@ const ComunicacaoDaePage: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Desktop: Tabela com colunas redimensionáveis */}
               <div ref={tableContainerRef} className="hidden md:block w-full overflow-x-auto">
                 <table
                   className="table-fixed divide-y divide-gray-200"
-                  style={{ width: totalWidth, minWidth: '100%' }}
+                  style={{ width: isSelectionMode ? totalWidth + 44 : totalWidth, minWidth: '100%' }}
                 >
                   <colgroup>
+                    {isSelectionMode && <col style={{ width: 44 }} />}
                     {DAE_TABLE_COLUMN_ORDER.map((colId) => (
                       <col key={colId} style={{ width: columnWidths[colId] }} />
                     ))}
                   </colgroup>
                   <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                     <tr>
+                      {isSelectionMode && (
+                        <th className="w-11 px-2 py-3 text-center align-middle">
+                          <input
+                            ref={selectAllPageRef}
+                            type="checkbox"
+                            checked={allPageSelected}
+                            onChange={handleToggleSelectAllPage}
+                            aria-label="Selecionar todos desta página"
+                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          />
+                        </th>
+                      )}
                       {renderSortableHeader('id_comunicacao', 'Nº', 'id_comunicacao', { title: 'Nº Comunicação' })}
                       {renderSortableHeader('data_comunicacao', 'Data', 'data_comunicacao')}
                       {renderSortableHeader('semana_epidemiologica', 'SE', 'semana_epidemiologica', {
@@ -1224,6 +1507,7 @@ const ComunicacaoDaePage: React.FC = () => {
                       const municipioNome = comunicacao.tipo_municipio?.descricao || '-';
                       const se = calcularSemanaEpidemiologica(comunicacao.data_comunicacao);
                       const seLabel = se ? `SE ${se.semana.toString().padStart(2, '0')}/${se.ano}` : '-';
+                      const comunicacaoId = getComunicacaoId(comunicacao);
 
                       return (
                       <tr 
@@ -1231,10 +1515,19 @@ const ComunicacaoDaePage: React.FC = () => {
                         className={getLinhaClasses(comunicacao, index)}
                         role="button"
                         tabIndex={0}
-                        title="Clique para abrir a ficha"
-                        onClick={() => handleVisualizar(Number(comunicacao.id_comunicacao))}
-                        onKeyDown={(e) => handleLinhaKeyDown(e, Number(comunicacao.id_comunicacao))}
+                        title={isSelectionMode ? 'Clique para selecionar' : 'Clique para abrir a ficha'}
+                        onClick={() => handleRowActivation(comunicacaoId)}
+                        onKeyDown={(e) => handleLinhaKeyDown(e, comunicacaoId)}
                       >
+                        {isSelectionMode && (
+                          <td
+                            className="px-2 py-3 align-middle w-11"
+                            onClick={pararPropagacaoAcao}
+                            onKeyDown={pararPropagacaoAcao}
+                          >
+                            {renderSelectionCheckbox(comunicacaoId)}
+                          </td>
+                        )}
                         <td className={tdClass} style={{ width: columnWidths.id_comunicacao }}>
                           <div className="flex items-center gap-1 min-w-0">
                             {isComunicacaoNaoLida(comunicacao) && (
