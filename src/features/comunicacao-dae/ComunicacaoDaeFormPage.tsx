@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { 
   Save, 
   X, 
@@ -16,6 +16,7 @@ import {
   Wifi,
   WifiOff,
   ArchiveRestore,
+  Pencil,
 } from 'lucide-react';
 import axios from '@/utils/axiosRetry';
 import ComunicacaoDaeService, {
@@ -92,8 +93,11 @@ const getComunicacaoDaeSaveAlert = (
 
 const ComunicacaoDaeFormPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams<{ id: string }>();
-  const isEditMode = !!id;
+  const isEditMode = Boolean(id);
+  const isEditRoute = location.pathname.includes('/editar/');
+  const isViewMode = isEditMode && !isEditRoute;
   const { user, loading: authLoading } = useAuth();
 
   // ✅ Hook do sistema offline
@@ -125,6 +129,8 @@ const ComunicacaoDaeFormPage: React.FC = () => {
   // Dados adicionais para exibição
   const [comunicacaoCompleta, setComunicacaoCompleta] = useState<ComunicacaoDae | null>(null);
   const isArquivada = Boolean(comunicacaoCompleta?.arquivada);
+  const isReadOnlyForm = isViewMode || isArquivada;
+  const canEditForm = !isReadOnlyForm;
 
   // Listas para selects
   const [daes, setDaes] = useState<Dae[]>([]);
@@ -476,8 +482,12 @@ const ComunicacaoDaeFormPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (isArquivada) {
-      setError('Comunicação arquivada. Desarquive para editar.');
+    if (isReadOnlyForm) {
+      if (isViewMode) {
+        setError('Modo visualização. Use o botão Editar para alterar esta comunicação.');
+      } else if (isArquivada) {
+        setError('Comunicação arquivada. Desarquive para editar.');
+      }
       return;
     }
     
@@ -618,6 +628,8 @@ const ComunicacaoDaeFormPage: React.FC = () => {
   };
 
   const handleAddAnexo = async (tipo: TipoAnexo, file: File) => {
+    if (isReadOnlyForm) return;
+
     // Calcular total de arquivos já adicionados
     const totalArquivos = isEditMode 
       ? anexos.length 
@@ -682,6 +694,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
   };
 
   const handleRemoveAnexo = async (anexoId: number) => {
+    if (isReadOnlyForm) return;
     if (!confirm('Tem certeza que deseja remover este anexo?')) return;
 
     try {
@@ -894,6 +907,9 @@ const ComunicacaoDaeFormPage: React.FC = () => {
   const labelClass = "block mb-2 font-medium text-gray-700 text-sm";
   const inputClass = "w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-all hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none";
   const selectClass = "w-full p-3 border border-gray-200 rounded-lg text-sm bg-white transition-all hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none cursor-pointer";
+  const readOnlyFieldClass = "w-full p-3 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-700 outline-none cursor-not-allowed";
+  const fieldInputClass = isReadOnlyForm ? readOnlyFieldClass : inputClass;
+  const fieldSelectClass = isReadOnlyForm ? readOnlyFieldClass : selectClass;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -921,7 +937,11 @@ const ComunicacaoDaeFormPage: React.FC = () => {
             <div className="flex flex-col flex-1 truncate">
               <div className="flex items-center gap-2">
                 <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-white truncate flex-1">
-                  {isEditMode ? 'Editar Comunicação DAE' : 'Nova Comunicação DAE'}
+                  {isViewMode
+                    ? 'Visualizar Comunicação DAE'
+                    : isEditMode
+                      ? 'Editar Comunicação DAE'
+                      : 'Nova Comunicação DAE'}
                 </h1>
                 {/* Indicador Online/Offline */}
                 {isOnline ? (
@@ -944,7 +964,19 @@ const ComunicacaoDaeFormPage: React.FC = () => {
 
           {/* Linha 2: Botões de Ação */}
           <div className="flex items-center justify-end gap-2 flex-wrap">
-            {!isArquivada ? (
+            {isViewMode && !isArquivada && (
+              <button
+                type="button"
+                onClick={() => navigate(`/private/comunicacao-dae/editar/${id}`)}
+                className="p-2 sm:w-auto sm:inline-flex sm:items-center sm:justify-center sm:gap-2 sm:px-4 sm:py-2 bg-white text-blue-700 rounded-md hover:bg-blue-50 transition-colors shadow-sm border border-transparent"
+                title="Editar"
+              >
+                <Pencil className="h-4 w-4" />
+                <span className="hidden sm:inline">Editar</span>
+              </button>
+            )}
+
+            {canEditForm ? (
               <button
                 type="submit"
                 form="comunicacao-form"
@@ -959,7 +991,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                 )}
                 <span className="hidden sm:inline">{isEditMode ? 'Atualizar' : 'Salvar'}</span>
               </button>
-            ) : (
+            ) : isArquivada ? (
               <button
                 type="button"
                 onClick={handleDesarquivar}
@@ -970,7 +1002,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                 <ArchiveRestore className="h-4 w-4" />
                 <span className="hidden sm:inline">Desarquivar</span>
               </button>
-            )}
+            ) : null}
 
             <div ref={exportMenuRef} className="relative">
               <button
@@ -1017,15 +1049,17 @@ const ComunicacaoDaeFormPage: React.FC = () => {
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={handleClearForm}
-              className="p-2 sm:w-auto sm:inline-flex sm:items-center sm:justify-center sm:gap-2 sm:px-4 sm:py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
-              title="Limpar Formulário"
-            >
-              <Trash2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Limpar</span>
-            </button>
+            {!isEditMode && (
+              <button
+                type="button"
+                onClick={handleClearForm}
+                className="p-2 sm:w-auto sm:inline-flex sm:items-center sm:justify-center sm:gap-2 sm:px-4 sm:py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+                title="Limpar Formulário"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Limpar</span>
+              </button>
+            )}
             
             <button
               type="button"
@@ -1087,6 +1121,12 @@ const ComunicacaoDaeFormPage: React.FC = () => {
         )}
 
         <form id="comunicacao-form" onSubmit={handleSubmit} className="space-y-6">
+          {isViewMode && !isArquivada && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800">
+              Modo visualização. Os campos estão bloqueados para leitura. Use o botão <strong>Editar</strong> para alterar.
+            </div>
+          )}
+
           {isArquivada && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               Esta comunicação está arquivada na sua visão. Você pode visualizar e exportar, mas precisa desarquivar para editar.
@@ -1129,8 +1169,8 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                       origem_id: 0
                     });
                   }}
-                  className={selectClass}
-                  disabled={shouldLockOrigemFields}
+                  className={fieldSelectClass}
+                  disabled={isReadOnlyForm || shouldLockOrigemFields}
                   required
                 >
                   {origemTipoOptions
@@ -1161,7 +1201,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                   onChange={(value) => setFormData({ ...formData, origem_id: Number(value) })}
                   placeholder="Selecione a unidade..."
                   required
-                  disabled={shouldLockOrigemFields}
+                  disabled={isReadOnlyForm || shouldLockOrigemFields}
                   searchPlaceholder="Digite o nome ou código da unidade..."
                   emptyMessage="Nenhuma unidade encontrada"
                 />
@@ -1182,7 +1222,8 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                   type="datetime-local"
                   value={formData.data_comunicacao}
                   onChange={(e) => setFormData({ ...formData, data_comunicacao: e.target.value })}
-                  className={inputClass}
+                  className={fieldInputClass}
+                  readOnly={isReadOnlyForm}
                   required
                 />
               </div>
@@ -1214,11 +1255,11 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                     setMunicipioOcorrencia(''); // Limpar município ao trocar UF
                   }}
                   placeholder="Selecione a UF"
-                  disabled={false}
+                  disabled={isReadOnlyForm}
                   apiEndpoint="api/tipo-estado"
                   idField="idtipo_estado"
                   required
-                  className={inputClass}
+                  className={fieldInputClass}
                 />
                 <p className="mt-1.5 text-xs text-gray-500">Estado onde ocorreu o evento</p>
               </div>
@@ -1239,12 +1280,12 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                         ? "Selecione o município"
                         : "Primeiro selecione a UF"
                   }
-                  disabled={!ufOcorrencia || isLoadingMunicipios}
+                  disabled={isReadOnlyForm || !ufOcorrencia || isLoadingMunicipios}
                   apiEndpoint="api/tipo-municipio"
                   idField="idtipo_municipio"
                   parentValue={ufOcorrencia}
                   required
-                  className={inputClass}
+                  className={fieldInputClass}
                   debug={true}
                 />
                 <p className="mt-1.5 text-xs text-gray-500">Município onde ocorreu o evento que está sendo comunicado</p>
@@ -1261,11 +1302,11 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                     setMunicipioResidencia(''); // Limpar município ao trocar UF
                   }}
                   placeholder="Selecione a UF"
-                  disabled={false}
+                  disabled={isReadOnlyForm}
                   apiEndpoint="api/tipo-estado"
                   idField="idtipo_estado"
                   required
-                  className={inputClass}
+                  className={fieldInputClass}
                 />
                 <p className="mt-1.5 text-xs text-gray-500">Estado de residência do paciente</p>
               </div>
@@ -1286,12 +1327,12 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                         ? "Selecione o município"
                         : "Primeiro selecione a UF"
                   }
-                  disabled={!ufResidencia || isLoadingMunicipios}
+                  disabled={isReadOnlyForm || !ufResidencia || isLoadingMunicipios}
                   apiEndpoint="api/tipo-municipio"
                   idField="idtipo_municipio"
                   parentValue={ufResidencia}
                   required
-                  className={inputClass}
+                  className={fieldInputClass}
                   debug={true}
                 />
                 <p className="mt-1.5 text-xs text-gray-500">Município de residência do paciente</p>
@@ -1330,7 +1371,8 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                   type="text"
                   value={formData.nome_paciente}
                   onChange={(e) => setFormData({ ...formData, nome_paciente: normalizeText(e.target.value) })}
-                  className={inputClass}
+                  className={fieldInputClass}
+                  readOnly={isReadOnlyForm}
                   placeholder="Ex: JOAO DA SILVA SANTOS"
                   maxLength={150}
                   required
@@ -1347,6 +1389,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                   daes={daes}
                   selectedDaeIds={formData.id_daes || []}
                   pinSelectedToTop={isEditMode}
+                  disabled={isReadOnlyForm}
                   onChange={(daeIds) => {
                     setFormData({ ...formData, id_daes: daeIds });
                     setError(null);
@@ -1365,7 +1408,12 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                   id="observacao_descricao"
                   value={formData.observacao_descricao}
                   onChange={(e) => setFormData({ ...formData, observacao_descricao: normalizeText(e.target.value) })}
-                  className="w-full min-h-[120px] p-3 border border-gray-200 rounded-lg text-sm bg-white transition-all hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none resize-y"
+                  className={`w-full min-h-[120px] p-3 border border-gray-200 rounded-lg text-sm transition-all outline-none resize-y ${
+                    isReadOnlyForm
+                      ? 'bg-gray-50 text-gray-700 cursor-not-allowed'
+                      : 'bg-white hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                  }`}
+                  readOnly={isReadOnlyForm}
                   rows={5}
                   placeholder="DESCREVA DETALHADAMENTE: SINTOMAS, EVOLUCAO DO CASO, MEDIDAS TOMADAS, CONTEXTO EPIDEMIOLOGICO, ETC."
                   maxLength={4000}
@@ -1391,7 +1439,8 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                     type="text"
                     value={formData.digitador || ''}
                     onChange={(e) => setFormData({ ...formData, digitador: normalizeText(e.target.value) })}
-                    className={inputClass}
+                    className={fieldInputClass}
+                    readOnly={isReadOnlyForm}
                     placeholder="Ex: MARIA OLIVEIRA SANTOS"
                     maxLength={150}
                   />
@@ -1435,7 +1484,8 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                       
                       setFormData({ ...formData, telefone_digitador: value });
                     }}
-                    className={inputClass}
+                    className={fieldInputClass}
+                    readOnly={isReadOnlyForm}
                     placeholder="(91) 98765-4321"
                     maxLength={15}
                   />
@@ -1574,14 +1624,16 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                         >
                           <Download className="w-4 h-4" />
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveAnexo(anexo.id_anexo)}
-                          className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
-                          title="Remover"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {!isReadOnlyForm && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAnexo(anexo.id_anexo)}
+                            className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
+                            title="Remover"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1611,18 +1663,20 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                 </div>
 
                 {/* Botão + para adicionar mais arquivos */}
-                <FileUploadWithCompression
-                  label="+ Adicionar arquivo"
-                  file={null}
-                  onFileSelect={(file) => {
-                    if (file) {
-                      handleAddAnexo('FICHA_NOTIFICACAO', file);
-                    }
-                  }}
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.heic"
-                  maxSizeMB={2}
-                  disabled={uploadingAnexo}
-                />
+                {!isReadOnlyForm && (
+                  <FileUploadWithCompression
+                    label="+ Adicionar arquivo"
+                    file={null}
+                    onFileSelect={(file) => {
+                      if (file) {
+                        handleAddAnexo('FICHA_NOTIFICACAO', file);
+                      }
+                    }}
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.heic"
+                    maxSizeMB={2}
+                    disabled={uploadingAnexo}
+                  />
+                )}
               </div>
 
               {/* Anexo 2: Relatório */}
@@ -1656,14 +1710,16 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                         >
                           <Download className="w-4 h-4" />
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveAnexo(anexo.id_anexo)}
-                          className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
-                          title="Remover"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {!isReadOnlyForm && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAnexo(anexo.id_anexo)}
+                            className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
+                            title="Remover"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1693,18 +1749,20 @@ const ComunicacaoDaeFormPage: React.FC = () => {
                 </div>
 
                 {/* Botão + para adicionar mais arquivos */}
-                <FileUploadWithCompression
-                  label="+ Adicionar arquivo"
-                  file={null}
-                  onFileSelect={(file) => {
-                    if (file) {
-                      handleAddAnexo('RELATORIO_INVESTIGACAO', file);
-                    }
-                  }}
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.heic"
-                  maxSizeMB={2}
-                  disabled={uploadingAnexo}
-                />
+                {!isReadOnlyForm && (
+                  <FileUploadWithCompression
+                    label="+ Adicionar arquivo"
+                    file={null}
+                    onFileSelect={(file) => {
+                      if (file) {
+                        handleAddAnexo('RELATORIO_INVESTIGACAO', file);
+                      }
+                    }}
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.heic"
+                    maxSizeMB={2}
+                    disabled={uploadingAnexo}
+                  />
+                )}
               </div>
             </div>
 
@@ -1721,7 +1779,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
 
           {/* Rodapé com botões de ação CENTRALIZADOS */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 pt-6 border-t border-gray-200 mt-8 mb-8">
-            {!isArquivada && (
+            {canEditForm && (
               <button
                 type="submit"
                 disabled={loading || uploadingAnexo}
@@ -1741,7 +1799,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
               </button>
             )}
 
-            {!isArquivada && (
+            {canEditForm && !isEditMode && (
               <button
                 type="button"
                 onClick={handleClearForm}
@@ -1749,6 +1807,17 @@ const ComunicacaoDaeFormPage: React.FC = () => {
               >
                 <Trash2 className="w-5 h-5 mr-2" />
                 Limpar
+              </button>
+            )}
+
+            {isViewMode && !isArquivada && (
+              <button
+                type="button"
+                onClick={() => navigate(`/private/comunicacao-dae/editar/${id}`)}
+                className="inline-flex items-center px-6 py-2.5 border border-transparent text-base font-medium rounded-md text-white bg-slate-600 hover:bg-slate-700 shadow-sm min-w-[120px] justify-center w-full sm:w-auto"
+              >
+                <Pencil className="w-5 h-5 mr-2" />
+                Editar
               </button>
             )}
 

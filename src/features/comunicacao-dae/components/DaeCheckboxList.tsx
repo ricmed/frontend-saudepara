@@ -8,6 +8,7 @@ interface DaeCheckboxListProps {
   selectedDaeIds: number[];
   onChange: (daeIds: number[]) => void;
   error?: string;
+  disabled?: boolean;
   /** No modo edição, mantém os agravos já selecionados no topo da lista para não precisar rolar. */
   pinSelectedToTop?: boolean;
 }
@@ -17,6 +18,7 @@ const DaeCheckboxList: React.FC<DaeCheckboxListProps> = ({
   selectedDaeIds,
   onChange,
   error,
+  disabled = false,
   pinSelectedToTop = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,6 +51,7 @@ const DaeCheckboxList: React.FC<DaeCheckboxListProps> = ({
   }, [daes, searchTerm, selectedDaeIds, pinSelectedToTop]);
 
   const toggleDae = (id: number) => {
+    if (disabled) return;
     const next = new Set(selectedSet);
     if (next.has(id)) {
       next.delete(id);
@@ -84,7 +87,10 @@ const DaeCheckboxList: React.FC<DaeCheckboxListProps> = ({
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="Buscar por nome ou código CID..."
-          className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm"
+          disabled={disabled}
+          className={`w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm ${
+            disabled ? 'bg-gray-50 cursor-not-allowed' : ''
+          }`}
         />
         {searchTerm && (
           <button
@@ -115,7 +121,12 @@ const DaeCheckboxList: React.FC<DaeCheckboxListProps> = ({
               <label
                 key={dae.id_dae}
                 className={`
-                  flex items-start gap-3 p-5 rounded-xl cursor-pointer transition-all duration-200 min-h-[100px]
+                  flex items-start gap-3 p-5 rounded-xl transition-all duration-200 min-h-[100px]
+                  ${
+                    disabled
+                      ? 'cursor-not-allowed opacity-90'
+                      : 'cursor-pointer'
+                  }
                   ${
                     isSelected
                       ? 'bg-blue-50 border-2 border-blue-500 shadow-md scale-[1.02]'
@@ -128,7 +139,8 @@ const DaeCheckboxList: React.FC<DaeCheckboxListProps> = ({
                     type="checkbox"
                     checked={isSelected}
                     onChange={() => toggleDae(dae.id_dae)}
-                    className="w-5 h-5 rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer"
+                    disabled={disabled}
+                    className="w-5 h-5 rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 transition-all cursor-pointer disabled:cursor-not-allowed"
                   />
                 </div>
 
