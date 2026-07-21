@@ -4,15 +4,57 @@ import Footer from "@/features/desktop/components/Footer";
 import { SideMenu } from "@/features/home/components/SideMenu";
 import { useNavigate } from "react-router-dom";
 import { Language } from "@/i18n/types";
-import { Info, Calendar, Code, Users, Shield, ArrowLeft } from "lucide-react";
+import { Info, Calendar, Code, Users, Shield, ArrowLeft, Layers } from "lucide-react";
+
+type ProductWave = {
+  version: string;
+  title: string;
+  period: string;
+  highlights: string[];
+  current?: boolean;
+};
+
+const PRODUCT_WAVES: ProductWave[] = [
+  {
+    version: "1.0",
+    title: "Eventos de massa",
+    period: "Jun–nov/2025 · COP 30 (03–25/11/2025)",
+    highlights: [
+      "Comunicação de caso (ficha clássica) e pacientes",
+      "Estabelecimentos, portal, campanhas e mapas",
+      "Dashboard Cirio, admin hierárquico e PWA/offline",
+    ],
+  },
+  {
+    version: "2.0",
+    title: "Comunicação DAE",
+    period: "A partir de jan/2026 (pós-COP 30)",
+    highlights: [
+      "Comunicação DAE com anexos e dashboard",
+      "Cadastros DAE, NHE, CIEVS e CRS",
+      "Evoluções: leitura, arquivamento e abrangência",
+    ],
+  },
+  {
+    version: "3.0",
+    title: "Formulários dinâmicos",
+    period: "A partir de jan/2026 · linha atual",
+    highlights: [
+      "Builder, versões, respostas e link público",
+      "ACL, escopo hierárquico e sync offline",
+      "Autenticação interna e categorias SESPA",
+    ],
+    current: true,
+  },
+];
 
 const VersionPage: React.FC = () => {
   const [selectedLanguage] = React.useState<Language>("pt-BR");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const navigate = useNavigate();
 
-  const appVersion = "1.0.0";
-  const releaseDate = "2025-10-08";
+  const appVersion = "3.0.0";
+  const originalReleaseDate = "2025-10-08";
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 via-white to-blue-50">
@@ -53,7 +95,7 @@ const VersionPage: React.FC = () => {
               App Saúde Pará
             </h1>
             <p className="text-xl text-gray-600 mb-2">
-              Sistema de Comunicação de Casos para Eventos de Massa
+              Comunicação de casos, DAE e formulários dinâmicos
             </p>
             <div className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-full shadow-lg">
               <Code className="h-5 w-5" />
@@ -73,7 +115,13 @@ const VersionPage: React.FC = () => {
                   </h2>
                   <div className="space-y-2 text-gray-600">
                     <p>
-                      <span className="font-medium">Versão:</span> {appVersion}
+                      <span className="font-medium">Versão atual:</span> {appVersion}
+                    </p>
+                    <p>
+                      <span className="font-medium">Onda de produto:</span> Formulários dinâmicos
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Inclui as capacidades das versões 1.0 e 2.0 no mesmo aplicativo.
                     </p>
                   </div>
                 </div>
@@ -87,16 +135,19 @@ const VersionPage: React.FC = () => {
                 </div>
                 <div className="flex-1">
                   <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                    Data de Lançamento
+                    Datas
                   </h2>
                   <div className="space-y-2 text-gray-600">
                     <p>
-                      <span className="font-medium">Lançamento:</span>{" "}
-                      {new Date(releaseDate).toLocaleDateString("pt-BR", {
+                      <span className="font-medium">Lançamento 1.0:</span>{" "}
+                      {new Date(originalReleaseDate).toLocaleDateString("pt-BR", {
                         day: "2-digit",
                         month: "long",
                         year: "numeric",
                       })}
+                    </p>
+                    <p>
+                      <span className="font-medium">COP 30:</span> 03 a 25 de novembro de 2025
                     </p>
                     <p>
                       <span className="font-medium">Status:</span>{" "}
@@ -121,23 +172,23 @@ const VersionPage: React.FC = () => {
                   <ul className="space-y-2 text-gray-600 text-sm">
                     <li className="flex items-center gap-2">
                       <span className="text-green-500">✓</span>
-                      <span>Sistema de comunicação de casos de saúde pública</span>
+                      <span>Comunicação de caso e modo offline (PWA)</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="text-green-500">✓</span>
-                      <span>Gestão de estabelecimentos</span>
+                      <span>Comunicação DAE (NHE, CIEVS e CRS)</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="text-green-500">✓</span>
-                      <span>Dashboard analítico</span>
+                      <span>Formulários dinâmicos com link público</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="text-green-500">✓</span>
-                      <span>Modo offline</span>
+                      <span>Dashboard, estabelecimentos e mapas</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="text-green-500">✓</span>
-                      <span>Integração Keycloak</span>
+                      <span>Administração hierárquica de usuários</span>
                     </li>
                   </ul>
                 </div>
@@ -156,15 +207,15 @@ const VersionPage: React.FC = () => {
                   <ul className="space-y-2 text-gray-600 text-sm">
                     <li className="flex items-center gap-2">
                       <span className="text-green-500">✓</span>
-                      <span>Autenticação via Keycloak</span>
+                      <span>Autenticação interna (sessão segura)</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="text-green-500">✓</span>
-                      <span>Controle de acesso hierárquico</span>
+                      <span>Controle de acesso hierárquico e escopo</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="text-green-500">✓</span>
-                      <span>Criptografia de dados</span>
+                      <span>Proteção de dados sob LGPD</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="text-green-500">✓</span>
@@ -173,6 +224,52 @@ const VersionPage: React.FC = () => {
                   </ul>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 md:p-8 mb-12">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="bg-blue-100 p-3 rounded-lg">
+                <Layers className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Histórico de versões</h2>
+                <p className="text-sm text-gray-500">
+                  Ondas de produto do App Saúde Pará (capacidades acumulativas)
+                </p>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-4">
+              {PRODUCT_WAVES.map((wave) => (
+                <div
+                  key={wave.version}
+                  className={`rounded-xl border p-5 ${
+                    wave.current
+                      ? "border-blue-300 bg-blue-50 shadow-sm"
+                      : "border-gray-200 bg-gray-50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-lg font-bold text-gray-900">v{wave.version}</span>
+                    {wave.current ? (
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-600 text-white">
+                        Atual
+                      </span>
+                    ) : null}
+                  </div>
+                  <h3 className="font-semibold text-gray-800 mb-1">{wave.title}</h3>
+                  <p className="text-xs text-gray-500 mb-3">{wave.period}</p>
+                  <ul className="space-y-1.5 text-sm text-gray-600">
+                    {wave.highlights.map((item) => (
+                      <li key={item} className="flex items-start gap-2">
+                        <span className="text-green-500 mt-0.5">✓</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
           </div>
 
