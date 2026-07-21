@@ -270,6 +270,17 @@ export const de = {
   "login.button": "Anmelden",
   "login.verifying": "Authentifizierung wird überprüft...",
   "login.error.invalid": "Ungültiger Benutzername oder Passwort",
+  "login.error.userNotFound": "Benutzer nicht registriert",
+  "login.error.wrongPassword": "Falsches Passwort",
+  "login.error.offline": "Keine Internetverbindung",
+  "login.passwordSetup.title": "Neues Passwort erstellen",
+  "login.passwordSetup.instruction": "Ihr Konto hat in diesem System noch kein Passwort. Legen Sie ein neues Passwort fest, um fortzufahren.",
+  "login.passwordSetup.newPassword": "Neues Passwort",
+  "login.passwordSetup.confirmPassword": "Neues Passwort bestätigen",
+  "login.passwordSetup.button": "Passwort erstellen",
+  "login.passwordSetup.success": "Passwort erfolgreich erstellt. Melden Sie sich mit dem neuen Passwort an.",
+  "login.passwordSetup.mismatch": "Die Passwörter stimmen nicht überein",
+  "login.passwordSetup.back": "Zurück zur Anmeldung",
   
   // Access Denied
   "accessDenied.title": "Zugriff verweigert",

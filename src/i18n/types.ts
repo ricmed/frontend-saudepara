@@ -218,6 +218,17 @@ export type TranslationRecord = {
   'login.button': string;
   'login.verifying': string;
   'login.error.invalid': string;
+  'login.error.userNotFound': string;
+  'login.error.wrongPassword': string;
+  'login.error.offline': string;
+  'login.passwordSetup.title': string;
+  'login.passwordSetup.instruction': string;
+  'login.passwordSetup.newPassword': string;
+  'login.passwordSetup.confirmPassword': string;
+  'login.passwordSetup.button': string;
+  'login.passwordSetup.success': string;
+  'login.passwordSetup.mismatch': string;
+  'login.passwordSetup.back': string;
   
   // Access Denied
   'accessDenied.title': string;

@@ -241,6 +241,17 @@ export const fr: TranslationRecord = {
   "login.button": "Se connecter",
   "login.verifying": "Vérification de l'authentification...",
   "login.error.invalid": "Nom d'utilisateur ou mot de passe invalide",
+  "login.error.userNotFound": "Utilisateur non enregistré",
+  "login.error.wrongPassword": "Mot de passe incorrect",
+  "login.error.offline": "Pas de connexion Internet",
+  "login.passwordSetup.title": "Créer un nouveau mot de passe",
+  "login.passwordSetup.instruction": "Votre compte n'a pas encore de mot de passe dans ce système. Définissez un nouveau mot de passe pour continuer.",
+  "login.passwordSetup.newPassword": "Nouveau mot de passe",
+  "login.passwordSetup.confirmPassword": "Confirmer le nouveau mot de passe",
+  "login.passwordSetup.button": "Créer le mot de passe",
+  "login.passwordSetup.success": "Mot de passe créé avec succès. Connectez-vous avec le nouveau mot de passe.",
+  "login.passwordSetup.mismatch": "Les mots de passe ne correspondent pas",
+  "login.passwordSetup.back": "Retour à la connexion",
   
   // Access Denied
   "accessDenied.title": "Accès Refusé",

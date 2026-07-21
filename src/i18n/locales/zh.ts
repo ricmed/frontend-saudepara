@@ -253,6 +253,17 @@ export const zh: TranslationRecord = {
   "login.button": "登录",
   "login.verifying": "正在验证身份...",
   "login.error.invalid": "用户名或密码无效",
+  "login.error.userNotFound": "用户未注册",
+  "login.error.wrongPassword": "密码错误",
+  "login.error.offline": "无网络连接",
+  "login.passwordSetup.title": "创建新密码",
+  "login.passwordSetup.instruction": "您的账户尚未在本系统中设置密码。请设置新密码以继续。",
+  "login.passwordSetup.newPassword": "新密码",
+  "login.passwordSetup.confirmPassword": "确认新密码",
+  "login.passwordSetup.button": "创建密码",
+  "login.passwordSetup.success": "密码创建成功。请使用新密码登录。",
+  "login.passwordSetup.mismatch": "两次输入的密码不一致",
+  "login.passwordSetup.back": "返回登录",
   
   // Access Denied
   "accessDenied.title": "访问被拒绝",

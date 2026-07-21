@@ -282,6 +282,17 @@ export const ptBR = {
   "login.button": "Entrar",
   "login.verifying": "Verificando autenticação...",
   "login.error.invalid": "Usuário ou senha inválidos",
+  "login.error.userNotFound": "Usuário não cadastrado",
+  "login.error.wrongPassword": "Senha incorreta",
+  "login.error.offline": "Sem conexão com a internet",
+  "login.passwordSetup.title": "Criar nova senha",
+  "login.passwordSetup.instruction": "Seu usuário ainda não possui senha neste sistema. Defina uma nova senha para continuar.",
+  "login.passwordSetup.newPassword": "Nova senha",
+  "login.passwordSetup.confirmPassword": "Confirmar nova senha",
+  "login.passwordSetup.button": "Criar senha",
+  "login.passwordSetup.success": "Senha criada com sucesso. Faça login com a nova senha.",
+  "login.passwordSetup.mismatch": "As senhas não coincidem",
+  "login.passwordSetup.back": "Voltar ao login",
   
   // Access Denied
   "accessDenied.title": "Acesso Negado",

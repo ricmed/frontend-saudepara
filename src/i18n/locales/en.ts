@@ -266,6 +266,17 @@ export const en: TranslationRecord = {
   "login.button": "Sign In",
   "login.verifying": "Verifying authentication...",
   "login.error.invalid": "Invalid username or password",
+  "login.error.userNotFound": "User not registered",
+  "login.error.wrongPassword": "Incorrect password",
+  "login.error.offline": "No internet connection",
+  "login.passwordSetup.title": "Create new password",
+  "login.passwordSetup.instruction": "Your account does not have a password in this system yet. Set a new password to continue.",
+  "login.passwordSetup.newPassword": "New password",
+  "login.passwordSetup.confirmPassword": "Confirm new password",
+  "login.passwordSetup.button": "Create password",
+  "login.passwordSetup.success": "Password created successfully. Sign in with your new password.",
+  "login.passwordSetup.mismatch": "Passwords do not match",
+  "login.passwordSetup.back": "Back to login",
   
   // Access Denied
   "accessDenied.title": "Access Denied",

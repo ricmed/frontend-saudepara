@@ -273,6 +273,17 @@ export const ru: TranslationRecord = {
   "login.button": "Войти",
   "login.verifying": "Проверка аутентификации...",
   "login.error.invalid": "Неверное имя пользователя или пароль",
+  "login.error.userNotFound": "Пользователь не зарегистрирован",
+  "login.error.wrongPassword": "Неверный пароль",
+  "login.error.offline": "Нет подключения к интернету",
+  "login.passwordSetup.title": "Создать новый пароль",
+  "login.passwordSetup.instruction": "У вашей учетной записи еще нет пароля в этой системе. Задайте новый пароль, чтобы продолжить.",
+  "login.passwordSetup.newPassword": "Новый пароль",
+  "login.passwordSetup.confirmPassword": "Подтвердите новый пароль",
+  "login.passwordSetup.button": "Создать пароль",
+  "login.passwordSetup.success": "Пароль успешно создан. Войдите с новым паролем.",
+  "login.passwordSetup.mismatch": "Пароли не совпадают",
+  "login.passwordSetup.back": "Вернуться к входу",
   
   // Access Denied
   "accessDenied.title": "Доступ запрещен",

@@ -273,6 +273,17 @@ export const it: TranslationRecord = {
   "login.button": "Accedi",
   "login.verifying": "Verifica autenticazione...",
   "login.error.invalid": "Nome utente o password non validi",
+  "login.error.userNotFound": "Utente non registrato",
+  "login.error.wrongPassword": "Password non corretta",
+  "login.error.offline": "Nessuna connessione a Internet",
+  "login.passwordSetup.title": "Crea nuova password",
+  "login.passwordSetup.instruction": "Il tuo account non ha ancora una password in questo sistema. Imposta una nuova password per continuare.",
+  "login.passwordSetup.newPassword": "Nuova password",
+  "login.passwordSetup.confirmPassword": "Conferma nuova password",
+  "login.passwordSetup.button": "Crea password",
+  "login.passwordSetup.success": "Password creata con successo. Accedi con la nuova password.",
+  "login.passwordSetup.mismatch": "Le password non coincidono",
+  "login.passwordSetup.back": "Torna al login",
   
   // Access Denied
   "accessDenied.title": "Accesso Negato",

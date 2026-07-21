@@ -273,6 +273,17 @@ export const ar: TranslationRecord = {
   "login.button": "تسجيل الدخول",
   "login.verifying": "جاري التحقق من المصادقة...",
   "login.error.invalid": "اسم المستخدم أو كلمة المرور غير صحيحة",
+  "login.error.userNotFound": "المستخدم غير مسجل",
+  "login.error.wrongPassword": "كلمة المرور غير صحيحة",
+  "login.error.offline": "لا يوجد اتصال بالإنترنت",
+  "login.passwordSetup.title": "إنشاء كلمة مرور جديدة",
+  "login.passwordSetup.instruction": "حسابك لا يحتوي بعد على كلمة مرور في هذا النظام. عيّن كلمة مرور جديدة للمتابعة.",
+  "login.passwordSetup.newPassword": "كلمة المرور الجديدة",
+  "login.passwordSetup.confirmPassword": "تأكيد كلمة المرور الجديدة",
+  "login.passwordSetup.button": "إنشاء كلمة المرور",
+  "login.passwordSetup.success": "تم إنشاء كلمة المرور بنجاح. سجّل الدخول بكلمة المرور الجديدة.",
+  "login.passwordSetup.mismatch": "كلمتا المرور غير متطابقتين",
+  "login.passwordSetup.back": "العودة لتسجيل الدخول",
   
   // Access Denied
   "accessDenied.title": "تم رفض الوصول",

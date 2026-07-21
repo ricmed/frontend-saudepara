@@ -273,6 +273,17 @@ export const ko: TranslationRecord = {
   "login.button": "로그인",
   "login.verifying": "인증 확인 중...",
   "login.error.invalid": "사용자 이름 또는 비밀번호가 잘못되었습니다",
+  "login.error.userNotFound": "등록되지 않은 사용자입니다",
+  "login.error.wrongPassword": "비밀번호가 올바르지 않습니다",
+  "login.error.offline": "인터넷에 연결되어 있지 않습니다",
+  "login.passwordSetup.title": "새 비밀번호 만들기",
+  "login.passwordSetup.instruction": "이 시스템에 아직 비밀번호가 없습니다. 계속하려면 새 비밀번호를 설정하세요.",
+  "login.passwordSetup.newPassword": "새 비밀번호",
+  "login.passwordSetup.confirmPassword": "새 비밀번호 확인",
+  "login.passwordSetup.button": "비밀번호 만들기",
+  "login.passwordSetup.success": "비밀번호가 생성되었습니다. 새 비밀번호로 로그인하세요.",
+  "login.passwordSetup.mismatch": "비밀번호가 일치하지 않습니다",
+  "login.passwordSetup.back": "로그인으로 돌아가기",
   
   // Access Denied
   "accessDenied.title": "액세스 거부됨",

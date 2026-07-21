@@ -270,6 +270,17 @@ export const ja = {
   "login.button": "ログイン",
   "login.verifying": "認証を確認しています...",
   "login.error.invalid": "ユーザー名またはパスワードが無効です",
+  "login.error.userNotFound": "ユーザーが登録されていません",
+  "login.error.wrongPassword": "パスワードが正しくありません",
+  "login.error.offline": "インターネットに接続されていません",
+  "login.passwordSetup.title": "新しいパスワードを作成",
+  "login.passwordSetup.instruction": "このシステムにはまだパスワードがありません。続行するには新しいパスワードを設定してください。",
+  "login.passwordSetup.newPassword": "新しいパスワード",
+  "login.passwordSetup.confirmPassword": "新しいパスワード（確認）",
+  "login.passwordSetup.button": "パスワードを作成",
+  "login.passwordSetup.success": "パスワードが作成されました。新しいパスワードでログインしてください。",
+  "login.passwordSetup.mismatch": "パスワードが一致しません",
+  "login.passwordSetup.back": "ログインに戻る",
   
   // Access Denied
   "accessDenied.title": "アクセス拒否",
