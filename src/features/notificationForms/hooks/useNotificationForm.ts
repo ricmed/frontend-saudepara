@@ -56,8 +56,7 @@ import {
   isTipoAtendimento,
   isTipoEncerramento,
   validateForm,
-  mapGestanteForApi,
-  mapSexoNascimentoToApi
+  mapGestanteForApi
 } from '../utils/formUtils';
 import {
   normalizeOptionLabels,
@@ -157,9 +156,6 @@ const initialFormData: FormData = {
   idadeMeses: "", // <-- CAMPO ADICIONADO AQUI
   idadeUnidade: 'anos' as 'anos' | 'meses', // <-- VALOR INICIAL
   cpf: "",
-  sexoNascimento: "",
-  eEstrangeiro: "",
-  cns: "",
   identidadeGenero: "",
   gestante: "",
   raca: "",
@@ -1403,7 +1399,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
           const novoPaciente: any = buildPatientPayloadFromForm(
             formData,
-            { mapSexoNascimentoToApi, mapGestanteForApi },
+            { mapGestanteForApi },
             {
               uppercaseNome: true,
               uppercaseNomeMae: true,
@@ -1435,7 +1431,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
         const pacienteData: any = buildPatientPayloadFromForm(
           formData,
-          { mapSexoNascimentoToApi, mapGestanteForApi },
+          { mapGestanteForApi },
           {
             uppercaseNome: false,
             uppercaseNomeMae: false,
@@ -1469,7 +1465,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
   }, [
     formData,
     isEditMode,
-    mapSexoNascimentoToApi,
     mapGestanteForApi,
     searchPatientsOfflineSafe,
     savePatientOfflineSafe,
@@ -2000,16 +1995,13 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       });
     }
 
-    if (name === "cns") {
-      const digits = value.replace(/\D/g, "").slice(0, 15);
-      setFormData((prev) => ({ ...prev, cns: digits }));
-      return;
-    }
-
-    if (name === "sexoNascimento") {
+    // Gestante: Mulher cis (1), Mulher trans (3) ou Não binário (6)
+    if (name === "identidadeGenero") {
       setFormData((prev) => {
-        const next = { ...prev, sexoNascimento: value };
-        if (value !== "2") next.gestante = "";
+        const next = { ...prev, identidadeGenero: value };
+        if (value !== "1" && value !== "3" && value !== "6") {
+          next.gestante = "";
+        }
         return next;
       });
       return;
@@ -2205,23 +2197,9 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       paciente: paciente.nome || "",
       pacienteId: paciente.idpaciente,
       cpf: paciente.cpf || "",
-      cns: (paciente as any).cns ? String((paciente as any).cns).replace(/\D/g, "").slice(0, 15) : "",
       dataNascimento: paciente.data_nascimento || "",
       nomeMae: paciente.nome_mae || "",
       identidadeGenero: paciente.tipo_genero?.idtipo_genero?.toString() || "",
-      sexoNascimento: (() => {
-        const s = (paciente as any).sexo;
-        if (s === "M" || s === "m") return "1";
-        if (s === "F" || s === "f") return "2";
-        if (s === "I" || s === "i") return "3";
-        return "";
-      })(),
-      eEstrangeiro: (() => {
-        const e = (paciente as any).e_estrangeiro;
-        if (e === 1 || e === "1" || e === "S") return "1";
-        if (e === 2 || e === "2" || e === "N") return "2";
-        return "";
-      })(),
       gestante: paciente.gestante || "",
       raca: paciente.tipo_raca?.idtipo_raca?.toString() || "",
       escolaridade: paciente.escolaridade_idescolaridade?.toString() || "",
@@ -2322,7 +2300,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       // ✅ USAR SISTEMA OFFLINE
       const novoPaciente: any = buildPatientPayloadFromForm(
         formData,
-        { mapSexoNascimentoToApi, mapGestanteForApi },
+        { mapGestanteForApi },
         {
           uppercaseNome: false,
           uppercaseNomeMae: false,

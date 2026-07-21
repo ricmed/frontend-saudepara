@@ -183,33 +183,6 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
               required
             />
 
-            {/* Sexo ao nascimento (SINAN) */}
-            <div>
-              <label className="block mb-2 font-medium text-gray-700">
-                Sexo ao nascimento <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="sexoNascimento"
-                className={`w-full p-3 border ${
-                  errors.sexoNascimento
-                    ? "border-red-500 bg-red-50"
-                    : "border-gray-200"
-                } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
-                value={formData.sexoNascimento ?? ""}
-                onChange={handleChange}
-                data-error={errors.sexoNascimento ? "true" : "false"}
-              >
-                <option value="">Selecione</option>
-                <option value="1">Masculino</option>
-                <option value="2">Feminino</option>
-                <option value="3">Intersexo</option>
-                <option value="9">Ignorado</option>
-              </select>
-              {errors.sexoNascimento && (
-                <p className="mt-1 text-sm text-red-500">{errors.sexoNascimento}</p>
-              )}
-            </div>
-
             {/* Data de Nascimento */}
             <div>
               <label className="block mb-2 font-medium text-gray-700">
@@ -299,36 +272,11 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
               )}
             </div>
 
-            {/* É estrangeiro? */}
-            <div>
-              <label className="block mb-2 font-medium text-gray-700">
-                É estrangeiro? <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="eEstrangeiro"
-                className={`w-full p-3 border ${
-                  errors.eEstrangeiro
-                    ? "border-red-500 bg-red-50"
-                    : "border-gray-200"
-                } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
-                value={formData.eEstrangeiro ?? ""}
-                onChange={handleChange}
-                data-error={errors.eEstrangeiro ? "true" : "false"}
-              >
-                <option value="">Selecione</option>
-                <option value="2">Não</option>
-                <option value="1">Sim</option>
-              </select>
-              {errors.eEstrangeiro && (
-                <p className="mt-1 text-sm text-red-500">{errors.eEstrangeiro}</p>
-              )}
-            </div>
-
             {/* CPF */}
             <div>
               <label className="block mb-2 font-medium text-gray-700">
                 CPF
-                {formData.eEstrangeiro === "2" && (
+                {formData.residenteBelem !== "3" && (
                   <span className="text-red-500"> *</span>
                 )}
               </label>
@@ -350,44 +298,13 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
                   maxLength={14}
                   data-error={errors.cpf ? "true" : "false"}
                 />
-                {/* ✅ REMOVIDO: Ícone de validação de CPF */}
               </div>
               {errors.cpf && (
                 <p className="mt-1 text-sm text-red-500" data-testid="notif-cpf-error">
                   {errors.cpf}
                 </p>
               )}
-              {/* ✅ REMOVIDO: Mensagem "CPF válido e disponível para cadastro" */}
             </div>
-
-            {/* CNS — obrigatório se não houver CPF válido (não estrangeiro) */}
-            {formData.eEstrangeiro === "2" && (
-              <div>
-                <label className="block mb-2 font-medium text-gray-700">
-                  CNS (Cartão SUS)
-                  {(!formData.cpf || formData.cpf.replace(/\D/g, "").length !== 11) && (
-                    <span className="text-red-500"> *</span>
-                  )}
-                </label>
-                <input
-                  type="text"
-                  name="cns"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  placeholder="Somente números (15 dígitos)"
-                  className={`w-full p-3 border ${
-                    errors.cns ? "border-red-500 bg-red-50" : "border-gray-200"
-                  } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}
-                  value={formData.cns ?? ""}
-                  onChange={handleChange}
-                  maxLength={18}
-                  data-error={errors.cns ? "true" : "false"}
-                />
-                {errors.cns && (
-                  <p className="mt-1 text-sm text-red-500">{errors.cns}</p>
-                )}
-              </div>
-            )}
 
             {/* Identidade de Gênero */}
             <div>
@@ -484,8 +401,10 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
               )}
             </div>
 
-            {/* Gestante — visível quando sexo ao nascimento = Feminino (SINAN) */}
-            {formData.sexoNascimento === "2" && (
+            {/* Gestante — Mulher cis (1), Mulher trans (3) ou Não binário (6) */}
+            {(formData.identidadeGenero === "1" ||
+              formData.identidadeGenero === "3" ||
+              formData.identidadeGenero === "6") && (
               <FormField
                 label="Gestante"
                 name="gestante"
@@ -495,13 +414,8 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
                 required
                 error={errors.gestante}
                 options={[
-                  { value: "T1", label: "1º trimestre" },
-                  { value: "T2", label: "2º trimestre" },
-                  { value: "T3", label: "3º trimestre" },
-                  { value: "TI", label: "Idade gestacional ignorada" },
-                  { value: "N", label: "Não" },
-                  { value: "NA", label: "Não se aplica" },
-                  { value: "9", label: "Ignorado" },
+                  { value: "1", label: "Sim" },
+                  { value: "2", label: "Não" },
                 ]}
               />
             )}

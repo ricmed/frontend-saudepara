@@ -1,7 +1,6 @@
 import type { FormData } from '@/features/notificationForms/types/index2';
 
 type BuildPatientPayloadDependencies = {
-  mapSexoNascimentoToApi: (value: string) => string | null;
   mapGestanteForApi: (value: string) => string | null;
 };
 
@@ -15,12 +14,6 @@ const parseOptionalInt = (value?: string): number | null => {
   if (!value) return null;
   const parsed = parseInt(value, 10);
   return Number.isNaN(parsed) ? null : parsed;
-};
-
-export const resolveEstrangeiroFlag = (value?: string): '1' | '2' | null => {
-  if (value === '1') return '1';
-  if (value === '2') return '2';
-  return null;
 };
 
 export const resolvePatientAgeInMonths = (formData: FormData): number | null => {
@@ -43,14 +36,12 @@ export const buildPatientPayloadFromForm = (
   const nomeMaeValue = formData.nomeMae || '';
   const nomeMae = uppercaseNomeMae ? nomeMaeValue.toUpperCase() : nomeMaeValue;
 
+  // CNS / sexo ao nascimento / e_estrangeiro são fluxo SINAN (formulários dinâmicos).
   const payload: Record<string, any> = {
     nome,
     nome_mae: nomeMae,
     data_nascimento: formData.dataNascimento || null,
     cpf: formData.cpf || '',
-    cns: formData.cns || null,
-    sexo: dependencies.mapSexoNascimentoToApi(formData.sexoNascimento),
-    e_estrangeiro: resolveEstrangeiroFlag(formData.eEstrangeiro),
     contato: formData.contatoTelefonico || '',
     ddi: formData.ddi || '55',
     gestante: dependencies.mapGestanteForApi(formData.gestante),

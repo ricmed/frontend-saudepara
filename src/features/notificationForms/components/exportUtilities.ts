@@ -584,9 +584,10 @@ const prepareDataForExport = (
     // Valores padrão baseados no gênero
     if (
       formData.identidadeGenero === "1" ||
-      formData.identidadeGenero === "3"
+      formData.identidadeGenero === "3" ||
+      formData.identidadeGenero === "6"
     ) {
-      return "Não"; // Padrão para gêneros femininos
+      return "Não"; // Padrão quando gestante se aplica e não foi informado
     }
 
     return "Não aplicável"; // Padrão para outros gêneros
@@ -1287,9 +1288,9 @@ const formatNotificacaoForExport = (
     }
 
     const generoId = paciente.tipo_genero_idtipo_genero?.toString();
-    if (generoId === "1" || generoId === "3") {
-      // Mulher cis ou trans
-      return "Não"; // Padrão para gêneros femininos sem status definido
+    if (generoId === "1" || generoId === "3" || generoId === "6") {
+      // Mulher cis, mulher trans ou não binário
+      return "Não"; // Padrão quando gestante se aplica e não foi informado
     }
 
     return "Não aplicável"; // Padrão para outros gêneros

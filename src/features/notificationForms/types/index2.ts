@@ -144,11 +144,6 @@ export interface FormData {
   idadeMeses: string; 
   idadeUnidade: 'anos' | 'meses';
   cpf: string;
-  /** SINAN: sexo ao nascimento — 1 Masculino, 2 Feminino, 3 Intersexo, 9 Ignorado */
-  sexoNascimento: string;
-  /** 1 Sim (estrangeiro), 2 Não — alinha CPF/CNS ao PDF SINAN */
-  eEstrangeiro: string;
-  cns: string;
   identidadeGenero: string;
   gestante: string;
   raca: string;

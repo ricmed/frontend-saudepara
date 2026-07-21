@@ -3,11 +3,10 @@
 import { FormData, AtendimentoOption, EncerramentoOption, detectUserTimezone } from '@/features/notificationForms/types/index2';
 import type { SectionState } from '@/features/notificationForms/hooks/useSectionExpansion';
 import { validateCPF } from '@/utils/cpfValidator';
-import { validateCNS } from '@/utils/cnsValidator';
 
 /**
- * Converte o valor detalhado de gestante do formulário (SINAN) para o que a API costuma aceitar (S/N/9).
- * Mantém compatibilidade com valores legados "S", "N", "1", "2".
+ * Converte gestante do formulário de comunicação de caso para o que a API aceita (S/N/9).
+ * Mantém compatibilidade com valores legados e códigos SINAN caso ainda existam em registros antigos.
  */
 export function mapGestanteForApi(gestante: string): string | null {
   const g = (gestante || "").trim();
@@ -18,14 +17,6 @@ export function mapGestanteForApi(gestante: string): string | null {
   if (["T1", "T2", "T3", "TI"].includes(g)) return "S";
   if (g === "NA") return "N";
   return g;
-}
-
-/** Valor de sexo biológico para APIs que usam M / F / I */
-export function mapSexoNascimentoToApi(code: string): string | null {
-  if (code === '1') return 'M';
-  if (code === '2') return 'F';
-  if (code === '3') return 'I';
-  return null;
 }
 
 /**
@@ -447,14 +438,6 @@ newErrors.paciente = "O nome do paciente é obrigatório";
 newErrors.nomeMae = "O nome da mãe é obrigatório";
  }
 
- if (!formData.sexoNascimento || formData.sexoNascimento === "") {
-newErrors.sexoNascimento = "O sexo ao nascimento é obrigatório";
- }
-
- if (!formData.eEstrangeiro || formData.eEstrangeiro === "") {
-newErrors.eEstrangeiro = "Informe se o paciente é estrangeiro";
- }
-
  // NOVA VALIDAÇÃO: Data de nascimento
  if (formData.dataNascimento) {
 const birthValidation = validateBirthDate(formData.dataNascimento);
@@ -470,28 +453,33 @@ Object.assign(newErrors, ageValidation.errors);
  }
 
  const cpfDigits = (formData.cpf || "").replace(/\D/g, "");
- const cnsDigits = (formData.cns || "").replace(/\D/g, "");
- const isEstrangeiro = formData.eEstrangeiro === "1";
+ // Estrangeiro neste módulo = Procedência "Residente em Belém = ESTRANGEIRO"
+ const isEstrangeiroProcedencia = formData.residenteBelem === "3";
 
- if (!isEstrangeiro) {
-const cpfOk = cpfDigits.length === 11 && validateCPF(cpfDigits);
-const cnsOk = validateCNS(cnsDigits);
-if (!cpfOk && !cnsOk) {
- if (cpfDigits.length > 0 && cpfDigits.length !== 11) {
+ if (!isEstrangeiroProcedencia) {
+if (cpfDigits.length === 0) {
+ newErrors.cpf = "O CPF é obrigatório";
+} else if (cpfDigits.length !== 11) {
  newErrors.cpf = "CPF deve ter 11 dígitos";
- } else if (cpfDigits.length === 11 && !validateCPF(cpfDigits)) {
+} else if (!validateCPF(cpfDigits)) {
  newErrors.cpf = "CPF inválido";
- } else if (cnsDigits.length > 0 && !validateCNS(cnsDigits)) {
- newErrors.cns = "CNS inválido";
- } else {
- newErrors.cpf = "Informe CPF válido (11 dígitos) ou CNS válido (15 dígitos)";
- }
 }
  }
 
  // ✅ NOVA VALIDAÇÃO: Identidade de Gênero obrigatório
  if (!formData.identidadeGenero || formData.identidadeGenero === "") {
 newErrors.identidadeGenero = "A Identidade de Gênero é obrigatória";
+ }
+
+ // Gestante obrigatória para Mulher cis (1), Mulher trans (3) ou Não binário (6)
+ if (
+formData.identidadeGenero === "1" ||
+formData.identidadeGenero === "3" ||
+formData.identidadeGenero === "6"
+ ) {
+if (!formData.gestante || formData.gestante === "") {
+ newErrors.gestante = "O campo Gestante é obrigatório";
+}
  }
 
  // ✅ NOVA VALIDAÇÃO: Raça obrigatório  
@@ -510,12 +498,6 @@ newErrors.profissao = "Ocupação (CBO) é obrigatória";
  const telDigits = (formData.contatoTelefonico || "").replace(/\D/g, "");
  if (telDigits.length < 8) {
 newErrors.contatoTelefonico = "Informe um telefone de contato válido (mínimo 8 dígitos)";
- }
-
- if (formData.sexoNascimento === "2") {
-if (!formData.gestante || formData.gestante === "") {
- newErrors.gestante = "O campo Gestante é obrigatório para sexo feminino ao nascimento";
-}
  }
 
  // ========================================
@@ -656,9 +638,6 @@ if (
  newErrors.idade ||
  newErrors.idadeMeses || // NOVO
  newErrors.cpf ||
- newErrors.cns ||
- newErrors.sexoNascimento ||
- newErrors.eEstrangeiro ||
  newErrors.identidadeGenero ||
  newErrors.gestante ||
  newErrors.raca ||

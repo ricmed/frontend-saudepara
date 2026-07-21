@@ -87,9 +87,6 @@ describe('validateForm — CPF curto', () => {
       idadeMeses: '',
       idadeUnidade: 'anos',
       cpf: '52998224725',
-      sexoNascimento: '1',
-      eEstrangeiro: '2',
-      cns: '',
       identidadeGenero: '1',
       gestante: '',
       raca: '1',
@@ -134,7 +131,7 @@ describe('validateForm — CPF curto', () => {
     const setErrors = vi.fn();
     const setExpanded = vi.fn();
     const ok = validateForm(
-      minimalForm({ cpf: '12345', cns: '' }),
+      minimalForm({ cpf: '12345' }),
       {},
       setErrors,
       setExpanded,
