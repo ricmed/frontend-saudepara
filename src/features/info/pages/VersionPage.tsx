@@ -5,6 +5,7 @@ import { SideMenu } from "@/features/home/components/SideMenu";
 import { useNavigate } from "react-router-dom";
 import { Language } from "@/i18n/types";
 import { Info, Calendar, Code, Users, Shield, ArrowLeft, Layers } from "lucide-react";
+import packageJson from "../../../../package.json";
 
 type ProductWave = {
   version: string;
@@ -53,7 +54,7 @@ const VersionPage: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const navigate = useNavigate();
 
-  const appVersion = "3.0.0";
+  const appVersion = packageJson.version;
   const originalReleaseDate = "2025-10-08";
 
   return (
