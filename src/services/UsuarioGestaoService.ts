@@ -1348,11 +1348,23 @@ class UsuarioGestaoService {
 
   /**
    * Buscar todas as CRS (Centros Regionais de Saúde)
+   * Usa limit alto: o endpoint pagina (default 10) e a ordenação lexicográfica
+   * de "10º…" antes de "7º…" escondia 7º/8º/9º no select de nível de acesso.
    */
   async getCrs(): Promise<Crs[]> {
     try {
-      const response = await this.backendApi.get('/crs');
-      return response.data?.data || response.data || [];
+      const response = await this.backendApi.get('/crs', {
+        params: { page: 1, limit: 100 },
+      });
+      const list: Crs[] = response.data?.data || response.data || [];
+      const parseOrdinal = (nome: string): number => {
+        const m = (nome ?? '').match(/^\s*(\d{1,2})\s*[ªº°]/i) || (nome ?? '').match(/^\s*(\d{1,2})\b/);
+        const n = m ? Number(m[1]) : NaN;
+        return Number.isFinite(n) ? n : 999;
+      };
+      return list
+        .slice()
+        .sort((a, b) => parseOrdinal(a.nome) - parseOrdinal(b.nome) || a.nome.localeCompare(b.nome));
     } catch (error: any) {
       console.error('Erro ao buscar CRS:', error);
       throw new Error(this.getErrorMessage(error, 'Erro ao carregar Centros Regionais de Saúde'));
