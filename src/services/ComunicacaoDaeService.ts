@@ -159,6 +159,7 @@ class ComunicacaoDaeService {
 
   /**
    * Marca comunicação como lida para o usuário autenticado (idempotente).
+   * O horário retornado é o da primeira visualização.
    */
   async marcarComoLida(id: number): Promise<{ lida: boolean; lido_em: string }> {
     this.assertValidId(id, 'ID da comunicação');
