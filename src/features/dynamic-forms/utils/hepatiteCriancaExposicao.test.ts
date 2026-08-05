@@ -18,7 +18,7 @@ describe('hepatiteCriancaExposicao', () => {
     expect(agravoDoencaPorTipoExposicao(TIPO_EXPOSICAO_HCV)).toBe('CRIANÇA EXPOSTA AO HCV');
     expect(agravoCidPorTipoExposicao(TIPO_EXPOSICAO_HCV)).toBe('');
     expect(agravoDoencaPorTipoExposicao(TIPO_EXPOSICAO_AMBOS)).toBe('CRIANÇA EXPOSTA AO HBV / HCV');
-    expect(agravoCidPorTipoExposicao(TIPO_EXPOSICAO_AMBOS)).toBe('Z20.5');
+    expect(agravoCidPorTipoExposicao(TIPO_EXPOSICAO_AMBOS)).toBe('Z20.5CO');
   });
 
   it('controla visibilidade de blocos HBV e HCV', () => {

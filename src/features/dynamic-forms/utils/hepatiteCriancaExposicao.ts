@@ -36,10 +36,15 @@ export function agravoDoencaPorTipoExposicao(tipo: unknown): string {
   return '';
 }
 
+/** CID-10 base (HBV). Co-infecção acrescenta sufixo CO (ata NIVS 14/07/2026). */
+export const AGRAVO_CID_HBV = 'Z20.5';
+export const AGRAVO_CID_COINFECCAO = 'Z20.5CO';
+
 export function agravoCidPorTipoExposicao(tipo: unknown): string {
   const v = String(tipo ?? '').trim();
   if (v === TIPO_EXPOSICAO_HCV) return '';
-  if (v === TIPO_EXPOSICAO_HBV || v === TIPO_EXPOSICAO_AMBOS) return 'Z20.5';
+  if (v === TIPO_EXPOSICAO_HBV) return AGRAVO_CID_HBV;
+  if (v === TIPO_EXPOSICAO_AMBOS) return AGRAVO_CID_COINFECCAO;
   return '';
 }
 
@@ -52,7 +57,7 @@ export function agravoCidHintPorTipoExposicao(tipo: unknown): string {
     return 'Z20.5 — Contato com e exposição à hepatite viral (criança exposta ao HBV).';
   }
   if (v === TIPO_EXPOSICAO_AMBOS) {
-    return 'Z20.5 para exposição HBV; HCV sem CID oficial do MS.';
+    return 'Z20.5CO — co-infecção HBV/HCV (sufixo CO para diferenciar do HBV isolado).';
   }
   return 'Selecione o tipo de exposição para definir o CID.';
 }

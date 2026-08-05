@@ -36,7 +36,7 @@ const OPTIONS: OptionDef[] = [
     value: TIPO_EXPOSICAO_AMBOS,
     title: 'Co-infecção',
     badge: 'HBV + HCV',
-    description: 'Exposição aos dois vírus — CID Z20.5',
+    description: 'Exposição aos dois vírus — CID Z20.5CO',
     selectedRing: 'ring-[#5c3d99]',
     selectedBg: 'bg-[#7950f2]/[0.08] border-[#7950f2]',
   },
