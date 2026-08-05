@@ -2214,6 +2214,19 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
               />
             );
           }
+          if (resolved.key === 'mae.orientacao_sexual') {
+            return (
+              <ApiSelectField
+                {...commonProps}
+                {...selectAux}
+                context={context}
+                onChange={(val: any) => {
+                  setValue(resolved.key, val);
+                  if (val !== '4') setValue('mae.outra_orientacao_sexual', undefined);
+                }}
+              />
+            );
+          }
         if (resolved.key === 'acao.programa_alcancado') {
           const semArea = !getValue('acao.area');
           return <ApiSelectField {...commonProps} {...selectAux} context={context} disabled={disabled || semArea} />;

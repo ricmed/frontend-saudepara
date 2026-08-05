@@ -290,6 +290,9 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange, formKe
       if (key === 'paciente.outra_orientacao_sexual') {
         return orientacaoOutra;
       }
+      if (key === 'mae.outra_orientacao_sexual') {
+        return String(getValue('mae.orientacao_sexual') ?? '') === '4';
+      }
       // Qual povo ou comunidade tradicional: só quando É membro = SIM (1)
       if (key === 'paciente.qual_povo_tradicional') {
         return povoTradicionalSim;
@@ -440,6 +443,9 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange, formKe
       if (key === 'paciente.orientacao_sexual') return true;
       // Outra orientação sexual: obrigatório quando Orientação = 4 (OUTRA)
       if (key === 'paciente.outra_orientacao_sexual') return orientacaoSexual === '4';
+      if (key === 'mae.outra_orientacao_sexual') {
+        return String(getValue('mae.orientacao_sexual') ?? '') === '4';
+      }
       // Raça/Cor: sempre obrigatório
       if (key === 'paciente.raca_cor') return true;
       // É membro de povo/comunidade tradicional: sempre obrigatório
