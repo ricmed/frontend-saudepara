@@ -376,13 +376,32 @@ export type MonitorOperReportFilters = {
   area: string;
   /** Quem operou o registro no envio (`cabecalho.executor_nivel`, preenchido no servidor). */
   executor_nivel: '' | 'CENTRAL' | 'REGIONAL';
+  /** Dimensões geográficas (município alcançado) — catálogo /api/geo-dimensoes/catalog. */
+  macrorregiao_id: string;
+  regiao_saude_id: string;
+  regiao_integracao_id: string;
+  municipio_id: string;
 };
 
 export function defaultMonitorOperReportFilters(): MonitorOperReportFilters {
-  return { ano: '', quadrimestre: '', crs_id: '', area: '', executor_nivel: '' };
+  return {
+    ano: '',
+    quadrimestre: '',
+    crs_id: '',
+    area: '',
+    executor_nivel: '',
+    macrorregiao_id: '',
+    regiao_saude_id: '',
+    regiao_integracao_id: '',
+    municipio_id: '',
+  };
 }
 
-export function monitorOperRowMatchesFilters(d: MonitorOperRow, f: MonitorOperReportFilters): boolean {
+export function monitorOperRowMatchesFilters(
+  d: MonitorOperRow,
+  f: MonitorOperReportFilters,
+  allowedMunicipioIds?: Set<string> | null,
+): boolean {
   const cab = d.cabecalho as Record<string, any> | undefined;
   const ac = d.acao as Record<string, any> | undefined;
   if (!cab || !ac) return false;
@@ -395,19 +414,25 @@ export function monitorOperRowMatchesFilters(d: MonitorOperRow, f: MonitorOperRe
   if (f.crs_id && String(cab.crs_id ?? '') !== f.crs_id) return false;
   if (f.area && String(ac.area ?? '') !== f.area) return false;
   if (f.executor_nivel && String(cab.executor_nivel ?? '') !== f.executor_nivel) return false;
+  if (allowedMunicipioIds) {
+    const muns = normalizeMunicipiosAlcancados(ac.municipios_alcancados);
+    if (muns.length === 0) return false;
+    if (!muns.some((id) => allowedMunicipioIds.has(String(id)))) return false;
+  }
   return true;
 }
 
 export function filterMonitorOperSubmissionsByReportFilters<T extends { data_json?: unknown }>(
   submissions: T[],
   f: MonitorOperReportFilters,
+  allowedMunicipioIds?: Set<string> | null,
 ): T[] {
   return submissions.filter((sub) => {
     const d = sub.data_json;
     if (!d || typeof d !== 'object') return false;
     const row = d as MonitorOperRow;
     if (!row.cabecalho || !row.acao) return false;
-    return monitorOperRowMatchesFilters(row, f);
+    return monitorOperRowMatchesFilters(row, f, allowedMunicipioIds);
   });
 }
 

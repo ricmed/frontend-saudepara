@@ -64,7 +64,7 @@ function MunicipioBandeiraMini({ nomeMunicipio }: { nomeMunicipio: string }) {
 type MonitorOperImpactGroup = 'epi' | 'san' | 'amb';
 
 export const MonitorOperTechnicalReportView: React.FC = () => {
-  const { filters, setFilters, filterOptions, crsLabels, municipioLabels, rows, report, summaries } =
+  const { filters, setFilters, filterOptions, crsLabels, municipioLabels, geoCatalog, rows, report, summaries } =
     useMonitorOperReport();
 
   /** Ordenação da lista de impactos: independente por área (padrão: maior → menor). */
@@ -196,6 +196,7 @@ export const MonitorOperTechnicalReportView: React.FC = () => {
         setFilters={setFilters}
         filterOptions={filterOptions}
         crsLabels={crsLabels}
+        geoCatalog={geoCatalog}
       />
 
       <section className="rounded-2xl border border-slate-200/80 bg-white shadow-lg overflow-hidden">

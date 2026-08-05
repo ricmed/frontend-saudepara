@@ -20,6 +20,7 @@ export const MonitorOperExecutiveReportView: React.FC = () => {
     setFilters,
     filterOptions,
     crsLabels,
+    geoCatalog,
     filteredSubmissions,
     rows,
     report,
@@ -136,6 +137,7 @@ export const MonitorOperExecutiveReportView: React.FC = () => {
         setFilters={setFilters}
         filterOptions={filterOptions}
         crsLabels={crsLabels}
+        geoCatalog={geoCatalog}
       />
 
       <section

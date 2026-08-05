@@ -8,6 +8,7 @@ import {
   type MonitorOperRow,
   type MonitorOperSubmissionSummary,
 } from '../utils/monitorOperRegionalReport';
+import type { GeoDimensoesCatalog } from '../utils/monitorOperGeoDimensoes';
 
 export type MonitorOperFilterOptions = ReturnType<typeof collectMonitorOperReportFilterOptions>;
 
@@ -26,6 +27,8 @@ export type MonitorOperReportContextValue = {
   crsLabels: Record<string, string>;
   /** idtipo_municipio (string) → descrição — para `acao.municipios_alcancados`. */
   municipioLabels: Record<string, string>;
+  /** Catálogo geo PA (pode ser null se API/seed ainda não disponíveis). */
+  geoCatalog: GeoDimensoesCatalog | null;
   downloadCsv: () => void;
 };
 

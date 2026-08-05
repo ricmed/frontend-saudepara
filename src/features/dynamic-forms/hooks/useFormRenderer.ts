@@ -34,7 +34,9 @@ import {
   isMaternidadeHbvHbigRequired,
   maternidadeHbvHbigNaoRealizado,
 } from '../utils/hepatiteCriancaMaternidadeHbvHbig';
-import { SEXO_NASCIMENTO_INTERSEXO_CODIGO } from '../utils/apiSelectOptionFilters';
+import {
+  SEXO_NASCIMENTO_HEPATITE_CRIANCA_EXCLUDE_CODIGOS,
+} from '../utils/apiSelectOptionFilters';
 import { validatePassaporte } from '@/utils/passaporteValidator';
 
 /** Agrupa campos da seção detalhamento do monitor operacional por tipo de atividade. */
@@ -606,9 +608,9 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange, formKe
         field.key === 'paciente.sexo' &&
         value != null &&
         value !== '' &&
-        String(value) === SEXO_NASCIMENTO_INTERSEXO_CODIGO
+        (SEXO_NASCIMENTO_HEPATITE_CRIANCA_EXCLUDE_CODIGOS as readonly string[]).includes(String(value))
       ) {
-        return 'Intersexo não se aplica a esta ficha. Selecione Masculino, Feminino ou Ignorado.';
+        return 'Nesta ficha selecione apenas Masculino ou Feminino (sem Intersexo nem Ignorado).';
       }
 
       if (field.key === 'paciente.idade' && value != null && value !== '') {

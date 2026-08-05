@@ -5,6 +5,15 @@ export type ApiSelectOption = { value: string; label: string };
 /** Código SINAN — Intersexo (excluído apenas em formulários que definem `apiSelectExcludeCodigos`). */
 export const SEXO_NASCIMENTO_INTERSEXO_CODIGO = '3';
 
+/** Código SINAN — Ignorado. */
+export const SEXO_NASCIMENTO_IGNORADO_CODIGO = '9';
+
+/** SICEX / criança exposta: só Masculino e Feminino. */
+export const SEXO_NASCIMENTO_HEPATITE_CRIANCA_EXCLUDE_CODIGOS = [
+  SEXO_NASCIMENTO_INTERSEXO_CODIGO,
+  SEXO_NASCIMENTO_IGNORADO_CODIGO,
+] as const;
+
 function getExcludeCodigos(field: FormField): string[] {
   const raw = (field as FormField & { apiSelectExcludeCodigos?: string[] }).apiSelectExcludeCodigos;
   return Array.isArray(raw) ? raw.map(String) : [];

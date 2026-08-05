@@ -143,7 +143,7 @@ function withPrintField(printLayoutMode: boolean, className?: string): string | 
   return merged || undefined;
 }
 import { applySinanFichaToField } from '../utils/sinanFichaUi';
-import { SEXO_NASCIMENTO_INTERSEXO_CODIGO } from '../utils/apiSelectOptionFilters';
+import { SEXO_NASCIMENTO_HEPATITE_CRIANCA_EXCLUDE_CODIGOS } from '../utils/apiSelectOptionFilters';
 import {
   fetchSyndromicAgravos,
   fetchSyndromicAgravosRanking,
@@ -1771,17 +1771,15 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       return { ...withPlaceholder, options };
     }
 
-    if (
-      isHepatiteCriancaHBV &&
-      withPlaceholder.key === 'paciente.sexo' &&
-      !(
-        Array.isArray(withPlaceholder.apiSelectExcludeCodigos) &&
-        withPlaceholder.apiSelectExcludeCodigos.length > 0
-      )
-    ) {
+    if (isHepatiteCriancaHBV && withPlaceholder.key === 'paciente.sexo') {
+      const existing = Array.isArray(withPlaceholder.apiSelectExcludeCodigos)
+        ? withPlaceholder.apiSelectExcludeCodigos.map(String)
+        : [];
       return {
         ...withPlaceholder,
-        apiSelectExcludeCodigos: [SEXO_NASCIMENTO_INTERSEXO_CODIGO],
+        apiSelectExcludeCodigos: [
+          ...new Set([...existing, ...SEXO_NASCIMENTO_HEPATITE_CRIANCA_EXCLUDE_CODIGOS]),
+        ],
       };
     }
 

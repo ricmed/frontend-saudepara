@@ -17,9 +17,12 @@ import {
 } from '../utils/monitorOperRegionalReport';
 import { useCrsLabelByIdMap } from '../hooks/useCrsLabelByIdMap';
 import { useMunicipioLabelByIdMap } from '../hooks/useMunicipioLabelByIdMap';
+import { useGeoDimensoesCatalog } from '../hooks/useGeoDimensoesCatalog';
 import { MonitorOperReportProvider } from './monitorOperReportContext';
 import { MonitorOperExecutiveReportView } from './MonitorOperExecutiveReportView';
+import { MonitorOperSigplanPanelView } from './MonitorOperSigplanPanelView';
 import { MonitorOperTechnicalReportView } from './MonitorOperTechnicalReportView';
+import { resolveAllowedMunicipioIds } from '../utils/monitorOperGeoDimensoes';
 
 export const MonitorOperRegionalReportPage: React.FC = () => {
   const { agravo } = useParams<{ agravo: string }>();
@@ -37,6 +40,7 @@ export const MonitorOperRegionalReportPage: React.FC = () => {
   const isMonitorOper = agravo?.toUpperCase() === MONITOR_OPER_REGIONAL_KEY;
   const crsLabels = useCrsLabelByIdMap(isMonitorOper);
   const municipioLabels = useMunicipioLabelByIdMap(isMonitorOper);
+  const geoCatalog = useGeoDimensoesCatalog(isMonitorOper);
 
   useEffect(() => {
     if (!agravo || !isMonitorOper) return;
@@ -69,9 +73,26 @@ export const MonitorOperRegionalReportPage: React.FC = () => {
 
   const filterOptions = useMemo(() => collectMonitorOperReportFilterOptions(submissions), [submissions]);
 
+  const allowedMunicipioIds = useMemo(
+    () =>
+      resolveAllowedMunicipioIds(geoCatalog, {
+        macrorregiao_id: filters.macrorregiao_id,
+        regiao_saude_id: filters.regiao_saude_id,
+        regiao_integracao_id: filters.regiao_integracao_id,
+        municipio_id: filters.municipio_id,
+      }),
+    [
+      geoCatalog,
+      filters.macrorregiao_id,
+      filters.regiao_saude_id,
+      filters.regiao_integracao_id,
+      filters.municipio_id,
+    ],
+  );
+
   const filteredSubmissions = useMemo(
-    () => filterMonitorOperSubmissionsByReportFilters(submissions, filters),
-    [submissions, filters],
+    () => filterMonitorOperSubmissionsByReportFilters(submissions, filters, allowedMunicipioIds),
+    [submissions, filters, allowedMunicipioIds],
   );
 
   const rows = useMemo(() => filterMonitorOperRows(filteredSubmissions), [filteredSubmissions]);
@@ -98,8 +119,11 @@ export const MonitorOperRegionalReportPage: React.FC = () => {
     if (summaries.length === 0) return;
     const el = reportExportRef.current;
     if (!el) return;
-    const isTechnical = location.pathname.replace(/\/$/, '').endsWith('/tecnico');
-    const tabSlug = isTechnical ? 'detalhamento_tecnico' : 'painel_executivo';
+    const path = location.pathname.replace(/\/$/, '');
+    const isTechnical = path.endsWith('/tecnico');
+    const isSigplan = path.endsWith('/sigplan');
+    const tabSlug = isSigplan ? 'painel_sigplan' : isTechnical ? 'detalhamento_tecnico' : 'painel_executivo';
+    const tabLabel = isSigplan ? 'Painel SIGPLAN' : isTechnical ? 'Detalhamento técnico' : 'Painel executivo';
     setPdfExporting(true);
     try {
       await exportHtmlElementToPdfA4({
@@ -107,7 +131,7 @@ export const MonitorOperRegionalReportPage: React.FC = () => {
         filename: `monitoramento_operacional_${tabSlug}_${new Date().toISOString().slice(0, 10)}.pdf`,
         footerExtraLines: [
           form?.nome?.trim() ? form.nome.trim() : 'Monitoramento operacional regional',
-          isTechnical ? 'Aba: Detalhamento técnico' : 'Aba: Painel executivo',
+          `Aba: ${tabLabel}`,
         ],
         pixelRatio: 2,
       });
@@ -133,6 +157,7 @@ export const MonitorOperRegionalReportPage: React.FC = () => {
       summaries,
       crsLabels,
       municipioLabels,
+      geoCatalog,
       downloadCsv,
     }),
     [
@@ -148,6 +173,7 @@ export const MonitorOperRegionalReportPage: React.FC = () => {
       summaries,
       crsLabels,
       municipioLabels,
+      geoCatalog,
       downloadCsv,
     ],
   );
@@ -279,11 +305,15 @@ export const MonitorOperRegionalReportPage: React.FC = () => {
             <NavLink to="tecnico" className={tabClass} data-testid="monitor-oper-tab-technical">
               Detalhamento técnico
             </NavLink>
+            <NavLink to="sigplan" className={tabClass} data-testid="monitor-oper-tab-sigplan">
+              Painel SIGPLAN
+            </NavLink>
           </nav>
 
           <Routes>
             <Route index element={<MonitorOperExecutiveReportView />} />
             <Route path="tecnico" element={<MonitorOperTechnicalReportView />} />
+            <Route path="sigplan" element={<MonitorOperSigplanPanelView />} />
           </Routes>
         </div>
       </MonitorOperReportProvider>
