@@ -3,7 +3,6 @@ import axios from '@/utils/axiosRetry';
 import type { FormField, TableColumnDef } from '@/services/FormService';
 import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { getRuntimeApiRoot } from '@/config/runtimeApiBase';
-import { TableField } from './TableField';
 
 const API_BASE = getRuntimeApiRoot();
 
@@ -405,12 +404,14 @@ export const EntomologiaMunicipiosField: React.FC<EntomologiaMunicipiosFieldProp
 
   React.useEffect(() => {
     if (!didInitOpen && blocks.length > 0) {
-      setOpenKeys(new Set([blocks[0].uiKey]));
+      // Em leitura, abre todos os municípios para ver o preenchimento sem clicar.
+      setOpenKeys(disabled ? new Set(blocks.map((b) => b.uiKey)) : new Set([blocks[0].uiKey]));
       setDidInitOpen(true);
     }
-  }, [blocks, didInitOpen]);
+  }, [blocks, didInitOpen, disabled]);
 
   const commitBlocks = (next: EntomologiaMunicipioBlock[]) => {
+    if (disabled) return;
     const { resumo_mensal, frequencia_recipientes } = blocksToEntomologiaArrays(next);
     setValue('resumo_mensal', resumo_mensal);
     setValue('frequencia_recipientes', frequencia_recipientes);
@@ -426,6 +427,7 @@ export const EntomologiaMunicipiosField: React.FC<EntomologiaMunicipiosFieldProp
   };
 
   const addMunicipio = () => {
+    if (disabled) return;
     const uiKey = `idx-${blocks.length}`;
     const next: EntomologiaMunicipioBlock[] = [
       ...blocks,
@@ -436,6 +438,7 @@ export const EntomologiaMunicipiosField: React.FC<EntomologiaMunicipiosFieldProp
   };
 
   const removeBlock = (uiKey: string) => {
+    if (disabled) return;
     commitBlocks(blocks.filter((b) => b.uiKey !== uiKey));
     setOpenKeys((prev) => {
       const n = new Set(prev);
@@ -445,6 +448,7 @@ export const EntomologiaMunicipiosField: React.FC<EntomologiaMunicipiosFieldProp
   };
 
   const updateBlock = (uiKey: string, patch: Partial<EntomologiaMunicipioBlock>) => {
+    if (disabled) return;
     let nextUiKey = uiKey;
     const next = blocks.map((b) => {
       if (b.uiKey !== uiKey) return b;
@@ -489,33 +493,14 @@ export const EntomologiaMunicipiosField: React.FC<EntomologiaMunicipiosFieldProp
     return municipioOptions.find((o) => o.value === id)?.label ?? `Município ${id}`;
   };
 
-  if (disabled) {
-    return (
-      <div className="mb-4 space-y-6 md:col-span-2">
-        <p className="text-sm text-gray-600">
-          Visualização em tabela (a digitação é por município na edição). A planilha completa sai no export
-          Excel/PDF.
-        </p>
-        <TableField
-          field={resumoField}
-          value={resumoRows}
-          onChange={() => undefined}
-          disabled
-          getValue={getValue}
-        />
-        {frequenciaField ? (
-          <TableField
-            field={frequenciaField}
-            value={frequenciaRows}
-            onChange={() => undefined}
-            disabled
-            getValue={getValue}
-          />
-        ) : null}
-        {error ? <p className="mt-1 text-sm text-red-500">{error}</p> : null}
-      </div>
-    );
-  }
+  const resumoColumnsView = useMemo(
+    () => resumoColumns.filter((c) => c.key !== 'municipio_id'),
+    [resumoColumns],
+  );
+  const frequenciaColumnsView = useMemo(
+    () => frequenciaColumns.filter((c) => c.key !== 'municipio_id'),
+    [frequenciaColumns],
+  );
 
   return (
     <div className="mb-4 space-y-3 md:col-span-2">
@@ -524,25 +509,33 @@ export const EntomologiaMunicipiosField: React.FC<EntomologiaMunicipiosFieldProp
           <label className="block text-sm font-medium text-gray-700">
             Municípios (resumo + frequência relativa)
           </label>
-          <p className="text-xs text-gray-500 mt-0.5">
-            Use só números inteiros (0, 1, 2…). Se houver larvas, pupas ou exúvias de uma espécie, informe também
-            quantos imóveis tiveram essa espécie. T.B + P.E não podem passar do total de imóveis. Não deixe o
-            município todo zerado.
-          </p>
+          {!disabled ? (
+            <p className="text-xs text-gray-500 mt-0.5">
+              Use só números inteiros (0, 1, 2…). Se houver larvas, pupas ou exúvias de uma espécie, informe também
+              quantos imóveis tiveram essa espécie. T.B + P.E não podem passar do total de imóveis. Não deixe o
+              município todo zerado.
+            </p>
+          ) : (
+            <p className="text-xs text-gray-500 mt-0.5">
+              Mesmo layout da digitação, somente leitura. Export completo em Excel/PDF no dashboard.
+            </p>
+          )}
         </div>
-        <button
-          type="button"
-          onClick={addMunicipio}
-          disabled={!crsId}
-          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          title={!crsId ? 'Selecione a CRS primeiro' : undefined}
-        >
-          <Plus className="h-4 w-4" />
-          Adicionar município
-        </button>
+        {!disabled ? (
+          <button
+            type="button"
+            onClick={addMunicipio}
+            disabled={!crsId}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={!crsId ? 'Selecione a CRS primeiro' : undefined}
+          >
+            <Plus className="h-4 w-4" />
+            Adicionar município
+          </button>
+        ) : null}
       </div>
 
-      {!crsId ? (
+      {!disabled && !crsId ? (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
           Selecione a CRS no cabeçalho para liberar a lista de municípios (somente da regional).
         </div>
@@ -550,67 +543,77 @@ export const EntomologiaMunicipiosField: React.FC<EntomologiaMunicipiosFieldProp
 
       {blocks.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
-          Nenhum município. Clique em &quot;Adicionar município&quot; para começar o relatório do mês.
+          {disabled
+            ? 'Nenhum município neste relatório.'
+            : 'Nenhum município. Clique em "Adicionar município" para começar o relatório do mês.'}
         </div>
       ) : (
         <ul className="space-y-2">
           {blocks.map((block, index) => {
             const isOpen = openKeys.has(block.uiKey);
             return (
-              <li key={block.uiKey} className="rounded-lg border border-gray-200 bg-white shadow-sm">
-                <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100">
+              <li key={block.uiKey} className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+                <div className="flex items-center gap-2 px-3 py-2.5 bg-blue-600 text-white">
                   <button
                     type="button"
                     onClick={() => toggleOpen(block.uiKey)}
-                    className="flex flex-1 items-center gap-2 text-left text-sm font-medium text-gray-800"
+                    className="flex flex-1 items-center gap-2 text-left text-sm font-semibold text-white"
                   >
                     {isOpen ? (
-                      <ChevronDown className="h-4 w-4 text-gray-500 shrink-0" />
+                      <ChevronDown className="h-4 w-4 text-blue-100 shrink-0" />
                     ) : (
-                      <ChevronRight className="h-4 w-4 text-gray-500 shrink-0" />
+                      <ChevronRight className="h-4 w-4 text-blue-100 shrink-0" />
                     )}
                     <span>
                       {index + 1}. {labelForMunicipio(block.municipio_id)}
                     </span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => removeBlock(block.uiKey)}
-                    className="p-1.5 text-red-600 hover:bg-red-50 rounded"
-                    title="Remover município"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {!disabled ? (
+                    <button
+                      type="button"
+                      onClick={() => removeBlock(block.uiKey)}
+                      className="p-1.5 text-white/90 hover:bg-blue-700 rounded"
+                      title="Remover município"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  ) : null}
                 </div>
                 {isOpen ? (
                   <div className="p-4 space-y-5">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">
                         {municipioCol?.label ?? 'Município'}
-                        <span className="text-red-500 ml-0.5">*</span>
+                        {!disabled ? <span className="text-red-500 ml-0.5">*</span> : null}
                       </label>
-                      <MunicipioSearchSelect
-                        value={block.municipio_id}
-                        onChange={(v) =>
-                          updateBlock(block.uiKey, {
-                            municipio_id: v,
-                          })
-                        }
-                        options={municipioOptions}
-                        excludeValues={
-                          new Set(
-                            [...selectedMunicipioIds].filter((id) => id !== block.municipio_id),
-                          )
-                        }
-                        disabled={disabled || !crsId}
-                        loading={municipiosLoading}
-                      />
+                      {disabled ? (
+                        <div className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded bg-gray-50 text-gray-800">
+                          {labelForMunicipio(block.municipio_id)}
+                        </div>
+                      ) : (
+                        <MunicipioSearchSelect
+                          value={block.municipio_id}
+                          onChange={(v) =>
+                            updateBlock(block.uiKey, {
+                              municipio_id: v,
+                            })
+                          }
+                          options={municipioOptions}
+                          excludeValues={
+                            new Set(
+                              [...selectedMunicipioIds].filter((id) => id !== block.municipio_id),
+                            )
+                          }
+                          disabled={!crsId}
+                          loading={municipiosLoading}
+                        />
+                      )}
                     </div>
 
                     <div>
                       <h4 className="text-sm font-semibold text-gray-800 mb-2">Resumo mensal</h4>
                       <FieldGrid
-                        columns={resumoColumns}
+                        columns={disabled ? resumoColumnsView : resumoColumns}
                         row={block.resumo}
                         onCellChange={(key, value) =>
                           updateBlock(block.uiKey, { resumo: { [key]: value } })
@@ -630,7 +633,7 @@ export const EntomologiaMunicipiosField: React.FC<EntomologiaMunicipiosFieldProp
                           lixo | E naturais. Vermelho = albopictus. % calculados.
                         </p>
                         <FieldGrid
-                          columns={frequenciaColumns}
+                          columns={disabled ? frequenciaColumnsView : frequenciaColumns}
                           row={block.frequencia}
                           onCellChange={(key, value) =>
                             updateBlock(block.uiKey, { frequencia: { [key]: value } })

@@ -30,6 +30,7 @@ import {
 } from '@/features/comunicacao-dae/hooks/useResizableTableColumns';
 import { calcularSemanaEpidemiologica } from '@/utils/timezoneUtils';
 import { offlineDataManager } from '@/services/offlineDataManager';
+import { ListPaginationBar } from '@/components/list/ListPaginationBar';
 
 // Tipos para pesquisa
 type SearchField = 'all' | 'nome_paciente' | 'origem' | 'unidade_notificadora' | 'dae' | 'municipio';
@@ -1633,77 +1634,19 @@ const ComunicacaoDaePage: React.FC = () => {
               </div>
             </div>
 
-            {/* Paginação e Controles */}
-            <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                {/* Informações de Registros */}
-                <div className="text-sm text-gray-600 text-center lg:text-left">
-                  Mostrando <span className="font-semibold text-gray-900">{total > 0 ? ((currentPage - 1) * itemsPerPage) + 1 : 0}</span> a{' '}
-                  <span className="font-semibold text-gray-900">{Math.min(currentPage * itemsPerPage, total)}</span> de{' '}
-                  <span className="font-semibold text-gray-900">{total}</span> registros
-                </div>
-
-                {/* Controles de Paginação - Só mostra se houver múltiplas páginas */}
-                {totalPages > 1 && (
-                  <div className="flex flex-wrap items-center justify-center gap-2">
-                    <button
-                      onClick={() => setCurrentPage(1)}
-                      disabled={currentPage === 1}
-                      className="px-3 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors text-sm font-medium"
-                      title="Primeira página"
-                    >
-                      ««
-                    </button>
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
-                      className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors text-sm font-medium"
-                    >
-                      Anterior
-                    </button>
-                    
-                    {/* Indicador de Página */}
-                    <div className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-semibold text-sm shadow-sm">
-                      Página {currentPage} de {totalPages}
-                    </div>
-                    
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages}
-                      className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors text-sm font-medium"
-                    >
-                      Próxima
-                    </button>
-                    <button
-                      onClick={() => setCurrentPage(totalPages)}
-                      disabled={currentPage === totalPages}
-                      className="px-3 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors text-sm font-medium"
-                      title="Última página"
-                    >
-                      »»
-                    </button>
-                  </div>
-                )}
-
-                {/* Seletor de Itens por Página - SEMPRE VISÍVEL */}
-                <div className="flex items-center justify-center gap-2 w-full lg:w-auto">
-                  <label className="text-sm text-gray-600 font-medium whitespace-nowrap">Itens por página:</label>
-                  <select
-                    value={itemsPerPage}
-                    onChange={(e) => {
-                      setItemsPerPage(Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium"
-                  >
-                    <option value={10}>10</option>
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                  </select>
-                </div>
-              </div>
-            </div>
+            <ListPaginationBar
+              page={currentPage}
+              totalPages={totalPages}
+              total={total}
+              itemsPerPage={itemsPerPage}
+              itemsPerPageId="dae-list-items-per-page"
+              itemsPerPageTestId="dae-list-items-per-page"
+              onPageChange={setCurrentPage}
+              onItemsPerPageChange={(limit) => {
+                setItemsPerPage(limit);
+                setCurrentPage(1);
+              }}
+            />
           </>
         )}
       </main>

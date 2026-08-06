@@ -12,6 +12,18 @@ const api = axios.create({
 
 export type ResponseStatus = 'draft' | 'submitted' | 'synced';
 
+export type FormResponsesListFilters = {
+  page?: number;
+  limit?: number;
+  status?: ResponseStatus;
+  search?: string;
+  search_field?: string;
+  sortKey?: string;
+  sortDir?: 'asc' | 'desc';
+  data_inicio?: string;
+  data_fim?: string;
+};
+
 export interface FormResponsesListResponse {
   data: Array<{
     id: number;
@@ -30,7 +42,7 @@ export interface FormResponsesListResponse {
 }
 
 class FormResponsesService {
-  async list(formId: number, filters?: { page?: number; limit?: number; status?: ResponseStatus }) {
+  async list(formId: number, filters?: FormResponsesListFilters) {
     const response = await api.get<FormResponsesListResponse>(`/forms/${formId}/responses`, { params: filters });
     return response.data;
   }
@@ -41,14 +53,15 @@ class FormResponsesService {
    */
   async listAllResponses(
     formId: number,
-    filters?: { status?: ResponseStatus; pageSize?: number; maxPages?: number },
+    filters?: Omit<FormResponsesListFilters, 'page' | 'limit'> & { pageSize?: number; maxPages?: number },
   ): Promise<FormResponsesListResponse['data']> {
     const pageSize = filters?.pageSize ?? 500;
     const maxPages = filters?.maxPages ?? 500;
+    const { pageSize: _ps, maxPages: _mp, ...listFilters } = filters ?? {};
     const out: FormResponsesListResponse['data'] = [];
     let page = 1;
     while (page <= maxPages) {
-      const res = await this.list(formId, { page, limit: pageSize, status: filters?.status });
+      const res = await this.list(formId, { ...listFilters, page, limit: pageSize });
       out.push(...res.data);
       if (page >= res.totalPages || res.data.length === 0) break;
       page += 1;
@@ -56,7 +69,10 @@ class FormResponsesService {
     return out;
   }
 
-  async downloadExport(formId: number, params?: { format?: 'csv' | 'xlsx'; status?: ResponseStatus }) {
+  async downloadExport(
+    formId: number,
+    params?: FormResponsesListFilters & { format?: 'csv' | 'xlsx' },
+  ) {
     const response = await api.get(`/forms/${formId}/responses/export`, {
       params,
       responseType: 'blob',
@@ -76,4 +92,3 @@ class FormResponsesService {
 }
 
 export default new FormResponsesService();
-

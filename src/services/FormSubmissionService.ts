@@ -99,11 +99,16 @@ class FormSubmissionService {
 
   /**
    * Busca todas as páginas com `data_json` (até `maxPages` páginas × `pageSize` itens).
-   * Uso: consolidados QDQQ / relatório operacional regional.
+   * Uso: consolidados QDQQ / relatório operacional regional / Entomologia.
    */
   async getSubmissionsAllPagesWithFormPayload(
     form_version_id: number,
-    opts?: { pageSize?: number; maxPages?: number },
+    opts?: {
+      pageSize?: number;
+      maxPages?: number;
+      crs_id?: number;
+      competencia?: string;
+    },
   ): Promise<FormSubmission[]> {
     const pageSize = opts?.pageSize ?? 500;
     const maxPages = opts?.maxPages ?? 200;
@@ -115,6 +120,8 @@ class FormSubmissionService {
         limit: pageSize,
         page,
         with_form_payload: '1',
+        ...(opts?.crs_id != null ? { crs_id: opts.crs_id } : {}),
+        ...(opts?.competencia ? { competencia: opts.competencia } : {}),
       });
       out.push(...res.data);
       if (page >= res.totalPages || res.data.length === 0) break;
@@ -237,6 +244,27 @@ class FormSubmissionService {
     const disp = response.headers['content-disposition'];
     const match = typeof disp === 'string' ? /filename="?([^"]+)"?/.exec(disp) : null;
     const filename = match?.[1] ?? `entomologia-larvas-${id}.${format}`;
+    return { blob, filename };
+  }
+
+  /** Excel consolidado Entomologia (filtros CRS/competência). */
+  async downloadEntomologiaConsolidatedExport(params: {
+    form_version_id: number;
+    crs_id?: number;
+    competencia?: string;
+  }): Promise<{ blob: Blob; filename: string }> {
+    const response = await api.get(`/submissions/export-entomologia`, {
+      params: {
+        form_version_id: params.form_version_id,
+        ...(params.crs_id != null ? { crs_id: params.crs_id } : {}),
+        ...(params.competencia ? { competencia: params.competencia } : {}),
+      },
+      responseType: 'blob',
+    });
+    const blob = response.data as Blob;
+    const disp = response.headers['content-disposition'];
+    const match = typeof disp === 'string' ? /filename="?([^"]+)"?/.exec(disp) : null;
+    const filename = match?.[1] ?? 'entomologia-larvas-consolidado.xlsx';
     return { blob, filename };
   }
 }

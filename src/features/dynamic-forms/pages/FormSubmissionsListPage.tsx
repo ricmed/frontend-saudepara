@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import FormService, { type Form } from '@/services/FormService';
 import FormSubmissionService, { type FormSubmission } from '@/services/FormSubmissionService';
 import FormResponsesService from '@/services/FormResponsesService';
-import { Plus, Edit, Trash2, FileText, BarChart2, BarChart3, FileSpreadsheet, Download, Columns2 } from 'lucide-react';
+import { Plus, Edit, Trash2, FileText, BarChart2, BarChart3, FileSpreadsheet, Columns2, CheckSquare, Square, Loader2 } from 'lucide-react';
 import { HEPATITE_CRIANCA_HBV_FORM_KEY } from '../hepatite-crianca-hbv/constants';
 import {
   buildHepatiteCriancaSummaryById,
@@ -34,8 +34,17 @@ import { useMunicipioLabelByIdMap } from '../hooks/useMunicipioLabelByIdMap';
 import { useTipoPaisLabelByIdMap } from '../hooks/useTipoPaisLabelByIdMap';
 import { FormResponseReadonlyModal } from '../components/FormResponseReadonlyModal';
 import { FormResponsesSpreadsheetModal } from '../components/FormResponsesSpreadsheetModal';
+import { ListPaginationBar } from '@/components/list/ListPaginationBar';
+import { ListSearchFiltersBar, type ListDateFilterValues } from '../components/list/ListSearchFiltersBar';
+import { ListExportMenu } from '../components/list/ListExportMenu';
+import { exportRowsAsCsv, exportRowsAsXlsx } from '../components/list/exportCurrentPage';
+import {
+  getFormListSearchFields,
+  mapUiSortToApiParams,
+} from '../components/list/formListSearchAdapter';
 import { getValueAtPath, guessKeyFields, resolveActiveSchema, collectSchemaReferenceMapsNeeded, findFormFieldByKey, formatCellValueForResponseList, type ResponseListLabelMaps } from '../utils/formResponsesListUtils';
 import { useAuth } from '@/keycloak/AuthProvider';
+import type { FormResponsesListFilters } from '@/services/FormResponsesService';
 
 type ResponseRow = {
   id: number;
@@ -191,6 +200,7 @@ export const FormSubmissionsListPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [listTotal, setListTotal] = useState(0);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ResponseRow | null>(null);
@@ -209,7 +219,15 @@ export const FormSubmissionsListPage: React.FC = () => {
     key: null,
     order: 'asc',
   });
+  const [searchParams, setSearchParams] = useState({ term: '', field: 'all' });
+  const [debouncedSearch, setDebouncedSearch] = useState({ term: '', field: 'all' });
+  const [dateFilters, setDateFilters] = useState<ListDateFilterValues>({});
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const listColPickerRef = useRef<HTMLDivElement | null>(null);
+  const listQueryReadyRef = useRef(false);
+  const skipListReloadOnceRef = useRef(false);
 
   const isMonitorOperList = agravo?.toUpperCase() === MONITOR_OPER_REGIONAL_KEY;
   const isHepatiteCriancaList = agravo?.toUpperCase() === HEPATITE_CRIANCA_HBV_FORM_KEY;
@@ -285,11 +303,18 @@ export const FormSubmissionsListPage: React.FC = () => {
       if (prev.key !== key) return { key, order: 'asc' };
       return { key, order: prev.order === 'asc' ? 'desc' : 'asc' };
     });
+    setPage(1);
   }, []);
 
+  const serverSortMeta = useMemo(
+    () => mapUiSortToApiParams(listSort.key, listSort.order),
+    [listSort.key, listSort.order],
+  );
+
   const sortedRows = useMemo(() => {
+    // Ordenação no servidor para campos genéricos; Monitor/Hepatite custom ficam client-side na página.
+    if (!serverSortMeta.clientOnly || !listSort.key) return rows;
     const sk = listSort.key;
-    if (!sk) return rows;
     const dir = listSort.order;
     const opts = {
       monitorSummaryById,
@@ -309,6 +334,7 @@ export const FormSubmissionsListPage: React.FC = () => {
     rows,
     listSort.key,
     listSort.order,
+    serverSortMeta.clientOnly,
     monitorSummaryById,
     monitorColById,
     hepatiteSummaryById,
@@ -317,6 +343,30 @@ export const FormSubmissionsListPage: React.FC = () => {
     activeSchema,
     responseLabelMaps,
   ]);
+
+  const formSearchFields = useMemo(() => getFormListSearchFields(agravo), [agravo]);
+
+  const buildListFilters = useCallback(
+    (p: number, limit: number): FormResponsesListFilters => {
+      const filters: FormResponsesListFilters = {
+        page: p,
+        limit,
+        status: 'submitted',
+      };
+      if (debouncedSearch.term.length >= 3) {
+        filters.search = debouncedSearch.term;
+        filters.search_field = debouncedSearch.field;
+      }
+      if (dateFilters.data_inicio) filters.data_inicio = dateFilters.data_inicio;
+      if (dateFilters.data_fim) filters.data_fim = dateFilters.data_fim;
+      if (!serverSortMeta.clientOnly && serverSortMeta.sortKey) {
+        filters.sortKey = serverSortMeta.sortKey;
+        filters.sortDir = serverSortMeta.sortDir;
+      }
+      return filters;
+    },
+    [debouncedSearch, dateFilters, serverSortMeta],
+  );
 
   const sheetMonitorSummaryById = useMemo(
     () => (isMonitorOperList ? buildMonitorOperSummaryById(sheetPreviewRows) : new Map()),
@@ -416,8 +466,8 @@ export const FormSubmissionsListPage: React.FC = () => {
     loadData();
   }, [agravo]);
 
-  const loadResponsesPage = async (formId: number, p = 1) => {
-    const res = await FormResponsesService.list(formId, { page: p, limit: 50, status: 'submitted' });
+  const loadResponsesPage = async (formId: number, p = 1, limit = itemsPerPage) => {
+    const res = await FormResponsesService.list(formId, buildListFilters(p, limit));
     setRows(res.data as ResponseRow[]);
     setPage(res.page);
     setTotalPages(res.totalPages);
@@ -431,7 +481,13 @@ export const FormSubmissionsListPage: React.FC = () => {
       setLoading(true);
       setError(null);
       setListSort({ key: null, order: 'asc' });
+      setSearchParams({ term: '', field: 'all' });
+      setDebouncedSearch({ term: '', field: 'all' });
+      setDateFilters({});
+      setPage(1);
+      setItemsPerPage(10);
       setMonitorSubmissionsForTotals([]);
+      listQueryReadyRef.current = false;
 
       const formData = await FormService.getFormByKey(agravo);
       setForm(formData);
@@ -441,7 +497,17 @@ export const FormSubmissionsListPage: React.FC = () => {
       }
 
       if (formData.id) {
-        await loadResponsesPage(formData.id, 1);
+        const res = await FormResponsesService.list(formData.id, {
+          page: 1,
+          limit: 10,
+          status: 'submitted',
+        });
+        setRows(res.data as ResponseRow[]);
+        setPage(res.page);
+        setTotalPages(res.totalPages);
+        setListTotal(res.total);
+        listQueryReadyRef.current = true;
+        skipListReloadOnceRef.current = true;
       } else {
         setRows([]);
         setListTotal(0);
@@ -456,6 +522,24 @@ export const FormSubmissionsListPage: React.FC = () => {
   };
 
   useEffect(() => {
+    if (searchParams.term.length > 0 && searchParams.term.length < 3) return;
+    const t = window.setTimeout(() => {
+      setDebouncedSearch(searchParams);
+      setPage(1);
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!listQueryReadyRef.current || !form?.id) return;
+    if (skipListReloadOnceRef.current) {
+      skipListReloadOnceRef.current = false;
+      return;
+    }
+    void loadResponsesPage(form.id, page, itemsPerPage);
+  }, [debouncedSearch, dateFilters, serverSortMeta.sortKey, serverSortMeta.sortDir, serverSortMeta.clientOnly, page, itemsPerPage, form?.id]);
+
+  useEffect(() => {
     if (!showSheet || !form?.id) {
       setSheetPreviewRows([]);
       setSheetPreviewLoading(false);
@@ -464,7 +548,13 @@ export const FormSubmissionsListPage: React.FC = () => {
     let cancelled = false;
     setSheetPreviewLoading(true);
     setSheetPreviewRows([]);
-    FormResponsesService.listAllResponses(form.id, { status: 'submitted' })
+    FormResponsesService.listAllResponses(form.id, {
+      status: 'submitted',
+      ...(debouncedSearch.term.length >= 3
+        ? { search: debouncedSearch.term, search_field: debouncedSearch.field }
+        : {}),
+      ...dateFilters,
+    })
       .then((data) => {
         if (!cancelled) setSheetPreviewRows(data as ResponseRow[]);
       })
@@ -481,12 +571,22 @@ export const FormSubmissionsListPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [showSheet, form?.id]);
+  }, [showSheet, form?.id, debouncedSearch, dateFilters]);
 
-  const download = async (format: 'xlsx' | 'csv') => {
+  const downloadAll = async (format: 'xlsx' | 'csv') => {
     if (!form?.id) return;
     try {
-      const { blob, filename } = await FormResponsesService.downloadExport(form.id, { format, status: 'submitted' });
+      const { blob, filename } = await FormResponsesService.downloadExport(form.id, {
+        format,
+        status: 'submitted',
+        ...(debouncedSearch.term.length >= 3
+          ? { search: debouncedSearch.term, search_field: debouncedSearch.field }
+          : {}),
+        ...dateFilters,
+        ...(!serverSortMeta.clientOnly && serverSortMeta.sortKey
+          ? { sortKey: serverSortMeta.sortKey, sortDir: serverSortMeta.sortDir }
+          : {}),
+      });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -518,7 +618,143 @@ export const FormSubmissionsListPage: React.FC = () => {
     }
   };
 
+  const toggleSelectId = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllPage = () => {
+    const pageIds = sortedRows.map((r) => r.id);
+    const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) pageIds.forEach((id) => next.delete(id));
+      else pageIds.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    if (!confirm(`Excluir ${ids.length} notificação(ões) selecionada(s)? Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+    const userId = user?.sub || (user as any)?.id;
+    if (!userId) {
+      alert('Usuário não autenticado');
+      return;
+    }
+    setBulkDeleting(true);
+    let failed = 0;
+    try {
+      for (const id of ids) {
+        try {
+          await FormSubmissionService.deleteSubmission(id, userId);
+        } catch {
+          failed += 1;
+        }
+      }
+      setSelectedIds(new Set());
+      setIsSelectionMode(false);
+      if (form?.id) await loadResponsesPage(form.id, page);
+      if (agravo === MONITOR_OPER_REGIONAL_KEY && form?.active_version_id) {
+        const all = await FormSubmissionService.getSubmissionsAllPagesWithFormPayload(form.active_version_id);
+        setMonitorSubmissionsForTotals(all);
+      }
+      if (failed > 0) {
+        alert(`${failed} exclusão(ões) falharam. As demais foram concluídas.`);
+      }
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   const genericKeyFields = guessKeyFields(activeSchema as Parameters<typeof guessKeyFields>[0]);
+
+  const formatRowCard = (r: ResponseRow) => {
+    const submittedAt = r.submitted_at ? new Date(r.submitted_at).toLocaleString('pt-BR') : '—';
+    if (isMonitorOperList) {
+      const sum = monitorSummaryById.get(r.id);
+      const title = sum ? visibleMonitorCols[0]?.format(sum, crsByIdMap) || `#${r.id}` : `#${r.id}`;
+      const lines = visibleMonitorCols.slice(1, 4).map((c) => {
+        const text = sum ? c.format(sum, crsByIdMap) : '—';
+        return `${c.label}: ${text}`;
+      });
+      return { title: String(title), subtitle: submittedAt, lines };
+    }
+    if (isHepatiteCriancaList) {
+      const sum = hepatiteSummaryById.get(r.id);
+      const title = sum ? visibleHepatiteCols[0]?.format(sum) || `#${r.id}` : `#${r.id}`;
+      const lines = visibleHepatiteCols.slice(1, 4).map((c) => {
+        const text = sum ? c.format(sum) : '—';
+        return `${c.label}: ${text}`;
+      });
+      return { title: String(title), subtitle: submittedAt, lines };
+    }
+    const fields = genericKeyFields.slice(0, 3);
+    const titleField = fields[0];
+    const title = titleField
+      ? formatCellValueForResponseList(
+          getValueAtPath(r.data_json ?? {}, titleField.key),
+          findFormFieldByKey(activeSchema, titleField.key),
+          responseLabelMaps,
+        ) || `#${r.id}`
+      : `#${r.id}`;
+    const lines = fields.slice(1).map((f) => {
+      const display = formatCellValueForResponseList(
+        getValueAtPath(r.data_json ?? {}, f.key),
+        findFormFieldByKey(activeSchema, f.key),
+        responseLabelMaps,
+      );
+      return `${f.label}: ${display || '—'}`;
+    });
+    return { title: String(title), subtitle: submittedAt, lines };
+  };
+
+  const pageAllSelected =
+    sortedRows.length > 0 && sortedRows.every((r) => selectedIds.has(r.id));
+  const pageSomeSelected = sortedRows.some((r) => selectedIds.has(r.id)) && !pageAllSelected;
+
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === 0) return prev;
+      const pageSet = new Set(sortedRows.map((r) => r.id));
+      const next = new Set([...prev].filter((id) => pageSet.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [sortedRows]);
+
+  const downloadPage = (format: 'xlsx' | 'csv') => {
+    const cols: Array<{ key: string; label: string }> = [
+      { key: 'id', label: 'ID' },
+      { key: 'submitted_at', label: 'Data do envio' },
+      { key: 'created_by', label: 'Criado por' },
+    ];
+    for (const f of genericKeyFields.slice(0, 8)) {
+      cols.push({ key: `f_${f.key}`, label: f.label || f.key });
+    }
+    const flat = sortedRows.map((r) => {
+      const row: Record<string, unknown> = {
+        id: r.id,
+        submitted_at: r.submitted_at ?? r.created_at,
+        created_by: r.created_by,
+      };
+      for (const f of genericKeyFields.slice(0, 8)) {
+        const v = getValueAtPath(r.data_json ?? {}, f.key);
+        const field = findFormFieldByKey(activeSchema, f.key);
+        row[`f_${f.key}`] = formatCellValueForResponseList(v, field, responseLabelMaps);
+      }
+      return row;
+    });
+    const base = `form-${form?.id ?? 'respostas'}-pagina-${page}`;
+    if (format === 'csv') exportRowsAsCsv(flat, cols, base);
+    else exportRowsAsXlsx(flat, cols, base);
+  };
 
   if (loading) {
     return (
@@ -566,7 +802,7 @@ export const FormSubmissionsListPage: React.FC = () => {
 
   const exportHeader =
     form?.id != null ? (
-      <div className="flex flex-wrap gap-2 justify-end">
+      <div className="flex flex-wrap gap-2 justify-end items-center">
         <button
           type="button"
           onClick={() => setShowSheet(true)}
@@ -576,24 +812,10 @@ export const FormSubmissionsListPage: React.FC = () => {
           <FileSpreadsheet className="h-4 w-4" />
           Tabela
         </button>
-        <button
-          type="button"
-          onClick={() => download('xlsx')}
-          className="px-3 py-2 bg-white text-emerald-700 rounded-lg hover:bg-emerald-50 flex items-center gap-2 shadow font-medium"
-          title="Exportar XLSX"
-        >
-          <Download className="h-4 w-4" />
-          XLSX
-        </button>
-        <button
-          type="button"
-          onClick={() => download('csv')}
-          className="px-3 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-50 flex items-center gap-2 shadow font-medium"
-          title="Exportar CSV"
-        >
-          <Download className="h-4 w-4" />
-          CSV
-        </button>
+        <ListExportMenu
+          onExportPage={downloadPage}
+          onExportAll={(fmt) => void downloadAll(fmt)}
+        />
       </div>
     ) : null;
 
@@ -617,6 +839,17 @@ export const FormSubmissionsListPage: React.FC = () => {
             >
               <BarChart3 className="h-4 w-4" />
               Relatório
+            </button>
+          )}
+          {agravo?.toUpperCase() === 'ENTOMOLOGIA_LARVAS' && (
+            <button
+              type="button"
+              data-testid="entomologia-larvas-dashboard"
+              onClick={() => navigate('/private/entomologia-larvas')}
+              className="px-4 py-2 bg-white text-gray-800 rounded-md hover:bg-gray-50 flex items-center gap-2 font-medium border border-gray-200"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Dashboard
             </button>
           )}
           {isHepatiteCriancaList && (
@@ -648,8 +881,8 @@ export const FormSubmissionsListPage: React.FC = () => {
         form={form}
         rows={sortedSheetPreviewRows}
         loading={sheetPreviewLoading}
-        onDownloadXlsx={() => download('xlsx')}
-        onDownloadCsv={() => download('csv')}
+        onDownloadXlsx={() => void downloadAll('xlsx')}
+        onDownloadCsv={() => void downloadAll('csv')}
         labelMaps={responseLabelMaps}
       />
 
@@ -675,6 +908,59 @@ export const FormSubmissionsListPage: React.FC = () => {
           </button>
         </div>
       ) : (
+        <>
+        <ListSearchFiltersBar
+          searchFields={formSearchFields.map((f) => ({ value: f.value, label: f.label }))}
+          searchField={searchParams.field}
+          searchTerm={searchParams.term}
+          onSearchFieldChange={(field) => setSearchParams((s) => ({ ...s, field }))}
+          onSearchTermChange={(term) => setSearchParams((s) => ({ ...s, term }))}
+          dateFilters={dateFilters}
+          onApplyDateFilters={(next) => {
+            setDateFilters(next);
+            setPage(1);
+          }}
+          onClearDateFilters={() => {
+            setDateFilters({});
+            setPage(1);
+          }}
+        />
+
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            data-testid="form-list-selection-toggle"
+            onClick={() => {
+              setIsSelectionMode((v) => !v);
+              setSelectedIds(new Set());
+            }}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            {isSelectionMode ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+            {isSelectionMode ? 'Cancelar seleção' : 'Selecionar'}
+          </button>
+          {isSelectionMode ? (
+            <>
+              <button
+                type="button"
+                onClick={toggleSelectAllPage}
+                className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm text-gray-700 hover:bg-gray-50"
+              >
+                {pageAllSelected ? 'Limpar página' : 'Selecionar página'}
+              </button>
+              <button
+                type="button"
+                disabled={selectedIds.size === 0 || bulkDeleting}
+                onClick={() => void handleBulkDelete()}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+              >
+                {bulkDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                Excluir ({selectedIds.size})
+              </button>
+            </>
+          ) : null}
+        </div>
+
         <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-visible">
           {isCustomList && listTotal > 0 ? (
             <div className="flex flex-wrap items-center justify-end gap-2 border-b border-gray-200 bg-gray-100 px-3 py-2">
@@ -796,10 +1082,87 @@ export const FormSubmissionsListPage: React.FC = () => {
               </div>
             </div>
           ) : null}
-          <div className="overflow-x-auto">
+          {/* Mobile: cards */}
+          <div className="block md:hidden divide-y divide-gray-100" data-testid="form-list-mobile-cards">
+            {sortedRows.map((r) => {
+              const card = formatRowCard(r);
+              const selected = selectedIds.has(r.id);
+              return (
+                <div
+                  key={r.id}
+                  className={`p-4 ${selected ? 'ring-2 ring-inset ring-blue-400 bg-blue-50/80' : ''}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    {isSelectionMode ? (
+                      <div className="pt-1 shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => toggleSelectId(r.id)}
+                          aria-label={`Selecionar resposta ${r.id}`}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                      </div>
+                    ) : null}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{card.title}</p>
+                      <p className="text-xs text-gray-500 mt-1">{card.subtitle}</p>
+                      {card.lines.map((line) => (
+                        <p key={line} className="text-xs text-gray-700 mt-1 truncate">
+                          {line}
+                        </p>
+                      ))}
+                    </div>
+                    <div className="flex flex-col gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setSelected(r)}
+                        className="px-2.5 py-1 rounded-lg border bg-white text-xs text-blue-700 hover:bg-blue-50 font-medium"
+                      >
+                        Ver
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/private/formularios/${agravo}/editar/${r.id}`)}
+                        className="p-1.5 text-green-600 hover:bg-green-50 rounded self-end"
+                        title="Editar"
+                      >
+                        <Edit className="h-5 w-5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(r.id)}
+                        className="p-1.5 text-red-600 hover:bg-red-50 rounded self-end"
+                        title="Excluir"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop: tabela */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full min-w-full text-sm divide-y divide-gray-200">
               <thead className="bg-blue-600 text-white">
                 <tr>
+                  {isSelectionMode ? (
+                    <th scope="col" className="w-11 px-2 py-3 text-center align-middle">
+                      <input
+                        type="checkbox"
+                        checked={pageAllSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = pageSomeSelected;
+                        }}
+                        onChange={toggleSelectAllPage}
+                        aria-label="Selecionar todos desta página"
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                    </th>
+                  ) : null}
                   {isMonitorOperList
                     ? visibleMonitorCols.map((c) => (
                         <FormListSortableTh
@@ -863,7 +1226,23 @@ export const FormSubmissionsListPage: React.FC = () => {
                 {sortedRows.map((r) => {
                   const submittedAt = r.submitted_at ? new Date(r.submitted_at) : null;
                   return (
-                    <tr key={r.id} className="transition-colors duration-150 hover:bg-gray-50">
+                    <tr
+                      key={r.id}
+                      className={`transition-colors duration-150 hover:bg-gray-50 ${
+                        selectedIds.has(r.id) ? 'bg-blue-50/70' : ''
+                      }`}
+                    >
+                      {isSelectionMode ? (
+                        <td className="w-11 px-2 py-3 text-center align-middle">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(r.id)}
+                            onChange={() => toggleSelectId(r.id)}
+                            aria-label={`Selecionar resposta ${r.id}`}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                        </td>
+                      ) : null}
                       {isMonitorOperList ? (
                         visibleMonitorCols.map((c) => {
                           const sum = monitorSummaryById.get(r.id);
@@ -946,29 +1325,24 @@ export const FormSubmissionsListPage: React.FC = () => {
               </tbody>
             </table>
           </div>
-
-          <div className="flex items-center justify-between px-3 lg:px-4 py-3 border-t border-gray-200 bg-gray-50">
-            <button
-              type="button"
-              onClick={() => form?.id && loadResponsesPage(form.id, Math.max(1, page - 1))}
-              disabled={page <= 1 || !form?.id}
-              className="px-3 py-1 rounded border disabled:opacity-50"
-            >
-              Anterior
-            </button>
-            <span className="text-sm text-gray-700">
-              Página {page} de {totalPages}
-            </span>
-            <button
-              type="button"
-              onClick={() => form?.id && loadResponsesPage(form.id, Math.min(totalPages, page + 1))}
-              disabled={page >= totalPages || !form?.id}
-              className="px-3 py-1 rounded border disabled:opacity-50"
-            >
-              Próxima
-            </button>
-          </div>
         </div>
+
+            {/* Paginação — card separado, padrão Comunicação DAE */}
+            <ListPaginationBar
+              page={page}
+              totalPages={totalPages}
+              total={listTotal}
+              itemsPerPage={itemsPerPage}
+              disabled={!form?.id}
+              itemsPerPageId="form-list-items-per-page"
+              itemsPerPageTestId="form-list-items-per-page"
+              onPageChange={(p) => setPage(p)}
+              onItemsPerPageChange={(limit) => {
+                setItemsPerPage(limit);
+                setPage(1);
+              }}
+            />
+        </>
       )}
     </AppPageLayout>
   );
