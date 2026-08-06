@@ -28,6 +28,7 @@ import {
   ClipboardList,
   Settings,
   QrCode,
+  Bug,
 } from "lucide-react";
 
 interface SideMenuProps {
@@ -122,6 +123,11 @@ export const SideMenu: React.FC<SideMenuProps> = ({
             icon: <ClipboardList />,
             label: t("menu.dynamic_forms"),
             onClick: () => navigate("/private/formularios"),
+          },
+          {
+            icon: <Bug />,
+            label: "Entomologia (Larvas)",
+            onClick: () => navigate("/private/entomologia-larvas"),
           },
         ]
       : []),

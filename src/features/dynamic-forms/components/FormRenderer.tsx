@@ -46,6 +46,7 @@ import { CriancaVacinaDoseRow } from './CriancaVacinaDoseRow';
 import { FORM_TAB_PANEL_ANIMATE_CLASS, FormTabBar } from './FormTabBar';
 import DynamicFormErrorSummary from './DynamicFormErrorSummary';
 import { FormActionBar } from './FormActionBar';
+import { CompetenciaMesAnoInputs } from './CompetenciaMesAnoInputs';
 import {
   buildDynamicFormFieldMeta,
   buildOrderedFormErrors,
@@ -77,6 +78,7 @@ import {
   CRIANCA_INVESTIGADOR_LAYOUT_KEYS,
 } from './InvestigadorDadosPanel';
 import { TableField } from './TableField';
+import { EntomologiaMunicipiosField } from './EntomologiaMunicipiosField';
 import MiniMapa, { type MiniMapaResolvedAddress } from '@/features/maps/leaflet/components/MiniMapa';
 import { ClipboardList, Calendar, DollarSign, Target, Activity, Shield, Leaf, BarChart3, Wrench, Users } from 'lucide-react';
 import { convertLocalDateTimeToUTC } from '@/utils/timezoneUtils';
@@ -622,6 +624,8 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     []
   );
   const isHepatiteCriancaHBV = isHepatiteCriancaHBVForm({ schema, formKey });
+  const isEntomologiaLarvas =
+    String(schema?.agravo ?? formKey ?? '').trim().toUpperCase() === 'ENTOMOLOGIA_LARVAS';
   const { isEstado, isAdmin, isEstabelecimento } = useUserPermissions();
   const showHepatiteResidenciaMap =
     isHepatiteCriancaHBV && canShowHepatiteResidenciaMap({ isEstado, isAdmin });
@@ -2026,83 +2030,23 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       case 'date':
         return <DateField {...dateProps} />;
       case 'month':
-        return (
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {resolved.label}
-              {required && <span className="text-red-500 ml-1">*</span>}
-            </label>
-            <input
-              type="month"
-              value={value ?? ''}
-              onChange={(e) => setValue(resolved.key, e.target.value || undefined)}
-              disabled={disabled}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${error ? 'border-red-500' : 'border-gray-300'}`}
-            />
-            {error && <p className="mt-1 text-sm text-red-500">{error}</p>}
-          </div>
-        );
       case 'month-year': {
         const comp = typeof value === 'string' ? value : '';
-        const m = comp.match(/^(\d{4})-(\d{2})$/);
-        const year = m ? m[1] : '';
-        const month = m ? m[2] : '';
-        const months = [
-          { value: '01', label: 'Janeiro' },
-          { value: '02', label: 'Fevereiro' },
-          { value: '03', label: 'Março' },
-          { value: '04', label: 'Abril' },
-          { value: '05', label: 'Maio' },
-          { value: '06', label: 'Junho' },
-          { value: '07', label: 'Julho' },
-          { value: '08', label: 'Agosto' },
-          { value: '09', label: 'Setembro' },
-          { value: '10', label: 'Outubro' },
-          { value: '11', label: 'Novembro' },
-          { value: '12', label: 'Dezembro' },
-        ];
-
-        const setComp = (y: string, mm: string) => {
-          if (y && mm) setValue(resolved.key, `${y}-${mm}`);
-          else setValue(resolved.key, undefined);
-        };
-
         return (
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               {resolved.label}
               {required && <span className="text-red-500 ml-1">*</span>}
             </label>
-            {resolved.helpText && <p className="text-xs text-gray-500 mb-2">{resolved.helpText}</p>}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <select
-                value={month}
-                onChange={(e) => setComp(year, e.target.value)}
-                disabled={disabled}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  error ? 'border-red-500' : 'border-gray-300'
-                } ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-              >
-                <option value="">Selecione o mês</option>
-                {months.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                inputMode="numeric"
-                value={year}
-                onChange={(e) => setComp(e.target.value ? String(e.target.value) : '', month)}
-                disabled={disabled}
-                placeholder="Ano"
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  error ? 'border-red-500' : 'border-gray-300'
-                } ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-              />
-            </div>
-            {error && <p className="mt-1 text-sm text-red-500">{error}</p>}
+            {resolved.helpText ? <p className="text-xs text-gray-500 mb-2">{resolved.helpText}</p> : null}
+            <CompetenciaMesAnoInputs
+              idPrefix={resolved.key}
+              value={comp}
+              onChange={(next) => setValue(resolved.key, next || undefined)}
+              disabled={disabled}
+              error={Boolean(error)}
+            />
+            {error ? <p className="mt-1 text-sm text-red-500">{error}</p> : null}
           </div>
         );
       }
@@ -2446,6 +2390,25 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       case 'address':
         return <AddressField {...commonProps} />;
       case 'table':
+        if (isEntomologiaLarvas && resolved.key === 'frequencia_recipientes') {
+          return null;
+        }
+        if (isEntomologiaLarvas && resolved.key === 'resumo_mensal') {
+          const frequenciaField =
+            (schema.sections ?? [])
+              .flatMap((s) => s.fields ?? [])
+              .find((f) => f.key === 'frequencia_recipientes') ?? null;
+          return (
+            <EntomologiaMunicipiosField
+              resumoField={resolved}
+              frequenciaField={frequenciaField}
+              getValue={getValue}
+              setValue={setValue}
+              disabled={disabled}
+              error={error}
+            />
+          );
+        }
         return <TableField {...commonProps} getValue={getValue} />;
       default:
         return (
@@ -2499,6 +2462,9 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
 
       {(() => {
         const sectionNodes = (pageMode ? (currentSection ? [currentSection] : []) : sectionsForDisplay).map((section) => {
+          if (isEntomologiaLarvas && section.id === 'frequencia_recipientes') {
+            return null;
+          }
           if (isHepatiteCriancaHBV) {
             const tipoExposicao = getValue(TIPO_EXPOSICAO_HEPATITE_KEY);
             if (HEPATITE_CRIANCA_HBV_ONLY_SECTIONS.has(section.id) && !tipoExposicaoMostraHbv(tipoExposicao)) {
@@ -3348,7 +3314,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                           <LabMaePanel
                             step={3}
                             variant="hbv"
-                            title="Vacina para Hepatite B + Imunoglobulina Hepatite B na maternidade"
+                            title="Vacina para Hepatite B + Imunoglobulina Anti-Hepatite B na maternidade"
                             subtitle="Obrigatório: antes ou após 24h de vida, ou não realizado (informe o que faltou). Informe as datas de administração quando aplicável."
                           >
                             <div className={`max-w-2xl space-y-4 ${criancaCell}`}>
@@ -3393,7 +3359,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                           step={1}
                           variant="neutral"
                           title="Vacina para Hepatite A"
-                          subtitle="Realizada no acompanhamento até 15 meses de idade (não na maternidade)."
+                          subtitle="Realizada no acompanhamento até, OU 15 meses de idade (não na maternidade)."
                         >
                           <div className={`max-w-md ${vacinaCell}`}>
                             {fieldDef ? renderField(fieldDef) : null}

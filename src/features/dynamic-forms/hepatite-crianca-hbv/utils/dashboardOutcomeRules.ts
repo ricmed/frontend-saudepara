@@ -16,7 +16,7 @@ import {
 
 
 export const ALERTA_LABELS: Record<HepatiteAlertaTipo, string> = {
-  hbig_pendente: 'HBIG pendente (mãe HBsAg+)',
+  hbig_pendente: 'IGHAHB pendente (mãe HBsAg+)',
   esquema1_pendente: 'Esquema 1 pendente (9–15m)',
   esquema2_pendente: 'Esquema 2 pendente',
   hcv_36_pendente: 'HCV-RNA 3–6m pendente',

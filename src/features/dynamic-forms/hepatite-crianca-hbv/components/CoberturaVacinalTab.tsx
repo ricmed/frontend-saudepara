@@ -61,9 +61,9 @@ export const CoberturaVacinalTab: React.FC<Props> = ({ charts }) => {
         <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
           <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
           <div>
-            <p className="font-semibold text-sm">Alerta — HBIG na maternidade</p>
+            <p className="font-semibold text-sm">Alerta — IGHAHB na maternidade</p>
             <p className="text-sm mt-1">
-              {charts.alertaHbsagSemHbig} filho(s) de mãe HBsAg+ sem registro de HBIG/vacina na
+              {charts.alertaHbsagSemHbig} filho(s) de mãe HBsAg+ sem registro de IGHAHB/vacina na
               maternidade no recorte atual.
             </p>
           </div>
@@ -79,7 +79,7 @@ export const CoberturaVacinalTab: React.FC<Props> = ({ charts }) => {
           gradient="from-blue-600 to-cyan-700"
         />
         <KpiCard
-          title="HBIG (mães HBsAg+)"
+          title="IGHAHB (mães HBsAg+)"
           value={`${pctHbig}%`}
           subtitle={`${kpis.hbigRecebido} de ${kpis.elegiveisHbig} elegíveis`}
           icon={Shield}
@@ -93,7 +93,7 @@ export const CoberturaVacinalTab: React.FC<Props> = ({ charts }) => {
           gradient="from-violet-600 to-purple-700"
         />
         <KpiCard
-          title="Sem HBIG (confirmado)"
+          title="Sem IGHAHB (confirmado)"
           value={kpis.semHbig}
           subtitle="Não realizado — imunoglobulina ou ambos"
           icon={AlertTriangle}
@@ -132,11 +132,11 @@ export const CoberturaVacinalTab: React.FC<Props> = ({ charts }) => {
 
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">HBIG — elegíveis vs cobertura</h3>
+            <h3 className="text-lg font-semibold text-gray-800">IGHAHB — elegíveis vs cobertura</h3>
             <ChartExportMenu
               chartId="hepatite-vacinal-hbig"
               chartData={charts.hbigRamo}
-              chartTitle="HBIG elegíveis"
+              chartTitle="IGHAHB elegíveis"
               buttonVariant="icon"
             />
           </div>

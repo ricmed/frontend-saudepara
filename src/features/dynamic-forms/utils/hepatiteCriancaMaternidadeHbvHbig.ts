@@ -56,7 +56,7 @@ export function isMaternidadeNaoRealizadoQualRequired(maternidadeCode: unknown):
 }
 
 const DEFAULT_MATERNIDADE_LABEL =
-  'Vacina para Hepatite B + Imunoglobulina Hepatite B na maternidade';
+  'Vacina para Hepatite B + Imunoglobulina Anti-Hepatite B na maternidade';
 
 /** Campo 54 — obrigatório quando o tipo de exposição inclui HBV. */
 export function collectHepatiteCriancaMaternidadeHbvErrors(

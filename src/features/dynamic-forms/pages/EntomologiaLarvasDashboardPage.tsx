@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import axios from '@/utils/axiosRetry';
 import FormService, { type Form } from '@/services/FormService';
 import FormSubmissionService, { type FormSubmission } from '@/services/FormSubmissionService';
 import { Plus, Edit, Eye, Trash2, Calendar, User, Bug, Filter, FileSpreadsheet, FileText } from 'lucide-react';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 import { getRuntimeApiRoot } from '@/config/runtimeApiBase';
+import { useAuth } from '@/keycloak/AuthProvider';
+import { CompetenciaMesAnoInputs } from '../components/CompetenciaMesAnoInputs';
 
 const AGRAVO = 'ENTOMOLOGIA_LARVAS';
 const API_BASE = getRuntimeApiRoot();
@@ -17,6 +19,7 @@ interface CrsOption {
 
 export const EntomologiaLarvasDashboardPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [form, setForm] = useState<Form | null>(null);
   const [submissions, setSubmissions] = useState<FormSubmission[]>([]);
   const [crsOptions, setCrsOptions] = useState<CrsOption[]>([]);
@@ -36,7 +39,7 @@ export const EntomologiaLarvasDashboardPage: React.FC = () => {
     try {
       const { data } = await axios.get<unknown>(`${API_BASE}/crs/select`, { withCredentials: true });
       const list = Array.isArray(data) ? data : (data as { data?: unknown[] })?.data ?? [];
-      const opts: CrsOption[] = (list as any[]).map((item: any) => ({
+      const opts: CrsOption[] = (list as Array<Record<string, unknown>>).map((item) => ({
         value: String(item.value ?? item.id_crs ?? item.id ?? ''),
         label: String(item.label ?? item.nome ?? item.descricao ?? ''),
       }));
@@ -54,13 +57,17 @@ export const EntomologiaLarvasDashboardPage: React.FC = () => {
       const filters: Parameters<typeof FormSubmissionService.getSubmissions>[0] = {
         form_version_id: form.active_version_id,
         limit: 100,
+        with_form_payload: '1',
       };
       if (filterCrsId) filters.crs_id = Number(filterCrsId);
       if (filterCompetencia) filters.competencia = filterCompetencia;
       const res = await FormSubmissionService.getSubmissions(filters);
       setSubmissions(res.data);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Erro ao carregar relatórios');
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Erro ao carregar relatórios';
+      setError(msg);
       setSubmissions([]);
     } finally {
       setLoadingList(false);
@@ -74,13 +81,20 @@ export const EntomologiaLarvasDashboardPage: React.FC = () => {
         await loadForm();
         if (cancelled) return;
         await loadCrsOptions();
-      } catch (err: any) {
-        if (!cancelled) setError(err.response?.data?.message || 'Erro ao carregar dados');
+      } catch (err: unknown) {
+        if (!cancelled) {
+          const msg =
+            (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+            'Erro ao carregar dados';
+          setError(msg);
+        }
       } finally {
         if (!cancelled) setLoadingForm(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [loadForm, loadCrsOptions]);
 
   useEffect(() => {
@@ -95,11 +109,19 @@ export const EntomologiaLarvasDashboardPage: React.FC = () => {
 
   const handleDelete = async (id: number) => {
     if (!confirm('Excluir este relatório? Esta ação não pode ser desfeita.')) return;
+    const userId = user?.sub || (user as { id?: string } | null)?.id;
+    if (!userId) {
+      alert('Usuário não autenticado');
+      return;
+    }
     try {
-      await FormSubmissionService.deleteSubmission(id, 'user-id');
+      await FormSubmissionService.deleteSubmission(id, userId);
       loadSubmissions();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Erro ao excluir');
+    } catch (err: unknown) {
+      alert(
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          'Erro ao excluir',
+      );
     }
   };
 
@@ -112,19 +134,20 @@ export const EntomologiaLarvasDashboardPage: React.FC = () => {
       a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
-    } catch (err: any) {
+    } catch (err: unknown) {
       let msg = 'Erro ao exportar. Verifique se o relatório é do tipo Entomologia.';
-      const data = err.response?.data;
+      const data = (err as { response?: { data?: unknown } })?.response?.data;
       if (data instanceof Blob) {
         try {
           const text = await data.text();
-          const j = JSON.parse(text);
+          const j = JSON.parse(text) as { message?: string; error?: string };
           msg = j.message || j.error || msg;
         } catch {
           // keep default msg
         }
-      } else if (data?.message || data?.error) {
-        msg = data.message || data.error;
+      } else if (data && typeof data === 'object') {
+        const o = data as { message?: string; error?: string };
+        if (o.message || o.error) msg = o.message || o.error || msg;
       }
       alert(msg);
     }
@@ -144,7 +167,7 @@ export const EntomologiaLarvasDashboardPage: React.FC = () => {
     const s = String(competencia);
     if (s.length >= 7) {
       const [y, m] = [s.slice(0, 4), s.slice(5, 7)];
-      const monthNames = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+      const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
       return `${monthNames[parseInt(m, 10) - 1]}/${y}`;
     }
     return s;
@@ -235,7 +258,7 @@ export const EntomologiaLarvasDashboardPage: React.FC = () => {
   return (
     <AppPageLayout
       title="Controle de Qualidade de Larvas"
-      subtitle="Entomologia – Resumo Mensal e Frequência Relativa"
+      subtitle="Entomologia – Resumo Mensal e Frequência Relativa (A1–E: caixa d'água, depósitos, móveis, fixos, pneus, lixo, naturais)"
       icon={<Bug className="h-8 w-8" />}
       variant="desktop"
       showBottomNav={false}
@@ -250,7 +273,6 @@ export const EntomologiaLarvasDashboardPage: React.FC = () => {
       }
     >
       <div className="space-y-4">
-        {/* Filtros */}
         <div className="bg-white rounded-lg shadow p-4 flex flex-wrap items-end gap-4">
           <div className="flex items-center gap-2 text-gray-700">
             <Filter className="h-4 w-4" />
@@ -265,23 +287,28 @@ export const EntomologiaLarvasDashboardPage: React.FC = () => {
             >
               <option value="">Todos</option>
               {crsOptions.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
               ))}
             </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Competência (mês/ano)</label>
-            <input
-              type="month"
+            <CompetenciaMesAnoInputs
+              idPrefix="filtro-competencia"
               value={filterCompetencia}
-              onChange={(e) => setFilterCompetencia(e.target.value)}
-              className="block w-40 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
+              onChange={setFilterCompetencia}
+              compact
             />
           </div>
           {(filterCrsId || filterCompetencia) && (
             <button
               type="button"
-              onClick={() => { setFilterCrsId(''); setFilterCompetencia(''); }}
+              onClick={() => {
+                setFilterCrsId('');
+                setFilterCompetencia('');
+              }}
               className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 underline"
             >
               Limpar filtros
@@ -289,7 +316,6 @@ export const EntomologiaLarvasDashboardPage: React.FC = () => {
           )}
         </div>
 
-        {/* Lista */}
         {loadingList ? (
           <div className="bg-white rounded-lg shadow p-8 text-center">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto" />
@@ -312,11 +338,21 @@ export const EntomologiaLarvasDashboardPage: React.FC = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CRS</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Competência</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Responsável</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Criado em</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Competência
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Responsável
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Criado em
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Ações
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -395,3 +431,5 @@ export const EntomologiaLarvasDashboardPage: React.FC = () => {
     </AppPageLayout>
   );
 };
+
+export default EntomologiaLarvasDashboardPage;

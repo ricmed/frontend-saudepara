@@ -287,8 +287,10 @@ export interface TableColumnDef {
   options?: Array<{ value: string; label: string }>;
   apiSelectEndpoint?: string;
   placeholder?: string;
+  hint?: string;
   min?: number;
   max?: number;
+  maxLength?: number;
   /** Para type 'computed': chaves das colunas a somar na mesma linha (ex.: ["larv_aeg","pupa_aeg","exuv_aeg"]). */
   sumKeys?: string[];
   /** Para type 'computedPct': percentual = (numerador / soma(denominador)) * 100 (ex.: freq. relativa por tipo de recipiente). */

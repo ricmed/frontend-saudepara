@@ -70,6 +70,7 @@ import { FormResponsesSummaryPage } from '@/features/dynamic-forms/pages/FormRes
 import { MyFormsPage } from '@/features/dynamic-forms/pages/MyFormsPage';
 import { FormShareSettingsPage } from '@/features/dynamic-forms/pages/FormShareSettingsPage';
 import { FormShareSinanSettingsPage } from '@/features/dynamic-forms/pages/FormShareSinanSettingsPage';
+import { EntomologiaLarvasDashboardPage } from '@/features/dynamic-forms/pages/EntomologiaLarvasDashboardPage';
 
 const ListaNotificacoes = lazy(() => import('@/features/notificationForms/ListaNotificacoes'));
 const NotificationForm = lazy(() => import('@/features/notificationForms/NotificationForm'));
@@ -205,6 +206,7 @@ export const getPrivateAppRoutes = () => {
               </ProtectedRoute>
             }
           />
+          <Route path="/private/entomologia-larvas" element={<EntomologiaLarvasDashboardPage />} />
           <Route path="/private/formularios/:agravo/relatorio/*" element={<MonitorOperRegionalReportPage />} />
           <Route path="/private/formularios/:agravo/dashboard" element={<HepatiteCriancaHbvDashboardPage />} />
           <Route path="/private/formularios/:agravo" element={<FormSubmissionsListPage />} />

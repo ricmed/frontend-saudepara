@@ -103,8 +103,8 @@ export function useHepatiteCriancaDashboardClinicalCharts({
       funilDoses: doseCounts,
       hbigRamo: [
         { name: 'Elegíveis (HBsAg+)', value: elegiveisHbig.length },
-        { name: 'Receberam HBIG', value: hbigRecebido },
-        { name: 'Sem HBIG', value: semHbig },
+        { name: 'Receberam IGHAHB', value: hbigRecebido },
+        { name: 'Sem IGHAHB', value: semHbig },
       ],
       kpis: {
         esquemaCompleto: hbvRows.filter((r) => esquemaVacinalCompleto(r)).length,
