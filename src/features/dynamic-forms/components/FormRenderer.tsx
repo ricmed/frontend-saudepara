@@ -2032,6 +2032,10 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       case 'month':
       case 'month-year': {
         const comp = typeof value === 'string' ? value : '';
+        const showQuadrimestreQdqq =
+          resolved.key === 'cabecalho.competencia_mes_ano' &&
+          (String(schema.agravo || '').includes('Monitoramento operacional') ||
+            String(formKey || '').toUpperCase() === 'MONITOR_OPER_REGIONAL');
         return (
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -2045,6 +2049,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
               onChange={(next) => setValue(resolved.key, next || undefined)}
               disabled={disabled}
               error={Boolean(error)}
+              showQuadrimestre={showQuadrimestreQdqq}
             />
             {error ? <p className="mt-1 text-sm text-red-500">{error}</p> : null}
           </div>

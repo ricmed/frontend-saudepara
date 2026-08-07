@@ -1,4 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import {
+  quadrimestreKeyFromMonth,
+  quadrimestreLabel,
+} from '../utils/monitorOperRegionalReport';
 
 const MONTHS = [
   { value: '01', label: 'Janeiro' },
@@ -14,6 +18,13 @@ const MONTHS = [
   { value: '11', label: 'Novembro' },
   { value: '12', label: 'Dezembro' },
 ] as const;
+
+/** Rótulo do quadrimestre QDQQ a partir do mês `01`–`12`; sem mês → vazio. */
+export function quadrimestreLabelFromCompetenciaMonth(month: string): string {
+  const m = Number(month);
+  if (!Number.isFinite(m) || m < 1 || m > 12) return '';
+  return quadrimestreLabel(quadrimestreKeyFromMonth(m));
+}
 
 /** Parse `YYYY-MM` → partes; inválido → vazios. */
 export function parseCompetenciaMesAno(value: unknown): { year: string; month: string } {
@@ -56,6 +67,11 @@ export interface CompetenciaMesAnoInputsProps {
   error?: boolean;
   /** Compacto para filtros de dashboard. */
   compact?: boolean;
+  /**
+   * QDQQ / Monitor Operacional: mostra o quadrimestre derivado do mês
+   * (somente leitura, fundo cinza) na mesma linha, com ano mais estreito.
+   */
+  showQuadrimestre?: boolean;
   idPrefix?: string;
 }
 
@@ -69,6 +85,7 @@ export const CompetenciaMesAnoInputs: React.FC<CompetenciaMesAnoInputsProps> = (
   disabled,
   error,
   compact,
+  showQuadrimestre = false,
   idPrefix = 'competencia',
 }) => {
   const parsed = parseCompetenciaMesAno(value);
@@ -117,10 +134,18 @@ export const CompetenciaMesAnoInputs: React.FC<CompetenciaMesAnoInputsProps> = (
     commit(y, month);
   };
 
+  const qLabel = showQuadrimestre ? quadrimestreLabelFromCompetenciaMonth(month) : '';
+
+  const rowClass = compact
+    ? 'flex flex-wrap gap-2'
+    : showQuadrimestre
+      ? 'grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_5.5rem_minmax(0,1.55fr)] gap-3'
+      : 'grid grid-cols-1 sm:grid-cols-2 gap-3';
+
   return (
     <div className={compact ? 'flex flex-wrap items-end gap-2' : undefined}>
-      <div className={compact ? 'flex flex-wrap gap-2' : 'grid grid-cols-1 sm:grid-cols-2 gap-3'}>
-        <div className={compact ? 'w-40' : undefined}>
+      <div className={rowClass}>
+        <div className={compact ? 'w-40' : 'min-w-0'}>
           <label htmlFor={`${idPrefix}-mes`} className="sr-only">
             Mês
           </label>
@@ -140,7 +165,7 @@ export const CompetenciaMesAnoInputs: React.FC<CompetenciaMesAnoInputsProps> = (
             ))}
           </select>
         </div>
-        <div className={compact ? 'w-28' : undefined}>
+        <div className={compact ? 'w-28' : showQuadrimestre ? 'min-w-0' : undefined}>
           <label htmlFor={`${idPrefix}-ano`} className="sr-only">
             Ano
           </label>
@@ -160,6 +185,23 @@ export const CompetenciaMesAnoInputs: React.FC<CompetenciaMesAnoInputsProps> = (
             ))}
           </select>
         </div>
+        {showQuadrimestre ? (
+          <div className="min-w-0">
+            <label htmlFor={`${idPrefix}-quadrimestre`} className="sr-only">
+              Quadrimestre
+            </label>
+            <input
+              id={`${idPrefix}-quadrimestre`}
+              type="text"
+              readOnly
+              tabIndex={-1}
+              value={qLabel || '—'}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-100 text-gray-700 cursor-not-allowed"
+              aria-label="Quadrimestre (derivado do mês)"
+              title="Derivado automaticamente do mês da competência"
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   );

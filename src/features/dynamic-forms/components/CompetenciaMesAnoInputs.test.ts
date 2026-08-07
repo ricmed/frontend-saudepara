@@ -3,6 +3,7 @@ import {
   currentCompetenciaMesAno,
   formatCompetenciaMesAno,
   parseCompetenciaMesAno,
+  quadrimestreLabelFromCompetenciaMonth,
 } from './CompetenciaMesAnoInputs';
 
 describe('parseCompetenciaMesAno', () => {
@@ -26,5 +27,21 @@ describe('formatCompetenciaMesAno', () => {
 describe('currentCompetenciaMesAno', () => {
   it('retorna YYYY-MM', () => {
     expect(currentCompetenciaMesAno()).toMatch(/^\d{4}-\d{2}$/);
+  });
+});
+
+describe('quadrimestreLabelFromCompetenciaMonth', () => {
+  it('mapeia os 3 quadrimestres SESPA', () => {
+    expect(quadrimestreLabelFromCompetenciaMonth('01')).toBe('1º quadrimestre (jan–abr)');
+    expect(quadrimestreLabelFromCompetenciaMonth('04')).toBe('1º quadrimestre (jan–abr)');
+    expect(quadrimestreLabelFromCompetenciaMonth('05')).toBe('2º quadrimestre (mai–ago)');
+    expect(quadrimestreLabelFromCompetenciaMonth('08')).toBe('2º quadrimestre (mai–ago)');
+    expect(quadrimestreLabelFromCompetenciaMonth('09')).toBe('3º quadrimestre (set–dez)');
+    expect(quadrimestreLabelFromCompetenciaMonth('12')).toBe('3º quadrimestre (set–dez)');
+  });
+
+  it('sem mês válido retorna vazio', () => {
+    expect(quadrimestreLabelFromCompetenciaMonth('')).toBe('');
+    expect(quadrimestreLabelFromCompetenciaMonth('13')).toBe('');
   });
 });
