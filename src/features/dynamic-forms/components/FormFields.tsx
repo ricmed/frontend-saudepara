@@ -116,6 +116,8 @@ export const DateField: React.FC<TextFieldProps> = ({
   const allowFutureDate = field.allowFutureDate === true;
   const explicitMax =
     typeof field.max === 'string' && field.max.match(/^\d{4}-\d{2}-\d{2}$/) ? field.max : undefined;
+  // Com allowFutureDate: usa max explícito do schema, senão teto das doses HBV (legado).
+  // Sem allowFutureDate: não passa de hoje (padrão do sistema).
   const maxDate = allowFutureDate ? explicitMax ?? maxScheduledHepBDoseDateIso() : explicitMax ?? today;
 
   const incrementDate = () => {

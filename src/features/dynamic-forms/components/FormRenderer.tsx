@@ -2027,8 +2027,26 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           return <TextField {...textProps} showCharCount={false} wrapperClassName="mb-0" />;
         }
         return <TextField {...textProps} />;
-      case 'date':
+      case 'date': {
+        const isPeriodoProvavelQdqq =
+          resolved.key === 'acao.periodo_inicio' || resolved.key === 'acao.periodo_fim';
+        if (isPeriodoProvavelQdqq) {
+          return (
+            <DateField
+              {...dateProps}
+              field={{
+                ...resolved,
+                allowFutureDate: true,
+                max:
+                  typeof resolved.max === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(resolved.max)
+                    ? resolved.max
+                    : '2099-12-31',
+              }}
+            />
+          );
+        }
         return <DateField {...dateProps} />;
+      }
       case 'month':
       case 'month-year': {
         const comp = typeof value === 'string' ? value : '';

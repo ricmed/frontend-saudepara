@@ -51,6 +51,26 @@ export function quadrimestreLabel(q: 'Q1' | 'Q2' | 'Q3'): string {
   return '3º quadrimestre (set–dez)';
 }
 
+/** Rótulos de atividade do instrumento (value interno estável). */
+export const MONITOR_OPER_ATIVIDADE_LABELS: Record<string, string> = {
+  capacitacao: 'Capacitação',
+  avaliacao: 'Avaliação e análise',
+  acao_complementar: 'Ação complementar',
+  aquisicao: 'Aquisição',
+  distribuicao: 'Distribuição',
+  fiscalizacao_inspecao: 'Fiscalização / Inspeção',
+  regulacao: 'Regulação',
+};
+
+export function formatMonitorOperAtividadeLabel(value: unknown): string {
+  if (value == null || value === '') return '—';
+  const raw = String(value).trim();
+  if (!raw) return '—';
+  const key = raw.toLowerCase();
+  if (MONITOR_OPER_ATIVIDADE_LABELS[key]) return MONITOR_OPER_ATIVIDADE_LABELS[key];
+  return formatSnakeOrTextToTitle(raw);
+}
+
 /** Chave única para consolidar totais QDQQ: CRS + ano + quadrimestre. */
 export function qdqqConsolidationKey(d: MonitorOperRow): string {
   const cab = d.cabecalho as Record<string, any> | undefined;
@@ -559,11 +579,11 @@ export function buildAtividadesPorArea(rows: MonitorOperRow[]): AtividadePorArea
     .map(([k, count]) => {
       const tab = k.indexOf('\t');
       const areaKey = tab >= 0 ? k.slice(0, tab) : k;
-      const atividade = tab >= 0 ? k.slice(tab + 1) : '—';
+      const atividadeRaw = tab >= 0 ? k.slice(tab + 1) : '—';
       return {
         areaKey,
         areaLabel: monitorOperAreaLabel(areaKey),
-        atividade,
+        atividade: atividadeRaw === '—' ? '—' : formatMonitorOperAtividadeLabel(atividadeRaw),
         count,
       };
     })
@@ -588,7 +608,7 @@ export function buildObstaculosDetalhe(rows: MonitorOperRow[]): ObstaculoDetalhe
     const textoRaw = rr.qual_obstaculo ?? rr.descricao_obstaculos ?? rr.observacoes;
     out.push({
       crs_id: cab?.crs_id,
-      atividade: String(d?.acao?.atividade ?? '—'),
+      atividade: formatMonitorOperAtividadeLabel(d?.acao?.atividade),
       competencia:
         cab?.competencia_mes_ano != null && String(cab.competencia_mes_ano) !== ''
           ? String(cab.competencia_mes_ano)
@@ -672,6 +692,9 @@ export interface MonitorOperSubmissionSummary {
   programaAlcancado: unknown;
   atividade: unknown;
   dataRealizacao: unknown;
+  periodoInicio: unknown;
+  periodoFim: unknown;
+  nDiasAtividade: unknown;
   programada: unknown;
   realizada: unknown;
   custoTotal: number;
@@ -689,11 +712,18 @@ export const MONITOR_OPER_SHEET_PRESET_PATHS: readonly string[] = [
   'acao.area',
   'acao.programa_alcancado',
   'acao.atividade',
+  'acao.periodo_inicio',
+  'acao.periodo_fim',
+  'acao.n_dias_atividade',
+  'acao.n_tecnicos',
+  'acao.n_motoristas',
+  'acao.n_diarias',
   'acao.data_realizacao',
   'acao.qtd_programadas_qdqq',
   'acao.qtd_realizadas_conforme_programacao',
   'acao.qtd_nao_programadas_qdqq',
   'acao.municipios_alcancados',
+  'custo.el_339014',
   'custo.total',
 ];
 
@@ -853,13 +883,25 @@ export function getMonitorOperListColumnSpecs(): MonitorOperListColSpec[] {
       id: 'atividade',
       label: 'Atividade',
       tdClassName: 'min-w-[10rem] max-w-[20rem] truncate',
-      format: (r) => formatSnakeOrTextToTitle(r.atividade),
+      format: (r) => formatMonitorOperAtividadeLabel(r.atividade),
     },
     {
-      id: 'data_realizacao',
-      label: 'Data da realização',
+      id: 'periodo',
+      label: 'Período da atividade',
       tdClassName: 'whitespace-nowrap',
-      format: (r) => formatDatePtBr(r.dataRealizacao),
+      format: (r) => {
+        const ini = formatDatePtBr(r.periodoInicio);
+        const fim = formatDatePtBr(r.periodoFim);
+        if (ini !== '—' && fim !== '—') return `${ini} a ${fim}`;
+        if (ini !== '—') return ini;
+        return formatDatePtBr(r.dataRealizacao);
+      },
+    },
+    {
+      id: 'n_dias',
+      label: 'Nº de dias',
+      tdClassName: 'whitespace-nowrap text-right',
+      format: (r) => (r.nDiasAtividade == null || r.nDiasAtividade === '' ? '—' : String(r.nDiasAtividade)),
     },
     {
       id: 'programada',
@@ -891,7 +933,7 @@ export const MONITOR_OPER_LIST_DEFAULT_VISIBLE_COL_IDS: readonly string[] = [
   'competencia',
   'area',
   'atividade',
-  'data_realizacao',
+  'periodo',
 ];
 
 export function getMonitorOperDefaultVisibleListColIds(allowedIds: string[]): string[] {
@@ -967,6 +1009,9 @@ export function buildPerSubmissionSummaries(
       programaAlcancado: d?.acao?.programa_alcancado,
       atividade: d?.acao?.atividade,
       dataRealizacao: d?.acao?.data_realizacao,
+      periodoInicio: d?.acao?.periodo_inicio,
+      periodoFim: d?.acao?.periodo_fim,
+      nDiasAtividade: d?.acao?.n_dias_atividade,
       programada: d?.acao?.qtd_programadas_qdqq,
       realizada: d?.acao?.qtd_realizadas_conforme_programacao,
       custoTotal,
@@ -990,6 +1035,9 @@ export function monitorOperSubmissionsToCsv(rows: MonitorOperSubmissionSummary[]
     'area',
     'area_label',
     'atividade',
+    'periodo_inicio',
+    'periodo_fim',
+    'n_dias_atividade',
     'data_realizacao',
     'programada_qdqq',
     'realizada',
@@ -1016,7 +1064,10 @@ export function monitorOperSubmissionsToCsv(rows: MonitorOperSubmissionSummary[]
         r.quadrimestre,
         r.area,
         r.areaLabel,
-        r.atividade,
+        formatMonitorOperAtividadeLabel(r.atividade),
+        r.periodoInicio ?? '',
+        r.periodoFim ?? '',
+        r.nDiasAtividade ?? '',
         r.dataRealizacao,
         r.programada,
         r.realizada,

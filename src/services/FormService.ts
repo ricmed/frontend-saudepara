@@ -170,8 +170,11 @@ export interface FormField {
   /** Para campo `date`: permite datas futuras (ex.: doses previstas de vacina HBV). */
   allowFutureDate?: boolean;
   mask?: string;
-  min?: number;
-  max?: number;
+  /**
+   * Limite superior: número (campos numéricos) ou data `YYYY-MM-DD` (campos date).
+   */
+  max?: number | string;
+  min?: number | string;
   /** Passo numérico (ex.: slider; escala linear em valores inteiros). */
   step?: number;
   /** Rótulo no extremo inferior/esquerdo da escala linear. */

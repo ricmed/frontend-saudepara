@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   currentCompetenciaMesAno,
+  formatCompetenciaFilter,
   formatCompetenciaMesAno,
   parseCompetenciaMesAno,
   quadrimestreLabelFromCompetenciaMonth,
@@ -9,6 +10,10 @@ import {
 describe('parseCompetenciaMesAno', () => {
   it('parseia YYYY-MM', () => {
     expect(parseCompetenciaMesAno('2026-08')).toEqual({ year: '2026', month: '08' });
+  });
+
+  it('parseia YYYY (ano só)', () => {
+    expect(parseCompetenciaMesAno('2026')).toEqual({ year: '2026', month: '' });
   });
 
   it('rejeita inválido', () => {
@@ -21,6 +26,17 @@ describe('formatCompetenciaMesAno', () => {
   it('só formata com mês e ano', () => {
     expect(formatCompetenciaMesAno('2026', '08')).toBe('2026-08');
     expect(formatCompetenciaMesAno('2026', '')).toBeUndefined();
+  });
+});
+
+describe('formatCompetenciaFilter', () => {
+  it('emite YYYY-MM quando mês e ano', () => {
+    expect(formatCompetenciaFilter('2026', '08', true)).toBe('2026-08');
+  });
+
+  it('emite YYYY com allowYearOnly', () => {
+    expect(formatCompetenciaFilter('2026', '', true)).toBe('2026');
+    expect(formatCompetenciaFilter('2026', '', false)).toBe('');
   });
 });
 

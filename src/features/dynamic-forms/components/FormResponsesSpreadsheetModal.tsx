@@ -9,7 +9,7 @@ import {
   resolveActiveSchema,
   type ResponseListLabelMaps,
 } from '../utils/formResponsesListUtils';
-import { MONITOR_OPER_REGIONAL_KEY, monitorOperPresetVisibleSheetKeys } from '../utils/monitorOperRegionalReport';
+import { MONITOR_OPER_REGIONAL_KEY, formatMonitorOperAtividadeLabel, monitorOperPresetVisibleSheetKeys } from '../utils/monitorOperRegionalReport';
 import type { Form } from '@/services/FormService';
 import { useCrsLabelByIdMap } from '../hooks/useCrsLabelByIdMap';
 
@@ -61,6 +61,12 @@ export const FormResponsesSpreadsheetModal: React.FC<Props> = ({
     'acao.programa_alcancado': 'Programa alcançado',
     'acao.atividade': 'Atividade',
     'acao.data_realizacao': 'Data da realização',
+    'acao.periodo_inicio': 'Período — do dia',
+    'acao.periodo_fim': 'Período — ao dia',
+    'acao.n_dias_atividade': 'Nº de dias da atividade',
+    'acao.n_tecnicos': 'Nº de técnicos',
+    'acao.n_motoristas': 'Nº de motoristas',
+    'acao.n_diarias': 'Nº de diárias',
     'acao.qtd_programadas_qdqq': 'Programada no QDQQ?',
     'acao.qtd_realizadas_conforme_programacao': 'Foi realizada?',
     'acao.qtd_nao_programadas_qdqq': 'Não programada no QDQQ?',
@@ -183,8 +189,10 @@ export const FormResponsesSpreadsheetModal: React.FC<Props> = ({
       return crsById[id] || id || '—';
     }
     if (key === 'cabecalho.competencia_mes_ano') return formatCompetenciaPtBr(v);
-    if (key === 'acao.data_realizacao') return formatDatePtBr(v);
-    if (key === 'acao.area' || key === 'acao.programa_alcancado' || key === 'acao.atividade') return formatSnakeTitle(v);
+    if (key === 'acao.data_realizacao' || key === 'acao.periodo_inicio' || key === 'acao.periodo_fim')
+      return formatDatePtBr(v);
+    if (key === 'acao.atividade') return formatMonitorOperAtividadeLabel(v);
+    if (key === 'acao.area' || key === 'acao.programa_alcancado') return formatSnakeTitle(v);
     if (
       key === 'acao.qtd_programadas_qdqq' ||
       key === 'acao.qtd_realizadas_conforme_programacao' ||

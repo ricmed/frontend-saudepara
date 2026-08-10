@@ -2,22 +2,22 @@ import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '@/utils/axiosRetry';
 import FormService, { type Form } from '@/services/FormService';
-import FormSubmissionService, { type FormSubmission } from '@/services/FormSubmissionService';
+import FormSubmissionService from '@/services/FormSubmissionService';
 import { Plus, Edit, Eye, Trash2, Calendar, User, Bug, Filter, FileSpreadsheet, FileText } from 'lucide-react';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 import { getRuntimeApiRoot } from '@/config/runtimeApiBase';
 import { useAuth } from '@/keycloak/AuthProvider';
-import { CompetenciaMesAnoInputs } from '../components/CompetenciaMesAnoInputs';
+import { CompetenciaMesAnoInputs, parseCompetenciaMesAno } from '../components/CompetenciaMesAnoInputs';
 import { EntomologiaDashKpiStrip } from '../components/entomologia/EntomologiaDashKpiStrip';
 import { EntomologiaFrequenciaTables } from '../components/entomologia/EntomologiaFrequenciaTables';
 import { EntomologiaResumoTable } from '../components/entomologia/EntomologiaResumoTable';
 import { useMunicipioLabelByIdMap } from '../hooks/useMunicipioLabelByIdMap';
 import {
-  flattenEntomologiaFrequenciaRows,
-  flattenEntomologiaResumoRows,
   formatCompetenciaCurta,
+  type EntomologiaFrequenciaDashRow,
+  type EntomologiaResumoDashRow,
 } from '../utils/entomologiaDashboardTables';
-import { computeEntomologiaDashboardKpis } from '../utils/entomologiaDashboardKpis';
+import type { EntomologiaDashboardKpis } from '../utils/entomologiaDashboardKpis';
 import { ENTOMO_TABLE_VIEWPORT_MAX } from '../components/entomologia/entomologiaDenseTableClasses';
 
 const AGRAVO = 'ENTOMOLOGIA_LARVAS';
@@ -29,6 +29,24 @@ interface CrsOption {
   value: string;
   label: string;
 }
+
+type EntomologiaReportRow = {
+  id: number;
+  status: string;
+  created_at: string;
+  crs_id: string;
+  competencia: string;
+  responsavel: string;
+};
+
+const EMPTY_KPIS: EntomologiaDashboardKpis = {
+  relatorios: 0,
+  municipios: 0,
+  tubosComLarvas: 0,
+  totalAeg: 0,
+  totalAlb: 0,
+  municipiosComAlb: 0,
+};
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -61,7 +79,10 @@ export const EntomologiaLarvasDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [form, setForm] = useState<Form | null>(null);
-  const [submissions, setSubmissions] = useState<FormSubmission[]>([]);
+  const [reports, setReports] = useState<EntomologiaReportRow[]>([]);
+  const [resumoRows, setResumoRows] = useState<EntomologiaResumoDashRow[]>([]);
+  const [frequenciaRows, setFrequenciaRows] = useState<EntomologiaFrequenciaDashRow[]>([]);
+  const [dashboardKpis, setDashboardKpis] = useState<EntomologiaDashboardKpis>(EMPTY_KPIS);
   const [crsOptions, setCrsOptions] = useState<CrsOption[]>([]);
   const [loadingForm, setLoadingForm] = useState(true);
   const [loadingList, setLoadingList] = useState(true);
@@ -72,6 +93,8 @@ export const EntomologiaLarvasDashboardPage: React.FC = () => {
   const [tab, setTab] = useState<DashTab>('relatorios');
   const [exportingConsolidated, setExportingConsolidated] = useState(false);
   const [municipioOptions, setMunicipioOptions] = useState<CrsOption[]>([]);
+  const [facetYears, setFacetYears] = useState<number[]>([]);
+  const [facetMonthsByYear, setFacetMonthsByYear] = useState<Record<string, string[]>>({});
 
   const municipioLabels = useMunicipioLabelByIdMap(true);
 
@@ -115,26 +138,42 @@ export const EntomologiaLarvasDashboardPage: React.FC = () => {
     }
   }, []);
 
-  const loadSubmissions = useCallback(async () => {
+  const loadDashboard = useCallback(async () => {
     if (!form?.active_version_id) return;
     setLoadingList(true);
     setError(null);
     try {
-      const all = await FormSubmissionService.getSubmissionsAllPagesWithFormPayload(form.active_version_id, {
+      const payload = await FormSubmissionService.getEntomologiaDashboard({
+        form_version_id: form.active_version_id,
         crs_id: filterCrsId ? Number(filterCrsId) : undefined,
         competencia: filterCompetencia || undefined,
+        municipio_id: filterMunicipioId || undefined,
       });
-      setSubmissions(all);
+      setReports(Array.isArray(payload.reports) ? payload.reports : []);
+      setResumoRows(Array.isArray(payload.resumoRows) ? payload.resumoRows : []);
+      setFrequenciaRows(Array.isArray(payload.frequenciaRows) ? payload.frequenciaRows : []);
+      setDashboardKpis(payload.kpis ?? EMPTY_KPIS);
+      setFacetYears(Array.isArray(payload.facets?.years) ? payload.facets.years : []);
+      setFacetMonthsByYear(
+        payload.facets?.monthsByYear && typeof payload.facets.monthsByYear === 'object'
+          ? payload.facets.monthsByYear
+          : {},
+      );
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Erro ao carregar relatórios';
+        'Erro ao carregar dashboard';
       setError(msg);
-      setSubmissions([]);
+      setReports([]);
+      setResumoRows([]);
+      setFrequenciaRows([]);
+      setDashboardKpis(EMPTY_KPIS);
+      setFacetYears([]);
+      setFacetMonthsByYear({});
     } finally {
       setLoadingList(false);
     }
-  }, [form?.active_version_id, filterCrsId, filterCompetencia]);
+  }, [form?.active_version_id, filterCrsId, filterCompetencia, filterMunicipioId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -174,48 +213,32 @@ export const EntomologiaLarvasDashboardPage: React.FC = () => {
       setLoadingList(false);
       return;
     }
-    loadSubmissions();
-  }, [form?.active_version_id, filterCrsId, filterCompetencia, loadSubmissions]);
+    void loadDashboard();
+  }, [form?.active_version_id, filterCrsId, filterCompetencia, filterMunicipioId, loadDashboard]);
+
+  const competenciaParts = useMemo(() => parseCompetenciaMesAno(filterCompetencia), [filterCompetencia]);
+  const facetMonthOptions = useMemo(() => {
+    if (!competenciaParts.year) {
+      const all = new Set<string>();
+      for (const months of Object.values(facetMonthsByYear)) {
+        for (const m of months) all.add(m);
+      }
+      return Array.from(all).sort((a, b) => a.localeCompare(b));
+    }
+    return facetMonthsByYear[competenciaParts.year] ?? [];
+  }, [competenciaParts.year, facetMonthsByYear]);
+
+  useEffect(() => {
+    if (!competenciaParts.month) return;
+    if (facetMonthOptions.length === 0) return;
+    if (!facetMonthOptions.includes(competenciaParts.month)) {
+      setFilterCompetencia(competenciaParts.year || '');
+    }
+  }, [competenciaParts.month, competenciaParts.year, facetMonthOptions]);
 
   const crsLabelMap = useMemo(
     () => Object.fromEntries(crsOptions.map((o) => [o.value, o.label])),
     [crsOptions],
-  );
-
-  const submissionHasMunicipio = useCallback((s: FormSubmission, municipioId: string) => {
-    const data = (s.data_json || {}) as Record<string, unknown>;
-    const tables = [data.resumo_mensal, data.frequencia_recipientes];
-    for (const table of tables) {
-      if (!Array.isArray(table)) continue;
-      for (const row of table) {
-        if (row == null || typeof row !== 'object') continue;
-        const id = (row as Record<string, unknown>).municipio_id;
-        if (id != null && String(id) === municipioId) return true;
-      }
-    }
-    return false;
-  }, []);
-
-  const filteredSubmissions = useMemo(() => {
-    if (!filterMunicipioId) return submissions;
-    return submissions.filter((s) => submissionHasMunicipio(s, filterMunicipioId));
-  }, [submissions, filterMunicipioId, submissionHasMunicipio]);
-
-  const resumoRows = useMemo(() => {
-    const rows = flattenEntomologiaResumoRows(filteredSubmissions);
-    if (!filterMunicipioId) return rows;
-    return rows.filter((r) => r.municipio_id === filterMunicipioId);
-  }, [filteredSubmissions, filterMunicipioId]);
-
-  const frequenciaRows = useMemo(() => {
-    const rows = flattenEntomologiaFrequenciaRows(filteredSubmissions);
-    if (!filterMunicipioId) return rows;
-    return rows.filter((r) => r.municipio_id === filterMunicipioId);
-  }, [filteredSubmissions, filterMunicipioId]);
-
-  const dashboardKpis = useMemo(
-    () => computeEntomologiaDashboardKpis(filteredSubmissions, resumoRows),
-    [filteredSubmissions, resumoRows],
   );
 
   const handleDelete = async (id: number) => {
@@ -227,7 +250,7 @@ export const EntomologiaLarvasDashboardPage: React.FC = () => {
     }
     try {
       await FormSubmissionService.deleteSubmission(id, userId);
-      loadSubmissions();
+      void loadDashboard();
     } catch (err: unknown) {
       alert(
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
@@ -443,6 +466,9 @@ export const EntomologiaLarvasDashboardPage: React.FC = () => {
               value={filterCompetencia}
               onChange={setFilterCompetencia}
               compact
+              allowYearOnly
+              yearOptions={facetYears}
+              monthOptions={facetMonthOptions}
             />
           </div>
           {(filterCrsId || filterMunicipioId || filterCompetencia) && (
@@ -468,7 +494,7 @@ export const EntomologiaLarvasDashboardPage: React.FC = () => {
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200/60 overflow-hidden">
           <div className="bg-gradient-to-r from-blue-600 to-blue-800 px-2 flex flex-wrap gap-1">
-            {tabBtn('relatorios', `Relatórios (${filteredSubmissions.length})`)}
+            {tabBtn('relatorios', `Relatórios (${reports.length})`)}
             {tabBtn('resumo', `Resumo mensal (${resumoRows.length})`)}
             {tabBtn('frequencia', `Frequência relativa (${frequenciaRows.length})`)}
           </div>
@@ -479,7 +505,7 @@ export const EntomologiaLarvasDashboardPage: React.FC = () => {
               <p className="mt-3 text-gray-500">Carregando dados...</p>
             </div>
           ) : tab === 'relatorios' ? (
-            filteredSubmissions.length === 0 ? (
+            reports.length === 0 ? (
               <div className="p-12 text-center">
                 <p className="text-gray-500 mb-4">Nenhum relatório encontrado para os filtros selecionados.</p>
                 <button
@@ -516,76 +542,71 @@ export const EntomologiaLarvasDashboardPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-sky-50">
-                    {filteredSubmissions.map((s, idx) => {
-                      const data = (s.data_json || {}) as Record<string, unknown>;
-                      const crsId = data.crs_id != null ? String(data.crs_id) : '';
-                      const responsavel = (data.responsavel as string) ?? '—';
-                      return (
-                        <tr
-                          key={s.id}
-                          className={`hover:bg-sky-50/80 ${idx % 2 === 1 ? 'bg-sky-50/40' : ''}`}
-                        >
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 font-medium">
-                            {(crsLabelMap[crsId] ?? crsId) || '—'}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                            {formatCompetenciaCurta(data.competencia as string)}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                            <span className="flex items-center gap-1">
-                              <User className="h-4 w-4 text-blue-400" />
-                              {responsavel}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">{getStatusBadge(s.status)}</td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-4 w-4 text-blue-400" />
-                              {formatDate(s.created_at)}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
-                            <div className="flex justify-end gap-2">
-                              <button
-                                onClick={() => handleExport(s.id, 'xlsx')}
-                                className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg"
-                                title="Exportar Excel"
-                              >
-                                <FileSpreadsheet className="h-5 w-5" />
-                              </button>
-                              <button
-                                onClick={() => handleExport(s.id, 'pdf')}
-                                className="p-1.5 text-slate-600 hover:bg-slate-50 rounded-lg"
-                                title="Exportar PDF"
-                              >
-                                <FileText className="h-5 w-5" />
-                              </button>
-                              <button
-                                onClick={() => navigate(`/private/formularios/${AGRAVO}/visualizar/${s.id}`)}
-                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"
-                                title="Visualizar"
-                              >
-                                <Eye className="h-5 w-5" />
-                              </button>
-                              <button
-                                onClick={() => navigate(`/private/formularios/${AGRAVO}/editar/${s.id}`)}
-                                className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg"
-                                title="Editar"
-                              >
-                                <Edit className="h-5 w-5" />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(s.id)}
-                                className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"
-                                title="Excluir"
-                              >
-                                <Trash2 className="h-5 w-5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {reports.map((s, idx) => (
+                      <tr
+                        key={s.id}
+                        className={`hover:bg-sky-50/80 ${idx % 2 === 1 ? 'bg-sky-50/40' : ''}`}
+                      >
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 font-medium">
+                          {(crsLabelMap[s.crs_id] ?? s.crs_id) || '—'}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                          {formatCompetenciaCurta(s.competencia)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                          <span className="flex items-center gap-1">
+                            <User className="h-4 w-4 text-blue-400" />
+                            {s.responsavel || '—'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">{getStatusBadge(s.status)}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-4 w-4 text-blue-400" />
+                            {s.created_at ? formatDate(s.created_at) : '—'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={() => handleExport(s.id, 'xlsx')}
+                              className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg"
+                              title="Exportar Excel"
+                            >
+                              <FileSpreadsheet className="h-5 w-5" />
+                            </button>
+                            <button
+                              onClick={() => handleExport(s.id, 'pdf')}
+                              className="p-1.5 text-slate-600 hover:bg-slate-50 rounded-lg"
+                              title="Exportar PDF"
+                            >
+                              <FileText className="h-5 w-5" />
+                            </button>
+                            <button
+                              onClick={() => navigate(`/private/formularios/${AGRAVO}/visualizar/${s.id}`)}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"
+                              title="Visualizar"
+                            >
+                              <Eye className="h-5 w-5" />
+                            </button>
+                            <button
+                              onClick={() => navigate(`/private/formularios/${AGRAVO}/editar/${s.id}`)}
+                              className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg"
+                              title="Editar"
+                            >
+                              <Edit className="h-5 w-5" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(s.id)}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"
+                              title="Excluir"
+                            >
+                              <Trash2 className="h-5 w-5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   quadrimestreKeyFromMonth,
   quadrimestreLabel,
@@ -26,17 +26,30 @@ export function quadrimestreLabelFromCompetenciaMonth(month: string): string {
   return quadrimestreLabel(quadrimestreKeyFromMonth(m));
 }
 
-/** Parse `YYYY-MM` → partes; inválido → vazios. */
+/** Parse `YYYY-MM` ou `YYYY` → partes; inválido → vazios. */
 export function parseCompetenciaMesAno(value: unknown): { year: string; month: string } {
   const s = typeof value === 'string' ? value.trim() : '';
-  const m = s.match(/^(\d{4})-(\d{2})$/);
-  if (!m) return { year: '', month: '' };
-  return { year: m[1], month: m[2] };
+  const full = s.match(/^(\d{4})-(\d{2})$/);
+  if (full) return { year: full[1]!, month: full[2]! };
+  const yearOnly = s.match(/^(\d{4})$/);
+  if (yearOnly) return { year: yearOnly[1]!, month: '' };
+  return { year: '', month: '' };
 }
 
 export function formatCompetenciaMesAno(year: string, month: string): string | undefined {
   if (year && month) return `${year}-${month}`;
   return undefined;
+}
+
+/** Formata filtro de dashboard: `YYYY-MM`, ou só `YYYY` se `allowYearOnly`. */
+export function formatCompetenciaFilter(
+  year: string,
+  month: string,
+  allowYearOnly = false,
+): string {
+  if (year && month) return `${year}-${month}`;
+  if (allowYearOnly && year) return year;
+  return '';
 }
 
 export function currentCompetenciaMesAno(): string {
@@ -73,10 +86,19 @@ export interface CompetenciaMesAnoInputsProps {
    */
   showQuadrimestre?: boolean;
   idPrefix?: string;
+  /**
+   * Dashboard: permite emitir só `YYYY` quando o mês ainda não foi escolhido.
+   * Formulário de preenchimento deve permanecer sem esta flag.
+   */
+  allowYearOnly?: boolean;
+  /** Anos disponíveis (ex.: facets). Se omitido, usa janela fixa ao redor do ano corrente. */
+  yearOptions?: number[];
+  /** Meses `01`–`12` disponíveis (ex.: facets do ano). Se omitido, lista os 12 meses. */
+  monthOptions?: string[];
 }
 
 /**
- * Mês (nome) + Ano (lista) → valor `YYYY-MM`.
+ * Mês (nome) + Ano (lista) → valor `YYYY-MM` (ou `YYYY` com `allowYearOnly`).
  * Substitui o input nativo type="month", pouco usável no Windows.
  */
 export const CompetenciaMesAnoInputs: React.FC<CompetenciaMesAnoInputsProps> = ({
@@ -87,6 +109,9 @@ export const CompetenciaMesAnoInputs: React.FC<CompetenciaMesAnoInputsProps> = (
   compact,
   showQuadrimestre = false,
   idPrefix = 'competencia',
+  allowYearOnly = false,
+  yearOptions,
+  monthOptions,
 }) => {
   const parsed = parseCompetenciaMesAno(value);
   const [month, setMonth] = useState(parsed.month);
@@ -98,26 +123,41 @@ export const CompetenciaMesAnoInputs: React.FC<CompetenciaMesAnoInputsProps> = (
     setYear(next.year);
   }, [value]);
 
-  const years = buildYearOptions();
+  const years = useMemo(() => {
+    if (yearOptions && yearOptions.length > 0) {
+      return [...yearOptions].sort((a, b) => b - a);
+    }
+    return buildYearOptions();
+  }, [yearOptions]);
+
   const yearNum = year ? Number(year) : NaN;
   const yearsWithValue =
     Number.isFinite(yearNum) && !years.includes(yearNum)
       ? [yearNum, ...years].sort((a, b) => b - a)
       : years;
 
+  const monthChoices = useMemo(() => {
+    if (!monthOptions || monthOptions.length === 0) return [...MONTHS];
+    const allowed = new Set(monthOptions);
+    return MONTHS.filter((m) => allowed.has(m.value));
+  }, [monthOptions]);
+
   const commit = (nextYear: string, nextMonth: string) => {
     setYear(nextYear);
     setMonth(nextMonth);
-    const formatted = formatCompetenciaMesAno(nextYear, nextMonth);
-    onChange(formatted ?? '');
+    onChange(formatCompetenciaFilter(nextYear, nextMonth, allowYearOnly));
   };
 
   const onMonthChange = (mm: string) => {
-    const y = year || String(new Date().getFullYear());
     if (!mm) {
+      if (allowYearOnly && year) {
+        commit(year, '');
+        return;
+      }
       commit('', '');
       return;
     }
+    const y = year || String(new Date().getFullYear());
     // Ao escolher só o mês, assume o ano já selecionado ou o ano corrente.
     commit(y, mm);
   };
@@ -128,6 +168,10 @@ export const CompetenciaMesAnoInputs: React.FC<CompetenciaMesAnoInputsProps> = (
       return;
     }
     if (!month) {
+      if (allowYearOnly) {
+        commit(y, '');
+        return;
+      }
       setYear(y);
       return;
     }
@@ -158,7 +202,7 @@ export const CompetenciaMesAnoInputs: React.FC<CompetenciaMesAnoInputsProps> = (
             aria-label="Mês da competência"
           >
             <option value="">Mês</option>
-            {MONTHS.map((opt) => (
+            {monthChoices.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>

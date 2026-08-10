@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronDown, Download } from 'lucide-react';
+import { ChevronDown, Download, FileSpreadsheet } from 'lucide-react';
 
 export type ListExportMenuProps = {
   disabled?: boolean;
@@ -7,7 +7,7 @@ export type ListExportMenuProps = {
   onExportAll: (format: 'xlsx' | 'csv') => void;
 };
 
-/** Menu de exportação: página atual vs completo (XLSX/CSV). */
+/** Menu de exportação: página atual vs completo (Excel/CSV), estilo Comunicação DAE. */
 export const ListExportMenu: React.FC<ListExportMenuProps> = ({
   disabled = false,
   onExportPage,
@@ -25,6 +25,11 @@ export const ListExportMenu: React.FC<ListExportMenuProps> = ({
     return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
 
+  const run = (action: () => void) => {
+    setOpen(false);
+    action();
+  };
+
   return (
     <div className="relative" ref={ref}>
       <button
@@ -36,53 +41,51 @@ export const ListExportMenu: React.FC<ListExportMenuProps> = ({
       >
         <Download className="h-4 w-4" />
         Exportar
-        <ChevronDown className="h-4 w-4" />
+        <ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open ? (
-        <div className="absolute right-0 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-xl z-40 p-2 space-y-2">
-          <div className="px-2 pt-1 text-xs font-semibold uppercase text-gray-500">Página atual</div>
-          <button
-            type="button"
-            className="w-full text-left px-3 py-2 text-sm rounded hover:bg-emerald-50"
-            onClick={() => {
-              setOpen(false);
-              onExportPage('xlsx');
-            }}
-          >
-            XLSX (página)
-          </button>
-          <button
-            type="button"
-            className="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-50"
-            onClick={() => {
-              setOpen(false);
-              onExportPage('csv');
-            }}
-          >
-            CSV (página)
-          </button>
-          <div className="border-t border-gray-100 my-1" />
-          <div className="px-2 pt-1 text-xs font-semibold uppercase text-gray-500">Completo</div>
-          <button
-            type="button"
-            className="w-full text-left px-3 py-2 text-sm rounded hover:bg-emerald-50"
-            onClick={() => {
-              setOpen(false);
-              onExportAll('xlsx');
-            }}
-          >
-            XLSX (completo)
-          </button>
-          <button
-            type="button"
-            className="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-50"
-            onClick={() => {
-              setOpen(false);
-              onExportAll('csv');
-            }}
-          >
-            CSV (completo)
-          </button>
+        <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-40 overflow-hidden text-gray-700">
+          <div className="py-1">
+            <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
+              <span className="text-xs font-semibold text-gray-700 uppercase">Página atual</span>
+            </div>
+            <button
+              type="button"
+              className="w-full px-4 py-2.5 text-left text-gray-700 hover:bg-blue-50 flex items-center space-x-3 transition-colors"
+              onClick={() => run(() => onExportPage('xlsx'))}
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="text-sm font-medium">Excel</span>
+            </button>
+            <button
+              type="button"
+              className="w-full px-4 py-2.5 text-left text-gray-700 hover:bg-blue-50 flex items-center space-x-3 transition-colors"
+              onClick={() => run(() => onExportPage('csv'))}
+            >
+              <FileSpreadsheet className="w-4 h-4 text-green-600 shrink-0" />
+              <span className="text-sm font-medium">CSV</span>
+            </button>
+
+            <div className="px-3 py-2 bg-gray-50 border-t border-b border-gray-200 mt-1">
+              <span className="text-xs font-semibold text-gray-700 uppercase">Exportação completa</span>
+            </div>
+            <button
+              type="button"
+              className="w-full px-4 py-2.5 text-left text-gray-700 hover:bg-blue-50 flex items-center space-x-3 transition-colors"
+              onClick={() => run(() => onExportAll('xlsx'))}
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="text-sm font-medium">Excel</span>
+            </button>
+            <button
+              type="button"
+              className="w-full px-4 py-2.5 text-left text-gray-700 hover:bg-blue-50 flex items-center space-x-3 transition-colors"
+              onClick={() => run(() => onExportAll('csv'))}
+            >
+              <FileSpreadsheet className="w-4 h-4 text-green-600 shrink-0" />
+              <span className="text-sm font-medium">CSV</span>
+            </button>
+          </div>
         </div>
       ) : null}
     </div>

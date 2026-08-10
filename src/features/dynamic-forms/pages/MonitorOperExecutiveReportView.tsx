@@ -11,7 +11,7 @@ import {
 } from 'recharts';
 import { formatMonitorOperCrsDisplay } from '../components/MonitorOperQdqqGroupedTotalsTable';
 import { MonitorOperReportFiltersBar } from '../components/MonitorOperReportFiltersBar';
-import { buildAggregatesPorCrs, quadrimestreLabel } from '../utils/monitorOperRegionalReport';
+import { buildAggregatesPorCrs, formatMonitorOperAtividadeLabel, quadrimestreLabel } from '../utils/monitorOperRegionalReport';
 import { useMonitorOperReport } from './monitorOperReportContext';
 
 export const MonitorOperExecutiveReportView: React.FC = () => {
@@ -399,7 +399,7 @@ export const MonitorOperExecutiveReportView: React.FC = () => {
                       <span className="line-clamp-2">{s.areaLabel}</span>
                     </td>
                     <td className="px-4 py-2.5 text-slate-600 max-w-[200px]">
-                      <span className="line-clamp-2">{String(s.atividade ?? '—')}</span>
+                      <span className="line-clamp-2">{formatMonitorOperAtividadeLabel(s.atividade)}</span>
                     </td>
                     <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap tabular-nums text-xs">
                       {String(s.dataRealizacao ?? '—')}

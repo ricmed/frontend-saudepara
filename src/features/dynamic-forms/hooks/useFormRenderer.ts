@@ -29,6 +29,11 @@ import {
   TIPO_EXPOSICAO_HBV,
 } from '../utils/hepatiteCriancaExposicao';
 import {
+  calcMonitorOperNDiasAtividade,
+  calcMonitorOperQtdDiarias,
+  calcMonitorOperValorDiarias,
+} from '../utils/monitorOperDiarias';
+import {
   MATERNIDADE_HBV_HBIG_KEY,
   MATERNIDADE_NAO_REALIZADO_QUAL_KEY,
   isMaternidadeHbvHbigRequired,
@@ -254,6 +259,45 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange, formKe
     const curRounded = Number.isFinite(curNum) ? Math.round(curNum * 100) / 100 : null;
     if (curRounded === null || curRounded !== rounded) {
       setValue('custo.total', rounded);
+    }
+  }, [formData, schema?.agravo, setValue]);
+
+  // Monitor operacional: período → dias; técnicos/motoristas → nº diárias e 3390-14
+  useEffect(() => {
+    if (!schema?.agravo?.includes('Monitoramento operacional')) return;
+
+    const inicio = get(formData, 'acao.periodo_inicio');
+    const fim = get(formData, 'acao.periodo_fim');
+    const nDias = calcMonitorOperNDiasAtividade(inicio, fim);
+    const nTec = get(formData, 'acao.n_tecnicos');
+    const nMot = get(formData, 'acao.n_motoristas');
+    const qtdDiarias = calcMonitorOperQtdDiarias(nDias, nTec, nMot);
+    const valorDiarias = calcMonitorOperValorDiarias(nDias, nTec, nMot);
+
+    const curDias = get(formData, 'acao.n_dias_atividade');
+    const curQtd = get(formData, 'acao.n_diarias');
+    const curValor = get(formData, 'custo.el_339014');
+    const curDataReal = get(formData, 'acao.data_realizacao');
+
+    const sameNum = (a: unknown, b: number | null) => {
+      if (b == null) return a === '' || a === null || a === undefined;
+      const n = Number(a);
+      return Number.isFinite(n) && Math.round(n * 100) / 100 === Math.round(b * 100) / 100;
+    };
+
+    if (!sameNum(curDias, nDias)) {
+      setValue('acao.n_dias_atividade', nDias == null ? undefined : nDias);
+    }
+    if (!sameNum(curQtd, qtdDiarias)) {
+      setValue('acao.n_diarias', qtdDiarias == null ? undefined : qtdDiarias);
+    }
+    // Só preenche 3390-14 quando há período válido (evita zerar diárias manuais de envios antigos
+    // até o usuário informar o período).
+    if (nDias != null && !sameNum(curValor, valorDiarias ?? 0)) {
+      setValue('custo.el_339014', valorDiarias ?? 0);
+    }
+    if (typeof inicio === 'string' && /^\d{4}-\d{2}-\d{2}/.test(inicio) && curDataReal !== inicio) {
+      setValue('acao.data_realizacao', inicio);
     }
   }, [formData, schema?.agravo, setValue]);
 

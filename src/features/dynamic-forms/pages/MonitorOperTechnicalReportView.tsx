@@ -23,6 +23,7 @@ import {
   buildMunicipiosRanking,
   buildObstaculosDetalhe,
   buildProgramasAlcancadosRanking,
+  formatMonitorOperAtividadeLabel,
   formatMonitorOperMunicipioAlcancadoLabel,
   quadrimestreLabel,
 } from '../utils/monitorOperRegionalReport';
@@ -238,7 +239,7 @@ export const MonitorOperTechnicalReportView: React.FC = () => {
                       <span className="line-clamp-2">{s.areaLabel}</span>
                     </td>
                     <td className="px-3 py-2 text-xs text-slate-600 max-w-[180px]">
-                      <span className="line-clamp-2">{String(s.atividade ?? '—')}</span>
+                      <span className="line-clamp-2">{formatMonitorOperAtividadeLabel(s.atividade)}</span>
                     </td>
                     <td className="px-3 py-2 text-xs text-slate-600 max-w-[200px]">
                       <span className="line-clamp-2">

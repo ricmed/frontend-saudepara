@@ -846,10 +846,10 @@ export const FormSubmissionsListPage: React.FC = () => {
               type="button"
               data-testid="entomologia-larvas-dashboard"
               onClick={() => navigate('/private/entomologia-larvas')}
-              className="px-4 py-2 bg-white text-gray-800 rounded-md hover:bg-gray-50 flex items-center gap-2 font-medium border border-gray-200"
+              className="p-2 sm:w-auto sm:inline-flex sm:items-center sm:justify-center sm:space-x-2 sm:px-4 sm:py-2.5 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-200 shadow-md font-medium"
             >
-              <BarChart3 className="h-4 w-4" />
-              Dashboard
+              <BarChart2 className="w-5 h-5" />
+              <span className="hidden sm:inline">Dashboard</span>
             </button>
           )}
           {isHepatiteCriancaList && (

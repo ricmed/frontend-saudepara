@@ -1,6 +1,11 @@
 import axios from 'axios';
 import type { FormVersion } from './FormService';
 import { getRuntimeApiRoot } from '@/config/runtimeApiBase';
+import type {
+  EntomologiaFrequenciaDashRow,
+  EntomologiaResumoDashRow,
+} from '@/features/dynamic-forms/utils/entomologiaDashboardTables';
+import type { EntomologiaDashboardKpis } from '@/features/dynamic-forms/utils/entomologiaDashboardKpis';
 
 const API_URL = getRuntimeApiRoot();
 
@@ -61,7 +66,7 @@ export interface FormSubmissionFilters {
   created_by?: string;
   /** Filtro por CRS (data_json.crs_id – ex.: entomologia) */
   crs_id?: number;
-  /** Filtro por competência mês/ano (data_json.competencia – ex.: "2026-01") */
+  /** Filtro por competência: `YYYY-MM` ou `YYYY` (prefixo) */
   competencia?: string;
   page?: number;
   limit?: number;
@@ -266,6 +271,59 @@ class FormSubmissionService {
     const match = typeof disp === 'string' ? /filename="?([^"]+)"?/.exec(disp) : null;
     const filename = match?.[1] ?? 'entomologia-larvas-consolidado.xlsx';
     return { blob, filename };
+  }
+
+  /** Facets (anos/meses/competências) do dashboard Entomologia. */
+  async getEntomologiaFacets(params: {
+    form_version_id: number;
+    crs_id?: number;
+  }): Promise<{
+    years: number[];
+    monthsByYear: Record<string, string[]>;
+    competencias: string[];
+  }> {
+    const response = await api.get(`/submissions/entomologia-facets`, {
+      params: {
+        form_version_id: params.form_version_id,
+        ...(params.crs_id != null ? { crs_id: params.crs_id } : {}),
+      },
+    });
+    return response.data;
+  }
+
+  /** Payload agregado do dashboard Entomologia (reports + KPIs + tabelas + facets). */
+  async getEntomologiaDashboard(params: {
+    form_version_id: number;
+    crs_id?: number;
+    competencia?: string;
+    municipio_id?: string;
+  }): Promise<{
+    reports: Array<{
+      id: number;
+      status: string;
+      created_at: string;
+      crs_id: string;
+      competencia: string;
+      responsavel: string;
+    }>;
+    kpis: EntomologiaDashboardKpis;
+    resumoRows: EntomologiaResumoDashRow[];
+    frequenciaRows: EntomologiaFrequenciaDashRow[];
+    facets: {
+      years: number[];
+      monthsByYear: Record<string, string[]>;
+      competencias: string[];
+    };
+  }> {
+    const response = await api.get(`/submissions/entomologia-dashboard`, {
+      params: {
+        form_version_id: params.form_version_id,
+        ...(params.crs_id != null ? { crs_id: params.crs_id } : {}),
+        ...(params.competencia ? { competencia: params.competencia } : {}),
+        ...(params.municipio_id ? { municipio_id: params.municipio_id } : {}),
+      },
+    });
+    return response.data;
   }
 }
 
