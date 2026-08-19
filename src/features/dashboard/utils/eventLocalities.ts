@@ -1,3 +1,5 @@
+import { HOMOLOGACAO_MIN_AGGREGATE_COUNT } from './aggregateCountDefaults';
+
 export type ModoLocalidadeEvento = 'NAO_USA' | 'OPCIONAL' | 'OBRIGATORIA';
 
 export interface DashboardEventOption {
@@ -12,7 +14,7 @@ export type EventLocalitySpecialCode = 'NORMAL' | 'OUTRO' | 'NAO_INFORMADO';
 export interface EventLocalityDTO {
   id: number;
   nome: string;
-  tipo: 'BAIRRO' | 'COMUNIDADE' | 'RAMAL' | null;
+  tipo: 'BAIRRO' | 'COMUNIDADE' | 'RAMAL' | 'ALDEIA_INDIGENA' | null;
   especial: EventLocalitySpecialCode;
   ribeirinha: boolean;
   latitude: number | string | null;
@@ -43,7 +45,7 @@ export interface AggregateCountPolicy {
 }
 
 const DEVELOPMENT_MODES = new Set(['development', 'homologacao']);
-const DEVELOPMENT_FALLBACK_MINIMUM = 5;
+const DEVELOPMENT_FALLBACK_MINIMUM = HOMOLOGACAO_MIN_AGGREGATE_COUNT;
 
 const toPositiveInteger = (value: unknown): number | null => {
   if (typeof value !== 'string' && typeof value !== 'number') {
@@ -200,7 +202,8 @@ export const aggregateEventLocalities = (
       tipo:
         locality.tipo === 'BAIRRO' ||
         locality.tipo === 'COMUNIDADE' ||
-        locality.tipo === 'RAMAL'
+        locality.tipo === 'RAMAL' ||
+        locality.tipo === 'ALDEIA_INDIGENA'
           ? locality.tipo
           : null,
       especial,

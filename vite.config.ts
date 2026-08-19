@@ -4,6 +4,9 @@ import path from 'path';
 import { readFileSync } from 'fs';
 import { VitePWA } from 'vite-plugin-pwa';
 
+/** Manter igual a HOMOLOGACAO_MIN_AGGREGATE_COUNT em aggregateCountDefaults.ts */
+const HOMOLOGACAO_MIN_AGGREGATE_COUNT = 5;
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const pkgJson = JSON.parse(
@@ -35,6 +38,15 @@ export default defineConfig(({ mode }) => {
   console.log('🔐 API Auth proxy:', API_AUTH_URL);
   console.log('⚡ API Backend proxy:', API_BACKEND_URL);
   console.log('🧩 Internal auth:', useInternalAuth ? 'ON' : 'OFF');
+  const homologacaoMinAggregateCount =
+    env.VITE_MIN_AGGREGATE_COUNT ||
+    (mode === 'homologacao' ? String(HOMOLOGACAO_MIN_AGGREGATE_COUNT) : '');
+  if (mode === 'homologacao') {
+    console.log(
+      'VITE_MIN_AGGREGATE_COUNT efetivo:',
+      homologacaoMinAggregateCount || '(unset)',
+    );
+  }
   const APP_ORIGIN_REGEX = /^https:\/\/app(?:\.hml)?\.saude\.pa\.gov\.br\/.*$/i;
   const API_ORIGIN_REGEX = /^https:\/\/app-api(?:\.hml)?\.saude\.pa\.gov\.br\/.*$/i;
 
@@ -429,6 +441,13 @@ export default defineConfig(({ mode }) => {
     __OFFLINE_DEBUG__: process.env.NODE_ENV === 'development',
     __PWA_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),
     'import.meta.env.VITE_APP_BUILD_ID': JSON.stringify(viteAppBuildId),
+    ...(homologacaoMinAggregateCount
+      ? {
+          'import.meta.env.VITE_MIN_AGGREGATE_COUNT': JSON.stringify(
+            homologacaoMinAggregateCount,
+          ),
+        }
+      : {}),
   },
   };
 });

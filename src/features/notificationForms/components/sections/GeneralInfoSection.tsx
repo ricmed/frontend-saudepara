@@ -58,6 +58,13 @@ export const groupLocalidadesEvento = (
     ),
   },
   {
+    label: 'Aldeias indígenas',
+    options: options.filter(
+      option =>
+        option.especial === 'NORMAL' && option.tipo === 'ALDEIA_INDIGENA',
+    ),
+  },
+  {
     label: 'Especiais',
     options: options.filter(option => option.especial !== 'NORMAL'),
   },

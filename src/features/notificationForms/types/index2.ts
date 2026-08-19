@@ -122,7 +122,11 @@ export const validateTotalFiles = (arquivos: ArquivoFormulario[], config: Upload
 
 export type ModoLocalidadeEvento = 'NAO_USA' | 'OPCIONAL' | 'OBRIGATORIA';
 
-export type TipoLocalidadeEvento = 'BAIRRO' | 'COMUNIDADE' | 'RAMAL';
+export type TipoLocalidadeEvento =
+  | 'BAIRRO'
+  | 'COMUNIDADE'
+  | 'RAMAL'
+  | 'ALDEIA_INDIGENA';
 
 export type EspecialLocalidadeEvento = 'NORMAL' | 'OUTRO' | 'NAO_INFORMADO';
 

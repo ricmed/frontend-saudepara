@@ -5,6 +5,7 @@ import {
   getMappableEventLocalities,
   resolveAggregateCountPolicy
 } from './eventLocalities';
+import { HOMOLOGACAO_MIN_AGGREGATE_COUNT } from './aggregateCountDefaults';
 
 const createNotification = (
   id: number,
@@ -51,6 +52,7 @@ describe('event locality aggregate policy', () => {
       .toBe(5);
     expect(resolveAggregateCountPolicy('', 'homologacao').minimumCount)
       .toBe(5);
+    expect(HOMOLOGACAO_MIN_AGGREGATE_COUNT).toBe(5);
     expect(resolveAggregateCountPolicy(undefined, 'test').enabled)
       .toBe(false);
   });
@@ -62,6 +64,20 @@ describe('event locality aggregation', () => {
     minimumCount: 3,
     source: 'environment' as const
   };
+
+  it('does not merge communities by tipo or ribeirinha flag', () => {
+    const data = aggregateEventLocalities([
+      createNotification(11, { nome: 'Areia Branca', tipo: 'COMUNIDADE', ribeirinha: false }),
+      createNotification(11, { nome: 'Areia Branca', tipo: 'COMUNIDADE', ribeirinha: false }),
+      createNotification(11, { nome: 'Areia Branca', tipo: 'COMUNIDADE', ribeirinha: false }),
+      createNotification(12, { nome: 'Taparí', tipo: 'COMUNIDADE', ribeirinha: true }),
+      createNotification(12, { nome: 'Taparí', tipo: 'COMUNIDADE', ribeirinha: true }),
+      createNotification(12, { nome: 'Taparí', tipo: 'COMUNIDADE', ribeirinha: true }),
+    ], policy);
+
+    expect(data.map((item) => item.id).sort()).toEqual([11, 12]);
+    expect(data.find((item) => item.id === 12)?.ribeirinha).toBe(true);
+  });
 
   it('groups by stable ID and never uses the OUTRO free text as a label', () => {
     const data = aggregateEventLocalities([

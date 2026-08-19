@@ -1,0 +1,1 @@
+export const HOMOLOGACAO_MIN_AGGREGATE_COUNT = 5;
