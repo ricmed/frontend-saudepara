@@ -283,6 +283,9 @@ export function gerarCasoAleatorio(): FormData {
     // Seção 1: Dados Gerais
     evento: escolherAleatorio(['3', '2']), // 3=COP30, 2=CÍRIO DE NAZARÉ 2025
     publicoAtendido: escolherAleatorio(['1', '2', '3', '4']), // 1=Participante, 2=Trab.evento, 3=Autoridade, 4=Outro
+    localidadeEvento: '',
+    localidadeEventoOutro: '',
+    localidadeEventoAtual: null,
 
     // Seção 2: Procedência do indivíduo
     residenteBelem: eBelem ? 'S' : 'N', // S=Sim, N=Não (VarChar(1))

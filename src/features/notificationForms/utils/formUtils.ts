@@ -1,6 +1,13 @@
 // src/utils/formUtils.ts
 
-import { FormData, AtendimentoOption, EncerramentoOption, detectUserTimezone } from '@/features/notificationForms/types/index2';
+import {
+ FormData,
+ AtendimentoOption,
+ EncerramentoOption,
+ EventoOption,
+ LocalidadeEventoDTO,
+ ModoLocalidadeEvento
+} from '@/features/notificationForms/types/index2';
 import type { SectionState } from '@/features/notificationForms/hooks/useSectionExpansion';
 import { validateCPF } from '@/utils/cpfValidator';
 
@@ -324,6 +331,94 @@ normalizados.municipio = "";
  return normalizados;
 };
 
+export const getModoLocalidadeEvento = (
+ eventoId: string,
+ eventoOptions: EventoOption[]
+): ModoLocalidadeEvento => {
+ const evento = eventoOptions.find(
+   option => option.idtipo_evento.toString() === eventoId
+ );
+
+ return evento?.modo_localidade_evento ?? "NAO_USA";
+};
+
+export const changeEventoAndClearLocalidade = (
+ formData: FormData,
+ evento: string
+): FormData => ({
+ ...formData,
+ evento,
+ localidadeEvento: "",
+ localidadeEventoOutro: "",
+ localidadeEventoAtual: null
+});
+
+export interface LocalidadeEventoValidationContext {
+ modo: ModoLocalidadeEvento;
+ options: LocalidadeEventoDTO[];
+ catalogAvailable: boolean;
+}
+
+export const validateLocalidadeEvento = (
+ formData: FormData,
+ context: LocalidadeEventoValidationContext
+): Record<string, string> => {
+ const validationErrors: Record<string, string> = {};
+
+ if (context.modo === "NAO_USA") {
+   return validationErrors;
+ }
+
+ if (context.modo === "OBRIGATORIA" && !context.catalogAvailable) {
+   validationErrors.localidadeEvento =
+     "Catálogo de localidades indisponível. Sincronize os dados de apoio antes de salvar offline.";
+   return validationErrors;
+ }
+
+ const selectedId = Number(formData.localidadeEvento);
+ if (!formData.localidadeEvento || !Number.isInteger(selectedId) || selectedId <= 0) {
+   if (context.modo === "OBRIGATORIA") {
+     validationErrors.localidadeEvento = "A Localidade no evento é obrigatória";
+   }
+   return validationErrors;
+ }
+
+ const currentLocalidade =
+   formData.localidadeEventoAtual?.id === selectedId
+     ? formData.localidadeEventoAtual
+     : undefined;
+ const selectedLocalidade =
+   context.options.find(option => option.id === selectedId) ?? currentLocalidade;
+
+ if (!selectedLocalidade) {
+   validationErrors.localidadeEvento =
+     "Selecione uma localidade válida para o evento informado";
+   return validationErrors;
+ }
+
+ if (
+   !selectedLocalidade.ativo &&
+   formData.localidadeEventoAtual?.id !== selectedLocalidade.id
+ ) {
+   validationErrors.localidadeEvento =
+     "A localidade selecionada não está mais ativa";
+   return validationErrors;
+ }
+
+ if (selectedLocalidade.especial === "OUTRO") {
+   const outro = formData.localidadeEventoOutro.trim();
+   if (!outro) {
+     validationErrors.localidadeEventoOutro =
+       "Informe a localidade de forma genérica";
+   } else if (outro.length > 150) {
+     validationErrors.localidadeEventoOutro =
+       "A localidade complementar deve ter no máximo 150 caracteres";
+   }
+ }
+
+ return validationErrors;
+};
+
 /**
 * Verificar se o tipo de atendimento contém determinado texto
 */
@@ -374,12 +469,13 @@ export const isTipoEncerramento = (tipo: string, tipoEncerramento: string, encer
 */
 export const validateForm = (
  formData: FormData, 
- errors: Record<string, string>,
+ _errors: Record<string, string>,
  setErrors: React.Dispatch<React.SetStateAction<Record<string, string>>>,
  setExpandedSections: React.Dispatch<React.SetStateAction<SectionState>>,
  expandedSections: SectionState,
  atendimentoOptions: AtendimentoOption[],
- encerramentoOptions: EncerramentoOption[]
+ encerramentoOptions: EncerramentoOption[],
+ localidadeEventoContext?: LocalidadeEventoValidationContext
 ): boolean => {
  // ========================================
  // IMPORTANTE: Coletar TODOS os erros de uma vez
@@ -397,6 +493,13 @@ newErrors.evento = "O campo Evento é obrigatório";
  
  if (!formData.publicoAtendido || formData.publicoAtendido === "") {
 newErrors.publicoAtendido = "O campo Público Atendido é obrigatório";
+ }
+
+ if (localidadeEventoContext) {
+Object.assign(
+ newErrors,
+ validateLocalidadeEvento(formData, localidadeEventoContext)
+);
  }
 
  // ========================================
@@ -613,7 +716,12 @@ if (dataEncerramento > hoje) {
 const newExpandedSections = { ...expandedSections };
 
 // Seção 1: Dados Gerais
-if (newErrors.evento || newErrors.publicoAtendido) {
+if (
+ newErrors.evento ||
+ newErrors.publicoAtendido ||
+ newErrors.localidadeEvento ||
+ newErrors.localidadeEventoOutro
+) {
  newExpandedSections.dadosGerais = true;
 }
 

@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   Download,
   Loader,
-  FileChartColumnIncreasing,
   Files,
   Trash2,
   Menu,
@@ -91,11 +90,12 @@ const NotificationForm: React.FC = () => {
       
     // Opções de dropdown
     eventoOptions,
+    localidadeEventoOptions,
+    modoLocalidadeEvento,
+    isLoadingLocalidadesEvento,
+    localidadeEventoCatalogAvailable,
     publicoOptions,
     paisOptions,
-    estadoOptions,
-    municipioOptions,
-    bairroOptions,
     generoOptions,
     racaOptions,
     escolaridadeOptions,
@@ -104,7 +104,6 @@ const NotificationForm: React.FC = () => {
     hipoteseDiagOptions,
     traumaOptions,
     encerramentoOptions,
-    estabelecimentoOptions,
       
     // Estado dos municípios
     isLoadingMunicipios,
@@ -329,6 +328,12 @@ const NotificationForm: React.FC = () => {
             toggleSection={() => toggleSection("dadosGerais")}
             eventoOptions={eventoOptions}
             publicoOptions={publicoOptions}
+            localidadeEventoOptions={localidadeEventoOptions}
+            modoLocalidadeEvento={modoLocalidadeEvento}
+            isLoadingLocalidadesEvento={isLoadingLocalidadesEvento}
+            localidadeEventoCatalogAvailable={
+              localidadeEventoCatalogAvailable
+            }
             isLoadingMunicipios={isLoadingMunicipios}
             paisOptions={paisOptions}
             handleValidationError={handleValidationError}

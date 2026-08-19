@@ -27,6 +27,8 @@ const ErrorSummary: React.FC<ErrorSummaryProps> = ({
     // Seção 1: Dados Gerais
     evento: "Evento",
     publicoAtendido: "Público Atendido",
+    localidadeEvento: "Localidade no evento",
+    localidadeEventoOutro: "Outra localidade",
     
     // Seção 2: Procedência do Indivíduo
     residenteBelem: "Residente em Belém",
@@ -83,6 +85,8 @@ const ErrorSummary: React.FC<ErrorSummaryProps> = ({
     // Seção 1: Dados Gerais
     evento: "dadosGerais",
     publicoAtendido: "dadosGerais",
+    localidadeEvento: "dadosGerais",
+    localidadeEventoOutro: "dadosGerais",
     
     // Seção 2: Procedência do Indivíduo
     residenteBelem: "procedencia",
@@ -200,6 +204,8 @@ export const scrollToField = (
     // Seção 1: Dados Gerais
     evento: "dadosGerais",
     publicoAtendido: "dadosGerais",
+    localidadeEvento: "dadosGerais",
+    localidadeEventoOutro: "dadosGerais",
     
     // Seção 2: Procedência do Indivíduo
     residenteBelem: "procedencia",
@@ -258,8 +264,6 @@ export const scrollToField = (
   setTimeout(() => {
     let element: Element | null = null;
     
-    console.log(`🔍 Procurando elemento para campo: ${fieldName}`);
-    
     // ========================================
     // BUSCA ESPECÍFICA PARA CAMPOS ESPECIAIS
     // ========================================
@@ -280,8 +284,6 @@ export const scrollToField = (
                   const label = div.querySelector('label');
                   return label && label.textContent?.includes('Sinais e Sintomas');
                 }) || null;
-      
-      console.log('🔍 Procurando Sinais e Sintomas:', element);
     }
     // Tipo de Trauma (SearchableCheckboxGroup)
     else if (fieldName === 'tipoTrauma') {
@@ -300,8 +302,6 @@ export const scrollToField = (
                   const label = div.querySelector('label');
                   return label && label.textContent?.includes('Tipo de Trauma');
                 }) || null;
-      
-      console.log('🔍 Procurando Tipo de Trauma:', element);
     }
     // Hipótese Diagnóstica (grid de checkboxes)
     else if (fieldName === 'hipoteseDiagnostica') {
@@ -311,22 +311,18 @@ export const scrollToField = (
                 )?.closest('div') ||
                 // Buscar pelo grid de hipóteses
                 document.querySelector(`div[class*="grid"] input[type="checkbox"]`)?.closest('div') || null;
-      
-      console.log('🔍 Procurando Hipótese Diagnóstica:', element);
     }
     // Unidade Notificadora
     else if (fieldName === 'unidadeNotificadora') {
       element = document.querySelector(`[data-field-type="unidade"]`) ||
                 document.querySelector(`input[placeholder*="unidade notificadora"]`) ||
                 document.querySelector(`[data-field="unidadeNotificadora"]`);
-      console.log('🔍 Procurando Unidade Notificadora:', element);
     }
     // Local de Encaminhamento  
     else if (fieldName === 'localEncaminhamento') {
       element = document.querySelector(`[data-field-type="encaminhamento"]`) ||
                 document.querySelector(`input[placeholder*="encaminhamento"]`) ||
                 document.querySelector(`[data-field="localEncaminhamento"]`);
-      console.log('🔍 Procurando Local de Encaminhamento:', element);
     }
     // Busca padrão para outros campos
     else {
@@ -340,8 +336,6 @@ export const scrollToField = (
     // ========================================
     
     if (element) {
-      console.log(`✅ Elemento encontrado para ${fieldName}:`, element);
-      
       element.scrollIntoView({
         behavior: 'smooth',
         block: 'center'
@@ -368,23 +362,6 @@ export const scrollToField = (
           (element as HTMLElement).click();
         }
       }, 400);
-    } else {
-      console.log(`❌ Elemento não encontrado para campo: ${fieldName}`);
-      
-      // Debug: listar todos os elementos possíveis
-      console.log('🔍 Debug - Elementos disponíveis:');
-      console.log('- Labels com "Sintomas":', 
-        Array.from(document.querySelectorAll('label')).filter(l => 
-          l.textContent?.toLowerCase().includes('sintoma')
-        ));
-      console.log('- Labels com "Trauma":', 
-        Array.from(document.querySelectorAll('label')).filter(l => 
-          l.textContent?.toLowerCase().includes('trauma')
-        ));
-      console.log('- Elementos com data-field:', 
-        document.querySelectorAll('[data-field]'));
-      console.log('- Elementos com data-field-type:', 
-        document.querySelectorAll('[data-field-type]'));
     }
   }, 100);
 };

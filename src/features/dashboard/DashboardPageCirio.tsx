@@ -4,13 +4,17 @@ import EnhancedNotificationDashboard from '@/features/dashboard/NotificationDash
 import { useDashboardDataLoader } from '@/features/dashboard/hooks/useDashboardDataLoader';
 
 const DashboardPageCirio: React.FC = () => {
-  const { notificacoes, exportOptions, loading, error, setNotificacoes } = useDashboardDataLoader();
-
-  // 🔧 Callback para quando o dashboard filho atualizar dados
-  const handleDataRefresh = React.useCallback((newData: any[]) => {
-    console.log(`🔄 DashboardPageCirio: Recebendo ${newData.length} notificações do componente filho`);
-    setNotificacoes(newData);
-  }, []);
+  const {
+    notificacoes,
+    exportOptions,
+    loading,
+    dataLoading,
+    error,
+    dataError,
+    selectedEventId,
+    loadNotificationsForEvent,
+    reloadNotifications
+  } = useDashboardDataLoader();
 
   // Componente para mostrar durante o carregamento
   if (loading) {
@@ -50,7 +54,11 @@ const DashboardPageCirio: React.FC = () => {
       <EnhancedNotificationDashboard 
         notificacoes={notificacoes}
         exportOptions={exportOptions}
-        onDataRefresh={handleDataRefresh}
+        selectedEventId={selectedEventId}
+        dataLoading={dataLoading}
+        dataError={dataError}
+        onEventSelectionChange={loadNotificationsForEvent}
+        onDataRefresh={reloadNotifications}
       />
     </div>
   );

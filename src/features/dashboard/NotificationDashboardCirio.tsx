@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, startTransition } from "react";
-import NotificacaoService from '@/services/NotificacaoService';
 import DashboardExportMenu from '@/components/common/DashboardExportMenu';
 import {
   BarChart,
@@ -56,6 +55,7 @@ import {
 
 // 🆕 NOVOS IMPORTS: Componentes do dashboard aprimorado
 import GeographicLocationPanel from './components/charts/GeographicLocationPanel';
+import EventLocalitiesChartWithMap from './components/charts/EventLocalitiesChartWithMap';
 import DashboardTabs, { useDashboardTabs } from './components/DashboardTabs';
 // Componentes de IA temporariamente comentados - serão usados no futuro
 // import AIInsights from './components/AIInsights';
@@ -88,6 +88,14 @@ import {
   formatNotificationDatePtBr,
   getOptionDescriptionById
 } from './utils/notificationModalFormatters';
+import {
+  aggregateEventLocalities,
+  DashboardEventOption,
+  getNotificationEventId,
+  getNotificationEventLocalityId,
+  isDashboardEventActive,
+  resolveAggregateCountPolicy
+} from './utils/eventLocalities';
 
 // ⚡ OTIMIZAÇÃO: Memoizar componentes de gráfico para evitar re-renderizações desnecessárias
 const MemoizedPiramideEtariaChart = React.memo(PiramideEtariaChart);
@@ -105,6 +113,12 @@ const MemoizedAtendimentosPorHoraChart = React.memo(AtendimentosPorHoraChart);
 const MemoizedEstabelecimentosMapaAvancado = React.memo(EstabelecimentosMapaAvancado);
 const MemoizedAlertasPanel = React.memo(AlertasPanel);
 const MemoizedGeographicLocationPanel = React.memo(GeographicLocationPanel);
+const MemoizedEventLocalitiesChartWithMap = React.memo(EventLocalitiesChartWithMap);
+
+const EVENT_LOCALITY_AGGREGATE_POLICY = resolveAggregateCountPolicy(
+  import.meta.env.VITE_MIN_AGGREGATE_COUNT,
+  import.meta.env.MODE
+);
 
 // 🕐 NOVO: Hook e Componente para filtro de período personalizado
 import useDashboardDateRangeFilter from './hooks/useDashboardTimeFilter';
@@ -180,7 +194,11 @@ const COLORS = {
 interface DashboardProps {
   notificacoes?: any[]; // Lista de notificações da API
   exportOptions?: any; // Opções de exportação com os tipos/categorias
-  onDataRefresh?: (newData: any[]) => void; // Callback para notificar sobre novos dados
+  selectedEventId?: number | null;
+  dataLoading?: boolean;
+  dataError?: string | null;
+  onEventSelectionChange?: (eventId: number | null) => Promise<any[]>;
+  onDataRefresh?: () => Promise<any[]>;
 }
 
 // Define interface for chart data
@@ -203,6 +221,10 @@ interface StatCounts {
 const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   notificacoes = [],
   exportOptions = {},
+  selectedEventId = null,
+  dataLoading = false,
+  dataError = null,
+  onEventSelectionChange,
   onDataRefresh,
 }) => {
   // ⚡ OTIMIZAÇÃO: Sistema de log condicional para produção
@@ -222,6 +244,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   
   // Para controlar se já fizemos o processamento inicial
   const initialProcessingDone = useRef(false);
+  const emptyDatasetProcessed = useRef(false);
   const originalNotificacoes = useRef<any[]>([]);
   const filteredNotificacoes = useRef<any[]>([]);
   const autoRefreshInterval = useRef<NodeJS.Timeout | null>(null);
@@ -279,7 +302,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
   // Estado para filtragem interativa
   const [loading, setLoading] = useState(false);
-  const [selectedEvento, setSelectedEvento] = useState("Todos");
   const [lastUpdate, setLastUpdate] = useState(new Date().toLocaleString());
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showExportDropdown, setShowExportDropdown] = useState(false);
@@ -331,7 +353,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     pais: null,
     estado: null,
     municipio: null,
-    bairro: null
+    bairro: null,
+    localidadeEvento: null
   });
   
   // 🆕 ESTADOS PARA FILTRO POR DATA DE NOTIFICAÇÃO
@@ -395,6 +418,25 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   // Mapeamentos de tipos de atendimento (serão inicializados com base nos dados)
   const [tipoAtendimentoMap, setTipoAtendimentoMap] = useState<Record<string, string>>({});
 
+  const dashboardEventOptions = useMemo<DashboardEventOption[]>(
+    () => Array.isArray(exportOptions?.eventoOptions)
+      ? exportOptions.eventoOptions
+      : [],
+    [exportOptions?.eventoOptions]
+  );
+  const selectedEvent = useMemo(
+    () => selectedEventId === null
+      ? null
+      : dashboardEventOptions.find(
+          (event) => event.idtipo_evento === selectedEventId
+        ) ?? null,
+    [dashboardEventOptions, selectedEventId]
+  );
+  const selectedEventDescription = selectedEvent?.descricao ?? '';
+  const shouldShowEventLocalities =
+    selectedEvent?.modo_localidade_evento === 'OPCIONAL' ||
+    selectedEvent?.modo_localidade_evento === 'OBRIGATORIA';
+
   // Mapeamento de descrições para identificadores de filtro
   const atendimentoToFilterKey = ATENDIMENTO_TO_FILTER_KEY;
 
@@ -438,50 +480,28 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   // 🆕 FILTRAR NOTIFICAÇÕES PELO EVENTO SELECIONADO
   // IMPORTANTE: Deve vir antes de funções que dependem dele (ex: handleDataNotificacaoChange)
   const notificacoesFiltradasPorEvento = useMemo(() => {
-    // Se "Todos" está selecionado, retornar todas as notificações (já filtradas por período)
-    if (selectedEvento === "Todos") {
-      console.log(`📊 Evento "Todos" selecionado - usando ${notificacoesFiltradasPorPeriodo.length} notificações`);
+    if (selectedEventId === null) {
       return notificacoesFiltradasPorPeriodo;
     }
 
-    // Filtrar pelo evento selecionado
-    console.log(`🔍 Filtrando notificações pelo evento: "${selectedEvento}"`);
-    
-    const filtradas = notificacoesFiltradasPorPeriodo.filter((notificacao: any) => {
-      // Buscar o nome do evento usando tipoEvento ou original.tipo_evento.descricao
-      const eventoNome = notificacao.tipoEvento || 
-                        notificacao.original?.tipo_evento?.descricao;
-      
-      return eventoNome === selectedEvento;
-    });
-
-    console.log(`✅ Filtro de evento aplicado: ${notificacoesFiltradasPorPeriodo.length} → ${filtradas.length} notificações`);
-    return filtradas;
-  }, [notificacoesFiltradasPorPeriodo, selectedEvento]);
+    return notificacoesFiltradasPorPeriodo.filter(
+      (notification: any) =>
+        getNotificationEventId(notification) === selectedEventId
+    );
+  }, [notificacoesFiltradasPorPeriodo, selectedEventId]);
 
   // 🆕 NOTIFICAÇÕES PARA ANÁLISE TEMPORAL (INDEPENDENTE DO FILTRO GLOBAL)
   // Filtra apenas por evento, ignorando o filtro de período
   const notificacoesParaAnalisetemporal = useMemo(() => {
-    // Se "Todos" está selecionado, retornar todas as notificações originais (sem filtro de período)
-    if (selectedEvento === "Todos") {
-      console.log(`📊 Análise Temporal - Evento "Todos" selecionado - usando ${notificacoes.length} notificações (sem filtro de período)`);
+    if (selectedEventId === null) {
       return notificacoes;
     }
 
-    // Filtrar apenas pelo evento selecionado (ignorando período)
-    console.log(`🔍 Análise Temporal - Filtrando notificações pelo evento: "${selectedEvento}" (sem filtro de período)`);
-    
-    const filtradas = notificacoes.filter((notificacao: any) => {
-      // Buscar o nome do evento usando tipoEvento ou original.tipo_evento.descricao
-      const eventoNome = notificacao.tipoEvento || 
-                        notificacao.original?.tipo_evento?.descricao;
-      
-      return eventoNome === selectedEvento;
-    });
-
-    console.log(`✅ Análise Temporal - Filtro de evento aplicado: ${notificacoes.length} → ${filtradas.length} notificações (sem filtro de período)`);
-    return filtradas;
-  }, [notificacoes, selectedEvento]);
+    return notificacoes.filter(
+      (notification: any) =>
+        getNotificationEventId(notification) === selectedEventId
+    );
+  }, [notificacoes, selectedEventId]);
   
   // Função para obter a descrição de um tipo de atendimento pelo ID
   const getAtendimentoDescById = useCallback((idAtendimento: string | number): string => {
@@ -530,67 +550,18 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       return resultado;
     }
     
-    // Verificar se é um evento
-    if (exportOptions?.eventoOptions?.length > 0) {
-      const isEvento = exportOptions.eventoOptions.some(
-        (e: any) => e.descricao.toLowerCase() === categoriaLower
+    const possibleEventId = Number(categoria);
+    const isEventId =
+      Number.isInteger(possibleEventId) &&
+      dashboardEventOptions.some(
+        (event) => event.idtipo_evento === possibleEventId
       );
-      
-      if (isEvento) {
-        // Filtrar por evento - verificar várias estruturas de dados possíveis
-        const resultado = originalNotificacoes.current.filter(n => {
-          // Verificar usando a estrutura esperada
-          const eventoId = n?.original?.evento_idevento;
-          if (eventoId !== undefined) {
-            // Encontrar o evento correspondente por ID
-            const eventoEncontrado = exportOptions.eventoOptions.find(
-              (e: any) => {
-                const matchId = String(e.idtipo_evento) === String(eventoId) || 
-                               String(e.idevento) === String(eventoId);
-                return matchId;
-              }
-            );
-            
-            if (eventoEncontrado && eventoEncontrado.descricao.toLowerCase() === categoriaLower) {
-              return true;
-            }
-          }
-          
-          // Verificar diretamente por descrição do evento (caso o evento esteja embutido)
-          if (n?.original?.evento?.descricao) {
-            const match = n.original.evento.descricao.toLowerCase() === categoriaLower;
-            if (match) return true;
-          }
-          
-          // Verificar nome do evento diretamente
-          if (n?.eventoNome) {
-            const match = n.eventoNome.toLowerCase() === categoriaLower;
-            if (match) return true;
-          }
-          
-          // Verificar o campo evento_nome se existir
-          if (n?.original?.evento_nome) {
-            const match = n.original.evento_nome.toLowerCase() === categoriaLower;
-            if (match) return true;
-          }
-          
-          // Verificar em evento.nome se existir
-          if (n?.original?.evento?.nome) {
-            const match = n.original.evento.nome.toLowerCase() === categoriaLower;
-            if (match) return true;
-          }
-          
-          // Como último recurso, verificar no objeto JSON completo
-          const notificacaoStr = JSON.stringify(n).toLowerCase();
-          const containsEvento = notificacaoStr.includes(`"descricao":"${categoriaLower}"`) || 
-                               notificacaoStr.includes(`"nome":"${categoriaLower}"`) ||
-                               notificacaoStr.includes(`"evento_nome":"${categoriaLower}"`);
-          
-          return containsEvento;
-        });
-        
-        return resultado;
-      }
+
+    if (isEventId) {
+      return originalNotificacoes.current.filter(
+        (notification) =>
+          getNotificationEventId(notification) === possibleEventId
+      );
     }
     
     // Filtro genérico para outros tipos de categorias
@@ -601,7 +572,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       return notificacaoStr.includes(categoriaLower);
     });
     return resultado;
-  }, [exportOptions, checkAtendimentoType]);
+  }, [dashboardEventOptions, checkAtendimentoType]);
 
   // 🆕 FUNÇÃO PARA APLICAR FILTROS CRUZADOS (com suporte a seleção múltipla)
   const applyFilters = useCallback((notificacoes: any[], excludeCategory?: string) => {
@@ -616,33 +587,34 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       
       if (filterValue !== null && filterValue !== undefined) {
         switch (category) {
-          case 'evento':
-            if (Array.isArray(filterValue)) {
-              // Seleção múltipla
-              filteredData = filteredData.filter(n => {
-                const eventoId = n?.original?.tipo_evento_idtipo_evento;
-                if (eventoId !== undefined && exportOptions?.eventoOptions?.length > 0) {
-                  const evento = exportOptions.eventoOptions.find(
-                    (e: any) => String(e.idtipo_evento) === String(eventoId) || String(e.idevento) === String(eventoId)
-                  );
-                  return evento?.descricao && filterValue.includes(evento.descricao);
-                }
-                return false;
-              });
-            } else {
-              // Seleção simples
-              filteredData = filteredData.filter(n => {
-                const eventoId = n?.original?.tipo_evento_idtipo_evento;
-                if (eventoId !== undefined && exportOptions?.eventoOptions?.length > 0) {
-                  const evento = exportOptions.eventoOptions.find(
-                    (e: any) => String(e.idtipo_evento) === String(eventoId) || String(e.idevento) === String(eventoId)
-                  );
-                  return evento?.descricao === filterValue;
-                }
-                return false;
-              });
-            }
+          case 'evento': {
+            const eventIds = (Array.isArray(filterValue)
+              ? filterValue
+              : [filterValue])
+              .map(Number)
+              .filter((id) => Number.isInteger(id) && id > 0);
+            filteredData = filteredData.filter((notification) => {
+              const notificationEventId = getNotificationEventId(notification);
+              return notificationEventId !== null &&
+                eventIds.includes(notificationEventId);
+            });
             break;
+          }
+
+          case 'localidadeEvento': {
+            const localityIds = (Array.isArray(filterValue)
+              ? filterValue
+              : [filterValue])
+              .map(Number)
+              .filter((id) => Number.isInteger(id) && id > 0);
+            filteredData = filteredData.filter((notification) => {
+              const notificationLocalityId =
+                getNotificationEventLocalityId(notification);
+              return notificationLocalityId !== null &&
+                localityIds.includes(notificationLocalityId);
+            });
+            break;
+          }
             
           case 'tipoAtendimento':
             if (Array.isArray(filterValue)) {
@@ -1185,7 +1157,11 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   }, [notificacoesFiltradasPorEvento, activeFilters, applyFilters]);
 
   // 🆕 FUNÇÃO PARA ALTERNAR FILTRO (com suporte a seleção múltipla)
-  const toggleFilter = useCallback((category: string, value: string, multiSelect = false) => {
+  const toggleFilter = useCallback((
+    category: string,
+    value: string | number,
+    multiSelect = false
+  ) => {
     setActiveFilters(prev => {
       const newFilters = { ...prev };
       const currVal = newFilters[category];
@@ -1242,13 +1218,14 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       pais: null,
       estado: null,
       municipio: null,
-      bairro: null
+      bairro: null,
+      localidadeEvento: null
     });
     setSelectedCategory(null);
-    setSelectedEvento("Todos");
     setSelectedDataNotificacao(null); // 🆕 Limpar data selecionada
+    void onEventSelectionChange?.(null);
     console.log("🧹 Todos os filtros foram limpos");
-  }, []);
+  }, [onEventSelectionChange]);
 
   // 🆕 FUNÇÃO PARA EXTRAIR DATAS DISPONÍVEIS DAS NOTIFICAÇÕES
   const extrairDatasNotificacao = useCallback((notificacoes: any[]): string[] => {
@@ -1366,6 +1343,104 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   const hasActiveFilters = useMemo(() => {
     return Object.values(activeFilters).some(filter => filter !== null);
   }, [activeFilters]);
+
+  const eventLocalityFilterBase = useMemo(() => {
+    if (!shouldShowEventLocalities) {
+      return [];
+    }
+
+    return hasActiveFilters
+      ? applyFilters(notificacoesFiltradasPorEvento, 'localidadeEvento')
+      : notificacoesFiltradasPorEvento;
+  }, [
+    applyFilters,
+    hasActiveFilters,
+    notificacoesFiltradasPorEvento,
+    shouldShowEventLocalities
+  ]);
+
+  const eventLocalityAggregates = useMemo(
+    () => aggregateEventLocalities(
+      eventLocalityFilterBase,
+      EVENT_LOCALITY_AGGREGATE_POLICY
+    ),
+    [eventLocalityFilterBase]
+  );
+
+  const selectedEventLocalityIds = useMemo(() => {
+    const value = activeFilters.localidadeEvento;
+    const rawValues = Array.isArray(value) ? value : value !== null ? [value] : [];
+
+    return rawValues
+      .map(Number)
+      .filter((id) => Number.isInteger(id) && id > 0);
+  }, [activeFilters.localidadeEvento]);
+
+  useEffect(() => {
+    if (selectedEventLocalityIds.length === 0) {
+      return;
+    }
+
+    const selectableIds = new Set(
+      eventLocalityAggregates
+        .filter((item) => !item.suppressed)
+        .map((item) => item.id)
+    );
+    const selectionRemainsAllowed =
+      shouldShowEventLocalities &&
+      EVENT_LOCALITY_AGGREGATE_POLICY.enabled &&
+      selectedEventLocalityIds.every((id) => selectableIds.has(id));
+
+    if (!selectionRemainsAllowed) {
+      setActiveFilters((previous) => ({
+        ...previous,
+        localidadeEvento: null
+      }));
+    }
+  }, [
+    eventLocalityAggregates,
+    selectedEventLocalityIds,
+    shouldShowEventLocalities
+  ]);
+
+  const getActiveFilterDisplayValue = useCallback((
+    category: string,
+    value: any
+  ): string => {
+    const values = Array.isArray(value) ? value : [value];
+
+    if (category === 'evento') {
+      return values
+        .map((id) => dashboardEventOptions.find(
+          (event) => event.idtipo_evento === Number(id)
+        )?.descricao)
+        .filter(Boolean)
+        .join(', ');
+    }
+
+    if (category === 'localidadeEvento') {
+      return values
+        .map((id) => eventLocalityAggregates.find(
+          (item) => item.id === Number(id)
+        )?.label)
+        .filter(Boolean)
+        .join(', ');
+    }
+
+    return values.join(', ');
+  }, [dashboardEventOptions, eventLocalityAggregates]);
+
+  const displayActiveFilters = useMemo(
+    () => Object.fromEntries(
+      Object.entries(activeFilters).map(([category, value]) => [
+        category,
+        value === null
+          ? null
+          : getActiveFilterDisplayValue(category, value)
+      ])
+    ),
+    [activeFilters, getActiveFilterDisplayValue]
+  );
 
   // 🆕 FUNÇÃO PARA OBTER DADOS FILTRADOS
   const getFilteredData = useCallback(() => {
@@ -2533,95 +2608,33 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   // Função para buscar dados frescos do servidor
   const fetchFreshData = useCallback(async () => {
     try {
-      // 🆕 PASSO 1: Buscar eventos ativos para filtrar
-      const eventosAtivos = exportOptions?.eventoOptions || [];
-      const idsEventosAtivos = new Set(eventosAtivos.map((e: any) => e.idtipo_evento));
-      
-      console.log(`🔍 Buscando notificações... (${idsEventosAtivos.size} eventos ativos)`);
-      
-      // 🌐 Buscar TODAS as notificações com paginação (SEM CACHE)
-      let allData: any[] = [];
-      let page = 1;
-      const pageSize = 200;
-      let hasMore = true;
-      let totalExpected = 0;
-      const maxPages = 100; // 🔒 SEGURANÇA: Limite máximo de páginas (100 * 200 = 20.000 registros)
-
-      while (hasMore && page <= maxPages) {
-        console.log(`📄 Buscando página ${page}/${maxPages}...`);
-        
-        try {
-          const response = await NotificacaoService.getAll(page, pageSize);
-          
-          if (response && response.data && response.data.length > 0) {
-            // Armazenar o total esperado da primeira página
-            if (page === 1 && response.meta) {
-              totalExpected = response.meta.total;
-              console.log(`📊 Total de notificações no servidor: ${totalExpected}`);
-              console.log(`📄 Total de páginas: ${response.meta.totalPages}`);
-            }
-            
-            allData = [...allData, ...response.data];
-            console.log(`✅ Página ${page}: ${response.data.length} registros | Total acumulado: ${allData.length}/${totalExpected}`);
-            
-            // Verificar se há mais páginas
-            if (response.data.length < pageSize || page >= response.meta.totalPages) {
-              console.log(`🏁 Última página alcançada (${page}/${response.meta.totalPages})`);
-              hasMore = false;
-            } else {
-              page++;
-            }
-          } else {
-            console.log(`⚠️ Página ${page} retornou vazia - finalizando`);
-            hasMore = false;
-          }
-        } catch (pageError) {
-          console.error(`❌ Erro ao buscar página ${page}:`, pageError);
-          // Se falhar em uma página, parar o loop mas retornar os dados já carregados
-          console.warn(`⚠️ Parando na página ${page} devido a erro. Total carregado até agora: ${allData.length}`);
-          hasMore = false;
+      if (onDataRefresh) {
+        const freshData = await onDataRefresh();
+        if (Array.isArray(freshData)) {
+          originalNotificacoes.current = [...freshData];
+          return freshData;
         }
+        return null;
       }
-      
-      if (page > maxPages) {
-        console.warn(`⚠️ AVISO: Limite de segurança atingido (${maxPages} páginas). Total carregado: ${allData.length}`);
-      }
-      
-      console.log(`📥 Dados frescos recebidos: ${allData.length} notificações (esperado: ${totalExpected})`);
-      
-      // 🆕 PASSO 3: Filtrar apenas notificações de eventos ativos (igual ao DashboardPageCirio)
-      const freshData = allData.filter((notificacao: any) => {
-        const idEvento = notificacao.original?.tipo_evento?.idtipo_evento || 
-                        notificacao.idtipo_evento || 
-                        notificacao.tipo_evento?.idtipo_evento;
-        
-        return idEvento && idsEventosAtivos.has(idEvento);
-      });
-      
-      console.log(`✅ Filtro aplicado: ${allData.length} → ${freshData.length} notificações (apenas eventos ativos)`);
-      
-      // Verificar se temos dados novos
-      if (freshData && Array.isArray(freshData) && freshData.length > 0) {
-        // Atualizar as notificações originais
+
+      if (Array.isArray(notificacoes)) {
+        const freshData = [...notificacoes];
         originalNotificacoes.current = [...freshData];
         return freshData;
       }
-      
+
       return null;
-    } catch (error) {
-      console.error("Erro ao buscar dados do servidor:", error);
-      
-      // Em caso de erro, tentar usar dados locais se disponíveis
+    } catch {
+      console.error('Não foi possível atualizar os dados do dashboard.');
       if (notificacoes && notificacoes.length > 0) {
-        console.log("Usando dados locais como fallback...");
-        const mockData = [...notificacoes];
-        originalNotificacoes.current = [...mockData];
-        return mockData;
+        const localData = [...notificacoes];
+        originalNotificacoes.current = [...localData];
+        return localData;
       }
-      
+
       return null;
     }
-  }, [notificacoes, exportOptions]);
+  }, [notificacoes, onDataRefresh]);
 
   // Função para atualizar os dados
   const refreshData = useCallback(async () => {
@@ -2649,14 +2662,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         if (dataAtualmenteSeleciona) {
           const novoTotalDia = contarNotificacoesPorData(freshData, dataAtualmenteSeleciona);
           setTotalNotificacoesDia(novoTotalDia);
-        }
-        
-        // ✅ CORREÇÃO: Notificar o componente pai SEMPRE, não só quando o total muda
-        // Isso garante que os dados sejam atualizados mesmo quando há modificações
-        // nas notificações existentes (ex: mudança de status, edições, etc)
-        if (onDataRefresh) {
-          console.log("🔔 Notificando componente pai sobre novos dados...");
-          onDataRefresh(freshData);
         }
         
         console.log("📈 Atualizando dados locais...");
@@ -2735,7 +2740,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       setLoading(false);
       setLastUpdate(new Date().toLocaleString());
     }
-  }, [loading, selectedCategory, selectedDataNotificacao, activeFilters, fetchFreshData, notificacoes, filtrarNotificacoes, calcularEstatisticas, onDataRefresh, extrairDatasNotificacao, contarNotificacoesPorData, applyFilters, notificacoesFiltradasPorEvento]);
+  }, [loading, selectedCategory, selectedDataNotificacao, activeFilters, fetchFreshData, notificacoes, filtrarNotificacoes, calcularEstatisticas, extrairDatasNotificacao, contarNotificacoesPorData, applyFilters, notificacoesFiltradasPorEvento]);
 
   // 🔧 CORREÇÃO: Atribuir refreshData ao ref para que o auto-refresh funcione
   useEffect(() => {
@@ -2818,10 +2823,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
 
   // useEffect para processamento inicial de dados
   useEffect(() => {
-    // Sempre armazenar as notificações originais quando recebermos novas
+    originalNotificacoes.current = Array.isArray(notificacoes)
+      ? [...notificacoes]
+      : [];
+
     if (notificacoes && notificacoes.length > 0) {
-      originalNotificacoes.current = [...notificacoes];
-      
+      emptyDatasetProcessed.current = false;
       // 🆕 INICIALIZAR DATAS DE NOTIFICAÇÃO DISPONÍVEIS
       const datasDisponiveis = extrairDatasNotificacao(notificacoes);
       setDatasNotificacaoDisponiveis(datasDisponiveis);
@@ -2890,11 +2897,14 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           });
         }
       }
-    }
-    
-    // Esta flag useRef garante que não faremos o processamento repetidamente se não for necessário
-    if (initialProcessingDone.current && notificacoes.length === 0) {
-      return;
+    } else {
+      if (emptyDatasetProcessed.current) {
+        return;
+      }
+      emptyDatasetProcessed.current = true;
+      filteredNotificacoes.current = [];
+      setDatasNotificacaoDisponiveis([]);
+      setTotalNotificacoesDia(0);
     }
 
     const doInitialProcessing = async () => {
@@ -2921,6 +2931,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           setOriginalHipoteses([]);
           setOriginalTrauma([]);
           setOriginalGenero([]);
+          setOriginalPais([]);
+          setOriginalEstado([]);
+          setOriginalMunicipio([]);
+          setOriginalBairro([]);
           
           setFilteredRaca([]);
           setFilteredEscolaridade([]);
@@ -2931,6 +2945,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           setFilteredHipoteses([]);
           setFilteredTrauma([]);
           setFilteredGenero([]);
+          setFilteredPais([]);
+          setFilteredEstado([]);
+          setFilteredMunicipio([]);
+          setFilteredBairro([]);
         } else {
           console.log("Iniciando processamento de dados com", notificacoes.length, "notificações");
           
@@ -2968,10 +2986,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     
   }, [notificacoes, calcularEstatisticas, notificacoesFiltradasPorEvento, applyFilters, activeFilters, extrairDatasNotificacao, selectedDataNotificacao, obterDataAtual, contarNotificacoesPorData, exportOptions]);
 
-  // Usar dados reais para eventos
-  const eventoOptions = exportOptions?.eventoOptions?.length > 0 
-    ? ["Todos", ...exportOptions.eventoOptions.map((e: any) => e.descricao)]
-    : ["Todos", "COP30", "Carnaval", "Copa do Mundo Feminina", "Círio de Nazaré"];
+  const activeEventOptions = dashboardEventOptions.filter(isDashboardEventActive);
+  const historicalEventOptions = dashboardEventOptions.filter(
+    (event) => !isDashboardEventActive(event)
+  );
 
   const handleRefresh = useCallback(() => {
     refreshDataRef.current && refreshDataRef.current();
@@ -2982,21 +3000,22 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   }, []);
 
   const handleEventoChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const novoEvento = e.target.value;
-    console.log(`🎯 Evento alterado para: ${novoEvento}`);
-    
-    setSelectedEvento(novoEvento);
-    setSelectedCategory(novoEvento !== "Todos" ? novoEvento : null);
-    
-    // CORREÇÃO: Sincronizar com activeFilters para integração com filtro de data
-    const eventoValue = novoEvento !== "Todos" ? novoEvento : null;
+    const rawEventId = e.target.value;
+    const eventId = rawEventId === '' ? null : Number(rawEventId);
+    const normalizedEventId =
+      eventId !== null && Number.isInteger(eventId) && eventId > 0
+        ? eventId
+        : null;
+
+    setSelectedCategory(null);
     setActiveFilters(prev => ({
       ...prev,
-      evento: eventoValue
+      evento: normalizedEventId,
+      localidadeEvento: null
     }));
-    
-    console.log(`✅ ActiveFilters.evento atualizado para:`, eventoValue);
-  }, []);
+
+    void onEventSelectionChange?.(normalizedEventId);
+  }, [onEventSelectionChange]);
 
   // Handler para cards e charts - ATUALIZADO para filtros cruzados (com suporte a Ctrl)
   const handleCardClick = useCallback((tipoAtendimento: string, multiSelect = false) => {
@@ -3487,7 +3506,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 traumaData={filteredTrauma}
                 hipotesesData={filteredHipoteses}
                 totalRecords={filteredNotificacoes.current.length}
-                activeFilters={activeFilters}
+                activeFilters={displayActiveFilters}
                 buttonVariant="button"
                 className="text-xs sm:text-sm"
               />
@@ -3532,16 +3551,45 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
               <div className="w-full md:w-64">
                 <label className="block text-sm text-gray-600 mb-1">Evento</label>
                 <select
-                  value={selectedEvento}
+                  value={selectedEventId ?? ''}
                   onChange={handleEventoChange}
+                  disabled={dataLoading}
                   className="w-full p-2 border border-gray-300 rounded text-sm"
                 >
-                  {eventoOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
+                  <option value="">Todos (eventos ativos)</option>
+                  {activeEventOptions.length > 0 && (
+                    <optgroup label="Eventos ativos">
+                      {activeEventOptions.map((event) => (
+                        <option
+                          key={event.idtipo_evento}
+                          value={event.idtipo_evento}
+                        >
+                          {event.descricao}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {historicalEventOptions.length > 0 && (
+                    <optgroup label="Histórico">
+                      {historicalEventOptions.map((event) => (
+                        <option
+                          key={event.idtipo_evento}
+                          value={event.idtipo_evento}
+                        >
+                          {event.descricao}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
+                {dataLoading && (
+                  <p className="mt-1 text-xs text-blue-700">
+                    Carregando notificações do evento...
+                  </p>
+                )}
+                {dataError && (
+                  <p className="mt-1 text-xs text-red-700">{dataError}</p>
+                )}
               </div>
             </div>
 
@@ -3563,7 +3611,6 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 <button
                   onClick={() => {
                     setSelectedCategory(null);
-                    setSelectedEvento("Todos");
                   }}
                   className="hover:bg-blue-200 rounded-full p-1"
                 >
@@ -3595,8 +3642,17 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                     hipotese: 'Hipótese Diagnóstica',
                     trauma: 'Tipo de Trauma',
                     sintoma: 'Sintoma',
-                    dataNotificacao: 'Data'
+                    dataNotificacao: 'Data',
+                    pais: 'País',
+                    estado: 'Estado',
+                    municipio: 'Município',
+                    bairro: 'Bairro',
+                    localidadeEvento: 'Localidade no evento'
                   };
+                  const displayValue = getActiveFilterDisplayValue(
+                    category,
+                    value
+                  );
                   
                   return (
                     <div
@@ -3604,9 +3660,24 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                       className="flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs"
                     >
                       <span className="font-medium">{categoryLabels[category]}:</span>
-                      <span>{value}</span>
+                      <span>{displayValue}</span>
                       <button
-                        onClick={() => toggleFilter(category, value)}
+                        onClick={() => {
+                          if (category === 'evento') {
+                            setActiveFilters((previous) => ({
+                              ...previous,
+                              evento: null,
+                              localidadeEvento: null
+                            }));
+                            void onEventSelectionChange?.(null);
+                            return;
+                          }
+
+                          setActiveFilters((previous) => ({
+                            ...previous,
+                            [category]: null
+                          }));
+                        }}
                         className="ml-1 hover:bg-blue-200 rounded-full p-0.5"
                         title={`Remover filtro ${categoryLabels[category]}`}
                       >
@@ -3935,6 +4006,24 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
               activeFilters={activeFilters}
             />
           </div>
+
+          {shouldShowEventLocalities && selectedEventDescription && (
+            <div className="sm:col-span-2 lg:col-span-4 xl:col-span-8">
+              <MemoizedEventLocalitiesChartWithMap
+                eventDescription={selectedEventDescription}
+                data={eventLocalityAggregates}
+                selectedLocalityIds={selectedEventLocalityIds}
+                aggregatePolicy={EVENT_LOCALITY_AGGREGATE_POLICY}
+                onLocalityClick={(localityId, multiSelect) => {
+                  toggleFilter(
+                    'localidadeEvento',
+                    localityId,
+                    multiSelect ?? false
+                  );
+                }}
+              />
+            </div>
+          )}
 
           {/* =============================================== */}
           {/* LINHA 5: Estabelecimentos e Pirâmide Etária (Grid 8 cols: 4+4) */}

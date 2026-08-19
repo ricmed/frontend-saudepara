@@ -1,7 +1,10 @@
 // NotificacaoService.ts - VERSÃO ATUALIZADA com funções de arquivo
 import axios from 'axios';
 import { getApiOrigin } from '@/config/apiOrigin';
-import type { FormData } from '@/features/notificationForms/types/index2';
+import type {
+  FormData,
+  ModoLocalidadeEvento,
+} from '@/features/notificationForms/types/index2';
 import { formatFromBackend, formatToBackend, formatListResponse } from '@/utils/notificacaoAdapter';
 import indexedDBService from '@/services/indexedDB';
 
@@ -17,6 +20,7 @@ export interface BaseOption {
 export interface EventoOption extends BaseOption {
   idtipo_evento: number;
   ativo?: string; // 🆕 CAMPO ADICIONADO para compatibilidade
+  modo_localidade_evento: ModoLocalidadeEvento;
   created_at?: string;
   updated_at?: string;
   // 🆕 NOVA ESTRUTURA: Abrangência com relacionamento N:N
@@ -98,6 +102,11 @@ export interface PaginatedResponse<T> {
   };
 }
 
+export interface NotificacaoListFilters {
+  eventoId?: number;
+  somenteEventosAtivos?: boolean;
+}
+
 const API_ORIGIN = getApiOrigin();
 // URL base para o backend
 const API_BASE_URL = `${API_ORIGIN}/api/notificacao`;
@@ -135,12 +144,13 @@ const api = axios.create({
 
 // Função para tratar erros da API
 const handleApiError = (error: any): never => {
-  console.error('Erro completo:', error);
+  console.error('Falha na API de notificações', {
+    status: error?.response?.status,
+    method: error?.config?.method,
+    url: error?.config?.url,
+  });
   
   if (error.response) {
-    console.error('Dados do erro:', error.response.data);
-    console.error('Status:', error.response.status);
-    
     // Tratar diferentes formatos de resposta de erro
     if (error.response.data?.message) {
       throw new Error(error.response.data.message);
@@ -211,8 +221,8 @@ export const NotificacaoService = {
       // Ou remover esta parte se todos os endpoints já estiverem implementados
       if (endpoint.includes('tipo-evento')) {
         return [
-          { id: 1, idtipo_evento: 1, descricao: "COP30" },
-          { id: 2, idtipo_evento: 2, descricao: "Carnaval" }
+          { id: 1, idtipo_evento: 1, descricao: "COP30", modo_localidade_evento: "NAO_USA" },
+          { id: 2, idtipo_evento: 2, descricao: "Carnaval", modo_localidade_evento: "NAO_USA" }
         ] as unknown as T[];
       }
       
@@ -368,7 +378,7 @@ export const NotificacaoService = {
 
   async getCboOptions(): Promise<BaseOption[]> {
     try {
-      const response = await axios.get(`${server}:${port}/api/tipo-cbo?limit=20000`);
+      const response = await axios.get(`${API_ORIGIN}/api/tipo-cbo?limit=20000`);
       
       // Verificar diferentes formatos de resposta
       const data = response.data?.data || response.data || [];
@@ -507,9 +517,25 @@ export const NotificacaoService = {
   },
 
   // Obter todas as notificações paginadas
-  async getAll(page: number = 1, limit: number = 10): Promise<PaginatedResponse<any>> {
+  async getAll(
+    page: number = 1,
+    limit: number = 10,
+    filters: NotificacaoListFilters = {},
+  ): Promise<PaginatedResponse<any>> {
     try {
-      const response = await api.get(`?page=${page}&limit=${limit}`);
+      const params: Record<string, number | boolean> = { page, limit };
+
+      if (
+        typeof filters.eventoId === 'number' &&
+        Number.isInteger(filters.eventoId) &&
+        filters.eventoId > 0
+      ) {
+        params.eventoId = filters.eventoId;
+      } else if (typeof filters.somenteEventosAtivos === 'boolean') {
+        params.somenteEventosAtivos = filters.somenteEventosAtivos;
+      }
+
+      const response = await api.get('', { params });
       return formatListResponse(response.data);
     } catch (error) {
       return handleApiError(error);
@@ -521,7 +547,6 @@ export const NotificacaoService = {
     try {
       // Converter formData para o formato da API
       const apiData = formatToBackend(formData, false);
-      console.log("Dados enviados para API (create):", JSON.stringify(apiData, null, 2));
       
       const response = await api.post('', apiData);
       return response.data;
@@ -535,7 +560,6 @@ export const NotificacaoService = {
     try {
       // Converter formData para o formato da API
       const apiData = formatToBackend(formData, true);
-      console.log(`Atualizando notificação ${id} com dados:`, JSON.stringify(apiData, null, 2));
       
       const response = await api.put(`/${id}`, apiData);
       return response.data;
@@ -606,7 +630,7 @@ export const NotificacaoService = {
 
       // Fazer upload
       const response = await axios.post(
-        `${server}:${port}/api/notificacao/${notificacaoId}/arquivos`,
+        `${API_ORIGIN}/api/notificacao/${notificacaoId}/arquivos`,
         formData,
         {
           headers: {
@@ -647,7 +671,7 @@ export const NotificacaoService = {
   async getArquivos(notificacaoId: number): Promise<any[]> {
     try {
       const response = await axios.get(
-        `${server}:${port}/api/notificacao/${notificacaoId}/arquivos`
+        `${API_ORIGIN}/api/notificacao/${notificacaoId}/arquivos`
       );
       
       return response.data || [];
@@ -667,7 +691,7 @@ export const NotificacaoService = {
    */
   async deleteArquivo(arquivoId: number): Promise<void> {
     try {
-      await axios.delete(`${server}:${port}/api/arquivos/${arquivoId}`);
+      await axios.delete(`${API_ORIGIN}/api/arquivos/${arquivoId}`);
     } catch (error: any) {
       console.error('Erro ao deletar arquivo:', error);
       
@@ -685,7 +709,7 @@ export const NotificacaoService = {
   async getArquivosStats(notificacaoId: number): Promise<any> {
     try {
       const response = await axios.get(
-        `${server}:${port}/api/notificacao/${notificacaoId}/arquivos/stats`
+        `${API_ORIGIN}/api/notificacao/${notificacaoId}/arquivos/stats`
       );
       
       return response.data;
@@ -710,7 +734,7 @@ export const NotificacaoService = {
    * Função utilitária para download de arquivo
    */
   getDownloadUrl(arquivoId: number): string {
-    return `${server}:${port}/api/arquivos/${arquivoId}/download`;
+    return `${API_ORIGIN}/api/arquivos/${arquivoId}/download`;
   }
 };
 

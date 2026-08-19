@@ -1,5 +1,8 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { FormData } from '@/features/notificationForms/types/index2';
+import {
+  FormData,
+  LocalidadeEventoDTO,
+} from '@/features/notificationForms/types/index2';
 import { deviceIdService } from './deviceIdService'; // ✅ NOVO: Import do serviço de Device ID
 import { getAuthenticatedUserIdentifier } from './comunicacaoDaeOfflineScope';
 
@@ -39,6 +42,14 @@ interface NotificacaoDatabase extends DBSchema {
     value: {
       tipo: string;
       data: any;
+      timestamp: number;
+    };
+  };
+  localidades_evento: {
+    key: number;
+    value: {
+      eventoId: number;
+      data: LocalidadeEventoDTO[];
       timestamp: number;
     };
   };
@@ -143,7 +154,7 @@ interface NotificacaoDatabase extends DBSchema {
   };
 }
 
-const DB_VERSION = 7; // ✅ VERSÃO 7: Adiciona store para anexos_pendentes
+const DB_VERSION = 8; // V8: catálogo de localidades indexado por evento
 const DB_NAME = 'NotificacaoOfflineDB';
 const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 dias
 const INIT_MAX_RETRIES = 3;
@@ -305,7 +316,19 @@ export class IndexedDBService {
               db.createObjectStore('opcoes', {
                 keyPath: 'tipo'
               });
-            }          // Store para pacientes (dados criados localmente)
+            }
+
+            if (
+              oldVersion < 8 &&
+              !db.objectStoreNames.contains('localidades_evento')
+            ) {
+              console.log('🆕 Criando store: localidades_evento');
+              db.createObjectStore('localidades_evento', {
+                keyPath: 'eventoId',
+              });
+            }
+
+            // Store para pacientes (dados criados localmente)
             if (!db.objectStoreNames.contains('pacientes')) {
               console.log('🆕 Criando store: pacientes');
               const pacientesStore = db.createObjectStore('pacientes', {
@@ -628,31 +651,11 @@ export class IndexedDBService {
         }
       }
 
-      // ✅ LOG DETALHADO PARA DEBUG DO MODO OFFLINE
       console.log(`💾 [INDEXEDDB] Salvando notificação offline:`, {
         id: notificacao.id,
-        offlineId: notificacao.offlineId, // ✅ NOVO LOG
-        deviceId: notificacao.deviceId, // ✅ NOVO LOG
         isEdit: isEdit,
-        sincronizado: notificacao.sincronizado, // ✅ NOVO LOG
-        // Campos críticos para verificação
-        localHospedagem: formDataCopy.localHospedagem,
-        contatoLocal: formDataCopy.contatoLocal,
-        uf: formDataCopy.uf,
-        municipio: formDataCopy.municipio,
-        bairro: formDataCopy.bairro,
-        paisProcedencia: formDataCopy.paisProcedencia,
-        residenteBelem: formDataCopy.residenteBelem,
+        sincronizado: notificacao.sincronizado,
         totalCampos: Object.keys(formDataCopy).length
-      });
-
-      // ✅ DEBUG ESPECÍFICO: Log dos campos de trauma no IndexedDB
-      console.log('🩹 [DEBUG TRAUMA] Campos de trauma salvos no IndexedDB:', {
-        tipoTrauma: formDataCopy.tipoTrauma,
-        observacaoTrauma: formDataCopy.observacaoTrauma,
-        observacaoSintomas: formDataCopy.observacaoSintomas,
-        observacaoHipotese: formDataCopy.observacaoHipotese,
-        observacaoIncidente: formDataCopy.observacaoIncidente
       });
 
       await this.db!.put('notificacoes', notificacao);
@@ -1464,6 +1467,12 @@ export class IndexedDBService {
     const notificacao = await this.db!.get('notificacoes', offlineId);
     if (notificacao) {
       const currentRetryCount = notificacao.errorInfo?.retryCount || 0;
+      const safeLastError =
+        typeof errorDetails === 'string'
+          ? errorDetails.slice(0, 300)
+          : typeof errorDetails?.message === 'string'
+            ? errorDetails.message.slice(0, 300)
+            : undefined;
       
       notificacao.syncStatus = 'error';
       notificacao.sincronizado = false; // ✅ NOVO: Manter como não sincronizado
@@ -1471,7 +1480,7 @@ export class IndexedDBService {
         message: errorMessage,
         timestamp: Date.now(),
         retryCount: currentRetryCount + 1,
-        lastError: errorDetails ? JSON.stringify(errorDetails) : undefined
+        lastError: safeLastError
       };
       
       await this.db!.put('notificacoes', notificacao);
@@ -1545,6 +1554,57 @@ export class IndexedDBService {
     }
     
     return null;
+  }
+
+  async saveLocalidadesEvento(
+    eventoId: number,
+    data: LocalidadeEventoDTO[],
+  ): Promise<void> {
+    await this.init();
+    await this.db!.put('localidades_evento', {
+      eventoId,
+      data,
+      timestamp: Date.now(),
+    });
+  }
+
+  async getLocalidadesEvento(
+    eventoId: number,
+  ): Promise<LocalidadeEventoDTO[] | null> {
+    await this.init();
+    const catalog = await this.db!.get('localidades_evento', eventoId);
+
+    if (catalog && Date.now() - catalog.timestamp < CACHE_DURATION) {
+      return catalog.data;
+    }
+
+    return null;
+  }
+
+  async getLocalidadesEventoCacheStats(): Promise<{
+    catalogs: number;
+    records: number;
+  }> {
+    await this.init();
+    const catalogs = await this.db!.getAll('localidades_evento');
+    const validCatalogs = catalogs.filter(
+      catalog => Date.now() - catalog.timestamp < CACHE_DURATION,
+    );
+
+    return {
+      catalogs: validCatalogs.length,
+      records: validCatalogs.reduce(
+        (total, catalog) => total + catalog.data.length,
+        0,
+      ),
+    };
+  }
+
+  async clearLocalidadesEventoCache(): Promise<void> {
+    await this.init();
+    const tx = this.db!.transaction('localidades_evento', 'readwrite');
+    await tx.store.clear();
+    await tx.done;
   }
 
   // 🆕 FUNÇÃO: Obter eventos ativos com filtro de município (se necessário)
@@ -1631,6 +1691,7 @@ export class IndexedDBService {
       'pacientes_cache',
       'cpfs_cache',
       'estabelecimentos_cache',
+      'localidades_evento',
     ] as const;
 
     try {

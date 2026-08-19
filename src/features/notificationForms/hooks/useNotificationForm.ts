@@ -34,6 +34,8 @@ import {
   DEFAULT_UPLOAD_CONFIG,
   detectUserTimezone,
   EventoOption, 
+  LocalidadeEventoDTO,
+  ModoLocalidadeEvento,
   PublicoOption, 
   PaisOption, 
   EstadoOption, 
@@ -56,7 +58,9 @@ import {
   isTipoAtendimento,
   isTipoEncerramento,
   validateForm,
-  mapGestanteForApi
+  mapGestanteForApi,
+  changeEventoAndClearLocalidade,
+  getModoLocalidadeEvento
 } from '../utils/formUtils';
 import {
   normalizeOptionLabels,
@@ -79,6 +83,7 @@ import {
 } from '@/features/notificationForms/components/exportUtilities';
 import { useSectionExpansion } from './useSectionExpansion';
 import { NotificacaoService } from '@/services/NotificacaoService';
+import { LocalidadeEventoService } from '@/services/LocalidadeEventoService';
 import { Paciente, PacienteService } from '@/services/PacienteService';
 import { ListaSindromicaService } from '@/services/ListaSindromicaService';
 
@@ -138,6 +143,9 @@ export const calcularIdadeAutomatica = (dataNascimento: string) => {
 const initialFormData: FormData = {
   evento: "",
   publicoAtendido: "",
+  localidadeEvento: "",
+  localidadeEventoOutro: "",
+  localidadeEventoAtual: null,
 
   // Seção 2: Procedência do indivíduo
   residenteBelem: "",
@@ -209,6 +217,8 @@ const PATIENT_CREATE_ERROR_FIELD_MAP: Record<string, string> = {
 const NOTIFICATION_SAVE_ERROR_FIELD_MAP: Record<string, string> = {
   tipo_evento_idtipo_evento: "evento",
   tipo_publico_idtipo_publico: "publicoAtendido",
+  localidade_evento_id: "localidadeEvento",
+  localidade_evento_outro: "localidadeEventoOutro",
   paciente_idpaciente: "paciente",
   residente_belem: "residenteBelem",
   tipo_pais_idtipo_pais: "paisProcedencia",
@@ -285,6 +295,15 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
   
   // Estado para opções de dropdown
   const [eventoOptions, setEventoOptions] = useState<EventoOption[]>([]);
+  const [localidadeEventoOptions, setLocalidadeEventoOptions] = useState<
+    LocalidadeEventoDTO[]
+  >([]);
+  const [isLoadingLocalidadesEvento, setIsLoadingLocalidadesEvento] =
+    useState(false);
+  const [
+    localidadeEventoCatalogAvailable,
+    setLocalidadeEventoCatalogAvailable,
+  ] = useState(true);
   const [publicoOptions, setPublicoOptions] = useState<PublicoOption[]>([]);
   const [paisOptions, setPaisOptions] = useState<PaisOption[]>([]);
   const [estadoOptions, setEstadoOptions] = useState<EstadoOption[]>([]);
@@ -304,6 +323,100 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
   const [isLoadingMunicipios, setIsLoadingMunicipios] = useState<boolean>(false);
   const [ufError, setUfError] = useState<string | null>(null);
   const latestUfRef = useRef<string>("");
+  const localidadeEventoRequestRef = useRef(0);
+
+  const modoLocalidadeEvento = getModoLocalidadeEvento(
+    formData.evento,
+    eventoOptions,
+  );
+  const eventoLocalidadeMetadataLoaded =
+    !formData.evento ||
+    eventoOptions.some(
+      evento => evento.idtipo_evento.toString() === formData.evento,
+    );
+  const localidadeEventoSelectedRef = useRef(formData.localidadeEvento);
+  const localidadeEventoAtualRef = useRef(formData.localidadeEventoAtual);
+  localidadeEventoSelectedRef.current = formData.localidadeEvento;
+  localidadeEventoAtualRef.current = formData.localidadeEventoAtual;
+
+  const loadLocalidadesEvento = useCallback(
+    async (
+      eventoIdValue: string,
+      modo: ModoLocalidadeEvento,
+      selectedIdValue: string,
+      currentLocalidade: LocalidadeEventoDTO | null | undefined,
+    ) => {
+      const requestId = ++localidadeEventoRequestRef.current;
+      const eventoId = Number(eventoIdValue);
+
+      if (
+        modo === 'NAO_USA' ||
+        !Number.isInteger(eventoId) ||
+        eventoId <= 0
+      ) {
+        setLocalidadeEventoOptions([]);
+        setLocalidadeEventoCatalogAvailable(true);
+        setIsLoadingLocalidadesEvento(false);
+        return;
+      }
+
+      setIsLoadingLocalidadesEvento(true);
+
+      try {
+        let catalog: LocalidadeEventoDTO[] | null = null;
+        const canUseOnline = await syncService.canUseOnlineMode();
+
+        if (canUseOnline) {
+          try {
+            catalog = await LocalidadeEventoService.getByEventoId(eventoId);
+            await indexedDBService.saveLocalidadesEvento(eventoId, catalog);
+          } catch (error: any) {
+            console.warn('Falha ao atualizar catálogo de localidades', {
+              eventoId,
+              status: error?.response?.status,
+            });
+          }
+        }
+
+        if (catalog === null) {
+          catalog = await indexedDBService.getLocalidadesEvento(eventoId);
+        }
+
+        if (requestId !== localidadeEventoRequestRef.current) {
+          return;
+        }
+
+        const hasCatalog = catalog !== null;
+        const options = catalog ? [...catalog] : [];
+        const selectedId = Number(selectedIdValue);
+
+        if (
+          currentLocalidade &&
+          currentLocalidade.id === selectedId &&
+          !options.some(option => option.id === currentLocalidade.id)
+        ) {
+          options.push(currentLocalidade);
+        }
+
+        setLocalidadeEventoOptions(options);
+        setLocalidadeEventoCatalogAvailable(hasCatalog);
+      } catch (error: any) {
+        if (requestId === localidadeEventoRequestRef.current) {
+          setLocalidadeEventoOptions([]);
+          setLocalidadeEventoCatalogAvailable(false);
+        }
+        console.warn('Catálogo de localidades indisponível', {
+          eventoId,
+          status: error?.response?.status,
+        });
+      } finally {
+        if (requestId === localidadeEventoRequestRef.current) {
+          setIsLoadingLocalidadesEvento(false);
+        }
+      }
+    },
+    [],
+  );
   
   // Estados para buscas
   const [searchSintomas, setSearchSintomas] = useState("");
@@ -339,7 +452,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       // Adiciona ao storage apenas se for um arquivo novo (que vem com a propriedade .file)
       if (arquivo.file && arquivo.id) {
         storage.set(arquivo.id, arquivo.file);
-        console.log(`[HOOK] 💾 Arquivo [${arquivo.nome}] com ID [${arquivo.id}] foi ADICIONADO/ATUALIZADO no window.fileStorage.`);
       }
     });
 
@@ -417,11 +529,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     const arquivosValidos: ArquivoFormulario[] = [];
     
     for (const file of novosArquivos) {
-      console.log(`\n📄 Processando: ${file.name}`);
-      console.log(`   • Tamanho: ${file.size} bytes`);
-      console.log(`   • Tipo: ${file.type}`);
-      console.log(`   • É File: ${file instanceof File}`);
-      
       // Validar arquivo
       const validation = validateFile(file);
       if (!validation.valid) {
@@ -447,7 +554,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       };
       
       arquivosValidos.push(arquivoFormulario);
-      console.log(`✅ ArquivoFormulario criado para: ${file.name}`);
     }
     
     if (arquivosValidos.length === 0) {
@@ -464,67 +570,20 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
   // 2. Debug antes de salvar a notificação (versão melhorada)
   const debugAntesDoSalvamento = (data: FormData) => {
-    console.log('\n🔍 ===== DEBUG ANTES DO SALVAMENTO =====');
-    console.log('📁 Total de arquivos no formulário:', (data.arquivos?.length || 0));
-    console.log('💾 Storage disponível:', (window as any).fileStorage?.size || 0);
-    
-    // Listar tudo que está no storage
-    console.log('\n📋 Conteúdo do storage:');
-    if ((window as any).fileStorage) {
-      (window as any).fileStorage.forEach((file: File, id: string) => {
-        console.log(`   • ${id}: ${file.name} (${file.size} bytes)`);
-      });
-    } else {
-      console.log('   ❌ Storage não existe!');
-    }
-    
-    // ✅ VERIFICAÇÃO DE SEGURANÇA: Só processar se arquivos existir
-    if (data.arquivos && Array.isArray(data.arquivos)) {
-      data.arquivos.forEach((arquivo, index) => {
-        console.log(`\n📄 Arquivo ${index + 1} no FormData (Estado):`);
-        console.log('   • ID:', arquivo.id);
-        console.log('   • Nome:', arquivo.nome);
-        console.log('   • Tamanho:', arquivo.tamanho);
-        console.log('   • Tipo:', arquivo.tipo);
-        console.log('   • isExisting:', arquivo.isExisting);
-        console.log('   • status:', arquivo.status);
-        
-        // Verificar no storage
-        if (!arquivo.isExisting && arquivo.id) {
-          const fileNoStorage = (window as any).fileStorage?.get(arquivo.id);
-          console.log('   • Verificando no Storage... Encontrado?', fileNoStorage instanceof File ? '✅ SIM' : '❌ NÃO');
-          if (fileNoStorage instanceof File) {
-            console.log(`   • File no storage: ${fileNoStorage.name} (${fileNoStorage.size} bytes)`);
-          }
-        }
-      });
-    } else {
-      console.log('📄 Nenhum arquivo no formulário (seção de anexos oculta)');
-    }
-    
     const arquivosNovos = (data.arquivos || []).filter(a => !a.isExisting);
     const arquivosExistentes = (data.arquivos || []).filter(a => a.isExisting);
-    
-    console.log('\n📊 RESUMO:');
-    console.log('   🆕 Arquivos novos para upload:', arquivosNovos.length);
-    console.log('   ✅ Arquivos existentes:', arquivosExistentes.length);
-    console.log('   📄 Total:', (data.arquivos?.length || 0));
-    
-    if (arquivosNovos.length === 0) {
-      console.log('\n⚠️ ATENÇÃO: Nenhum arquivo novo será enviado!');
-    }
-    
-    console.log('✅ ===== FIM DEBUG SALVAMENTO =====\n');
+
+    console.log('Resumo de anexos antes do salvamento', {
+      novos: arquivosNovos.length,
+      existentes: arquivosExistentes.length,
+      total: data.arquivos?.length || 0,
+      storageDisponivel: (window as any).fileStorage?.size || 0,
+    });
   };
 
   // 3. Handler para drop ou seleção de arquivo com debug
   const handleFilesDrop = (files: File[]) => {
     console.log('🎯 Arquivos recebidos no drop/seleção:', files.length);
-    
-    // Verificar se são Files válidos
-    files.forEach((file, index) => {
-      console.log(`File ${index + 1}:`, file instanceof File, file.name);
-    });
     
     // Adicionar arquivos com debug
     handleFilesAdd(files);
@@ -532,24 +591,12 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
   // 4. Função para debug - debug do storage
   const debugStorage = () => {
-    console.log('\n🔍 ===== DEBUG STORAGE =====');
-    console.log('Storage existe:', !!(window as any).fileStorage);
-    console.log('Storage tamanho:', (window as any).fileStorage?.size || 0);
-    console.log('Arquivos no formData:', (formData.arquivos?.length || 0));
-    console.log('Arquivos para excluir:', arquivosParaExcluir);
-    
-    if ((window as any).fileStorage) {
-      console.log('Conteúdo do storage:');
-      (window as any).fileStorage.forEach((file: File, id: string) => {
-        console.log(`  ${id}: ${file.name}`);
-      });
-    }
-    
-    console.log('Arquivos no estado:');
-    (formData.arquivos || []).forEach((arquivo, index) => {
-      console.log(`  ${index + 1}. ${arquivo.id}: ${arquivo.nome} (existente: ${arquivo.isExisting})`);
+    console.log('Resumo do armazenamento de anexos', {
+      storageDisponivel: Boolean((window as any).fileStorage),
+      storageCount: (window as any).fileStorage?.size || 0,
+      formCount: formData.arquivos?.length || 0,
+      deleteCount: arquivosParaExcluir.length,
     });
-    console.log('✅ ===== FIM DEBUG =====\n');
   };
 
   // 5. Função corrigida para remover arquivo usando a função centralizada
@@ -569,13 +616,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     console.log('📁 Total de arquivos:', arquivos.length);
     console.log('💾 Storage disponível:', (window as any).fileStorage?.size || 0);
     
-    // Listar tudo que está no storage
-    console.log('\n📋 Conteúdo do storage:');
-    if ((window as any).fileStorage) {
-      (window as any).fileStorage.forEach((file: File, id: string) => {
-        console.log(`   • ${id}: ${file.name} (${file.size} bytes)`);
-      });
-    } else {
+    if (!(window as any).fileStorage) {
       console.log('   ❌ Storage não existe!');
     }
     
@@ -602,9 +643,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       let arquivosAnexados = 0;
       
       for (const arquivo of arquivosNovos) {
-        console.log(`\n🔍 Processando: ${arquivo.nome}`);
-        console.log(`   • ID: ${arquivo.id}`);
-        
         if (!arquivo.id) {
           console.log('   ❌ ID ausente');
           continue;
@@ -619,7 +657,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         if (file instanceof File) {
           formData.append('arquivos', file);
           arquivosAnexados++;
-          console.log(`   ✅ Anexado: ${file.name} (${arquivosAnexados}/${arquivosNovos.length})`);
         } else {
           console.log(`   ❌ File inválido ou não encontrado`);
           console.log(`   📋 Tipo recebido: ${typeof file}`);
@@ -640,12 +677,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       
       console.log(`📤 Enviando para: ${url}`);
       
-      const response = await axios.post(url, formData, {
+      await axios.post(url, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 120000
       });
-      
-      console.log('✅ Upload sucesso!', response.data);
       
       // Limpar storage
       arquivosNovos.forEach(arquivo => {
@@ -657,10 +692,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       
       console.log('✅ ===== FIM UPLOAD =====\n');
       
-    } catch (error) {
-      console.log('\n❌ ===== ERRO =====');
-      console.error('Erro:', error);
-      console.log('❌ ===== FIM ERRO =====\n');
+    } catch (error: any) {
+      console.error('Falha no upload de anexos', {
+        status: error?.response?.status,
+      });
       throw new Error('Falha ao processar arquivos anexados.');
     }
   };
@@ -1259,16 +1294,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       const dadosFormatados = await NotificacaoService.getById(Number(notificacaoId));
       
       if (dadosFormatados) {
-        console.log("[HOOK] Dados formatados recebidos do serviço:", dadosFormatados);
         console.log("[HOOK] Arquivos carregados:", (dadosFormatados as any)?.arquivos?.length || 0);
-        
-        // ✅ DEBUG ESPECÍFICO: Log dos campos de trauma carregados
-        console.log('🩹 [DEBUG TRAUMA] Dados carregados no loadNotificacao:', {
-          tipoTrauma: (dadosFormatados as any)?.tipoTrauma,
-          observacaoTrauma: (dadosFormatados as any)?.observacaoTrauma,
-          observacaoSintomas: (dadosFormatados as any)?.observacaoSintomas,
-          observacaoHipotese: (dadosFormatados as any)?.observacaoHipotese
-        });
         
         // 2. Armazena o CPF original para validações futuras.
         setOriginalCpf((dadosFormatados as any)?.cpf || "");
@@ -1293,8 +1319,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         
         console.log("[HOOK] FormData atualizado com dados da notificação");
       }
-    } catch (error) {
-      console.error("Erro ao carregar notificação:", error);
+    } catch (error: any) {
+      console.error("Falha ao carregar notificação", {
+        status: error?.response?.status,
+      });
       toast.error("Erro ao carregar dados da notificação");
       navigate("/private/comunicacao-de-caso");
     } finally {
@@ -1303,7 +1331,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
   }, [navigate, loadMunicipiosByEstado, loadRemainingOptions]);
 
   const handlePatientAutoCreateError = useCallback(async (error: any): Promise<boolean> => {
-    console.error("Erro ao criar paciente automaticamente:", error);
+    console.error("Falha ao criar paciente automaticamente", {
+      status: error?.response?.status,
+      code: error?.code,
+    });
 
     const isNetworkError = (
       error?.code === 'ERR_NETWORK' ||
@@ -1372,7 +1403,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         if (lookupResult.matchedBy) {
           console.log(`✅ Paciente encontrado por estratégia: ${lookupResult.matchedBy}`, {
             id: pacienteExistente?.idpaciente,
-            nome: pacienteExistente?.nome,
             source: pacienteExistente?.source
           });
         } else {
@@ -1390,12 +1420,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           console.log("⚠️ Nenhum paciente similar encontrado, criando novo...");
 
           toast.info("Criando novo paciente automaticamente...");
-          console.log("Criando novo paciente com dados:", {
-            nome: formData.paciente,
-            nomeMae: formData.nomeMae,
-            dataNascimento: formData.dataNascimento,
-            cpf: formData.cpf
-          });
 
           const novoPaciente: any = buildPatientPayloadFromForm(
             formData,
@@ -1406,14 +1430,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
               includeNullableClassificationIds: true
             }
           );
-
-          console.log('🔍 DEBUG - Criando paciente com gestante e idade:', {
-            gestante: formData.gestante,
-            gestante_novoPaciente: novoPaciente.gestante,
-            idade_formData: formData.idadeMeses,
-            idade_novoPaciente: novoPaciente.idade,
-            dataNascimento: formData.dataNascimento
-          });
 
           const pacienteCriado = await savePatientOfflineSafe(novoPaciente);
           formData.pacienteId = pacienteCriado.idpaciente;
@@ -1439,14 +1455,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           }
         );
 
-        console.log('🔍 DEBUG useNotificationForm - Valor de gestante:', {
-          original: formData.gestante,
-          final: pacienteData.gestante,
-          tipo: typeof formData.gestante
-        });
-
-        console.log("Dados do paciente para atualização:", pacienteData);
-
         const canUseOnline = await syncService.canUseOnlineMode();
         if (canUseOnline && isEditMode) {
           await PacienteService.update(formData.pacienteId, pacienteData);
@@ -1455,8 +1463,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         }
 
         console.log("Dados do paciente atualizados com sucesso!");
-      } catch (error) {
-        console.error("Erro ao atualizar dados do paciente:", error);
+      } catch (error: any) {
+        console.error("Falha ao atualizar dados do paciente", {
+          status: error?.response?.status,
+        });
         toast.warning("Aviso: Os dados do paciente não puderam ser atualizados, mas tentaremos salvar a notificação.");
       }
     }
@@ -1526,7 +1536,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
   const handleNotificationSaveError = useCallback(
     (error: any) => {
-      console.error("Erro ao salvar notificação:", error);
+      console.error("Falha ao salvar notificação", {
+        status: error?.response?.status,
+        code: error?.code,
+      });
 
       let errorMessage = "Erro ao salvar notificação";
       let validationErrors: Record<string, string> = {};
@@ -1565,7 +1578,12 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       setExpandedSections,
       expandedSections,
       atendimentoOptions,
-      encerramentoOptions
+      encerramentoOptions,
+      {
+        modo: modoLocalidadeEvento,
+        options: localidadeEventoOptions,
+        catalogAvailable: localidadeEventoCatalogAvailable,
+      },
     );
 
     if (!isValid) {
@@ -1599,6 +1617,9 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     errors,
     expandedSections,
     formData,
+    localidadeEventoCatalogAvailable,
+    localidadeEventoOptions,
+    modoLocalidadeEvento,
   ]);
 
   const prepareNotificationPayloadForSubmit = useCallback((): Record<string, any> => {
@@ -1612,13 +1633,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       arquivosCount: arquivos?.length || 0,
       arquivosIDs: (arquivos as Array<{ id?: string | number }>).map((arquivo) => arquivo.id),
       arquivosParaExcluir: arquivosParaExcluir
-    });
-
-    console.log('🩹 [DEBUG TRAUMA] observacaoTrauma no handleSubmit:', {
-      original: formData.observacaoTrauma,
-      processado: dataForBackend.observacaoTrauma,
-      tipoTrauma: formData.tipoTrauma,
-      tipoTraumaProcessado: dataForBackend.tipoTrauma
     });
 
     return dataForBackend;
@@ -1702,6 +1716,43 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!eventoLocalidadeMetadataLoaded) {
+      return;
+    }
+
+    if (modoLocalidadeEvento === 'NAO_USA') {
+      setFormData(prev => {
+        if (
+          !prev.localidadeEvento &&
+          !prev.localidadeEventoOutro &&
+          !prev.localidadeEventoAtual
+        ) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          localidadeEvento: '',
+          localidadeEventoOutro: '',
+          localidadeEventoAtual: null,
+        };
+      });
+    }
+
+    void loadLocalidadesEvento(
+      formData.evento,
+      modoLocalidadeEvento,
+      localidadeEventoSelectedRef.current,
+      localidadeEventoAtualRef.current,
+    );
+  }, [
+    formData.evento,
+    eventoLocalidadeMetadataLoaded,
+    loadLocalidadesEvento,
+    modoLocalidadeEvento,
+  ]);
 
   // Efeito para processar idade quando dados vêm do backend
   useEffect(() => {
@@ -1995,6 +2046,55 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       });
     }
 
+    if (name === 'evento') {
+      localidadeEventoRequestRef.current += 1;
+      const nextModo = getModoLocalidadeEvento(value, eventoOptions);
+
+      setLocalidadeEventoOptions([]);
+      setLocalidadeEventoCatalogAvailable(nextModo === 'NAO_USA');
+      setIsLoadingLocalidadesEvento(nextModo !== 'NAO_USA' && value !== '');
+      setErrors(prev => {
+        const nextErrors = { ...prev };
+        delete nextErrors.evento;
+        delete nextErrors.localidadeEvento;
+        delete nextErrors.localidadeEventoOutro;
+        return nextErrors;
+      });
+      setFormData(prev => changeEventoAndClearLocalidade(prev, value));
+      return;
+    }
+
+    if (name === 'localidadeEvento') {
+      const selectedLocalidade = localidadeEventoOptions.find(
+        option => option.id.toString() === value,
+      );
+
+      setErrors(prev => {
+        const nextErrors = { ...prev };
+        delete nextErrors.localidadeEvento;
+        delete nextErrors.localidadeEventoOutro;
+        return nextErrors;
+      });
+      setFormData(prev => ({
+        ...prev,
+        localidadeEvento: value,
+        localidadeEventoOutro:
+          selectedLocalidade?.especial === 'OUTRO'
+            ? prev.localidadeEventoOutro
+            : '',
+        localidadeEventoAtual: selectedLocalidade ?? null,
+      }));
+      return;
+    }
+
+    if (name === 'localidadeEventoOutro') {
+      setFormData(prev => ({
+        ...prev,
+        localidadeEventoOutro: value.slice(0, 150),
+      }));
+      return;
+    }
+
     // Gestante: Mulher cis (1), Mulher trans (3) ou Não binário (6)
     if (name === "identidadeGenero") {
       setFormData((prev) => {
@@ -2263,6 +2363,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         traumaOptions,
         estabelecimentoOptions,
         encerramentoOptions,
+        localidadeEventoOptions,
       };
 
       switch (format) {
@@ -2308,16 +2409,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         }
       );
       
-      // ✅ DEBUG: Log para verificar se gestante e idade estão incluídos
-      console.log('🔍 DEBUG - Criando novo paciente com gestante e idade:', {
-        gestante: formData.gestante,
-        gestante_novoPaciente: novoPaciente.gestante,
-        idade_formData: formData.idadeMeses,
-        idade_novoPaciente: novoPaciente.idade,
-        dataNascimento: formData.dataNascimento,
-        tipo: typeof formData.gestante
-      });
-
       const pacienteCriado = await savePatientOfflineSafe(novoPaciente);
 
       // Atualizar o formData com o novo paciente e seu ID
@@ -2332,8 +2423,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         : "Paciente salvo offline. Será sincronizado quando conectar.";
       
       toast.success(message);
-    } catch (error) {
-      console.error("Erro ao criar novo paciente:", error);
+    } catch (error: any) {
+      console.error("Falha ao criar novo paciente", {
+        status: error?.response?.status,
+      });
       toast.error("Erro ao criar novo paciente. Por favor, tente novamente.");
     } finally {
       setIsCreatingNewPatient(false);
@@ -2421,6 +2514,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     
     // Opções de dropdown
     eventoOptions,
+    localidadeEventoOptions,
+    modoLocalidadeEvento,
+    isLoadingLocalidadesEvento,
+    localidadeEventoCatalogAvailable,
     publicoOptions,
     paisOptions,
     estadoOptions,

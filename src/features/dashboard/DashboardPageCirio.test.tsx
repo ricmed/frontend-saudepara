@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 // Mock do dashboard pesado (só valida props recebidas)
 vi.mock('@/features/dashboard/NotificationDashboardCirio', () => {
@@ -9,6 +9,16 @@ vi.mock('@/features/dashboard/NotificationDashboardCirio', () => {
       <div data-testid="mock-dashboard">
         <div data-testid="notif-count">{String(props?.notificacoes?.length ?? 0)}</div>
         <div data-testid="evento-count">{String(props?.exportOptions?.eventoOptions?.length ?? 0)}</div>
+        <div data-testid="first-event">
+          {String(props?.notificacoes?.[0]?.original?.tipo_evento?.idtipo_evento ?? '')}
+        </div>
+        <button
+          type="button"
+          data-testid="select-history"
+          onClick={() => props?.onEventSelectionChange?.(2)}
+        >
+          Histórico
+        </button>
       </div>
     ),
   };
@@ -105,7 +115,12 @@ describe('DashboardPageCirio', () => {
     });
 
     expect(screen.getByTestId('notif-count').textContent).toBe('1');
-    expect(screen.getByTestId('evento-count').textContent).toBe('1');
+    expect(screen.getByTestId('evento-count').textContent).toBe('2');
+    expect(NotificacaoServiceModule.getAll).toHaveBeenCalledWith(
+      1,
+      200,
+      { somenteEventosAtivos: true }
+    );
   });
 
   it('renders with empty data when no active events', async () => {
@@ -145,7 +160,67 @@ describe('DashboardPageCirio', () => {
     });
 
     expect(screen.getByTestId('notif-count').textContent).toBe('0');
-    expect(screen.getByTestId('evento-count').textContent).toBe('0');
+    expect(screen.getByTestId('evento-count').textContent).toBe('1');
+    expect(NotificacaoServiceModule.getAll).not.toHaveBeenCalled();
+  });
+
+  it('loads an inactive event on demand by stable ID', async () => {
+    (TiposEventoService.getAll as any).mockResolvedValue([
+      { idtipo_evento: 1, descricao: 'ATIVO', ativo: 'S' },
+      { idtipo_evento: 2, descricao: 'HISTÓRICO', ativo: 'N' },
+    ]);
+
+    (NotificacaoServiceModule.getAll as any).mockImplementation(
+      (_page: number, _limit: number, filters?: Record<string, unknown>) => {
+        const eventId = filters?.eventoId;
+        return Promise.resolve({
+          data: [{
+            original: {
+              tipo_evento: {
+                idtipo_evento: eventId === 2 ? 2 : 1
+              }
+            }
+          }],
+          meta: { total: 1, totalPages: 1, page: 1, limit: 200 },
+        });
+      }
+    );
+
+    const svc: any = NotificacaoServiceModule;
+    [
+      'getPublicoOptions',
+      'getPaisOptions',
+      'getEstadoOptions',
+      'getMunicipioOptions',
+      'getRacaOptions',
+      'getEscolaridadeOptions',
+      'getGeneroOptions',
+      'getAtendimentoOptions',
+      'getSintomaOptions',
+      'getHipoteseDiagOptions',
+      'getTraumaOptions',
+      'getEstabelecimentoOptions',
+      'getEncerramentoOptions',
+      'getCboOptions',
+      'getBairroOptions',
+    ].forEach((method) => svc[method].mockResolvedValue([]));
+
+    render(<DashboardPageCirio />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('first-event')).toHaveTextContent('1');
+    });
+
+    fireEvent.click(screen.getByTestId('select-history'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('first-event')).toHaveTextContent('2');
+    });
+    expect(NotificacaoServiceModule.getAll).toHaveBeenCalledWith(
+      1,
+      200,
+      { eventoId: 2 }
+    );
   });
 });
 

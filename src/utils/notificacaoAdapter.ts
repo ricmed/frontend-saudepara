@@ -6,7 +6,13 @@ interface NotificacaoGenerica {
 }
 
 // Interface para os dados do formulário frontend
-import { type FormData, ArquivoFormulario, detectUserTimezone, formatDateWithTimezone } from '@/features/notificationForms/types/index2';
+import {
+  type FormData,
+  type LocalidadeEventoDTO,
+  ArquivoFormulario,
+  detectUserTimezone,
+  formatDateWithTimezone,
+} from '@/features/notificationForms/types/index2';
 import { formatLocalDateForBackend } from './timezoneHelper';
 import { getApiOrigin } from '@/config/apiOrigin';
 import axios from "axios";
@@ -91,6 +97,40 @@ const processarData = (dateString: string | null | undefined): string => {
   }
 };
 
+const mapLocalidadeEventoFromBackend = (
+  value: any,
+): LocalidadeEventoDTO | null => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  return {
+    id: Number(value.id),
+    nome: String(value.nome ?? ''),
+    tipo: value.tipo ?? null,
+    especial: value.especial ?? 'NORMAL',
+    ribeirinha: Boolean(value.ribeirinha),
+    latitude:
+      value.latitude === null || value.latitude === undefined
+        ? null
+        : Number(value.latitude),
+    longitude:
+      value.longitude === null || value.longitude === undefined
+        ? null
+        : Number(value.longitude),
+    exibir_mapa: Boolean(value.exibir_mapa),
+    ativo:
+      value.ativo === true ||
+      value.ativo === 1 ||
+      value.ativo === '1' ||
+      value.ativo === 'S',
+    ordem:
+      value.ordem === null || value.ordem === undefined
+        ? null
+        : Number(value.ordem),
+  };
+};
+
 // 🆕 FUNÇÃO OTIMIZADA: Processar data com timezone para envio ao backend
 const processarDataParaUTC = (
   dateString: string | null | undefined, 
@@ -137,8 +177,6 @@ export const formatFromBackend = async (
   backendData: any // Usando 'any' para flexibilidade com os dados da API
 ): Promise<FormData | null> => {
   if (!backendData) return null;
-
-  console.log("[ADAPTER] Dados recebidos do backend para formatação:", backendData);
 
   // Converter valores de residente_belem para o formato do formulário
   const residenteBelem =
@@ -244,6 +282,15 @@ export const formatFromBackend = async (
     // Seção 1: Dados Gerais
     evento: backendData.tipo_evento_idtipo_evento?.toString() || "",
     publicoAtendido: backendData.tipo_publico_idtipo_publico?.toString() || "",
+    localidadeEvento:
+      (
+        backendData.localidade_evento_id ??
+        backendData.localidade_evento?.id
+      )?.toString() || "",
+    localidadeEventoOutro: backendData.localidade_evento_outro || "",
+    localidadeEventoAtual: mapLocalidadeEventoFromBackend(
+      backendData.localidade_evento,
+    ),
     ddi: ddi,
 
     // Seção 2: Procedência do indivíduo - ✅ CORRIGIDO para modo offline
@@ -295,14 +342,7 @@ export const formatFromBackend = async (
       const observacao = backendData.notificacao_has_tipo_trauma && Array.isArray(backendData.notificacao_has_tipo_trauma) && backendData.notificacao_has_tipo_trauma.length > 0
         ? backendData.notificacao_has_tipo_trauma[0].observacao_trauma || ""
         : "";
-      
-      console.log('🩹 [DEBUG TRAUMA] Extraindo observacaoTrauma do backend:', {
-        hasTraumas: !!backendData.notificacao_has_tipo_trauma,
-        traumasArray: backendData.notificacao_has_tipo_trauma,
-        observacaoExtraida: observacao,
-        novaEstrutura: 'Recuperando da tabela de relacionamento'
-      });
-      
+
       return observacao;
     })(),
     relacionadoSurto: "", // REMOVIDO: campo relacionadoSurto não é mais usado
@@ -335,44 +375,6 @@ export const formatFromBackend = async (
     created_by_userid: backendData.created_by_userid || undefined,
     updated_by_userid: backendData.updated_by_userid || undefined,
   };
-  
-  // ✅ DEBUG ESPECÍFICO: Log dos campos de observação vindos do backend
-  console.log('🩹 [DEBUG TRAUMA] Dados do backend recebidos:', {
-    observacao_trauma_backend: backendData.observacao_trauma,
-    observacao_sintomas_backend: backendData.observacao_sintomas,
-    observacao_hiposete_backend: backendData.observacao_hiposete,
-    observavao_incidente_backend: backendData.observavao_incidente,
-    traumas_backend: backendData.notificacao_has_tipo_trauma
-  });
-
-  // ✅ DEBUG ESPECÍFICO: Log dos campos após conversão para FormData
-  console.log('🩹 [DEBUG TRAUMA] Campos após conversão para FormData:', {
-    observacaoTrauma_frontend: formData.observacaoTrauma,
-    observacaoSintomas_frontend: formData.observacaoSintomas,
-    observacaoHipotese_frontend: formData.observacaoHipotese,
-    observacaoIncidente_frontend: formData.observacaoIncidente,
-    tipoTrauma_frontend: formData.tipoTrauma
-  });
-
-  // ✅ LOG DETALHADO PARA DEBUG DO MODO OFFLINE
-  console.log("🔄 [ADAPTER] FormData processado do backend:", {
-    // Campos de localização
-    residenteBelem: formData.residenteBelem,
-    uf: formData.uf,
-    municipio: formData.municipio, 
-    bairro: formData.bairro,
-    paisProcedencia: formData.paisProcedencia,
-    localHospedagem: formData.localHospedagem,
-    contatoLocal: formData.contatoLocal,
-    // Outros campos críticos
-    contatoTelefonico: formData.contatoTelefonico,
-    contatoNotificador: formData.contatoNotificador,
-    sinaisESintomas: formData.sinaisESintomas.length,
-    hipoteseDiagnostica: formData.hipoteseDiagnostica.length,
-    localEncaminhamento: formData.localEncaminhamento,
-    tipoEncerramento: formData.tipoEncerramento,
-    arquivos: formData.arquivos.length
-  });
 
   return formData;
 };
@@ -485,6 +487,17 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
   };
 
   const trimmedData = trimFields(frontendData);
+  const localidadeEventoId = Number(trimmedData.localidadeEvento);
+  const localidadeEventoAtual =
+    trimmedData.localidadeEventoAtual?.id === localidadeEventoId
+      ? trimmedData.localidadeEventoAtual
+      : null;
+  const localidadeEventoOutro =
+    Number.isInteger(localidadeEventoId) &&
+    localidadeEventoId > 0 &&
+    (!localidadeEventoAtual || localidadeEventoAtual.especial === 'OUTRO')
+      ? trimmedData.localidadeEventoOutro || null
+      : null;
 
   // ✅ MELHORADO: Converter valores específicos com mapeamento correto
   const residenteBelem =
@@ -529,14 +542,6 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
     }
   }
   
-  // Log especial para debug do campo de encaminhamento
-  console.log("Processando campo de encaminhamento:", {
-    original: trimmedData.localEncaminhamento,
-    tipo: typeof trimmedData.localEncaminhamento,
-    convertido: estabelecimentoEncaminhado,
-    tipoEncerramento: trimmedData.tipoEncerramento
-  });
-
   // 🆕 LOG DOS ARQUIVOS NO ENVIO
   console.log("Arquivos no formulário para envio:", {
     total: trimmedData.arquivos?.length || 0,
@@ -551,20 +556,15 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
 
   console.log('🌍 Timezone detectado para envio:', timezoneInfo);
 
-  // ✅ DEBUG ESPECÍFICO: Log do campo observacaoTrauma antes da formatação
-  console.log('🩹 [DEBUG TRAUMA] observacaoTrauma no frontend:', {
-    value: trimmedData.observacaoTrauma,
-    type: typeof trimmedData.observacaoTrauma,
-    length: trimmedData.observacaoTrauma?.length,
-    tipoTrauma: trimmedData.tipoTrauma,
-    tipoTraumaLength: trimmedData.tipoTrauma?.length,
-    novaEstrutura: 'Enviando dentro do array traumas com observacao_trauma'
-  });
-
   // Construir payload para o backend com datas ajustadas para UTC
   const payload: NotificacaoGenerica = {
     tipo_evento_idtipo_evento: parseInt(trimmedData.evento) || null,
     tipo_publico_idtipo_publico: parseInt(trimmedData.publicoAtendido) || null,
+    localidade_evento_id:
+      Number.isInteger(localidadeEventoId) && localidadeEventoId > 0
+        ? localidadeEventoId
+        : null,
+    localidade_evento_outro: localidadeEventoOutro,
     paciente_idpaciente: pacienteId,
     residente_belem: residenteBelem,
     tipo_pais_idtipo_pais: trimmedData.residenteBelem === "3" 
@@ -660,33 +660,6 @@ export const formatToBackend = (frontendData: FormData, isUpdate: boolean = fals
       ? { estabelecimento_idestabelecimento_encaminhado: estabelecimentoEncaminhado } 
       : {})
   };
-
-  // ✅ LOG DETALHADO PARA DEBUG DO MODO OFFLINE
-  console.log("🚀 [ADAPTER] Enviando payload para o backend:", {
-    // Campos de localização
-    residente_belem: payload.residente_belem,
-    tipo_estado_idtipo_estado: payload.tipo_estado_idtipo_estado,
-    tipo_municipio_idtipo_municipio: payload.tipo_municipio_idtipo_municipio,
-    tipo_bairro_idtipo_bairro: payload.tipo_bairro_idtipo_bairro,
-    tipo_pais_idtipo_pais: payload.tipo_pais_idtipo_pais,
-    local_hospedagem: payload.local_hospedagem,
-    contato_local_hospedagem: payload.contato_local_hospedagem,
-    // Outros campos críticos  
-    paciente_idpaciente: payload.paciente_idpaciente,
-    timezone_name: payload.timezone_name,
-    isUpdate: isUpdate
-  });
-
-  // ✅ DEBUG ESPECÍFICO: Log dos campos de observação no payload final
-  console.log('🩹 [DEBUG TRAUMA] Campos de observação no payload final:', {
-    observacao_trauma: payload.observacao_trauma,
-    observacao_sintomas: payload.observacao_sintomas,
-    observacao_hiposete: payload.observacao_hiposete,
-    observavao_incidente: payload.observavao_incidente,
-    traumas: payload.traumas
-  });
-  
-  console.log("🔍 [ADAPTER] Payload completo:", JSON.stringify(payload, null, 2));
 
   return payload;
 };
@@ -803,10 +776,6 @@ export const salvarNotificacaoCompleta = async (
   isUpdate: boolean = false,
   notificacaoId?: number
 ): Promise<any> => {
-  
-  console.log("DADOS DO FORM ANTES DE ENVIAR:", formData);
-  console.log("Dados antes de salvar - Tipo residente:", formData.residenteBelem, "País:", formData.paisProcedencia);
-
   const apiO = getApiOrigin();
 
   // Verificar campos obrigatórios
@@ -821,16 +790,12 @@ export const salvarNotificacaoCompleta = async (
   // Formatar dados para o backend
   const payloadBackend = formatToBackend(formData, isUpdate);
   
-  console.log("PAYLOAD APÓS FORMATAÇÃO:", payloadBackend);
-  
   try {
     let response;
     let savedNotificacaoId;
     
     if (isUpdate && notificacaoId) {
       // Atualizar notificação existente
-      console.log(`Enviando atualização para notificação ${notificacaoId}:`, JSON.stringify(payloadBackend, null, 2));
-      
       // Ajustes adicionais para o payload de atualização (se necessário)
       // Garantir que o ID do paciente está correto
       if (!payloadBackend.paciente_idpaciente) {
@@ -842,8 +807,6 @@ export const salvarNotificacaoCompleta = async (
       savedNotificacaoId = notificacaoId;
     } else {
       // Criar nova notificação
-      console.log("Enviando notificação para criação:", JSON.stringify(payloadBackend, null, 2));
-      
       // Verificações específicas para criação
       if (!payloadBackend.paciente_idpaciente) {
         console.error("ERRO: ID do paciente é obrigatório para criar notificação!");
@@ -871,14 +834,9 @@ export const salvarNotificacaoCompleta = async (
         savedNotificacaoId = response.data.idnotificacao;
         console.log(`Notificação criada com ID: ${savedNotificacaoId}`);
       } catch (postError: any) {
-        // Log mais detalhado do erro de POST
-        console.error("Erro detalhado na criação:", postError);
-        console.error("Status:", postError.response?.status);
-        console.error("Erro completo:", JSON.stringify(postError.response?.data || {}, null, 2));
-        
-        if (postError.response?.data?.errors) {
-          console.error("Campos com erro:", postError.response.data.errors);
-        }
+        console.error("Falha ao criar notificação", {
+          status: postError.response?.status,
+        });
         
         throw postError; // Repassar o erro
       }
@@ -957,33 +915,11 @@ export const salvarNotificacaoCompleta = async (
     toast.success('Notificação salva com sucesso!');
     return response.data || response;
   } catch (error: any) {
-    console.error("Erro ao salvar notificação:", error);
+    console.error("Falha ao salvar notificação", {
+      status: error?.response?.status,
+    });
     
-    // Log detalhado do erro para diagnóstico
     if (error.response) {
-      console.error("Detalhes da resposta de erro:", {
-        status: error.response.status,
-        statusText: error.response.statusText,
-        data: JSON.stringify(error.response.data, null, 2)
-      });
-      
-      // Mostra exatamente quais campos têm problemas
-      if (error.response.data?.errors) {
-        console.error("Erros por campo:", error.response.data.errors);
-        const errorFields = Array.isArray(error.response.data.errors) 
-          ? error.response.data.errors
-          : [error.response.data.errors];
-          
-        errorFields.forEach((err: any) => {
-          // Mostrar detalhes de cada campo com erro
-          if (err.field && err.message) {
-            console.error(`Erro no campo ${err.field}: ${err.message}`);
-          } else {
-            console.error("Erro não estruturado:", err);
-          }
-        });
-      }
-      
       // Mostrar mensagem específica do erro
       if (error.response.data?.message) {
         toast.error(`Erro: ${error.response.data.message}`);

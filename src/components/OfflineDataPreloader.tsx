@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, Check, AlertCircle, Wifi, Database, Loader, X, CheckCircle, XCircle, Users, Building } from 'lucide-react'; // ✅ ADICIONAR Building
+import { Download, Wifi, Database, Loader, X, CheckCircle, XCircle, Users, Building } from 'lucide-react'; // ✅ ADICIONAR Building
 import { toast } from 'react-toastify';
 import { NotificacaoService } from '@/services/NotificacaoService';
 import indexedDBService from '@/services/indexedDB';
@@ -41,6 +41,14 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
   
   const [dataItems, setDataItems] = useState<DataItem[]>([
     { key: 'eventos', name: 'Tipos de Evento', fetchFn: NotificacaoService.getEventoOptions, loaded: false, loading: false, category: 'essential' },
+    {
+      key: 'localidades-evento',
+      name: 'Localidades por Evento',
+      fetchFn: () => offlineDataManager.downloadLocalidadesEventoCatalogs(),
+      loaded: false,
+      loading: false,
+      category: 'essential',
+    },
     { key: 'publicos', name: 'Tipos de Público', fetchFn: NotificacaoService.getPublicoOptions, loaded: false, loading: false, category: 'essential' },
     { key: 'paises', name: 'Países', fetchFn: NotificacaoService.getPaisOptions, loaded: false, loading: false, category: 'geographic' },
     { key: 'estados', name: 'Estados', fetchFn: NotificacaoService.getEstadoOptions, loaded: false, loading: false, category: 'geographic' },
@@ -106,9 +114,19 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
   }, []);
 
   const checkCachedData = async () => {
+    const managerStatus = await offlineDataManager.checkCachedData();
     const updatedItems = await Promise.all(
       dataItems.map(async (item) => {
         try {
+          if (item.key === 'localidades-evento') {
+            const catalogStatus = managerStatus[item.key];
+            return {
+              ...item,
+              loaded: catalogStatus?.loaded || false,
+              recordCount: catalogStatus?.count || 0,
+            };
+          }
+
           const cachedData = await indexedDBService.getOpcoes(item.key);
           const hasValidData = cachedData && Array.isArray(cachedData) && cachedData.length > 0;
           return { 
@@ -196,8 +214,14 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
         const data = await item.fetchFn();
         
         // Validação rigorosa
-        if (data && Array.isArray(data) && data.length > 0) {
-          await indexedDBService.saveOpcoes(item.key, data);
+        if (
+          data &&
+          Array.isArray(data) &&
+          (data.length > 0 || item.key === 'localidades-evento')
+        ) {
+          if (item.key !== 'localidades-evento') {
+            await indexedDBService.saveOpcoes(item.key, data);
+          }
           totalDownloaded += data.length;
           successCount++;
           
@@ -347,7 +371,11 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
       try {
         // Limpar dados normais
         for (const item of dataItems) {
-          await indexedDBService.saveOpcoes(item.key, []);
+          if (item.key === 'localidades-evento') {
+            await indexedDBService.clearLocalidadesEventoCache();
+          } else {
+            await indexedDBService.saveOpcoes(item.key, []);
+          }
         }
         
         // ✅ Limpar cache de pacientes E estabelecimentos

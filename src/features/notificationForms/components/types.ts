@@ -1,9 +1,13 @@
 // types.ts - Define FormData interface and other type definitions
+import type { LocalidadeEventoDTO } from '@/features/notificationForms/types/index2';
 
 export interface FormData {
     // Seção 1: Dados Gerais
     evento: string;
     publicoAtendido: string;
+    localidadeEvento: string;
+    localidadeEventoOutro: string;
+    localidadeEventoAtual?: LocalidadeEventoDTO | null;
   
     // Seção 2: Procedência do indivíduo
     residenteBelem: string;

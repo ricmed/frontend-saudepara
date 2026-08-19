@@ -1,5 +1,6 @@
 import { PacienteService } from '@/services/PacienteService';
 import { NotificacaoService } from '@/services/NotificacaoService';
+import { LocalidadeEventoService } from '@/services/LocalidadeEventoService';
 import indexedDBService from '@/services/indexedDB';
 import encryptionService from '@/services/encryptionService'; // ✅ NOVO: Criptografia
 import { getRuntimeApiRoot } from '@/config/runtimeApiBase';
@@ -91,6 +92,14 @@ class OfflineDataManager {
       priority: 1, 
       estimatedSize: 50,
       category: 'essential'
+    },
+    {
+      key: 'localidades-evento',
+      name: 'Localidades por Evento',
+      fetchFn: () => this.downloadLocalidadesEventoCatalogs(),
+      priority: 1,
+      estimatedSize: 500,
+      category: 'essential',
     },
     { 
       key: 'publicos', 
@@ -401,7 +410,38 @@ class OfflineDataManager {
       estimatedSize: 0,
       category: 'essential'
     }
-  ];  // Verificar quais dados estão em cache
+  ];
+
+  async downloadLocalidadesEventoCatalogs(): Promise<any[]> {
+    const eventos = await NotificacaoService.getEventoOptions();
+    await indexedDBService.saveOpcoes('eventos', eventos);
+
+    const eventosComLocalidade = eventos.filter(
+      evento =>
+        (evento.modo_localidade_evento ?? 'NAO_USA') !== 'NAO_USA',
+    );
+    const flattenedCatalogs: any[] = [];
+
+    for (const evento of eventosComLocalidade) {
+      const catalog = await LocalidadeEventoService.getByEventoId(
+        evento.idtipo_evento,
+      );
+      await indexedDBService.saveLocalidadesEvento(
+        evento.idtipo_evento,
+        catalog,
+      );
+      flattenedCatalogs.push(
+        ...catalog.map(localidade => ({
+          ...localidade,
+          eventoId: evento.idtipo_evento,
+        })),
+      );
+    }
+
+    return flattenedCatalogs;
+  }
+
+  // Verificar quais dados estão em cache
   async checkCachedData(): Promise<Record<string, { loaded: boolean; count: number; lastUpdate?: Date }>> {
     const status: Record<string, { loaded: boolean; count: number; lastUpdate?: Date }> = {};
     
@@ -422,6 +462,29 @@ class OfflineDataManager {
             loaded: cacheStats.estabelecimentos_verificacao > 0,
             count: cacheStats.estabelecimentos_verificacao,
             lastUpdate: cacheStats.estabelecimentos_verificacao > 0 ? new Date() : undefined
+          };
+        } else if (source.key === 'localidades-evento') {
+          const eventos =
+            (await indexedDBService.getOpcoes<any[]>('eventos')) || [];
+          const eventosComLocalidade = eventos.filter(
+            evento =>
+              (evento.modo_localidade_evento ?? 'NAO_USA') !== 'NAO_USA',
+          );
+          const catalogs = await Promise.all(
+            eventosComLocalidade.map(evento =>
+              indexedDBService.getLocalidadesEvento(evento.idtipo_evento),
+            ),
+          );
+          const allCatalogsLoaded =
+            eventos.length > 0 &&
+            catalogs.every(catalog => catalog !== null);
+          status[source.key] = {
+            loaded: allCatalogsLoaded,
+            count: catalogs.reduce(
+              (total, catalog) => total + (catalog?.length || 0),
+              0,
+            ),
+            lastUpdate: allCatalogsLoaded ? new Date() : undefined,
           };
         } else {
           // Para outros dados, usar método normal
@@ -482,7 +545,13 @@ class OfflineDataManager {
         onProgress?.(completed / total * 100, source.name, completed, total, source.category);
         
         const data = await source.fetchFn();
-          if (data && Array.isArray(data) && data.length > 0) {          // ✅ VERIFICAR se é dados de verificação de pacientes
+        const acceptsEmptyCatalog =
+          source.key === 'localidades-evento' && Array.isArray(data);
+        if (
+          data &&
+          Array.isArray(data) &&
+          (data.length > 0 || acceptsEmptyCatalog)
+        ) {
           if (source.key === 'pacientes-verificacao') {
             // Para dados de verificação, o salvamento já foi feito na fetchFn
             // Não salvar novamente em opcoes
@@ -492,6 +561,8 @@ class OfflineDataManager {
             // ✅ NOVO: Para verificação de estabelecimentos, o salvamento já foi feito na fetchFn
             console.log(`✅ ${source.name}: Dados salvos no cache de verificação`);
             totalRecords += 1; // Contagem simbólica
+          } else if (source.key === 'localidades-evento') {
+            totalRecords += data.length;
           } else {
             // Para outros dados, salvar normalmente
             await indexedDBService.saveOpcoes(source.key, data);
@@ -1162,6 +1233,8 @@ class OfflineDataManager {
           await indexedDBService.clearPacientesCache();
         } else if (source.key === 'estabelecimentos-verificacao') {
           await indexedDBService.clearEstabelecimentosCache();
+        } else if (source.key === 'localidades-evento') {
+          await indexedDBService.clearLocalidadesEventoCache();
         } else {
           await indexedDBService.saveOpcoes(source.key, []);
         }
@@ -1351,10 +1424,17 @@ class OfflineDataManager {
       
       onProgress?.(85, 'Salvando no cache...');
       
-      if (data && Array.isArray(data) && data.length > 0) {
+      if (
+        data &&
+        Array.isArray(data) &&
+        (data.length > 0 || source.key === 'localidades-evento')
+      ) {
         if (source.key === 'pacientes-verificacao') {
           // Para verificação, o salvamento já foi feito
           onProgress?.(100, `Cache de pacientes atualizado`);
+          return { success: true, recordCount: data.length };
+        } else if (source.key === 'localidades-evento') {
+          onProgress?.(100, `${data.length} localidades salvas`);
           return { success: true, recordCount: data.length };
         } else {
           await indexedDBService.saveOpcoes(sourceKey, data);

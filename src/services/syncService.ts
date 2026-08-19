@@ -525,12 +525,7 @@ class SyncService {
       
       for (const paciente of pacientesParaSincronizar) {
         try {
-          console.log(`👤 Sincronizando paciente: ${paciente.nome} (ID temp: ${paciente.idpaciente})`);
-          console.log(`🔍 DEBUG - Dados originais do paciente:`, {
-            gestante: paciente.gestante,
-            gestante_tipo: typeof paciente.gestante,
-            dadosCompletos: paciente
-          });
+          console.log(`👤 Sincronizando paciente local ID ${paciente.idpaciente}`);
           
           // ✅ VERIFICAR SE JÁ EXISTE NO SERVIDOR (evitar duplicação)
           // Usar estratégia inteligente de múltiplos critérios
@@ -675,13 +670,6 @@ class SyncService {
           
           // ✅ CRIAR PACIENTE NO SERVIDOR (apenas se não existir)
           const { idpaciente, synced, savedAt, syncedAt, savedOffline, source, ...pacienteData } = paciente;
-          
-          console.log(`📤 Criando novo paciente no servidor:`, {
-            nome: pacienteData.nome,
-            cpf: pacienteData.cpf,
-            gestante: pacienteData.gestante,
-            allData: pacienteData // ✅ DEBUG: Log completo dos dados
-          });
           
           const result = await PacienteService.create(pacienteData);
           const newPatientId = result.idpaciente;
@@ -1019,14 +1007,6 @@ class SyncService {
             console.log(`✅ ID do paciente é válido: ${pacienteIdFinal}`);
           }
           
-          // ✅ DEBUG ESPECÍFICO: Log dos campos de trauma antes da sincronização
-          console.log(`🩹 [DEBUG TRAUMA] Sincronizando notificação ID ${id}:`, {
-            tipoTrauma: formDataAtualizada.tipoTrauma,
-            observacaoTrauma: formDataAtualizada.observacaoTrauma,
-            observacaoSintomas: formDataAtualizada.observacaoSintomas,
-            observacaoHipotese: formDataAtualizada.observacaoHipotese
-          });
-
           // ✅ LOG CAMPOS OFFLINE ANTES DE SINCRONIZAR
           console.log('📱 [OFFLINE TRACKING] Enviando ao servidor:', {
             offline_id: formDataAtualizada.offline_id,
@@ -1055,22 +1035,23 @@ class SyncService {
           syncedCount++;
           
         } catch (error: any) {
-          console.error(`❌ Erro ao sincronizar notificação offlineId ${offlineId}:`, error);
+          console.error('Falha ao sincronizar notificação', {
+            status: error?.response?.status,
+            code: error?.code,
+          });
           
           // ✅ REVERTER de 'syncing' para 'pending' ou marcar como erro
           const statusCode = error?.response?.status;
           const isServerError = error?.response?.status === 500;
-          const isOrphanedNotification = id < 0;
-          const isInvalidData = statusCode === 422 || error?.message?.includes('validation') || error?.message?.includes('required');
+          const isInvalidData =
+            statusCode === 400 ||
+            statusCode === 422 ||
+            error?.message?.includes('validation') ||
+            error?.message?.includes('required');
           const isNetworkError = !error?.response || error?.code === 'NETWORK_ERROR';
           const isConflict = statusCode === 409;
           
-          if (isOrphanedNotification) {
-            // Apenas notificações órfãs devem ser removidas permanentemente
-            console.log(`🗑️ Removendo notificação órfã offlineId ${offlineId} - ID negativo inválido`);
-            await indexedDBService.markNotificacaoAsSynced(offlineId, { remove: true });
-            toast.info(`Notificação órfã (offlineId: ${offlineId}) foi removida da fila de sincronização`);
-          } else if (isConflict) {
+          if (isConflict) {
             // ✅ CONFLITO: tentar reconciliar com registro já criado no servidor (outro device)
             const reconciledServerId = await this.reconcileNotificationConflict(offlineId, deviceId);
             if (reconciledServerId) {
@@ -1429,19 +1410,9 @@ class SyncService {
       formDataParaSalvar.offlineId = formData.offlineId;
     }
 
-    // ✅ LOG DETALHADO PARA DEBUG
     console.log(`💾 [SYNC SERVICE] Salvando ${isEdit ? 'edição' : 'nova notificação'} offline:`, {
       id: notificacaoId || 'novo',
-      offline_id: formDataParaSalvar.offline_id || formDataParaSalvar.offlineId || 'será gerado',
       isEdit,
-      // Campos críticos para verificação
-      localHospedagem: formDataParaSalvar.localHospedagem,
-      contatoLocal: formDataParaSalvar.contatoLocal,
-      uf: formDataParaSalvar.uf,
-      municipio: formDataParaSalvar.municipio,
-      bairro: formDataParaSalvar.bairro,
-      paisProcedencia: formDataParaSalvar.paisProcedencia,
-      residenteBelem: formDataParaSalvar.residenteBelem,
     });
 
     await indexedDBService.saveNotificacao(formDataParaSalvar, isEdit, notificacaoId);
@@ -1462,22 +1433,16 @@ class SyncService {
     // ✅ Converter data_comunicacao de datetime-local para UTC antes de enviar
     const formDataParaEnvio = { ...formData };
     if (formDataParaEnvio.data_comunicacao) {
-      console.log('💾 [SYNC] Data original:', formDataParaEnvio.data_comunicacao);
-      
       // Se não tiver Z ou +/-, é datetime-local e precisa converter
       if (!formDataParaEnvio.data_comunicacao.includes('Z') && 
           !formDataParaEnvio.data_comunicacao.includes('+') &&
           formDataParaEnvio.data_comunicacao.length <= 16) {
         const dataConvertida = convertLocalDateTimeToUTC(formDataParaEnvio.data_comunicacao);
-        console.log('💾 [SYNC] Data convertida para UTC:', dataConvertida);
         formDataParaEnvio.data_comunicacao = dataConvertida;
       } else {
         console.log('💾 [SYNC] Data já está em UTC, não convertendo');
       }
     }
-    
-    console.log('💾 [SYNC] Dados que serão enviados ao backend:', formDataParaEnvio);
-    
     // Tentar salvar online primeiro (se disponível)
     if (this.shouldUseOnlineMode()) {
       try {
@@ -1638,14 +1603,19 @@ class SyncService {
       return true;
       
     } catch (error: any) {
-      console.error(`❌ Erro ao tentar sincronizar novamente notificação ${offlineId}:`, error);
+      console.error('Falha ao repetir sincronização de notificação', {
+        status: error?.response?.status,
+      });
       
       // Marcar como erro novamente
       const errorMessage = error?.response?.status === 500 ? 'Erro interno do servidor' :
                           error?.message?.includes('validation') ? 'Dados inválidos' :
                           error?.message || 'Erro desconhecido';
       
-      await indexedDBService.markNotificacaoAsError(offlineId, errorMessage, error);
+      await indexedDBService.markNotificacaoAsError(offlineId, errorMessage, {
+        message: errorMessage,
+        status: error?.response?.status,
+      });
       
       toast.error(`Falha ao sincronizar notificação ${offlineId}: ${errorMessage}`);
       return false;

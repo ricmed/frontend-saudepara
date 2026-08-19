@@ -39,6 +39,7 @@ export interface ExportOptions {
   estabelecimentoOptions: any[];
   encerramentoOptions: any[];
   cboOptions?: any[]; // Adicionado para suportar profissões
+  localidadeEventoOptions?: any[];
 }
 
 // ===================================================================
@@ -507,6 +508,39 @@ const prepareDataForExport = (
     return value;
   };
 
+  const getLocalidadeEventoText = (): string => {
+    if (!formData.localidadeEvento) return "";
+
+    if (
+      formData.localidadeEventoAtual?.id.toString() ===
+      formData.localidadeEvento
+    ) {
+      return `${formData.localidadeEventoAtual.nome}${
+        formData.localidadeEventoAtual.ativo ? "" : " (inativa)"
+      }`;
+    }
+
+    if (exportOptions?.localidadeEventoOptions) {
+      return getLabelFromOptions(
+        formData.localidadeEvento,
+        exportOptions.localidadeEventoOptions,
+        "id",
+        "nome",
+      );
+    }
+
+    return formData.localidadeEvento;
+  };
+
+  const isLocalidadeEventoOutro = (): boolean => {
+    const selected =
+      exportOptions?.localidadeEventoOptions?.find(
+        option => String(option.id) === String(formData.localidadeEvento),
+      ) ?? formData.localidadeEventoAtual;
+
+    return selected?.especial === "OUTRO";
+  };
+
   // Get pais label
   const getPaisLabel = (value: string): string => {
     if (exportOptions?.paisOptions) {
@@ -822,6 +856,10 @@ const prepareDataForExport = (
     // Seção 1: Dados Gerais
     Evento: getEventoLabel(formData.evento),
     "Público Atendido": getPublicoAtendidoLabel(formData.publicoAtendido),
+    "Localidade no evento": getLocalidadeEventoText(),
+    ...(isLocalidadeEventoOutro() && formData.localidadeEventoOutro
+      ? { "Outra localidade": formData.localidadeEventoOutro }
+      : {}),
 
     // Seção 2: Procedência do indivíduo
     "Residente em Belém": getResidenteBelemLabel(formData.residenteBelem),
@@ -1084,7 +1122,12 @@ export const exportToPDF = (
     const sections = [
       {
         title: "1. Dados Gerais",
-        fields: ["Evento", "Público Atendido"],
+        fields: [
+          "Evento",
+          "Público Atendido",
+          "Localidade no evento",
+          "Outra localidade",
+        ],
       },
       {
         title: "2. Procedência do indivíduo",

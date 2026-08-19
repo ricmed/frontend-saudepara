@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { FormData } from '@/features/notificationForms/types/index2';
+import type { LocalidadeEventoDTO } from '@/features/notificationForms/types/index2';
 import {
+  changeEventoAndClearLocalidade,
   normalizeText,
   formatCPF,
   displayFormattedCPF,
@@ -9,6 +11,7 @@ import {
   validateManualAge,
   isTipoAtendimento,
   isTipoEncerramento,
+  validateLocalidadeEvento,
   validateForm,
 } from './formUtils';
 import type { SectionState } from '@/features/notificationForms/hooks/useSectionExpansion';
@@ -73,6 +76,9 @@ describe('validateForm — CPF curto', () => {
     return {
       evento: '1',
       publicoAtendido: '1',
+      localidadeEvento: '',
+      localidadeEventoOutro: '',
+      localidadeEventoAtual: null,
       residenteBelem: '1',
       bairro: 'Centro',
       municipio: '',
@@ -144,5 +150,103 @@ describe('validateForm — CPF curto', () => {
     const payload = setErrors.mock.calls[0][0] as Record<string, string>;
     expect(payload.cpf).toMatch(/11 dígitos/i);
     vi.runAllTimers();
+  });
+});
+
+describe('localidade do evento', () => {
+  const outro: LocalidadeEventoDTO = {
+    id: 10,
+    nome: 'Outro',
+    tipo: null,
+    especial: 'OUTRO',
+    ribeirinha: false,
+    latitude: null,
+    longitude: null,
+    exibir_mapa: false,
+    ativo: true,
+    ordem: 1,
+  };
+  const naoInformado: LocalidadeEventoDTO = {
+    ...outro,
+    id: 11,
+    nome: 'Não informado',
+    especial: 'NAO_INFORMADO',
+    ordem: 2,
+  };
+
+  const form = {
+    localidadeEvento: '',
+    localidadeEventoOutro: '',
+    localidadeEventoAtual: null,
+  } as FormData;
+
+  it('respeita os três modos e bloqueia catálogo obrigatório ausente', () => {
+    expect(
+      validateLocalidadeEvento(form, {
+        modo: 'NAO_USA',
+        options: [],
+        catalogAvailable: false,
+      }),
+    ).toEqual({});
+    expect(
+      validateLocalidadeEvento(form, {
+        modo: 'OPCIONAL',
+        options: [],
+        catalogAvailable: false,
+      }),
+    ).toEqual({});
+    expect(
+      validateLocalidadeEvento(form, {
+        modo: 'OBRIGATORIA',
+        options: [],
+        catalogAvailable: false,
+      }).localidadeEvento,
+    ).toMatch(/sincronize os dados de apoio/i);
+  });
+
+  it('exige texto somente para OUTRO', () => {
+    expect(
+      validateLocalidadeEvento(
+        { ...form, localidadeEvento: '10', localidadeEventoAtual: outro },
+        {
+          modo: 'OBRIGATORIA',
+          options: [outro, naoInformado],
+          catalogAvailable: true,
+        },
+      ).localidadeEventoOutro,
+    ).toBeDefined();
+
+    expect(
+      validateLocalidadeEvento(
+        {
+          ...form,
+          localidadeEvento: '11',
+          localidadeEventoAtual: naoInformado,
+        },
+        {
+          modo: 'OBRIGATORIA',
+          options: [outro, naoInformado],
+          catalogAvailable: true,
+        },
+      ),
+    ).toEqual({});
+  });
+
+  it('limpa localidade e complemento ao trocar evento', () => {
+    const changed = changeEventoAndClearLocalidade(
+      {
+        ...form,
+        evento: '1',
+        localidadeEvento: '10',
+        localidadeEventoOutro: 'Área genérica',
+        localidadeEventoAtual: outro,
+      } as FormData,
+      '2',
+    );
+
+    expect(changed.evento).toBe('2');
+    expect(changed.localidadeEvento).toBe('');
+    expect(changed.localidadeEventoOutro).toBe('');
+    expect(changed.localidadeEventoAtual).toBeNull();
   });
 });

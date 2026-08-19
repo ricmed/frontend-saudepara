@@ -1,4 +1,6 @@
 import axios, { AxiosError } from 'axios';
+import axiosRetry from '@/utils/axiosRetry';
+import type { ModoLocalidadeEvento } from '@/features/notificationForms/types/index2';
 
 const server = import.meta.env.VITE_API_SERVER;
 const port = import.meta.env.VITE_API_PORT;
@@ -16,6 +18,7 @@ interface TipoEvento {
   idtipo_evento: number;
   descricao: string;
   ativo: string;
+  modo_localidade_evento: ModoLocalidadeEvento;
   created_at?: string;
   updated_at?: string;
   // 🆕 NOVA ESTRUTURA: Abrangência com relacionamento N:N
@@ -66,11 +69,19 @@ const handleApiError = (error: AxiosError<APIError>) => {
   );
 };
 
+const normalizeTipoEvento = (evento: TipoEvento): TipoEvento => ({
+  ...evento,
+  modo_localidade_evento: evento.modo_localidade_evento ?? 'NAO_USA',
+});
+
 export const TiposEventoService = {
   getAll: async (): Promise<TipoEvento[]> => {
     try {
-      const response = await axios.get<{ data: TipoEvento[] }>(API_URL);
-      return response.data.data;
+      const response = await axiosRetry.get<{ data: TipoEvento[] }>(API_URL, {
+        params: { page: 1, limit: 500 },
+        withCredentials: true,
+      });
+      return (response.data.data ?? []).map(normalizeTipoEvento);
     } catch (error) {
       return handleApiError(error as AxiosError<APIError>);
     }
@@ -79,8 +90,10 @@ export const TiposEventoService = {
   // 🆕 NOVO MÉTODO - Buscar apenas ativos
   getAllAtivos: async (): Promise<TipoEvento[]> => {
     try {
-      const response = await axiosInstance.get<TipoEvento[]>(`${API_URL}/ativos`);
-      return response.data;
+      const response = await axiosRetry.get<TipoEvento[]>(`${API_URL}/ativos`, {
+        withCredentials: true,
+      });
+      return (response.data ?? []).map(normalizeTipoEvento);
     } catch (error) {
       return handleApiError(error as AxiosError<APIError>);
     }

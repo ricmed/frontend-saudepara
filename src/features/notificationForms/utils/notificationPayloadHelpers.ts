@@ -6,11 +6,16 @@ export const buildNotificationDataForBackend = (
   formData: FormData,
   arquivosParaExcluir: number[]
 ): Record<string, any> => {
-  const { arquivos = [], ...restOfData } = formData;
+  const {
+    arquivos = [],
+    localidadeEventoOutro,
+    ...restOfData
+  } = formData;
   const timezone = detectUserTimezone();
 
   return {
     ...toUpperCaseAllStrings(restOfData),
+    localidadeEventoOutro: localidadeEventoOutro.trim(),
     arquivos,
     arquivos_para_excluir: arquivosParaExcluir,
     timezone_name: formData.timezone_name || timezone.timezone_name,

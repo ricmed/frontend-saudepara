@@ -120,11 +120,37 @@ export const validateTotalFiles = (arquivos: ArquivoFormulario[], config: Upload
   return { valid: true };
 };
 
+export type ModoLocalidadeEvento = 'NAO_USA' | 'OPCIONAL' | 'OBRIGATORIA';
+
+export type TipoLocalidadeEvento = 'BAIRRO' | 'COMUNIDADE' | 'RAMAL';
+
+export type EspecialLocalidadeEvento = 'NORMAL' | 'OUTRO' | 'NAO_INFORMADO';
+
+export interface LocalidadeEventoDTO {
+  id: number;
+  nome: string;
+  tipo: TipoLocalidadeEvento | null;
+  especial: EspecialLocalidadeEvento;
+  ribeirinha: boolean;
+  latitude: number | null;
+  longitude: number | null;
+  exibir_mapa: boolean;
+  ativo: boolean;
+  ordem: number | null;
+}
+
+export interface LocalidadesEventoResponse {
+  data: LocalidadeEventoDTO[];
+}
+
 // Interface FormData atualizada
 export interface FormData {
   // Seção 1: Dados Gerais
   evento: string;
   publicoAtendido: string;
+  localidadeEvento: string;
+  localidadeEventoOutro: string;
+  localidadeEventoAtual?: LocalidadeEventoDTO | null;
 
   // Seção 2: Procedência do indivíduo
   residenteBelem: string;
@@ -281,6 +307,7 @@ export interface EventoOption {
   idtipo_evento: number;
   descricao: string;
   ativo?: string; // 🆕 CAMPO ADICIONADO para compatibilidade
+  modo_localidade_evento: ModoLocalidadeEvento;
 }
 
 export interface PublicoOption {
