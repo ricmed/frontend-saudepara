@@ -1,4 +1,5 @@
 import type { FormSchema } from '@/services/FormService';
+import { formatMonitorOperObstaculoLabel } from './monitorOperObstaculoOptions';
 
 /** Linha de `data_json` com cabeçalho e ação (monitor operacional regional). */
 export type MonitorOperRow = Record<string, any>;
@@ -606,6 +607,15 @@ export function buildObstaculosDetalhe(rows: MonitorOperRow[]): ObstaculoDetalhe
     const cab = d.cabecalho as Record<string, any> | undefined;
     const rr = r as Record<string, unknown>;
     const textoRaw = rr.qual_obstaculo ?? rr.descricao_obstaculos ?? rr.observacoes;
+    let texto = '—';
+    if (Array.isArray(textoRaw)) {
+      const labels = textoRaw
+        .map((v) => formatMonitorOperObstaculoLabel(v))
+        .filter((l) => l && l !== '—');
+      texto = labels.length ? labels.join('; ') : '—';
+    } else if (textoRaw != null && String(textoRaw).trim() !== '') {
+      texto = formatMonitorOperObstaculoLabel(String(textoRaw).trim());
+    }
     out.push({
       crs_id: cab?.crs_id,
       atividade: formatMonitorOperAtividadeLabel(d?.acao?.atividade),
@@ -613,7 +623,7 @@ export function buildObstaculosDetalhe(rows: MonitorOperRow[]): ObstaculoDetalhe
         cab?.competencia_mes_ano != null && String(cab.competencia_mes_ano) !== ''
           ? String(cab.competencia_mes_ano)
           : '—',
-      texto: textoRaw != null && String(textoRaw).trim() !== '' ? String(textoRaw).trim() : '—',
+      texto,
     });
   }
   return out;

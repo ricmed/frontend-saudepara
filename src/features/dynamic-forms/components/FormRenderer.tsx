@@ -146,6 +146,7 @@ function withPrintField(printLayoutMode: boolean, className?: string): string | 
 }
 import { applySinanFichaToField } from '../utils/sinanFichaUi';
 import { SEXO_NASCIMENTO_HEPATITE_CRIANCA_EXCLUDE_CODIGOS } from '../utils/apiSelectOptionFilters';
+import { monitorOperObstaculoOptionsForAtividade } from '../utils/monitorOperObstaculoOptions';
 import {
   fetchSyndromicAgravos,
   fetchSyndromicAgravosRanking,
@@ -1408,6 +1409,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
 
   const clearDetalhamento = useCallback(() => {
     detalhamentoFieldKeys.forEach((k) => setValue(k, undefined));
+    setValue('resumo.qual_obstaculo', undefined);
   }, [detalhamentoFieldKeys, setValue]);
 
   // Retorno da assinatura Gov.br: preencher campo ou exibir erro e limpar hash/query
@@ -1773,6 +1775,13 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             ? optDiagnostico
             : [];
       return { ...withPlaceholder, options };
+    }
+
+    if (field.key === 'resumo.qual_obstaculo') {
+      return {
+        ...withPlaceholder,
+        options: monitorOperObstaculoOptionsForAtividade(getValue('acao.atividade')),
+      };
     }
 
     if (isHepatiteCriancaHBV && withPlaceholder.key === 'paciente.sexo') {
