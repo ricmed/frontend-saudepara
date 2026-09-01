@@ -19,7 +19,8 @@ import {
   Eye,
   Calendar,
   AlertCircle,
-  MessageCircle // ✅ NOVO: Ícone para Chat
+  MessageCircle, // ✅ NOVO: Ícone para Chat
+  BarChart3,
 } from 'lucide-react';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useNotificacoesByUserAccess, useNotificacoesStats } from '@/hooks/useNotificacoesHierarquicas';
@@ -170,6 +171,13 @@ const AdminDashboard: React.FC = () => {
       icon: Shield,
       color: 'bg-purple-500',
       href: '/admin/master/roles'
+    },
+    {
+      title: 'ObservaSUS',
+      description: 'Recursos, DataStorage e publicações do observatório',
+      icon: BarChart3,
+      color: 'bg-cyan-600',
+      href: '/admin/master/observasus'
     },
     // ✅ Chat de Suporte - APENAS para admin master (não admin hierárquico)
     ...(user?.roles?.includes('admin') ? [{

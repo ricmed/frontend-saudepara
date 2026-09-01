@@ -10,6 +10,8 @@ import UserForm from './UserForm';
 import PasswordReset from './PasswordReset';
 import RolesManagement from './RolesManagement';
 import AdminReports from './AdminReports';
+import ObservaSusAdminPage from '@/features/observasus/admin/pages/ObservaSusAdminPage';
+import ObservaSusResourceFormPage from '@/features/observasus/admin/pages/ObservaSusResourceFormPage';
 
 // Importar as páginas administrativas hierárquicas
 import DashboardUnidade from './DashboardUnidade';
@@ -122,6 +124,11 @@ const AdminRoutes: React.FC = () => {
         
         {/* Gestão de roles - admin master */}
         <Route path="/master/roles" element={<RolesManagement />} />
+
+        {/* ObservaSUS — catálogo de recursos */}
+        <Route path="/master/observasus" element={<ObservaSusAdminPage />} />
+        <Route path="/master/observasus/new" element={<ObservaSusResourceFormPage />} />
+        <Route path="/master/observasus/:id/edit" element={<ObservaSusResourceFormPage />} />
         
         {/* Relatórios - admin master */}
         <Route path="/master/reports" element={<AdminReports />} />

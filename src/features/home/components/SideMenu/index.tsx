@@ -28,6 +28,7 @@ import {
   ClipboardList,
   Settings,
   QrCode,
+  LineChart,
 } from "lucide-react";
 
 interface SideMenuProps {
@@ -163,6 +164,16 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       onClick: () => navigate("/private/offline-management"), // ou "/private/dados-offline"
     }] : []),
     
+    // ObservaSUS.PA - portal de vigilância em saúde
+    {
+      icon: <LineChart />,
+      label: t("observasus.menu") || "ObservaSUS.PA",
+      onClick: () => {
+        navigate("/observasus");
+        onClose();
+      },
+    },
+
     // Campanhas de Saúde - acesso direto
     {
       icon: <HeartPulse />,

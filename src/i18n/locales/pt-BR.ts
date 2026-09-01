@@ -473,6 +473,13 @@ export const ptBR = {
   "educationalMaterials.syphilis.description2": "Os sintomas variam conforme o estágio da doença e podem incluir feridas indolores, manchas no corpo e sintomas neurológicos em casos avançados.",
   "educationalMaterials.syphilis.description3": "O tratamento é feito com penicilina e está disponível gratuitamente no SUS. Gestantes devem fazer o teste para prevenir a sífilis congênita.",
   "educationalMaterials.syphilis.downloadButton": "Baixar Material Sífilis em Inglês",
-  "educationalMaterials.syphilis.pdfTitle": "Folder - Sífilis"
+  "educationalMaterials.syphilis.pdfTitle": "Folder - Sífilis",
+
+  // ObservaSUS
+  "observasus.menu": "ObservaSUS.PA",
+  "observasus.highlight.title": "Indicadores e dados da Vigilância em Saúde",
+  "observasus.highlight.description":
+    "Indicadores, bases e informações estratégicas da Vigilância em Saúde do Estado do Pará.",
+  "observasus.highlight.cta": "Acessar ObservaSUS",
 };
 

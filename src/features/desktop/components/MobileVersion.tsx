@@ -1,5 +1,6 @@
 import React from 'react';
 import { CustomCarousel } from '@/features/desktop/components/CustomCarousel';
+import { ObservaSusHighlightBanner } from '@/features/observasus/components/ObservaSusHighlightBanner';
 import { BottomNavigation } from '@/features/home/components/BottomNavigation';
 import { CustomHeader } from './CustomHeader';
 import { CustomMenuGrid } from './CustomMenuGrid';
@@ -34,6 +35,11 @@ export const MobileVersion: React.FC<MobileVersionProps> = ({
         <CustomCarousel />
       </div>
       
+      {/* Destaque ObservaSUS */}
+      <div className="px-4 pb-2">
+        <ObservaSusHighlightBanner selectedLanguage={selectedLanguage} />
+      </div>
+
       {/* Menu Grid com espaçamento azul acima */}
       <CustomMenuGrid selectedLanguage={selectedLanguage} />
       
