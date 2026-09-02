@@ -2,6 +2,7 @@ import React from "react";
 import { Search, Menu, Bell } from "lucide-react";
 import { useTranslation } from "@/i18n/useTranslations";
 import { Language } from "@/i18n/types";
+import { AppHeaderLogos } from "./AppHeaderLogos";
 
 interface CustomHeaderProps {
   onMenuToggle: () => void;
@@ -26,27 +27,8 @@ export const CustomHeader: React.FC<CustomHeaderProps> = ({
       </div>
 
       {/* Logos */}
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex flex-col">
-          <img
-            src="./images/logos/Logo Topo Sespa.png"
-            alt="Sespa Logo"
-            className="h-12 w-auto"
-          />
-        </div>
-
-        <div className="flex items-center space-x-10">
-          <img
-            src="./images/logos/Logo Topo Saude Para.png"
-            alt="Saúde Pará Logo"
-            className="h-11 w-auto"
-          />
-          <img
-            src="./images/logos/Logo Topo Bandeira.png"
-            alt="Governo do Pará"
-            className="h-8 w-auto"
-          />
-        </div>
+      <div className="mb-4">
+        <AppHeaderLogos compact />
       </div>
 
       {/* Barra de busca */}

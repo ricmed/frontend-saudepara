@@ -5,6 +5,8 @@ import Footer from '@/features/desktop/components/Footer';
 import { SideMenu } from '@/features/home/components/SideMenu';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ObservaSusBreadcrumb } from '../components/ObservaSusBreadcrumb';
+import { OBSERVASUS_PAGE_BG } from '../constants/observasusTheme';
+import '../observasus.css';
 
 interface ObservaSusLayoutProps {
   children: ReactNode;
@@ -35,9 +37,16 @@ export function ObservaSusLayout({
       className={
         immersive
           ? 'flex min-h-dvh flex-col bg-slate-100'
-          : 'min-h-screen bg-slate-50'
+          : 'relative min-h-screen bg-slate-50'
       }
     >
+      {!immersive && (
+        <div
+          className="pointer-events-none fixed inset-0 opacity-[0.02] bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url('${OBSERVASUS_PAGE_BG.pattern}')` }}
+          aria-hidden
+        />
+      )}
       <div className="shrink-0 bg-blue-700">
         <Header
           onMenuToggle={() => setIsMenuOpen(true)}
@@ -63,11 +72,11 @@ export function ObservaSusLayout({
         className={
           immersive
             ? 'flex min-h-0 flex-1 flex-col'
-            : 'mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8'
+            : 'relative mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8'
         }
       >
         {!immersive && (
-          <div className="mb-6">
+          <div className="mb-5">
             <ObservaSusBreadcrumb items={breadcrumbItems} />
           </div>
         )}

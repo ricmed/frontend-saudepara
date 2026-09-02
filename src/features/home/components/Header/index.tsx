@@ -2,6 +2,7 @@ import React from 'react';
 import { Menu, Bell, Search } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslations';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { AppHeaderLogos } from '@/features/desktop/components/AppHeaderLogos';
 
 interface HeaderProps {
   isMenuOpen: boolean;
@@ -30,22 +31,8 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Logos */}
-      <div className="flex justify-center items-center mt-4 space-x-0">
-        <img
-          src="./images/logos/Logo Topo Sespa.png"
-          alt="Sespa Logo"
-          className="h-10 w-auto"
-        />
-        <img
-          src="./images/logos/Logo Topo Saude Para.png"
-          alt="Saúde Pará Logo"
-          className="h-16 w-auto"
-        />
-        <img
-          src="./images/logos/Logo Topo Bandeira.png"
-          alt="Bandeira Logo"
-          className="h-8 w-auto"
-        />
+      <div className="mt-4 flex justify-center">
+        <AppHeaderLogos compact />
       </div>
 
       {/* Barra de Busca */}

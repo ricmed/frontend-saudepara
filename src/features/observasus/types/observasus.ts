@@ -35,7 +35,8 @@ export interface ObservaSusResource {
   status: ObservaSusResourceStatus;
   visibility: ObservaSusResourceVisibility;
   route: string | null;
-  externalUrl: string | null;
+  externalUrl?: string | null;
+  hasEmbed?: boolean;
   originalFileName: string | null;
   mimeType: string | null;
   fileSize: number | null;
@@ -76,6 +77,14 @@ export interface ObservaSusHomeResponse {
   updatedAt: string;
 }
 
+export interface ObservaSusPanelEmbedResponse {
+  embedUrl: string;
+  title: string;
+  expiresAt: string | null;
+}
+
+import type { ObservaSusPanelIconKey } from '../constants/observasusPanelVisuals';
+
 export interface ObservaSusPanel {
   id: string;
   slug: string;
@@ -84,7 +93,7 @@ export interface ObservaSusPanel {
   subtitle: string;
   description: string;
   status: ObservaSusResourceStatus;
-  icon: 'baby' | 'heart-pulse' | 'activity' | 'virus' | 'users' | 'award';
+  icon: ObservaSusPanelIconKey;
   /** ID do recurso na API (quando vem do admin). */
   resourceId?: number;
   visibility?: ObservaSusResourceVisibility;

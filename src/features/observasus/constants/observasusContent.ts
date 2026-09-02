@@ -8,7 +8,11 @@ import type {
 export const OBSERVASUS_IMAGES = {
   heroBackground: '/images/Observasus/Fundo.jpeg',
   mapOutline: '/images/Observasus/mapa-observasuspa.png',
+  /** Logo horizontal do portal (WordPress original). */
+  brandLogo: '/images/Observasus/observasus-logo.png',
   sespaLogo: '/images/logos/Logo Topo Sespa.png',
+  governoLogo: '/images/logos/logo-brasao-governo-pa.png',
+  nivsLogo: '/images/logos/logo-nivs-header.png',
   saudeParaLogo: '/images/logos/Logo Topo Saude Para.png',
 } as const;
 

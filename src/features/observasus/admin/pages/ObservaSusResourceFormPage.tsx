@@ -6,6 +6,8 @@ import { AdminHeader } from '@/keycloak/admin/components/AdminHeader';
 import Footer from '@/features/desktop/components/Footer';
 import { SideMenu } from '@/features/home/components/SideMenu';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/keycloak/AuthProvider';
+import { canGovernObservaSusResources } from '../observasusAdminAccess';
 import { OBSERVASUS_DOWNLOAD_ROLE_OPTIONS } from '../observasusAdminConstants';
 import {
   createObservaSusAdminResource,
@@ -24,7 +26,7 @@ const emptyForm: ObservaSusAdminPayload = {
   type: 'DATASET',
   system: 'SINAN',
   status: 'MIGRATING',
-  visibility: 'PUBLIC',
+  visibility: 'RESTRICTED',
   route: '',
   externalUrl: '',
   sortOrder: 0,
@@ -49,6 +51,8 @@ export function ObservaSusResourceFormPage() {
   const resourceId = id ? Number(id) : null;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const canGovern = canGovernObservaSusResources(user?.roles);
   const { selectedLanguage } = useLanguage();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [form, setForm] = useState<ObservaSusAdminPayload>(emptyForm);
@@ -92,19 +96,21 @@ export function ObservaSusResourceFormPage() {
         description: form.description || null,
         route: form.route || null,
         externalUrl: form.externalUrl || null,
-        requiredRoles: form.visibility === 'RESTRICTED' ? form.requiredRoles ?? [] : [],
+        visibility: canGovern ? form.visibility : 'RESTRICTED',
+        requiredRoles:
+          canGovern && form.visibility === 'RESTRICTED' ? form.requiredRoles ?? [] : [],
       };
 
       if (isEdit && resourceId) {
         const updated = await updateObservaSusAdminResource(resourceId, payload);
-        if (file) {
+        if (file && canGovern) {
           return uploadObservaSusAdminFile(updated.id, file);
         }
         return updated;
       }
 
       const created = await createObservaSusAdminResource(payload);
-      if (file) {
+      if (file && canGovern) {
         return uploadObservaSusAdminFile(created.id, file);
       }
       return created;
@@ -290,6 +296,7 @@ export function ObservaSusResourceFormPage() {
                     ))}
                   </select>
                 </label>
+                {canGovern && (
                 <label className="block">
                   <span className="text-sm font-medium text-gray-700">Visibilidade</span>
                   <select
@@ -304,6 +311,13 @@ export function ObservaSusResourceFormPage() {
                     <option value="RESTRICTED">RESTRICTED — exige role específica</option>
                   </select>
                 </label>
+                )}
+                {!canGovern && (
+                  <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    Painéis cadastrados por editor permanecem <strong>RESTRICTED</strong> até o admin
+                    master publicar.
+                  </p>
+                )}
                 <label className="block">
                   <span className="text-sm font-medium text-gray-700">Ordem</span>
                   <input
@@ -328,7 +342,7 @@ export function ObservaSusResourceFormPage() {
                 </label>
               </section>
 
-              {form.visibility === 'RESTRICTED' && (
+              {canGovern && form.visibility === 'RESTRICTED' && (
                 <section className="rounded-xl border border-amber-200 bg-amber-50/60 p-5 shadow-sm">
                   <h2 className="font-semibold text-gray-900 mb-2">Roles de download exigidas</h2>
                   <p className="text-sm text-gray-600 mb-4">
@@ -381,6 +395,8 @@ export function ObservaSusResourceFormPage() {
                     placeholder="https://..."
                   />
                 </label>
+                {canGovern && (
+                <>
                 <label className="block">
                   <span className="text-sm font-medium text-gray-700">Upload de arquivo</span>
                   <input
@@ -407,6 +423,8 @@ export function ObservaSusResourceFormPage() {
                       Remover
                     </button>
                   </div>
+                )}
+                </>
                 )}
               </section>
 

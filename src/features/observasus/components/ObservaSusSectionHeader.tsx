@@ -14,23 +14,19 @@ export function ObservaSusSectionHeader({
   action,
 }: ObservaSusSectionHeaderProps) {
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-8">
-      <div className="max-w-3xl">
+    <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="max-w-3xl border-l-4 border-blue-600 pl-5">
         {eyebrow && (
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-700 mb-2">
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.22em] text-blue-700">
             {eyebrow}
           </p>
         )}
-        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-          {title}
-        </h2>
+        <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{title}</h2>
         {description && (
-          <p className="mt-3 text-slate-600 leading-relaxed text-base sm:text-lg">
-            {description}
-          </p>
+          <p className="mt-3 text-base leading-relaxed text-slate-600 sm:text-lg">{description}</p>
         )}
       </div>
-      {action && <div className="shrink-0">{action}</div>}
+      {action && <div className="shrink-0 sm:pb-1">{action}</div>}
     </div>
   );
 }

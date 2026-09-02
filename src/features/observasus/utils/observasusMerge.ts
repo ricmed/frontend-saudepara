@@ -6,17 +6,7 @@ import type {
 } from '../types/observasus';
 import { SYSTEM_SLUG_BY_ENUM } from '../types/observasus';
 import { OBSERVASUS_DATA_SYSTEMS, OBSERVASUS_PANELS } from '../constants/observasusContent';
-
-const SYSTEM_ICON: Record<ObservaSusSystem, ObservaSusPanel['icon']> = {
-  SIM: 'heart-pulse',
-  SINASC: 'baby',
-  SINAN: 'activity',
-  ESUS_NOTIFICA: 'activity',
-  COVID_19: 'virus',
-  DEMOGRAFICO: 'users',
-  PQAVS: 'award',
-  GERAL: 'activity',
-};
+import { getObservaSusPanelCardLabels, getObservaSusPanelIcon } from '../constants/observasusPanelVisuals';
 
 export function mergeDataStorageSystems(
   apiItems: ObservaSusResource[]
@@ -65,7 +55,7 @@ export function mapApiResourcesToPanels(apiPanels: ObservaSusResource[]): Observ
       );
 
       const systemSlug = SYSTEM_SLUG_BY_ENUM[resource.system] ?? resource.slug;
-      const hasEmbed = Boolean(resource.externalUrl);
+      const hasEmbed = resource.hasEmbed ?? Boolean(resource.externalUrl);
       const isHubRoute =
         Boolean(resource.route) &&
         resource.route!.startsWith('/observasus/paineis') &&
@@ -76,18 +66,25 @@ export function mapApiResourcesToPanels(apiPanels: ObservaSusResource[]): Observ
           ? resource.route!
           : resource.route || `/observasus/dados/${systemSlug}`;
 
+      const baseSubtitle = resource.subtitle || catalog?.subtitle || resource.system;
+      const labels = getObservaSusPanelCardLabels(
+        resource.slug,
+        resource.title,
+        baseSubtitle
+      );
+
       return {
         id: String(resource.id),
         slug: resource.slug,
         system: resource.system,
-        title: resource.title,
-        subtitle: resource.subtitle || catalog?.subtitle || resource.system,
+        title: labels.title,
+        subtitle: labels.subtitle,
         description:
           resource.description ||
           catalog?.description ||
           'Painel de indicadores do ObservaSUS.PA.',
         status: resource.status,
-        icon: catalog?.icon || SYSTEM_ICON[resource.system] || 'activity',
+        icon: getObservaSusPanelIcon(resource.slug, resource.system),
         resourceId: resource.id,
         visibility: resource.visibility,
         href,

@@ -2,6 +2,7 @@ import React from "react";
 import { Search, Menu, Bell } from "lucide-react";
 import { useTranslation } from "@/i18n/useTranslations";
 import { Language } from "@/i18n/types";
+import { AppHeaderLogos } from "./AppHeaderLogos";
 
 interface HeaderProps {
   onMenuToggle: () => void;
@@ -38,26 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Logos com melhor hierarquia visual */}
       <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center">
-          <img
-            src="./images/logos/Logo Topo Sespa.png"
-            alt="Secretaria de Estado de Saúde Pública do Pará"
-            className="h-12 w-auto"
-          />
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <img
-            src="./images/logos/Logo Topo Saude Para.png"
-            alt="Saúde Pará"
-            className="h-10 w-auto"
-          />
-          <img
-            src="./images/logos/Logo Topo Bandeira.png"
-            alt="Governo do Estado do Pará"
-            className="h-8 w-auto"
-          />
-        </div>
+        <AppHeaderLogos compact />
       </div>
 
       {/* Barra de busca com melhor acessibilidade */}
@@ -91,25 +73,7 @@ export const Header: React.FC<HeaderProps> = ({
               <Menu className="h-6 w-6 text-white" />
             </button>
 
-            {/* Logos com melhor espaçamento */}
-            <div className="flex items-center space-x-3">
-              <img
-                src="./images/logos/Logo Topo Sespa.png"
-                alt="Secretaria de Estado de Saúde Pública do Pará"
-                className="h-12 w-auto"
-              />
-              <div className="h-10 w-px bg-white/20"></div>
-              <img
-                src="./images/logos/Logo Topo Saude Para.png"
-                alt="Saúde Pará"
-                className="h-11 w-auto"
-              />
-              <img
-                src="./images/logos/Logo Topo Bandeira.png"
-                alt="Governo do Estado do Pará"
-                className="h-9 w-auto"
-              />
-            </div>
+            <AppHeaderLogos />
           </div>
 
           {/* Navegação principal centralizada */}

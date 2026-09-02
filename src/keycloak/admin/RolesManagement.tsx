@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { useRoles, useUsers } from '@/keycloak/admin/hooks/useAdminApi';
 import type { Role, Notification } from  './types/admin.types';
+import { useAuth } from '@/keycloak/AuthProvider';
+import { isObservaSusOnlyAdmin } from '@/features/observasus/admin/observasusAdminAccess';
 
 interface RoleFormData {
   name: string;
@@ -28,6 +30,8 @@ interface RoleFormData {
 
 const RolesManagement: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const observasusOnly = isObservaSusOnlyAdmin(user?.roles);
   const { selectedLanguage } = useLanguage();
   const { t } = useTranslation(selectedLanguage);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -46,7 +50,9 @@ const RolesManagement: React.FC = () => {
     name: '',
     description: '',
   });
-  const [roleFilter, setRoleFilter] = useState<'all' | 'observasus' | 'other'>('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'observasus' | 'other'>(
+    observasusOnly ? 'observasus' : 'all'
+  );
 
   useEffect(() => {
     loadRoles();
@@ -209,9 +215,9 @@ const RolesManagement: React.FC = () => {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate('/admin')}
+                onClick={() => navigate(observasusOnly ? '/admin/master/observasus' : '/admin')}
                 className="flex items-center px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                title="Voltar ao Painel Administrativo"
+                title="Voltar"
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
@@ -225,13 +231,15 @@ const RolesManagement: React.FC = () => {
               </div>
             </div>
             <div className="flex gap-3 mt-4 sm:mt-0">
-              <button
-                onClick={handleCreateRole}
-                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                {t('admin.roles.createRole')}
-              </button>
+              {!observasusOnly && (
+                <button
+                  onClick={handleCreateRole}
+                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  {t('admin.roles.createRole')}
+                </button>
+              )}
             </div>
           </div>
 

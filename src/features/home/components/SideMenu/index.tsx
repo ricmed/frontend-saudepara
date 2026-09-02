@@ -258,12 +258,15 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     },
     
     // Menu de Gerenciar Usuários - apenas para admins logados
-    ...(user && isAdmin() ? [{
+    ...(user && (isAdmin() || user.roles?.includes('observasus.admin')) ? [{
       icon: <UserCog />,
-      label: t("menu.manage_users"),
+      label: user.roles?.includes('observasus.admin') && !isAdmin()
+        ? 'ObservaSUS — Admin'
+        : t("menu.manage_users"),
       onClick: () => {
-        // Redirecionar baseado na role
-        if (user.roles?.includes('admin.crs')) {
+        if (user.roles?.includes('observasus.admin') && !isAdmin()) {
+          navigate('/admin/master/observasus');
+        } else if (user.roles?.includes('admin.crs')) {
           navigate("/admin/crs");
         } else if (user.roles?.includes('admin.estado')) {
           navigate("/admin/estado");

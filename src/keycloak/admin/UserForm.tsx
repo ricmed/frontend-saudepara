@@ -19,6 +19,8 @@ import {
   MapPin,
   Globe
 } from 'lucide-react';
+import { useAuth } from '@/keycloak/AuthProvider';
+import { isObservaSusOnlyAdmin } from '@/features/observasus/admin/observasusAdminAccess';
 
 // Importar service de gestão de usuários
 import {
@@ -76,6 +78,8 @@ const adminUrl = (p: string) => `${ADMIN_API_BASE}${p.startsWith('/') ? '' : '/'
 const UserForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const observasusOnly = isObservaSusOnlyAdmin(user?.roles);
   const { selectedLanguage } = useLanguage();
   const { t } = useTranslation(selectedLanguage);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -419,7 +423,12 @@ const UserForm: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         console.log('✅ Roles carregadas:', data);
-        setRoles((Array.isArray(data) ? data : []).map(normalizeRole));
+        const normalized = (Array.isArray(data) ? data : []).map(normalizeRole);
+        setRoles(
+          observasusOnly
+            ? normalized.filter((role) => role.name.startsWith('observasus.'))
+            : normalized
+        );
       } else {
         console.error('❌ Erro ao carregar roles:', response.status, response.statusText);
         const errorText = await response.text();

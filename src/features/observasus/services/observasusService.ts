@@ -1,12 +1,22 @@
 import api from '@/utils/axiosRetry';
 import type {
   ObservaSusHomeResponse,
+  ObservaSusPanelEmbedResponse,
   ObservaSusResource,
   ObservaSusResourceFilters,
   ObservaSusResourceListResponse,
 } from '../types/observasus';
 
 const BASE = '/api/observasus';
+
+function sanitizeObservaSusQueryParams<T extends Record<string, unknown>>(params?: T): T | undefined {
+  if (!params) return undefined;
+  const entries = Object.entries(params).filter(
+    ([, value]) => value !== '' && value !== null && value !== undefined
+  );
+  if (entries.length === 0) return undefined;
+  return Object.fromEntries(entries) as T;
+}
 
 export async function getObservaSusHome(): Promise<ObservaSusHomeResponse> {
   const response = await api.get(`${BASE}/home`);
@@ -16,7 +26,9 @@ export async function getObservaSusHome(): Promise<ObservaSusHomeResponse> {
 export async function getObservaSusResources(
   params?: ObservaSusResourceFilters
 ): Promise<ObservaSusResourceListResponse> {
-  const response = await api.get(`${BASE}/resources`, { params });
+  const response = await api.get(`${BASE}/resources`, {
+    params: sanitizeObservaSusQueryParams(params),
+  });
   return response.data;
 }
 
@@ -25,10 +37,17 @@ export async function getObservaSusResourceBySlug(slug: string): Promise<Observa
   return response.data;
 }
 
+export async function getObservaSusPanelEmbed(slug: string): Promise<ObservaSusPanelEmbedResponse> {
+  const response = await api.get(`${BASE}/panels/${slug}/embed`);
+  return response.data;
+}
+
 export async function getObservaSusDataStorage(
   params?: ObservaSusResourceFilters
 ): Promise<ObservaSusResourceListResponse> {
-  const response = await api.get(`${BASE}/datastorage`, { params });
+  const response = await api.get(`${BASE}/datastorage`, {
+    params: sanitizeObservaSusQueryParams(params),
+  });
   return response.data;
 }
 
@@ -36,14 +55,18 @@ export async function getObservaSusDataStorageBySystem(
   systemSlug: string,
   params?: ObservaSusResourceFilters
 ): Promise<ObservaSusResourceListResponse & { system: string }> {
-  const response = await api.get(`${BASE}/datastorage/${systemSlug}`, { params });
+  const response = await api.get(`${BASE}/datastorage/${systemSlug}`, {
+    params: sanitizeObservaSusQueryParams(params),
+  });
   return response.data;
 }
 
 export async function getObservaSusPublications(
   params?: ObservaSusResourceFilters
 ): Promise<ObservaSusResourceListResponse> {
-  const response = await api.get(`${BASE}/publications`, { params });
+  const response = await api.get(`${BASE}/publications`, {
+    params: sanitizeObservaSusQueryParams(params),
+  });
   return response.data;
 }
 
@@ -81,7 +104,9 @@ export type ObservaSusAdminPayload = {
 export async function getObservaSusAdminResources(
   params?: ObservaSusResourceFilters
 ): Promise<ObservaSusResourceListResponse> {
-  const response = await api.get(`${BASE}/admin/resources`, { params });
+  const response = await api.get(`${BASE}/admin/resources`, {
+    params: sanitizeObservaSusQueryParams(params),
+  });
   return response.data;
 }
 

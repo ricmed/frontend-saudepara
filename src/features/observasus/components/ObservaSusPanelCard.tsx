@@ -1,26 +1,51 @@
 import { Link } from 'react-router-dom';
+import type { ComponentType } from 'react';
 import {
   Activity,
   Award,
   Baby,
   BarChart3,
+  BookOpen,
+  Brain,
   ChevronRight,
+  ClipboardList,
+  Clock,
+  Droplets,
+  HardHat,
   HeartPulse,
   Lock,
-  Users,
   Microscope,
+  Pill,
+  ShieldAlert,
+  Stethoscope,
+  Syringe,
+  Users,
 } from 'lucide-react';
 import type { ObservaSusPanel } from '../types/observasus';
+import type { ObservaSusPanelIconKey } from '../constants/observasusPanelVisuals';
+import { getObservaSusSystemAccent } from '../constants/observasusTheme';
 import { ObservaSusStatusBadge } from './ObservaSusStatusBadge';
+import { MosquitoIcon } from './icons/MosquitoIcon';
 
-const PANEL_ICONS = {
+const PANEL_ICONS: Record<ObservaSusPanelIconKey, ComponentType<{ className?: string }>> = {
   baby: Baby,
   'heart-pulse': HeartPulse,
   activity: Activity,
   virus: Microscope,
   users: Users,
   award: Award,
-} as const;
+  mosquito: MosquitoIcon,
+  droplets: Droplets,
+  brain: Brain,
+  pill: Pill,
+  'shield-alert': ShieldAlert,
+  'hard-hat': HardHat,
+  'clipboard-list': ClipboardList,
+  clock: Clock,
+  'book-open': BookOpen,
+  stethoscope: Stethoscope,
+  syringe: Syringe,
+};
 
 interface ObservaSusPanelCardProps {
   panel: ObservaSusPanel;
@@ -45,9 +70,12 @@ function panelFooterMessage(panel: ObservaSusPanel): string {
   }
 }
 
-export function ObservaSusPanelCard({ panel }: ObservaSusPanelCardProps) {
+const CARD_CLASS =
+  'group relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700';
+
+function PanelCardContent({ panel }: ObservaSusPanelCardProps) {
   const Icon = PANEL_ICONS[panel.icon];
-  const href = panel.href || '/observasus/paineis';
+  const accent = getObservaSusSystemAccent(panel.system);
   const ctaLabel =
     panel.status === 'AVAILABLE'
       ? panel.isExternal
@@ -55,13 +83,16 @@ export function ObservaSusPanelCard({ panel }: ObservaSusPanelCardProps) {
         : 'Acessar'
       : 'Saiba mais';
 
-  const ctaClassName =
-    'mt-5 inline-flex items-center gap-1 text-sm font-semibold text-blue-700 hover:text-blue-800';
-
   return (
-    <article className="group relative flex h-full flex-col rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-lg hover:shadow-blue-900/5">
+    <>
+      <div
+        className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-600 via-blue-500 to-teal-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        aria-hidden
+      />
       <div className="mb-5 flex items-start justify-between gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-md shadow-blue-900/20">
+        <div
+          className={`flex h-12 w-12 items-center justify-center rounded-xl shadow-md ring-4 ${accent.iconBg} ${accent.iconText} ${accent.ring}`}
+        >
           <Icon className="h-6 w-6" aria-hidden />
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1.5">
@@ -82,7 +113,7 @@ export function ObservaSusPanelCard({ panel }: ObservaSusPanelCardProps) {
       </div>
 
       <div className="flex-1">
-        <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">
+        <p className={`text-xs font-semibold uppercase tracking-wider ${accent.eyebrow}`}>
           {panel.subtitle}
         </p>
         <h3 className="mt-1 text-xl font-bold text-slate-900">{panel.title}</h3>
@@ -96,22 +127,37 @@ export function ObservaSusPanelCard({ panel }: ObservaSusPanelCardProps) {
         </div>
       </div>
 
-      {panel.isExternal ? (
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={ctaClassName}
-        >
-          {ctaLabel}
-          <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-        </a>
-      ) : (
-        <Link to={href} className={ctaClassName}>
-          {ctaLabel}
-          <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-        </Link>
-      )}
-    </article>
+      <span className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-blue-700 group-hover:text-blue-800">
+        {ctaLabel}
+        <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
+      </span>
+    </>
+  );
+}
+
+export function ObservaSusPanelCard({ panel }: ObservaSusPanelCardProps) {
+  const accent = getObservaSusSystemAccent(panel.system);
+  const href = panel.href || '/observasus/paineis';
+  const cardClassName = `${CARD_CLASS} ${accent.cardHover}`;
+  const ariaLabel = `${panel.title} — ${panel.subtitle}`;
+
+  if (panel.isExternal) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={cardClassName}
+        aria-label={ariaLabel}
+      >
+        <PanelCardContent panel={panel} />
+      </a>
+    );
+  }
+
+  return (
+    <Link to={href} className={cardClassName} aria-label={ariaLabel}>
+      <PanelCardContent panel={panel} />
+    </Link>
   );
 }

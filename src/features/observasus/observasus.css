@@ -1,0 +1,36 @@
+/* ObservaSUS — motion leve (prefers-reduced-motion respeitado) */
+@keyframes observasus-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.observasus-enter {
+  animation: observasus-enter 0.55s cubic-bezier(0.33, 1, 0.68, 1) both;
+}
+
+.observasus-enter-delay-1 {
+  animation-delay: 80ms;
+}
+
+.observasus-enter-delay-2 {
+  animation-delay: 160ms;
+}
+
+.observasus-enter-delay-3 {
+  animation-delay: 240ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .observasus-enter,
+  .observasus-enter-delay-1,
+  .observasus-enter-delay-2,
+  .observasus-enter-delay-3 {
+    animation: none;
+  }
+}

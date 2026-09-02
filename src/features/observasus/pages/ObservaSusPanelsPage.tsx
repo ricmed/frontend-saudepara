@@ -21,10 +21,13 @@ const SYSTEM_FILTERS: Array<{ value: '' | ObservaSusSystem; label: string }> = [
 
 export function ObservaSusPanelsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const systemParam = (searchParams.get('system') || '').toUpperCase();
-  const systemFilter = SYSTEM_FILTERS.some((item) => item.value === systemParam)
-    ? (systemParam as ObservaSusSystem)
-    : undefined;
+  const rawSystem = searchParams.get('system');
+  const systemParam = rawSystem?.trim().toUpperCase() ?? '';
+  const systemFilter =
+    systemParam &&
+    SYSTEM_FILTERS.some((item) => item.value !== '' && item.value === systemParam)
+      ? (systemParam as ObservaSusSystem)
+      : undefined;
 
   const { data, isLoading, isError, isFetched } = useObservaSusResources({
     type: 'PANEL',
@@ -68,8 +71,8 @@ export function ObservaSusPanelsPage() {
               }}
               className={
                 active
-                  ? 'rounded-full bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white'
-                  : 'rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50'
+                  ? 'rounded-full bg-gradient-to-r from-blue-700 to-blue-800 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-blue-900/20'
+                  : 'rounded-full bg-white px-4 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-blue-50 hover:ring-blue-200'
               }
             >
               {filter.label}

@@ -2,6 +2,10 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '@/keycloak/AuthProvider';
 import { useAdminUrls } from './hooks/useAdminContext';
+import {
+  canEditObservaSusResources,
+  canManageObservaSusUsers,
+} from '@/features/observasus/admin/observasusAdminAccess';
 
 // Importar as páginas administrativas
 import AdminDashboard from './AdminDashboard';
@@ -30,27 +34,16 @@ import UserListEstado from './UserListEstado';
 // Componente de proteção para verificar se o usuário tem role admin hierárquica
 const AdminProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  
-  // Verificar se o usuário tem alguma role admin (master ou hierárquica)
-  const isAdmin = user?.roles?.includes('admin') || 
-                  user?.roles?.includes('admin.unidade') ||
-                  user?.roles?.includes('admin.municipio') ||
-                  user?.roles?.includes('admin.crs') ||
-                  user?.roles?.includes('admin.estado') || 
-                  false;
+  const roles = user?.roles ?? [];
+  const isAdmin =
+    roles.includes('admin') ||
+    roles.includes('admin.unidade') ||
+    roles.includes('admin.municipio') ||
+    roles.includes('admin.crs') ||
+    roles.includes('admin.estado') ||
+    canEditObservaSusResources(roles) ||
+    canManageObservaSusUsers(roles);
 
-  // Log das verificações de role para debug
-  console.log('🛡️ Verificação de proteção admin:', {
-    username: user?.preferred_username,
-    roles: user?.roles,
-    isAdmin,
-    hasAdminMaster: user?.roles?.includes('admin'),
-    hasAdminUnidade: user?.roles?.includes('admin.unidade'),
-    hasAdminMunicipio: user?.roles?.includes('admin.municipio'),
-    hasAdminCrs: user?.roles?.includes('admin.crs'),
-    hasAdminEstado: user?.roles?.includes('admin.estado')
-  });
-  
   if (!isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -81,7 +74,44 @@ const AdminProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children
       </div>
     );
   }
-  
+
+  return <>{children}</>;
+};
+
+const PlatformAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
+  const roles = user?.roles ?? [];
+  const isPlatformAdmin =
+    roles.includes('admin') ||
+    roles.includes('admin.unidade') ||
+    roles.includes('admin.municipio') ||
+    roles.includes('admin.crs') ||
+    roles.includes('admin.estado');
+
+  if (!isPlatformAdmin) {
+    return <Navigate to="/admin/master/observasus" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+const ObservaSusEditorRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
+
+  if (!canEditObservaSusResources(user?.roles)) {
+    return <Navigate to="/admin/master/observasus" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+const ObservaSusUserManagementRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
+
+  if (!canManageObservaSusUsers(user?.roles)) {
+    return <Navigate to="/admin/master/observasus" replace />;
+  }
+
   return <>{children}</>;
 };
 
@@ -94,13 +124,10 @@ const AdminRedirect: React.FC = () => {
     return <Navigate to="/login" replace />;
   }
 
-  // Log do redirecionamento para debug
-  console.log('🔄 Redirecionando admin:', {
-    username: user.preferred_username,
-    roles: user.roles,
-    dashboardUrl: dashboard
-  });
-  
+  if (canManageObservaSusUsers(user.roles) && !user.roles?.some((r) => r === 'admin' || r.startsWith('admin.'))) {
+    return <Navigate to="/admin/master/observasus" replace />;
+  }
+
   return <Navigate to={dashboard} replace />;
 };
 
@@ -113,25 +140,88 @@ const AdminRoutes: React.FC = () => {
         <Route path="/dashboard" element={<AdminRedirect />} />
         
         {/* Dashboard principal - admin master */}
-        <Route path="/master" element={<AdminDashboard />} />
+        <Route
+          path="/master"
+          element={
+            <PlatformAdminRoute>
+              <AdminDashboard />
+            </PlatformAdminRoute>
+          }
+        />
         <Route path="/master/dashboard" element={<Navigate to="/admin/master" replace />} />
-        
-        {/* Gestão de usuários - admin master */}
-        <Route path="/master/users" element={<UsersList />} />
-        <Route path="/master/users/new" element={<UserForm />} />
-        <Route path="/master/users/:id/edit" element={<UserForm />} />
-        <Route path="/master/users/:id/reset-password" element={<PasswordReset />} />
-        
-        {/* Gestão de roles - admin master */}
-        <Route path="/master/roles" element={<RolesManagement />} />
+
+        {/* Gestão de usuários */}
+        <Route
+          path="/master/users"
+          element={
+            <ObservaSusUserManagementRoute>
+              <UsersList />
+            </ObservaSusUserManagementRoute>
+          }
+        />
+        <Route
+          path="/master/users/new"
+          element={
+            <ObservaSusUserManagementRoute>
+              <UserForm />
+            </ObservaSusUserManagementRoute>
+          }
+        />
+        <Route
+          path="/master/users/:id/edit"
+          element={
+            <ObservaSusUserManagementRoute>
+              <UserForm />
+            </ObservaSusUserManagementRoute>
+          }
+        />
+        <Route
+          path="/master/users/:id/reset-password"
+          element={
+            <ObservaSusUserManagementRoute>
+              <PasswordReset />
+            </ObservaSusUserManagementRoute>
+          }
+        />
+
+        {/* Gestão de roles */}
+        <Route
+          path="/master/roles"
+          element={
+            <ObservaSusUserManagementRoute>
+              <RolesManagement />
+            </ObservaSusUserManagementRoute>
+          }
+        />
 
         {/* ObservaSUS — catálogo de recursos */}
         <Route path="/master/observasus" element={<ObservaSusAdminPage />} />
-        <Route path="/master/observasus/new" element={<ObservaSusResourceFormPage />} />
-        <Route path="/master/observasus/:id/edit" element={<ObservaSusResourceFormPage />} />
-        
+        <Route
+          path="/master/observasus/new"
+          element={
+            <ObservaSusEditorRoute>
+              <ObservaSusResourceFormPage />
+            </ObservaSusEditorRoute>
+          }
+        />
+        <Route
+          path="/master/observasus/:id/edit"
+          element={
+            <ObservaSusEditorRoute>
+              <ObservaSusResourceFormPage />
+            </ObservaSusEditorRoute>
+          }
+        />
+
         {/* Relatórios - admin master */}
-        <Route path="/master/reports" element={<AdminReports />} />
+        <Route
+          path="/master/reports"
+          element={
+            <PlatformAdminRoute>
+              <AdminReports />
+            </PlatformAdminRoute>
+          }
+        />
         
         {/* Rotas legacy do admin master (para compatibilidade) */}
         <Route path="/users" element={<Navigate to="/admin/master/users" replace />} />

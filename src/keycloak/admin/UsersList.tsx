@@ -29,6 +29,8 @@ import type { UsuarioListItem } from '@/services/UsuarioGestaoService';
 import {
   usuarioGestaoService
 } from '@/services/UsuarioGestaoService';
+import { useAuth } from '@/keycloak/AuthProvider';
+import { isObservaSusOnlyAdmin } from '@/features/observasus/admin/observasusAdminAccess';
 
 type UserWithAccess = UsuarioListItem;
 
@@ -60,6 +62,8 @@ function isNotificadorUnidade(user: UserWithAccess): boolean {
 
 const UsersList: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const observasusOnly = isObservaSusOnlyAdmin(user?.roles);
   const { selectedLanguage } = useLanguage();
   const { t } = useTranslation(selectedLanguage);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -260,7 +264,7 @@ const UsersList: React.FC = () => {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate('/admin')}
+                onClick={() => navigate(observasusOnly ? '/admin/master/observasus' : '/admin')}
                 className="flex items-center px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                 title="Voltar ao Painel Administrativo"
               >

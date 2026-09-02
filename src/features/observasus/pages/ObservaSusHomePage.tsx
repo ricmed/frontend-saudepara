@@ -1,16 +1,12 @@
 import { Link } from 'react-router-dom';
 import { ChevronRight, Loader2, Lock } from 'lucide-react';
 import { ObservaSusLayout } from '../layouts/ObservaSusLayout';
+import { ObservaSusAboutBand } from '../components/ObservaSusAboutBand';
 import { ObservaSusHero } from '../components/ObservaSusHero';
 import { ObservaSusSectionHeader } from '../components/ObservaSusSectionHeader';
+import { ObservaSusSectionShell } from '../components/ObservaSusSectionShell';
 import { ObservaSusPanelCard } from '../components/ObservaSusPanelCard';
 import { ObservaSusResourceCard } from '../components/ObservaSusResourceCard';
-import { ObservaSusDocumentCard } from '../components/ObservaSusDocumentCard';
-import { ObservaSusQuickAccess } from '../components/ObservaSusQuickAccess';
-import {
-  OBSERVASUS_PUBLICATIONS,
-  OBSERVASUS_QUICK_LINKS,
-} from '../constants/observasusContent';
 import { useObservaSusHome } from '../hooks/useObservaSusHome';
 import {
   mapApiResourcesToPanels,
@@ -25,39 +21,22 @@ export function ObservaSusHomePage() {
 
   return (
     <ObservaSusLayout>
-      <div className="space-y-16 sm:space-y-20 pb-12">
+      <div className="space-y-14 pb-12 sm:space-y-16">
         <ObservaSusHero />
 
-        <section aria-labelledby="about-observasus">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm">
-            <ObservaSusSectionHeader
-              eyebrow="Institucional"
-              title="Sobre o ObservaSUS.PA"
-              description="O ObservaSUS.PA reúne dados, indicadores e informações estratégicas para o monitoramento sistemático da situação de saúde do Estado do Pará. O observatório apoia as áreas técnicas da SESPA na identificação de problemas e prioridades, no planejamento das ações e serviços de saúde e na tomada de decisão orientada por evidências."
-              action={
-                <Link
-                  to="/observasus/sobre"
-                  className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
-                >
-                  Conheça o ObservaSUS
-                  <ChevronRight className="h-4 w-4" />
-                </Link>
-              }
-            />
-          </div>
-        </section>
+        <ObservaSusAboutBand />
 
-        <section aria-labelledby="panels-section">
+        <ObservaSusSectionShell id="panels-section" className="observasus-enter-delay-2">
           <ObservaSusSectionHeader
             eyebrow="Indicadores"
             title="Painéis de Vigilância em Saúde"
-            description="Conjuntos de indicadores estratégicos liberados para o seu perfil. Painéis restritos só aparecem se você tiver a role correspondente."
             action={
               <Link
                 to="/observasus/paineis"
-                className="text-sm font-semibold text-blue-700 hover:text-blue-800"
+                className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-800 ring-1 ring-blue-100 transition hover:bg-blue-100"
               >
-                Ver todos os painéis →
+                Ver todos
+                <ChevronRight className="h-4 w-4" />
               </Link>
             }
           />
@@ -70,7 +49,7 @@ export function ObservaSusHomePage() {
           )}
 
           {isError && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-900 text-sm">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
               Não foi possível carregar os painéis do servidor. Tente novamente em instantes.
             </div>
           )}
@@ -81,7 +60,7 @@ export function ObservaSusHomePage() {
                 <Lock className="h-5 w-5" />
               </div>
               <p className="font-semibold text-slate-900">Nenhum painel disponível para o seu perfil</p>
-              <p className="mt-2 text-sm text-slate-600 max-w-md mx-auto">
+              <p className="mx-auto mt-2 max-w-md text-sm text-slate-600">
                 Faça login ou solicite à administração a role de acesso ao sistema desejado
                 (ex.: <code className="text-xs">observasus.download.sim</code>).
               </p>
@@ -95,15 +74,15 @@ export function ObservaSusHomePage() {
           )}
 
           {panels.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
               {panels.map((panel) => (
                 <ObservaSusPanelCard key={panel.id} panel={panel} />
               ))}
             </div>
           )}
-        </section>
+        </ObservaSusSectionShell>
 
-        <section aria-labelledby="datastorage-section">
+        <ObservaSusSectionShell variant="tinted" id="datastorage-section" className="observasus-enter-delay-3">
           <ObservaSusSectionHeader
             eyebrow="DataStorage"
             title="Bases e documentos por sistema"
@@ -111,51 +90,19 @@ export function ObservaSusHomePage() {
             action={
               <Link
                 to="/observasus/dados"
-                className="text-sm font-semibold text-blue-700 hover:text-blue-800"
+                className="inline-flex items-center gap-1 rounded-full bg-white px-4 py-2 text-sm font-semibold text-blue-800 shadow-sm ring-1 ring-slate-200 transition hover:ring-blue-200"
               >
-                Ver DataStorage completo →
+                Ver completo
+                <ChevronRight className="h-4 w-4" />
               </Link>
             }
           />
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
             {dataStorageSystems.map((system) => (
               <ObservaSusResourceCard key={system.id} resource={system} />
             ))}
           </div>
-        </section>
-
-        <section aria-labelledby="publications-section">
-          <ObservaSusSectionHeader
-            eyebrow="Conhecimento"
-            title="Publicações e documentos"
-            description="Notas técnicas, boletins, informes epidemiológicos, manuais e documentos metodológicos em um único repositório."
-            action={
-              <Link
-                to="/observasus/publicacoes"
-                className="text-sm font-semibold text-blue-700 hover:text-blue-800"
-              >
-                Ver publicações →
-              </Link>
-            }
-          />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {OBSERVASUS_PUBLICATIONS.map((doc) => (
-              <ObservaSusDocumentCard key={doc.id} document={doc} />
-            ))}
-          </div>
-        </section>
-
-        <section
-          aria-labelledby="explore-section"
-          className="rounded-3xl bg-gradient-to-br from-blue-800 via-blue-700 to-blue-900 px-6 py-10 sm:px-10 sm:py-12 shadow-xl shadow-blue-900/20"
-        >
-          <ObservaSusSectionHeader
-            eyebrow="Ecossistema"
-            title="Explore também o Saúde Pará"
-            description="Recursos complementares já disponíveis no portal principal da Secretaria de Saúde Pública do Pará."
-          />
-          <ObservaSusQuickAccess links={OBSERVASUS_QUICK_LINKS} />
-        </section>
+        </ObservaSusSectionShell>
       </div>
     </ObservaSusLayout>
   );

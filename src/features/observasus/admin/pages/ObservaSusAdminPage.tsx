@@ -9,11 +9,20 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Shield,
+  Users,
 } from 'lucide-react';
 import { AdminHeader } from '@/keycloak/admin/components/AdminHeader';
 import Footer from '@/features/desktop/components/Footer';
 import { SideMenu } from '@/features/home/components/SideMenu';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/keycloak/AuthProvider';
+import {
+  canEditObservaSusResources,
+  canGovernObservaSusResources,
+  canManageObservaSusUsers,
+  isObservaSusOnlyAdmin,
+} from '../observasusAdminAccess';
 import { ObservaSusStatusBadge } from '../../components/ObservaSusStatusBadge';
 import {
   archiveObservaSusAdminResource,
@@ -22,11 +31,16 @@ import {
 
 export function ObservaSusAdminPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const { selectedLanguage } = useLanguage();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
+  const canManageUsers = canManageObservaSusUsers(user?.roles);
+  const canEditResources = canEditObservaSusResources(user?.roles);
+  const canGovern = canGovernObservaSusResources(user?.roles);
+  const observasusOnly = isObservaSusOnlyAdmin(user?.roles);
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['observasus', 'admin', 'resources', appliedSearch],
@@ -60,7 +74,7 @@ export function ObservaSusAdminPage() {
             <div className="flex items-start gap-3">
               <button
                 type="button"
-                onClick={() => navigate('/admin/master')}
+                onClick={() => navigate(observasusOnly ? '/observasus' : '/admin/master')}
                 className="mt-1 p-2 text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg"
                 title="Voltar"
               >
@@ -68,37 +82,87 @@ export function ObservaSusAdminPage() {
               </button>
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-                  ObservaSUS — Recursos
+                  {observasusOnly ? 'ObservaSUS — Usuários e permissões' : 'ObservaSUS — Recursos'}
                 </h1>
                 <p className="text-gray-600 mt-1">
-                  Cadastre painéis, arquivos do DataStorage e publicações. Roles de download
-                  continuam em{' '}
-                  <Link to="/admin/master/roles" className="text-blue-700 font-medium underline">
-                    Gerenciar Roles
-                  </Link>
-                  .
+                  Cadastre painéis, arquivos do DataStorage e publicações.
+                  {canManageUsers && (
+                    <>
+                      {' '}
+                      Atribua roles ObservaSUS em{' '}
+                      <Link to="/admin/master/users" className="text-blue-700 font-medium underline">
+                        Gerenciar usuários
+                      </Link>{' '}
+                      ou{' '}
+                      <Link
+                        to="/admin/master/roles"
+                        className="text-blue-700 font-medium underline"
+                      >
+                        Gerenciar roles
+                      </Link>
+                      .
+                    </>
+                  )}
                 </p>
               </div>
             </div>
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => refetch()}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-              >
-                <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-                Atualizar
-              </button>
-              <Link
-                to="/admin/master/observasus/new"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-800"
-              >
-                <Plus className="h-4 w-4" />
-                Novo recurso
-              </Link>
+              {canEditResources && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => refetch()}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+                    Atualizar
+                  </button>
+                  <Link
+                    to="/admin/master/observasus/new"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-800"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Novo recurso
+                  </Link>
+                </>
+              )}
             </div>
           </div>
 
+          {canManageUsers && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+              <Link
+                to="/admin/master/users"
+                className="flex items-start gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm hover:border-blue-300 hover:shadow-md transition"
+              >
+                <div className="rounded-lg bg-green-100 p-3">
+                  <Users className="h-6 w-6 text-green-700" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-gray-900">Gerenciar usuários</h2>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Atribua roles ObservaSUS (download por sistema ou painel).
+                  </p>
+                </div>
+              </Link>
+              <Link
+                to="/admin/master/roles"
+                className="flex items-start gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm hover:border-blue-300 hover:shadow-md transition"
+              >
+                <div className="rounded-lg bg-purple-100 p-3">
+                  <Shield className="h-6 w-6 text-purple-700" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-gray-900">Roles ObservaSUS</h2>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Consulte o catálogo de roles de download e operação.
+                  </p>
+                </div>
+              </Link>
+            </div>
+          )}
+
+          {canEditResources && (
           <form
             className="bg-white border rounded-xl p-4 mb-6 shadow-sm"
             onSubmit={(e) => {
@@ -187,6 +251,7 @@ export function ObservaSusAdminPage() {
                               <Pencil className="h-3.5 w-3.5" />
                               Editar
                             </Link>
+                            {canGovern && (
                             <button
                               type="button"
                               disabled={archiveMutation.isPending || item.status === 'ARCHIVED'}
@@ -204,6 +269,7 @@ export function ObservaSusAdminPage() {
                               <Archive className="h-3.5 w-3.5" />
                               Arquivar
                             </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -213,6 +279,7 @@ export function ObservaSusAdminPage() {
               </div>
             )}
           </div>
+          )}
         </div>
       </main>
 
