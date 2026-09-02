@@ -163,6 +163,7 @@ export function ObservaSusAdminPage() {
           )}
 
           {canEditResources && (
+          <>
           <form
             className="bg-white border rounded-xl p-4 mb-6 shadow-sm"
             onSubmit={(e) => {
@@ -279,6 +280,7 @@ export function ObservaSusAdminPage() {
               </div>
             )}
           </div>
+          </>
           )}
         </div>
       </main>
