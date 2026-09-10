@@ -26,7 +26,12 @@ test.describe('Dashboard (Cirio) — cross-filter', () => {
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            data: [{ idtipo_evento: 1, descricao: 'IT_EVENTO_ATIVO', ativo: 'S' }],
+            data: [{
+              idtipo_evento: 1,
+              descricao: 'IT_EVENTO_ATIVO',
+              ativo: 'S',
+              modo_localidade_evento: 'NAO_USA',
+            }],
           }),
         });
       }

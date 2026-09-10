@@ -23,7 +23,12 @@ test.describe('Dashboard (Cirio) page', () => {
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            data: [{ idtipo_evento: 1, descricao: 'IT_EVENTO_ATIVO', ativo: 'S' }],
+            data: [{
+              idtipo_evento: 1,
+              descricao: 'IT_EVENTO_ATIVO',
+              ativo: 'S',
+              modo_localidade_evento: 'NAO_USA',
+            }],
           }),
         });
       }
@@ -40,6 +45,7 @@ test.describe('Dashboard (Cirio) page', () => {
                 created_at: '2026-03-10T12:00:00.000Z',
                 updated_at: '2026-03-10T12:00:00.000Z',
                 residente_belem: 'E',
+                tipo_evento_idtipo_evento: 1,
                 tipo_evento: { idtipo_evento: 1, descricao: 'IT_EVENTO_ATIVO' },
                 tipo_publico: { idtipo_publico: 1, descricao: 'PUB' },
                 tipo_atendimento: { idtipo_atendimento: 1, descricao: 'ATEND' },
@@ -104,7 +110,12 @@ test.describe('Dashboard (Cirio) page', () => {
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            data: [{ idtipo_evento: 1, descricao: 'IT_EVENTO_ATIVO', ativo: 'S' }],
+            data: [{
+              idtipo_evento: 1,
+              descricao: 'IT_EVENTO_ATIVO',
+              ativo: 'S',
+              modo_localidade_evento: 'NAO_USA',
+            }],
           }),
         });
       }
@@ -120,6 +131,7 @@ test.describe('Dashboard (Cirio) page', () => {
                 created_at: '2026-03-10T12:00:00.000Z',
                 updated_at: '2026-03-10T12:00:00.000Z',
                 residente_belem: 'E',
+                tipo_evento_idtipo_evento: 1,
                 tipo_evento: { idtipo_evento: 1, descricao: 'IT_EVENTO_ATIVO' },
                 tipo_publico: { idtipo_publico: 1, descricao: 'PUB' },
                 tipo_atendimento: { idtipo_atendimento: 1, descricao: 'ATEND' },
@@ -141,6 +153,7 @@ test.describe('Dashboard (Cirio) page', () => {
                 created_at: '2026-03-20T12:00:00.000Z',
                 updated_at: '2026-03-20T12:00:00.000Z',
                 residente_belem: 'E',
+                tipo_evento_idtipo_evento: 1,
                 tipo_evento: { idtipo_evento: 1, descricao: 'IT_EVENTO_ATIVO' },
                 tipo_publico: { idtipo_publico: 1, descricao: 'PUB' },
                 tipo_atendimento: { idtipo_atendimento: 1, descricao: 'ATEND' },

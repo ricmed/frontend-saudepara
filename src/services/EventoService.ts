@@ -1,10 +1,9 @@
 import axios, { AxiosError } from 'axios';
+import { getApiOrigin } from '@/config/apiOrigin';
 import axiosRetry from '@/utils/axiosRetry';
 import type { ModoLocalidadeEvento } from '@/features/notificationForms/types/index2';
 
-const server = import.meta.env.VITE_API_SERVER;
-const port = import.meta.env.VITE_API_PORT;
-const API_URL = `${server}:${port}/api/tipo-evento`;
+const getTipoEventoApiUrl = (): string => `${getApiOrigin()}/api/tipo-evento`;
 
 // 🔧 CONFIGURAÇÃO: Axios com withCredentials para autenticação
 const axiosInstance = axios.create({
@@ -77,7 +76,7 @@ const normalizeTipoEvento = (evento: TipoEvento): TipoEvento => ({
 export const TiposEventoService = {
   getAll: async (): Promise<TipoEvento[]> => {
     try {
-      const response = await axiosRetry.get<{ data: TipoEvento[] }>(API_URL, {
+      const response = await axiosRetry.get<{ data: TipoEvento[] }>(getTipoEventoApiUrl(), {
         params: { page: 1, limit: 500 },
         withCredentials: true,
       });
@@ -90,7 +89,7 @@ export const TiposEventoService = {
   // 🆕 NOVO MÉTODO - Buscar apenas ativos
   getAllAtivos: async (): Promise<TipoEvento[]> => {
     try {
-      const response = await axiosRetry.get<TipoEvento[]>(`${API_URL}/ativos`, {
+      const response = await axiosRetry.get<TipoEvento[]>(`${getTipoEventoApiUrl()}/ativos`, {
         withCredentials: true,
       });
       return (response.data ?? []).map(normalizeTipoEvento);
@@ -105,14 +104,15 @@ export const TiposEventoService = {
     searchTerm: string = ''
   ): Promise<PaginatedResponse> => {
     try {
-      let url = API_URL;
+      const apiUrl = getTipoEventoApiUrl();
+      let url = apiUrl;
       const params: Record<string, any> = {
         page,
         limit: itemsPerPage
       };
 
       if (searchTerm) {
-        url = `${API_URL}/search`;
+        url = `${apiUrl}/search`;
         params.descricao = searchTerm;
       }
 
@@ -136,7 +136,7 @@ export const TiposEventoService = {
     try {
       if (isNaN(id) || id <= 0) throw new Error('ID inválido');
       
-      const response = await axios.get<TipoEvento>(`${API_URL}/${id}`);
+      const response = await axios.get<TipoEvento>(`${getTipoEventoApiUrl()}/${id}`);
       return response.data;
     } catch (error) {
       return handleApiError(error as AxiosError<APIError>);
@@ -146,7 +146,7 @@ export const TiposEventoService = {
   // 🔄 MÉTODO ATUALIZADO - Incluir abrangência de municípios
   create: async (data: TipoEventoCreate): Promise<TipoEvento> => {
     try {
-      const response = await axios.post<TipoEvento>(API_URL, data);
+      const response = await axios.post<TipoEvento>(getTipoEventoApiUrl(), data);
       return response.data;
     } catch (error) {
       return handleApiError(error as AxiosError<APIError>);
@@ -158,7 +158,7 @@ export const TiposEventoService = {
     try {
       if (isNaN(id) || id <= 0) throw new Error('ID inválido');
       
-      await axios.put(`${API_URL}/${id}`, data);
+      await axios.put(`${getTipoEventoApiUrl()}/${id}`, data);
     } catch (error) {
       return handleApiError(error as AxiosError<APIError>);
     }
@@ -187,7 +187,7 @@ export const TiposEventoService = {
     try {
       if (isNaN(id) || id <= 0) throw new Error('ID inválido');
       
-      const response = await axios.put<{ data: TipoEvento }>(`${API_URL}/${id}/toggle`);
+      const response = await axios.put<{ data: TipoEvento }>(`${getTipoEventoApiUrl()}/${id}/toggle`);
       return response.data.data;
     } catch (error) {
       return handleApiError(error as AxiosError<APIError>);
@@ -198,7 +198,7 @@ export const TiposEventoService = {
     try {
       if (isNaN(id) || id <= 0) throw new Error('ID inválido');
       
-      await axios.delete(`${API_URL}/${id}`);
+      await axios.delete(`${getTipoEventoApiUrl()}/${id}`);
     } catch (error) {
       return handleApiError(error as AxiosError<APIError>);
     }
@@ -209,7 +209,7 @@ export const TiposEventoService = {
     excludeId?: number
   ): Promise<boolean> => {
     try {
-      const response = await axios.get<{ data: TipoEvento[] }>(`${API_URL}/search`, {
+      const response = await axios.get<{ data: TipoEvento[] }>(`${getTipoEventoApiUrl()}/search`, {
         params: {
           descricao: descricao.trim(),
           limit: 1
@@ -230,7 +230,7 @@ export const TiposEventoService = {
   
   getAllForSelect: async (): Promise<TipoEvento[]> => {
     try {
-      const response = await axios.get<TipoEvento[]>(`${API_URL}/select`);
+      const response = await axios.get<TipoEvento[]>(`${getTipoEventoApiUrl()}/select`);
       return response.data;
     } catch (error) {
       return handleApiError(error as AxiosError<APIError>);
