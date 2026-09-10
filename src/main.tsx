@@ -9,6 +9,7 @@ import App from "../App.tsx";
 import { registerServiceWorker } from "./registerSW";
 import { runIndexedDbCachePolicyIfNewBuild } from "./services/appBuildCachePolicy";
 import { AuthProvider } from './keycloak/AuthProvider';
+import { PwaUpdateBanner } from './components/PwaUpdateBanner';
 import { RetryNotification } from './components/RetryNotification';
 import { useRetryNotification } from './hooks/useRetryNotification';
 import './utils/axiosRetry'; // Importar para configurar interceptors
@@ -20,6 +21,7 @@ function AppWithNotifications() {
   return (
     <>
       <App />
+      <PwaUpdateBanner />
       <RetryNotification 
         show={retryState.isRetrying}
         message={retryState.message}

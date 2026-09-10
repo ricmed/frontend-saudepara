@@ -1,4 +1,8 @@
 import { registerSW } from 'virtual:pwa-register';
+import {
+  notifyPwaNeedsRefresh,
+  setPwaApplyUpdate,
+} from '@/pwa/pwaUpdate';
 
 const SW_UPDATE_INTERVAL_MS = 15 * 60 * 1000;
 
@@ -12,10 +16,12 @@ export function registerServiceWorker() {
     return;
   }
 
-  // registerType: 'autoUpdate' no vite.config — sem onNeedRefresh o app recarrega sozinho
-  // quando há nova versão (skipWaiting + clientsClaim já estão no Workbox).
-  registerSW({
+  const updateSW = registerSW({
     immediate: true,
+
+    onNeedRefresh() {
+      notifyPwaNeedsRefresh();
+    },
 
     onOfflineReady() {
       // Uso offline disponível; sem toast para não poluir a tela.
@@ -30,7 +36,6 @@ export function registerServiceWorker() {
         registration.update().catch(() => undefined);
       };
 
-      // Ao registrar, ao focar a aba e ao voltar à página visível
       checkForUpdates();
 
       const onVisible = () => {
@@ -49,4 +54,6 @@ export function registerServiceWorker() {
       console.error('Erro ao registrar Service Worker:', error);
     },
   });
+
+  setPwaApplyUpdate(updateSW);
 }

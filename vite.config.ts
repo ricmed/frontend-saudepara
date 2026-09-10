@@ -54,7 +54,7 @@ export default defineConfig(({ mode }) => {
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: [
         'favicon.ico', 
         'apple-touch-icon.png', 
@@ -117,7 +117,7 @@ export default defineConfig(({ mode }) => {
       
       workbox: {
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
-        skipWaiting: true,
+        skipWaiting: false,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         
