@@ -18,6 +18,7 @@ import {
   Dot,
 } from "recharts";
 import { findRuleByHypothesis } from './config/vigilancia.config';
+import { getNotificacaoHipoteseIds } from './utils/hipotesesNotificacao';
 import {
   User,
   Activity,
@@ -797,24 +798,28 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
             if (Array.isArray(filterValue)) {
               // Seleção múltipla
               filteredData = filteredData.filter(n => {
-                const hipoteseId = n?.original?.tipo_hipotese_diag_idtipo_hipotese_diag;
-                if (hipoteseId !== undefined && exportOptions?.hipoteseDiagOptions?.length > 0) {
-                  const hipotese = exportOptions.hipoteseDiagOptions.find(
-                    (h: any) => String(h.idtipo_hipotese_diag) === String(hipoteseId)
-                  );
-                  return hipotese?.descricao && filterValue.includes(hipotese.descricao);
+                const hipoteseIds = getNotificacaoHipoteseIds(n?.original);
+                if (hipoteseIds.length > 0 && exportOptions?.hipoteseDiagOptions?.length > 0) {
+                  return hipoteseIds.some((hipoteseId) => {
+                    const hipotese = exportOptions.hipoteseDiagOptions.find(
+                      (h: any) => String(h.idtipo_hipotese_diag) === String(hipoteseId)
+                    );
+                    return hipotese?.descricao && filterValue.includes(hipotese.descricao);
+                  });
                 }
                 return false;
               });
             } else {
               // Seleção simples
               filteredData = filteredData.filter(n => {
-                const hipoteseId = n?.original?.tipo_hipotese_diag_idtipo_hipotese_diag;
-                if (hipoteseId !== undefined && exportOptions?.hipoteseDiagOptions?.length > 0) {
-                  const hipotese = exportOptions.hipoteseDiagOptions.find(
-                    (h: any) => String(h.idtipo_hipotese_diag) === String(hipoteseId)
-                  );
-                  return hipotese?.descricao === filterValue;
+                const hipoteseIds = getNotificacaoHipoteseIds(n?.original);
+                if (hipoteseIds.length > 0 && exportOptions?.hipoteseDiagOptions?.length > 0) {
+                  return hipoteseIds.some((hipoteseId) => {
+                    const hipotese = exportOptions.hipoteseDiagOptions.find(
+                      (h: any) => String(h.idtipo_hipotese_diag) === String(hipoteseId)
+                    );
+                    return hipotese?.descricao === filterValue;
+                  });
                 }
                 return false;
               });
@@ -2321,7 +2326,17 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       }
 
       const dadosSemFiltroHipotese = hasActiveFilters ? applyFilters(notificacoesFiltradasPorEvento, 'hipotese') : notificacoesFiltradasPorEvento;
-      const hipotesePorNotificacao = processarCategoria(
+      const hipotesePorJoin = processarCategoriaMuitosParaMuitos(
+        dadosSemFiltroHipotese,
+        "original.notificacao_has_tipo_hipotese_diag",
+        "tipo_hipotese_diag_idtipo_hipotese_diag",
+        exportOptions.hipoteseDiagOptions || [],
+        "idtipo_hipotese_diag",
+        "descricao",
+        COLORS.blue,
+        'normal'
+      );
+      const hipotesePorFk = processarCategoria(
         dadosSemFiltroHipotese,
         "original.tipo_hipotese_diag_idtipo_hipotese_diag",
         exportOptions.hipoteseDiagOptions || [],
@@ -2330,6 +2345,12 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         COLORS.blue,
         'normal'
       );
+      const hipotesePorNotificacao = (hipotesePorJoin.length > 0 ? hipotesePorJoin : hipotesePorFk)
+        .map((item) => ({
+          ...item,
+          fill: getHipotesisColor(item.name, item.value),
+          isAlarmante: isHipotesisAlarmante(item.name),
+        }));
       if (hipotesePorNotificacao.length > 0) {
         // Ordenar hipóteses: primeiro alarmantes, depois valor
         const sortedHipoteses = hipotesePorNotificacao.sort((a, b) => {
@@ -2463,7 +2484,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
       // 🆕 INCLUIR ESTADOS ORIGINAIS DE LOCALIZAÇÃO GEOGRÁFICA
       originalPais, originalEstado, originalMunicipio, originalBairro,
       // 🔧 CORREÇÃO: Incluir dependências de filtros para que os gráficos sejam reprocessados
-      applyFilters, hasActiveFilters, notificacoesFiltradasPorEvento, activeFilters]);
+      applyFilters, hasActiveFilters, notificacoesFiltradasPorEvento, activeFilters,
+      getHipotesisColor, isHipotesisAlarmante]);
 
   // ⚡ Função otimizada para calcular estatísticas a partir das notificações
   const calcularEstatisticas = useCallback((dadosFiltrados: any[] = []) => {
@@ -3077,7 +3099,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   }, [toggleFilter]);
 
   const handleBackButton = useCallback(() => {
-    navigate('/');
+    navigate('/private/comunicacao-de-caso');
   }, [navigate]);
 
   useEffect(() => {
@@ -3442,13 +3464,14 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
           <div className="flex items-center gap-2 sm:gap-3 text-white">
             <button
               type="button"
-              className="p-1.5 sm:p-2 hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
-              title="Voltar para o início"
-              aria-label="Voltar para o início"
+              className="flex items-center gap-2 px-3 py-2 bg-white text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-xs sm:text-sm flex-shrink-0"
+              title="Voltar para a lista de comunicação de casos"
+              aria-label="Voltar para a lista de comunicação de casos"
               data-testid="dashboard-back"
               onClick={handleBackButton}
             >
-              <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+              <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Voltar</span>
             </button>
             <ClipboardList className="h-6 w-6 sm:h-7 sm:w-7 flex-shrink-0" />
             <h1 className="text-sm sm:text-lg lg:text-xl xl:text-2xl font-semibold leading-tight">

@@ -1,5 +1,6 @@
 // ✅ Configuração de Vigilância Epidemiológica baseada no Guia MS
 import { findRuleByHypothesis, normalize, GVS_RULES } from '../../../shared/vigilancia.config';
+import { getNotificacaoHipoteseNomes } from '../utils/hipotesesNotificacao';
 
 export type Severidade = 'critico' | 'urgente' | 'atencao';
 
@@ -66,12 +67,7 @@ export const detectarAlertas = (notificacoes: any[]): AlertaEpidemiologico[] => 
 
   // 🔧 HELPER: Extrair nome da hipótese
   const getHipoteseNome = (notif: any): string => {
-    return (
-      notif.hipoteseDiagnostico ||
-      notif.tipo_hipotese_diag?.descricao ||
-      notif.original?.tipo_hipotese_diag?.descricao ||
-      ''
-    );
+    return getNotificacaoHipoteseNomes(notif)[0] || '';
   };
 
   // 1. 🚨 ALERTAS BASEADOS NAS REGRAS GVS (principais) - POR HIPÓTESE

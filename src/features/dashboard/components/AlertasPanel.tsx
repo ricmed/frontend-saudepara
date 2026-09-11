@@ -17,6 +17,7 @@ import {
 import { 
   detectarAlertas
 } from '../config/vigilancia.config';
+import { getNotificacaoHipoteseNomes } from '../utils/hipotesesNotificacao';
 import { STORAGE_KEYS, readJsonWithLegacy, removeWithLegacy } from '@/utils/storageKeys';
 
 interface AlertaItem {
@@ -366,12 +367,7 @@ export const AlertasPanel: React.FC<AlertasPanelProps> = ({
     const casosAgrupados = new Map<string, Array<any>>();
     
     notificacoesFiltradas.forEach((notif) => {
-      const hipoteseNome = (
-        notif.hipoteseDiagnostico ||
-        notif.tipo_hipotese_diag?.descricao ||
-        notif.original?.tipo_hipotese_diag?.descricao ||
-        'Não informado'
-      );
+      const hipoteseNome = getNotificacaoHipoteseNomes(notif)[0] || 'Não informado';
 
       if (!casosAgrupados.has(hipoteseNome)) {
         casosAgrupados.set(hipoteseNome, []);

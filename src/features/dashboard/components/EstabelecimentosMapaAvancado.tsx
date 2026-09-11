@@ -25,6 +25,10 @@ import { findRuleByHypothesis } from '../config/vigilancia.config';
 import EstabelecimentoDetailModal from './EstabelecimentoDetailModal';
 // 🆕 Importar menu de exportação
 import ChartExportMenu from '../../../components/common/ChartExportMenu';
+import {
+  contarEstabelecimentosPorTipo,
+  tiposEstabelecimentoDoMapa,
+} from '../utils/tiposEstabelecimentoMapa';
 
 interface EstabelecimentoInfo {
   id: string;
@@ -115,17 +119,6 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
     return placesMap;
   }, [allPlaces]);
 
-  // 🆕 Extrair tipos de estabelecimento disponíveis
-  const tiposEstabelecimento = useMemo(() => {
-    const tipos = new Set<string>();
-    allPlaces.forEach(lugar => {
-      if (lugar.tipoEstabelecimento) {
-        tipos.add(lugar.tipoEstabelecimento);
-      }
-    });
-    return Array.from(tipos).sort();
-  }, [allPlaces]);
-
   // 🆕 Extrair datas disponíveis das notificações (data de criação) - MESMA LÓGICA DO DASHBOARD
   const datasDisponiveis = useMemo(() => {
     const datas = new Set<string>();
@@ -163,8 +156,8 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
     }
   }, [datasDisponiveis]);
 
-  // Processar estabelecimentos de forma memoizada
-  const estabelecimentosProcessados = useMemo(() => {
+  // Processar estabelecimentos de forma memoizada (sem o filtro de tipo — o combo usa este recorte)
+  const estabelecimentosNoRecorte = useMemo(() => {
     // 🚫 SE O FILTRO GLOBAL ESTIVER ATIVO, NÃO APLICAR FILTRO DE DATA INDIVIDUAL
     let dataParaFiltrar = null;
     
@@ -185,7 +178,6 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
       allPlacesMapSize: allPlacesMap.size,
       notificacoesLength: notificacoes.length,
       filtros: {
-        tipoEstabelecimento: tipoEstabelecimentoSelecionado,
         data: dataParaFiltrar,
         dataOriginalDashboard: selectedDataNotificacao,
         dataInternaMap: dataSelecionada,
@@ -374,31 +366,33 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
       estabelecimentosUnicos: estabelecimentosMap.size
     });
 
-    let resultado = Array.from(estabelecimentosMap.values());
-    
-    console.log(`🔍 Antes de filtrar por tipo:`, {
-      total: resultado.length,
-      tiposFiltro: tipoEstabelecimentoSelecionado,
-      tiposPresentes: [...new Set(resultado.map(e => e.tipo))].slice(0, 5)
-    });
-    
-    // 🆕 Filtrar por tipo de estabelecimento se necessário
-    if (tipoEstabelecimentoSelecionado) {
-      const antesDoFiltro = resultado.length;
-      resultado = resultado.filter(est => {
-        const match = est.tipo === tipoEstabelecimentoSelecionado;
-        if (!match && antesDoFiltro < 5) {
-          console.log(`❌ Tipo "${est.tipo}" não corresponde a "${tipoEstabelecimentoSelecionado}"`);
-        }
-        return match;
-      });
-      console.log(`🏥 Filtrado por tipo "${tipoEstabelecimentoSelecionado}": ${resultado.length} de ${antesDoFiltro} estabelecimentos`);
-    }
-    
-    console.log(`✅ Retornando ${resultado.length} estabelecimentos processados`);
-    
+    const resultado = Array.from(estabelecimentosMap.values());
+    console.log(`✅ Recorte do mapa: ${resultado.length} estabelecimentos com notificação`);
     return resultado;
-  }, [allPlacesMap, notificacoes, exportOptions, tipoEstabelecimentoSelecionado, dataSelecionada, selectedDataNotificacao, datasNotificacaoDisponiveis, isGlobalFilterActive]);
+  }, [allPlacesMap, notificacoes, exportOptions, dataSelecionada, selectedDataNotificacao, datasNotificacaoDisponiveis, isGlobalFilterActive]);
+
+  const tiposEstabelecimento = useMemo(
+    () => tiposEstabelecimentoDoMapa(estabelecimentosNoRecorte),
+    [estabelecimentosNoRecorte],
+  );
+
+  useEffect(() => {
+    if (
+      tipoEstabelecimentoSelecionado &&
+      !tiposEstabelecimento.includes(tipoEstabelecimentoSelecionado)
+    ) {
+      setTipoEstabelecimentoSelecionado(null);
+    }
+  }, [tiposEstabelecimento, tipoEstabelecimentoSelecionado]);
+
+  const estabelecimentosProcessados = useMemo(() => {
+    if (!tipoEstabelecimentoSelecionado) {
+      return estabelecimentosNoRecorte;
+    }
+    return estabelecimentosNoRecorte.filter(
+      (est) => est.tipo === tipoEstabelecimentoSelecionado,
+    );
+  }, [estabelecimentosNoRecorte, tipoEstabelecimentoSelecionado]);
 
   // Atualizar estado apenas quando dados processados mudarem
   useEffect(() => {
@@ -570,13 +564,14 @@ const EstabelecimentosMapaAvancado: React.FC<EstabelecimentosMapaAvancadoProps> 
           <div className="flex-1 min-w-[200px]">
             <label className="block text-xs text-gray-600 mb-1">Tipo de Estabelecimento</label>
             <select
+              data-testid="mapa-filtro-tipo-estabelecimento"
               value={tipoEstabelecimentoSelecionado || 'todos'}
               onChange={(e) => setTipoEstabelecimentoSelecionado(e.target.value === 'todos' ? null : e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="todos">📊 Todos os Tipos ({allPlaces.length})</option>
+              <option value="todos">📊 Todos os Tipos ({estabelecimentosNoRecorte.length})</option>
               {tiposEstabelecimento.map((tipo) => {
-                const quantidade = allPlaces.filter(p => p.tipoEstabelecimento === tipo).length;
+                const quantidade = contarEstabelecimentosPorTipo(estabelecimentosNoRecorte, tipo);
                 return (
                   <option key={tipo} value={tipo}>
                     {tipo} ({quantidade})

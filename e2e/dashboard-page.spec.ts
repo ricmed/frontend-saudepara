@@ -328,5 +328,36 @@ test.describe('Dashboard (Cirio) page', () => {
     await expect(page.getByText('Bairros de Residência')).toBeVisible();
     await expect(page.locator('[data-dashboard="event-localities"]')).toHaveCount(0);
   });
+
+  test('back button returns to the communication list', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('offline_mode', 'true');
+      localStorage.setItem(
+        'user_data',
+        JSON.stringify({
+          preferred_username: 'it-dashboard',
+          roles: ['dashboard', 'notificador'],
+          groups: ['/grupo_notificador'],
+        }),
+      );
+    });
+
+    await page.route('**/*', async (route) => {
+      const url = route.request().url();
+      if (url.includes('/api/')) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: [], meta: { total: 0, totalPages: 0, page: 1, limit: 20 } }),
+        });
+      }
+      return route.continue();
+    });
+
+    await page.goto('/dashboard-page');
+    await expect(page.locator('[data-dashboard="main"]')).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId('dashboard-back').click();
+    await expect(page).toHaveURL(/\/private\/comunicacao-de-caso$/);
+  });
 });
 
