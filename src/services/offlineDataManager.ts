@@ -1,6 +1,15 @@
 import { PacienteService } from '@/services/PacienteService';
 import { NotificacaoService } from '@/services/NotificacaoService';
+import { TiposEventoService } from '@/services/EventoService';
 import { LocalidadeEventoService } from '@/services/LocalidadeEventoService';
+import { listFiltersForActiveEvents } from '@/features/notificationForms/utils/listFiltersForActiveEvents';
+import {
+  deveRestringirEstabelecimentosAoEvento,
+  eventosAtivos,
+  eventosAtivosComLocalidade,
+  unirEstabelecimentosDoEvento,
+  type EstabelecimentoOfflineDTO,
+} from '@/features/notificationForms/utils/offlineEventoScope';
 import indexedDBService from '@/services/indexedDB';
 import encryptionService from '@/services/encryptionService'; // ✅ NOVO: Criptografia
 import { getRuntimeApiRoot } from '@/config/runtimeApiBase';
@@ -59,6 +68,11 @@ const createDirectApiFetch = (endpoint: string, limit?: number) => {
 };
 
 class OfflineDataManager {
+  private estabelecimentosOfflinePackPromise: Promise<{
+    restringe: boolean;
+    unidades: EstabelecimentoOfflineDTO[];
+  }> | null = null;
+
   private dataSources: DataSource[] = [
     // ===== DADOS ESSENCIAIS (Prioridade 1) =====
     { 
@@ -289,81 +303,14 @@ class OfflineDataManager {
     },
     { 
       key: 'estabelecimentos', 
-      name: 'Estabelecimentos (Filtrados por Acesso)', 
+      name: 'Estabelecimentos (evento ativo)', 
       fetchFn: async () => {
-        console.log('📥 Baixando estabelecimentos com filtro hierárquico...');
-        
-        try {
-          // ✅ USAR O ENDPOINT ESPECÍFICO QUE JÁ APLICA O FILTRO HIERÁRQUICO
-          // O endpoint /api/usuario-acesso/current/estabelecimentos retorna apenas
-          // os estabelecimentos que o usuário autenticado tem permissão de acessar
-          const server = import.meta.env.VITE_API_SERVER;
-          const port = import.meta.env.VITE_API_PORT;
-          const url = `${server}:${port}/api/usuario-acesso/current/estabelecimentos`;
-          
-          console.log('🌐 Buscando estabelecimentos com autenticação:', url);
-          
-          // ✅ USAR AXIOS COM CONFIGURAÇÃO COMPLETA (igual aos outros serviços)
-          const response = await axios.get(url, {
-            withCredentials: true, // Enviar cookies de autenticação
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json'
-            },
-            timeout: 30000 // 30 segundos de timeout
-          });
-          
-          // A resposta do backend tem formato { status: 'success', data: [...], pagination: {...} }
-          const estabelecimentos = response?.data?.data || response?.data || [];
-          
-          console.log(`✅ Estabelecimentos filtrados pelo backend: ${estabelecimentos.length}`);
-          console.log(`🔑 O backend já aplicou o filtro hierárquico baseado no nível de acesso do usuário`);
-          
-          // Log de exemplo para verificar o filtro
-          if (estabelecimentos.length > 0) {
-            console.log(`📊 Amostra dos estabelecimentos permitidos:`, {
-              total: estabelecimentos.length,
-              primeiro: {
-                id: estabelecimentos[0].idestabelecimento,
-                nome: estabelecimentos[0].nome,
-                municipio: estabelecimentos[0].tipo_municipio?.descricao || estabelecimentos[0].cidade
-              },
-              ultimo: estabelecimentos.length > 1 ? {
-                id: estabelecimentos[estabelecimentos.length - 1].idestabelecimento,
-                nome: estabelecimentos[estabelecimentos.length - 1].nome,
-                municipio: estabelecimentos[estabelecimentos.length - 1].tipo_municipio?.descricao || estabelecimentos[estabelecimentos.length - 1].cidade
-              } : null
-            });
-          }
-          
-          // ⚠️ IMPORTANTE: Salvar em chave SEPARADA para não misturar com cache antigo
-          // Esta chave será usada no modo offline
-          await indexedDBService.saveOpcoes('estabelecimentos-permitidos', estabelecimentos);
-          console.log(`💾 Estabelecimentos salvos na chave 'estabelecimentos-permitidos' para uso offline`);
-          
-          return estabelecimentos;
-          
-        } catch (error: any) {
-          console.error('❌ Erro ao buscar estabelecimentos com filtro hierárquico:', error);
-          
-          // Log detalhado do erro
-          if (error.response) {
-            console.error('Erro da API:', {
-              status: error.response.status,
-              statusText: error.response.statusText,
-              data: error.response.data
-            });
-          } else if (error.request) {
-            console.error('Erro de rede - nenhuma resposta recebida');
-          } else {
-            console.error('Erro:', error.message);
-          }
-          
-          throw error;
-        }
+        const pack = await this.resolveEstabelecimentosOfflinePack();
+        await indexedDBService.saveOpcoes('estabelecimentos-permitidos', pack.unidades);
+        return pack.unidades;
       },
       priority: 3, 
-      estimatedSize: 11000,
+      estimatedSize: 80,
       category: 'administrative'
     },    // ✅ CORRIGIDO: DADOS DE PACIENTES PARA VERIFICAÇÃO (não sincronizar)
     { 
@@ -388,23 +335,10 @@ class OfflineDataManager {
       key: 'estabelecimentos-verificacao',
       name: 'Lista de Estabelecimentos (Verificação CNES)',
       fetchFn: async () => {
-        console.log('📥 Baixando estabelecimentos para verificação de CNES...');
-        
-        // Usar uma abordagem genérica já que não temos ListaDeEstabelecimentoService
-        const server = import.meta.env.VITE_API_SERVER;
-        const port = import.meta.env.VITE_API_PORT;
-        const url = `${server}:${port}/api/estabelecimentos?limit=20000`;
-        
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-        const estabelecimentos = data?.data || data || [];
-        
-        // Salvar no cache de verificação
-        await indexedDBService.saveEstabelecimentosParaCache(estabelecimentos);
-        
-        console.log(`✅ ${estabelecimentos.length} estabelecimentos salvos no cache de verificação`);
-        return [{ info: `${estabelecimentos.length} estabelecimentos para verificação` }];
+        const pack = await this.resolveEstabelecimentosOfflinePack();
+        await indexedDBService.saveEstabelecimentosParaCache(pack.unidades);
+        console.log(`✅ ${pack.unidades.length} estabelecimentos no cache de verificação (escopo do evento ativo)`);
+        return [{ info: `${pack.unidades.length} estabelecimentos para verificação` }];
       },
       priority: 2,
       estimatedSize: 0,
@@ -416,10 +350,7 @@ class OfflineDataManager {
     const eventos = await NotificacaoService.getEventoOptions();
     await indexedDBService.saveOpcoes('eventos', eventos);
 
-    const eventosComLocalidade = eventos.filter(
-      evento =>
-        (evento.modo_localidade_evento ?? 'NAO_USA') !== 'NAO_USA',
-    );
+    const eventosComLocalidade = eventosAtivosComLocalidade(eventos);
     const flattenedCatalogs: any[] = [];
 
     for (const evento of eventosComLocalidade) {
@@ -439,6 +370,65 @@ class OfflineDataManager {
     }
 
     return flattenedCatalogs;
+  }
+
+  private resolveEstabelecimentosOfflinePack() {
+    if (!this.estabelecimentosOfflinePackPromise) {
+      this.estabelecimentosOfflinePackPromise = this.computeEstabelecimentosOfflinePack();
+    }
+    return this.estabelecimentosOfflinePackPromise;
+  }
+
+  private async computeEstabelecimentosOfflinePack(): Promise<{
+    restringe: boolean;
+    unidades: EstabelecimentoOfflineDTO[];
+  }> {
+    const eventos = await NotificacaoService.getEventoOptions();
+    await indexedDBService.saveOpcoes('eventos', eventos);
+    const ativos = eventosAtivos(eventos);
+
+    const vinculos = [];
+    for (const evento of ativos) {
+      const result = await TiposEventoService.getEstabelecimentosVinculados(
+        evento.idtipo_evento,
+      );
+      await indexedDBService.saveOpcoes(
+        `estabelecimentos-evento-${evento.idtipo_evento}`,
+        result,
+      );
+      vinculos.push(result);
+    }
+
+    const restringe = deveRestringirEstabelecimentosAoEvento(vinculos);
+    if (restringe) {
+      const unidades = unirEstabelecimentosDoEvento(vinculos);
+      console.log(`✅ Offline: ${unidades.length} estabelecimentos dos eventos ativos (sem cadastro geral)`);
+      return { restringe: true, unidades };
+    }
+
+    if (ativos.length === 0) {
+      console.warn('⚠️ Offline: nenhum evento ativo — não baixa o cadastro geral de estabelecimentos');
+      return { restringe: true, unidades: [] };
+    }
+
+    const unidades = await this.fetchEstabelecimentosHierarquicos();
+    return { restringe: false, unidades };
+  }
+
+  private async fetchEstabelecimentosHierarquicos(): Promise<EstabelecimentoOfflineDTO[]> {
+    const server = import.meta.env.VITE_API_SERVER;
+    const port = import.meta.env.VITE_API_PORT;
+    const url = `${server}:${port}/api/usuario-acesso/current/estabelecimentos`;
+    const response = await axios.get(url, {
+      withCredentials: true,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      timeout: 30000,
+    });
+    const estabelecimentos = response?.data?.data || response?.data || [];
+    return Array.isArray(estabelecimentos) ? estabelecimentos : [];
   }
 
   // Verificar quais dados estão em cache
@@ -516,6 +506,8 @@ class OfflineDataManager {
       toast.error('❌ Sem conexão com a internet. Não é possível baixar os dados.');
       throw new Error('Sem conexão com a internet');
     }
+
+    this.estabelecimentosOfflinePackPromise = null;
     
     // Filtrar e ordenar por prioridade
     const sourcesToDownload = this.dataSources
@@ -775,20 +767,15 @@ class OfflineDataManager {
     try {
       onProgress?.(10, 'Analisando estratégia...');
       
-      onProgress?.(30, 'Baixando estabelecimentos para verificação...');
-      
-      // Usar uma abordagem genérica já que não temos ListaDeEstabelecimentoService
-      const server = import.meta.env.VITE_API_SERVER;
-      const port = import.meta.env.VITE_API_PORT;
-      const url = `${server}:${port}/api/estabelecimentos?limit=20000`;
-      
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
-      const estabelecimentos = data?.data || data || [];
-      
+      onProgress?.(30, 'Baixando estabelecimentos do evento ativo...');
+
+      this.estabelecimentosOfflinePackPromise = null;
+      const pack = await this.resolveEstabelecimentosOfflinePack();
+      const estabelecimentos = pack.unidades;
+
       onProgress?.(80, 'Salvando no cache...');
-      
+
+      await indexedDBService.saveOpcoes('estabelecimentos-permitidos', estabelecimentos);
       await indexedDBService.saveEstabelecimentosParaCache(estabelecimentos);
       
       onProgress?.(100, `${estabelecimentos.length} estabelecimentos salvos`);
@@ -824,104 +811,62 @@ class OfflineDataManager {
       console.log('📥 Baixando notificações para visualização offline...');
       console.log(`   Limite: ${limit} notificações`);
       console.log(`   Criptografia: ${encrypt ? 'ATIVADA' : 'DESATIVADA'}`);
-      
-      // 1. Buscar notificações da API (paginação para não travar)
-      onProgress?.(30, `Baixando ${limit} notificações mais recentes...`);
-      
-      let allNotificacoes: any[] = [];
-      let page = 1;
-      const pageSize = 100; // Baixar de 100 em 100
-      const maxPages = Math.ceil(limit / pageSize);
-      
-      for (let i = 0; i < maxPages; i++) {
-        const response = await NotificacaoService.getAll(page, pageSize);
-        
-        if (response && response.data && response.data.length > 0) {
-          allNotificacoes = [...allNotificacoes, ...response.data];
-          
-          const progressPct = 30 + (i / maxPages) * 40; // 30-70%
-          onProgress?.(progressPct, `${allNotificacoes.length}/${limit} notificações...`);
-          
-          // Se já temos o suficiente, parar
-          if (allNotificacoes.length >= limit) {
-            allNotificacoes = allNotificacoes.slice(0, limit);
-            break;
-          }
-          
-          page++;
-        } else {
-          break; // Não há mais dados
-        }
-      }
-      
-      console.log(`✅ ${allNotificacoes.length} notificações baixadas da API`);
-      
-      // 🆕 2. FILTRAR: Aplicar filtro de eventos ativos
-      onProgress?.(70, 'Aplicando filtro de eventos ativos...');
-      
-      // Buscar eventos ativos do IndexedDB ou API
-      let eventosAtivos: any[] = [];
-      try {
-        const eventosCache = await indexedDBService.getOpcoes('eventos');
-        if (eventosCache && eventosCache.length > 0) {
-          eventosAtivos = eventosCache.filter((evento: any) => 
-            evento.ativo === 'S' || evento.ativo === '1' || evento.ativo === true
-          );
-          console.log(`📊 ${eventosAtivos.length} eventos ativos encontrados no cache`);
-        } else {
-          // Se não há no cache, buscar da API
-          console.log('📡 Buscando eventos da API...');
-          const { TiposEventoService } = await import('./EventoService');
-          const todosEventos = await TiposEventoService.getAll();
-          eventosAtivos = todosEventos.filter((evento: any) => 
-            evento.ativo === 'S' || evento.ativo === '1' || evento.ativo === true
-          );
-          console.log(`📊 ${eventosAtivos.length} eventos ativos encontrados na API`);
-        }
-      } catch (error) {
-        console.warn('⚠️ Erro ao buscar eventos ativos:', error);
-      }
-      
-      // Se não há eventos ativos, não baixar notificações
-      if (eventosAtivos.length === 0) {
+
+      onProgress?.(20, 'Resolvendo eventos ativos...');
+      const eventos = await NotificacaoService.getEventoOptions();
+      await indexedDBService.saveOpcoes('eventos', eventos);
+      const filtrosLista = listFiltersForActiveEvents(
+        eventosAtivos(eventos).map((evento) => evento.idtipo_evento),
+      );
+
+      if (!filtrosLista) {
         console.warn('⚠️ Nenhum evento ativo - cancelando download de notificações');
         return {
           success: false,
           count: 0,
           encrypted: false,
-          error: 'Nenhum evento ativo. Ative pelo menos um evento para baixar notificações.'
+          error: 'Nenhum evento ativo. Ative pelo menos um evento para baixar notificações.',
         };
       }
-      
-      // Criar Set com IDs dos eventos ativos para filtro rápido
-      const idsEventosAtivos = new Set(eventosAtivos.map((evento: any) => evento.idtipo_evento));
-      console.log(`🔍 Filtrando notificações por eventos ativos: [${Array.from(idsEventosAtivos).join(', ')}]`);
-      
-      // Filtrar notificações
-      const notificacoesFiltradas = allNotificacoes.filter((notificacao: any) => {
-        // Buscar idEvento em múltiplos caminhos
-        const idEvento = notificacao.original?.tipo_evento?.idtipo_evento || 
-                        notificacao.idtipo_evento || 
-                        notificacao.tipo_evento?.idtipo_evento;
-        
-        return idEvento && idsEventosAtivos.has(idEvento);
-      });
-      
-      console.log(`✅ Filtro aplicado: ${allNotificacoes.length} → ${notificacoesFiltradas.length} notificações (apenas eventos ativos)`);
-      
-      // Se o filtro removeu tudo, avisar
-      if (notificacoesFiltradas.length === 0) {
-        console.warn('⚠️ Nenhuma notificação passou pelo filtro de eventos ativos');
+
+      onProgress?.(30, `Baixando ${limit} notificações do evento ativo...`);
+
+      let allNotificacoes: any[] = [];
+      let page = 1;
+      const pageSize = 100;
+      const maxPages = Math.ceil(limit / pageSize);
+
+      for (let i = 0; i < maxPages; i++) {
+        const response = await NotificacaoService.getAll(page, pageSize, filtrosLista);
+
+        if (response && response.data && response.data.length > 0) {
+          allNotificacoes = [...allNotificacoes, ...response.data];
+
+          const progressPct = 30 + (i / maxPages) * 40;
+          onProgress?.(progressPct, `${allNotificacoes.length}/${limit} notificações...`);
+
+          if (allNotificacoes.length >= limit) {
+            allNotificacoes = allNotificacoes.slice(0, limit);
+            break;
+          }
+
+          page++;
+        } else {
+          break;
+        }
+      }
+
+      console.log(`✅ ${allNotificacoes.length} notificações do evento ativo baixadas da API`);
+
+      if (allNotificacoes.length === 0) {
+        console.warn('⚠️ Nenhuma notificação do evento ativo para o cache offline');
         return {
           success: false,
           count: 0,
           encrypted: false,
-          error: 'Nenhuma notificação encontrada para os eventos ativos.'
+          error: 'Nenhuma notificação encontrada para os eventos ativos.',
         };
       }
-      
-      // Usar as notificações filtradas daqui pra frente
-      allNotificacoes = notificacoesFiltradas;
       
       // 3. Criptografar se necessário
       let dataToSave: any = allNotificacoes;
