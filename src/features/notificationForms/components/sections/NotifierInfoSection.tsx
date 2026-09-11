@@ -10,6 +10,11 @@ import BrazilianPhoneInput from '@/features/notificationForms/components/Brazili
 import useUserPermissions from '@/hooks/useUserPermissions';
 import { usuarioGestaoService } from '@/services/UsuarioGestaoService';
 import indexedDBService from '@/services/indexedDB';
+import { useEstabelecimentosDoEvento } from '@/features/notificationForms/hooks/useEstabelecimentosDoEvento';
+import {
+  aplicarEscopoUnidadeNoEvento,
+  toAllowedOptions,
+} from '@/features/notificationForms/utils/eventoEstabelecimentos';
 
 const NotifierInfoSection: React.FC<FormSectionProps> = ({
   formData,
@@ -22,6 +27,20 @@ const NotifierInfoSection: React.FC<FormSectionProps> = ({
   const permissions = useUserPermissions();
   const [unidadesPermitidas, setUnidadesPermitidas] = useState<Array<{id: number; nome: string}>>([]);
   const [loadingUnidades, setLoadingUnidades] = useState(false);
+  const {
+    vincula: vinculaEstabelecimentos,
+    estabelecimentos: estabelecimentosDoEvento,
+    loading: loadingEvento,
+  } = useEstabelecimentosDoEvento(formData.evento);
+  const restringePorEvento =
+    Boolean(formData.evento) && (loadingEvento || vinculaEstabelecimentos);
+  const unidadesDoEvento = toAllowedOptions(
+    aplicarEscopoUnidadeNoEvento(
+      estabelecimentosDoEvento,
+      permissions.nivel,
+      permissions.estabelecimentoId,
+    ),
+  );
 
   // Carregar unidades permitidas baseado no nível de acesso
   useEffect(() => {
@@ -209,30 +228,35 @@ const NotifierInfoSection: React.FC<FormSectionProps> = ({
                 }
                 label=""
                 placeholder={
-                  loadingUnidades 
+                  loadingUnidades || loadingEvento
                     ? "Carregando unidades..." 
+                    : restringePorEvento
+                      ? "Buscar unidades deste evento..."
                     : permissions.nivel === 'unidade' 
                       ? "Sua unidade será selecionada automaticamente"
                       : permissions.nivel === 'municipio'
                         ? "Buscar unidades do seu município..."
                         : "Buscar unidades do Pará..."
                 }
-                /** 
-                 * 🔒 MODO ONLINE: Restringir por allowedOptions 
-                 * 📱 MODO OFFLINE: Cache já está filtrado hierarquicamente, não restringir
-                 * ⚠️ IMPORTANTE: Se lista vazia, passar undefined para buscar do cache
-                 */
-                restrictToAllowed={navigator.onLine && unidadesPermitidas.length > 0}
-                allowedOptions={navigator.onLine && unidadesPermitidas.length > 0 ? unidadesPermitidas.map(u => ({
-                  idestabelecimento: u.id,
-                  nome: u.nome,
-                  // Se você tiver mais campos disponíveis, inclua aqui:
-                  // cnes: u.cnes,
-                  // cidade: u.cidade,
-                  // bairro: u.bairro,
-                })) : undefined}
+                restrictToAllowed={
+                  restringePorEvento ||
+                  (navigator.onLine && unidadesPermitidas.length > 0)
+                }
+                allowedOptions={
+                  restringePorEvento
+                    ? unidadesDoEvento
+                    : navigator.onLine && unidadesPermitidas.length > 0
+                      ? unidadesPermitidas.map(u => ({
+                          idestabelecimento: u.id,
+                          nome: u.nome,
+                        }))
+                      : undefined
+                }
+                expandAllowedOptionsOnFocus={restringePorEvento}
                 denyOutsideMessage={
-                  permissions.nivel === 'unidade' 
+                  restringePorEvento
+                    ? "Esta unidade não pertence à lista deste evento"
+                    : permissions.nivel === 'unidade' 
                     ? "Você só pode selecionar sua própria unidade"
                     : permissions.nivel === 'municipio'
                       ? "Você só pode selecionar unidades do seu município"
@@ -246,17 +270,22 @@ const NotifierInfoSection: React.FC<FormSectionProps> = ({
                   {errors.unidadeNotificadora}
                 </p>
               )}
-              {permissions.nivel === 'unidade' && unidadesPermitidas.length > 0 && (
+              {restringePorEvento && (
+                <p className="mt-1 text-xs text-blue-600">
+                  Somente as unidades vinculadas a este evento ({unidadesDoEvento.length} unidades)
+                </p>
+              )}
+              {permissions.nivel === 'unidade' && !restringePorEvento && unidadesPermitidas.length > 0 && (
                 <p className="mt-1 text-xs text-blue-600">
                   ℹ️ Como usuário de unidade, você só pode notificar por: {unidadesPermitidas[0].nome}
                 </p>
               )}
-              {permissions.nivel === 'municipio' && (
+              {permissions.nivel === 'municipio' && !restringePorEvento && (
                 <p className="mt-1 text-xs text-green-600">
                   ℹ️ Você pode escolher qualquer unidade do seu município ({unidadesPermitidas.length} unidades disponíveis)
                 </p>
               )}
-              {permissions.nivel === 'estado' && (
+              {permissions.nivel === 'estado' && !restringePorEvento && (
                 <p className="mt-1 text-xs text-purple-600">
                   ℹ️ Você pode escolher qualquer unidade do Estado do Pará ({unidadesPermitidas.length} unidades disponíveis)
                 </p>

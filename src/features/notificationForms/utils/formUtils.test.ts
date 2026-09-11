@@ -133,6 +133,23 @@ describe('validateForm — CPF curto', () => {
     vi.useRealTimers();
   });
 
+  it('pede Residente em Belém quando o evento não usa localidade', () => {
+    const setErrors = vi.fn();
+    const setExpanded = vi.fn();
+    validateForm(
+      minimalForm({ residenteBelem: '' }),
+      {},
+      setErrors,
+      setExpanded,
+      expanded,
+      atendimentoOptions,
+      encerramentoOptions,
+      { modo: 'NAO_USA', options: [], catalogAvailable: true },
+    );
+    const payload = setErrors.mock.calls[0][0] as Record<string, string>;
+    expect(payload.residenteBelem).toMatch(/Residente em Belém/);
+  });
+
   it('preenche erro de CPF quando dígitos < 11', () => {
     const setErrors = vi.fn();
     const setExpanded = vi.fn();
@@ -150,6 +167,75 @@ describe('validateForm — CPF curto', () => {
     const payload = setErrors.mock.calls[0][0] as Record<string, string>;
     expect(payload.cpf).toMatch(/11 dígitos/i);
     vi.runAllTimers();
+  });
+
+  it('NAO_USA + SIM ainda exige bairro de Belém', () => {
+    const setErrors = vi.fn();
+    const setExpanded = vi.fn();
+    validateForm(
+      minimalForm({ residenteBelem: '1', bairro: '' }),
+      {},
+      setErrors,
+      setExpanded,
+      expanded,
+      atendimentoOptions,
+      encerramentoOptions,
+      { modo: 'NAO_USA', options: [], catalogAvailable: true },
+    );
+    const payload = setErrors.mock.calls[0][0] as Record<string, string>;
+    expect(payload.bairro).toMatch(/Bairro é obrigatório/);
+    expect(payload.residenteBelem).toBeUndefined();
+  });
+
+  it('evento com localidade + SIM não exige bairro de Belém', () => {
+    const setErrors = vi.fn();
+    const setExpanded = vi.fn();
+    validateForm(
+      minimalForm({
+        residenteBelem: '1',
+        bairro: '',
+        localidadeEvento: '11',
+        localidadeEventoAtual: {
+          id: 11,
+          nome: 'Não informado',
+          tipo: null,
+          especial: 'NAO_INFORMADO',
+          ribeirinha: false,
+          latitude: null,
+          longitude: null,
+          exibir_mapa: false,
+          ativo: true,
+          ordem: 2,
+        },
+      }),
+      {},
+      setErrors,
+      setExpanded,
+      expanded,
+      atendimentoOptions,
+      encerramentoOptions,
+      {
+        modo: 'OBRIGATORIA',
+        options: [
+          {
+            id: 11,
+            nome: 'Não informado',
+            tipo: null,
+            especial: 'NAO_INFORMADO',
+            ribeirinha: false,
+            latitude: null,
+            longitude: null,
+            exibir_mapa: false,
+            ativo: true,
+            ordem: 2,
+          },
+        ],
+        catalogAvailable: true,
+      },
+    );
+    const payload = setErrors.mock.calls[0][0] as Record<string, string>;
+    expect(payload.bairro).toBeUndefined();
+    expect(payload.residenteBelem).toBeUndefined();
   });
 });
 
@@ -179,6 +265,19 @@ describe('localidade do evento', () => {
     localidadeEventoOutro: '',
     localidadeEventoAtual: null,
   } as FormData;
+
+  it('NÃO em evento OBRIGATORIA não exige localidade', () => {
+    expect(
+      validateLocalidadeEvento(
+        { ...form, residenteBelem: '2' },
+        {
+          modo: 'OBRIGATORIA',
+          options: [outro, naoInformado],
+          catalogAvailable: true,
+        },
+      ),
+    ).toEqual({});
+  });
 
   it('respeita os três modos e bloqueia catálogo obrigatório ausente', () => {
     expect(
@@ -240,6 +339,8 @@ describe('localidade do evento', () => {
         localidadeEvento: '10',
         localidadeEventoOutro: 'Área genérica',
         localidadeEventoAtual: outro,
+        unidadeNotificadora: '24407',
+        localEncaminhamento: '18308',
       } as FormData,
       '2',
     );
@@ -248,5 +349,7 @@ describe('localidade do evento', () => {
     expect(changed.localidadeEvento).toBe('');
     expect(changed.localidadeEventoOutro).toBe('');
     expect(changed.localidadeEventoAtual).toBeNull();
+    expect(changed.unidadeNotificadora).toBe('');
+    expect(changed.localEncaminhamento).toBe('');
   });
 });

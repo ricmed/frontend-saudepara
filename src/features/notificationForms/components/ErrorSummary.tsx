@@ -10,13 +10,15 @@ interface ErrorSummaryProps {
   onFieldClick: (fieldName: string) => void;
   expandedSections: Record<string, boolean>;
   toggleSection: (section: string) => void;
+  usaLocalidadeEvento?: boolean;
 }
 
 const ErrorSummary: React.FC<ErrorSummaryProps> = ({ 
   errors, 
   onFieldClick, 
   expandedSections, 
-  toggleSection 
+  toggleSection,
+  usaLocalidadeEvento = false,
 }) => {
   const errorEntries = Object.entries(errors);
   
@@ -31,7 +33,9 @@ const ErrorSummary: React.FC<ErrorSummaryProps> = ({
     localidadeEventoOutro: "Outra localidade",
     
     // Seção 2: Procedência do Indivíduo
-    residenteBelem: "Residente em Belém",
+    residenteBelem: usaLocalidadeEvento
+      ? "Residente em Alter do Chão"
+      : "Residente em Belém",
     bairro: "Bairro",
     uf: "UF",
     municipio: "Município",
@@ -85,8 +89,8 @@ const ErrorSummary: React.FC<ErrorSummaryProps> = ({
     // Seção 1: Dados Gerais
     evento: "dadosGerais",
     publicoAtendido: "dadosGerais",
-    localidadeEvento: "dadosGerais",
-    localidadeEventoOutro: "dadosGerais",
+    localidadeEvento: "procedencia",
+    localidadeEventoOutro: "procedencia",
     
     // Seção 2: Procedência do Indivíduo
     residenteBelem: "procedencia",
@@ -204,8 +208,8 @@ export const scrollToField = (
     // Seção 1: Dados Gerais
     evento: "dadosGerais",
     publicoAtendido: "dadosGerais",
-    localidadeEvento: "dadosGerais",
-    localidadeEventoOutro: "dadosGerais",
+    localidadeEvento: "procedencia",
+    localidadeEventoOutro: "procedencia",
     
     // Seção 2: Procedência do Indivíduo
     residenteBelem: "procedencia",

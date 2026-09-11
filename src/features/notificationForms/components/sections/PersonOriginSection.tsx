@@ -1,24 +1,46 @@
 // src/features/notificationForms/components/sections/PersonOriginSection.tsx
 import React from "react";
 import { Globe } from "lucide-react";
-import { FormSectionProps } from "@/features/notificationForms/types";
+import {
+  FormSectionProps,
+  LocalidadeEventoDTO,
+  ModoLocalidadeEvento,
+} from "@/features/notificationForms/types/index2";
 import SectionHeader from "../shared/SectionHeader";
 import FormField from "../shared/FormField";
 import LocationInput from "@/features/notificationForms/components/LocationInput";
 import BairroInput from "@/features/notificationForms/components/BairroInput";
 import PhoneInput from "@/features/notificationForms/components/BrazilianPhoneInput";
+import LocalidadeEventoField from "./LocalidadeEventoField";
+import {
+  getResidentePerguntaLabel,
+  usaLocalidadeEvento,
+} from "@/features/notificationForms/utils/procedenciaResidencia";
 
-const PersonOriginSection: React.FC<FormSectionProps> = ({
+interface PersonOriginSectionProps extends FormSectionProps {
+  modoLocalidadeEvento?: ModoLocalidadeEvento;
+  localidadeEventoOptions?: LocalidadeEventoDTO[];
+  isLoadingLocalidadesEvento?: boolean;
+  localidadeEventoCatalogAvailable?: boolean;
+}
+
+const PersonOriginSection: React.FC<PersonOriginSectionProps> = ({
   formData,
   setFormData,
   errors,
   handleChange,
-  handleContatoLocalChange,
   isExpanded,
   toggleSection,
   isLoadingMunicipios,
   ufError,
+  modoLocalidadeEvento = "NAO_USA",
+  localidadeEventoOptions = [],
+  isLoadingLocalidadesEvento = false,
+  localidadeEventoCatalogAvailable = true,
 }) => {
+  const usaLocalidade = usaLocalidadeEvento(modoLocalidadeEvento);
+  const residenteLabel = getResidentePerguntaLabel(modoLocalidadeEvento);
+
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
       <SectionHeader
@@ -31,21 +53,23 @@ const PersonOriginSection: React.FC<FormSectionProps> = ({
       {isExpanded && (
         <div className="p-6 border-t">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Residente em Belém? */}
             <FormField
-              label="Residente em Belém?"
+              label={residenteLabel}
               name="residenteBelem"
               value={formData.residenteBelem}
               onChange={(e) => {
                 const newValue = e.target.value;
                 handleChange(e);
-                
-                // ⚠️ VALIDAÇÃO: Se mudou para "NÃO" e município é Belém, limpar
-                if (newValue === "2" && formData.municipio === "170") {
+
+                if (
+                  !usaLocalidade &&
+                  newValue === "2" &&
+                  formData.municipio === "170"
+                ) {
                   setFormData((prev) => ({
                     ...prev,
                     residenteBelem: newValue,
-                    municipio: "", // Limpar Belém
+                    municipio: "",
                   }));
                 }
               }}
@@ -59,8 +83,21 @@ const PersonOriginSection: React.FC<FormSectionProps> = ({
               ]}
             />
 
-            {/* Campos condicionais baseados na residência */}
-            {formData.residenteBelem === "1" && (
+            {usaLocalidade && formData.residenteBelem === "1" && (
+              <LocalidadeEventoField
+                formData={formData}
+                errors={errors}
+                handleChange={handleChange}
+                localidadeEventoOptions={localidadeEventoOptions}
+                modoLocalidadeEvento={modoLocalidadeEvento}
+                isLoadingLocalidadesEvento={isLoadingLocalidadesEvento}
+                localidadeEventoCatalogAvailable={
+                  localidadeEventoCatalogAvailable
+                }
+              />
+            )}
+
+            {!usaLocalidade && formData.residenteBelem === "1" && (
               <div>
                 <BairroInput
                   label="Bairro"
@@ -70,11 +107,9 @@ const PersonOriginSection: React.FC<FormSectionProps> = ({
                       ...prev,
                       bairro: value,
                       tipo_bairro_idtipo_bairro: value,
-                      // ✅ AUTO-PREENCHIMENTO: Quando seleciona bairro de Belém, preencher automaticamente
-                      paisProcedencia: "105", // Brasil
-                      uf: "15", // Pará (ID correto)
-                      municipio: "170", // Belém (ID correto)
-                      // Limpar campos não aplicáveis
+                      paisProcedencia: "105",
+                      uf: "15",
+                      municipio: "170",
                       localHospedagem: "",
                       contatoLocal: "",
                     }));
@@ -91,7 +126,6 @@ const PersonOriginSection: React.FC<FormSectionProps> = ({
             {formData.residenteBelem === "2" && (
               <>
                 <div>
-                  {/* UF */}
                   <LocationInput
                     name="uf"
                     label="UF"
@@ -100,7 +134,7 @@ const PersonOriginSection: React.FC<FormSectionProps> = ({
                       setFormData((prev) => ({
                         ...prev,
                         uf: value,
-                        municipio: "", // Sempre limpa município ao trocar de estado
+                        municipio: "",
                       }));
                     }}
                     placeholder="Selecione a UF"
@@ -116,9 +150,12 @@ const PersonOriginSection: React.FC<FormSectionProps> = ({
                     label="Município"
                     value={formData.municipio}
                     onChange={(value) => {
-                      // ⚠️ VALIDAÇÃO: Impedir seleção de Belém quando não é residente de Belém
-                      if (formData.residenteBelem === "2" && formData.uf === "15" && value === "170") {
-                        // Não permitir selecionar Belém
+                      if (
+                        !usaLocalidade &&
+                        formData.residenteBelem === "2" &&
+                        formData.uf === "15" &&
+                        value === "170"
+                      ) {
                         return;
                       }
                       setFormData((prev) => ({
@@ -129,7 +166,7 @@ const PersonOriginSection: React.FC<FormSectionProps> = ({
                     placeholder={
                       isLoadingMunicipios
                         ? "Carregando municípios..."
-                        : formData.uf === "15" 
+                        : !usaLocalidade && formData.uf === "15"
                           ? "Selecione o município (exceto Belém)"
                           : "Selecione o município"
                     }
@@ -138,16 +175,25 @@ const PersonOriginSection: React.FC<FormSectionProps> = ({
                     idField="idtipo_municipio"
                     parentValue={formData.uf}
                     debug={true}
-                    excludeValues={formData.residenteBelem === "2" && formData.uf === "15" ? ["170"] : []}
+                    excludeValues={
+                      !usaLocalidade &&
+                      formData.residenteBelem === "2" &&
+                      formData.uf === "15"
+                        ? ["170"]
+                        : []
+                    }
                   />
                   {ufError && (
                     <p className="mt-1 text-sm text-red-500">{ufError}</p>
                   )}
-                  {formData.residenteBelem === "2" && formData.uf === "15" && (
-                    <p className="mt-1 text-sm text-amber-600">
-                      ⚠️ Belém não está disponível. Se a pessoa reside em Belém, selecione "SIM" em "Residente em Belém?"
-                    </p>
-                  )}
+                  {!usaLocalidade &&
+                    formData.residenteBelem === "2" &&
+                    formData.uf === "15" && (
+                      <p className="mt-1 text-sm text-amber-600">
+                        ⚠️ Belém não está disponível. Se a pessoa reside em
+                        Belém, selecione "SIM" em "Residente em Belém?"
+                      </p>
+                    )}
                 </div>
                 <div>
                   <FormField
@@ -220,7 +266,9 @@ const PersonOriginSection: React.FC<FormSectionProps> = ({
                     placeholder="Celular ou telefone fixo com DDD"
                   />
                   {errors.contatoLocal && (
-                    <p className="mt-1 text-sm text-red-500">{errors.contatoLocal}</p>
+                    <p className="mt-1 text-sm text-red-500">
+                      {errors.contatoLocal}
+                    </p>
                   )}
                 </div>
               </>

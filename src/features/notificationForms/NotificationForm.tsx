@@ -292,6 +292,7 @@ const NotificationForm: React.FC = () => {
           onFieldClick={handleScrollToField}
           expandedSections={expandedSections as unknown as Record<string, boolean>}
           toggleSection={handleToggleSection}
+          usaLocalidadeEvento={modoLocalidadeEvento !== 'NAO_USA'}
         />
 
         {/* Gerador de Casos Fictícios - apenas para novos formulários */}
@@ -328,12 +329,6 @@ const NotificationForm: React.FC = () => {
             toggleSection={() => toggleSection("dadosGerais")}
             eventoOptions={eventoOptions}
             publicoOptions={publicoOptions}
-            localidadeEventoOptions={localidadeEventoOptions}
-            modoLocalidadeEvento={modoLocalidadeEvento}
-            isLoadingLocalidadesEvento={isLoadingLocalidadesEvento}
-            localidadeEventoCatalogAvailable={
-              localidadeEventoCatalogAvailable
-            }
             isLoadingMunicipios={isLoadingMunicipios}
             paisOptions={paisOptions}
             handleValidationError={handleValidationError}
@@ -352,6 +347,12 @@ const NotificationForm: React.FC = () => {
             ufError={ufError || undefined}
             paisOptions={paisOptions}
             handleValidationError={handleValidationError}
+            modoLocalidadeEvento={modoLocalidadeEvento}
+            localidadeEventoOptions={localidadeEventoOptions}
+            isLoadingLocalidadesEvento={isLoadingLocalidadesEvento}
+            localidadeEventoCatalogAvailable={
+              localidadeEventoCatalogAvailable
+            }
           />          <PersonIdentificationSection
             formData={formData}
             setFormData={setFormData}

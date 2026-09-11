@@ -7,6 +7,11 @@ import FormField from '../shared/FormField';
 import CustomDateInput from '@/features/notificationForms/components/CustomDateInput';
 import UnidadeNotificadoraField from '@/features/notificationForms/components/UnidadeNotificadoraField';
 import LocalEncaminhamentoSelect from '@/features/notificationForms/components/LocalEncaminhamentoSelect';
+import { useEstabelecimentosDoEvento } from '@/features/notificationForms/hooks/useEstabelecimentosDoEvento';
+import {
+  rotuloOpcaoObitoEvento,
+  toAllowedOptions,
+} from '@/features/notificationForms/utils/eventoEstabelecimentos';
 
 interface CaseClosureSectionProps extends FormSectionProps {
   encerramentoOptions: any[];
@@ -23,6 +28,23 @@ const CaseClosureSection: React.FC<CaseClosureSectionProps> = ({
   encerramentoOptions,
   isTipoEncerramentoFunc
 }) => {
+  const {
+    vinculaEncaminhamentos,
+    vinculaObitos,
+    encaminhamentos: estabelecimentosEncaminhamento,
+    obitos: estabelecimentosObito,
+    loading: loadingEvento,
+  } = useEstabelecimentosDoEvento(formData.evento);
+  const restringeEncaminhamentoPorEvento =
+    Boolean(formData.evento) && (loadingEvento || vinculaEncaminhamentos);
+  const restringeObitoPorEvento =
+    Boolean(formData.evento) && (loadingEvento || vinculaObitos);
+  const unidadesDoEvento = toAllowedOptions(estabelecimentosEncaminhamento);
+  const opcoesObito = estabelecimentosObito.map((item) => ({
+    idestabelecimento: item.idestabelecimento,
+    nome: rotuloOpcaoObitoEvento(item.nome, item.cnes),
+  }));
+
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
       <SectionHeader
@@ -80,14 +102,29 @@ const CaseClosureSection: React.FC<CaseClosureSectionProps> = ({
                     }))
                   }
                   label=""
-                  placeholder="Buscar estabelecimento para encaminhamento..."
-                  isForEncaminhamento={true}
+                  placeholder={
+                    restringeEncaminhamentoPorEvento
+                      ? "Buscar hospital ou UPA para encaminhamento..."
+                      : "Buscar estabelecimento para encaminhamento..."
+                  }
+                  isForEncaminhamento={!restringeEncaminhamentoPorEvento}
+                  restrictToAllowed={restringeEncaminhamentoPorEvento}
+                  allowedOptions={
+                    restringeEncaminhamentoPorEvento ? unidadesDoEvento : undefined
+                  }
+                  expandAllowedOptionsOnFocus={restringeEncaminhamentoPorEvento}
+                  denyOutsideMessage="Este local não recebe transferência neste evento"
                   hasError={!!errors.localEncaminhamento}
                   className={`${errors.localEncaminhamento ? "border-red-500 bg-red-50" : ""}`}
                 />
                 {errors.localEncaminhamento && (
                   <p className="mt-1 text-sm text-red-500">
                     {errors.localEncaminhamento}
+                  </p>
+                )}
+                {restringeEncaminhamentoPorEvento && (
+                  <p className="mt-1 text-xs text-blue-600">
+                    Somente hospitais e UPA que recebem transferência ({unidadesDoEvento.length} unidades)
                   </p>
                 )}
                 {/* ID selecionado */}
@@ -104,6 +141,13 @@ const CaseClosureSection: React.FC<CaseClosureSectionProps> = ({
                   value={formData.localEncaminhamento}
                   onChange={handleChange}
                   hasError={!!errors.localEncaminhamento}
+                  options={restringeObitoPorEvento ? opcoesObito : undefined}
+                  loading={restringeObitoPorEvento && loadingEvento}
+                  helpText={
+                    restringeObitoPorEvento
+                      ? 'Campo opcional. IML Santarém é o destino local. SVO SESPA só em interesse epidemiológico excepcional.'
+                      : undefined
+                  }
                 />
                 {errors.localEncaminhamento && (
                   <p className="mt-1 text-sm text-red-500">

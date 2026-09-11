@@ -10,6 +10,10 @@ import {
 } from '@/features/notificationForms/types/index2';
 import type { SectionState } from '@/features/notificationForms/hooks/useSectionExpansion';
 import { validateCPF } from '@/utils/cpfValidator';
+import {
+  getResidentePerguntaLabel,
+  usaLocalidadeEvento,
+} from '@/features/notificationForms/utils/procedenciaResidencia';
 
 /**
  * Converte gestante do formulário de comunicação de caso para o que a API aceita (S/N/9).
@@ -350,7 +354,9 @@ export const changeEventoAndClearLocalidade = (
  evento,
  localidadeEvento: "",
  localidadeEventoOutro: "",
- localidadeEventoAtual: null
+ localidadeEventoAtual: null,
+ unidadeNotificadora: "",
+ localEncaminhamento: "",
 });
 
 export interface LocalidadeEventoValidationContext {
@@ -365,7 +371,7 @@ export const validateLocalidadeEvento = (
 ): Record<string, string> => {
  const validationErrors: Record<string, string> = {};
 
- if (context.modo === "NAO_USA") {
+ if (context.modo === "NAO_USA" || formData.residenteBelem === "2") {
    return validationErrors;
  }
 
@@ -505,8 +511,12 @@ Object.assign(
  // ========================================
  // SEÇÃO 2: PROCEDÊNCIA (CORRIGIDA)
  // ========================================
+ const modoProcedencia = localidadeEventoContext?.modo ?? "NAO_USA";
+ const residenteLabel = getResidentePerguntaLabel(modoProcedencia).replace(/\?$/, "");
+ const usaLocalidade = usaLocalidadeEvento(modoProcedencia);
+
  if (!formData.residenteBelem || formData.residenteBelem === "") {
-newErrors.residenteBelem = "O campo Residente em Belém é obrigatório";
+newErrors.residenteBelem = `O campo ${residenteLabel} é obrigatório`;
  } else {
 // Só validar país de procedência se já selecionou "Estrangeiro"
 if (formData.residenteBelem === "3") {
@@ -515,17 +525,20 @@ newErrors.paisProcedencia = "O campo País de Procedência é obrigatório para 
  }
 }
 
-// Validações condicionais para outras opções
-if (formData.residenteBelem === "1") { // Residente em Belém
+if (formData.residenteBelem === "1" && !usaLocalidade) {
  if (!formData.bairro || formData.bairro === "") {
 newErrors.bairro = "O campo Bairro é obrigatório para residentes em Belém";
  }
-} else if (formData.residenteBelem === "2") { // Não residente em Belém (outro estado BR)
+} else if (formData.residenteBelem === "2") {
  if (!formData.uf || formData.uf === "") {
-newErrors.uf = "O campo UF é obrigatório para não residentes em Belém";
+newErrors.uf = usaLocalidade
+ ? "O campo UF é obrigatório para não residentes em Alter do Chão"
+ : "O campo UF é obrigatório para não residentes em Belém";
  }
  if (!formData.municipio || formData.municipio === "") {
-newErrors.municipio = "O campo Município é obrigatório para não residentes em Belém";
+newErrors.municipio = usaLocalidade
+ ? "O campo Município é obrigatório para não residentes em Alter do Chão"
+ : "O campo Município é obrigatório para não residentes em Belém";
  }
 }
  }
@@ -718,9 +731,7 @@ const newExpandedSections = { ...expandedSections };
 // Seção 1: Dados Gerais
 if (
  newErrors.evento ||
- newErrors.publicoAtendido ||
- newErrors.localidadeEvento ||
- newErrors.localidadeEventoOutro
+ newErrors.publicoAtendido
 ) {
  newExpandedSections.dadosGerais = true;
 }
@@ -733,7 +744,9 @@ if (
  newErrors.uf ||
  newErrors.paisProcedencia ||
  newErrors.localHospedagem ||
- newErrors.contatoLocal
+ newErrors.contatoLocal ||
+ newErrors.localidadeEvento ||
+ newErrors.localidadeEventoOutro
 ) {
  newExpandedSections.procedencia = true;
 }

@@ -73,7 +73,8 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   expandAllowedOptionsOnFocus = false,
 }) => {
   const usePreloadedAllowedList =
-    expandAllowedOptionsOnFocus && Boolean(allowedOptions?.length);
+    allowedOptions !== undefined &&
+    (expandAllowedOptionsOnFocus || restrictToAllowed);
   const [unidadesNotificadoras, setUnidadesNotificadoras] = useState<Estabelecimento[]>([]);
   const [loadingUnidades, setLoadingUnidades] = useState(false);
   const [errorUnidades, setErrorUnidades] = useState<string | null>(null);
@@ -122,14 +123,13 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   // 🔒 Helper para saber se uma unidade é permitida
   const isAllowed = (id: number) => {
     if (!restrictToAllowed) return true;
-    // allowedOptions tem precedência (caso você mande a lista completa)
-    if (allowedOptions?.length) {
+    if (allowedOptions !== undefined) {
       return allowedOptions.some(o => o.idestabelecimento === id);
     }
     if (allowedEstablishmentIds?.length) {
       return allowedEstablishmentIds.includes(id);
     }
-    return true; // se nada foi passado, não restringe
+    return true;
   };
   
   // Função para lidar com erros de CORS ou conectividade
@@ -168,7 +168,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
       }
 
       // 👉 Se vieram opções permitidas completas, filtra localmente e sai
-      if (allowedOptions && allowedOptions.length) {
+      if (allowedOptions !== undefined) {
         const q = norm(searchTerm);
         const onlyDigits = searchTerm.replace(/\D/g, "");
         const filtradas = allowedOptions.filter(est => {
@@ -236,7 +236,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
           let estabelecimentosParaFiltrar = cachedEstabelecimentos;
           
           if (restrictToAllowed) {
-            if (allowedOptions && allowedOptions.length > 0) {
+            if (allowedOptions !== undefined) {
               const allowedIds = allowedOptions.map(o => o.idestabelecimento);
               estabelecimentosParaFiltrar = cachedEstabelecimentos.filter((est: any) => 
                 allowedIds.includes(est.idestabelecimento)
@@ -469,7 +469,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
       }
       
       // 🔒 Se for pra restringir, filtre pelos IDs permitidos
-      if (restrictToAllowed && (allowedEstablishmentIds?.length || allowedOptions?.length)) {
+      if (restrictToAllowed && (allowedEstablishmentIds?.length || allowedOptions !== undefined)) {
         const allowedIds = new Set(
           allowedOptions?.map(o => o.idestabelecimento) ??
           allowedEstablishmentIds!
@@ -741,7 +741,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
         }
       }
       // Cenário 3: MODO OFFLINE - props vazias, buscar direto do cache 'estabelecimentos-permitidos'
-      else if ((!allowedOptions || allowedOptions.length === 0) && (!allowedEstablishmentIds || allowedEstablishmentIds.length === 0)) {
+      else if (allowedOptions === undefined && (!allowedEstablishmentIds || allowedEstablishmentIds.length === 0)) {
         console.log('🎯 Auto-seleção (offline): verificando cache estabelecimentos-permitidos...');
         try {
           const cachedEstabelecimentos = await indexedDBService.getOpcoes('estabelecimentos-permitidos');

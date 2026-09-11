@@ -2,16 +2,22 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-interface LocalEncaminhamentoSelectProps {
-  value: string;
-  onChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
-  hasError?: boolean;
-}
-
 interface Estabelecimento {
   idestabelecimento: number;
   nome: string;
 }
+
+interface LocalEncaminhamentoSelectProps {
+  value: string;
+  onChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
+  hasError?: boolean;
+  options?: Estabelecimento[];
+  helpText?: string;
+  loading?: boolean;
+}
+
+const HELP_TEXT_PADRAO =
+  'Campo opcional. Selecione SVO DVS SESPA ou INSTITUTO DE MEDICINA E ODONTOLOGIA LEGAL (IMOL), se for necessário encaminhamento para estes locais.';
 
 // Cache simples para evitar múltiplas requisições
 let estabelecimentosCache: Estabelecimento[] | null = null;
@@ -19,21 +25,28 @@ let estabelecimentosCache: Estabelecimento[] | null = null;
 const LocalEncaminhamentoSelect: React.FC<LocalEncaminhamentoSelectProps> = ({
   value,
   onChange,
-  hasError = false
+  hasError = false,
+  options,
+  helpText,
+  loading = false,
 }) => {
   const [estabelecimentos, setEstabelecimentos] = useState<Estabelecimento[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingRemote, setIsLoadingRemote] = useState(options === undefined);
 
   useEffect(() => {
+    if (options !== undefined) {
+      setIsLoadingRemote(false);
+      return;
+    }
+
     const buscarEstabelecimentos = async () => {
       try {
-        setIsLoading(true);
+        setIsLoadingRemote(true);
         if (estabelecimentosCache) {
           setEstabelecimentos(estabelecimentosCache);
-          setIsLoading(false);
+          setIsLoadingRemote(false);
           return;
         }
-        // Buscar diretamente do endpoint específico
         const response = await axios.get('/api/estabelecimentos/encaminhamento-especificos', {
           headers: { 'Accept': 'application/json' }
         });
@@ -45,11 +58,14 @@ const LocalEncaminhamentoSelect: React.FC<LocalEncaminhamentoSelectProps> = ({
         estabelecimentosCache = [];
         setEstabelecimentos([]);
       } finally {
-        setIsLoading(false);
+        setIsLoadingRemote(false);
       }
     };
-    buscarEstabelecimentos();
-  }, []);
+    void buscarEstabelecimentos();
+  }, [options]);
+
+  const lista = options ?? estabelecimentos;
+  const isLoading = options !== undefined ? loading : isLoadingRemote;
 
   return (
     <div>
@@ -58,6 +74,7 @@ const LocalEncaminhamentoSelect: React.FC<LocalEncaminhamentoSelectProps> = ({
       </label>
       <select
         name="localEncaminhamento"
+        data-testid="local-encaminhamento-obito"
         className={`w-full p-3 border rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none ${
           hasError ? 'border-red-500 bg-red-50' : 'border-gray-200'
         }`}
@@ -69,7 +86,7 @@ const LocalEncaminhamentoSelect: React.FC<LocalEncaminhamentoSelectProps> = ({
         {isLoading ? (
           <option value="" disabled>Carregando...</option>
         ) : (
-          estabelecimentos.map(est => (
+          lista.map(est => (
             <option key={`enc_${est.idestabelecimento}`} value={String(est.idestabelecimento)}>
               {est.nome}
             </option>
@@ -77,8 +94,7 @@ const LocalEncaminhamentoSelect: React.FC<LocalEncaminhamentoSelectProps> = ({
         )}
       </select>
       <p className="mt-1 text-xs text-gray-500">
-        Campo opcional. Selecione SVO DVS SESPA ou INSTITUTO DE MEDICINA E ODONTOLOGIA LEGAL (IMOL), se for
-        necessário encaminhamento para estes locais.
+        {helpText ?? HELP_TEXT_PADRAO}
       </p>
     </div>
   );

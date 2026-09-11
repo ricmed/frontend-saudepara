@@ -13,11 +13,29 @@ const axiosInstance = axios.create({
   }
 });
 
+export interface EstabelecimentoEventoDTO {
+  idestabelecimento: number;
+  nome: string;
+  cnes: string | null;
+  cidade: string | null;
+  ativo: string;
+}
+
+export interface EstabelecimentosDoEventoResponse {
+  vincula_estabelecimentos: boolean;
+  data: EstabelecimentoEventoDTO[];
+  vincula_encaminhamentos: boolean;
+  encaminhamentos: EstabelecimentoEventoDTO[];
+  vincula_obitos: boolean;
+  obitos: EstabelecimentoEventoDTO[];
+}
+
 interface TipoEvento {
   idtipo_evento: number;
   descricao: string;
   ativo: string;
   modo_localidade_evento: ModoLocalidadeEvento;
+  vincula_estabelecimentos?: boolean;
   created_at?: string;
   updated_at?: string;
   // 🆕 NOVA ESTRUTURA: Abrangência com relacionamento N:N
@@ -71,6 +89,7 @@ const handleApiError = (error: AxiosError<APIError>) => {
 const normalizeTipoEvento = (evento: TipoEvento): TipoEvento => ({
   ...evento,
   modo_localidade_evento: evento.modo_localidade_evento ?? 'NAO_USA',
+  vincula_estabelecimentos: Boolean(evento.vincula_estabelecimentos),
 });
 
 export const TiposEventoService = {
@@ -235,5 +254,30 @@ export const TiposEventoService = {
     } catch (error) {
       return handleApiError(error as AxiosError<APIError>);
     }
-  }
+  },
+
+  getEstabelecimentosVinculados: async (
+    id: number,
+  ): Promise<EstabelecimentosDoEventoResponse> => {
+    try {
+      if (isNaN(id) || id <= 0) throw new Error('ID inválido');
+
+      const response = await axiosRetry.get<EstabelecimentosDoEventoResponse>(
+        `${getTipoEventoApiUrl()}/${id}/estabelecimentos`,
+        { withCredentials: true },
+      );
+      return {
+        vincula_estabelecimentos: Boolean(response.data?.vincula_estabelecimentos),
+        data: Array.isArray(response.data?.data) ? response.data.data : [],
+        vincula_encaminhamentos: Boolean(response.data?.vincula_encaminhamentos),
+        encaminhamentos: Array.isArray(response.data?.encaminhamentos)
+          ? response.data.encaminhamentos
+          : [],
+        vincula_obitos: Boolean(response.data?.vincula_obitos),
+        obitos: Array.isArray(response.data?.obitos) ? response.data.obitos : [],
+      };
+    } catch (error) {
+      return handleApiError(error as AxiosError<APIError>);
+    }
+  },
 };

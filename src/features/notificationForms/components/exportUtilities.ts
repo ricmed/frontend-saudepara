@@ -4,6 +4,8 @@ import "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { PDFDocument } from "pdf-lib";
 import { getRealCreationDate } from "@/utils/offlineIdUtils";
+import { getResidentePerguntaLabel } from "@/features/notificationForms/utils/procedenciaResidencia";
+import type { ModoLocalidadeEvento } from "@/features/notificationForms/types/index2";
 
 // Interface para os dados exportados
 interface ExportData {
@@ -40,6 +42,7 @@ export interface ExportOptions {
   encerramentoOptions: any[];
   cboOptions?: any[]; // Adicionado para suportar profissões
   localidadeEventoOptions?: any[];
+  modoLocalidadeEvento?: ModoLocalidadeEvento;
 }
 
 // ===================================================================
@@ -862,7 +865,9 @@ const prepareDataForExport = (
       : {}),
 
     // Seção 2: Procedência do indivíduo
-    "Residente em Belém": getResidenteBelemLabel(formData.residenteBelem),
+    [getResidentePerguntaLabel(
+      exportOptions?.modoLocalidadeEvento ?? "NAO_USA",
+    ).replace(/\?$/, "")]: getResidenteBelemLabel(formData.residenteBelem),
     Bairro: getBairroText(),
     Município: getMunicipioText(),
     UF: getUfText(),

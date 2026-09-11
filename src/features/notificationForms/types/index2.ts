@@ -312,6 +312,7 @@ export interface EventoOption {
   descricao: string;
   ativo?: string; // 🆕 CAMPO ADICIONADO para compatibilidade
   modo_localidade_evento: ModoLocalidadeEvento;
+  vincula_estabelecimentos?: boolean;
 }
 
 export interface PublicoOption {

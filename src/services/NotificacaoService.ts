@@ -21,6 +21,7 @@ export interface EventoOption extends BaseOption {
   idtipo_evento: number;
   ativo?: string; // 🆕 CAMPO ADICIONADO para compatibilidade
   modo_localidade_evento: ModoLocalidadeEvento;
+  vincula_estabelecimentos?: boolean;
   created_at?: string;
   updated_at?: string;
   // 🆕 NOVA ESTRUTURA: Abrangência com relacionamento N:N
@@ -308,7 +309,7 @@ export const NotificacaoService = {
       const idEstado = Number(estadoId);
       
       // Usar o parâmetro correto e garantir que seja passado como número
-      const endpoint = `${TIPO_ENDPOINTS.MUNICIPIO}?tipo_estado_idtipo_estado=${idEstado}`;
+      const endpoint = `${TIPO_ENDPOINTS.MUNICIPIO}?tipo_estado_idtipo_estado=${idEstado}&limit=1000`;
       
       console.log(`Buscando municípios para o estado ID: ${idEstado} (${typeof idEstado})`);
       

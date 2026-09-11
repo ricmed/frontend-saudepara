@@ -10,7 +10,7 @@
 // 6. Rollback automático em caso de falha na validação
 // 7. ✅ CORREÇÃO CRÍTICA: handleSubmit isola array 'arquivos' da conversão toUpperCase
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import axios from 'axios';
@@ -81,6 +81,11 @@ import {
   exportToCSV, 
   exportToPDF 
 } from '@/features/notificationForms/components/exportUtilities';
+import {
+  applyResidenciaAutoFill,
+  findSantaremMunicipioId,
+  usaLocalidadeEvento,
+} from '../utils/procedenciaResidencia';
 import { useSectionExpansion } from './useSectionExpansion';
 import { NotificacaoService } from '@/services/NotificacaoService';
 import { LocalidadeEventoService } from '@/services/LocalidadeEventoService';
@@ -324,10 +329,15 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
   const [ufError, setUfError] = useState<string | null>(null);
   const latestUfRef = useRef<string>("");
   const localidadeEventoRequestRef = useRef(0);
+  const prevResidenteRef = useRef<string | null>(null);
 
   const modoLocalidadeEvento = getModoLocalidadeEvento(
     formData.evento,
     eventoOptions,
+  );
+  const santaremMunicipioId = useMemo(
+    () => findSantaremMunicipioId(municipioOptions),
+    [municipioOptions],
   );
   const eventoLocalidadeMetadataLoaded =
     !formData.evento ||
@@ -1809,68 +1819,75 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     }
   }, [formData.tipoAtendimento]);
 
-  // ✅ MELHORADO: Efeito para auto-preenchimento inteligente quando muda opção de residente
   useEffect(() => {
-    // Somente executar se já tiver um valor selecionado (evita limpar na inicialização)
-    if (formData.residenteBelem && Object.keys(formData).length > 1) {
-      // Criar uma cópia do formData para fazer as alterações
-      const updatedData = { ...formData };
-
-      // Se selecionar "SIM" (residente em Belém)
-      if (formData.residenteBelem === "1") {
-        // Auto-preencher dados obrigatórios
-        updatedData.paisProcedencia = "105"; // Brasil
-        updatedData.uf = "15"; // Pará (ID correto: 15)
-        updatedData.municipio = "170"; // Belém (ID correto: 170)
-        
-        // Limpar campos não aplicáveis
-        updatedData.localHospedagem = "";
-        updatedData.contatoLocal = "";
-        
-        console.log('✅ Auto-preenchimento: Residente de Belém - País, UF e Município definidos automaticamente');
-        console.log(`🔍 DEBUG: updatedData.uf = "${updatedData.uf}", updatedData.municipio = "${updatedData.municipio}"`);
-      }
-      // Se selecionar "NÃO" (outro município/estado brasileiro)
-      else if (formData.residenteBelem === "2") {
-        // Auto-preencher país como Brasil
-        updatedData.paisProcedencia = "105"; // Brasil
-        
-        // Limpar campos específicos de Belém e estrangeiros
-        updatedData.bairro = "";
-        
-        // Se estava com Belém selecionado, limpar para permitir nova seleção
-        if (updatedData.municipio === "170") {  // ID correto de Belém
-          updatedData.uf = "";
-          updatedData.municipio = "";
-        }
-        
-        console.log('✅ Auto-preenchimento: Outro município brasileiro - País definido como Brasil');
-      }
-      // Se selecionar "ESTRANGEIRO"
-      else if (formData.residenteBelem === "3") {
-        // Limpar todos os dados de localização nacional
-        updatedData.bairro = "";
-        updatedData.uf = "";
-        updatedData.municipio = "";
-        
-        // Se estava com Brasil selecionado, limpar para permitir seleção de outro país
-        if (updatedData.paisProcedencia === "105") {
-          updatedData.paisProcedencia = "";
-        }
-        
-        console.log('✅ Auto-preenchimento: Estrangeiro - Dados nacionais limpos');
-      }
-
-      // Atualizar o estado apenas se houve mudanças
-      const hasChanges = Object.keys(updatedData).some(key => 
-        updatedData[key as keyof typeof updatedData] !== formData[key as keyof typeof formData]
-      );
-      
-      if (hasChanges) {
-        setFormData(updatedData);
-      }
+    if (!formData.residenteBelem) {
+      return;
     }
-  }, [formData.residenteBelem]);
+
+    const isHydrate =
+      prevResidenteRef.current === null &&
+      Boolean(
+        formData.uf ||
+          formData.municipio ||
+          formData.paisProcedencia ||
+          formData.bairro,
+      );
+    const residenteJustChanged =
+      prevResidenteRef.current !== null &&
+      prevResidenteRef.current !== formData.residenteBelem;
+    prevResidenteRef.current = formData.residenteBelem;
+
+    setFormData((prev) => {
+      const next = applyResidenciaAutoFill({
+        residenteBelem: prev.residenteBelem,
+        modo: modoLocalidadeEvento,
+        current: prev,
+        santaremMunicipioId,
+        residenteJustChanged,
+        hydrate: isHydrate,
+      });
+
+      const clearLocalidade =
+        usaLocalidadeEvento(modoLocalidadeEvento) &&
+        prev.residenteBelem === '2' &&
+        Boolean(
+          prev.localidadeEvento ||
+            prev.localidadeEventoOutro ||
+            prev.localidadeEventoAtual,
+        );
+
+      if (!next && !clearLocalidade) {
+        return prev;
+      }
+
+      const merged = {
+        ...prev,
+        ...(next ?? {}),
+        ...(clearLocalidade
+          ? {
+              localidadeEvento: '',
+              localidadeEventoOutro: '',
+              localidadeEventoAtual: null,
+            }
+          : {}),
+      };
+
+      if (
+        !clearLocalidade &&
+        next &&
+        next.paisProcedencia === prev.paisProcedencia &&
+        next.uf === prev.uf &&
+        next.municipio === prev.municipio &&
+        next.bairro === prev.bairro &&
+        next.localHospedagem === prev.localHospedagem &&
+        next.contatoLocal === prev.contatoLocal
+      ) {
+        return prev;
+      }
+
+      return merged;
+    });
+  }, [formData.residenteBelem, modoLocalidadeEvento, santaremMunicipioId]);
 
   // Efeito para fechar sugestões quando clicar fora
   useEffect(() => {
@@ -2338,6 +2355,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
   // ✅ FUNÇÃO PARA LIMPAR FORMULÁRIO INCLUINDO ARQUIVOS
   const handleClearForm = () => {
     if (window.confirm("Tem certeza que deseja limpar todos os campos do formulário?")) {
+      prevResidenteRef.current = null;
       setFormData(initialFormData);
       setErrors({});
       toast.info("Formulário limpo com sucesso");
@@ -2364,6 +2382,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         estabelecimentoOptions,
         encerramentoOptions,
         localidadeEventoOptions,
+        modoLocalidadeEvento,
       };
 
       switch (format) {
