@@ -9,6 +9,7 @@ import UnidadeNotificadoraField from '@/features/notificationForms/components/Un
 import LocalEncaminhamentoSelect from '@/features/notificationForms/components/LocalEncaminhamentoSelect';
 import { useEstabelecimentosDoEvento } from '@/features/notificationForms/hooks/useEstabelecimentosDoEvento';
 import {
+  eventoRestringeObito,
   rotuloOpcaoObitoEvento,
   toAllowedOptions,
 } from '@/features/notificationForms/utils/eventoEstabelecimentos';
@@ -37,8 +38,7 @@ const CaseClosureSection: React.FC<CaseClosureSectionProps> = ({
   } = useEstabelecimentosDoEvento(formData.evento);
   const restringeEncaminhamentoPorEvento =
     Boolean(formData.evento) && (loadingEvento || vinculaEncaminhamentos);
-  const restringeObitoPorEvento =
-    Boolean(formData.evento) && (loadingEvento || vinculaObitos);
+  const restringeObitoPorEvento = eventoRestringeObito(vinculaObitos);
   const unidadesDoEvento = toAllowedOptions(estabelecimentosEncaminhamento);
   const opcoesObito = estabelecimentosObito.map((item) => ({
     idestabelecimento: item.idestabelecimento,

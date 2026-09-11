@@ -33,6 +33,13 @@ export function useEstabelecimentosDoEvento(eventoIdValue: string | undefined) {
     let cancelled = false;
     const cacheKey = `estabelecimentos-evento-${eventoId}`;
 
+    setVincula(false);
+    setVinculaEncaminhamentos(false);
+    setVinculaObitos(false);
+    setEstabelecimentos([]);
+    setEncaminhamentos([]);
+    setObitos([]);
+
     const load = async () => {
       setLoading(true);
       try {

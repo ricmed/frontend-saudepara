@@ -54,6 +54,10 @@ export function toAllowedOptions(
   }));
 }
 
+export function eventoRestringeObito(vinculaObitos: boolean): boolean {
+  return vinculaObitos;
+}
+
 export function rotuloOpcaoObitoEvento(
   nome: string,
   cnes?: string | null,

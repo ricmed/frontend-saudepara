@@ -2,6 +2,7 @@ import {
   aplicarEscopoUnidadeNoEvento,
   eventoVinculaEstabelecimentos,
   filtrarUnidadesDoEvento,
+  eventoRestringeObito,
   rotuloOpcaoObitoEvento,
 } from './eventoEstabelecimentos';
 
@@ -30,6 +31,11 @@ describe('eventoEstabelecimentos', () => {
       { idestabelecimento: 20, nome: 'B' },
     ]);
     expect(aplicarEscopoUnidadeNoEvento(unidades, 'unidade', 99)).toEqual([]);
+  });
+
+  it('só restringe o óbito quando o evento tem vínculos de óbito', () => {
+    expect(eventoRestringeObito(false)).toBe(false);
+    expect(eventoRestringeObito(true)).toBe(true);
   });
 
   it('marca SVO como opção excepcional de óbito sem alterar o IML', () => {
