@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { getOptimalTileProvider } from '@/features/maps/leaflet/config/tileProviders';
+import { CompactMapProviderSelectorView } from '@/features/maps/leaflet/components/CompactMapProviderSelector';
+import { useMapProvider } from '@/features/maps/leaflet/hooks/useMapProvider';
+import { TILE_OPTIONS } from '@/features/maps/leaflet/config/tileProviders';
 import {
   EventLocalityAggregate,
   getEventLocalityMarkerRadius,
@@ -40,6 +42,12 @@ const EventLocalitiesMiniMap: React.FC<EventLocalitiesMiniMapProps> = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const currentTileLayerRef = useRef<L.TileLayer | null>(null);
+  const fittedBoundsKeyRef = useRef<string>('');
+  const forcedMapboxRef = useRef(false);
+  const { tileProvider, currentProvider, setCurrentProvider, isAvailable } = useMapProvider({
+    defaultProvider: 'mapbox'
+  });
   const mappableData = useMemo(
     () => getMappableEventLocalities(data),
     [data]
@@ -48,28 +56,53 @@ const EventLocalitiesMiniMap: React.FC<EventLocalitiesMiniMapProps> = ({
     () => new Set(selectedLocalityIds),
     [selectedLocalityIds]
   );
+  const boundsKey = useMemo(
+    () => mappableData.map((item) => item.id).sort((left, right) => left - right).join(','),
+    [mappableData]
+  );
+
+  useEffect(() => {
+    if (forcedMapboxRef.current) {
+      return;
+    }
+    forcedMapboxRef.current = true;
+    if (currentProvider !== 'mapbox' && isAvailable('mapbox')) {
+      setCurrentProvider('mapbox');
+    }
+  }, [currentProvider, isAvailable, setCurrentProvider]);
 
   useEffect(() => {
     if (!granularityEnabled || !containerRef.current || mapRef.current) {
       return;
     }
 
-    const tileProvider = getOptimalTileProvider('openstreetmap');
     const map = L.map(containerRef.current, {
       center: DEFAULT_CENTER,
       zoom: 11,
+      minZoom: 6,
+      maxZoom: 22,
       zoomControl: true,
-      attributionControl: true
+      attributionControl: true,
+      scrollWheelZoom: true,
+      doubleClickZoom: true,
+      touchZoom: true,
+      boxZoom: true,
+      dragging: true,
+      keyboard: true
     });
 
-    L.tileLayer(tileProvider.url, {
+    const tileLayer = L.tileLayer(tileProvider.url, {
       attribution: tileProvider.attribution,
-      maxZoom: tileProvider.maxZoom
+      maxZoom: tileProvider.maxZoom,
+      minZoom: 6,
+      ...TILE_OPTIONS
     }).addTo(map);
 
+    currentTileLayerRef.current = tileLayer;
     const markersLayer = L.layerGroup().addTo(map);
     mapRef.current = map;
     markersLayerRef.current = markersLayer;
+    map.scrollWheelZoom.enable();
 
     const animationFrame = window.requestAnimationFrame(() => {
       map.invalidateSize();
@@ -80,8 +113,30 @@ const EventLocalitiesMiniMap: React.FC<EventLocalitiesMiniMapProps> = ({
       map.remove();
       mapRef.current = null;
       markersLayerRef.current = null;
+      currentTileLayerRef.current = null;
+      fittedBoundsKeyRef.current = '';
     };
+    // O mapa não pode depender do tile: recriar zera o zoom do usuário.
   }, [granularityEnabled]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!granularityEnabled || !map) {
+      return;
+    }
+
+    if (currentTileLayerRef.current) {
+      map.removeLayer(currentTileLayerRef.current);
+      currentTileLayerRef.current = null;
+    }
+
+    currentTileLayerRef.current = L.tileLayer(tileProvider.url, {
+      attribution: tileProvider.attribution,
+      maxZoom: tileProvider.maxZoom,
+      minZoom: 6,
+      ...TILE_OPTIONS
+    }).addTo(map);
+  }, [granularityEnabled, tileProvider.attribution, tileProvider.maxZoom, tileProvider.url]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -118,16 +173,17 @@ const EventLocalitiesMiniMap: React.FC<EventLocalitiesMiniMapProps> = ({
       bounds.extend([item.latitude, item.longitude]);
     });
 
-    if (mappableData.length === 1) {
-      const onlyItem = mappableData[0];
-      if (onlyItem.latitude !== null && onlyItem.longitude !== null) {
-        map.setView([onlyItem.latitude, onlyItem.longitude], 13);
+    const shouldFitBounds = bounds.isValid() && fittedBoundsKeyRef.current !== boundsKey;
+    if (shouldFitBounds) {
+      fittedBoundsKeyRef.current = boundsKey;
+      if (mappableData.length === 1) {
+        const onlyItem = mappableData[0];
+        if (onlyItem.latitude !== null && onlyItem.longitude !== null) {
+          map.setView([onlyItem.latitude, onlyItem.longitude], 13);
+        }
+      } else {
+        map.fitBounds(bounds.pad(0.1));
       }
-    } else if (bounds.isValid()) {
-      map.fitBounds(bounds, {
-        padding: [28, 28],
-        maxZoom: 14
-      });
     }
 
     const animationFrame = window.requestAnimationFrame(() => {
@@ -138,6 +194,7 @@ const EventLocalitiesMiniMap: React.FC<EventLocalitiesMiniMapProps> = ({
       window.cancelAnimationFrame(animationFrame);
     };
   }, [
+    boundsKey,
     granularityEnabled,
     mappableData,
     onLocalityClick,
@@ -146,26 +203,34 @@ const EventLocalitiesMiniMap: React.FC<EventLocalitiesMiniMapProps> = ({
 
   if (!granularityEnabled) {
     return (
-      <div className="flex min-h-80 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 p-6 text-center text-sm text-amber-900">
+      <div className="flex min-h-96 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 p-6 text-center text-sm text-amber-900">
         Minimapa indisponível sem limiar agregado configurado.
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-80 overflow-hidden rounded-lg border border-gray-200 bg-gray-100">
+    <div className="relative min-h-96 rounded-lg border border-gray-200 bg-gray-100">
       <div
         ref={containerRef}
-        className="h-80 w-full"
+        className="h-96 w-full"
         aria-label="Minimapa agregado de localidades do evento"
       />
+      <div className="absolute top-4 right-4 z-[1000]">
+        <CompactMapProviderSelectorView
+          currentProvider={currentProvider}
+          setCurrentProvider={setCurrentProvider}
+          isAvailable={isAvailable}
+        />
+      </div>
       {mappableData.length === 0 && (
         <div className="pointer-events-none absolute inset-0 z-[500] flex items-center justify-center bg-white/85 p-6 text-center text-sm text-gray-600">
-          Nenhuma localidade cartográfica atende aos filtros e ao limiar atual.
+          Nenhuma localidade cartográfica atende aos filtros atuais.
         </div>
       )}
-      <div className="pointer-events-none absolute bottom-2 left-2 z-[500] max-w-xs rounded bg-white/90 px-2 py-1 text-[11px] text-gray-700 shadow">
-        Círculos representam totais agregados em centroides de localidades.
+      <div className="pointer-events-none absolute bottom-2 left-2 z-[500] max-w-sm rounded bg-white/90 px-2 py-1 text-[11px] text-gray-700 shadow">
+        {mappableData.length} de {data.length} localidades com centroide no
+        catálogo. Outro e Não informado não entram no mapa.
       </div>
     </div>
   );

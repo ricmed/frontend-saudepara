@@ -295,6 +295,9 @@ interface GeographicLocationPanelProps {
   estadoData: ChartDataItem[];
   municipioData: ChartDataItem[];
   bairroData: ChartDataItem[];
+  hideResidenceNeighborhoods?: boolean;
+  eventLocalitiesChart?: React.ReactNode;
+  eventLocalitiesMap?: React.ReactNode;
   onFilterClick?: (category: string, value: string, multiSelect?: boolean) => void;
   activeFilters?: Record<string, any>;
   exportMenu?: React.ReactNode;
@@ -1692,6 +1695,9 @@ const GeographicLocationPanel: React.FC<GeographicLocationPanelProps> = ({
   estadoData,
   municipioData, 
   bairroData,
+  hideResidenceNeighborhoods = false,
+  eventLocalitiesChart,
+  eventLocalitiesMap,
   onFilterClick,
   activeFilters = {},
   exportMenu
@@ -1740,11 +1746,13 @@ const GeographicLocationPanel: React.FC<GeographicLocationPanelProps> = ({
             paisData={paisData}
             estadoData={estadoData}
             municipioData={municipioData}
-            bairroData={bairroData}
+            bairroData={hideResidenceNeighborhoods ? [] : bairroData}
             totalRecords={paisData.reduce((sum, item) => sum + item.value, 0) + 
                          estadoData.reduce((sum, item) => sum + item.value, 0) + 
                          municipioData.reduce((sum, item) => sum + item.value, 0) + 
-                         bairroData.reduce((sum, item) => sum + item.value, 0)}
+                         (hideResidenceNeighborhoods
+                           ? 0
+                           : bairroData.reduce((sum, item) => sum + item.value, 0))}
             activeFilters={activeFilters}
             buttonVariant="button"
             className="text-sm"
@@ -1796,24 +1804,33 @@ const GeographicLocationPanel: React.FC<GeographicLocationPanelProps> = ({
           />
         </div>
 
-        {/* Componente Híbrido - Bairros com Gráfico + Tabela */}
-        <div className="lg:col-span-1">
-          <NeighborhoodsChartWithTable
-            data={bairroData}
-            title="Bairros de Residência"
-            icon={<Home className="h-5 w-5 text-purple-600" />}
-            onItemClick={onFilterClick}
-            filterCategory="bairro"
-            activeFilter={activeFilters?.bairro}
-            municipalityFilter={activeFilters?.municipio} // Passa o filtro de município ativo
-            stateFilter={activeFilters?.estado} // Passa o filtro de estado ativo
-            ctrlPressed={ctrlPressedRef.current}
-          />
-        </div>
+        {hideResidenceNeighborhoods ? (
+          eventLocalitiesChart ? (
+            <div className="lg:col-span-1">
+              {eventLocalitiesChart}
+            </div>
+          ) : null
+        ) : (
+          <div className="lg:col-span-1" data-dashboard="residence-neighborhoods">
+            <NeighborhoodsChartWithTable
+              data={bairroData}
+              title="Bairros de Residência"
+              icon={<Home className="h-5 w-5 text-purple-600" />}
+              onItemClick={onFilterClick}
+              filterCategory="bairro"
+              activeFilter={activeFilters?.bairro}
+              municipalityFilter={activeFilters?.municipio}
+              stateFilter={activeFilters?.estado}
+              ctrlPressed={ctrlPressedRef.current}
+            />
+          </div>
+        )}
       </div>
 
+      {eventLocalitiesMap}
+
       {/* Informações adicionais */}
-      {(activeFilters?.pais || activeFilters?.estado || activeFilters?.municipio || activeFilters?.bairro) && (
+      {(activeFilters?.pais || activeFilters?.estado || activeFilters?.municipio || (!hideResidenceNeighborhoods && activeFilters?.bairro)) && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
             <MapPin className="h-5 w-5 text-blue-600" />
@@ -1835,7 +1852,7 @@ const GeographicLocationPanel: React.FC<GeographicLocationPanelProps> = ({
                 Município: {activeFilters.municipio}
               </span>
             )}
-            {activeFilters?.bairro && (
+            {!hideResidenceNeighborhoods && activeFilters?.bairro && (
               <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">
                 Bairro: {activeFilters.bairro}
               </span>

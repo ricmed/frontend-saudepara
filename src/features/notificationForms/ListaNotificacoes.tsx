@@ -161,6 +161,7 @@ const ListaNotificacoes: React.FC = () => {
         onExportMenuToggle={tableControls.toggleExportMenu}
         onExport={notifications.handleExport}
         searchFields={searchFields as { value: SearchParams['field']; label: string }[]}
+        exportEventos={notifications.exportEventos}
       />
 
       {/* SideMenu atualizado com as props corretas */}

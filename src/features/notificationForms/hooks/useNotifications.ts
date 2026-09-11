@@ -5,9 +5,11 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { useOfflineSystem } from '@/hooks/useOfflineSystem';
 import { NotificacaoService } from '@/services/NotificacaoService';
 import { TiposEventoService } from '@/services/EventoService';
+import { LocalidadeEventoService } from '@/services/LocalidadeEventoService';
 import syncService from '@/services/syncService'; // ✅ AGORA SERÁ USADO
 import indexedDBService from '@/services/indexedDB';
 import { Notificacao, PaginationMeta, SearchParams } from '../types';
+import type { EventoOption } from '../types/index2';
 import { adjustDatesForExport, compareValues, getValueForSorting } from '../utils';
 import { 
   exportListToExcel, 
@@ -16,6 +18,9 @@ import {
   PDFExportType,
   ExportOptions
 } from '@/features/notificationForms/components/exportUtilities';
+import { getModoLocalidadeEvento } from '../utils/formUtils';
+import { usaLocalidadeEvento } from '../utils/procedenciaResidencia';
+import { filterNotificationsByEvento } from '../utils/filterNotificationsByEvento';
 
 export const useNotifications = () => {
   // ✅ Integrar sistema offline
@@ -33,6 +38,7 @@ export const useNotifications = () => {
 
   // 🆕 CACHE: Para eventos ativos (evitar buscar múltiplas vezes)
   const [eventosAtivosCache, setEventosAtivosCache] = useState<Set<number> | null>(null);
+  const [exportEventos, setExportEventos] = useState<EventoOption[]>([]);
 
   // 🆕 FUNÇÃO: Carregar eventos ativos uma única vez (com opção de forçar atualização)
   const loadEventosAtivos = useCallback(async (forceRefresh: boolean = false): Promise<Set<number>> => {
@@ -88,6 +94,14 @@ export const useNotifications = () => {
       
       const idsEventosAtivos = new Set(eventosAtivosFiltrados.map((evento: any) => evento.idtipo_evento));
       setEventosAtivosCache(idsEventosAtivos);
+      setExportEventos(
+        eventosAtivosFiltrados.map((evento: any) => ({
+          idtipo_evento: evento.idtipo_evento,
+          descricao: evento.descricao,
+          ativo: evento.ativo,
+          modo_localidade_evento: evento.modo_localidade_evento ?? 'NAO_USA',
+        }))
+      );
       
       console.log(`✅ Cache de eventos ativos atualizado: ${idsEventosAtivos.size} eventos ativos de ${eventosAtivos.length} totais`);
       console.log(`📊 IDs dos eventos ativos: [${Array.from(idsEventosAtivos).join(', ')}]`);
@@ -943,16 +957,28 @@ export const useNotifications = () => {
   const handleExport = async (
     format: 'csv' | 'excel' | 'pdf', 
     type: 'page' | 'all',
-    pdfType?: PDFExportType
+    pdfType?: PDFExportType,
+    eventId?: number
   ) => {
     try {
       setIsLoading(true);
 
+      if (!eventId || !Number.isInteger(eventId) || eventId <= 0) {
+        toast.info("Selecione o evento para exportar.");
+        setIsLoading(false);
+        return;
+      }
+
       // Buscar dados - página atual ou todos
       const dataToExport = type === "page" ? notificacoes : await fetchAllData();
+      const dataDoEvento = filterNotificationsByEvento(dataToExport || [], eventId);
 
-      if (!dataToExport || dataToExport.length === 0) {
-        toast.info("Não há dados para exportar.");
+      if (!dataDoEvento.length) {
+        toast.info(
+          type === "page"
+            ? "Não há comunicações deste evento na página atual."
+            : "Não há comunicações deste evento para exportar."
+        );
         setIsLoading(false);
         return;
       }
@@ -1048,8 +1074,25 @@ export const useNotifications = () => {
         console.log('✅ Opções de exportação carregadas do cache offline');
       }
 
+      const modoLocalidadeEvento = getModoLocalidadeEvento(
+        String(eventId),
+        [...exportEventos, ...(options.eventoOptions || [])]
+      );
+      options.modoLocalidadeEvento = modoLocalidadeEvento;
+
+      if (usaLocalidadeEvento(modoLocalidadeEvento)) {
+        try {
+          options.localidadeEventoOptions = isOnline
+            ? await LocalidadeEventoService.getByEventoId(eventId)
+            : (await indexedDBService.getLocalidadesEvento(eventId)) || [];
+        } catch {
+          options.localidadeEventoOptions =
+            (await indexedDBService.getLocalidadesEvento(eventId)) || [];
+        }
+      }
+
       // Ajustar datas antes de exportar
-      const formattedData = adjustDatesForExport(dataToExport);
+      const formattedData = adjustDatesForExport(dataDoEvento);
 
       // Exportar com base no formato escolhido
       if (format === 'csv') {
@@ -1235,6 +1278,7 @@ export const useNotifications = () => {
     handleSortChange,
     handleExport,
     fetchAllData,
-    refreshEventosCache  // ✅ NOVO: Expor função para forçar atualização
+    refreshEventosCache,  // ✅ NOVO: Expor função para forçar atualização
+    exportEventos
   };
 };

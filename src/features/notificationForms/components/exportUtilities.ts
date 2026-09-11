@@ -4,8 +4,16 @@ import "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { PDFDocument } from "pdf-lib";
 import { getRealCreationDate } from "@/utils/offlineIdUtils";
-import { getResidentePerguntaLabel } from "@/features/notificationForms/utils/procedenciaResidencia";
+import { usaLocalidadeEvento } from "@/features/notificationForms/utils/procedenciaResidencia";
 import type { ModoLocalidadeEvento } from "@/features/notificationForms/types/index2";
+import {
+  EXPORT_BAIRRO_COLUMN,
+  EXPORT_LOCALIDADE_COLUMN,
+  EXPORT_LOCALIDADE_OUTRO_COLUMN,
+  getExportDadosGeraisFieldKeys,
+  getExportPdfProcedenciaFieldKeys,
+  getExportResidenteColumnLabel,
+} from "@/features/notificationForms/components/exportColumns";
 
 // Interface para os dados exportados
 interface ExportData {
@@ -854,21 +862,28 @@ const prepareDataForExport = (
   const contatoLocalProcessado = extractPhoneComponents(formData.contatoLocal, formData);
   const contatoNotificadorProcessado = extractPhoneComponents(formData.contatoNotificador, formData);
 
+  const modoExportacao = exportOptions?.modoLocalidadeEvento ?? "NAO_USA";
+  const usaLocalidade = usaLocalidadeEvento(modoExportacao);
+
   // Return formatted data ready for export
   return {
     // Seção 1: Dados Gerais
     Evento: getEventoLabel(formData.evento),
     "Público Atendido": getPublicoAtendidoLabel(formData.publicoAtendido),
-    "Localidade no evento": getLocalidadeEventoText(),
-    ...(isLocalidadeEventoOutro() && formData.localidadeEventoOutro
-      ? { "Outra localidade": formData.localidadeEventoOutro }
+    ...(usaLocalidade
+      ? {
+          [EXPORT_LOCALIDADE_COLUMN]: getLocalidadeEventoText(),
+          ...(isLocalidadeEventoOutro() && formData.localidadeEventoOutro
+            ? { [EXPORT_LOCALIDADE_OUTRO_COLUMN]: formData.localidadeEventoOutro }
+            : {}),
+        }
       : {}),
 
     // Seção 2: Procedência do indivíduo
-    [getResidentePerguntaLabel(
-      exportOptions?.modoLocalidadeEvento ?? "NAO_USA",
-    ).replace(/\?$/, "")]: getResidenteBelemLabel(formData.residenteBelem),
-    Bairro: getBairroText(),
+    [getExportResidenteColumnLabel(modoExportacao)]: getResidenteBelemLabel(
+      formData.residenteBelem,
+    ),
+    ...(usaLocalidade ? {} : { [EXPORT_BAIRRO_COLUMN]: getBairroText() }),
     Município: getMunicipioText(),
     UF: getUfText(),
     "País de Procedência": getPaisLabel(formData.paisProcedencia),
@@ -1123,28 +1138,15 @@ export const exportToPDF = (
 
     let currentY = 25;
 
-    // Definir as seções e seus campos
+    const modoExportacao = exportOptions?.modoLocalidadeEvento ?? "NAO_USA";
     const sections = [
       {
         title: "1. Dados Gerais",
-        fields: [
-          "Evento",
-          "Público Atendido",
-          "Localidade no evento",
-          "Outra localidade",
-        ],
+        fields: getExportDadosGeraisFieldKeys(modoExportacao),
       },
       {
         title: "2. Procedência do indivíduo",
-        fields: [
-          "Residente em Belém",
-          "Bairro",
-          "Município",
-          "UF",
-          "País de Procedência",
-          "Local de Hospedagem",
-          "Contato do Local",
-        ],
+        fields: getExportPdfProcedenciaFieldKeys(modoExportacao),
       },
       {
         title: "3. Identificação do indivíduo",
@@ -1289,7 +1291,7 @@ export const exportToPDF = (
 // ===================================================================
 
 // Prepara dados de um objeto notificação para exportação
-const formatNotificacaoForExport = (
+export const formatNotificacaoForExport = (
   notificacao: NotificacaoItem,
   options?: ExportOptions
 ): ExportData => {
@@ -1396,6 +1398,32 @@ const formatNotificacaoForExport = (
     }
 
     return original.bairro || "";
+  };
+
+  const getLocalidadeEventoText = (): string => {
+    const locality = original.localidade_evento;
+    if (locality && typeof locality === "object" && locality.nome) {
+      return locality.ativo === false
+        ? `${locality.nome} (inativa)`
+        : String(locality.nome);
+    }
+
+    const localityId =
+      original.localidade_evento_id ?? notificacao.localidade_evento_id;
+    if (options?.localidadeEventoOptions && localityId) {
+      return getLabelFromOptions(
+        String(localityId),
+        options.localidadeEventoOptions,
+        "id",
+        "nome"
+      );
+    }
+
+    return "";
+  };
+
+  const getLocalidadeOutroText = (): string => {
+    return original.localidade_evento_outro || "";
   };
 
   // 5. Função para obter UF/Estado
@@ -1616,6 +1644,9 @@ const formatNotificacaoForExport = (
     observavao_incidente: original.observavao_incidente
   });
 
+  const modoExportacao = options?.modoLocalidadeEvento ?? "NAO_USA";
+  const usaLocalidade = usaLocalidadeEvento(modoExportacao);
+
   // Construir objeto com todos os dados formatados
   return {
     // Dados Gerais
@@ -1629,9 +1660,15 @@ const formatNotificacaoForExport = (
       options?.publicoOptions || [],
       "idtipo_publico"
     ),
+    ...(usaLocalidade
+      ? {
+          [EXPORT_LOCALIDADE_COLUMN]: getLocalidadeEventoText(),
+          [EXPORT_LOCALIDADE_OUTRO_COLUMN]: getLocalidadeOutroText(),
+        }
+      : {}),
 
     // Procedência do indivíduo
-    "Residente em Belém": getResidenteText(),
+    [getExportResidenteColumnLabel(modoExportacao)]: getResidenteText(),
     "País de Procedência": getLabelFromOptions(
       original.tipo_pais_idtipo_pais?.toString(),
       options?.paisOptions || [],
@@ -1639,7 +1676,7 @@ const formatNotificacaoForExport = (
     ),
     UF: getUfText(), // Usando a função aprimorada
     Município: getMunicipioText(), // Usando a função aprimorada
-    Bairro: getBairroText(), // Usando a função aprimorada
+    ...(usaLocalidade ? {} : { [EXPORT_BAIRRO_COLUMN]: getBairroText() }),
     "Local de Hospedagem": original.local_hospedagem || "",
     "DDI Local": contatoLocalProcessado.ddi,
     "Contato do Local": contatoLocalProcessado.number,
@@ -1937,6 +1974,7 @@ export const exportListToPDF = (
     const formattedData = notificacoes.map((item) =>
       formatNotificacaoForExport(item, exportOptions)
     );
+    const modoExportacao = exportOptions?.modoLocalidadeEvento ?? "NAO_USA";
 
     // Criar dois documentos separados com orientações diferentes
     // 1. Documento para tabela resumida (paisagem)
@@ -2027,7 +2065,7 @@ export const exportListToPDF = (
     const sections = [
       {
         title: "Dados Gerais",
-        fields: ["Evento", "Público Atendido"],
+        fields: getExportDadosGeraisFieldKeys(modoExportacao),
       },
       {
         title: "Identificação do Paciente",
@@ -2047,15 +2085,7 @@ export const exportListToPDF = (
       },
       {
         title: "Procedência",
-        fields: [
-          "Residente em Belém",
-          "País de Procedência",
-          "UF",
-          "Município",
-          "Bairro",
-          "Local de Hospedagem",
-          "Contato do Local",
-        ],
+        fields: getExportPdfProcedenciaFieldKeys(modoExportacao),
       },
       {
         title: "Atendimento e Sintomas",
@@ -2451,6 +2481,7 @@ export const exportListToPDFFormsOnly = (
     const formattedData = notificacoes.map((item) =>
       formatNotificacaoForExport(item, exportOptions)
     );
+    const modoExportacao = exportOptions?.modoLocalidadeEvento ?? "NAO_USA";
 
     // Criar documento em retrato
     const doc = new jsPDF({
@@ -2463,7 +2494,7 @@ export const exportListToPDFFormsOnly = (
     const sections = [
       {
         title: "Dados Gerais",
-        fields: ["Evento", "Público Atendido"],
+        fields: getExportDadosGeraisFieldKeys(modoExportacao),
       },
       {
         title: "Identificação do Paciente",
@@ -2484,16 +2515,7 @@ export const exportListToPDFFormsOnly = (
       },
       {
         title: "Procedência",
-        fields: [
-          "Residente em Belém",
-          "País de Procedência",
-          "UF",
-          "Município",
-          "Bairro",
-          "Local de Hospedagem",
-          "DDI Local",
-          "Contato do Local",
-        ],
+        fields: getExportPdfProcedenciaFieldKeys(modoExportacao),
       },
       {
         title: "Atendimento e Sintomas",

@@ -77,6 +77,10 @@ export const isDashboardEventActive = (event: DashboardEventOption): boolean =>
   event.ativo === '1' ||
   event.ativo === 'S';
 
+export const eventUsesLocalidadeOperacional = (
+  modo: ModoLocalidadeEvento | null | undefined
+): boolean => modo === 'OPCIONAL' || modo === 'OBRIGATORIA';
+
 export const getNotificationEventId = (notification: unknown): number | null => {
   if (!notification || typeof notification !== 'object') {
     return null;
@@ -240,11 +244,28 @@ export const aggregateEventLocalities = (
     });
 };
 
+export const EVENT_LOCALITY_CHART_TOP_COUNT = 10;
+
+export const getRankedEventLocalities = (
+  data: EventLocalityAggregate[]
+): EventLocalityAggregate[] =>
+  [...data].sort((left, right) => {
+    if (right.count !== left.count) {
+      return right.count - left.count;
+    }
+
+    return left.label.localeCompare(right.label, 'pt-BR');
+  });
+
+export const getTopEventLocalitiesForChart = (
+  data: EventLocalityAggregate[],
+  limit = EVENT_LOCALITY_CHART_TOP_COUNT
+): EventLocalityAggregate[] => getRankedEventLocalities(data).slice(0, limit);
+
 export const getMappableEventLocalities = (
   data: EventLocalityAggregate[]
 ): EventLocalityAggregate[] =>
   data.filter((item) =>
-    !item.suppressed &&
     item.especial === 'NORMAL' &&
     item.exibirMapa &&
     item.latitude !== null &&

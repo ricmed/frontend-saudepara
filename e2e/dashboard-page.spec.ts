@@ -219,5 +219,114 @@ test.describe('Dashboard (Cirio) page', () => {
     await page.getByTitle('Resetar e limpar configuração salva').click();
     await expect(page.getByText('Mostrando todas as notificações')).toBeVisible();
   });
+
+  test('hides Bairros de Residência only when the selected event uses locality mode', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('offline_mode', 'true');
+      localStorage.setItem(
+        'user_data',
+        JSON.stringify({
+          preferred_username: 'it-dashboard',
+          roles: ['dashboard'],
+          groups: [],
+        }),
+      );
+    });
+
+    const notification = (id: number, eventId: number, eventLabel: string) => ({
+      idnotificacao: id,
+      created_at: '2026-03-10T12:00:00.000Z',
+      updated_at: '2026-03-10T12:00:00.000Z',
+      residente_belem: 'E',
+      tipo_evento_idtipo_evento: eventId,
+      tipo_evento: { idtipo_evento: eventId, descricao: eventLabel },
+      tipo_publico: { idtipo_publico: 1, descricao: 'PUB' },
+      tipo_atendimento: { idtipo_atendimento: 1, descricao: 'ATEND' },
+      tipo_encerramento: { idtipo_encerramento: 1, descricao: 'ENC' },
+      paciente: {
+        idpaciente: id,
+        nome: `Paciente IT ${id}`,
+        idade: 24,
+        tipo_genero: { idtipo_genero: 1, descricao: 'Homem Cisgênero' },
+        tipo_raca: { idtipo_raca: 1, descricao: 'Branca' },
+      },
+      estabelecimento_notificacao_estabelecimento_idestabelecimentoToestabelecimento: {
+        idestabelecimento: 1,
+        nome: 'Estabelecimento IT',
+      },
+    });
+
+    await page.route('**/*', async (route) => {
+      const url = route.request().url();
+
+      if (url.includes('/api/tipo-evento')) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: [
+              {
+                idtipo_evento: 1,
+                descricao: 'IT_EVENTO_ATIVO',
+                ativo: 'S',
+                modo_localidade_evento: 'NAO_USA',
+              },
+              {
+                idtipo_evento: 2,
+                descricao: 'IT_EVENTO_LOCALIDADE',
+                ativo: 'S',
+                modo_localidade_evento: 'OBRIGATORIA',
+              },
+            ],
+          }),
+        });
+      }
+
+      if (url.includes('/api/notificacao') && url.includes('page=')) {
+        const eventId = new URL(url).searchParams.get('eventoId');
+        const data = eventId === '2'
+          ? [notification(201, 2, 'IT_EVENTO_LOCALIDADE')]
+          : [
+              notification(101, 1, 'IT_EVENTO_ATIVO'),
+              notification(201, 2, 'IT_EVENTO_LOCALIDADE'),
+            ];
+
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data,
+            meta: { total: data.length, totalPages: 1, page: 1, limit: 200 },
+          }),
+        });
+      }
+
+      if (url.includes('/api/')) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: [] }),
+        });
+      }
+
+      return route.continue();
+    });
+
+    await page.goto('/dashboard-page');
+    await expect(page.locator('[data-dashboard="main"]')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText('Bairros de Residência')).toBeVisible();
+    await expect(page.locator('[data-dashboard="event-localities"]')).toHaveCount(0);
+
+    const eventSelect = page.locator('label', { hasText: 'Evento' }).locator('xpath=following-sibling::select');
+    await eventSelect.selectOption({ label: 'IT_EVENTO_LOCALIDADE' });
+    await expect(page.getByText('Bairros de Residência')).toHaveCount(0);
+    await expect(page.locator('[data-dashboard="event-localities"]')).toBeVisible();
+    await expect(page.getByText('Países de Residência')).toBeVisible();
+    await expect(page.getByText('Municípios de Residência')).toBeVisible();
+
+    await eventSelect.selectOption({ label: 'IT_EVENTO_ATIVO' });
+    await expect(page.getByText('Bairros de Residência')).toBeVisible();
+    await expect(page.locator('[data-dashboard="event-localities"]')).toHaveCount(0);
+  });
 });
 

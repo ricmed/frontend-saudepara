@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   aggregateEventLocalities,
+  EVENT_LOCALITY_CHART_TOP_COUNT,
+  eventUsesLocalidadeOperacional,
   getEventLocalityMarkerRadius,
   getMappableEventLocalities,
+  getTopEventLocalitiesForChart,
   resolveAggregateCountPolicy
 } from './eventLocalities';
 import { HOMOLOGACAO_MIN_AGGREGATE_COUNT } from './aggregateCountDefaults';
@@ -28,6 +31,16 @@ const createNotification = (
       ...overrides
     }
   }
+});
+
+describe('event locality operational mode', () => {
+  it('hides residence neighborhoods only when the selected event uses locality mode', () => {
+    expect(eventUsesLocalidadeOperacional(undefined)).toBe(false);
+    expect(eventUsesLocalidadeOperacional(null)).toBe(false);
+    expect(eventUsesLocalidadeOperacional('NAO_USA')).toBe(false);
+    expect(eventUsesLocalidadeOperacional('OPCIONAL')).toBe(true);
+    expect(eventUsesLocalidadeOperacional('OBRIGATORIA')).toBe(true);
+  });
 });
 
 describe('event locality aggregate policy', () => {
@@ -134,7 +147,31 @@ describe('event locality aggregation', () => {
 
     expect(data.find((item) => item.id === 1)?.suppressed).toBe(true);
     expect(data.find((item) => item.id === 2)?.suppressed).toBe(false);
-    expect(getMappableEventLocalities(data).map((item) => item.id)).toEqual([2]);
+    expect(getMappableEventLocalities(data).map((item) => item.id).sort())
+      .toEqual([1, 2]);
+  });
+
+  it('keeps the chart at the same top-10 cut used by bairros', () => {
+    const ranked = getTopEventLocalitiesForChart(
+      Array.from({ length: 12 }, (_, index) => ({
+        id: index + 1,
+        label: `L${index + 1}`,
+        count: index + 1,
+        suppressed: false,
+        tipo: 'BAIRRO' as const,
+        especial: 'NORMAL' as const,
+        ribeirinha: false,
+        latitude: -2.43,
+        longitude: -54.7,
+        exibirMapa: true,
+        ordem: index + 1
+      }))
+    );
+
+    expect(EVENT_LOCALITY_CHART_TOP_COUNT).toBe(10);
+    expect(ranked).toHaveLength(10);
+    expect(ranked[0]?.label).toBe('L12');
+    expect(ranked[9]?.label).toBe('L3');
   });
 
   it('scales marker radius proportionally within bounds', () => {

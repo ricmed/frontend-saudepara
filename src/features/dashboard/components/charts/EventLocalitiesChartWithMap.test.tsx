@@ -8,16 +8,23 @@ vi.mock('./EventLocalitiesMiniMap', () => ({
   default: () => <div data-testid="event-localities-map" />
 }));
 
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+vi.stubGlobal('ResizeObserver', ResizeObserverStub);
+
 const createAggregate = (
   id: number,
   label: string,
-  count: number,
-  suppressed: boolean
+  count: number
 ): EventLocalityAggregate => ({
   id,
   label,
   count,
-  suppressed,
+  suppressed: count < 5,
   tipo: 'BAIRRO',
   especial: 'NORMAL',
   ribeirinha: false,
@@ -28,55 +35,34 @@ const createAggregate = (
 });
 
 describe('EventLocalitiesChartWithMap', () => {
-  it('hides exact small counts and disables their filter', () => {
+  it('ranks every locality with the exact count and charts only the top 10', () => {
     const onLocalityClick = vi.fn();
+    const data = [
+      ...Array.from({ length: 11 }, (_, index) =>
+        createAggregate(index + 1, `Localidade ${index + 1}`, 20 - index)
+      ),
+      createAggregate(99, 'Pequena', 2)
+    ];
 
     render(
       <EventLocalitiesChartWithMap
         eventDescription="Evento de teste"
-        data={[
-          createAggregate(1, 'Reservado', 2, true),
-          createAggregate(2, 'Liberado', 8, false)
-        ]}
-        selectedLocalityIds={[2]}
-        aggregatePolicy={{
-          enabled: true,
-          minimumCount: 5,
-          source: 'environment'
-        }}
+        data={data}
+        selectedLocalityIds={[99]}
         onLocalityClick={onLocalityClick}
       />
     );
 
-    const suppressed = screen.getByRole('listitem', {
-      name: 'Reservado: <5 notificações'
-    });
-    expect(suppressed).toBeDisabled();
-    expect(screen.queryByText('2')).not.toBeInTheDocument();
+    expect(screen.getByText('Top 10 Localidades')).toBeInTheDocument();
+    expect(screen.getByText('Todas as Localidades')).toBeInTheDocument();
+    expect(screen.getByText('12 localidades')).toBeInTheDocument();
+    expect(screen.getByRole('listitem', {
+      name: 'Pequena: 2 notificações'
+    })).toBeEnabled();
 
     fireEvent.click(screen.getByRole('listitem', {
-      name: 'Liberado: 8 notificações'
+      name: 'Pequena: 2 notificações'
     }));
-    expect(onLocalityClick).toHaveBeenCalledWith(2, false);
-    expect(screen.getByTestId('event-localities-map')).toBeInTheDocument();
-  });
-
-  it('fails closed without an approved production threshold', () => {
-    render(
-      <EventLocalitiesChartWithMap
-        eventDescription="Evento de teste"
-        data={[createAggregate(1, 'Não deve aparecer', 20, true)]}
-        selectedLocalityIds={[]}
-        aggregatePolicy={{
-          enabled: false,
-          minimumCount: null,
-          source: 'disabled'
-        }}
-        onLocalityClick={vi.fn()}
-      />
-    );
-
-    expect(screen.getByText(/Granularidade indisponível/)).toBeInTheDocument();
-    expect(screen.queryByText('Não deve aparecer')).not.toBeInTheDocument();
+    expect(onLocalityClick).toHaveBeenCalledWith(99, false);
   });
 });

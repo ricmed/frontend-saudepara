@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, startTransition } from "react";
+import { useNavigate } from "react-router-dom";
 import DashboardExportMenu from '@/components/common/DashboardExportMenu';
 import {
   BarChart,
@@ -55,7 +56,9 @@ import {
 
 // 🆕 NOVOS IMPORTS: Componentes do dashboard aprimorado
 import GeographicLocationPanel from './components/charts/GeographicLocationPanel';
-import EventLocalitiesChartWithMap from './components/charts/EventLocalitiesChartWithMap';
+import EventLocalitiesChartWithMap, {
+  EventLocalitiesMapSection
+} from './components/charts/EventLocalitiesChartWithMap';
 import DashboardTabs, { useDashboardTabs } from './components/DashboardTabs';
 // Componentes de IA temporariamente comentados - serão usados no futuro
 // import AIInsights from './components/AIInsights';
@@ -91,6 +94,7 @@ import {
 import {
   aggregateEventLocalities,
   DashboardEventOption,
+  eventUsesLocalidadeOperacional,
   getNotificationEventId,
   getNotificationEventLocalityId,
   isDashboardEventActive,
@@ -227,6 +231,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
   onEventSelectionChange,
   onDataRefresh,
 }) => {
+  const navigate = useNavigate();
   // ⚡ OTIMIZAÇÃO: Sistema de log condicional para produção
   const DEBUG_MODE = process.env.NODE_ENV === 'development';
   const debugLog = useCallback((...args: any[]) => {
@@ -433,9 +438,23 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     [dashboardEventOptions, selectedEventId]
   );
   const selectedEventDescription = selectedEvent?.descricao ?? '';
-  const shouldShowEventLocalities =
-    selectedEvent?.modo_localidade_evento === 'OPCIONAL' ||
-    selectedEvent?.modo_localidade_evento === 'OBRIGATORIA';
+  const shouldShowEventLocalities = eventUsesLocalidadeOperacional(
+    selectedEvent?.modo_localidade_evento
+  );
+  const hideResidenceNeighborhoods = shouldShowEventLocalities;
+  const residenceNeighborhoodExportData = hideResidenceNeighborhoods
+    ? []
+    : filteredBairro;
+
+  useEffect(() => {
+    if (!hideResidenceNeighborhoods) {
+      return;
+    }
+
+    setActiveFilters((previous) => (
+      previous.bairro == null ? previous : { ...previous, bairro: null }
+    ));
+  }, [hideResidenceNeighborhoods]);
 
   // Mapeamento de descrições para identificadores de filtro
   const atendimentoToFilterKey = ATENDIMENTO_TO_FILTER_KEY;
@@ -1382,13 +1401,10 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     }
 
     const selectableIds = new Set(
-      eventLocalityAggregates
-        .filter((item) => !item.suppressed)
-        .map((item) => item.id)
+      eventLocalityAggregates.map((item) => item.id)
     );
     const selectionRemainsAllowed =
       shouldShowEventLocalities &&
-      EVENT_LOCALITY_AGGREGATE_POLICY.enabled &&
       selectedEventLocalityIds.every((id) => selectableIds.has(id));
 
     if (!selectionRemainsAllowed) {
@@ -3011,7 +3027,8 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     setActiveFilters(prev => ({
       ...prev,
       evento: normalizedEventId,
-      localidadeEvento: null
+      localidadeEvento: null,
+      bairro: null
     }));
 
     void onEventSelectionChange?.(normalizedEventId);
@@ -3059,10 +3076,9 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     toggleFilter(category, itemName, multiSelect);
   }, [toggleFilter]);
 
-  // Handler para o botão de voltar
   const handleBackButton = useCallback(() => {
-    window.history.back();
-  }, []);
+    navigate('/');
+  }, [navigate]);
 
   useEffect(() => {
     refreshDataRef.current = refreshData;
@@ -3425,8 +3441,11 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
         <div className={`mx-auto flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 ${getMaxWidth()}`}>
           <div className="flex items-center gap-2 sm:gap-3 text-white">
             <button
+              type="button"
               className="p-1.5 sm:p-2 hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
-              title="Voltar"
+              title="Voltar para o início"
+              aria-label="Voltar para o início"
+              data-testid="dashboard-back"
               onClick={handleBackButton}
             >
               <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
@@ -3496,7 +3515,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
                 paisData={filteredPais}
                 estadoData={filteredEstado}
                 municipioData={filteredMunicipio}
-                bairroData={filteredBairro}
+                bairroData={residenceNeighborhoodExportData}
                 estabelecimentosData={filteredUnidades}
                 publicoData={filteredPublico}
                 tipoAtendimentoData={filteredTipoAtendimento}
@@ -3630,6 +3649,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
               <div className="flex flex-wrap gap-2">
                 {Object.entries(activeFilters).map(([category, value]) => {
                   if (value === null) return null;
+                  if (category === 'bairro' && hideResidenceNeighborhoods) return null;
                   
                   const categoryLabels: Record<string, string> = {
                     evento: 'Evento',
@@ -4001,29 +4021,41 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
               paisData={filteredPais}
               estadoData={filteredEstado}
               municipioData={filteredMunicipio}
-              bairroData={filteredBairro}
+              bairroData={residenceNeighborhoodExportData}
+              hideResidenceNeighborhoods={hideResidenceNeighborhoods}
+              eventLocalitiesChart={
+                shouldShowEventLocalities && selectedEventDescription ? (
+                  <MemoizedEventLocalitiesChartWithMap
+                    eventDescription={selectedEventDescription}
+                    data={eventLocalityAggregates}
+                    selectedLocalityIds={selectedEventLocalityIds}
+                    onLocalityClick={(localityId, multiSelect) => {
+                      toggleFilter(
+                        'localidadeEvento',
+                        localityId,
+                        multiSelect ?? false
+                      );
+                    }}
+                  />
+                ) : null
+              }
+              eventLocalitiesMap={
+                shouldShowEventLocalities ? (
+                  <div className="rounded-lg border border-gray-200 p-4">
+                    <EventLocalitiesMapSection
+                      data={eventLocalityAggregates}
+                      selectedLocalityIds={selectedEventLocalityIds}
+                      onLocalityClick={(localityId) => {
+                        toggleFilter('localidadeEvento', localityId, false);
+                      }}
+                    />
+                  </div>
+                ) : null
+              }
               onFilterClick={toggleFilter}
               activeFilters={activeFilters}
             />
           </div>
-
-          {shouldShowEventLocalities && selectedEventDescription && (
-            <div className="sm:col-span-2 lg:col-span-4 xl:col-span-8">
-              <MemoizedEventLocalitiesChartWithMap
-                eventDescription={selectedEventDescription}
-                data={eventLocalityAggregates}
-                selectedLocalityIds={selectedEventLocalityIds}
-                aggregatePolicy={EVENT_LOCALITY_AGGREGATE_POLICY}
-                onLocalityClick={(localityId, multiSelect) => {
-                  toggleFilter(
-                    'localidadeEvento',
-                    localityId,
-                    multiSelect ?? false
-                  );
-                }}
-              />
-            </div>
-          )}
 
           {/* =============================================== */}
           {/* LINHA 5: Estabelecimentos e Pirâmide Etária (Grid 8 cols: 4+4) */}
@@ -4124,7 +4156,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
               paisData={filteredPais}
               estadoData={filteredEstado}
               municipioData={filteredMunicipio}
-              bairroData={filteredBairro}
+              bairroData={residenceNeighborhoodExportData}
               publicoData={filteredPublico}
               tipoAtendimentoData={filteredTipoAtendimento}
               generoData={filteredGenero}
@@ -4172,7 +4204,7 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
               paisData={filteredPais}
               estadoData={filteredEstado}
               municipioData={filteredMunicipio}
-              bairroData={filteredBairro}
+              bairroData={residenceNeighborhoodExportData}
               publicoData={filteredPublico}
               tipoAtendimentoData={filteredTipoAtendimento}
               generoData={filteredGenero}

@@ -1,12 +1,14 @@
 // src/features/notificationForms/components/TableHeader.tsx
 import React, { useRef } from 'react';
-import { Menu, ArrowLeft, Plus, ChevronUp, ChevronDown, Download } from 'lucide-react';
+import { Menu, ArrowLeft, Plus, ChevronUp, ChevronDown, Download, BarChart2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import SearchBar from './SearchBar';
 import ColumnsMenu from './ColumnsMenu';
 import SortingMenu from './SortingMenu';
 import ExportMenu from './ExportMenu';
 import { ColumnDefinition, SearchParams } from '../types';
+import type { EventoOption } from '../types/index2';
+import type { PDFExportType } from '@/features/notificationForms/components/exportUtilities';
 
 interface TableHeaderProps {
   onMenuOpen: () => void;
@@ -25,8 +27,9 @@ interface TableHeaderProps {
   onSortChange: (key: string) => void;
   exportMenuOpen: boolean;
   onExportMenuToggle: () => void;
-  onExport: (format: 'csv' | 'excel' | 'pdf', type: 'page' | 'all') => void;
+  onExport: (format: 'csv' | 'excel' | 'pdf', type: 'page' | 'all', pdfType?: PDFExportType, eventId?: number) => void;
   searchFields: { value: SearchParams['field']; label: string }[];
+  exportEventos: EventoOption[];
 }
 
 const TableHeader: React.FC<TableHeaderProps> = ({
@@ -47,7 +50,8 @@ const TableHeader: React.FC<TableHeaderProps> = ({
   exportMenuOpen,
   onExportMenuToggle,
   onExport,
-  searchFields
+  searchFields,
+  exportEventos
 }) => {
   const navigate = useNavigate();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -131,13 +135,24 @@ const TableHeader: React.FC<TableHeaderProps> = ({
                 isOpen={exportMenuOpen}
                 onExport={onExport}
                 isLoading={false}
+                eventos={exportEventos}
               />
             </div>
 
-            {/* Botão Nova Comunicação - apenas ícone */}
+            <button
+              type="button"
+              onClick={() => navigate("/dashboard-page")}
+              className="p-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-md hover:from-purple-700 hover:to-purple-800 transition-all touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+              title="Dashboard"
+              aria-label="Dashboard"
+              data-testid="lista-caso-dashboard-mobile"
+            >
+              <BarChart2 className="h-5 w-5" />
+            </button>
+
             <button
               onClick={() => navigate("/private/comunicacao-de-caso/nova")}
-              className="p-3 bg-white/10 text-white rounded-md hover:bg-white/20 transition-colors ml-auto touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+              className="p-3 bg-blue-900 text-white rounded-md hover:bg-blue-800 transition-colors ml-auto touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
               title="Nova Comunicação de Caso"
             >
               <Plus className="h-5 w-5" />
@@ -245,6 +260,7 @@ const TableHeader: React.FC<TableHeaderProps> = ({
                 isOpen={exportMenuOpen}
                 onExport={onExport}
                 isLoading={false}
+                eventos={exportEventos}
               />
             </div>
 
@@ -260,13 +276,26 @@ const TableHeader: React.FC<TableHeaderProps> = ({
               debounceTime={300}
             />
 
-            {/* Botão Nova Notificação */}
+            <button
+              type="button"
+              onClick={() => navigate("/dashboard-page")}
+              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-md hover:from-purple-700 hover:to-purple-800 transition-colors flex items-center gap-2"
+              title="Dashboard"
+              aria-label="Dashboard"
+              data-testid="lista-caso-dashboard"
+            >
+              <BarChart2 className="h-4 w-4" />
+              Dashboard
+            </button>
+
             <button
               onClick={() => navigate("/private/comunicacao-de-caso/nova")}
-              className="px-4 py-2 bg-white text-blue-600 rounded-md hover:bg-gray-100 transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-blue-900 text-white rounded-md hover:bg-blue-800 transition-colors flex items-center gap-2"
+              title="Nova Comunicação de Caso"
+              aria-label="Nova Comunicação de Caso"
             >
-              <Plus className="h-5 w-5" />
-              Nova Comunicação de Caso
+              <Plus className="h-4 w-4" />
+              Nova Comunicação
             </button>
           </div>
         </div>
