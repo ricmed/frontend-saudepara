@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useOfflineSystem } from '@/hooks/useOfflineSystem';
-import { NotificacaoService } from '@/services/NotificacaoService';
+import { NotificacaoService, type NotificacaoListFilters } from '@/services/NotificacaoService';
 import { TiposEventoService } from '@/services/EventoService';
 import { LocalidadeEventoService } from '@/services/LocalidadeEventoService';
 import syncService from '@/services/syncService'; // ✅ AGORA SERÁ USADO
@@ -21,6 +21,7 @@ import {
 import { getModoLocalidadeEvento } from '../utils/formUtils';
 import { usaLocalidadeEvento } from '../utils/procedenciaResidencia';
 import { filterNotificationsByEvento } from '../utils/filterNotificationsByEvento';
+import { listFiltersForActiveEvents } from '../utils/listFiltersForActiveEvents';
 
 export const useNotifications = () => {
   // ✅ Integrar sistema offline
@@ -205,6 +206,45 @@ export const useNotifications = () => {
     }
   }, [loadEventosAtivos]);
 
+  const getAllForLista = useCallback(async (page: number, limit: number) => {
+    const filters = listFiltersForActiveEvents(await loadEventosAtivos());
+    if (!filters) {
+      return {
+        data: [],
+        meta: { total: 0, totalPages: 0, page, limit },
+      };
+    }
+    return NotificacaoService.getAll(page, limit, filters);
+  }, [loadEventosAtivos]);
+
+  const fetchPagesFromApi = useCallback(async (
+    filters: NotificacaoListFilters,
+    pageSize = 100,
+  ) => {
+    let page = 1;
+    let hasMore = true;
+    const collected: Notificacao[] = [];
+
+    while (hasMore) {
+      const response = await NotificacaoService.getAll(page, pageSize, filters);
+      if (response?.data?.length > 0) {
+        collected.push(...response.data);
+        if (
+          page >= response.meta.totalPages ||
+          response.data.length < pageSize
+        ) {
+          hasMore = false;
+        } else {
+          page += 1;
+        }
+      } else {
+        hasMore = false;
+      }
+    }
+
+    return collected;
+  }, []);
+
   // Estados existentes...
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   const [allNotificacoes, setAllNotificacoes] = useState<Notificacao[]>([]);
@@ -332,11 +372,6 @@ export const useNotifications = () => {
 
       // ✅ OTIMIZADO: Buscar dados frescos da API quando online
       let allNotificacoes: Notificacao[] = [];
-      
-      // ✅ CORRIGIDO: SEMPRE buscar da API primeiro quando online
-      let page = 1;
-      let hasMore = true;
-      const MODERATE_PAGE_SIZE = 100;
 
       // ✅ VERIFICAR: Só buscar da API se estiver online e autenticado
       const podeUsarAPI = await syncService.canUseOnlineMode();
@@ -354,31 +389,15 @@ export const useNotifications = () => {
         console.log(`✅ Usando ${allData.length} notificações (${allData.filter(n => n._isPending).length} pendentes + ${allData.filter(n => !n._isPending).length} cache)`);
         allNotificacoes = allData;
       } else {
-        // ✅ ONLINE: Buscar dados FRESCOS da API
-        console.log('🌐 Buscando TODAS as notificações da API (dados atualizados)...');
+        const filtrosLista = listFiltersForActiveEvents(await loadEventosAtivos());
+        if (!filtrosLista) {
+          console.warn('⚠️ Nenhum evento ativo — a lista não busca o cadastro geral');
+          allNotificacoes = [];
+        } else {
+        console.log('🌐 Buscando notificações da API após resolver o evento ativo...');
         
         try {
-          while (hasMore) {
-            console.log(`📄 Buscando página ${page}...`);
-            const response = await NotificacaoService.getAll(page, MODERATE_PAGE_SIZE);
-
-            if (response && response.data && response.data.length > 0) {
-              allNotificacoes = [...allNotificacoes, ...response.data];
-              console.log(`   ➜ ${response.data.length} notificações (Total: ${allNotificacoes.length}/${response.meta.total})`);
-
-              if (
-                page >= response.meta.totalPages ||
-                response.data.length < MODERATE_PAGE_SIZE
-              ) {
-                hasMore = false;
-                console.log(`✅ Busca completa: ${allNotificacoes.length} notificações`);
-              } else {
-                page++;
-              }
-            } else {
-              hasMore = false;
-            }
-          }
+          allNotificacoes = await fetchPagesFromApi(filtrosLista);
 
           // ✅ SALVAR NO CACHE para uso offline futuro
           if (allNotificacoes.length > 0) {
@@ -402,6 +421,7 @@ export const useNotifications = () => {
           } else {
             throw apiError; // Re-lançar erro se não há dados
           }
+        }
         }
       }
 
@@ -435,7 +455,7 @@ export const useNotifications = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [isOnline, filterNotificacoesComEventosAtivos, loadOfflineDisplayData]);
+  }, [isOnline, filterNotificacoesComEventosAtivos, loadOfflineDisplayData, fetchPagesFromApi, loadEventosAtivos]);
 
   // ✅ CARREGAR DADOS (online/offline) - useEffect principal
   useEffect(() => {
@@ -602,7 +622,7 @@ export const useNotifications = () => {
                 };
               } else if (await syncService.canUseOnlineMode()) {
                 // Se não há cache, buscar apenas os dados necessários da API (só se online/autenticado)
-                response = await NotificacaoService.getAll(currentPage, itemsPerPage);
+                response = await getAllForLista(currentPage, itemsPerPage);
               } else {
                 // Sistema offline/não autenticado e sem cache
                 console.log('⚠️ Sistema offline/não autenticado e sem cache para busca');
@@ -703,7 +723,7 @@ export const useNotifications = () => {
             try {
               // ✅ VERIFICAR: Só buscar da API se estiver online e autenticado
               if (await syncService.canUseOnlineMode()) {
-                response = await NotificacaoService.getAll(currentPage, itemsPerPage);
+                response = await getAllForLista(currentPage, itemsPerPage);
               } else {
                 console.log('⚠️ Sistema offline/não autenticado, não é possível buscar da API');
                 response = { data: [], meta: { total: 0, totalPages: 0, page: 1, limit: itemsPerPage } };
@@ -720,7 +740,7 @@ export const useNotifications = () => {
                     try {
                       // ✅ VERIFICAR: Só buscar dados adicionais se ainda estiver online/autenticado
                       if (await syncService.canUseOnlineMode()) {
-                        const moreData = await NotificacaoService.getAll(1, 200); // Reduzido de 1000 para 200
+                        const moreData = await getAllForLista(1, 200);
                         if (moreData && moreData.data) {
                           await indexedDBService.saveOpcoes('notificacoes-cache', moreData.data);
                           console.log('✅ Cache atualizado em background');
@@ -907,7 +927,7 @@ export const useNotifications = () => {
           await NotificacaoService.delete(id);
 
           // Recarregar os dados após a exclusão
-          const response = await NotificacaoService.getAll(
+          const response = await getAllForLista(
             currentPage,
             itemsPerPage
           );
@@ -929,7 +949,7 @@ export const useNotifications = () => {
             // Atualizar cache apenas se online/autenticado
             if (await syncService.canUseOnlineMode()) {
               try {
-                const allData = await NotificacaoService.getAll(1, 1000);
+                const allData = await getAllForLista(1, 1000);
                 if (allData && allData.data) {
                   await indexedDBService.saveOpcoes('notificacoes-cache', allData.data);
                 }
@@ -970,7 +990,9 @@ export const useNotifications = () => {
       }
 
       // Buscar dados - página atual ou todos
-      const dataToExport = type === "page" ? notificacoes : await fetchAllData();
+      const dataToExport = type === "page"
+        ? notificacoes
+        : await fetchPagesFromApi({ eventoId: eventId });
       const dataDoEvento = filterNotificationsByEvento(dataToExport || [], eventId);
 
       if (!dataDoEvento.length) {
