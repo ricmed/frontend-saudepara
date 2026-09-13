@@ -54,6 +54,72 @@ const EMPTY_EXPORT_OPTIONS: Record<string, any[]> = {
   cboOptions: []
 };
 
+type DashboardSupportingOptions = Omit<typeof EMPTY_EXPORT_OPTIONS, 'eventoOptions'>;
+
+/** Cache de catálogos do dashboard na sessão (mesmo payload; evita re-download). */
+let supportingOptionsSessionCache: DashboardSupportingOptions | null = null;
+let supportingOptionsInFlight: Promise<DashboardSupportingOptions> | null = null;
+
+/** Limpa o cache de catálogos (útil em testes). */
+export function clearDashboardSupportingOptionsCache() {
+  supportingOptionsSessionCache = null;
+  supportingOptionsInFlight = null;
+}
+
+async function loadSupportingOptionsFromApi(): Promise<DashboardSupportingOptions> {
+  const [
+    publicoOptions,
+    paisOptions,
+    estadoOptions,
+    municipioOptions,
+    racaOptions,
+    escolaridadeOptions,
+    generoOptions,
+    atendimentoOptions,
+    sintomaOptions,
+    hipoteseDiagOptions,
+    traumaOptions,
+    estabelecimentoOptions,
+    encerramentoOptions,
+    cboOptions,
+    bairroOptions
+  ] = await Promise.all([
+    NotificacaoService.getPublicoOptions(),
+    NotificacaoService.getPaisOptions(),
+    NotificacaoService.getEstadoOptions(),
+    NotificacaoService.getMunicipioOptions(),
+    NotificacaoService.getRacaOptions(),
+    NotificacaoService.getEscolaridadeOptions(),
+    NotificacaoService.getGeneroOptions(),
+    NotificacaoService.getAtendimentoOptions(),
+    NotificacaoService.getSintomaOptions(),
+    NotificacaoService.getHipoteseDiagOptions(),
+    NotificacaoService.getTraumaOptions(),
+    NotificacaoService.getEstabelecimentoOptions(),
+    NotificacaoService.getEncerramentoOptions(),
+    NotificacaoService.getCboOptions(),
+    NotificacaoService.getBairroOptions()
+  ]);
+
+  return {
+    publicoOptions,
+    paisOptions,
+    estadoOptions,
+    municipioOptions,
+    bairroOptions,
+    generoOptions,
+    racaOptions,
+    escolaridadeOptions,
+    atendimentoOptions,
+    sintomaOptions,
+    hipoteseDiagOptions,
+    traumaOptions,
+    estabelecimentoOptions,
+    encerramentoOptions,
+    cboOptions
+  };
+}
+
 export const useDashboardDataLoader = (options?: UseDashboardDataLoaderOptions) => {
   const [notificacoes, setNotificacoes] = useState<any[]>([]);
   const [exportOptions, setExportOptions] = useState<Record<string, any[]>>(
@@ -135,58 +201,23 @@ export const useDashboardDataLoader = (options?: UseDashboardDataLoaderOptions) 
     return notifications;
   }, [maxPages, verboseLogs]);
 
-  const fetchSupportingOptions = useCallback(async () => {
-    const [
-      publicoOptions,
-      paisOptions,
-      estadoOptions,
-      municipioOptions,
-      racaOptions,
-      escolaridadeOptions,
-      generoOptions,
-      atendimentoOptions,
-      sintomaOptions,
-      hipoteseDiagOptions,
-      traumaOptions,
-      estabelecimentoOptions,
-      encerramentoOptions,
-      cboOptions,
-      bairroOptions
-    ] = await Promise.all([
-      NotificacaoService.getPublicoOptions(),
-      NotificacaoService.getPaisOptions(),
-      NotificacaoService.getEstadoOptions(),
-      NotificacaoService.getMunicipioOptions(),
-      NotificacaoService.getRacaOptions(),
-      NotificacaoService.getEscolaridadeOptions(),
-      NotificacaoService.getGeneroOptions(),
-      NotificacaoService.getAtendimentoOptions(),
-      NotificacaoService.getSintomaOptions(),
-      NotificacaoService.getHipoteseDiagOptions(),
-      NotificacaoService.getTraumaOptions(),
-      NotificacaoService.getEstabelecimentoOptions(),
-      NotificacaoService.getEncerramentoOptions(),
-      NotificacaoService.getCboOptions(),
-      NotificacaoService.getBairroOptions()
-    ]);
+  const fetchSupportingOptions = useCallback(async (): Promise<DashboardSupportingOptions> => {
+    if (supportingOptionsSessionCache) {
+      return supportingOptionsSessionCache;
+    }
 
-    return {
-      publicoOptions,
-      paisOptions,
-      estadoOptions,
-      municipioOptions,
-      bairroOptions,
-      generoOptions,
-      racaOptions,
-      escolaridadeOptions,
-      atendimentoOptions,
-      sintomaOptions,
-      hipoteseDiagOptions,
-      traumaOptions,
-      estabelecimentoOptions,
-      encerramentoOptions,
-      cboOptions
-    };
+    if (!supportingOptionsInFlight) {
+      supportingOptionsInFlight = loadSupportingOptionsFromApi()
+        .then((options) => {
+          supportingOptionsSessionCache = options;
+          return options;
+        })
+        .finally(() => {
+          supportingOptionsInFlight = null;
+        });
+    }
+
+    return supportingOptionsInFlight;
   }, []);
 
   const loadDashboardData = useCallback(async () => {

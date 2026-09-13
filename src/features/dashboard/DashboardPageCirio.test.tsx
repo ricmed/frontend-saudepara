@@ -67,10 +67,12 @@ vi.mock('@/services/indexedDB', () => {
 import DashboardPageCirio from './DashboardPageCirio';
 import NotificacaoServiceModule from '@/services/NotificacaoService';
 import { TiposEventoService } from '@/services/EventoService';
+import { clearDashboardSupportingOptionsCache } from './hooks/useDashboardDataLoader';
 
 describe('DashboardPageCirio', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    clearDashboardSupportingOptionsCache();
   });
 
   it('filters notifications to only active events', async () => {
@@ -268,6 +270,53 @@ describe('DashboardPageCirio', () => {
       200,
       { eventoId: 2 }
     );
+  });
+
+  it('reuses supporting catalog cache across remounts in the same session', async () => {
+    (TiposEventoService.getAll as any).mockResolvedValue([
+      { idtipo_evento: 1, descricao: 'ATIVO', ativo: 'S' },
+    ]);
+    (NotificacaoServiceModule.getAll as any).mockResolvedValue({
+      data: [{ original: { tipo_evento: { idtipo_evento: 1 } } }],
+      meta: { total: 1, totalPages: 1, page: 1, limit: 200 },
+    });
+
+    const svc: any = NotificacaoServiceModule;
+    [
+      'getPublicoOptions',
+      'getPaisOptions',
+      'getEstadoOptions',
+      'getMunicipioOptions',
+      'getRacaOptions',
+      'getEscolaridadeOptions',
+      'getGeneroOptions',
+      'getAtendimentoOptions',
+      'getSintomaOptions',
+      'getHipoteseDiagOptions',
+      'getTraumaOptions',
+      'getEstabelecimentoOptions',
+      'getEncerramentoOptions',
+      'getCboOptions',
+      'getBairroOptions',
+    ].forEach((method) => svc[method].mockResolvedValue([]));
+
+    const first = render(<DashboardPageCirio />);
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-dashboard')).toBeInTheDocument();
+    });
+    expect(svc.getEstabelecimentoOptions).toHaveBeenCalledTimes(1);
+    expect(svc.getMunicipioOptions).toHaveBeenCalledTimes(1);
+    expect(svc.getCboOptions).toHaveBeenCalledTimes(1);
+
+    first.unmount();
+
+    render(<DashboardPageCirio />);
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-dashboard')).toBeInTheDocument();
+    });
+    expect(svc.getEstabelecimentoOptions).toHaveBeenCalledTimes(1);
+    expect(svc.getMunicipioOptions).toHaveBeenCalledTimes(1);
+    expect(svc.getCboOptions).toHaveBeenCalledTimes(1);
   });
 });
 
