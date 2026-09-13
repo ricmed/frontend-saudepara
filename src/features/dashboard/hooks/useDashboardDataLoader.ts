@@ -197,14 +197,26 @@ export const useDashboardDataLoader = (options?: UseDashboardDataLoaderOptions) 
 
       const events = await fetchEventOptions();
       eventOptionsRef.current = events;
-      selectedEventIdRef.current = null;
-      setSelectedEventId(null);
+
+      // Com um único evento ativo, já deixa o filtro escolhido (não "Todos").
+      const activeEvents = events.filter(isDashboardEventActive);
+      const initialEventId =
+        activeEvents.length === 1 ? Number(activeEvents[0].idtipo_evento) : null;
+      const resolvedInitialEventId =
+        initialEventId !== null &&
+        Number.isInteger(initialEventId) &&
+        initialEventId > 0
+          ? initialEventId
+          : null;
+
+      selectedEventIdRef.current = resolvedInitialEventId;
+      setSelectedEventId(resolvedInitialEventId);
 
       const [
         notifications,
         supportingOptions
       ] = await Promise.all([
-        fetchPaginatedNotifications(null, events),
+        fetchPaginatedNotifications(resolvedInitialEventId, events),
         fetchSupportingOptions()
       ]);
 

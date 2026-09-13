@@ -119,6 +119,53 @@ describe('DashboardPageCirio', () => {
     expect(NotificacaoServiceModule.getAll).toHaveBeenCalledWith(
       1,
       200,
+      { eventoId: 1 }
+    );
+  });
+
+  it('keeps "todos os ativos" when there is more than one active event', async () => {
+    (TiposEventoService.getAll as any).mockResolvedValue([
+      { idtipo_evento: 1, descricao: 'ATIVO A', ativo: 'S' },
+      { idtipo_evento: 2, descricao: 'ATIVO B', ativo: 'S' },
+    ]);
+
+    (NotificacaoServiceModule.getAll as any).mockResolvedValue({
+      data: [
+        { original: { tipo_evento: { idtipo_evento: 1 } } },
+        { original: { tipo_evento: { idtipo_evento: 2 } } },
+      ],
+      meta: { total: 2, totalPages: 1, page: 1, limit: 200 },
+    });
+
+    const svc: any = NotificacaoServiceModule;
+    [
+      'getPublicoOptions',
+      'getPaisOptions',
+      'getEstadoOptions',
+      'getMunicipioOptions',
+      'getRacaOptions',
+      'getEscolaridadeOptions',
+      'getGeneroOptions',
+      'getAtendimentoOptions',
+      'getSintomaOptions',
+      'getHipoteseDiagOptions',
+      'getTraumaOptions',
+      'getEstabelecimentoOptions',
+      'getEncerramentoOptions',
+      'getCboOptions',
+      'getBairroOptions',
+    ].forEach((m) => svc[m].mockResolvedValue([]));
+
+    render(<DashboardPageCirio />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-dashboard')).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId('notif-count').textContent).toBe('2');
+    expect(NotificacaoServiceModule.getAll).toHaveBeenCalledWith(
+      1,
+      200,
       { somenteEventosAtivos: true }
     );
   });

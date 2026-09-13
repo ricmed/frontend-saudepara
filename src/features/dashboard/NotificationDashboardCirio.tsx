@@ -362,6 +362,17 @@ const EnhancedNotificationDashboard: React.FC<DashboardProps> = ({
     bairro: null,
     localidadeEvento: null
   });
+
+  // Quando o loader pré-seleciona o único evento ativo, espelha no chip/filtro cruzado.
+  useEffect(() => {
+    setActiveFilters((prev) => {
+      if (prev.evento === selectedEventId) return prev;
+      return {
+        ...prev,
+        evento: selectedEventId,
+      };
+    });
+  }, [selectedEventId]);
   
   // 🆕 ESTADOS PARA FILTRO POR DATA DE NOTIFICAÇÃO
   const [selectedDataNotificacao, setSelectedDataNotificacao] = useState<string | null>(null);
