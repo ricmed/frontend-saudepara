@@ -174,10 +174,18 @@ describe('event locality aggregation', () => {
     expect(ranked[9]?.label).toBe('L3');
   });
 
-  it('scales marker radius proportionally within bounds', () => {
+  it('scales marker radius linearly so high vs low counts look clearly different', () => {
     expect(getEventLocalityMarkerRadius(0, 10)).toBe(0);
-    expect(getEventLocalityMarkerRadius(1, 100))
-      .toBeLessThan(getEventLocalityMarkerRadius(100, 100));
-    expect(getEventLocalityMarkerRadius(100, 100)).toBe(26);
+
+    const small = getEventLocalityMarkerRadius(5, 100);
+    const mid = getEventLocalityMarkerRadius(50, 100);
+    const large = getEventLocalityMarkerRadius(100, 100);
+
+    expect(small).toBeLessThan(mid);
+    expect(mid).toBeLessThan(large);
+    expect(large).toBe(42);
+    expect(small).toBe(5 + 0.05 * 37);
+    // Contraste forte: o maior deve ser bem maior que o menor
+    expect(large / small).toBeGreaterThan(5);
   });
 });

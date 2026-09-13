@@ -272,6 +272,14 @@ export const getMappableEventLocalities = (
     item.longitude !== null
   );
 
+export const EVENT_LOCALITY_MARKER_MIN_RADIUS = 5;
+export const EVENT_LOCALITY_MARKER_MAX_RADIUS = 42;
+
+/**
+ * Raio em pixels do circleMarker.
+ * Escala linear no intervalo [min, max] para contraste visual claro entre
+ * localidades com poucas vs muitas notificações (sqrt comprimia demais).
+ */
 export const getEventLocalityMarkerRadius = (
   count: number,
   maximumCount: number
@@ -280,6 +288,9 @@ export const getEventLocalityMarkerRadius = (
     return 0;
   }
 
-  const proportionalRadius = 8 + Math.sqrt(count / maximumCount) * 18;
-  return Math.min(26, Math.max(8, proportionalRadius));
+  const ratio = Math.min(1, count / maximumCount);
+  return (
+    EVENT_LOCALITY_MARKER_MIN_RADIUS +
+    ratio * (EVENT_LOCALITY_MARKER_MAX_RADIUS - EVENT_LOCALITY_MARKER_MIN_RADIUS)
+  );
 };
