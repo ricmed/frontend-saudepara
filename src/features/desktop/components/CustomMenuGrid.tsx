@@ -16,22 +16,22 @@ export const CustomMenuGrid: React.FC<CustomMenuGridProps> = ({
 
   const menuItems = [
     {
-      icon: <Building className="h-8 w-8 text-[#4A6CF7] mb-3" />,
+      icon: <Building className="h-8 w-8 text-[var(--sp-accent)] mb-3" />,
       label: t('menu.locations'),
       onClick: () => navigate('/mapa')
     },
     {
-      icon: <Heart className="h-8 w-8 text-[#4A6CF7] mb-3" />,
+      icon: <Heart className="h-8 w-8 text-[var(--sp-accent)] mb-3" />,
       label: t('menu.campaigns'),
       onClick: () => navigate('/campanhas')
     },
     {
-      icon: <Book className="h-8 w-8 text-[#4A6CF7] mb-3" />,
+      icon: <Book className="h-8 w-8 text-[var(--sp-accent)] mb-3" />,
       label: t('menu.materials'),
       onClick: () => navigate('/materiais-educativos')
     },
     {
-      icon: <MessageCircle className="h-8 w-8 text-[#4A6CF7] mb-3" />,
+      icon: <MessageCircle className="h-8 w-8 text-[var(--sp-accent)] mb-3" />,
       label: t('menu.fale_conosco'),
       onClick: () => navigate('/fale-conosco')
     }

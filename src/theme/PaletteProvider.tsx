@@ -4,7 +4,8 @@ import { useAuth } from '@/keycloak/AuthProvider';
 import useUserPermissions from '@/hooks/useUserPermissions';
 import {
   applyDocumentPalette,
-  isAdminMasterRoles,
+  canChooseUiPaletteRoles,
+  isForcedSairePaletteMunicipio,
   isForcedSairePaletteUsername,
   normalizeUiPalette,
   type UiPalette,
@@ -25,12 +26,12 @@ type PaletteContextValue = {
 const PaletteContext = createContext<PaletteContextValue | null>(null);
 
 function resolveEffectivePalette(params: {
-  isAdminMaster: boolean;
+  canChoosePalette: boolean;
   preferredPalette: UiPalette;
   forceSairePalette: boolean;
   eligibilityLoading: boolean;
 }): UiPalette {
-  if (params.isAdminMaster) {
+  if (params.canChoosePalette) {
     return params.preferredPalette;
   }
   if (params.eligibilityLoading && !params.forceSairePalette) {
@@ -44,7 +45,10 @@ export function PaletteProvider({ children }: { children: React.ReactNode }) {
   const permissions = useUserPermissions();
   const [saving, setSaving] = useState(false);
 
-  const isAdminMaster = useMemo(() => isAdminMasterRoles(user?.roles), [user?.roles]);
+  const canChoosePalette = useMemo(
+    () => canChooseUiPaletteRoles(user?.roles),
+    [user?.roles],
+  );
   const preferredPalette = useMemo(
     () => normalizeUiPalette(user?.uiPalette ?? user?.ui_palette),
     [user?.uiPalette, user?.ui_palette],
@@ -53,26 +57,31 @@ export function PaletteProvider({ children }: { children: React.ReactNode }) {
     () => isForcedSairePaletteUsername(user?.username),
     [user?.username],
   );
+  const forcedByMunicipio = useMemo(
+    () => isForcedSairePaletteMunicipio(permissions.municipioId),
+    [permissions.municipioId],
+  );
 
   const eligibility = useSaireEligibility({
     estabelecimentoId: permissions.estabelecimentoId,
     permissionsLoading: permissions.loading || authLoading,
   });
 
-  const forceSairePalette = eligibility.isSaireNotificadora || forcedByUsername;
+  const forceSairePalette =
+    eligibility.isSaireNotificadora || forcedByUsername || forcedByMunicipio;
 
   const palette = useMemo(
     () =>
       resolveEffectivePalette({
-        isAdminMaster,
+        canChoosePalette,
         preferredPalette,
         forceSairePalette,
         eligibilityLoading: eligibility.loading,
       }),
     [
+      canChoosePalette,
       eligibility.loading,
       forceSairePalette,
-      isAdminMaster,
       preferredPalette,
     ],
   );
@@ -83,8 +92,8 @@ export function PaletteProvider({ children }: { children: React.ReactNode }) {
 
   const setPalette = useCallback(
     async (next: UiPalette) => {
-      if (!isAdminMaster) {
-        throw new Error('Apenas admin master pode alterar a paleta');
+      if (!canChoosePalette) {
+        throw new Error('Sem permissão para alterar a paleta');
       }
       setSaving(true);
       try {
@@ -98,7 +107,7 @@ export function PaletteProvider({ children }: { children: React.ReactNode }) {
         setSaving(false);
       }
     },
-    [isAdminMaster, setUser],
+    [canChoosePalette, setUser],
   );
 
   const value = useMemo<PaletteContextValue>(
@@ -106,17 +115,17 @@ export function PaletteProvider({ children }: { children: React.ReactNode }) {
       palette,
       preferredPalette,
       loading: authLoading || permissions.loading || eligibility.loading,
-      isAdminMaster,
-      canChoosePalette: isAdminMaster,
+      isAdminMaster: canChoosePalette,
+      canChoosePalette,
       isSaireNotificadora: eligibility.isSaireNotificadora,
       setPalette,
       saving,
     }),
     [
       authLoading,
+      canChoosePalette,
       eligibility.isSaireNotificadora,
       eligibility.loading,
-      isAdminMaster,
       palette,
       permissions.loading,
       preferredPalette,

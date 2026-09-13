@@ -7,6 +7,9 @@ export const SAIRE_NOTIFICADORAS_CACHE_KEY_PREFIX = 'saire-notificadoras-evento-
 /** Usuários que recebem a paleta Rosa/Cinza por padrão (além das notificadoras Sairé). */
 export const SAIRE_PALETTE_USERNAMES = ['crs9', 'cievsoestedopara'] as const;
 
+/** Município Santarém (PA) — força Rosa/Cinza no nível municipal. */
+export const SAIRE_PALETTE_MUNICIPIO_IDS = [265] as const;
+
 export function isUiPalette(value: unknown): value is UiPalette {
   return value === 'default' || value === 'saire';
 }
@@ -20,12 +23,26 @@ export function isAdminMasterRoles(roles: unknown): boolean {
   return roles.some((role) => role === 'admin' || role === 'administrator');
 }
 
+/** Admin master ou CIEVS/escopo estadual (`admin.estado`) podem escolher a paleta. */
+export function canChooseUiPaletteRoles(roles: unknown): boolean {
+  if (!Array.isArray(roles)) return false;
+  return roles.some(
+    (role) => role === 'admin' || role === 'administrator' || role === 'admin.estado',
+  );
+}
+
 export function isForcedSairePaletteUsername(username: unknown): boolean {
   const normalized = String(username || '')
     .trim()
     .toLowerCase();
   if (!normalized) return false;
   return (SAIRE_PALETTE_USERNAMES as readonly string[]).includes(normalized);
+}
+
+export function isForcedSairePaletteMunicipio(municipioId: unknown): boolean {
+  const id = Number(municipioId);
+  if (!Number.isInteger(id) || id <= 0) return false;
+  return (SAIRE_PALETTE_MUNICIPIO_IDS as readonly number[]).includes(id);
 }
 
 export function isActiveEventFlag(value: unknown): boolean {

@@ -26,7 +26,7 @@ export const CustomLocalizeAqui: React.FC<CustomLocalizeAquiProps> = ({ selected
           className="flex flex-col items-center cursor-pointer group"
           onClick={() => navigateToMapa({ qualificacao: "Postos de atendimento - COP 30" })}
         >
-          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-[#4A6CF7] flex items-center justify-center mb-2 group-hover:bg-[#5A7CFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-[var(--sp-accent)] flex items-center justify-center mb-2 group-hover:bg-[var(--sp-accent-hover)] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
             <MapPin className="h-6 w-6 text-white" />
           </div>
           <span className="text-xs md:text-sm text-center font-medium leading-tight">
@@ -38,7 +38,7 @@ export const CustomLocalizeAqui: React.FC<CustomLocalizeAquiProps> = ({ selected
           className="flex flex-col items-center cursor-pointer group"
           onClick={() => navigateToMapa({ qualificacao: "Alojamentos - Cúpula dos Povos - COP 30" })}
         >
-          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-[#4A6CF7] flex items-center justify-center mb-2 group-hover:bg-[#5A7CFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-[var(--sp-accent)] flex items-center justify-center mb-2 group-hover:bg-[var(--sp-accent-hover)] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
             <Users className="h-6 w-6 text-white" />
           </div>
           <span className="text-xs md:text-sm text-center font-medium leading-tight">
@@ -50,7 +50,7 @@ export const CustomLocalizeAqui: React.FC<CustomLocalizeAquiProps> = ({ selected
           className="flex flex-col items-center cursor-pointer group"
           onClick={() => navigateToMapa({ qualificacao: "Posto fixo de atendimento - Aldeia COP 30" })}
         >
-          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-[#4A6CF7] flex items-center justify-center mb-2 group-hover:bg-[#5A7CFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-[var(--sp-accent)] flex items-center justify-center mb-2 group-hover:bg-[var(--sp-accent-hover)] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
             <Tent className="h-6 w-6 text-white" />
           </div>
           <span className="text-xs md:text-sm text-center font-medium leading-tight">
@@ -62,7 +62,7 @@ export const CustomLocalizeAqui: React.FC<CustomLocalizeAquiProps> = ({ selected
           className="flex flex-col items-center cursor-pointer group"
           onClick={() => navigateToMapa({ qualificacao: "Usinas da Paz - COP 30" })}
         >
-          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-[#4A6CF7] flex items-center justify-center mb-2 group-hover:bg-[#5A7CFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-[var(--sp-accent)] flex items-center justify-center mb-2 group-hover:bg-[var(--sp-accent-hover)] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
             <Home className="h-6 w-6 text-white" />
           </div>
           <span className="text-xs md:text-sm text-center font-medium leading-tight">
@@ -74,7 +74,7 @@ export const CustomLocalizeAqui: React.FC<CustomLocalizeAquiProps> = ({ selected
           className="flex flex-col items-center cursor-pointer group"
           onClick={() => navigateToMapa({ qualificacao: "Unidades de Pronto Atendimento - COP 30" })}
         >
-          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-[#4A6CF7] flex items-center justify-center mb-2 group-hover:bg-[#5A7CFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-[var(--sp-accent)] flex items-center justify-center mb-2 group-hover:bg-[var(--sp-accent-hover)] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
             <Ambulance className="h-6 w-6 text-white" />
           </div>
           <span className="text-xs md:text-sm text-center font-medium leading-tight">
@@ -86,7 +86,7 @@ export const CustomLocalizeAqui: React.FC<CustomLocalizeAquiProps> = ({ selected
           className="flex flex-col items-center cursor-pointer group"
           onClick={() => navigateToMapa({ qualificacao: "Centros de Atenção Psicossocial - COP 30" })}
         >
-          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-[#4A6CF7] flex items-center justify-center mb-2 group-hover:bg-[#5A7CFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-[var(--sp-accent)] flex items-center justify-center mb-2 group-hover:bg-[var(--sp-accent-hover)] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
             <Heart className="h-6 w-6 text-white" />
           </div>
           <span className="text-xs md:text-sm text-center font-medium leading-tight">
@@ -98,7 +98,7 @@ export const CustomLocalizeAqui: React.FC<CustomLocalizeAquiProps> = ({ selected
           className="flex flex-col items-center cursor-pointer group"
           onClick={() => navigateToMapa({ qualificacao: "Vacinação - COP 30" })}
         >
-          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-[#4A6CF7] flex items-center justify-center mb-2 group-hover:bg-[#5A7CFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-[var(--sp-accent)] flex items-center justify-center mb-2 group-hover:bg-[var(--sp-accent-hover)] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
             <Syringe className="h-6 w-6 text-white" />
           </div>
           <span className="text-xs md:text-sm text-center font-medium leading-tight">
