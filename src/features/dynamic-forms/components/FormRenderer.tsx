@@ -348,9 +348,9 @@ const PRENATAL_LAYOUT_KEYS = new Set([
 
 type LabMaePanelVariant = 'neutral' | 'quando' | 'hbv' | 'hcv';
 
-/** Paleta DAE: primary #3b5bdb, barras #5eafc6 / #06b6d4, rótulos #1e6f8c (ComunicacaoDaeDashboard). */
+/** Paleta DAE: primary via --sp-brand (troca com tema), barras #5eafc6 / #06b6d4. */
 const LAB_MAE_HBV_SURFACE =
-  'rounded-md border border-[#3b5bdb]/20 bg-[#3b5bdb]/[0.06] px-2 py-1';
+  'rounded-md border border-[var(--sp-brand)]/20 bg-[var(--sp-brand)]/[0.06] px-2 py-1';
 const LAB_MAE_HCV_SURFACE =
   'rounded-md border border-[#06b6d4]/25 bg-[#06b6d4]/[0.08] px-2 py-1';
 
@@ -373,9 +373,9 @@ const LAB_MAE_PANEL_STYLES: Record<
   },
   hbv: {
     container:
-      'border border-[#3b5bdb]/25 bg-[#3b5bdb]/[0.06] border-l-4 border-l-[#3b5bdb] shadow-sm',
-    badge: 'bg-[#3b5bdb]/15 text-[#364fc7] ring-1 ring-[#3b5bdb]/20',
-    title: 'text-[#364fc7]',
+      'border border-[var(--sp-brand)]/25 bg-[var(--sp-brand)]/[0.06] border-l-4 border-l-[var(--sp-brand)] shadow-sm',
+    badge: 'bg-[var(--sp-brand)]/15 text-[var(--sp-brand-soft)] ring-1 ring-[var(--sp-brand)]/20',
+    title: 'text-[var(--sp-brand-soft)]',
     subtitle: 'text-gray-600',
   },
   hcv: {
@@ -3208,7 +3208,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                                   <tr className="text-left text-gray-700">
                                     <th className="px-3 py-2 font-medium w-[28%] bg-slate-100/80">Momento</th>
                                     {showColB ? (
-                                      <th className="px-3 py-2 font-medium bg-[#3b5bdb]/10 text-[#364fc7]">
+                                      <th className="px-3 py-2 font-medium bg-[var(--sp-brand)]/10 text-[var(--sp-brand-soft)]">
                                         Hepatite B (HBsAg Reagente)
                                       </th>
                                     ) : null}
@@ -3226,7 +3226,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                                         {row.label}
                                       </td>
                                       {showColB ? (
-                                        <td className="px-3 py-2 bg-[#3b5bdb]/[0.04]">
+                                        <td className="px-3 py-2 bg-[var(--sp-brand)]/[0.04]">
                                           {renderQuandoCell(row.hbvKey)}
                                         </td>
                                       ) : null}

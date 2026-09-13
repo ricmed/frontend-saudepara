@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '@/i18n/useTranslations';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/keycloak/AuthProvider';
-import { Home, Map, Heart, User, FileText } from 'lucide-react';
+import { Home, Map, Heart, User } from 'lucide-react';
 import { Language } from '@/i18n/types';
+import { useSaireHomeCta } from '@/features/home/hooks/useSaireHomeCta';
+import { HomeFabSpeedDial } from '@/features/home/components/HomeFabSpeedDial';
 
 interface BottomNavigationProps {
   currentTab: string;
@@ -15,119 +17,121 @@ interface BottomNavigationProps {
 export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   currentTab,
   onTabChange,
-  selectedLanguage: propSelectedLanguage
+  selectedLanguage: propSelectedLanguage,
 }) => {
   const navigate = useNavigate();
-  const { selectedLanguage: contextLanguage } = useLanguage(); // Pegando a linguagem do contexto
-  const selectedLanguage = propSelectedLanguage || contextLanguage; // Use prop if provided, otherwise use context
-  const { t } = useTranslation(selectedLanguage); // Passando a linguagem para o hook
+  const { selectedLanguage: contextLanguage } = useLanguage();
+  const selectedLanguage = propSelectedLanguage || contextLanguage;
+  const { t } = useTranslation(selectedLanguage);
   const { user } = useAuth();
+  const { showSaireCaseButton, canAccessComunicacaoDae } = useSaireHomeCta();
 
-  const canAccessComunicacaoDae = !!user?.roles?.some((role: string) =>
-    ['comunicacao.dae', 'admin', 'admin.estado', 'admin.crs'].includes(role)
+  // Mantém compatibilidade se o hook ainda estiver carregando / usuário sem unidade.
+  const canAccessDaeFallback = !!user?.roles?.some((role: string) =>
+    ['comunicacao.dae', 'admin', 'admin.estado', 'admin.crs'].includes(role),
   );
+  const showDae = canAccessComunicacaoDae || canAccessDaeFallback;
 
   return (
-    <nav className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-100">
-      <div className="flex items-center h-16 relative px-2">
+    <nav className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-100 overflow-visible">
+      <div className="flex items-center h-16 relative px-2 overflow-visible">
         <div className="flex-1 flex justify-around items-center">
           <button
+            type="button"
             className="flex flex-col items-center"
             onClick={() => {
-              onTabChange("inicio");
-              navigate("/");
+              onTabChange('inicio');
+              navigate('/');
             }}
           >
             <Home
               className={`w-6 h-6 ${
-                currentTab === "inicio" ? "text-blue-600" : "text-gray-400"
+                currentTab === 'inicio' ? 'text-blue-600' : 'text-gray-400'
               }`}
             />
             <span
               className={`text-xs ${
-                currentTab === "inicio" ? "text-blue-600" : "text-gray-400"
+                currentTab === 'inicio' ? 'text-blue-600' : 'text-gray-400'
               }`}
             >
-              {t("nav.home")}
+              {t('nav.home')}
             </span>
           </button>
-          
+
           <button
+            type="button"
             className="flex flex-col items-center"
             onClick={() => {
-              onTabChange("mapa");
-              navigate("/mapa");
+              onTabChange('mapa');
+              navigate('/mapa');
             }}
           >
             <Map
               className={`w-6 h-6 ${
-                currentTab === "mapa" ? "text-blue-600" : "text-gray-400"
+                currentTab === 'mapa' ? 'text-blue-600' : 'text-gray-400'
               }`}
             />
             <span
               className={`text-xs ${
-                currentTab === "mapa" ? "text-blue-600" : "text-gray-400"
+                currentTab === 'mapa' ? 'text-blue-600' : 'text-gray-400'
               }`}
             >
-              {t("nav.map")}
+              {t('nav.map')}
             </span>
           </button>
         </div>
 
-        {/* FAB Button - Comunicar DAE */}
-        <div className="w-12"></div>
-        {canAccessComunicacaoDae && (
-          <button 
-            className="absolute -top-6 left-1/2 -translate-x-1/2 w-14 h-14 bg-blue-600 rounded-full flex flex-col items-center justify-center shadow-lg"
-            onClick={() => {
-              navigate("/private/comunicacao-dae/nova");
-            }}
-            title="Comunicar DAE"
-          >
-            <FileText className="w-6 h-6 text-white" />
-          </button>
-        )}
+        <HomeFabSpeedDial
+          showSaire={showSaireCaseButton}
+          showDae={showDae}
+          saireLabel={t('menu.reportSaireCase')}
+          daeLabel={t('menu.reportDAE')}
+          onSaireClick={() => navigate('/private/comunicacao-de-caso/nova')}
+          onDaeClick={() => navigate('/private/comunicacao-dae/nova')}
+        />
 
         <div className="flex-1 flex justify-around items-center">
           <button
+            type="button"
             className="flex flex-col items-center"
             onClick={() => {
-              onTabChange("campanhas");
-              navigate("/campanhas");
+              onTabChange('campanhas');
+              navigate('/campanhas');
             }}
           >
             <Heart
               className={`w-6 h-6 ${
-                currentTab === "campanhas" ? "text-blue-600" : "text-gray-400"
+                currentTab === 'campanhas' ? 'text-blue-600' : 'text-gray-400'
               }`}
             />
             <span
               className={`text-xs ${
-                currentTab === "campanhas" ? "text-blue-600" : "text-gray-400"
+                currentTab === 'campanhas' ? 'text-blue-600' : 'text-gray-400'
               }`}
             >
-              {t("nav.campaigns")}
+              {t('nav.campaigns')}
             </span>
           </button>
 
           <button
+            type="button"
             className="flex flex-col items-center"
             onClick={() => {
-              onTabChange("login");
-              navigate("/login");
+              onTabChange('login');
+              navigate('/login');
             }}
           >
             <User
               className={`w-6 h-6 ${
-                currentTab === "login" ? "text-blue-600" : "text-gray-400"
+                currentTab === 'login' ? 'text-blue-600' : 'text-gray-400'
               }`}
             />
             <span
               className={`text-xs ${
-                currentTab === "login" ? "text-blue-600" : "text-gray-400"
+                currentTab === 'login' ? 'text-blue-600' : 'text-gray-400'
               }`}
             >
-              {t("nav.entrar")}
+              {t('nav.entrar')}
             </span>
           </button>
         </div>

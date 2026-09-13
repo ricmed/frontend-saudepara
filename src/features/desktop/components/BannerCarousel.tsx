@@ -246,7 +246,7 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
                     <h2 className="text-3xl font-bold text-white mb-2">{item.titulo}</h2>
                     <p className="text-lg text-white/90">{item.descricao}</p>
                     <button 
-                      className="mt-4 bg-white text-[#3B5FFF] px-6 py-2 rounded-md font-medium hover:bg-blue-50"
+                      className="mt-4 bg-white text-[var(--sp-accent)] px-6 py-2 rounded-md font-medium hover:bg-blue-50"
                       onClick={(e) => {
                         e.stopPropagation();
                         if (!isDragging) {

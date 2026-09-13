@@ -27,7 +27,7 @@ export const MobileVersion: React.FC<MobileVersionProps> = ({
   const selectedLanguage = propSelectedLanguage || languageContext.selectedLanguage;
   
   return (
-    <div className="relative bg-blue-600 min-h-screen pb-16">
+    <div className="relative bg-blue-600 min-h-screen pb-16 overflow-visible">
       {/* Header */}
       <CustomHeader onMenuToggle={onMenuToggle} selectedLanguage={selectedLanguage} />
       

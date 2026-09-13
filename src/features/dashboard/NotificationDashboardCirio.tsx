@@ -19,6 +19,7 @@ import {
 } from "recharts";
 import { findRuleByHypothesis } from './config/vigilancia.config';
 import { getNotificacaoHipoteseIds } from './utils/hipotesesNotificacao';
+import { getThemeBrandHex } from '@/theme/palette';
 import {
   User,
   Activity,
@@ -136,13 +137,17 @@ import ChartExportMenu from '@/components/common/ChartExportMenu';
 
 // Exportações por gráfico usam o componente compartilhado ChartExportMenu.
 
-// Cores padronizadas - voltando para a paleta original com tonalidades de azul
+// Cores padronizadas — primary acompanha --sp-brand (tema Original / Sairé)
 const COLORS = {
-  primary: "#3b5bdb",
+  get primary() {
+    return getThemeBrandHex();
+  },
   secondary: "#e05297",
   accent: "#047481",
   neutral: "#374151",
-  masculino: "#3b5bdb",
+  get masculino() {
+    return getThemeBrandHex();
+  },
   feminino: "#e05297",
   ignorado: "#999999",
   // Paleta de azuis para os gráficos
@@ -192,7 +197,9 @@ const COLORS = {
   alarmante: "#f44336",     // Vermelho para hipóteses alarmantes
   alerta: "#ff9800",        // Laranja para alertas
   medio: "#facc15",         // Amarelo para prioridade média
-  normal: "#3b5bdb",        // Azul para casos normais
+  get normal() {
+    return getThemeBrandHex();
+  },
 };
 
 // Interface para as props do dashboard

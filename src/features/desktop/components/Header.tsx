@@ -119,7 +119,7 @@ export const Header: React.FC<HeaderProps> = ({
                 id="search-desktop"
                 type="search"
                 placeholder={t("search.placeholder")}
-                className="w-full bg-[#4D6FFF]/40 border border-white/10 rounded-full py-2.5 pl-10 pr-4 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50 focus:bg-[#4D6FFF]/60 focus:border-white/20 transition-all"
+                className="w-full bg-[var(--sp-accent-hover)]/40 border border-white/10 rounded-full py-2.5 pl-10 pr-4 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50 focus:bg-[var(--sp-accent-hover)]/60 focus:border-white/20 transition-all"
                 autoComplete="off"
               />
             </div>

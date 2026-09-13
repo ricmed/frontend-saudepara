@@ -36,6 +36,7 @@ import ChartExportMenu from '@/components/common/ChartExportMenu';
 import DashboardExportMenu from '@/components/common/DashboardExportMenu';
 import MapaDashboardDAE, { LocalizacaoMapa, LocalizacaoTipo } from '@/features/dashboard/components/MapaDashboardDAE';
 import { MapProviderProvider } from '@/features/maps/leaflet/contexts/MapProviderContext';
+import { getThemeBrandHex } from '@/theme/palette';
 import {
   formatDateTimePtBr,
 } from '@/features/comunicacao-dae/utils/dashboardFormatters';
@@ -374,7 +375,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                   serieTemporalData={dadosSerieTemporalData.map(d => ({
                     name: d.date,
                     value: d.total,
-                    fill: '#3b5bdb'
+                    fill: getThemeBrandHex()
                   }))}
                 />
 
@@ -637,7 +638,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                 chartData={dadosSerieTemporalData.map(d => ({
                   name: d.date,
                   value: d.total,
-                  fill: '#3b5bdb'
+                  fill: getThemeBrandHex()
                 }))}
                 chartTitle="Série Temporal - Comunicações DAE"
                 buttonVariant="icon"
@@ -659,8 +660,8 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                   <AreaChart data={dadosSerieTemporalData} margin={{ top: 30, right: 30, left: 20, bottom: 50 }}>
                     <defs>
                       <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b5bdb" stopOpacity={0.8} />
-                        <stop offset="95%" stopColor="#3b5bdb" stopOpacity={0.1} />
+                        <stop offset="5%" stopColor={getThemeBrandHex()} stopOpacity={0.8} />
+                        <stop offset="95%" stopColor={getThemeBrandHex()} stopOpacity={0.1} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -708,7 +709,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                     <Area
                       type="monotone"
                       dataKey="total"
-                      stroke="#3b5bdb"
+                      stroke={getThemeBrandHex()}
                       strokeWidth={2}
                       fill="url(#colorTotal)"
                       animationDuration={800}
@@ -716,7 +717,7 @@ const ComunicacaoDaeDashboard: React.FC = () => {
                       <LabelList
                         dataKey="total"
                         position="top"
-                        style={{ fill: '#3b5bdb', fontWeight: 'bold', fontSize: 12 }}
+                        style={{ fill: getThemeBrandHex(), fontWeight: 'bold', fontSize: 12 }}
                       />
                     </Area>
                   </AreaChart>

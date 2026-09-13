@@ -22,7 +22,7 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
             className="flex flex-col items-center cursor-pointer group"
             onClick={() => navigateToMapa({ qualificacao: "Postos de atendimento - COP 30" })}
           >
-            <div className="w-16 h-16 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-2 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+            <div className="w-16 h-16 rounded-full bg-[var(--sp-accent)] flex items-center justify-center mb-2 group-hover:bg-[var(--sp-accent-hover)] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
               <MapPin className="h-6 w-6 text-white" />
             </div>
             <span className="text-xs text-center font-medium leading-tight">
@@ -34,7 +34,7 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
             className="flex flex-col items-center cursor-pointer group"
             onClick={() => navigateToMapa({ qualificacao: "Alojamentos - Cúpula dos Povos - COP 30" })}
           >
-            <div className="w-16 h-16 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-2 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+            <div className="w-16 h-16 rounded-full bg-[var(--sp-accent)] flex items-center justify-center mb-2 group-hover:bg-[var(--sp-accent-hover)] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
               <Users className="h-6 w-6 text-white" />
             </div>
             <span className="text-xs text-center font-medium leading-tight">
@@ -46,7 +46,7 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
             className="flex flex-col items-center cursor-pointer group"
             onClick={() => navigateToMapa({ qualificacao: "Posto fixo de atendimento - Aldeia COP 30" })}
           >
-            <div className="w-16 h-16 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-2 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+            <div className="w-16 h-16 rounded-full bg-[var(--sp-accent)] flex items-center justify-center mb-2 group-hover:bg-[var(--sp-accent-hover)] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
               <Tent className="h-6 w-6 text-white" />
             </div>
             <span className="text-xs text-center font-medium leading-tight">
@@ -58,7 +58,7 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
             className="flex flex-col items-center cursor-pointer group"
             onClick={() => navigateToMapa({ qualificacao: "Usinas da Paz - COP 30" })}
           >
-            <div className="w-16 h-16 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-2 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+            <div className="w-16 h-16 rounded-full bg-[var(--sp-accent)] flex items-center justify-center mb-2 group-hover:bg-[var(--sp-accent-hover)] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
               <Home className="h-6 w-6 text-white" />
             </div>
             <span className="text-xs text-center font-medium leading-tight">
@@ -70,7 +70,7 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
             className="flex flex-col items-center cursor-pointer group"
             onClick={() => navigateToMapa({ qualificacao: "Unidades de Pronto Atendimento - COP 30" })}
           >
-            <div className="w-16 h-16 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-2 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+            <div className="w-16 h-16 rounded-full bg-[var(--sp-accent)] flex items-center justify-center mb-2 group-hover:bg-[var(--sp-accent-hover)] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
               <Ambulance className="h-6 w-6 text-white" />
             </div>
             <span className="text-xs text-center font-medium leading-tight">
@@ -82,7 +82,7 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
             className="flex flex-col items-center cursor-pointer group"
             onClick={() => navigateToMapa({ qualificacao: "Centros de Atenção Psicossocial - COP 30" })}
           >
-            <div className="w-16 h-16 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-2 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+            <div className="w-16 h-16 rounded-full bg-[var(--sp-accent)] flex items-center justify-center mb-2 group-hover:bg-[var(--sp-accent-hover)] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
               <Heart className="h-6 w-6 text-white" />
             </div>
             <span className="text-xs text-center font-medium leading-tight">
@@ -94,7 +94,7 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
             className="flex flex-col items-center cursor-pointer group"
             onClick={() => navigateToMapa({ qualificacao: "Vacinação - COP 30" })}
           >
-            <div className="w-16 h-16 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-2 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+            <div className="w-16 h-16 rounded-full bg-[var(--sp-accent)] flex items-center justify-center mb-2 group-hover:bg-[var(--sp-accent-hover)] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
               <Syringe className="h-6 w-6 text-white" />
             </div>
             <span className="text-xs text-center font-medium leading-tight">
@@ -115,7 +115,7 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
             className="flex flex-col items-center cursor-pointer group"
             onClick={() => navigateToMapa({ qualificacao: "Postos de atendimento - COP 30" })}
           >
-            <div className="w-20 h-20 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-3 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+            <div className="w-20 h-20 rounded-full bg-[var(--sp-accent)] flex items-center justify-center mb-3 group-hover:bg-[var(--sp-accent-hover)] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
               <MapPin className="h-8 w-8 text-white" />
             </div>
             <span className="text-sm font-medium text-center leading-tight">
@@ -127,7 +127,7 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
             className="flex flex-col items-center cursor-pointer group"
             onClick={() => navigateToMapa({ qualificacao: "Alojamentos - Cúpula dos Povos - COP 30" })}
           >
-            <div className="w-20 h-20 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-3 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+            <div className="w-20 h-20 rounded-full bg-[var(--sp-accent)] flex items-center justify-center mb-3 group-hover:bg-[var(--sp-accent-hover)] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
               <Users className="h-8 w-8 text-white" />
             </div>
             <span className="text-sm font-medium text-center leading-tight">
@@ -139,7 +139,7 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
             className="flex flex-col items-center cursor-pointer group"
             onClick={() => navigateToMapa({ qualificacao: "Posto fixo de atendimento - Aldeia COP 30" })}
           >
-            <div className="w-20 h-20 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-3 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+            <div className="w-20 h-20 rounded-full bg-[var(--sp-accent)] flex items-center justify-center mb-3 group-hover:bg-[var(--sp-accent-hover)] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
               <Tent className="h-8 w-8 text-white" />
             </div>
             <span className="text-sm font-medium text-center leading-tight">
@@ -151,7 +151,7 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
             className="flex flex-col items-center cursor-pointer group"
             onClick={() => navigateToMapa({ qualificacao: "Usinas da Paz - COP 30" })}
           >
-            <div className="w-20 h-20 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-3 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+            <div className="w-20 h-20 rounded-full bg-[var(--sp-accent)] flex items-center justify-center mb-3 group-hover:bg-[var(--sp-accent-hover)] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
               <Home className="h-8 w-8 text-white" />
             </div>
             <span className="text-sm font-medium text-center leading-tight">
@@ -163,7 +163,7 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
             className="flex flex-col items-center cursor-pointer group"
             onClick={() => navigateToMapa({ qualificacao: "Unidades de Pronto Atendimento - COP 30" })}
           >
-            <div className="w-20 h-20 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-3 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+            <div className="w-20 h-20 rounded-full bg-[var(--sp-accent)] flex items-center justify-center mb-3 group-hover:bg-[var(--sp-accent-hover)] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
               <Ambulance className="h-8 w-8 text-white" />
             </div>
             <span className="text-sm font-medium text-center leading-tight">
@@ -175,7 +175,7 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
             className="flex flex-col items-center cursor-pointer group"
             onClick={() => navigateToMapa({ qualificacao: "Centros de Atenção Psicossocial - COP 30" })}
           >
-            <div className="w-20 h-20 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-3 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+            <div className="w-20 h-20 rounded-full bg-[var(--sp-accent)] flex items-center justify-center mb-3 group-hover:bg-[var(--sp-accent-hover)] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
               <Heart className="h-8 w-8 text-white" />
             </div>
             <span className="text-sm font-medium text-center leading-tight">
@@ -187,7 +187,7 @@ export const LocalizeAqui: React.FC<LocalizeAquiProps> = ({ isMobile = true, sel
             className="flex flex-col items-center cursor-pointer group"
             onClick={() => navigateToMapa({ qualificacao: "Vacinação - COP 30" })}
           >
-            <div className="w-20 h-20 rounded-full bg-[#3B5FFF] flex items-center justify-center mb-3 group-hover:bg-[#4D6FFF] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
+            <div className="w-20 h-20 rounded-full bg-[var(--sp-accent)] flex items-center justify-center mb-3 group-hover:bg-[var(--sp-accent-hover)] group-hover:scale-105 transition-all duration-200 shadow-md group-hover:shadow-lg">
               <Syringe className="h-8 w-8 text-white" />
             </div>
             <span className="text-sm font-medium text-center leading-tight">

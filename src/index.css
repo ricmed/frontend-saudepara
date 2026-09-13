@@ -2,6 +2,52 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   Paletas de tema (Original / Rosa-Cinza Sairé)
+   Tailwind blue-* consome --sp-blue-*; hexes usam --sp-accent*
+   ============================================================ */
+:root,
+[data-palette='default'] {
+  /* Tailwind default blue scale (RGB channels) */
+  --sp-blue-50: 239 246 255;
+  --sp-blue-100: 219 234 254;
+  --sp-blue-200: 191 219 254;
+  --sp-blue-300: 147 197 253;
+  --sp-blue-400: 96 165 250;
+  --sp-blue-500: 59 130 246;
+  --sp-blue-600: 37 99 235;
+  --sp-blue-700: 29 78 216;
+  --sp-blue-800: 30 64 175;
+  --sp-blue-900: 30 58 138;
+  --sp-blue-950: 23 37 84;
+
+  --sp-accent: #3b5fff;
+  --sp-accent-hover: #4d6fff;
+  --sp-brand: #3b5bdb;
+  --sp-brand-soft: #364fc7;
+}
+
+[data-palette='saire'] {
+  /* Rosa (primário) + cinza de golfinho “comum” (bottlenose / slate-blue gray) */
+  --sp-blue-50: 255 241 246;
+  --sp-blue-100: 255 228 239;
+  --sp-blue-200: 254 205 224;
+  --sp-blue-300: 251 162 196;
+  --sp-blue-400: 244 114 168;
+  --sp-blue-500: 236 72 153;
+  --sp-blue-600: 225 29 112;
+  --sp-blue-700: 190 24 93;
+  /* Cinza de golfinho “comum” (Valspar Bottlenose Dolphin #656B6F + variações) */
+  --sp-blue-800: 125 133 138;
+  --sp-blue-900: 101 107 111;
+  --sp-blue-950: 63 68 72;
+
+  --sp-accent: #ff4d94;
+  --sp-accent-hover: #e11d70;
+  --sp-brand: #e11d70;
+  --sp-brand-soft: #be185d;
+}
+
 /* Animations */
 @keyframes fadeIn {
   from {

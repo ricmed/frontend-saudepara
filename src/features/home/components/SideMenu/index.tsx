@@ -28,8 +28,12 @@ import {
   ClipboardList,
   Settings,
   QrCode,
+  Palette,
   // LineChart, // ObservaSUS — desativado temporariamente
 } from "lucide-react";
+import { usePalette } from "@/theme/PaletteProvider";
+import type { UiPalette } from "@/theme/palette";
+import { toast } from "react-toastify";
 
 interface SideMenuProps {
   isOpen: boolean;
@@ -46,10 +50,26 @@ export const SideMenu: React.FC<SideMenuProps> = ({
   const { user } = useAuth();
   const permissions = useUserPermissions();
   const [showAppsSubmenu, setShowAppsSubmenu] = useState(false);
+  const {
+    canChoosePalette,
+    preferredPalette,
+    setPalette,
+    saving: savingPalette,
+  } = usePalette();
   
   // ✅ NOVO: Chat de suporte
   const { isOpen: isChatOpen, abrirChat, fecharChat, mensagensNaoLidas } = useChatSuporte();
   const { resumo: comunicacaoDaeLeituraResumo } = useComunicacaoDaeLeituraResumo();
+
+  const handlePaletteChange = async (next: UiPalette) => {
+    if (next === preferredPalette || savingPalette) return;
+    try {
+      await setPalette(next);
+      toast.success(next === 'saire' ? 'Paleta Rosa e cinza aplicada' : 'Paleta Original aplicada');
+    } catch {
+      toast.error('Não foi possível salvar a paleta');
+    }
+  };
 
   // Função para verificar se o usuário é admin (incluindo admins hierárquicos)
   const isAdmin = () => {
@@ -397,8 +417,50 @@ export const SideMenu: React.FC<SideMenuProps> = ({
             ))}
           </div>
 
-          {/* Seletor de Idiomas */}
-          <div className="mt-4 border-t border-blue-800 pt-4 flex-shrink-0">
+          {/* Seletor de Idiomas + Aparência (admin master) */}
+          <div className="mt-4 border-t border-blue-800 pt-4 flex-shrink-0 space-y-4">
+            {canChoosePalette && (
+              <div>
+                <div className="flex items-center gap-2 text-white/90 mb-2 px-1">
+                  <Palette className="h-4 w-4" />
+                  <span className="text-xs font-semibold uppercase tracking-wide">Aparência</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={savingPalette}
+                    onClick={() => void handlePaletteChange('default')}
+                    className={`rounded-lg border px-2 py-2 text-left transition-colors ${
+                      preferredPalette === 'default'
+                        ? 'border-white bg-blue-800 text-white'
+                        : 'border-blue-700 bg-blue-950/40 text-white/80 hover:bg-blue-800'
+                    }`}
+                  >
+                    <span
+                      className="mb-1.5 block h-2 w-full rounded-full"
+                      style={{ background: 'linear-gradient(90deg, #2563eb, #1e3a8a)' }}
+                    />
+                    <span className="text-xs font-medium">Original</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={savingPalette}
+                    onClick={() => void handlePaletteChange('saire')}
+                    className={`rounded-lg border px-2 py-2 text-left transition-colors ${
+                      preferredPalette === 'saire'
+                        ? 'border-white bg-blue-800 text-white'
+                        : 'border-blue-700 bg-blue-950/40 text-white/80 hover:bg-blue-800'
+                    }`}
+                  >
+                    <span
+                      className="mb-1.5 block h-2 w-full rounded-full"
+                      style={{ background: 'linear-gradient(90deg, #ff4d94, #656B6F)' }}
+                    />
+                    <span className="text-xs font-medium">Rosa e cinza</span>
+                  </button>
+                </div>
+              </div>
+            )}
             <LanguageSelector
               selectedLanguage={selectedLanguage}
               onLanguageChange={setSelectedLanguage}
