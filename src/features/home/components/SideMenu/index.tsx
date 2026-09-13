@@ -28,7 +28,7 @@ import {
   ClipboardList,
   Settings,
   QrCode,
-  LineChart,
+  // LineChart, // ObservaSUS — desativado temporariamente
 } from "lucide-react";
 
 interface SideMenuProps {
@@ -164,15 +164,15 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       onClick: () => navigate("/private/offline-management"), // ou "/private/dados-offline"
     }] : []),
     
-    // ObservaSUS.PA - portal de vigilância em saúde
-    {
-      icon: <LineChart />,
-      label: t("observasus.menu") || "ObservaSUS.PA",
-      onClick: () => {
-        navigate("/observasus");
-        onClose();
-      },
-    },
+    // ObservaSUS.PA — desativado temporariamente
+    // {
+    //   icon: <LineChart />,
+    //   label: t("observasus.menu") || "ObservaSUS.PA",
+    //   onClick: () => {
+    //     navigate("/observasus");
+    //     onClose();
+    //   },
+    // },
 
     // Campanhas de Saúde - acesso direto
     {
@@ -258,15 +258,15 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     },
     
     // Menu de Gerenciar Usuários - apenas para admins logados
-    ...(user && (isAdmin() || user.roles?.includes('observasus.admin')) ? [{
+    // (ObservaSUS admin — desativado temporariamente: removido `observasus.admin`)
+    ...(user && isAdmin() ? [{
       icon: <UserCog />,
-      label: user.roles?.includes('observasus.admin') && !isAdmin()
-        ? 'ObservaSUS — Admin'
-        : t("menu.manage_users"),
+      label: t("menu.manage_users"),
       onClick: () => {
-        if (user.roles?.includes('observasus.admin') && !isAdmin()) {
-          navigate('/admin/master/observasus');
-        } else if (user.roles?.includes('admin.crs')) {
+        // if (user.roles?.includes('observasus.admin') && !isAdmin()) {
+        //   navigate('/admin/master/observasus');
+        // } else
+        if (user.roles?.includes('admin.crs')) {
           navigate("/admin/crs");
         } else if (user.roles?.includes('admin.estado')) {
           navigate("/admin/estado");

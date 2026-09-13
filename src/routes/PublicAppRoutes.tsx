@@ -31,14 +31,15 @@ import AscomPage from '@/features/contact/AscomPage';
 import OuvidoriaPage from '@/features/contact/OuvidoriaPage';
 import { PublicDynamicFormPage } from '@/features/dynamic-forms/pages/PublicDynamicFormPage';
 import QrCodeGeneratorPage from '@/features/qrcode/pages/QrCodeGeneratorPage';
-import ObservaSusHomePage from '@/features/observasus/pages/ObservaSusHomePage';
-import ObservaSusPanelsPage from '@/features/observasus/pages/ObservaSusPanelsPage';
-import ObservaSusPanelViewerPage from '@/features/observasus/pages/ObservaSusPanelViewerPage';
-import ObservaSusDataStoragePage from '@/features/observasus/pages/ObservaSusDataStoragePage';
-import ObservaSusSystemPage from '@/features/observasus/pages/ObservaSusSystemPage';
-import ObservaSusRepositoryPage from '@/features/observasus/pages/ObservaSusRepositoryPage';
-import ObservaSusPublicationsPage from '@/features/observasus/pages/ObservaSusPublicationsPage';
-import ObservaSusAboutPage from '@/features/observasus/pages/ObservaSusAboutPage';
+// TODO(reativar ObservaSUS): descomentar imports e rotas abaixo
+// import ObservaSusHomePage from '@/features/observasus/pages/ObservaSusHomePage';
+// import ObservaSusPanelsPage from '@/features/observasus/pages/ObservaSusPanelsPage';
+// import ObservaSusPanelViewerPage from '@/features/observasus/pages/ObservaSusPanelViewerPage';
+// import ObservaSusDataStoragePage from '@/features/observasus/pages/ObservaSusDataStoragePage';
+// import ObservaSusSystemPage from '@/features/observasus/pages/ObservaSusSystemPage';
+// import ObservaSusRepositoryPage from '@/features/observasus/pages/ObservaSusRepositoryPage';
+// import ObservaSusPublicationsPage from '@/features/observasus/pages/ObservaSusPublicationsPage';
+// import ObservaSusAboutPage from '@/features/observasus/pages/ObservaSusAboutPage';
 
 const ChatAdminDashboard = lazy(() => import('@/features/chat/pages/ChatAdminDashboard'));
 const DesktopPage = lazy(() => import('@/features/desktop/DesktopPage'));
@@ -63,6 +64,7 @@ export const getPublicAppRoutes = () => {
       <Route path="/mapa-leaflet" element={<MapaLeaflet />} />
       <Route path="/campanhas" element={<HealthCampaignsPage />} />
 
+      {/* ObservaSUS — desativado temporariamente (reativar junto com os imports)
       <Route path="/observasus" element={<ObservaSusHomePage />} />
       <Route path="/observasus/paineis" element={<ObservaSusPanelsPage />} />
       <Route path="/observasus/paineis/:slug" element={<ObservaSusPanelViewerPage />} />
@@ -71,6 +73,7 @@ export const getPublicAppRoutes = () => {
       <Route path="/observasus/repositorio" element={<ObservaSusRepositoryPage />} />
       <Route path="/observasus/publicacoes" element={<ObservaSusPublicationsPage />} />
       <Route path="/observasus/sobre" element={<ObservaSusAboutPage />} />
+      */}
 
       <Route path="/dashboard" element={<Navigate to="/dashboard-page" replace />} />
       <Route path="/dashboard-page" element={<ProtectedRoute requiredRoles={['notificador', 'dashboard']}><DashboardPageCirio /></ProtectedRoute>} />

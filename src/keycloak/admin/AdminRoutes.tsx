@@ -2,10 +2,11 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '@/keycloak/AuthProvider';
 import { useAdminUrls } from './hooks/useAdminContext';
-import {
-  canEditObservaSusResources,
-  canManageObservaSusUsers,
-} from '@/features/observasus/admin/observasusAdminAccess';
+// TODO(reativar ObservaSUS): descomentar imports e rotas ObservaSUS
+// import {
+//   canEditObservaSusResources,
+//   canManageObservaSusUsers,
+// } from '@/features/observasus/admin/observasusAdminAccess';
 
 // Importar as páginas administrativas
 import AdminDashboard from './AdminDashboard';
@@ -14,8 +15,8 @@ import UserForm from './UserForm';
 import PasswordReset from './PasswordReset';
 import RolesManagement from './RolesManagement';
 import AdminReports from './AdminReports';
-import ObservaSusAdminPage from '@/features/observasus/admin/pages/ObservaSusAdminPage';
-import ObservaSusResourceFormPage from '@/features/observasus/admin/pages/ObservaSusResourceFormPage';
+// import ObservaSusAdminPage from '@/features/observasus/admin/pages/ObservaSusAdminPage';
+// import ObservaSusResourceFormPage from '@/features/observasus/admin/pages/ObservaSusResourceFormPage';
 
 // Importar as páginas administrativas hierárquicas
 import DashboardUnidade from './DashboardUnidade';
@@ -40,9 +41,9 @@ const AdminProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children
     roles.includes('admin.unidade') ||
     roles.includes('admin.municipio') ||
     roles.includes('admin.crs') ||
-    roles.includes('admin.estado') ||
-    canEditObservaSusResources(roles) ||
-    canManageObservaSusUsers(roles);
+    roles.includes('admin.estado');
+    // || canEditObservaSusResources(roles)
+    // || canManageObservaSusUsers(roles);
 
   if (!isAdmin) {
     return (
@@ -89,31 +90,32 @@ const PlatformAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children 
     roles.includes('admin.estado');
 
   if (!isPlatformAdmin) {
-    return <Navigate to="/admin/master/observasus" replace />;
+    // ObservaSUS desativado: antes redirecionava para /admin/master/observasus
+    return <Navigate to="/access-denied" replace />;
   }
 
   return <>{children}</>;
 };
 
-const ObservaSusEditorRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+// const ObservaSusEditorRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+//   const { user } = useAuth();
+//
+//   if (!canEditObservaSusResources(user?.roles)) {
+//     return <Navigate to="/admin/master/observasus" replace />;
+//   }
+//
+//   return <>{children}</>;
+// };
 
-  if (!canEditObservaSusResources(user?.roles)) {
-    return <Navigate to="/admin/master/observasus" replace />;
-  }
-
-  return <>{children}</>;
-};
-
-const ObservaSusUserManagementRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
-
-  if (!canManageObservaSusUsers(user?.roles)) {
-    return <Navigate to="/admin/master/observasus" replace />;
-  }
-
-  return <>{children}</>;
-};
+// const ObservaSusUserManagementRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+//   const { user } = useAuth();
+//
+//   if (!canManageObservaSusUsers(user?.roles)) {
+//     return <Navigate to="/admin/master/observasus" replace />;
+//   }
+//
+//   return <>{children}</>;
+// };
 
 // Componente principal das rotas administrativas com redirecionamento inteligente
 const AdminRedirect: React.FC = () => {
@@ -124,9 +126,10 @@ const AdminRedirect: React.FC = () => {
     return <Navigate to="/login" replace />;
   }
 
-  if (canManageObservaSusUsers(user.roles) && !user.roles?.some((r) => r === 'admin' || r.startsWith('admin.'))) {
-    return <Navigate to="/admin/master/observasus" replace />;
-  }
+  // ObservaSUS — desativado temporariamente
+  // if (canManageObservaSusUsers(user.roles) && !user.roles?.some((r) => r === 'admin' || r.startsWith('admin.'))) {
+  //   return <Navigate to="/admin/master/observasus" replace />;
+  // }
 
   return <Navigate to={dashboard} replace />;
 };
@@ -154,33 +157,33 @@ const AdminRoutes: React.FC = () => {
         <Route
           path="/master/users"
           element={
-            <ObservaSusUserManagementRoute>
+            <PlatformAdminRoute>
               <UsersList />
-            </ObservaSusUserManagementRoute>
+            </PlatformAdminRoute>
           }
         />
         <Route
           path="/master/users/new"
           element={
-            <ObservaSusUserManagementRoute>
+            <PlatformAdminRoute>
               <UserForm />
-            </ObservaSusUserManagementRoute>
+            </PlatformAdminRoute>
           }
         />
         <Route
           path="/master/users/:id/edit"
           element={
-            <ObservaSusUserManagementRoute>
+            <PlatformAdminRoute>
               <UserForm />
-            </ObservaSusUserManagementRoute>
+            </PlatformAdminRoute>
           }
         />
         <Route
           path="/master/users/:id/reset-password"
           element={
-            <ObservaSusUserManagementRoute>
+            <PlatformAdminRoute>
               <PasswordReset />
-            </ObservaSusUserManagementRoute>
+            </PlatformAdminRoute>
           }
         />
 
@@ -188,13 +191,13 @@ const AdminRoutes: React.FC = () => {
         <Route
           path="/master/roles"
           element={
-            <ObservaSusUserManagementRoute>
+            <PlatformAdminRoute>
               <RolesManagement />
-            </ObservaSusUserManagementRoute>
+            </PlatformAdminRoute>
           }
         />
 
-        {/* ObservaSUS — catálogo de recursos */}
+        {/* ObservaSUS — catálogo de recursos (desativado temporariamente)
         <Route path="/master/observasus" element={<ObservaSusAdminPage />} />
         <Route
           path="/master/observasus/new"
@@ -212,6 +215,7 @@ const AdminRoutes: React.FC = () => {
             </ObservaSusEditorRoute>
           }
         />
+        */}
 
         {/* Relatórios - admin master */}
         <Route
