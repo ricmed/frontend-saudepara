@@ -1,5 +1,5 @@
 // src/features/notificationForms/NotificationForm.tsx
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Save,
@@ -15,6 +15,8 @@ import ModalBuscaPaciente from "@/features/paginaPacientesComu/components/ModalB
 // Atualizar a importação do SideMenu
 import { SideMenu } from "@/features/home/components/SideMenu";
 import ConnectionStatus from "@/components/ConnectionStatus";
+import { SAIRE_LOGO_FULL_PNG } from "@/features/home/components/SaireLogo";
+import { isSaireEventDescription } from "./utils/saireEventPrefill";
 
 // Import custom hooks
 import { useNotificationForm } from "./hooks/useNotificationForm";
@@ -121,7 +123,16 @@ const NotificationForm: React.FC = () => {
     // Adicionar estas duas variáveis
     hipoteseDiagFiltradas, 
     isLoadingHipoteses,
-  } = useNotificationForm(isEditMode, id);  // ========================================
+  } = useNotificationForm(isEditMode, id);
+
+  const showSaireLogo = useMemo(() => {
+    const selected = eventoOptions.find(
+      (option) => option.idtipo_evento.toString() === formData.evento,
+    );
+    return isSaireEventDescription(selected?.descricao);
+  }, [eventoOptions, formData.evento]);
+
+  // ========================================
   // FUNÇÃO PARA SCROLL PARA CAMPO ESPECÍFICO
   // ========================================
   const handleScrollToField = (fieldName: string) => {
@@ -183,6 +194,14 @@ const NotificationForm: React.FC = () => {
                 {isEditMode ? "Editar" : "Nova"}
               </span>
             </h1>
+
+            {showSaireLogo && (
+              <img
+                src={SAIRE_LOGO_FULL_PNG}
+                alt="Festival do Sairé 2026"
+                className="h-10 sm:h-12 lg:h-14 w-auto object-contain flex-shrink-0 drop-shadow-sm"
+              />
+            )}
           </div>
 
           {/* Linha 2: Botões de ação - organizados responsivamente */}

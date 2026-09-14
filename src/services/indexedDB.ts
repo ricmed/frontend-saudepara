@@ -1352,23 +1352,82 @@ export class IndexedDBService {
     return notificacao ? notificacao.formData : null;
   }
 
+  /**
+   * Pendente de sync = ainda não está no servidor de forma confiável.
+   * Aceita `sincronizado` boolean ou string (legado) e recupera falsos
+   * "synced" sem `serverId` (bug que fazia a ficha sumir da fila/lista).
+   */
+  private isNotificacaoPendingForSync(item: {
+    sincronizado?: boolean | string;
+    syncStatus?: string;
+    serverId?: number;
+    isEdit?: boolean;
+    id?: number;
+  }): boolean {
+    const hasServerId =
+      typeof item.serverId === 'number' &&
+      Number.isFinite(item.serverId) &&
+      item.serverId > 0;
+    const editAlreadyOnServer =
+      item.isEdit === true &&
+      typeof item.id === 'number' &&
+      item.id > 0;
+
+    // Falso positivo: marcado synced sem prova no servidor → volta à fila
+    if (
+      (item.syncStatus === 'synced' ||
+        item.sincronizado === true ||
+        item.sincronizado === 'true') &&
+      !hasServerId &&
+      !editAlreadyOnServer
+    ) {
+      return true;
+    }
+
+    if (hasServerId || (item.syncStatus === 'synced' && editAlreadyOnServer)) {
+      return false;
+    }
+
+    const sincronizado = item.sincronizado;
+    if (sincronizado === true || sincronizado === 'true') {
+      return false;
+    }
+
+    // false | 'false' | undefined | pending | syncing | error
+    return true;
+  }
+
   async getPendingNotificacoes(): Promise<Array<{ id: number; formData: FormData; offlineId: string; deviceId: string; timestamp?: number; isEdit?: boolean }>> {
     await this.init();
 
-    let pending: any[] = [];
+    // Sempre varre o store: o índice `by-sincronizado` com chave string 'false'
+    // não encontra registros gravados com boolean `false` (IndexedDB é tipado).
+    const allNotificacoes = await this.db!.getAll('notificacoes');
+    const pending = allNotificacoes.filter((item) =>
+      this.isNotificacaoPendingForSync(item as any),
+    );
 
-    // Índice `by-sincronizado` usa string ('false'/'true'), não boolean.
-    try {
-      pending = await this.db!.getAllFromIndex('notificacoes', 'by-sincronizado', 'false');
-    } catch (indexError) {
-      if (import.meta.env.DEV) {
-        console.warn('⚠️ Falha ao buscar pendentes por índice; aplicando fallback por varredura:', indexError);
+    // Autocorreção: reabrir falsos "synced" sem serverId
+    for (const item of pending) {
+      const syncStatus = (item as any).syncStatus;
+      const sincronizado = (item as any).sincronizado;
+      const looksFalselySynced =
+        syncStatus === 'synced' ||
+        sincronizado === true ||
+        sincronizado === 'true';
+      if (!looksFalselySynced) continue;
+
+      try {
+        (item as any).syncStatus = 'pending';
+        (item as any).sincronizado = false;
+        delete (item as any).syncedAt;
+        await this.db!.put('notificacoes', item);
+        console.warn(
+          `♻️ Notificação ${(item as any).offlineId} reaberta na fila (estava "synced" sem ID do servidor)`,
+        );
+      } catch (repairError) {
+        console.warn('Falha ao reabrir notificação falsa-synced:', repairError);
       }
-      const allNotificacoes = await this.db!.getAll('notificacoes');
-      pending = allNotificacoes.filter(item => {
-        const sincronizado = (item as any).sincronizado;
-        return sincronizado === false || sincronizado === 'false';
-      });
     }
 
     pending.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
@@ -1723,7 +1782,9 @@ export class IndexedDBService {
       
       // Buscar todas as notificações pendentes
       const allNotificacoes = await this.db!.getAll('notificacoes');
-      const pending = allNotificacoes.filter(n => n.sincronizado === false);
+      const pending = allNotificacoes.filter((n) =>
+        this.isNotificacaoPendingForSync(n as any),
+      );
       
       console.log(`📊 Total: ${allNotificacoes.length} notificações, ${pending.length} pendentes`);
       
@@ -1838,19 +1899,39 @@ export class IndexedDBService {
       
       console.log(`   ⏳ ${pendingFiltered.length} notificações pendentes`);
       
-      // 3. Converter pendentes para formato display
-      const pendingFormatted = pendingFiltered.map(p => ({
-        ...p.formData,
-        idnotificacao: p.id,
-        _isPending: true,
-        _offlineId: p.offlineId,
-        _deviceId: p.deviceId,
-        _syncStatus: 'pending',
-        _badge: '🟡 Aguardando sincronização',
-        // Garantir campos essenciais
-        created_at: p.formData.created_at || new Date(Date.now()).toISOString(),
-        updated_at: p.formData.updated_at || new Date(Date.now()).toISOString()
-      }));
+      // 3. Converter pendentes para formato display (lista usa `id`, não só idnotificacao)
+      const pendingFormatted = pendingFiltered.map(p => {
+        const fd = (p.formData || {}) as any;
+        const tempId = p.id;
+        return {
+          ...fd,
+          id: tempId,
+          idnotificacao: tempId,
+          paciente: fd.paciente || 'Paciente não informado',
+          tipoEvento: fd.tipoEvento || fd.eventoNome || fd.evento || '—',
+          dataOcorrencia:
+            fd.dataOcorrencia ||
+            fd.dataAtendimento ||
+            fd.dataInicioSintomas ||
+            '—',
+          tipoAtendimento: fd.tipoAtendimento || '—',
+          tipoEncerramento: fd.tipoEncerramento || '—',
+          _isPending: true,
+          _offlineId: p.offlineId,
+          _deviceId: p.deviceId,
+          _syncStatus: 'pending',
+          _badge: '🟡 Aguardando sincronização',
+          created_at: fd.created_at || new Date(p.timestamp || Date.now()).toISOString(),
+          updated_at: fd.updated_at || new Date(p.timestamp || Date.now()).toISOString(),
+          offline_id: p.offlineId,
+          original: {
+            ...fd,
+            idnotificacao: tempId,
+            offline_id: p.offlineId,
+            _isPending: true,
+          },
+        };
+      });
       
       // 4. Mesclar (pendentes primeiro para aparecer no topo)
       const all = [...pendingFormatted, ...cached];

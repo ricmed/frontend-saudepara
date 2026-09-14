@@ -481,37 +481,39 @@ export const NotificacaoService = {
     return NotificacaoService.fetchOptions<EncerramentoOption>(TIPO_ENDPOINTS.ENCERRAMENTO);
   },
 
-  // Obter notificação por ID
-  async getById(id: number): Promise<FormData> {
+  // Obter notificação por ID (servidor) ou ID temporário offline (IndexedDB)
+  async getById(id: number | string): Promise<FormData> {
     try {
-      // ✅ REABILITADO: Tentar buscar do IndexedDB primeiro (notificações offline)
-      // Isso é especialmente importante para notificações criadas/editadas offline
-      const offlineData = await indexedDBService.getNotificacao(id);
-      if (offlineData) {
-        console.log(`📱 [OFFLINE MODE] Carregando notificação ${id} do cache local`);
-        
-        // ✅ DEBUG ESPECÍFICO: Log dos campos de trauma do IndexedDB
-        console.log('🩹 [DEBUG TRAUMA] Dados do IndexedDB:', {
-          tipoTrauma: offlineData.tipoTrauma,
-          observacaoTrauma: offlineData.observacaoTrauma,
-          observacaoSintomas: offlineData.observacaoSintomas,
-          observacaoHipotese: offlineData.observacaoHipotese
-        });
-        
-        return offlineData;
+      const numericId = Number(id);
+
+      // ID temporário local (≤ 0): só IndexedDB
+      if (Number.isFinite(numericId) && numericId <= 0) {
+        const offlineData = await indexedDBService.getNotificacao(numericId);
+        if (offlineData) {
+          console.log(`📱 [OFFLINE MODE] Carregando notificação local ${numericId}`);
+          return offlineData;
+        }
+        throw new Error('Notificação offline não encontrada no dispositivo');
       }
 
-      // Se não encontrou offline, buscar da API (se online)
-      console.log(`🌐 [ONLINE MODE] Buscando notificação ${id} da API`);
-      const response = await api.get(`/${id}`);
-      
-      const formData = await formatFromBackend(response.data);
-      
-      if (!formData) {
-        throw new Error('Erro ao formatar dados da notificação');
+      // ID positivo: cache local primeiro (edição offline de ficha já no servidor)
+      if (Number.isFinite(numericId) && numericId > 0) {
+        const offlineData = await indexedDBService.getNotificacao(numericId);
+        if (offlineData) {
+          console.log(`📱 [OFFLINE MODE] Carregando notificação ${numericId} do cache local`);
+          return offlineData;
+        }
+
+        console.log(`🌐 [ONLINE MODE] Buscando notificação ${numericId} da API`);
+        const response = await api.get(`/${numericId}`);
+        const formData = await formatFromBackend(response.data);
+        if (!formData) {
+          throw new Error('Erro ao formatar dados da notificação');
+        }
+        return formData;
       }
-      
-      return formData;
+
+      throw new Error('ID de notificação inválido');
     } catch (error) {
       return handleApiError(error);
     }

@@ -371,7 +371,8 @@ export const validateLocalidadeEvento = (
 ): Record<string, string> => {
  const validationErrors: Record<string, string> = {};
 
- if (context.modo === "NAO_USA" || formData.residenteBelem === "2") {
+ // Localidade só se aplica a residente (SIM = "1"). NÃO ("2") e ESTRANGEIRO ("3") não usam o campo.
+ if (context.modo === "NAO_USA" || formData.residenteBelem !== "1") {
    return validationErrors;
  }
 
@@ -482,7 +483,7 @@ export const validateForm = (
  atendimentoOptions: AtendimentoOption[],
  encerramentoOptions: EncerramentoOption[],
  localidadeEventoContext?: LocalidadeEventoValidationContext
-): boolean => {
+): { isValid: boolean; errorCount: number } => {
  // ========================================
  // IMPORTANTE: Coletar TODOS os erros de uma vez
  // ========================================
@@ -821,8 +822,8 @@ errorSummary.scrollIntoView({
  }
 }, 150);
 
-return false; // Formulário inválido
+return { isValid: false, errorCount: Object.keys(newErrors).length };
  }
 
- return true; // Formulário válido
+ return { isValid: true, errorCount: 0 };
 };

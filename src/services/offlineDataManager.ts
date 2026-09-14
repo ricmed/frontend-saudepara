@@ -30,6 +30,26 @@ import {
 import { toast } from 'react-toastify';
 import axios from '@/utils/axiosRetry';
 
+/**
+ * Root da API só para o download offline.
+ * Em Vite local usa a origem da página (`/api` via proxy) para cookies de auth.
+ * Fora disso mantém `getRuntimeApiRoot()` (VITE_API_* / host oficial).
+ * Não altera getApiOrigin/getApiRoot globais.
+ */
+function getOfflineDownloadApiRoot(): string {
+  if (typeof window !== 'undefined') {
+    const h = window.location.hostname.toLowerCase();
+    if (h === 'localhost' || h === '127.0.0.1') {
+      const basePath =
+        (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api';
+      return `${window.location.origin}${
+        basePath.startsWith('/') ? basePath : `/${basePath}`
+      }`;
+    }
+  }
+  return getRuntimeApiRoot();
+}
+
 export interface DataSource {
   key: string;
   name: string;
@@ -47,7 +67,7 @@ export interface PatientsDataSource extends DataSource {
 // Função helper para chamadas diretas à API (usa origem correta em HML/prod)
 const createDirectApiFetch = (endpoint: string, limit?: number) => {
   return async () => {
-    const base = getRuntimeApiRoot();
+    const base = getOfflineDownloadApiRoot();
     const url = limit
       ? `${base}/${endpoint}?page=1&limit=${limit}`
       : `${base}/${endpoint}`;
@@ -145,7 +165,7 @@ class OfflineDataManager {
       key: 'paises', 
       name: 'Países', 
       fetchFn: createDirectApiFetch('tipo-pais', 300), // Aumentado para 300
-      priority: 2, 
+      priority: 1, 
       estimatedSize: 250,
       category: 'geographic'
     },
@@ -153,7 +173,7 @@ class OfflineDataManager {
       key: 'estados', 
       name: 'Estados', 
       fetchFn: createDirectApiFetch('tipo-estado', 100), 
-      priority: 2, 
+      priority: 1, 
       estimatedSize: 30,
       category: 'geographic'
     },
@@ -161,7 +181,7 @@ class OfflineDataManager {
       key: 'municipios', 
       name: 'Municípios', 
       fetchFn: createDirectApiFetch('tipo-municipio', 10000), // Aumentado para 10000
-      priority: 3, 
+      priority: 2, 
       estimatedSize: 5571,
       category: 'geographic'
     },
@@ -169,25 +189,26 @@ class OfflineDataManager {
       key: 'bairros', 
       name: 'Bairros', 
       fetchFn: createDirectApiFetch('tipo-bairro', 1000), // Aumentado para 1000
-      priority: 3, 
+      priority: 2, 
       estimatedSize: 100,
       category: 'geographic'
     },
 
-    // ===== DADOS MÉDICOS (Prioridade 2) =====
+    // ===== DADOS MÉDICOS (Prioridade 1 — ficha de comunicação) =====
     { 
       key: 'sintomas', 
       name: 'Sintomas', 
       fetchFn: createDirectApiFetch('tipo-sintoma', 500), // Aumentado para 500
-      priority: 2, 
+      priority: 1, 
       estimatedSize: 100,
       category: 'medical'
     },
     { 
-      key: 'hipoteses-diagnosticas', 
+      // Chave alinhada ao formulário/IndexedDB (`hipoteses`), não `hipoteses-diagnosticas`.
+      key: 'hipoteses', 
       name: 'Hipóteses Diagnósticas', 
       fetchFn: createDirectApiFetch('tipo-hipotese-diag', 200), // Aumentado para 200
-      priority: 2, 
+      priority: 1, 
       estimatedSize: 50,
       category: 'medical'
     },
@@ -195,7 +216,7 @@ class OfflineDataManager {
       key: 'traumas', 
       name: 'Tipos de Trauma', 
       fetchFn: createDirectApiFetch('tipo-trauma', 100), 
-      priority: 2, 
+      priority: 1, 
       estimatedSize: 40,
       category: 'medical'
     },
@@ -292,12 +313,12 @@ class OfflineDataManager {
       category: 'administrative'
     },
 
-    // ===== DADOS GRANDES (Prioridade 3) =====
+    // ===== DADOS GRANDES (Prioridade 1 — CBO obrigatório na ficha) =====
     { 
       key: 'cbos', 
       name: 'CBOs/Profissões', 
       fetchFn: createDirectApiFetch('tipo-cbo', 5000), // Aumentado para 5000
-      priority: 3, 
+      priority: 1, 
       estimatedSize: 2700,
       category: 'administrative'
     },
@@ -309,7 +330,7 @@ class OfflineDataManager {
         await indexedDBService.saveOpcoes('estabelecimentos-permitidos', pack.unidades);
         return pack.unidades;
       },
-      priority: 3, 
+      priority: 1, 
       estimatedSize: 80,
       category: 'administrative'
     },    // ✅ CORRIGIDO: DADOS DE PACIENTES PARA VERIFICAÇÃO (não sincronizar)
@@ -416,17 +437,17 @@ class OfflineDataManager {
   }
 
   private async fetchEstabelecimentosHierarquicos(): Promise<EstabelecimentoOfflineDTO[]> {
-    const server = import.meta.env.VITE_API_SERVER;
-    const port = import.meta.env.VITE_API_PORT;
-    const url = `${server}:${port}/api/usuario-acesso/current/estabelecimentos`;
-    const response = await axios.get(url, {
-      withCredentials: true,
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
+    const response = await axios.get(
+      `${getOfflineDownloadApiRoot()}/usuario-acesso/current/estabelecimentos`,
+      {
+        withCredentials: true,
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        timeout: 30000,
       },
-      timeout: 30000,
-    });
+    );
     const estabelecimentos = response?.data?.data || response?.data || [];
     return Array.isArray(estabelecimentos) ? estabelecimentos : [];
   }
@@ -558,6 +579,10 @@ class OfflineDataManager {
           } else {
             // Para outros dados, salvar normalmente
             await indexedDBService.saveOpcoes(source.key, data);
+            // Alias legado: ListaSindromicaService ainda lê `hipoteses-diagnosticas`.
+            if (source.key === 'hipoteses') {
+              await indexedDBService.saveOpcoes('hipoteses-diagnosticas', data);
+            }
             totalRecords += data.length;
             console.log(`✅ ${source.name}: ${data.length} registros salvos`);
           }

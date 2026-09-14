@@ -6,6 +6,7 @@ import { Language } from '@/i18n/types';
 import { useSaireHomeCta } from '@/features/home/hooks/useSaireHomeCta';
 import { BotoRosaIcon } from '@/features/home/components/BotoRosaIcon';
 import { SaireLogoWatermark } from '@/features/home/components/SaireLogo';
+import { buildNovaComunicacaoSairePath } from '@/features/notificationForms/utils/saireEventPrefill';
 
 interface MenuGridProps {
   isMobile?: boolean;
@@ -18,7 +19,8 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
 }) => {
   const navigate = useNavigate();
   const { t } = useTranslation(selectedLanguage || 'pt-BR');
-  const { showSaireCaseButton, canAccessComunicacaoDae } = useSaireHomeCta();
+  const { showSaireCaseButton, canAccessComunicacaoDae, saireEventId } =
+    useSaireHomeCta();
 
   const menuItems = [
     {
@@ -84,14 +86,16 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
         <div className="mb-8 flex flex-wrap justify-center gap-4">
           {showSaireCaseButton && (
             <div
-              onClick={() => navigate('/private/comunicacao-de-caso/nova')}
+              onClick={() =>
+                navigate(buildNovaComunicacaoSairePath(saireEventId))
+              }
               className="relative overflow-hidden bg-gradient-to-r from-[#ff4d94] to-[#e11d70] hover:from-[#ff3d8a] hover:to-[#c91860] text-white flex flex-col items-center p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:scale-105 min-w-[220px] max-w-[280px]"
               role="button"
               tabIndex={0}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
-                  navigate('/private/comunicacao-de-caso/nova');
+                  navigate(buildNovaComunicacaoSairePath(saireEventId));
                 }
               }}
             >

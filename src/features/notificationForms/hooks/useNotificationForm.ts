@@ -11,7 +11,7 @@
 // 7. ✅ CORREÇÃO CRÍTICA: handleSubmit isola array 'arquivos' da conversão toUpperCase
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import axios from 'axios';
 import syncService from '@/services/syncService';
@@ -86,6 +86,7 @@ import {
   findSantaremMunicipioId,
   usaLocalidadeEvento,
 } from '../utils/procedenciaResidencia';
+import { resolvePrefillEventoId } from '../utils/saireEventPrefill';
 import { useSectionExpansion } from './useSectionExpansion';
 import { NotificacaoService } from '@/services/NotificacaoService';
 import { LocalidadeEventoService } from '@/services/LocalidadeEventoService';
@@ -236,6 +237,7 @@ const NOTIFICATION_SAVE_ERROR_FIELD_MAP: Record<string, string> = {
 
 export const useNotificationForm = (isEditMode: boolean = false, id?: string) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   
   // ✅ GARANTIR QUE window.fileStorage EXISTA (já inicializado no topo do arquivo)
   useEffect(() => {
@@ -762,7 +764,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         indexedDBService.getOpcoes('escolaridades'),
         indexedDBService.getOpcoes('atendimentos'),
         indexedDBService.getOpcoes('sintomas'),
-        indexedDBService.getOpcoes('hipoteses'),
+        indexedDBService.getOpcoes('hipoteses').then(async (hipoteses) => {
+          if (hipoteses && hipoteses.length > 0) return hipoteses;
+          return indexedDBService.getOpcoes('hipoteses-diagnosticas');
+        }),
         indexedDBService.getOpcoes('traumas'),
         indexedDBService.getOpcoes('encerramentos'),
         // ✅ BUSCAR ESTABELECIMENTOS FILTRADOS HIERARQUICAMENTE (salvos no download)
@@ -1301,7 +1306,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     try {
       console.log("[HOOK] Carregando notificação ID:", notificacaoId);
       
-      const dadosFormatados = await NotificacaoService.getById(Number(notificacaoId));
+      const dadosFormatados = await NotificacaoService.getById(notificacaoId);
       
       if (dadosFormatados) {
         console.log("[HOOK] Arquivos carregados:", (dadosFormatados as any)?.arquivos?.length || 0);
@@ -1423,13 +1428,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         if (pacienteExistente) {
           formData.pacienteId = pacienteExistente.idpaciente;
           console.log("✅ Paciente existente encontrado! ID:", pacienteExistente.idpaciente);
-          toast.success(`Paciente ${pacienteExistente.nome} encontrado e associado à notificação`);
         }
         // Se não encontrou, criar novo paciente
         else {
           console.log("⚠️ Nenhum paciente similar encontrado, criando novo...");
-
-          toast.info("Criando novo paciente automaticamente...");
 
           const novoPaciente: any = buildPatientPayloadFromForm(
             formData,
@@ -1441,7 +1443,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
             }
           );
 
-          const pacienteCriado = await savePatientOfflineSafe(novoPaciente);
+          const pacienteCriado = await savePatientOfflineSafe(novoPaciente, { silent: true });
           formData.pacienteId = pacienteCriado.idpaciente;
 
           console.log("Paciente criado automaticamente com ID:", pacienteCriado.idpaciente);
@@ -1469,7 +1471,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         if (canUseOnline && isEditMode) {
           await PacienteService.update(formData.pacienteId, pacienteData);
         } else {
-          await syncService.savePaciente({ ...pacienteData, idpaciente: formData.pacienteId });
+          await syncService.savePaciente(
+            { ...pacienteData, idpaciente: formData.pacienteId },
+            { silent: true },
+          );
         }
 
         console.log("Dados do paciente atualizados com sucesso!");
@@ -1503,9 +1508,14 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
   const persistNotificationAndHandleSuccess = useCallback(
     async (dataForBackend: Record<string, any>) => {
-      if (isEditMode && id) {
+      const numericId = id != null ? Number(id) : NaN;
+      // Ficha ainda só local (ID temp ≤ 0): atualiza IndexedDB pelo offline_id, sem PUT no servidor.
+      const isLocalPendingOnly =
+        isEditMode && (!Number.isFinite(numericId) || numericId <= 0);
+
+      if (isEditMode && id && !isLocalPendingOnly) {
         console.log("Editando notificação ID:", id, "via sistema offline");
-        await saveNotificationOfflineSafe(dataForBackend, true, id);
+        await saveNotificationOfflineSafe(dataForBackend, true, id, { silent: true });
         console.log("Notificação editada com sucesso");
         setIsSuccess(true);
         toast.success("Notificação atualizada com sucesso");
@@ -1515,9 +1525,23 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           id,
         });
         console.log('📤 Evento de notificação editada disparado');
+      } else if (isLocalPendingOnly) {
+        console.log("Atualizando ficha offline pendente (mesmo offline_id)");
+        await saveNotificationOfflineSafe(dataForBackend, false, undefined, {
+          silent: true,
+          localPendingOnly: true,
+        });
+        setIsSuccess(true);
+        toast.success("Ficha offline atualizada");
+        setArquivosParaExcluir([]);
+        emitNotificationSavedEvent({
+          action: 'edit-offline-pending',
+          offlineId: dataForBackend.offline_id,
+          isOffline: !systemIsOnline,
+        });
       } else {
         console.log("Criando nova notificação via sistema offline");
-        await saveNotificationOfflineSafe(dataForBackend, false);
+        await saveNotificationOfflineSafe(dataForBackend, false, undefined, { silent: true });
         console.log("Notificação salva (online ou offline conforme disponibilidade)");
         setIsSuccess(true);
         toast.success(systemIsOnline ? "Notificação criada com sucesso" : "Notificação salva offline");
@@ -1581,7 +1605,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
   const runPreSubmitChecks = useCallback(async (): Promise<boolean> => {
     console.log("=== INICIANDO VALIDAÇÃO DO FORMULÁRIO ===");
 
-    const isValid = validateForm(
+    const { isValid, errorCount } = validateForm(
       formData,
       errors,
       setErrors,
@@ -1597,11 +1621,12 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     );
 
     if (!isValid) {
-      setTimeout(() => {
-        const currentErrors = Object.keys(errors).length;
-        console.log(`Validação falhou. Total de erros: ${currentErrors}`);
-        toast.error(`${currentErrors} erro(s) encontrado(s). Verifique o resumo acima.`);
-      }, 100);
+      console.log(`Validação falhou. Total de erros: ${errorCount}`);
+      toast.error(
+        errorCount === 1
+          ? '1 erro encontrado. Verifique o resumo acima.'
+          : `${errorCount} erros encontrados. Verifique o resumo acima.`,
+      );
       return false;
     }
 
@@ -1715,8 +1740,37 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     return () => {
       isMounted = false;
     };
-  }, [isEditMode, id]);  
+  }, [isEditMode, id]);
 
+  // Pré-seleciona evento da query (?eventoId=) ao abrir ficha nova (CTA Sairé na home).
+  useEffect(() => {
+    if (isEditMode || !optionsLoaded || eventoOptions.length === 0) {
+      return;
+    }
+
+    const prefillId = resolvePrefillEventoId(
+      searchParams.get('eventoId'),
+      eventoOptions,
+      formData.evento,
+    );
+    if (!prefillId) {
+      return;
+    }
+
+    const nextModo = getModoLocalidadeEvento(prefillId, eventoOptions);
+    localidadeEventoRequestRef.current += 1;
+    setLocalidadeEventoOptions([]);
+    setLocalidadeEventoCatalogAvailable(nextModo === 'NAO_USA');
+    setIsLoadingLocalidadesEvento(nextModo !== 'NAO_USA');
+    setFormData((prev) => changeEventoAndClearLocalidade(prev, prefillId));
+  }, [
+    isEditMode,
+    optionsLoaded,
+    eventoOptions,
+    formData.evento,
+    searchParams,
+  ]);
+  
   // 🆕 Hook para limpar window.fileStorage quando componente desmonta
   useEffect(() => {
     return () => {
@@ -1849,7 +1903,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
       const clearLocalidade =
         usaLocalidadeEvento(modoLocalidadeEvento) &&
-        prev.residenteBelem === '2' &&
+        (prev.residenteBelem === '2' || prev.residenteBelem === '3') &&
         Boolean(
           prev.localidadeEvento ||
             prev.localidadeEventoOutro ||

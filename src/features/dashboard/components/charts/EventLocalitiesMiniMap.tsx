@@ -147,7 +147,9 @@ const EventLocalitiesMiniMap: React.FC<EventLocalitiesMiniMapProps> = ({
     }
 
     markersLayer.clearLayers();
-    const maximumCount = Math.max(...mappableData.map((item) => item.count), 0);
+    const counts = mappableData.map((item) => item.count);
+    const maximumCount = Math.max(...counts, 0);
+    const minimumCount = counts.length > 0 ? Math.min(...counts) : 0;
     const bounds = L.latLngBounds([]);
 
     mappableData.forEach((item) => {
@@ -157,7 +159,7 @@ const EventLocalitiesMiniMap: React.FC<EventLocalitiesMiniMapProps> = ({
 
       const selected = selectedIds.has(item.id);
       const marker = L.circleMarker([item.latitude, item.longitude], {
-        radius: getEventLocalityMarkerRadius(item.count, maximumCount),
+        radius: getEventLocalityMarkerRadius(item.count, maximumCount, minimumCount),
         color: selected ? '#111827' : '#1d4ed8',
         weight: selected ? 4 : 2,
         fillColor: selected ? '#f59e0b' : '#3b82f6',

@@ -136,7 +136,7 @@ const GlobalOfflineIndicator: React.FC = () => {
   };
 
   // Não mostrar se tudo está perfeito
-  const shouldShow = !isOnline || pendingData.total > 0 || syncing || needsEssentialData();
+  const shouldShow = !isOnline || pendingData.notificacoes > 0 || syncing || needsEssentialData();
 
   if (!shouldShow && notifications.length === 0) {
     return null;
@@ -158,17 +158,19 @@ const GlobalOfflineIndicator: React.FC = () => {
                 <div className="text-sm font-medium truncate">
                   {syncing ? 'Sincronizando...' : getOfflineStatusMessage()}
                 </div>
-                {pendingData.total > 0 && (
+                {pendingData.notificacoes > 0 && (
                   <div className="text-xs opacity-90">
-                    {pendingData.notificacoes} notificações, {pendingData.pacientes} pacientes
+                    {pendingData.notificacoes === 1
+                      ? '1 ficha aguardando sincronização'
+                      : `${pendingData.notificacoes} fichas aguardando sincronização`}
                   </div>
                 )}
               </div>
               
-              {/* Contador de pendências */}
-              {pendingData.total > 0 && (
+              {/* Contador: só fichas (paciente vai junto no sync, sem confundir o total) */}
+              {pendingData.notificacoes > 0 && (
                 <div className="bg-white bg-opacity-20 rounded-full px-2 py-1 text-xs font-bold">
-                  {pendingData.total}
+                  {pendingData.notificacoes}
                 </div>
               )}
 
@@ -182,7 +184,7 @@ const GlobalOfflineIndicator: React.FC = () => {
               >
                 {!isOnline && needsEssentialData() ? (
                   <Download className="h-4 w-4" />
-                ) : pendingData.total > 0 ? (
+                ) : pendingData.notificacoes > 0 ? (
                   <RefreshCw className="h-4 w-4" />
                 ) : (
                   <Settings className="h-4 w-4" />

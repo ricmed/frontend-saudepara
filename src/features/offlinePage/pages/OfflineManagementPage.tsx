@@ -837,10 +837,12 @@ const OfflineManagementPage: React.FC = () => {
                   <span className="font-medium text-gray-700">Pendente Sync</span>
                 </div>
                 <div className="text-3xl font-bold text-orange-600 mb-1">
-                  {pendingSync.notificacoes + pendingSync.pacientes}
+                  {pendingSync.notificacoes}
                 </div>
                 <div className="text-sm text-gray-600">
-                  {pendingSync.notificacoes} notificações, {pendingSync.pacientes} pacientes
+                  {pendingSync.notificacoes === 1
+                    ? '1 ficha aguardando sync'
+                    : `${pendingSync.notificacoes} fichas aguardando sync`}
                 </div>
               </div>
 
@@ -1641,7 +1643,11 @@ const OfflineManagementPage: React.FC = () => {
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                               <span className="text-sm font-medium text-gray-900">
-                                #{index + 1} - {notif.formData?.tipoEvento || 'Notificação'}
+                                #{index + 1} -{' '}
+                                {notif.formData?.paciente ||
+                                  notif.formData?.tipoEvento ||
+                                  notif.formData?.eventoNome ||
+                                  'Notificação'}
                               </span>
                               <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">
                                 Offline

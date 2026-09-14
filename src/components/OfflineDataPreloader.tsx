@@ -67,9 +67,13 @@ const OfflineDataPreloader: React.FC<OfflineDataPreloaderProps> = ({
       key: 'cbos', 
       name: 'CBOs/Profissões', 
       fetchFn: async () => {
-        const server = import.meta.env.VITE_API_SERVER;
-        const port = import.meta.env.VITE_API_PORT;
-        const response = await fetch(`${server}:${port}/api/tipo-cbo?limit=5000`);
+        const basePath =
+          (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api';
+        // Relativo à página: no Vite local passa pelo proxy; em HML/PROD pelo nginx.
+        const response = await fetch(
+          `${basePath.startsWith('/') ? basePath : `/${basePath}`}/tipo-cbo?limit=5000`,
+          { credentials: 'include' },
+        );
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         return data?.data || data || [];

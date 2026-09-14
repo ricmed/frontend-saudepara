@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Wifi, WifiOff, RefreshCw, FileText, Users, AlertTriangle } from 'lucide-react';
+import { Wifi, WifiOff, RefreshCw, FileText, AlertTriangle } from 'lucide-react';
 import syncService from '@/services/syncService';
 import NotificationErrorsModal from './NotificationErrorsModal';
 
@@ -65,7 +65,7 @@ const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
     setPendingCount(count);
   };
 
-  const totalPending = pendingCount.notificacoes + pendingCount.pacientes + pendingCount.errors;
+  const totalPending = pendingCount.notificacoes + pendingCount.errors;
 
   // *** MELHORAR A EXIBIÇÃO ***
   const getStatusInfo = () => {
@@ -85,9 +85,16 @@ const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
     
     if (totalPending > 0) {
       const errorText = pendingCount.errors > 0 ? ` (${pendingCount.errors} com erro)` : '';
+      const n = pendingCount.notificacoes;
+      const fichaText =
+        n === 0
+          ? 'Pendências de sincronização'
+          : n === 1
+            ? '1 ficha aguardando sincronização'
+            : `${n} fichas aguardando sincronização`;
       return {
         color: pendingCount.errors > 0 ? 'bg-red-50 text-red-700 border-red-200' : 'bg-orange-50 text-orange-700 border-orange-200',
-        text: `${totalPending} registro(s) aguardando sincronização${errorText}`
+        text: `${fichaText}${errorText}`
       };
     }
     
@@ -119,15 +126,9 @@ const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
       </div>
 
       <div className="flex items-center gap-3">
-        {/* *** MOSTRAR CONTADORES DETALHADOS *** */}
+        {/* Contadores: só fichas/erros — paciente sincroniza junto, sem aparecer no total */}
         {totalPending > 0 && (
           <div className="flex items-center gap-3 text-xs">
-            {pendingCount.pacientes > 0 && (
-              <span className="flex items-center gap-1 bg-white/50 px-2 py-1 rounded">
-                <Users className="h-3 w-3" />
-                {pendingCount.pacientes} paciente(s)
-              </span>
-            )}
             {pendingCount.notificacoes > 0 && (
               <span className="flex items-center gap-1 bg-white/50 px-2 py-1 rounded">
                 <FileText className="h-3 w-3" />

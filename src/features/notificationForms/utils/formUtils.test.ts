@@ -162,7 +162,7 @@ describe('validateForm — CPF curto', () => {
       atendimentoOptions,
       encerramentoOptions
     );
-    expect(ok).toBe(false);
+    expect(ok.isValid).toBe(false);
     expect(setErrors).toHaveBeenCalled();
     const payload = setErrors.mock.calls[0][0] as Record<string, string>;
     expect(payload.cpf).toMatch(/11 dígitos/i);
@@ -261,6 +261,7 @@ describe('localidade do evento', () => {
   };
 
   const form = {
+    residenteBelem: '1',
     localidadeEvento: '',
     localidadeEventoOutro: '',
     localidadeEventoAtual: null,
@@ -270,6 +271,19 @@ describe('localidade do evento', () => {
     expect(
       validateLocalidadeEvento(
         { ...form, residenteBelem: '2' },
+        {
+          modo: 'OBRIGATORIA',
+          options: [outro, naoInformado],
+          catalogAvailable: true,
+        },
+      ),
+    ).toEqual({});
+  });
+
+  it('ESTRANGEIRO em evento OBRIGATORIA não exige localidade', () => {
+    expect(
+      validateLocalidadeEvento(
+        { ...form, residenteBelem: '3', paisProcedencia: '32' },
         {
           modo: 'OBRIGATORIA',
           options: [outro, naoInformado],

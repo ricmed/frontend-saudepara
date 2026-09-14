@@ -389,21 +389,31 @@ export function useOfflineSystem(options: UseOfflineSystemOptions = {}) {
     if (!state.initialized) return 'Inicializando sistema offline...';
     if (!state.isOnline && !state.stats?.hasEssentialData) return 'Offline - Dados essenciais ausentes';
     if (!state.isOnline && state.stats?.hasEssentialData) return 'Offline - Funcionando com cache';
-    if (state.isOnline && state.pendingData.total > 0) return `Online - ${state.pendingData.total} pendente(s)`;
+    if (state.isOnline && state.pendingData.notificacoes > 0) {
+      const n = state.pendingData.notificacoes;
+      return n === 1
+        ? 'Online - 1 ficha pendente'
+        : `Online - ${n} fichas pendentes`;
+    }
     if (state.isOnline && state.stats?.percentage === 100) return 'Online - Sistema completo';
     if (state.isOnline && state.stats) return `Online - ${state.stats.percentage}% dos dados baixados`;
     return 'Online';
   }, [state]);
 
   // ✅ CORRIGIDO: Funções para salvar dados
-  const saveNotificationOfflineSafe = useCallback(async (data: any, isEdit: boolean = false, notificacaoId?: string) => {
+  const saveNotificationOfflineSafe = useCallback(async (
+    data: any,
+    isEdit: boolean = false,
+    notificacaoId?: string,
+    options?: { silent?: boolean; localPendingOnly?: boolean },
+  ) => {
     try {
       // Se é edição e tem ID, garantir que está no formData
       if (isEdit && notificacaoId) {
         data.id = notificacaoId;
         data.idnotificacao = notificacaoId;
       }
-      await syncService.saveNotificacao(data, isEdit);
+      await syncService.saveNotificacao(data, isEdit, options);
       await updatePendingData(); // Atualizar contador
     } catch (error) {
       console.error('Erro ao salvar notificação:', error);
@@ -411,9 +421,12 @@ export function useOfflineSystem(options: UseOfflineSystemOptions = {}) {
     }
   }, [updatePendingData]);
 
-  const savePatientOfflineSafe = useCallback(async (data: any) => {
+  const savePatientOfflineSafe = useCallback(async (
+    data: any,
+    options?: { silent?: boolean },
+  ) => {
     try {
-      const result = await syncService.savePaciente(data);
+      const result = await syncService.savePaciente(data, options);
       await Promise.all([updatePendingData(), updatePatientsCache()]);
       return result;
     } catch (error) {

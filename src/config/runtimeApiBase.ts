@@ -46,4 +46,3 @@ export function getRuntimeApiRoot(): string {
   const base = getRuntimeApiBaseOrigin();
   return `${base}${basePath.startsWith('/') ? '' : '/'}${basePath}`;
 }
-

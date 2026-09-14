@@ -1,7 +1,5 @@
 import React from 'react';
-import { Menu, Bell, Search } from 'lucide-react';
-import { useTranslation } from '@/i18n/useTranslations';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { Menu, Bell } from 'lucide-react';
 import { AppHeaderLogos } from '@/features/desktop/components/AppHeaderLogos';
 
 interface HeaderProps {
@@ -16,9 +14,6 @@ export const Header: React.FC<HeaderProps> = ({
   onMenuToggle,
   children
 }) => {
-  const { selectedLanguage } = useLanguage();
-  const { t } = useTranslation(selectedLanguage);
-
   return (
     <header className="bg-blue-600 p-4">
       {/* Menu e Notificações */}
@@ -33,15 +28,6 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Logos */}
       <div className="mt-4 flex justify-center">
         <AppHeaderLogos compact />
-      </div>
-
-      {/* Barra de Busca */}
-      <div className="bg-blue-500/40 rounded-full p-3 flex items-center mt-4">
-        <Search className="h-5 w-5 text-white mr-2" />
-        <input
-          placeholder={t('search.placeholder')}
-          className="bg-transparent text-white placeholder-white/70 outline-none w-full text-sm"
-        />
       </div>
 
       {/* Carrossel */}

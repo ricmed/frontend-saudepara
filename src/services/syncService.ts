@@ -94,15 +94,21 @@ class SyncService {
   }
 
   private extractServerNotificationId(payload: any): number | null {
-    const raw =
-      payload?.idnotificacao ??
-      payload?.id ??
-      payload?.data?.idnotificacao ??
-      payload?.data?.id;
-    if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
-    if (typeof raw === 'string' && raw.trim() !== '') {
-      const parsed = Number(raw);
-      return Number.isFinite(parsed) ? parsed : null;
+    const candidates = [
+      payload?.idnotificacao,
+      payload?.id,
+      payload?.data?.idnotificacao,
+      payload?.data?.id,
+      payload?.notificacao?.idnotificacao,
+      payload?.notificacao?.id,
+      payload?.data?.notificacao?.idnotificacao,
+    ];
+    for (const raw of candidates) {
+      if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) return raw;
+      if (typeof raw === 'string' && raw.trim() !== '') {
+        const parsed = Number(raw);
+        if (Number.isFinite(parsed) && parsed > 0) return parsed;
+      }
     }
     return null;
   }
@@ -497,6 +503,7 @@ class SyncService {
     // ✅ NOVO: Criar Promise para o lock
     this.syncLockPromise = (async () => {
       let syncedCount = 0;
+      let syncedNotificacoes = 0;
       let errorCount = 0;
 
       try {
@@ -1021,18 +1028,28 @@ class SyncService {
           // ✅ SINCRONIZAR NOTIFICAÇÃO
           const isEdit = pendingIsEdit === true || (!!(formDataAtualizada as any).id && (formDataAtualizada as any).id > 0);
           const editId = isEdit ? Number((formDataAtualizada as any).id) : undefined;
+
+          if (!isEdit && !offlineId) {
+            throw new Error(
+              'offline_id ausente. Não é seguro criar notificação sem chave de idempotência.',
+            );
+          }
           
           const syncResult = await salvarNotificacaoCompleta(formDataAtualizada as any, isEdit, editId);
           const serverNotificationId = this.extractServerNotificationId(syncResult);
           if (!isEdit && !serverNotificationId) {
-            console.warn(`⚠️ Notificação ${offlineId} sincronizada sem ID de resposta do servidor. Mantendo registro local marcado como synced.`);
+            // Nunca marcar como synced sem ID: some da fila e não aparece no servidor.
+            throw new Error(
+              'Servidor não retornou o ID da notificação. Mantendo na fila offline para nova tentativa.',
+            );
           }
           
-          // ✅ Marcar como sincronizada SOMENTE após sucesso (usar offlineId)
+          // ✅ Marcar como sincronizada SOMENTE após sucesso com ID (criar) ou edição válida
           await indexedDBService.markNotificacaoAsSynced(offlineId, {
-            serverId: serverNotificationId || undefined
+            serverId: serverNotificationId || editId || undefined
           });
           syncedCount++;
+          syncedNotificacoes++;
           
         } catch (error: any) {
           console.error('Falha ao sincronizar notificação', {
@@ -1052,12 +1069,17 @@ class SyncService {
           const isConflict = statusCode === 409;
           
           if (isConflict) {
-            // ✅ CONFLITO: tentar reconciliar com registro já criado no servidor (outro device)
-            const reconciledServerId = await this.reconcileNotificationConflict(offlineId, deviceId);
+            // Backend novo: POST idempotente (201 com mesmo id). Backend antigo: 409.
+            // Aceitar id no body do 409, senão reconciliar por offline_id.
+            const fromConflictBody = this.extractServerNotificationId(error?.response?.data);
+            const reconciledServerId =
+              fromConflictBody ??
+              (await this.reconcileNotificationConflict(offlineId, deviceId));
             if (reconciledServerId) {
               await indexedDBService.markNotificacaoAsSynced(offlineId, { serverId: reconciledServerId });
               toast.info(`Conflito resolvido automaticamente para notificação ${offlineId}.`);
               syncedCount++;
+              syncedNotificacoes++;
             } else {
               const conflictMessage = 'Conflito de sincronização (possível duplicata já existente no servidor)';
               await indexedDBService.markNotificacaoAsError(offlineId, conflictMessage, {
@@ -1114,23 +1136,33 @@ class SyncService {
         }
       }
 
-      // ===== 3. FEEDBACK =====
-      if (syncedCount > 0) {
-        toast.success(`${syncedCount} registro(s) sincronizado(s)!`);
+      // ===== 3. FEEDBACK (só falar de ficha — paciente sincroniza em silêncio) =====
+      if (syncedNotificacoes > 0) {
+        toast.success(
+          syncedNotificacoes === 1
+            ? '1 ficha sincronizada!'
+            : `${syncedNotificacoes} fichas sincronizadas!`,
+        );
         
         // ✅ NOVO: Disparar evento de cache atualizado
         const cacheUpdatedEvent = new CustomEvent('cache-updated', {
           detail: { 
-            syncedCount,
+            syncedCount: syncedNotificacoes,
             timestamp: Date.now()
           }
         });
         window.dispatchEvent(cacheUpdatedEvent);
         console.log('📤 Evento de cache atualizado disparado');
+      } else if (syncedCount > 0) {
+        toast.success('Sincronização concluída!');
       }
       
       if (errorCount > 0) {
-        toast.warning(`${errorCount} registro(s) com erro na sincronização.`);
+        toast.warning(
+          errorCount === 1
+            ? '1 ficha com erro na sincronização.'
+            : `${errorCount} fichas com erro na sincronização.`,
+        );
       }
 
       // ===== 4. LIMPEZA =====
@@ -1325,12 +1357,18 @@ class SyncService {
   }
 
   // ✅ CORRIGIDO: Salvar paciente com ID único
-  async savePaciente(pacienteData: any): Promise<any> {
+  async savePaciente(
+    pacienteData: any,
+    options?: { silent?: boolean },
+  ): Promise<any> {
+    const silent = options?.silent === true;
     await this.checkAuthenticationStatus();
     if (this.shouldUseOnlineMode()) {
       try {
         const result = await PacienteService.create(pacienteData);
-        toast.success('✅ Paciente salvo!');
+        if (!silent) {
+          toast.success('✅ Paciente salvo!');
+        }
         return result;
       } catch (error) {
         console.warn('Falha online, salvando offline:', error);
@@ -1351,43 +1389,64 @@ class SyncService {
     
     await indexedDBService.savePaciente(pacienteComId);
     
-    const message = this.isOnline 
-      ? '📡 Erro na conexão - Paciente salvo offline!'
-      : '📱 Paciente salvo offline! Sincronizará quando voltar online.';
-    
-    toast.success(message);
+    if (!silent) {
+      const message = this.isOnline 
+        ? '📡 Erro na conexão - Paciente salvo offline!'
+        : '📱 Paciente salvo offline! Sincronizará quando voltar online.';
+      
+      toast.success(message);
+    }
     return pacienteComId;
   }
 
   // ✅ SALVAR NOTIFICAÇÃO (NOVA OU EXISTENTE)
-  async saveNotificacao(formData: any, isEdit: boolean = false): Promise<void> {
+  async saveNotificacao(
+    formData: any,
+    isEdit: boolean = false,
+    options?: { silent?: boolean; localPendingOnly?: boolean },
+  ): Promise<void> {
+    const silent = options?.silent === true;
+    const localPendingOnly = options?.localPendingOnly === true;
     // Verificar se é uma edição e existe um ID válido
     const notificacaoId = formData.id || formData.idnotificacao;
+    const numericNotificacaoId =
+      notificacaoId != null && notificacaoId !== ''
+        ? Number(notificacaoId)
+        : NaN;
+    const isServerEdit =
+      isEdit && Number.isFinite(numericNotificacaoId) && numericNotificacaoId > 0;
     
     // ✅ Verificar autenticação antes de tentar online
     await this.checkAuthenticationStatus();
     
-    if (this.shouldUseOnlineMode() && !isEdit) {
-      // Para novas notificações, tentar salvar online primeiro
-      try {
-        await salvarNotificacaoCompleta(formData, false);
-        toast.success('✅ Notificação salva!');
-        return;
-      } catch (error) {
-        console.warn('Falha online, salvando offline:', error);
-        // ✅ Se falhar, marcar como não autenticado para próximas tentativas
-        this.isAuthenticated = false;
-      }
-    } else if (this.shouldUseOnlineMode() && isEdit && notificacaoId) {
-      // Para edições online, tentar atualizar
-      try {
-        await salvarNotificacaoCompleta(formData, true, notificacaoId);
-        toast.success('✅ Notificação atualizada!');
-        return;
-      } catch (error) {
-        console.warn('Falha online ao editar, salvando offline:', error);
-        // ✅ Se falhar, marcar como não autenticado para próximas tentativas
-        this.isAuthenticated = false;
+    // Ficha só local (ainda não sincronizada): só atualiza IndexedDB — sem POST.
+    if (!localPendingOnly) {
+      if (this.shouldUseOnlineMode() && !isEdit) {
+        // Para novas notificações, tentar salvar online primeiro
+        try {
+          await salvarNotificacaoCompleta(formData, false);
+          if (!silent) {
+            toast.success('✅ Notificação salva!');
+          }
+          return;
+        } catch (error) {
+          console.warn('Falha online, salvando offline:', error);
+          // ✅ Se falhar, marcar como não autenticado para próximas tentativas
+          this.isAuthenticated = false;
+        }
+      } else if (this.shouldUseOnlineMode() && isServerEdit) {
+        // Para edições online, tentar atualizar (só ID real do servidor)
+        try {
+          await salvarNotificacaoCompleta(formData, true, numericNotificacaoId);
+          if (!silent) {
+            toast.success('✅ Notificação atualizada!');
+          }
+          return;
+        } catch (error) {
+          console.warn('Falha online ao editar, salvando offline:', error);
+          // ✅ Se falhar, marcar como não autenticado para próximas tentativas
+          this.isAuthenticated = false;
+        }
       }
     }
 
@@ -1410,18 +1469,26 @@ class SyncService {
       formDataParaSalvar.offlineId = formData.offlineId;
     }
 
-    console.log(`💾 [SYNC SERVICE] Salvando ${isEdit ? 'edição' : 'nova notificação'} offline:`, {
-      id: notificacaoId || 'novo',
-      isEdit,
+    console.log(`💾 [SYNC SERVICE] Salvando ${isServerEdit ? 'edição' : 'nova/pendente'} offline:`, {
+      id: isServerEdit ? numericNotificacaoId : 'local',
+      isServerEdit,
+      localPendingOnly,
+      offline_id: formDataParaSalvar.offline_id || formDataParaSalvar.offlineId || 'será gerado',
     });
 
-    await indexedDBService.saveNotificacao(formDataParaSalvar, isEdit, notificacaoId);
+    await indexedDBService.saveNotificacao(
+      formDataParaSalvar,
+      isServerEdit,
+      isServerEdit ? numericNotificacaoId : undefined,
+    );
     
-    const message = this.shouldUseOnlineMode() 
-      ? '📡 Erro na conexão - Salvo offline!'
-      : `📱 ${isEdit ? 'Edição salva' : 'Salvo'} offline! Sincronizará quando voltar online.`;
-    
-    toast.success(message);
+    if (!silent) {
+      const message = this.shouldUseOnlineMode() 
+        ? '📡 Erro na conexão - Salvo offline!'
+        : `📱 ${isServerEdit ? 'Edição salva' : 'Salvo'} offline! Sincronizará quando voltar online.`;
+      
+      toast.success(message);
+    }
   }
 
   // ✅ SALVAR COMUNICAÇÃO DAE (NOVA OU EXISTENTE)

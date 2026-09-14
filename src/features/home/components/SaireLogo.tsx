@@ -1,6 +1,8 @@
 /** Assets compactos da logo Sairé (UI). Original grande fica em `logo saire.png`. */
 export const SAIRE_LOGO_COMPACT_WEBP = '/images/logos/logo-saire-compact.webp';
 export const SAIRE_LOGO_COMPACT_PNG = '/images/logos/logo-saire-compact.png';
+/** Logo completa (ficha / destaque). Arquivo em public com espaço no nome. */
+export const SAIRE_LOGO_FULL_PNG = '/images/logos/logo%20saire.png';
 
 type SaireLogoProps = {
   className?: string;
