@@ -117,14 +117,22 @@ export function applyResidenciaAutoFill(args: {
     }
 
     if (residenteBelem === '2') {
-      const shouldPreselectSantarem =
-        (!hydrate && residenteJustChanged) ||
-        !current.municipio ||
-        current.municipio === BELEM_MUNICIPIO_ID;
+      // Pré-seleciona Pará + Santarém só na escolha de NÃO (ou quando o id de
+      // Santarém chega depois, ainda com UF Pará e município vazio).
+      // Não reaplicar se o usuário limpou o município ao trocar de UF — senão
+      // o formulário “trava” de volta em Pará/Santarém.
+      const justChoseNao = !hydrate && residenteJustChanged;
+      const pendingSantaremFill =
+        !hydrate &&
+        !residenteJustChanged &&
+        current.uf === PARA_ESTADO_ID &&
+        !current.municipio &&
+        Boolean(santaremMunicipioId);
+      const shouldPreselectSantarem = justChoseNao || pendingSantaremFill;
 
       return {
         paisProcedencia: BRASIL_PAIS_ID,
-        uf: shouldPreselectSantarem ? PARA_ESTADO_ID : current.uf || PARA_ESTADO_ID,
+        uf: shouldPreselectSantarem ? PARA_ESTADO_ID : current.uf,
         municipio: shouldPreselectSantarem
           ? santaremMunicipioId ?? ''
           : current.municipio,

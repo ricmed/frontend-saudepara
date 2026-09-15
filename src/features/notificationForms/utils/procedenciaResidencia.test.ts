@@ -132,4 +132,67 @@ describe('applyResidenciaAutoFill', () => {
       municipio: '200',
     });
   });
+
+  it('NÃO: trocar UF (município limpo) não força de volta Pará/Santarém', () => {
+    expect(
+      applyResidenciaAutoFill({
+        residenteBelem: '2',
+        modo: 'OBRIGATORIA',
+        current: {
+          ...empty,
+          paisProcedencia: BRASIL_PAIS_ID,
+          uf: '13',
+          municipio: '',
+        },
+        santaremMunicipioId: '77',
+        residenteJustChanged: false,
+        hydrate: false,
+      }),
+    ).toMatchObject({
+      uf: '13',
+      municipio: '',
+    });
+  });
+
+  it('NÃO: mantém município escolhido depois da pré-seleção (ex. Belém)', () => {
+    expect(
+      applyResidenciaAutoFill({
+        residenteBelem: '2',
+        modo: 'OBRIGATORIA',
+        current: {
+          ...empty,
+          paisProcedencia: BRASIL_PAIS_ID,
+          uf: PARA_ESTADO_ID,
+          municipio: BELEM_MUNICIPIO_ID,
+        },
+        santaremMunicipioId: '77',
+        residenteJustChanged: false,
+        hydrate: false,
+      }),
+    ).toMatchObject({
+      uf: PARA_ESTADO_ID,
+      municipio: BELEM_MUNICIPIO_ID,
+    });
+  });
+
+  it('NÃO: id de Santarém chega depois ainda preenche se UF Pará e município vazio', () => {
+    expect(
+      applyResidenciaAutoFill({
+        residenteBelem: '2',
+        modo: 'OBRIGATORIA',
+        current: {
+          ...empty,
+          paisProcedencia: BRASIL_PAIS_ID,
+          uf: PARA_ESTADO_ID,
+          municipio: '',
+        },
+        santaremMunicipioId: '77',
+        residenteJustChanged: false,
+        hydrate: false,
+      }),
+    ).toMatchObject({
+      uf: PARA_ESTADO_ID,
+      municipio: '77',
+    });
+  });
 });
