@@ -211,6 +211,9 @@ const ListaNotificacoes = lazyPage(
 const NotificationForm = lazyPage(
   () => import('@/features/notificationForms/NotificationForm'),
 );
+const ComunicacaoCasoPrintPage = lazyPage(
+  () => import('@/features/notificationForms/pages/ComunicacaoCasoPrintPage'),
+);
 const ComunicacaoDaePage = lazyPage(
   () => import('@/features/comunicacao-dae/ComunicacaoDaePage'),
 );
@@ -440,6 +443,14 @@ export const getPrivateAppRoutes = () => {
           <Route
             path="/private/comunicacao-de-caso/nova"
             element={<NotificationForm />}
+          />
+          <Route
+            path="/private/comunicacao-de-caso/imprimir/:id"
+            element={<ComunicacaoCasoPrintPage />}
+          />
+          <Route
+            path="/private/comunicacao-de-caso/imprimir"
+            element={<ComunicacaoCasoPrintPage />}
           />
           <Route
             path="/private/comunicacao-de-caso/editar/:id"

@@ -43,6 +43,22 @@ function normalizeMunicipioDescricao(value: string): string {
 
 const SANTAREM_NORMALIZADO = normalizeMunicipioDescricao(SANTAREM_DESCRICAO);
 
+export function resolveResidenciaChangeFlags(
+  previousResidente: string | null,
+  nextResidente: string,
+  hasExistingLocation: boolean,
+): { hydrate: boolean; residenteJustChanged: boolean } {
+  const hydrate = previousResidente === null && hasExistingLocation;
+  // Primeira escolha do usuário (ficha nova, procedência vazia): prev ainda é
+  // null, mas isso NÃO é hidratação. Sem este caso, NÃO no Sairé não pré-seleciona
+  // Pará/Santarém até o usuário trocar SIM/ESTRANGEIRO e voltar.
+  const residenteJustChanged =
+    (previousResidente !== null && previousResidente !== nextResidente) ||
+    (previousResidente === null && !hydrate);
+
+  return { hydrate, residenteJustChanged };
+}
+
 export function findSantaremMunicipioId(
   municipios: MunicipioLookup[],
 ): string | null {
@@ -117,18 +133,21 @@ export function applyResidenciaAutoFill(args: {
     }
 
     if (residenteBelem === '2') {
-      // Pré-seleciona Pará + Santarém só na escolha de NÃO (ou quando o id de
-      // Santarém chega depois, ainda com UF Pará e município vazio).
+      // Pré-seleciona Pará + Santarém na escolha de NÃO (incluindo a primeira,
+      // quando prevResidente ainda era null) ou quando o id de Santarém chega
+      // depois, ainda com UF Pará e município vazio.
       // Não reaplicar se o usuário limpou o município ao trocar de UF — senão
       // o formulário “trava” de volta em Pará/Santarém.
       const justChoseNao = !hydrate && residenteJustChanged;
+      const emptyLocation = !current.uf && !current.municipio;
       const pendingSantaremFill =
         !hydrate &&
         !residenteJustChanged &&
         current.uf === PARA_ESTADO_ID &&
         !current.municipio &&
         Boolean(santaremMunicipioId);
-      const shouldPreselectSantarem = justChoseNao || pendingSantaremFill;
+      const shouldPreselectSantarem =
+        justChoseNao || pendingSantaremFill || (!hydrate && emptyLocation);
 
       return {
         paisProcedencia: BRASIL_PAIS_ID,

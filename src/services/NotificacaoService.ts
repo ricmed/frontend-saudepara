@@ -386,7 +386,9 @@ export const NotificacaoService = {
       
       // Mapear para o formato correto
       return data.map((cbo: any) => ({
-        id: cbo.idtipo_cbo || cbo.id,  // Campo alternativo caso o backend use outro nome
+        id: cbo.idtipo_cbo || cbo.id,
+        idtipo_cbo: cbo.idtipo_cbo || cbo.id,
+        codigo: cbo.codigo,
         descricao: cbo.descricao || cbo.nome || "Descrição não disponível"
       }));
       

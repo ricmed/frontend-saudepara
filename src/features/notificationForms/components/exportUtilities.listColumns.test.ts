@@ -67,4 +67,69 @@ describe('formatNotificacaoForExport colunas por evento', () => {
     expect(row).not.toHaveProperty(EXPORT_BAIRRO_COLUMN);
     expect(row).toHaveProperty('Residente em Alter do Chão');
   });
+
+  it('Profissão resolve CBO e não imprime o id', () => {
+    const row = formatNotificacaoForExport(
+      {
+        id: 1,
+        original: {
+          tipo_evento_idtipo_evento: 6,
+          paciente: { nome: 'Paciente teste', cbo_idcbo: 42 },
+        },
+      },
+      {
+        modoLocalidadeEvento: 'NAO_USA',
+        eventoOptions: [],
+        publicoOptions: [],
+        paisOptions: [],
+        estadoOptions: [],
+        municipioOptions: [],
+        bairroOptions: [],
+        generoOptions: [],
+        racaOptions: [],
+        escolaridadeOptions: [],
+        atendimentoOptions: [],
+        sintomaOptions: [],
+        hipoteseDiagOptions: [],
+        traumaOptions: [],
+        estabelecimentoOptions: [],
+        encerramentoOptions: [],
+        cboOptions: [{ idtipo_cbo: 42, codigo: '2231-05', descricao: 'Médico' }],
+      },
+    );
+
+    expect(row.Profissão).toBe('2231-05 - Médico');
+  });
+
+  it('Profissão fica em branco se só houver o id numérico', () => {
+    const row = formatNotificacaoForExport(
+      {
+        id: 1,
+        original: {
+          tipo_evento_idtipo_evento: 6,
+          paciente: { nome: 'Paciente teste', cbo_idcbo: 777 },
+        },
+      },
+      {
+        modoLocalidadeEvento: 'NAO_USA',
+        eventoOptions: [],
+        publicoOptions: [],
+        paisOptions: [],
+        estadoOptions: [],
+        municipioOptions: [],
+        bairroOptions: [],
+        generoOptions: [],
+        racaOptions: [],
+        escolaridadeOptions: [],
+        atendimentoOptions: [],
+        sintomaOptions: [],
+        hipoteseDiagOptions: [],
+        traumaOptions: [],
+        estabelecimentoOptions: [],
+        encerramentoOptions: [],
+      },
+    );
+
+    expect(row.Profissão).toBe('');
+  });
 });

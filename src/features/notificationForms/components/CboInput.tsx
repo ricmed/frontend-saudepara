@@ -70,7 +70,9 @@ const CboInput: React.FC<CboInputProps> = ({
     // 1) Primeiro: tentar buscar no cache local (IndexedDBService.getOpcoes('cbos'))
     try {
       const cachedList: any[] = (await indexedDBService.getOpcoes("cbos")) || [];
-      const found = cachedList.find(item => String(item.idtipo_cbo) === id);
+      const found = cachedList.find(item =>
+        String(item.idtipo_cbo ?? item.id ?? item.idcbo) === id
+      );
 
       if (found) {
         const normalized = {

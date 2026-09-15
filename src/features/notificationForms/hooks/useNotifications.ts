@@ -1124,7 +1124,7 @@ export const useNotifications = () => {
         exportListToExcel(formattedData, options);
         toast.success(`Dados exportados com sucesso para Excel`);
       } else if (format === 'pdf') {
-        exportListToPDFWithOptions(formattedData, options, pdfType || 'both');
+        await exportListToPDFWithOptions(formattedData, options, pdfType || 'both');
         
         const pdfMessages = {
           'table': 'PDF da tabela resumida exportado com sucesso',

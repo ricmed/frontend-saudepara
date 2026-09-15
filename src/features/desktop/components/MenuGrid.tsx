@@ -89,7 +89,7 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
               onClick={() =>
                 navigate(buildNovaComunicacaoSairePath(saireEventId))
               }
-              className="relative overflow-hidden bg-gradient-to-r from-[#ff4d94] to-[#656B6F] hover:from-[#ff3d8a] hover:to-[#4f5559] text-white flex flex-col items-center p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:scale-105 min-w-[220px] max-w-[280px]"
+              className="relative overflow-hidden bg-[#ff4d94] hover:bg-gradient-to-r hover:from-[#ff4d94] hover:to-[#656B6F] text-white flex flex-col items-center p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:scale-105 min-w-[220px] max-w-[280px]"
               role="button"
               tabIndex={0}
               onKeyDown={(event) => {
@@ -115,7 +115,7 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
           {canAccessComunicacaoDae && (
             <div
               onClick={() => navigate('/private/comunicacao-dae/nova')}
-              className="bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white flex flex-col items-center p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:scale-105 min-w-[220px]"
+              className="bg-blue-600 hover:bg-gradient-to-r hover:from-blue-600 hover:to-blue-800 text-white flex flex-col items-center p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:scale-105 min-w-[220px]"
               role="button"
               tabIndex={0}
               onKeyDown={(event) => {

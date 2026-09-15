@@ -10,10 +10,13 @@ import {
   EXPORT_BAIRRO_COLUMN,
   EXPORT_LOCALIDADE_COLUMN,
   EXPORT_LOCALIDADE_OUTRO_COLUMN,
-  getExportDadosGeraisFieldKeys,
-  getExportPdfProcedenciaFieldKeys,
   getExportResidenteColumnLabel,
 } from "@/features/notificationForms/components/exportColumns";
+import {
+  looksLikeNumericId,
+  resolveCatalogLabel,
+  resolveCboLabel,
+} from "@/features/notificationForms/utils/exportCatalogLabels";
 
 // Interface para os dados exportados
 interface ExportData {
@@ -60,31 +63,25 @@ export interface ExportOptions {
 // Função auxiliar para obter rótulos a partir de IDs e opções
 const getLabelFromOptions = (
   value: string | undefined,
-  options: any[],
+  options: any[] | undefined,
   idField: string,
   descField: string = "descricao"
 ): string => {
-  if (!value || !options || !Array.isArray(options) || options.length === 0)
-    return value || "";
+  return resolveCatalogLabel(value, options, idField, descField);
+};
 
-  // Verificação de tipo mais segura
-  const option = options.find(
-    (opt) =>
-      opt &&
-      typeof opt === "object" &&
-      idField in opt &&
-      String(opt[idField]) === String(value)
-  );
-
-  // Adicione este trecho para debug
-  if (!option || !(descField in option)) {
-    console.warn(`Não foi possível encontrar label para valor: ${value} no campo ${idField}. Options disponíveis:`, options);
+const catalogThenMap = (
+  value: string,
+  options: any[] | undefined,
+  idField: string,
+  map: Record<string, string>,
+): string => {
+  if (options?.length) {
+    const label = getLabelFromOptions(value, options, idField);
+    if (label) return label;
   }
-
-  // Verificar se a propriedade existe antes de acessá-la
-  return option && typeof option === "object" && descField in option
-    ? String(option[descField])
-    : value || "";
+  if (map[value]) return map[value];
+  return looksLikeNumericId(value) ? "" : value || "";
 };
 
 // Função universal de formatação de datas - 🆕 ATUALIZADA com timezone
@@ -296,26 +293,17 @@ const extractPhoneComponents = (
 // ===================================================================
 
 // Helper function to format form data for export
-const prepareDataForExport = (
+export const prepareDataForExport = (
   formData: FormData,
   exportOptions?: ExportOptions
 ): ExportData => {
   // Convert enum values to their readable labels using options if provided
   const getPublicoAtendidoLabel = (value: string): string => {
-    if (exportOptions?.publicoOptions) {
-      return getLabelFromOptions(
-        value,
-        exportOptions.publicoOptions,
-        "idtipo_publico"
-      );
-    }
-
-    const map: Record<string, string> = {
+    return catalogThenMap(value, exportOptions?.publicoOptions, "idtipo_publico", {
       "1": "Visitante",
       "2": "Trabalhador",
       "3": "Autoridade",
-    };
-    return map[value] || value;
+    });
   };
 
   const getResidenteBelemLabel = (value: string): string => {
@@ -331,15 +319,7 @@ const prepareDataForExport = (
   };
 
   const getIdentidadeGeneroLabel = (value: string): string => {
-    if (exportOptions?.generoOptions) {
-      return getLabelFromOptions(
-        value,
-        exportOptions.generoOptions,
-        "idtipo_genero"
-      );
-    }
-
-    const map: Record<string, string> = {
+    return catalogThenMap(value, exportOptions?.generoOptions, "idtipo_genero", {
       "1": "Mulher cisgênero",
       "2": "Homem cisgênero",
       "3": "Mulher transgênero",
@@ -348,8 +328,7 @@ const prepareDataForExport = (
       "6": "Não binário",
       "7": "Não se aplica",
       "9": "Ignorado",
-    };
-    return map[value] || value;
+    });
   };
 
   const getGestanteLabel = (value: string): string => {
@@ -369,154 +348,118 @@ const prepareDataForExport = (
   };
 
   const getRacaLabel = (value: string): string => {
-    if (exportOptions?.racaOptions) {
-      return getLabelFromOptions(
-        value,
-        exportOptions.racaOptions,
-        "idtipo_raca"
-      );
-    }
-
-    const map: Record<string, string> = {
+    return catalogThenMap(value, exportOptions?.racaOptions, "idtipo_raca", {
       "1": "Branca",
       "2": "Preta",
       "3": "Amarela",
       "4": "Parda",
       "5": "Indígena",
       "9": "Ignorado",
-    };
-    return map[value] || value;
+    });
   };
 
   const getEscolaridadeLabel = (value: string): string => {
-    if (exportOptions?.escolaridadeOptions) {
-      return getLabelFromOptions(
-        value,
-        exportOptions.escolaridadeOptions,
-        "idtipo_escolaridade"
-      );
-    }
-
-    const map: Record<string, string> = {
-      "0": "Analfabeto",
-      "1": "Ensino fundamental incompleto",
-      "2": "Ensino fundamental completo",
-      "3": "Ensino médio incompleto",
-      "4": "Ensino médio completo",
-      "5": "Ensino superior incompleto",
-      "8": "Ensino superior completo",
-      "9": "Pós-graduado",
-      "10": "Ignorado",
-      "11": "Não se aplica",
-    };
-    return map[value] || value;
+    return catalogThenMap(
+      value,
+      exportOptions?.escolaridadeOptions,
+      "idtipo_escolaridade",
+      {
+        "0": "Analfabeto",
+        "1": "Ensino fundamental incompleto",
+        "2": "Ensino fundamental completo",
+        "3": "Ensino médio incompleto",
+        "4": "Ensino médio completo",
+        "5": "Ensino superior incompleto",
+        "8": "Ensino superior completo",
+        "9": "Pós-graduado",
+        "10": "Ignorado",
+        "11": "Não se aplica",
+      },
+    );
   };
 
   const getTipoAtendimentoLabel = (value: string): string => {
-    if (exportOptions?.atendimentoOptions) {
-      return getLabelFromOptions(
-        value,
-        exportOptions.atendimentoOptions,
-        "idtipo_atendimento"
-      );
-    }
-
-    const map: Record<string, string> = {
-      "1": "Clínico",
-      "2": "Trauma",
-      "3": "Surto",
-      "4": "Múltiplas vítimas",
-      "5": "Incidente QBRN",
-    };
-    return map[value] || value;
+    return catalogThenMap(
+      value,
+      exportOptions?.atendimentoOptions,
+      "idtipo_atendimento",
+      {
+        "1": "Clínico",
+        "2": "Trauma",
+        "3": "Surto",
+        "4": "Múltiplas vítimas",
+        "5": "Incidente QBRN",
+      },
+    );
   };
 
   const getTipoEncerramentoLabel = (value: string): string => {
-    if (exportOptions?.encerramentoOptions) {
-      return getLabelFromOptions(
-        value,
-        exportOptions.encerramentoOptions,
-        "idtipo_encerramento"
-      );
-    }
-
-    const map: Record<string, string> = {
-      "1": "Atendido e liberado",
-      "2": "Internação",
-      "3": "Observação",
-      "4": "Transferido",
-      "5": "Óbito",
-    };
-    return map[value] || value;
+    return catalogThenMap(
+      value,
+      exportOptions?.encerramentoOptions,
+      "idtipo_encerramento",
+      {
+        "1": "Atendido e liberado",
+        "2": "Internação",
+        "3": "Observação",
+        "4": "Transferido",
+        "5": "Óbito",
+      },
+    );
   };
 
   // Get sinais e sintomas labels
   const getSintomasLabels = (values: string[]): string => {
     if (!values || values.length === 0) return "";
 
-    if (exportOptions?.sintomaOptions) {
-      return values
-        .map((value) =>
-          getLabelFromOptions(
-            value,
-            exportOptions.sintomaOptions,
-            "idtipo_sintoma"
-          )
+    return values
+      .map((value) =>
+        getLabelFromOptions(
+          value,
+          exportOptions?.sintomaOptions,
+          "idtipo_sintoma"
         )
-        .join(", ");
-    }
-
-    return values.join(", ");
+      )
+      .filter(Boolean)
+      .join(", ");
   };
 
-  // Get hipótese diagnóstica labels
   const getHipoteseDiagLabels = (values: string[]): string => {
     if (!values || values.length === 0) return "";
 
-    if (exportOptions?.hipoteseDiagOptions) {
-      return values
-        .map((value) =>
-          getLabelFromOptions(
-            value,
-            exportOptions.hipoteseDiagOptions,
-            "idtipo_hipotese_diag"
-          )
+    return values
+      .map((value) =>
+        getLabelFromOptions(
+          value,
+          exportOptions?.hipoteseDiagOptions,
+          "idtipo_hipotese_diag"
         )
-        .join(", ");
-    }
-
-    return values.join(", ");
+      )
+      .filter(Boolean)
+      .join(", ");
   };
 
-  // Get trauma labels
   const getTraumaLabels = (values: string[]): string => {
     if (!values || values.length === 0) return "";
 
-    if (exportOptions?.traumaOptions) {
-      return values
-        .map((value) =>
-          getLabelFromOptions(
-            value,
-            exportOptions.traumaOptions,
-            "idtipo_trauma"
-          )
+    return values
+      .map((value) =>
+        getLabelFromOptions(
+          value,
+          exportOptions?.traumaOptions,
+          "idtipo_trauma"
         )
-        .join(", ");
-    }
-
-    return values.join(", ");
+      )
+      .filter(Boolean)
+      .join(", ");
   };
 
-  // Get evento label
   const getEventoLabel = (value: string): string => {
-    if (exportOptions?.eventoOptions) {
-      return getLabelFromOptions(
-        value,
-        exportOptions.eventoOptions,
-        "idtipo_evento"
-      );
-    }
-    return value;
+    return getLabelFromOptions(
+      value,
+      exportOptions?.eventoOptions,
+      "idtipo_evento"
+    );
   };
 
   const getLocalidadeEventoText = (): string => {
@@ -540,7 +483,9 @@ const prepareDataForExport = (
       );
     }
 
-    return formData.localidadeEvento;
+    return looksLikeNumericId(formData.localidadeEvento)
+      ? ""
+      : formData.localidadeEvento;
   };
 
   const isLocalidadeEventoOutro = (): boolean => {
@@ -554,38 +499,27 @@ const prepareDataForExport = (
 
   // Get pais label
   const getPaisLabel = (value: string): string => {
-    if (exportOptions?.paisOptions) {
-      return getLabelFromOptions(
-        value,
-        exportOptions.paisOptions,
-        "idtipo_pais"
-      );
-    }
-    return value;
+    return getLabelFromOptions(
+      value,
+      exportOptions?.paisOptions,
+      "idtipo_pais"
+    );
   };
 
-  // Get UF label
   const getUfLabel = (value: string): string => {
-    if (exportOptions?.estadoOptions) {
-      return getLabelFromOptions(
-        value,
-        exportOptions.estadoOptions,
-        "idtipo_estado"
-      );
-    }
-    return value;
+    return getLabelFromOptions(
+      value,
+      exportOptions?.estadoOptions,
+      "idtipo_estado"
+    );
   };
 
-  // Get municipio label
   const getMunicipioLabel = (value: string): string => {
-    if (exportOptions?.municipioOptions) {
-      return getLabelFromOptions(
-        value,
-        exportOptions.municipioOptions,
-        "idtipo_municipio"
-      );
-    }
-    return value;
+    return getLabelFromOptions(
+      value,
+      exportOptions?.municipioOptions,
+      "idtipo_municipio"
+    );
   };
 
   // Funções aprimoradas para campos problemáticos
@@ -672,8 +606,12 @@ const prepareDataForExport = (
       if ("nome" in bairroObj && bairroObj.nome) return bairroObj.nome;
     }
 
-    // Se for string direta
-    return String(formData.bairro);
+    return getLabelFromOptions(
+      String(formData.bairro),
+      exportOptions?.bairroOptions,
+      "idtipo_bairro",
+      "descricao"
+    );
   };
 
   // 4. Obter texto da UF aprimorado
@@ -703,10 +641,15 @@ const prepareDataForExport = (
       const ufObj = formData.uf as Record<string, any>;
       if ("descricao" in ufObj && ufObj.descricao) return ufObj.descricao;
       if ("nome" in ufObj && ufObj.nome) return ufObj.nome;
+      if ("sigla" in ufObj && ufObj.sigla) return ufObj.sigla;
     }
 
-    // Se for string direta
-    return String(formData.uf);
+    return getLabelFromOptions(
+      String(formData.uf),
+      exportOptions?.estadoOptions,
+      "idtipo_estado",
+      "descricao"
+    );
   };
 
   // 5. Obter texto do município aprimorado
@@ -739,73 +682,24 @@ const prepareDataForExport = (
       if ("nome" in municipioObj && municipioObj.nome) return municipioObj.nome;
     }
 
-    // Se for string direta
-    return String(formData.municipio);
+    return getLabelFromOptions(
+      String(formData.municipio),
+      exportOptions?.municipioOptions,
+      "idtipo_municipio",
+      "descricao"
+    );
   };
 
   // 6. Obter profissão aprimorada
   const getProfissaoText = (): string => {
     if (!formData.profissao) return "";
-
-    // Se for objeto com descrição (como tipo_cbo)
-    if (typeof formData.profissao === "object" && formData.profissao !== null) {
-      const profissaoObj = formData.profissao as Record<string, any>;
-      if ("descricao" in profissaoObj && profissaoObj.descricao)
-        return profissaoObj.descricao;
-      if ("nome" in profissaoObj && profissaoObj.nome) return profissaoObj.nome;
-
-      // Se tiver ID e temos options
-      if (
-        "id" in profissaoObj &&
-        profissaoObj.id &&
-        exportOptions?.cboOptions
-      ) {
-        return getLabelFromOptions(
-          profissaoObj.id.toString(),
-          exportOptions.cboOptions,
-          "idtipo_cbo",
-          "descricao"
-        );
-      }
-    }
-
-    // Se for ID e temos options
-    if (
-      typeof formData.profissao === "string" &&
-      /^\d+$/.test(formData.profissao) &&
-      exportOptions?.cboOptions
-    ) {
-      return getLabelFromOptions(
-        formData.profissao,
-        exportOptions.cboOptions,
-        "idtipo_cbo",
-        "descricao"
-      );
-    }
-
-    // Se for string direta
-    return String(formData.profissao);
+    return resolveCboLabel(formData.profissao, exportOptions?.cboOptions);
   };
 
   // 7. Obter unidade notificadora aprimorada
   const getUnidadeNotificadoraText = (): string => {
     if (!formData.unidadeNotificadora) return "";
 
-    // Se for ID e temos options
-    if (
-      exportOptions?.estabelecimentoOptions &&
-      typeof formData.unidadeNotificadora === "string" &&
-      /^\d+$/.test(formData.unidadeNotificadora)
-    ) {
-      return getLabelFromOptions(
-        formData.unidadeNotificadora,
-        exportOptions.estabelecimentoOptions,
-        "idestabelecimento",
-        "nome"
-      );
-    }
-
-    // Se for objeto com nome ou descrição
     if (
       typeof formData.unidadeNotificadora === "object" &&
       formData.unidadeNotificadora !== null
@@ -816,29 +710,17 @@ const prepareDataForExport = (
         return notificadora.descricao;
     }
 
-    // Se for string direta
-    return String(formData.unidadeNotificadora);
+    return getLabelFromOptions(
+      String(formData.unidadeNotificadora),
+      exportOptions?.estabelecimentoOptions,
+      "idestabelecimento",
+      "nome"
+    );
   };
 
-  // 8. Obter local de encaminhamento aprimorado
   const getLocalEncaminhamentoText = (): string => {
     if (!formData.localEncaminhamento) return "";
 
-    // Se temos options e é um ID
-    if (
-      exportOptions?.estabelecimentoOptions &&
-      typeof formData.localEncaminhamento === "string" &&
-      /^\d+$/.test(formData.localEncaminhamento)
-    ) {
-      return getLabelFromOptions(
-        formData.localEncaminhamento,
-        exportOptions.estabelecimentoOptions,
-        "idestabelecimento",
-        "nome"
-      );
-    }
-
-    // Se for objeto com nome ou descrição
     if (
       typeof formData.localEncaminhamento === "object" &&
       formData.localEncaminhamento !== null
@@ -853,8 +735,12 @@ const prepareDataForExport = (
         return encaminhamento.descricao;
     }
 
-    // Se for string direta
-    return String(formData.localEncaminhamento);
+    return getLabelFromOptions(
+      String(formData.localEncaminhamento),
+      exportOptions?.estabelecimentoOptions,
+      "idestabelecimento",
+      "nome"
+    );
   };
 
   // Extrair DDI e número de telefone separadamente
@@ -1116,169 +1002,15 @@ export const exportToWord = (
   }
 };
 
-// Função de exportação atualizada
-export const exportToPDF = (
+export const exportToPDF = async (
   formData: FormData,
   exportOptions?: ExportOptions
-): boolean => {
+): Promise<boolean> => {
   try {
-    const data = prepareDataForExport(formData, exportOptions);
-    const doc = new jsPDF();
-
-    // Dimensões e configurações
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-
-    // Adicionar título do documento
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text("Formulário de Notificação", pageWidth / 2, 15, {
-      align: "center",
-    });
-
-    let currentY = 25;
-
-    const modoExportacao = exportOptions?.modoLocalidadeEvento ?? "NAO_USA";
-    const sections = [
-      {
-        title: "1. Dados Gerais",
-        fields: getExportDadosGeraisFieldKeys(modoExportacao),
-      },
-      {
-        title: "2. Procedência do indivíduo",
-        fields: getExportPdfProcedenciaFieldKeys(modoExportacao),
-      },
-      {
-        title: "3. Identificação do indivíduo",
-        fields: [
-          "Nome do Paciente",
-          "Nome da Mãe",
-          "Data de Nascimento",
-          "Idade",
-          "CPF",
-          "Identidade de Gênero",
-          "Gestante",
-          "Raça",
-          "Escolaridade",
-          "Profissão",
-          "Contato Telefônico",
-        ],
-      },
-      {
-        title: "4. Informações do atendimento",
-        fields: [
-          "Tipo de Atendimento",
-          "Sinais e Sintomas",
-          "Data de Início dos Sintomas",
-          "Observação dos Sintomas",
-          "Hipótese Diagnóstica",
-          "Observação da Hipótese",
-          "Tipo de Trauma",
-          "Data da Ocorrência",
-          "Observação do Trauma",
-          "Relacionado a Surto",
-          "Observação do Incidente",
-        ],
-      },
-      {
-        title: "5. Informações da unidade notificadora",
-        fields: [
-          "Data do Atendimento",
-          "Unidade Notificadora",
-          "Nome do Notificador",
-          "Contato do Notificador",
-        ],
-      },
-      {
-        title: "6. Encerramento do Caso",
-        fields: [
-          "Data de Encerramento",
-          "Tipo de Encerramento",
-          "Local de Encaminhamento",
-        ],
-      },
-      {
-        title: "7. Campos de Auditoria",
-        fields: [
-          "Data e Hora de Criação",
-          "Data e Hora de Atualização",
-        ],
-      },
-    ];
-
-    // Processar cada seção
-    for (const section of sections) {
-      // Adicionar cabeçalho da seção
-      doc.setFillColor(65, 105, 225); // Royal Blue
-      doc.rect(10, currentY, pageWidth - 20, 8, "F");
-
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(12);
-      doc.text(section.title, 12, currentY + 5.5);
-
-      currentY += 10;
-
-      // Preparar dados para a tabela
-      const tableData = section.fields
-        .filter(
-          (field) =>
-            data[field] !== undefined &&
-            data[field] !== null &&
-            String(data[field]).trim() !== ""
-        )
-        .map((field) => [field, data[field] ?? ""]);
-
-      if (tableData.length > 0) {
-        // Usar autoTable para essa seção
-        doc.autoTable({
-          startY: currentY,
-          body: tableData,
-          theme: "plain",
-          styles: {
-            fontSize: 10,
-            cellPadding: 3,
-            lineColor: [220, 220, 220],
-            lineWidth: 0.1,
-          },
-          columnStyles: {
-            0: { fontStyle: "bold", cellWidth: 70 },
-            1: { cellWidth: "auto" },
-          },
-          didDrawPage: (_data) => {
-            // Adicionar rodapé em cada página
-            const pageNumber = doc.getNumberOfPages();
-            const text = `Gerado em ${new Date().toLocaleDateString("pt-BR")} - Página ${pageNumber}`;
-
-            doc.setFontSize(8);
-            doc.setTextColor(100, 100, 100);
-            doc.text(text, pageWidth - 10, pageHeight - 10, { align: "right" });
-          },
-          margin: { left: 10, right: 10 },
-        });
-
-        // Atualizar a posição Y após a tabela
-        currentY = (doc as any).lastAutoTable.finalY + 10;
-      } else {
-        currentY += 5; // Espaço adicional se não houver campos
-      }
-    }
-
-    // Atualizar todos os rodapés com o número total de páginas
-    const totalPages = doc.getNumberOfPages();
-    for (let i = 1; i <= totalPages; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setTextColor(100, 100, 100);
-      doc.text(
-        `Gerado em ${new Date().toLocaleDateString("pt-BR")} - Página ${i} de ${totalPages}`,
-        pageWidth - 10,
-        pageHeight - 10,
-        { align: "right" }
-      );
-    }
-
-    // Salvar o PDF
-    doc.save(generateFilename(formData, "pdf"));
+    const { exportarComunicacaoCasoDocumentoPDF } = await import(
+      "./caseFormDocumentExporter"
+    );
+    await exportarComunicacaoCasoDocumentoPDF(formData, exportOptions);
     return true;
   } catch (error) {
     console.error("Erro ao gerar PDF:", error);
@@ -1350,25 +1082,13 @@ export const formatNotificacaoForExport = (
   const getProfissaoText = (): string => {
     const paciente = notificacao.original?.paciente || {};
 
-    // 1. Tentar via CBO ID com options
-    if (options?.cboOptions && paciente.cbo_idcbo) {
-      const cboId = paciente.cbo_idcbo.toString();
+    const fromRelation = resolveCboLabel(paciente.tipo_cbo);
+    if (fromRelation) return fromRelation;
 
-      // Encontrar a opção correta com fallbacks
-      const cboOption = options.cboOptions.find(
-        (opt) => String(opt.id) === cboId || String(opt.idtipo_cbo) === cboId
-      );
-
-      return cboOption?.descricao || `CBO ID: ${cboId}`;
-    }
-
-    // 2. Tentar via objeto expandido do relacionamento
-    if (paciente.tipo_cbo?.descricao) {
-      return paciente.tipo_cbo.descricao;
-    }
-
-    // 3. Fallback para campo direto ou código
-    return paciente.profissao || paciente.cbo_idcbo || "";
+    return resolveCboLabel(
+      paciente.cbo_idcbo ?? paciente.profissao,
+      options?.cboOptions,
+    );
   };
 
   // 4. Função para obter bairro
@@ -1397,7 +1117,7 @@ export const formatNotificacaoForExport = (
       );
     }
 
-    return original.bairro || "";
+    return looksLikeNumericId(original.bairro) ? "" : original.bairro || "";
   };
 
   const getLocalidadeEventoText = (): string => {
@@ -1459,7 +1179,9 @@ export const formatNotificacaoForExport = (
       );
     }
 
-    return original.municipio || "";
+    return looksLikeNumericId(original.municipio)
+      ? ""
+      : original.municipio || "";
   };
 
   // 7. Função para local de encaminhamento
@@ -1548,15 +1270,11 @@ export const formatNotificacaoForExport = (
       return original.tipo_hipotese_diag.descricao;
     }
 
-    if (options?.hipoteseDiagOptions) {
-      return getLabelFromOptions(
-        original.tipo_hipotese_diag_idtipo_hipotese_diag?.toString(),
-        options.hipoteseDiagOptions,
-        "idtipo_hipotese_diag"
-      );
-    }
-
-    return original.tipo_hipotese_diag_idtipo_hipotese_diag?.toString() || "";
+    return getLabelFromOptions(
+      original.tipo_hipotese_diag_idtipo_hipotese_diag?.toString(),
+      options?.hipoteseDiagOptions,
+      "idtipo_hipotese_diag"
+    );
   };
 
   // Obter tipo de trauma aprimorado - usando notificacao_has_tipo_trauma (N:N)
@@ -1589,18 +1307,14 @@ export const formatNotificacaoForExport = (
       
       // Senão, buscar nas opções
       if (options?.traumaOptions && traumaId) {
-        const trauma = options.traumaOptions.find(
-          (t: any) => String(t.idtipo_trauma) === String(traumaId)
+        const label = getLabelFromOptions(
+          String(traumaId),
+          options.traumaOptions,
+          "idtipo_trauma"
         );
-        if (trauma && trauma.descricao) {
-          traumaDescricoes.push(trauma.descricao);
-          return;
+        if (label) {
+          traumaDescricoes.push(label);
         }
-      }
-      
-      // Último recurso: usar o ID
-      if (traumaId) {
-        traumaDescricoes.push(traumaId.toString());
       }
     });
 
@@ -1960,10 +1674,10 @@ export const exportListToCSV = (
 };
 
 // Exportar lista para PDF (tabela em paisagem + fichas em retrato)
-export const exportListToPDF = (
+export const exportListToPDF = async (
   notificacoes: NotificacaoItem[],
   exportOptions?: ExportOptions
-): void => {
+): Promise<void> => {
   try {
     if (!notificacoes || notificacoes.length === 0) {
       console.warn("Não há dados para exportar");
@@ -1974,19 +1688,10 @@ export const exportListToPDF = (
     const formattedData = notificacoes.map((item) =>
       formatNotificacaoForExport(item, exportOptions)
     );
-    const modoExportacao = exportOptions?.modoLocalidadeEvento ?? "NAO_USA";
 
-    // Criar dois documentos separados com orientações diferentes
-    // 1. Documento para tabela resumida (paisagem)
+    // Documento para tabela resumida (paisagem)
     const tabelaDoc = new jsPDF({
       orientation: "landscape",
-      unit: "mm",
-      format: "a4",
-    });
-
-    // 2. Documento para fichas detalhadas (retrato)
-    const fichasDoc = new jsPDF({
-      orientation: "portrait",
       unit: "mm",
       format: "a4",
     });
@@ -2060,143 +1765,6 @@ export const exportListToPDF = (
       },
     });
 
-    // PARTE 2: FICHAS DETALHADAS EM RETRATO
-    // Definir seções agrupadas para as fichas detalhadas
-    const sections = [
-      {
-        title: "Dados Gerais",
-        fields: getExportDadosGeraisFieldKeys(modoExportacao),
-      },
-      {
-        title: "Identificação do Paciente",
-        fields: [
-          "Nome do Paciente",
-          "Nome da Mãe",
-          "Data de Nascimento",
-          "Idade",
-          "CPF",
-          "Identidade de Gênero",
-          "Gestante",
-          "Raça",
-          "Escolaridade",
-          "Profissão",
-          "Contato Telefônico",
-        ],
-      },
-      {
-        title: "Procedência",
-        fields: getExportPdfProcedenciaFieldKeys(modoExportacao),
-      },
-      {
-        title: "Atendimento e Sintomas",
-        fields: [
-          "Tipo de Atendimento",
-          "Data da Ocorrência",
-          "Data do Atendimento",
-          "Data de Início dos Sintomas",
-          "Sinais e Sintomas",
-          "Observação dos Sintomas",
-        ],
-      },
-      {
-        title: "Diagnóstico",
-        fields: [
-          "Hipótese Diagnóstica",
-          "Observação da Hipótese",
-          "Tipo de Trauma",
-          "Observação do Trauma",
-          "Relacionado a Surto",
-          "Observação do Incidente",
-        ],
-      },
-      {
-        title: "Encerramento e Notificação",
-        fields: [
-          "Data de Encerramento",
-          "Tipo de Encerramento",
-          "Local de Encaminhamento",
-          "Unidade Notificadora",
-          "Nome do Notificador",
-          "Contato do Notificador",
-        ],
-      },
-    ];
-
-    // Adicionar ficha detalhada para cada notificação em páginas separadas
-    formattedData.forEach((item, index) => {
-      if (index > 0) {
-        // Adicionar nova página para cada ficha após a primeira
-        fichasDoc.addPage();
-      }
-
-      // Cabeçalho da ficha
-      fichasDoc.setFontSize(14);
-      fichasDoc.setTextColor(63, 81, 181);
-      fichasDoc.text(`Ficha de Notificação #${index + 1}`, 15, 15);
-
-      fichasDoc.setFontSize(12);
-      fichasDoc.text(
-        `Paciente: ${item["Nome do Paciente"] || "Não informado"}`,
-        15,
-        22
-      );
-
-      let yPos = 30;
-
-      // Adicionar cada seção
-      sections.forEach((section) => {
-        // Título da seção
-        fichasDoc.setFillColor(230, 230, 250); // Azul claro
-        fichasDoc.rect(15, yPos, 180, 8, "F");
-
-        fichasDoc.setFontSize(11);
-        fichasDoc.setTextColor(63, 81, 181);
-        fichasDoc.text(section.title, 18, yPos + 5.5);
-
-        yPos += 10;
-
-        // Conteúdo da seção
-        const sectionData = section.fields
-          .filter(
-            (field) =>
-              item[field] !== undefined &&
-              item[field] !== null &&
-              String(item[field]).trim() !== ""
-          )
-          .map((field) => [field, String(item[field] || "")]);
-
-        if (sectionData.length > 0) {
-          // Verificar se a próxima tabela cabe na página atual, caso contrário adicionar nova página
-          if (yPos > fichasDoc.internal.pageSize.height - 40) {
-            fichasDoc.addPage();
-            yPos = 15;
-          }
-
-          fichasDoc.autoTable({
-            startY: yPos,
-            head: [], // Sem cabeçalho
-            body: sectionData,
-            theme: "grid",
-            styles: {
-              fontSize: 9,
-              cellPadding: 3,
-            },
-            columnStyles: {
-              0: { fontStyle: "bold", cellWidth: 60 },
-              1: { cellWidth: "auto" },
-            },
-            margin: { left: 15, right: 15 },
-          });
-
-          yPos = (fichasDoc as any).lastAutoTable.finalY + 10;
-        }
-      });
-
-      // Adicionar rodapé para cada página de ficha
-      addFooter(fichasDoc, index + 2, 1 + notificacoes.length);
-    });
-
-    // Função auxiliar para adicionar rodapé com numeração correta
     function addFooter(doc: any, pageNumber: number, totalPages: number) {
       doc.setFontSize(8);
       doc.setTextColor(100, 100, 100);
@@ -2208,135 +1776,59 @@ export const exportListToPDF = (
       );
     }
 
-    // Nome do arquivo
     const currentDate = new Date().toISOString().split("T")[0];
     const fileName = `notificacoes_lista_${currentDate}.pdf`;
 
-    // ABORDAGEM 1: Usar jspdf-merger para combinar os PDFs (mais confiável)
-    combineAndExportPDFs();
+    const { buildComunicacoesCasoDocumentosPdfBytes } = await import(
+      "./caseFormDocumentExporter"
+    );
+    const fichasBytes = await buildComunicacoesCasoDocumentosPdfBytes(
+      notificacoes,
+      exportOptions
+    );
 
-    // Função para combinar e exportar os PDFs usando jspdf diretamente
-    async function combineAndExportPDFs() {
-      try {
-        // Método 1: Tentar com pdf-lib
-        await mergeWithPDFLib();
-      } catch (e) {
-        console.error("Erro ao mesclar com PDF-lib:", e);
-
-        // Método 2: Se falhar, tentar com jsPDF.addPage (mais básico)
-        try {
-          const combinedDoc = new jsPDF();
-
-          // Remover primeira página vazia
-          combinedDoc.deletePage(1);
-
-          // Adicionar a página da tabela (em paisagem)
-          const tabelaPdfOutput = tabelaDoc.output("arraybuffer");
-          const tabelaPdfBuffer = new ArrayBuffer(tabelaPdfOutput.byteLength);
-          const tabelaPdfUint8 = new Uint8Array(tabelaPdfBuffer);
-          tabelaPdfUint8.set(new Uint8Array(tabelaPdfOutput));
-          // Blob não é utilizado neste contexto
-          combinedDoc.addPage("landscape");
-          combinedDoc.setPage(1);
-          combinedDoc.addFileToVFS("tabela.pdf", tabelaPdfOutput.toString());
-
-          // Adicionar as páginas das fichas (em retrato)
-          // fichasPdfOutput não é utilizado neste contexto
-
-          // Para cada página em fichasDoc
-          const fichasPagesCount = fichasDoc.getNumberOfPages();
-          for (let i = 1; i <= fichasPagesCount; i++) {
-            combinedDoc.addPage("portrait");
-            // Não é possível copiar o conteúdo diretamente sem bibliotecas adicionais
-          }
-
-          combinedDoc.save(fileName);
-        } catch (err) {
-          console.error("Erro ao tentar método alternativo de mesclagem:", err);
-          // Método 3: Último recurso, salvar os dois PDFs separadamente
-          fallbackSave();
-        }
-      }
-    }
-
-    // Função para mesclar usando pdf-lib
-    async function mergeWithPDFLib() {
-      // Obter os bytes dos documentos
+    try {
       const tabelaBytes = tabelaDoc.output("arraybuffer");
-      const fichasBytes = fichasDoc.output("arraybuffer");
-
-      // Criar novo documento
       const mergedPdf = await PDFDocument.create();
-
-      // Carregar documentos fonte
       const tabelaPdf = await PDFDocument.load(tabelaBytes);
       const fichasPdf = await PDFDocument.load(fichasBytes);
 
-      // Copiar todas as páginas
-      // Primeiro da tabela (em paisagem)
-      const tabelaPageIndices = Array.from(
-        { length: tabelaPdf.getPageCount() },
-        (_, i) => i
-      );
       const tabelaPages = await mergedPdf.copyPages(
         tabelaPdf,
-        tabelaPageIndices
-      );
-
-      // Depois as fichas (em retrato)
-      const fichasPageIndices = Array.from(
-        { length: fichasPdf.getPageCount() },
-        (_, i) => i
+        tabelaPdf.getPageIndices()
       );
       const fichasPages = await mergedPdf.copyPages(
         fichasPdf,
-        fichasPageIndices
+        fichasPdf.getPageIndices()
       );
-
-      // Adicionar as páginas na ordem correta
-      // Primeiro as páginas da tabela
       tabelaPages.forEach((page) => mergedPdf.addPage(page));
-
-      // Depois as páginas das fichas
       fichasPages.forEach((page) => mergedPdf.addPage(page));
 
-      // Salvar o documento final
       const mergedBytes = await mergedPdf.save();
-
-      // Criar um blob e fazer o download
-      const arrayBuffer = new ArrayBuffer(mergedBytes.byteLength);
-      const uint8Array = new Uint8Array(arrayBuffer);
-      uint8Array.set(new Uint8Array(mergedBytes));
-      const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+      const blob = new Blob([mergedBytes], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
-
       const link = document.createElement("a");
       link.href = url;
       link.download = fileName;
       link.style.display = "none";
       document.body.appendChild(link);
       link.click();
-
-      // Limpar
       setTimeout(() => {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
       }, 100);
-    }
-
-    // Função alternativa caso falhe a mesclagem
-    function fallbackSave() {
-      console.warn(
-        "Não foi possível mesclar os documentos, salvando separadamente..."
-      );
-
-      // Salvar documento principal (tabela)
+    } catch (e) {
+      console.error("Erro ao mesclar com PDF-lib:", e);
       tabelaDoc.save(`tabela_${fileName}`);
-
-      // Salvar documento de fichas
-      const fichasFileName = `fichas_${fileName}`;
-      fichasDoc.save(fichasFileName);
-
+      const fichasBlob = new Blob([fichasBytes], { type: "application/pdf" });
+      const fichasUrl = URL.createObjectURL(fichasBlob);
+      const fichasLink = document.createElement("a");
+      fichasLink.href = fichasUrl;
+      fichasLink.download = `fichas_${fileName}`;
+      document.body.appendChild(fichasLink);
+      fichasLink.click();
+      document.body.removeChild(fichasLink);
+      URL.revokeObjectURL(fichasUrl);
       alert(
         "Não foi possível gerar um único PDF. Foram gerados dois arquivos separados: um com a tabela resumida e outro com as fichas detalhadas."
       );
@@ -2467,202 +1959,41 @@ export const exportListToPDFTableOnly = (
 };
 
 // Exportar lista APENAS como fichas detalhadas (retrato)
-export const exportListToPDFFormsOnly = (
+export const exportListToPDFFormsOnly = async (
   notificacoes: NotificacaoItem[],
   exportOptions?: ExportOptions
-): void => {
+): Promise<void> => {
   try {
     if (!notificacoes || notificacoes.length === 0) {
       console.warn("Não há dados para exportar");
       return;
     }
 
-    // Formatar dados para PDF
-    const formattedData = notificacoes.map((item) =>
-      formatNotificacaoForExport(item, exportOptions)
+    const { exportarComunicacoesCasoDocumentosPDF } = await import(
+      "./caseFormDocumentExporter"
     );
-    const modoExportacao = exportOptions?.modoLocalidadeEvento ?? "NAO_USA";
-
-    // Criar documento em retrato
-    const doc = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-    });
-
-    // Definir seções para as fichas
-    const sections = [
-      {
-        title: "Dados Gerais",
-        fields: getExportDadosGeraisFieldKeys(modoExportacao),
-      },
-      {
-        title: "Identificação do Paciente",
-        fields: [
-          "Nome do Paciente",
-          "Nome da Mãe",
-          "Data de Nascimento",
-          "Idade",
-          "CPF",
-          "Identidade de Gênero",
-          "Gestante",
-          "Raça",
-          "Escolaridade",
-          "Profissão",
-          "DDI Paciente",
-          "Contato Telefônico",
-        ],
-      },
-      {
-        title: "Procedência",
-        fields: getExportPdfProcedenciaFieldKeys(modoExportacao),
-      },
-      {
-        title: "Atendimento e Sintomas",
-        fields: [
-          "Tipo de Atendimento",
-          "Data da Ocorrência",
-          "Data do Atendimento",
-          "Data de Início dos Sintomas",
-          "Sinais e Sintomas",
-          "Observação dos Sintomas",
-        ],
-      },
-      {
-        title: "Diagnóstico",
-        fields: [
-          "Hipótese Diagnóstica",
-          "Observação da Hipótese",
-          "Tipo de Trauma",
-          "Observação do Trauma",
-          "Relacionado a Surto",
-          "Observação do Incidente",
-        ],
-      },
-      {
-        title: "Encerramento e Notificação",
-        fields: [
-          "Data de Encerramento",
-          "Tipo de Encerramento",
-          "Local de Encaminhamento",
-          "Unidade Notificadora",
-          "Nome do Notificador",
-          "DDI Notificador",
-          "Contato do Notificador",
-        ],
-      },
-    ];
-
-    // Adicionar ficha para cada notificação
-    formattedData.forEach((item, index) => {
-      if (index > 0) {
-        doc.addPage();
-      }
-
-      // Cabeçalho da ficha
-      doc.setFontSize(14);
-      doc.setTextColor(63, 81, 181);
-      doc.text(`Ficha de Notificação #${index + 1}`, 15, 15);
-
-      doc.setFontSize(12);
-      doc.text(
-        `Paciente: ${item["Nome do Paciente"] || "Não informado"}`,
-        15,
-        22
-      );
-
-      let yPos = 30;
-
-      // Adicionar cada seção
-      sections.forEach((section) => {
-        // Verificar se há espaço suficiente na página
-        if (yPos > doc.internal.pageSize.height - 60) {
-          doc.addPage();
-          yPos = 15;
-        }
-
-        // Título da seção
-        doc.setFillColor(230, 230, 250);
-        doc.rect(15, yPos, 180, 8, "F");
-
-        doc.setFontSize(11);
-        doc.setTextColor(63, 81, 181);
-        doc.text(section.title, 18, yPos + 5.5);
-
-        yPos += 10;
-
-        // Conteúdo da seção
-        const sectionData = section.fields
-          .filter(
-            (field) =>
-              item[field] !== undefined &&
-              item[field] !== null &&
-              String(item[field]).trim() !== ""
-          )
-          .map((field) => [field, String(item[field] || "")]);
-
-        if (sectionData.length > 0) {
-          doc.autoTable({
-            startY: yPos,
-            head: [],
-            body: sectionData,
-            theme: "grid",
-            styles: {
-              fontSize: 9,
-              cellPadding: 3,
-            },
-            columnStyles: {
-              0: { fontStyle: "bold", cellWidth: 60 },
-              1: { cellWidth: "auto" },
-            },
-            margin: { left: 15, right: 15 },
-          });
-
-          yPos = (doc as any).lastAutoTable.finalY + 10;
-        }
-      });
-
-      // Adicionar rodapé
-      doc.setFontSize(8);
-      doc.setTextColor(100, 100, 100);
-      doc.text(
-        `Ficha ${index + 1} de ${formattedData.length}`,
-        doc.internal.pageSize.getWidth() - 15,
-        doc.internal.pageSize.getHeight() - 10,
-        { align: "right" }
-      );
-    });
-
-    // Nome do arquivo
-    const currentDate = new Date().toISOString().split("T")[0];
-    const fileName = `fichas_notificacoes_${currentDate}.pdf`;
-
-    // Salvar o documento
-    doc.save(fileName);
-    
+    await exportarComunicacoesCasoDocumentosPDF(notificacoes, exportOptions);
   } catch (error) {
     console.error("Erro ao exportar fichas PDF:", error);
     throw error;
   }
 };
 
-// Modificar a função original para aceitar o tipo de exportação
-export const exportListToPDFWithOptions = (
+export const exportListToPDFWithOptions = async (
   notificacoes: NotificacaoItem[],
   exportOptions?: ExportOptions,
-  pdfType: PDFExportType = 'both'
-): void => {
+  pdfType: PDFExportType = "both"
+): Promise<void> => {
   switch (pdfType) {
-    case 'table':
+    case "table":
       exportListToPDFTableOnly(notificacoes, exportOptions);
       break;
-    case 'forms':
-      exportListToPDFFormsOnly(notificacoes, exportOptions);
+    case "forms":
+      await exportListToPDFFormsOnly(notificacoes, exportOptions);
       break;
-    case 'both':
+    case "both":
     default:
-      // Manter a função original que combina ambos
-      exportListToPDF(notificacoes, exportOptions);
+      await exportListToPDF(notificacoes, exportOptions);
       break;
   }
 };

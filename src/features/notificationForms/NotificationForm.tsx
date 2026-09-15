@@ -1,5 +1,5 @@
 // src/features/notificationForms/NotificationForm.tsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Save,
@@ -7,9 +7,10 @@ import {
   ArrowLeft,
   Download,
   Loader,
-  Files,
+  FileText,
   Trash2,
   Menu,
+  Printer,
 } from "lucide-react";
 import ModalBuscaPaciente from "@/features/paginaPacientesComu/components/ModalBuscaPaciente";
 // Atualizar a importação do SideMenu
@@ -17,6 +18,10 @@ import { SideMenu } from "@/features/home/components/SideMenu";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import { SAIRE_LOGO_FULL_PNG } from "@/features/home/components/SaireLogo";
 import { isSaireEventDescription } from "./utils/saireEventPrefill";
+import { prepareDataForExport } from "./components/exportUtilities";
+import { toPrintDataMap } from "./utils/caseFichaLayout";
+import { relayComunicacaoCasoPrintData } from "./utils/comunicacaoCasoPrintChannel";
+import { enrichExportOptions } from "./utils/enrichExportOptions";
 
 // Import custom hooks
 import { useNotificationForm } from "./hooks/useNotificationForm";
@@ -43,6 +48,8 @@ const NotificationForm: React.FC = () => {
   
   // Adicionar estado para controle do SideMenu
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [exportingDocumento, setExportingDocumento] = useState(false);
+  const printRelayCleanupRef = useRef<(() => void) | null>(null);
   // Use the main form hook
   const {
     formData,
@@ -63,6 +70,7 @@ const NotificationForm: React.FC = () => {
     handleSubmit,
     handleClearForm,
     handleExport,
+    getExportOptions,
     toggleExportDropdown,
     criarNovoPaciente,
     handleValidationError, // Add this new function
@@ -133,6 +141,56 @@ const NotificationForm: React.FC = () => {
     );
     return isSaireEventDescription(selected?.descricao);
   }, [eventoOptions, formData.evento]);
+
+  useEffect(() => {
+    return () => {
+      printRelayCleanupRef.current?.();
+    };
+  }, []);
+
+  const handleOpenPrintFicha = async () => {
+    printRelayCleanupRef.current?.();
+    setExportingDocumento(true);
+    try {
+      const channelId = crypto.randomUUID();
+      const exportData = prepareDataForExport(
+        formData,
+        await enrichExportOptions(getExportOptions(), formData),
+      );
+      const eventoNome = String(exportData.Evento || "");
+      printRelayCleanupRef.current = relayComunicacaoCasoPrintData(channelId, () => ({
+        data: toPrintDataMap(exportData as Record<string, unknown>),
+        modoLocalidadeEvento: modoLocalidadeEvento ?? "NAO_USA",
+        isSaire: showSaireLogo,
+        eventoNome,
+        returnPath:
+          isEditMode && id
+            ? `/private/comunicacao-de-caso/editar/${id}`
+            : "/private/comunicacao-de-caso/nova",
+      }));
+      const formFrom = isEditMode ? "editar" : "nova";
+      const channelQuery = `channel=${encodeURIComponent(channelId)}&from=${encodeURIComponent(formFrom)}`;
+      const path =
+        isEditMode && id
+          ? `/private/comunicacao-de-caso/imprimir/${id}?${channelQuery}`
+          : `/private/comunicacao-de-caso/imprimir?${channelQuery}`;
+      window.open(path, "_blank", "noopener,noreferrer");
+      if (isExportDropdownOpen) {
+        toggleExportDropdown();
+      }
+    } finally {
+      setExportingDocumento(false);
+    }
+  };
+
+  const handleExportDocumento = async () => {
+    setExportingDocumento(true);
+    try {
+      await handleExport("PDF_DOCUMENTO");
+    } finally {
+      setExportingDocumento(false);
+    }
+  };
 
   // ========================================
   // FUNÇÃO PARA SCROLL PARA CAMPO ESPECÍFICO
@@ -221,14 +279,34 @@ const NotificationForm: React.FC = () => {
 
               {/* Dropdown de Exportação */}
               {isExportDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 rounded-md shadow-xl bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
+                <div className="absolute right-0 mt-2 w-72 rounded-md shadow-xl bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
                   <div className="py-1" role="menu" aria-orientation="vertical">
                     <button
-                      onClick={() => handleExport("PDF")}
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left flex items-center gap-2"
+                      type="button"
+                      data-testid="export-imprimir-ficha"
+                      onClick={() => void handleOpenPrintFicha()}
+                      disabled={exportingDocumento}
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left flex items-center gap-2 disabled:opacity-70"
                       role="menuitem"
+                      title="Abre a ficha preenchida em nova aba, no mesmo espírito da HBV criança exposta"
                     >
-                      <Files className="h-4 w-4" /> PDF
+                      <Printer className="h-4 w-4" /> Imprimir ficha
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="export-pdf-documento"
+                      onClick={() => void handleExportDocumento()}
+                      disabled={exportingDocumento}
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left flex items-center gap-2 disabled:opacity-70"
+                      role="menuitem"
+                      title="Baixa um PDF institucional, no mesmo espírito da Comunicação DAE"
+                    >
+                      {exportingDocumento ? (
+                        <Loader className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileText className="h-4 w-4" />
+                      )}
+                      {exportingDocumento ? "Gerando PDF…" : "PDF documento"}
                     </button>
                   </div>
                 </div>

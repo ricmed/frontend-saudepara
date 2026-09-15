@@ -6,6 +6,7 @@ import {
   findSantaremMunicipioId,
   getResidentePerguntaLabel,
   PARA_ESTADO_ID,
+  resolveResidenciaChangeFlags,
   usaLocalidadeEvento,
 } from './procedenciaResidencia';
 
@@ -113,6 +114,38 @@ describe('applyResidenciaAutoFill', () => {
     });
   });
 
+  it('NÃO: primeira escolha (flags ainda “não mudou”) com campos vazios pré-seleciona', () => {
+    expect(
+      applyResidenciaAutoFill({
+        residenteBelem: '2',
+        modo: 'OBRIGATORIA',
+        current: empty,
+        santaremMunicipioId: '77',
+        residenteJustChanged: false,
+        hydrate: false,
+      }),
+    ).toMatchObject({
+      uf: PARA_ESTADO_ID,
+      municipio: '77',
+    });
+  });
+
+  it('NÃO: primeira escolha sem id de Santarém ainda preenche a UF Pará', () => {
+    expect(
+      applyResidenciaAutoFill({
+        residenteBelem: '2',
+        modo: 'OBRIGATORIA',
+        current: empty,
+        santaremMunicipioId: null,
+        residenteJustChanged: false,
+        hydrate: false,
+      }),
+    ).toMatchObject({
+      uf: PARA_ESTADO_ID,
+      municipio: '',
+    });
+  });
+
   it('hydrate de NÃO com outro município não sobrescreve', () => {
     expect(
       applyResidenciaAutoFill({
@@ -189,6 +222,56 @@ describe('applyResidenciaAutoFill', () => {
         santaremMunicipioId: '77',
         residenteJustChanged: false,
         hydrate: false,
+      }),
+    ).toMatchObject({
+      uf: PARA_ESTADO_ID,
+      municipio: '77',
+    });
+  });
+});
+
+describe('resolveResidenciaChangeFlags', () => {
+  it('ficha nova: primeira escolha conta como mudança, não como hidratação', () => {
+    expect(
+      resolveResidenciaChangeFlags(null, '2', false),
+    ).toEqual({ hydrate: false, residenteJustChanged: true });
+  });
+
+  it('editar ficha: prev null com procedência já preenchida é hidratação', () => {
+    expect(
+      resolveResidenciaChangeFlags(null, '2', true),
+    ).toEqual({ hydrate: true, residenteJustChanged: false });
+  });
+
+  it('trocar SIM → NÃO conta como mudança', () => {
+    expect(
+      resolveResidenciaChangeFlags('1', '2', true),
+    ).toEqual({ hydrate: false, residenteJustChanged: true });
+  });
+
+  it('efeito reexecuta no mesmo NÃO: não é mudança', () => {
+    expect(
+      resolveResidenciaChangeFlags('2', '2', true),
+    ).toEqual({ hydrate: false, residenteJustChanged: false });
+  });
+
+  it('ficha nova: flags da primeira NÃO + auto-fill geram Pará/Santarém', () => {
+    const flags = resolveResidenciaChangeFlags(null, '2', false);
+    expect(
+      applyResidenciaAutoFill({
+        residenteBelem: '2',
+        modo: 'OBRIGATORIA',
+        current: {
+          paisProcedencia: '',
+          uf: '',
+          municipio: '',
+          bairro: '',
+          localHospedagem: '',
+          contatoLocal: '',
+        },
+        santaremMunicipioId: '77',
+        residenteJustChanged: flags.residenteJustChanged,
+        hydrate: flags.hydrate,
       }),
     ).toMatchObject({
       uf: PARA_ESTADO_ID,

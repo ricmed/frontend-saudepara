@@ -81,10 +81,12 @@ import {
   exportToCSV, 
   exportToPDF 
 } from '@/features/notificationForms/components/exportUtilities';
+import { enrichExportOptions } from '@/features/notificationForms/utils/enrichExportOptions';
 import {
   applyResidenciaAutoFill,
   findSantaremMunicipioId,
   PARA_ESTADO_ID,
+  resolveResidenciaChangeFlags,
   usaLocalidadeEvento,
 } from '../utils/procedenciaResidencia';
 import { resolvePrefillEventoId } from '../utils/saireEventPrefill';
@@ -1909,17 +1911,17 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       return;
     }
 
-    const isHydrate =
-      prevResidenteRef.current === null &&
-      Boolean(
-        formData.uf ||
-          formData.municipio ||
-          formData.paisProcedencia ||
-          formData.bairro,
+    const { hydrate: isHydrate, residenteJustChanged } =
+      resolveResidenciaChangeFlags(
+        prevResidenteRef.current,
+        formData.residenteBelem,
+        Boolean(
+          formData.uf ||
+            formData.municipio ||
+            formData.paisProcedencia ||
+            formData.bairro,
+        ),
       );
-    const residenteJustChanged =
-      prevResidenteRef.current !== null &&
-      prevResidenteRef.current !== formData.residenteBelem;
     prevResidenteRef.current = formData.residenteBelem;
 
     setFormData((prev) => {
@@ -2197,6 +2199,54 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       return;
     }
 
+    if (name === 'residenteBelem') {
+      const { hydrate, residenteJustChanged } = resolveResidenciaChangeFlags(
+        prevResidenteRef.current,
+        value,
+        Boolean(
+          formData.uf ||
+            formData.municipio ||
+            formData.paisProcedencia ||
+            formData.bairro,
+        ),
+      );
+      prevResidenteRef.current = value;
+
+      setFormData((prev) => {
+        const filled = applyResidenciaAutoFill({
+          residenteBelem: value,
+          modo: modoLocalidadeEvento,
+          current: prev,
+          santaremMunicipioId,
+          residenteJustChanged,
+          hydrate,
+        });
+
+        const clearLocalidade =
+          usaLocalidadeEvento(modoLocalidadeEvento) &&
+          (value === '2' || value === '3') &&
+          Boolean(
+            prev.localidadeEvento ||
+              prev.localidadeEventoOutro ||
+              prev.localidadeEventoAtual,
+          );
+
+        return {
+          ...prev,
+          residenteBelem: value,
+          ...(filled ?? {}),
+          ...(clearLocalidade
+            ? {
+                localidadeEvento: '',
+                localidadeEventoOutro: '',
+                localidadeEventoAtual: null,
+              }
+            : {}),
+        };
+      });
+      return;
+    }
+
     // Gestante: Mulher cis (1), Mulher trans (3) ou Não binário (6)
     if (name === "identidadeGenero") {
       setFormData((prev) => {
@@ -2447,28 +2497,50 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     }
   };
 
-  // Funções de exportação
+  const getExportOptions = useCallback(
+    () => ({
+      eventoOptions,
+      publicoOptions,
+      paisOptions,
+      estadoOptions,
+      municipioOptions,
+      bairroOptions,
+      generoOptions,
+      racaOptions,
+      escolaridadeOptions,
+      atendimentoOptions,
+      sintomaOptions,
+      hipoteseDiagOptions,
+      traumaOptions,
+      estabelecimentoOptions,
+      encerramentoOptions,
+      localidadeEventoOptions,
+      modoLocalidadeEvento,
+    }),
+    [
+      eventoOptions,
+      publicoOptions,
+      paisOptions,
+      estadoOptions,
+      municipioOptions,
+      bairroOptions,
+      generoOptions,
+      racaOptions,
+      escolaridadeOptions,
+      atendimentoOptions,
+      sintomaOptions,
+      hipoteseDiagOptions,
+      traumaOptions,
+      estabelecimentoOptions,
+      encerramentoOptions,
+      localidadeEventoOptions,
+      modoLocalidadeEvento,
+    ],
+  );
+
   const handleExport = async (format: string) => {
     try {
-      const exportOptions = {
-        eventoOptions,
-        publicoOptions,
-        paisOptions,
-        estadoOptions,
-        municipioOptions,
-        bairroOptions,
-        generoOptions,
-        racaOptions,
-        escolaridadeOptions,
-        atendimentoOptions,
-        sintomaOptions,
-        hipoteseDiagOptions,
-        traumaOptions,
-        estabelecimentoOptions,
-        encerramentoOptions,
-        localidadeEventoOptions,
-        modoLocalidadeEvento,
-      };
+      const exportOptions = await enrichExportOptions(getExportOptions(), formData);
 
       switch (format) {
         case "Excel":
@@ -2481,8 +2553,15 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           exportToCSV(formData, exportOptions);
           break;
         case "PDF":
-          exportToPDF(formData, exportOptions);
+        case "PDF_DOCUMENTO": {
+          const ok = await exportToPDF(formData, exportOptions);
+          if (ok) {
+            toast.success("PDF documento gerado.");
+          } else {
+            toast.error("Falha ao gerar o PDF documento. Tente novamente.");
+          }
           break;
+        }
       }
     } catch (error) {
       console.error(`Error exporting to ${format}:`, error);
@@ -2586,6 +2665,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     handleSubmit,
     handleClearForm,
     handleExport,
+    getExportOptions,
     toggleExportDropdown,
     criarNovoPaciente,
     handleValidationError,
