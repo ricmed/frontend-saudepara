@@ -84,6 +84,7 @@ import {
 import {
   applyResidenciaAutoFill,
   findSantaremMunicipioId,
+  PARA_ESTADO_ID,
   usaLocalidadeEvento,
 } from '../utils/procedenciaResidencia';
 import { resolvePrefillEventoId } from '../utils/saireEventPrefill';
@@ -332,15 +333,21 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
   const latestUfRef = useRef<string>("");
   const localidadeEventoRequestRef = useRef(0);
   const prevResidenteRef = useRef<string | null>(null);
+  const santaremMunicipioIdRef = useRef<string | null>(null);
 
   const modoLocalidadeEvento = getModoLocalidadeEvento(
     formData.evento,
     eventoOptions,
   );
-  const santaremMunicipioId = useMemo(
-    () => findSantaremMunicipioId(municipioOptions),
-    [municipioOptions],
-  );
+  const santaremMunicipioId = useMemo(() => {
+    const found = findSantaremMunicipioId(municipioOptions);
+    if (found) {
+      santaremMunicipioIdRef.current = found;
+    }
+    // Mantém o id depois que a lista de municípios troca de UF (ex.: usuário
+    // saiu do Pará), para a pré-seleção de NÃO/SIM não esperar outro fetch.
+    return santaremMunicipioIdRef.current ?? found;
+  }, [municipioOptions]);
   const eventoLocalidadeMetadataLoaded =
     !formData.evento ||
     eventoOptions.some(
@@ -1837,12 +1844,36 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       
       console.log(`🔍 Chamando loadMunicipiosByEstado com UF: "${formData.uf}"`);
       loadMunicipiosByEstado(formData.uf);
-    } else {
-      // Limpar municípios quando nenhum estado estiver selecionado
+    } else if (!usaLocalidadeEvento(modoLocalidadeEvento)) {
+      // Em evento Sairé, não limpar a lista pré-aquecida do Pará (lookup Santarém).
       console.log('🔍 UF vazia, limpando municípios');
       setMunicipioOptions([]);
     }
-  }, [formData.uf, loadMunicipiosByEstado]);
+  }, [formData.uf, loadMunicipiosByEstado, modoLocalidadeEvento]);
+
+  // Pré-aquece municípios do Pará quando o evento usa localidade (SIM/NÃO
+  // precisam de Santarém sem esperar o primeiro clique em residente).
+  useEffect(() => {
+    if (!usaLocalidadeEvento(modoLocalidadeEvento)) {
+      return;
+    }
+    if (formData.uf && formData.uf !== PARA_ESTADO_ID) {
+      return;
+    }
+    if (
+      latestUfRef.current === PARA_ESTADO_ID &&
+      municipioOptions.length > 0 &&
+      santaremMunicipioIdRef.current
+    ) {
+      return;
+    }
+    void loadMunicipiosByEstado(PARA_ESTADO_ID);
+  }, [
+    modoLocalidadeEvento,
+    formData.uf,
+    loadMunicipiosByEstado,
+    municipioOptions.length,
+  ]);
 
   // Efeito para limpar campos de acordo com o tipo de atendimento
   useEffect(() => {

@@ -22,6 +22,12 @@ interface PersonOriginSectionProps extends FormSectionProps {
   localidadeEventoOptions?: LocalidadeEventoDTO[];
   isLoadingLocalidadesEvento?: boolean;
   localidadeEventoCatalogAvailable?: boolean;
+  estadoOptions?: Array<{ idtipo_estado: number; descricao: string; codigo?: string | null }>;
+  municipioOptions?: Array<{
+    idtipo_municipio: number;
+    descricao: string;
+    codigo?: string | null;
+  }>;
 }
 
 const PersonOriginSection: React.FC<PersonOriginSectionProps> = ({
@@ -37,6 +43,8 @@ const PersonOriginSection: React.FC<PersonOriginSectionProps> = ({
   localidadeEventoOptions = [],
   isLoadingLocalidadesEvento = false,
   localidadeEventoCatalogAvailable = true,
+  estadoOptions = [],
+  municipioOptions = [],
 }) => {
   const usaLocalidade = usaLocalidadeEvento(modoLocalidadeEvento);
   const residenteLabel = getResidentePerguntaLabel(modoLocalidadeEvento);
@@ -139,6 +147,7 @@ const PersonOriginSection: React.FC<PersonOriginSectionProps> = ({
                     }}
                     placeholder="Selecione a UF"
                     disabled={false}
+                    options={estadoOptions}
                     apiEndpoint="api/tipo-estado"
                     idField="idtipo_estado"
                     debug={true}
@@ -171,6 +180,7 @@ const PersonOriginSection: React.FC<PersonOriginSectionProps> = ({
                           : "Selecione o município"
                     }
                     disabled={!formData.uf || isLoadingMunicipios}
+                    options={municipioOptions}
                     apiEndpoint="api/tipo-municipio"
                     idField="idtipo_municipio"
                     parentValue={formData.uf}

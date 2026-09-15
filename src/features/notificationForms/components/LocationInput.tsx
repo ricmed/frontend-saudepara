@@ -159,12 +159,14 @@ const LocationInput: React.FC<LocationInputProps> = ({
         return;
       }
       
-      // Limpa apenas estado visual local; não força onChange aqui para evitar loop
-      // quando parentValue oscila durante sincronizações UF <-> estado.
+      // Limpa busca local; se já há um município no value (pré-seleção Pará/Santarém),
+      // não apaga o rótulo — evita flash/delay até o fetch da lista.
       setSelectedOption(null);
       setSearchQuery("");
-      setDisplayValue("");
       setIsManuallyEditing(false);
+      if (!String(value ?? "").trim()) {
+        setDisplayValue("");
+      }
 
       // Only fetch municipalities if a state is selected
       if (parentNorm) {

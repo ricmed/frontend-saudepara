@@ -98,6 +98,8 @@ const NotificationForm: React.FC = () => {
     localidadeEventoCatalogAvailable,
     publicoOptions,
     paisOptions,
+    estadoOptions,
+    municipioOptions,
     generoOptions,
     racaOptions,
     escolaridadeOptions,
@@ -372,6 +374,8 @@ const NotificationForm: React.FC = () => {
             localidadeEventoCatalogAvailable={
               localidadeEventoCatalogAvailable
             }
+            estadoOptions={estadoOptions}
+            municipioOptions={municipioOptions}
           />          <PersonIdentificationSection
             formData={formData}
             setFormData={setFormData}
