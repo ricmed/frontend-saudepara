@@ -329,7 +329,12 @@ export default defineConfig(({ mode }) => {
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
           'ui-vendor': ['lucide-react', 'react-toastify'],
           'data-vendor': ['axios', 'idb'],
-          'offline-vendor': ['date-fns', 'lodash']
+          'offline-vendor': ['date-fns', 'lodash'],
+          // Isola deps pesadas fora do chunk da home (lazy de rotas + split)
+          'maps-leaflet': ['leaflet'],
+          'charts-vendor': ['recharts'],
+          'xlsx-vendor': ['xlsx'],
+          'pdf-vendor': ['jspdf', 'jspdf-autotable', 'html2canvas', '@react-pdf/renderer'],
         }
       }
     },

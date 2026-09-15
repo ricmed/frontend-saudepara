@@ -1,54 +1,114 @@
-import { lazy } from 'react';
 import { Navigate, Route } from 'react-router-dom';
-import AdminRoutes from '@/keycloak/admin/AdminRoutes';
 import ProtectedRoute from '@/keycloak/ProtectedRoute';
-import MapaLocais from '@/features/maps/google';
-import MapaPage from '@/features/maps/MapaPage';
-import MapaLeaflet from '@/features/maps/leaflet/MapaLeaflet';
-import HealthCampaignsPage from '@/features/campaigns/pages/HealthCampaignsPage';
-import DezembroVermelho from '@/features/campaigns/pages/details/RedDecemberPage';
-import SetembroVerde from '@/features/campaigns/pages/details/GreenSeptemberPage';
-import SetembroAmarelo from '@/features/campaigns/pages/details/YellowSeptemberPage';
-import NovembroAzul from '@/features/campaigns/pages/details/BlueNovemberPage';
-import JaneiroRoxoPage from '@/features/campaigns/pages/details/JaneiroRoxoPage';
-import GoldenAugustPage from '@/features/campaigns/pages/details/GoldenAugustPage';
-import EducationalMaterialsPage from '@/features/educational-materials/pages/EducationalMaterialsPage';
-import OralHealthPage from '@/features/educational-materials/pages/details/OralHealthPage';
-import AntiSmokingPage from '@/features/educational-materials/pages/details/AntiSmokingPage';
-import CDCNTPage from '@/features/educational-materials/pages/details/CDCNTPage';
-import ChildrensHealthPage from '@/features/educational-materials/pages/details/ChildrensHealthPage';
-import SexualViolencePage from '@/features/educational-materials/pages/details/SexualViolencePage';
-import HIVPreventionPage from '@/features/educational-materials/pages/details/HIVPreventionPage';
-import LeprosyPage from '@/features/educational-materials/pages/details/LeprosyPage';
-import TuberculosisPage from '@/features/educational-materials/pages/details/TuberculosisPage';
-import HIVMandalaPage from '@/features/educational-materials/pages/details/HIVMandalaPage';
-import MPOXPage from '@/features/educational-materials/pages/details/MPOXPage';
-import WomensHealthPage from '@/features/educational-materials/pages/details/WomensHealthPage';
-import SyphilisPage from '@/features/educational-materials/pages/details/SyphilisPage';
-import HomePage from '@/features/home/HomePage';
-import FaleConoscoPage from '@/features/contact/FaleConoscoPage';
-import AscomPage from '@/features/contact/AscomPage';
-import OuvidoriaPage from '@/features/contact/OuvidoriaPage';
-import { PublicDynamicFormPage } from '@/features/dynamic-forms/pages/PublicDynamicFormPage';
-import QrCodeGeneratorPage from '@/features/qrcode/pages/QrCodeGeneratorPage';
-// TODO(reativar ObservaSUS): descomentar imports e rotas abaixo
-// import ObservaSusHomePage from '@/features/observasus/pages/ObservaSusHomePage';
-// import ObservaSusPanelsPage from '@/features/observasus/pages/ObservaSusPanelsPage';
-// import ObservaSusPanelViewerPage from '@/features/observasus/pages/ObservaSusPanelViewerPage';
-// import ObservaSusDataStoragePage from '@/features/observasus/pages/ObservaSusDataStoragePage';
-// import ObservaSusSystemPage from '@/features/observasus/pages/ObservaSusSystemPage';
-// import ObservaSusRepositoryPage from '@/features/observasus/pages/ObservaSusRepositoryPage';
-// import ObservaSusPublicationsPage from '@/features/observasus/pages/ObservaSusPublicationsPage';
-// import ObservaSusAboutPage from '@/features/observasus/pages/ObservaSusAboutPage';
+import { lazyNamed, lazyPage } from '@/routes/lazyPage';
 
-const ChatAdminDashboard = lazy(() => import('@/features/chat/pages/ChatAdminDashboard'));
-const DesktopPage = lazy(() => import('@/features/desktop/DesktopPage'));
-const DashboardPageCirio = lazy(() => import('@/features/dashboard/DashboardPageCirio'));
-const LoginPage = lazy(() => import('@/features/auth/pages/LoginPage'));
-const OfflineLoginPage = lazy(() => import('@/features/auth/pages/OfflineLoginPage'));
-const AccessDeniedPage = lazy(() => import('@/features/auth/pages/AccessDeniedPage'));
-const VersionPage = lazy(() => import('@/features/info/pages/VersionPage'));
-const ValidacaoCientificaPage = lazy(() => import('@/features/info/pages/ValidacaoCientificaPage'));
+// --- Páginas já lazy / a tornar lazy (fora do bundle da home) ---
+const AdminRoutes = lazyPage(() => import('@/keycloak/admin/AdminRoutes'));
+const MapaLocais = lazyPage(() => import('@/features/maps/google'));
+const MapaPage = lazyPage(() => import('@/features/maps/MapaPage'));
+const MapaLeaflet = lazyPage(() => import('@/features/maps/leaflet/MapaLeaflet'));
+const HealthCampaignsPage = lazyPage(
+  () => import('@/features/campaigns/pages/HealthCampaignsPage'),
+);
+const DezembroVermelho = lazyPage(
+  () => import('@/features/campaigns/pages/details/RedDecemberPage'),
+);
+const SetembroVerde = lazyPage(
+  () => import('@/features/campaigns/pages/details/GreenSeptemberPage'),
+);
+const SetembroAmarelo = lazyPage(
+  () => import('@/features/campaigns/pages/details/YellowSeptemberPage'),
+);
+const NovembroAzul = lazyPage(
+  () => import('@/features/campaigns/pages/details/BlueNovemberPage'),
+);
+const JaneiroRoxoPage = lazyPage(
+  () => import('@/features/campaigns/pages/details/JaneiroRoxoPage'),
+);
+const GoldenAugustPage = lazyPage(
+  () => import('@/features/campaigns/pages/details/GoldenAugustPage'),
+);
+const EducationalMaterialsPage = lazyPage(
+  () => import('@/features/educational-materials/pages/EducationalMaterialsPage'),
+);
+const OralHealthPage = lazyPage(
+  () => import('@/features/educational-materials/pages/details/OralHealthPage'),
+);
+const AntiSmokingPage = lazyPage(
+  () => import('@/features/educational-materials/pages/details/AntiSmokingPage'),
+);
+const CDCNTPage = lazyPage(
+  () => import('@/features/educational-materials/pages/details/CDCNTPage'),
+);
+const ChildrensHealthPage = lazyPage(
+  () =>
+    import('@/features/educational-materials/pages/details/ChildrensHealthPage'),
+);
+const SexualViolencePage = lazyPage(
+  () =>
+    import('@/features/educational-materials/pages/details/SexualViolencePage'),
+);
+const HIVPreventionPage = lazyPage(
+  () =>
+    import('@/features/educational-materials/pages/details/HIVPreventionPage'),
+);
+const LeprosyPage = lazyPage(
+  () => import('@/features/educational-materials/pages/details/LeprosyPage'),
+);
+const TuberculosisPage = lazyPage(
+  () =>
+    import('@/features/educational-materials/pages/details/TuberculosisPage'),
+);
+const HIVMandalaPage = lazyPage(
+  () => import('@/features/educational-materials/pages/details/HIVMandalaPage'),
+);
+const MPOXPage = lazyPage(
+  () => import('@/features/educational-materials/pages/details/MPOXPage'),
+);
+const WomensHealthPage = lazyPage(
+  () =>
+    import('@/features/educational-materials/pages/details/WomensHealthPage'),
+);
+const SyphilisPage = lazyPage(
+  () => import('@/features/educational-materials/pages/details/SyphilisPage'),
+);
+const HomePage = lazyPage(() => import('@/features/home/HomePage'));
+const FaleConoscoPage = lazyPage(
+  () => import('@/features/contact/FaleConoscoPage'),
+);
+const AscomPage = lazyPage(() => import('@/features/contact/AscomPage'));
+const OuvidoriaPage = lazyPage(
+  () => import('@/features/contact/OuvidoriaPage'),
+);
+const PublicDynamicFormPage = lazyNamed(
+  () => import('@/features/dynamic-forms/pages/PublicDynamicFormPage'),
+  'PublicDynamicFormPage',
+);
+const QrCodeGeneratorPage = lazyPage(
+  () => import('@/features/qrcode/pages/QrCodeGeneratorPage'),
+);
+
+const ChatAdminDashboard = lazyPage(
+  () => import('@/features/chat/pages/ChatAdminDashboard'),
+);
+const DesktopPage = lazyPage(() => import('@/features/desktop/DesktopPage'));
+const DashboardPageCirio = lazyPage(
+  () => import('@/features/dashboard/DashboardPageCirio'),
+);
+const LoginPage = lazyPage(() => import('@/features/auth/pages/LoginPage'));
+const OfflineLoginPage = lazyPage(
+  () => import('@/features/auth/pages/OfflineLoginPage'),
+);
+const AccessDeniedPage = lazyPage(
+  () => import('@/features/auth/pages/AccessDeniedPage'),
+);
+const VersionPage = lazyPage(() => import('@/features/info/pages/VersionPage'));
+const ValidacaoCientificaPage = lazyPage(
+  () => import('@/features/info/pages/ValidacaoCientificaPage'),
+);
+
+// TODO(reativar ObservaSUS): lazy + rotas abaixo
+// ObservaSUS permanece desativado — ver spec performance e notas ObservaSUS.
 
 export const getPublicAppRoutes = () => {
   return (
@@ -59,25 +119,27 @@ export const getPublicAppRoutes = () => {
       <Route path="/f/:slug" element={<PublicDynamicFormPage />} />
       <Route path="/mapa" element={<MapaLeaflet />} />
       <Route path="/mapa-google" element={<MapaPage />} />
-      <Route path="/mapa-google/fullscreen" element={<MapaPage fullScreen={true} />} />
+      <Route
+        path="/mapa-google/fullscreen"
+        element={<MapaPage fullScreen={true} />}
+      />
       <Route path="/mapa-original" element={<MapaLocais />} />
       <Route path="/mapa-leaflet" element={<MapaLeaflet />} />
       <Route path="/campanhas" element={<HealthCampaignsPage />} />
 
-      {/* ObservaSUS — desativado temporariamente (reativar junto com os imports)
-      <Route path="/observasus" element={<ObservaSusHomePage />} />
-      <Route path="/observasus/paineis" element={<ObservaSusPanelsPage />} />
-      <Route path="/observasus/paineis/:slug" element={<ObservaSusPanelViewerPage />} />
-      <Route path="/observasus/dados" element={<ObservaSusDataStoragePage />} />
-      <Route path="/observasus/dados/:systemSlug" element={<ObservaSusSystemPage />} />
-      <Route path="/observasus/repositorio" element={<ObservaSusRepositoryPage />} />
-      <Route path="/observasus/publicacoes" element={<ObservaSusPublicationsPage />} />
-      <Route path="/observasus/sobre" element={<ObservaSusAboutPage />} />
-      */}
-
       <Route path="/dashboard" element={<Navigate to="/dashboard-page" replace />} />
-      <Route path="/dashboard-page" element={<ProtectedRoute requiredRoles={['notificador', 'dashboard']}><DashboardPageCirio /></ProtectedRoute>} />
-      <Route path="/dashboard-normal" element={<Navigate to="/dashboard-page" replace />} />
+      <Route
+        path="/dashboard-page"
+        element={
+          <ProtectedRoute requiredRoles={['notificador', 'dashboard']}>
+            <DashboardPageCirio />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard-normal"
+        element={<Navigate to="/dashboard-page" replace />}
+      />
 
       <Route path="/setembro-verde" element={<SetembroVerde />} />
       <Route path="/setembro-amarelo" element={<SetembroAmarelo />} />

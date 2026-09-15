@@ -233,6 +233,8 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
                     alt=""
                     className="absolute inset-0 w-full h-full object-cover blur-sm opacity-30"
                     draggable="false"
+                    loading={index === 0 ? "eager" : "lazy"}
+                    decoding="async"
                   />
                   {/* Imagem principal */}
                   <img
@@ -240,6 +242,11 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
                     alt={item.titulo}
                     className="relative w-full h-full object-contain"
                     draggable="false"
+                    loading={index === 0 ? "eager" : "lazy"}
+                    decoding="async"
+                    {...(index === 0
+                      ? ({ fetchpriority: "high" } as React.ImgHTMLAttributes<HTMLImageElement>)
+                      : {})}
                   />
                   <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-transparent" />
                   <div className="absolute bottom-0 left-0 p-8 max-w-lg">
