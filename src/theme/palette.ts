@@ -10,6 +10,9 @@ export const SAIRE_PALETTE_USERNAMES = ['crs9', 'cievsoestedopara'] as const;
 /** Município Santarém (PA) — força Rosa/Cinza no nível municipal. */
 export const SAIRE_PALETTE_MUNICIPIO_IDS = [265] as const;
 
+/** Municípios do Festival do Sairé: nível municipal opera a ficha do evento. */
+export const SAIRE_MUNICIPIO_IDS = SAIRE_PALETTE_MUNICIPIO_IDS;
+
 export function isUiPalette(value: unknown): value is UiPalette {
   return value === 'default' || value === 'saire';
 }
@@ -51,6 +54,16 @@ export function isForcedSairePaletteMunicipio(municipioId: unknown): boolean {
   const id = Number(municipioId);
   if (!Number.isInteger(id) || id <= 0) return false;
   return (SAIRE_PALETTE_MUNICIPIO_IDS as readonly number[]).includes(id);
+}
+
+/**
+ * Nível municipal do Sairé (Santarém) vê o CTA do golfinho sem precisar de
+ * unidade notificadora nem de role de escopo estadual/master.
+ */
+export function canAccessSaireCaseCtaMunicipio(municipioId: unknown): boolean {
+  const id = Number(municipioId);
+  if (!Number.isInteger(id) || id <= 0) return false;
+  return (SAIRE_MUNICIPIO_IDS as readonly number[]).includes(id);
 }
 
 export function isActiveEventFlag(value: unknown): boolean {
