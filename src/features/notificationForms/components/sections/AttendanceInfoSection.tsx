@@ -866,7 +866,7 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                 <div className="relative">
                   <label className="block mb-2 font-medium text-gray-700">
                     <span className="flex items-center gap-2">
-                      Data de Início dos Sintomas
+                      Data de Início dos Sintomas <span className="text-red-500">*</span>
                       <button
                         type="button"
                         onClick={(e) => {
@@ -919,6 +919,7 @@ const AttendanceInfoSection: React.FC<AttendanceInfoSectionProps> = ({
                     data-error={errors.dataInicioSintomas ? "true" : "false"}
                     error={errors.dataInicioSintomas}
                     onValidationError={handleValidationError}
+                    required
                   />
                 </div>
 

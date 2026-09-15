@@ -327,3 +327,59 @@ export const convertLocalDateTimeToUTC = (localDateTimeString: string): string =
     return new Date().toISOString();
   }
 };
+
+/**
+ * 📅 DATE-ONLY (calendário civil YYYY-MM-DD)
+ * Usado só para botões +/- e comparação de “dia” — não altera o pipeline
+ * form → formatLocalDateForBackend / processarDataParaUTC.
+ */
+const ISO_DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+export type IsoDateParts = { y: number; m: number; d: number };
+
+export const parseIsoDateOnly = (iso: string): IsoDateParts | null => {
+  const match = ISO_DATE_ONLY_RE.exec(String(iso || '').trim());
+  if (!match) return null;
+  const y = Number(match[1]);
+  const m = Number(match[2]);
+  const d = Number(match[3]);
+  if (!Number.isInteger(y) || !Number.isInteger(m) || !Number.isInteger(d)) return null;
+  if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+  return { y, m, d };
+};
+
+export const toIsoDateOnly = (y: number, m: number, d: number): string =>
+  `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+/** Hoje em America/Belem como YYYY-MM-DD (sem new Date('YYYY-MM-DD')). */
+export const getTodayIsoInBelem = (now: Date = new Date()): string => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Belem',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const year = parts.find((p) => p.type === 'year')?.value;
+  const month = parts.find((p) => p.type === 'month')?.value;
+  const day = parts.find((p) => p.type === 'day')?.value;
+  if (!year || !month || !day) {
+    return toIsoDateOnly(now.getFullYear(), now.getMonth() + 1, now.getDate());
+  }
+  return `${year}-${month}-${day}`;
+};
+
+/**
+ * Soma/subtrai dias em data civil YYYY-MM-DD.
+ * UTC noon evita o bug de new Date('YYYY-MM-DD') = midnight UTC.
+ */
+export const addDaysIso = (iso: string, delta: number): string | null => {
+  const parts = parseIsoDateOnly(iso);
+  if (!parts) return null;
+  const utc = new Date(Date.UTC(parts.y, parts.m - 1, parts.d + delta, 12, 0, 0));
+  return toIsoDateOnly(utc.getUTCFullYear(), utc.getUTCMonth() + 1, utc.getUTCDate());
+};
+
+export const compareIsoDateOnly = (a: string, b: string): number => {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+};

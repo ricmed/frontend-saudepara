@@ -14,6 +14,10 @@ import {
   getResidentePerguntaLabel,
   usaLocalidadeEvento,
 } from '@/features/notificationForms/utils/procedenciaResidencia';
+import {
+  compareIsoDateOnly,
+  getTodayIsoInBelem,
+} from '@/utils/timezoneUtils';
 
 /**
  * Converte gestante do formulário de comunicação de caso para o que a API aceita (S/N/9).
@@ -282,19 +286,20 @@ return { isValid: false, error: "Data de nascimento não pode ser anterior a 120
 };
 
 /**
-* Compara duas datas e verifica se a primeira é igual ou depois da segunda
+* Compara duas datas civis YYYY-MM-DD (sem parse UTC de date-only).
+* Retorna true se date1 for igual ou depois de date2.
 */
 export const compareDates = (date1: string, date2: string): boolean => {
  if (!date1 || !date2) return true; // Se alguma data estiver faltando, a validação passa
 
- const d1 = new Date(date1);
- const d2 = new Date(date2);
+ // Aceita também valores com hora; usa só a parte da data civil.
+ const d1 = String(date1).slice(0, 10);
+ const d2 = String(date2).slice(0, 10);
+ if (!/^\d{4}-\d{2}-\d{2}$/.test(d1) || !/^\d{4}-\d{2}-\d{2}$/.test(d2)) {
+return true;
+ }
 
- // Verificar se ambas as datas são válidas
- if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return true;
-
- // Retorna true se date1 for igual ou depois de date2 (caso válido)
- return d1 >= d2;
+ return compareIsoDateOnly(d1, d2) >= 0;
 };
 
 /**
@@ -569,14 +574,10 @@ if (!birthValidation.isValid) {
 Object.assign(newErrors, ageValidation.errors);
  }
 
+ // CPF opcional: só valida formato/dígitos quando informado
  const cpfDigits = (formData.cpf || "").replace(/\D/g, "");
- // Estrangeiro neste módulo = Procedência "Residente em Belém = ESTRANGEIRO"
- const isEstrangeiroProcedencia = formData.residenteBelem === "3";
-
- if (!isEstrangeiroProcedencia) {
-if (cpfDigits.length === 0) {
- newErrors.cpf = "O CPF é obrigatório";
-} else if (cpfDigits.length !== 11) {
+ if (cpfDigits.length > 0) {
+if (cpfDigits.length !== 11) {
  newErrors.cpf = "CPF deve ter 11 dígitos";
 } else if (!validateCPF(cpfDigits)) {
  newErrors.cpf = "CPF inválido";
@@ -604,13 +605,7 @@ if (!formData.gestante || formData.gestante === "") {
 newErrors.raca = "A Raça/Cor é obrigatória";
  }
 
- if (!formData.escolaridade || formData.escolaridade === "") {
-newErrors.escolaridade = "A escolaridade é obrigatória";
- }
-
- if (!formData.profissao || String(formData.profissao).trim() === "") {
-newErrors.profissao = "Ocupação (CBO) é obrigatória";
- }
+ // Escolaridade e CBO continuam opcionais (não misturar regras SINAN).
 
  const telDigits = (formData.contatoTelefonico || "").replace(/\D/g, "");
  if (telDigits.length < 8) {
@@ -632,6 +627,12 @@ if (
 ) {
  if (!formData.sinaisESintomas || formData.sinaisESintomas.length === 0) {
 newErrors.sinaisESintomas = "Selecione pelo menos um sinal ou sintoma";
+ }
+}
+
+if (isTipoAtendimento("CLINICO", formData.tipoAtendimento, atendimentoOptions)) {
+ if (!formData.dataInicioSintomas || formData.dataInicioSintomas.trim() === "") {
+newErrors.dataInicioSintomas = "A data de início dos sintomas é obrigatória";
  }
 }
 
@@ -684,32 +685,29 @@ if (!compareDates(formData.dataAtendimento, formData.dataInicioSintomas)) {
 }
  }
 
- // Verificar se dataInicioSintomas não é futura
+ // Verificar se dataInicioSintomas não é futura (calendário de Belém)
  if (formData.dataInicioSintomas) {
-const hoje = new Date();
-const dataInicioSintomas = new Date(formData.dataInicioSintomas);
-
-if (dataInicioSintomas > hoje) {
+const data = String(formData.dataInicioSintomas).slice(0, 10);
+const hojeBelem = getTodayIsoInBelem();
+if (/^\d{4}-\d{2}-\d{2}$/.test(data) && compareIsoDateOnly(data, hojeBelem) > 0) {
  newErrors.dataInicioSintomas = "A data de início dos sintomas não pode ser futura";
 }
  }
 
  // Verificar se dataAtendimento não é futura
  if (formData.dataAtendimento) {
-const hoje = new Date();
-const dataAtendimento = new Date(formData.dataAtendimento);
-
-if (dataAtendimento > hoje) {
+const data = String(formData.dataAtendimento).slice(0, 10);
+const hojeBelem = getTodayIsoInBelem();
+if (/^\d{4}-\d{2}-\d{2}$/.test(data) && compareIsoDateOnly(data, hojeBelem) > 0) {
  newErrors.dataAtendimento = "A data de atendimento não pode ser futura";
 }
  }
 
  // Verificar se dataEncerramento não é futura
  if (formData.dataEncerramento) {
-const hoje = new Date();
-const dataEncerramento = new Date(formData.dataEncerramento);
-
-if (dataEncerramento > hoje) {
+const data = String(formData.dataEncerramento).slice(0, 10);
+const hojeBelem = getTodayIsoInBelem();
+if (/^\d{4}-\d{2}-\d{2}$/.test(data) && compareIsoDateOnly(data, hojeBelem) > 0) {
  newErrors.dataEncerramento = "A data de desfecho não pode ser futura";
 }
  }

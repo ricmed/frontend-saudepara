@@ -276,9 +276,6 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
             <div>
               <label className="block mb-2 font-medium text-gray-700">
                 CPF
-                {formData.residenteBelem !== "3" && (
-                  <span className="text-red-500"> *</span>
-                )}
               </label>
               <div className="relative">
                 <input
@@ -444,7 +441,6 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
               value={formData.escolaridade}
               onChange={handleChange}
               type="select"
-              required
               error={errors.escolaridade}
               options={
                 escolaridadeOptions?.map((option) => ({
@@ -457,7 +453,7 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
             {/* Profissão/Ocupação com pesquisa */}
             <div>
               <label className="block mb-2 font-medium text-gray-700">
-                Profissão/Ocupação (CBO) <span className="text-red-500">*</span>
+                Profissão/Ocupação (CBO)
               </label>
               <CboInput
                 name="profissao"

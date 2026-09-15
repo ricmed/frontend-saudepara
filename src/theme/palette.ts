@@ -31,6 +31,14 @@ export function canChooseUiPaletteRoles(roles: unknown): boolean {
   );
 }
 
+/**
+ * Quem vê o CTA do golfinho/Sairé além das unidades notificadoras:
+ * admin master e escopo estadual (`admin.estado` — CIEVS estadual / oeste etc.).
+ */
+export function canAccessSaireCaseCtaRoles(roles: unknown): boolean {
+  return canChooseUiPaletteRoles(roles);
+}
+
 export function isForcedSairePaletteUsername(username: unknown): boolean {
   const normalized = String(username || '')
     .trim()

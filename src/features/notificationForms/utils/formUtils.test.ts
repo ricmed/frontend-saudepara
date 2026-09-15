@@ -169,6 +169,62 @@ describe('validateForm — CPF curto', () => {
     vi.runAllTimers();
   });
 
+  it('exige mãe e telefone; mantém escolaridade/CBO/CPF opcionais', () => {
+    const setErrors = vi.fn();
+    const setExpanded = vi.fn();
+    const ok = validateForm(
+      minimalForm({
+        nomeMae: '',
+        escolaridade: '',
+        profissao: '',
+        contatoTelefonico: '',
+        cpf: '',
+        identidadeGenero: '2',
+        gestante: '',
+      }),
+      {},
+      setErrors,
+      setExpanded,
+      expanded,
+      atendimentoOptions,
+      encerramentoOptions,
+      { modo: 'NAO_USA', options: [], catalogAvailable: true },
+    );
+    const payload = setErrors.mock.calls[0][0] as Record<string, string>;
+    expect(payload.nomeMae).toMatch(/mãe é obrigatório/i);
+    expect(payload.contatoTelefonico).toMatch(/telefone/i);
+    expect(payload.escolaridade).toBeUndefined();
+    expect(payload.profissao).toBeUndefined();
+    expect(payload.cpf).toBeUndefined();
+    expect(ok.isValid).toBe(false);
+    vi.runAllTimers();
+  });
+
+  it('exige data de início dos sintomas no atendimento clínico', () => {
+    const setErrors = vi.fn();
+    const setExpanded = vi.fn();
+    const clinicoOptions = [{ idtipo_atendimento: 10, descricao: 'CLINICO' }];
+    validateForm(
+      minimalForm({
+        tipoAtendimento: '10',
+        dataInicioSintomas: '',
+        sinaisESintomas: ['1'],
+        identidadeGenero: '2',
+        gestante: '',
+      }),
+      {},
+      setErrors,
+      setExpanded,
+      expanded,
+      clinicoOptions,
+      encerramentoOptions,
+      { modo: 'NAO_USA', options: [], catalogAvailable: true },
+    );
+    const payload = setErrors.mock.calls[0][0] as Record<string, string>;
+    expect(payload.dataInicioSintomas).toMatch(/início dos sintomas é obrigatória/i);
+    vi.runAllTimers();
+  });
+
   it('NAO_USA + SIM ainda exige bairro de Belém', () => {
     const setErrors = vi.fn();
     const setExpanded = vi.fn();

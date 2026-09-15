@@ -1,4 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
+import {
+  addDaysIso,
+  compareIsoDateOnly,
+} from "@/utils/timezoneUtils";
 
 interface CustomDateInputProps {
   name: string;
@@ -372,16 +376,16 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
   };
   
   // Adiantar um dia
+  // IMPORTANTE: value é YYYY-MM-DD civil. NÃO usar new Date(value) (vira UTC midnight e quebra o +/-).
+  // O valor emitido continua YYYY-MM-DD — o adapter/timezone do envio ao backend não muda.
   const incrementDay = () => {
     if (disabled) return;
     
     if (value) {
-      const date = new Date(value);
-      date.setDate(date.getDate() + 1);
-      
-      // Usar data máxima no fuso de Belém
-      const maxDate = new Date(effectiveMaxDate);
-      if (date > maxDate) {
+      const isoDate = addDaysIso(value, 1);
+      if (!isoDate) return;
+
+      if (compareIsoDateOnly(isoDate, effectiveMaxDate) > 0) {
         const errorMsg = "A data não pode ser futura.";
         
         // MODIFICAÇÃO: Usar erro persistente
@@ -394,7 +398,6 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
         return;
       }
       
-      const isoDate = formatDateToISOInBelem(date);
       const syntheticEvent = {
         target: { name, value: isoDate },
         currentTarget: { name, value: isoDate }
@@ -419,26 +422,22 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
     if (disabled) return;
     
     if (value) {
-      const date = new Date(value);
-      date.setDate(date.getDate() - 1);
+      const isoDate = addDaysIso(value, -1);
+      if (!isoDate) return;
       
-      if (minDate) {
-        const minLimit = new Date(minDate);
-        if (date < minLimit) {
-          const errorMsg = `A data deve ser após ${formatDateForDisplay(minDate)}.`;
-          
-          // MODIFICAÇÃO: Usar erro persistente  
-          setLocalError(errorMsg);
-          setPersistentError(errorMsg);
-          
-          if (onValidationError) {
-            onValidationError(name, errorMsg);
-          }
-          return;
+      if (minDate && compareIsoDateOnly(isoDate, minDate) < 0) {
+        const errorMsg = `A data deve ser após ${formatDateForDisplay(minDate)}.`;
+        
+        // MODIFICAÇÃO: Usar erro persistente  
+        setLocalError(errorMsg);
+        setPersistentError(errorMsg);
+        
+        if (onValidationError) {
+          onValidationError(name, errorMsg);
         }
+        return;
       }
       
-      const isoDate = formatDateToISOInBelem(date);
       const syntheticEvent = {
         target: { name, value: isoDate },
         currentTarget: { name, value: isoDate }
@@ -446,27 +445,24 @@ const CustomDateInput: React.FC<CustomDateInputProps> = ({
       
       onChange(syntheticEvent);
     } else {
-      // 🌍 CORREÇÃO: Usar data atual no fuso de Belém ao invés de UTC
-      const date = getBelemCurrentDate();
-      date.setDate(date.getDate() - 1);
-      
-      if (minDate) {
-        const minLimit = new Date(minDate);
-        if (date < minLimit) {
-          const errorMsg = `A data deve ser após ${formatDateForDisplay(minDate)}.`;
-          
-          // MODIFICAÇÃO: Usar erro persistente
-          setLocalError(errorMsg);
-          setPersistentError(errorMsg);
-          
-          if (onValidationError) {
-            onValidationError(name, errorMsg);
-          }
-          return;
+      // 🌍 CORREÇÃO: hoje em Belém (helpers existentes) + -1 dia civil
+      const todayIso = formatDateToISOInBelem(getBelemCurrentDate());
+      const isoDate = addDaysIso(todayIso, -1);
+      if (!isoDate) return;
+
+      if (minDate && compareIsoDateOnly(isoDate, minDate) < 0) {
+        const errorMsg = `A data deve ser após ${formatDateForDisplay(minDate)}.`;
+        
+        // MODIFICAÇÃO: Usar erro persistente
+        setLocalError(errorMsg);
+        setPersistentError(errorMsg);
+        
+        if (onValidationError) {
+          onValidationError(name, errorMsg);
         }
+        return;
       }
       
-      const isoDate = formatDateToISOInBelem(date);
       const syntheticEvent = {
         target: { name, value: isoDate },
         currentTarget: { name, value: isoDate }
