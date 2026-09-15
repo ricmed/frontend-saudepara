@@ -54,7 +54,7 @@ export const HomeFabSpeedDial: React.FC<HomeFabSpeedDialProps> = ({
       <div className="relative w-12 flex justify-center">
         <button
           type="button"
-          className="absolute -top-6 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full bg-gradient-to-br from-[#ff4d94] to-[#e11d70] shadow-lg flex items-center justify-center ring-4 ring-white overflow-hidden"
+          className="absolute -top-6 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full bg-gradient-to-br from-[#ff4d94] to-[#656B6F] shadow-lg flex items-center justify-center ring-4 ring-white overflow-hidden"
           onClick={onSaireClick}
           title={saireLabel}
           aria-label={saireLabel}
@@ -73,7 +73,7 @@ export const HomeFabSpeedDial: React.FC<HomeFabSpeedDialProps> = ({
       <div className="relative w-12 flex justify-center">
         <button
           type="button"
-          className="absolute -top-6 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full bg-blue-600 shadow-lg flex items-center justify-center ring-4 ring-white"
+          className="absolute -top-6 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full bg-gradient-to-br from-blue-600 to-blue-800 shadow-lg flex items-center justify-center ring-4 ring-white"
           onClick={onDaeClick}
           title={daeLabel}
           aria-label={daeLabel}
@@ -94,7 +94,7 @@ export const HomeFabSpeedDial: React.FC<HomeFabSpeedDialProps> = ({
               setOpen(false);
               onSaireClick();
             }}
-            className="relative overflow-hidden flex items-center gap-2 rounded-full bg-gradient-to-r from-[#ff4d94] to-[#e11d70] pl-2 pr-4 py-2 shadow-xl text-white transition-all duration-200 ease-out"
+            className="relative overflow-hidden flex items-center gap-2 rounded-full bg-gradient-to-r from-[#ff4d94] to-[#656B6F] pl-2 pr-4 py-2 shadow-xl text-white transition-all duration-200 ease-out"
             aria-label={saireLabel}
           >
             <SaireLogoWatermark />
@@ -112,7 +112,7 @@ export const HomeFabSpeedDial: React.FC<HomeFabSpeedDialProps> = ({
               setOpen(false);
               onDaeClick();
             }}
-            className="flex items-center gap-2 rounded-full bg-blue-600 pl-2 pr-4 py-2 shadow-xl text-white transition-all duration-200 ease-out"
+            className="flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-blue-800 pl-2 pr-4 py-2 shadow-xl text-white transition-all duration-200 ease-out"
             aria-label={daeLabel}
           >
             <span className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
@@ -131,7 +131,7 @@ export const HomeFabSpeedDial: React.FC<HomeFabSpeedDialProps> = ({
         className={`absolute -top-6 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full shadow-lg flex items-center justify-center ring-4 ring-white transition-transform overflow-hidden ${
           open
             ? 'bg-gray-800 rotate-45'
-            : 'bg-gradient-to-br from-[#ff4d94] to-[#e11d70]'
+            : 'bg-gradient-to-br from-[#ff4d94] to-[#656B6F]'
         }`}
         onClick={() => setOpen((value) => !value)}
         title={open ? 'Fechar' : 'Nova comunicação'}
