@@ -28,6 +28,7 @@ vi.mock('@/features/dashboard/NotificationDashboardCirio', () => {
 vi.mock('@/services/NotificacaoService', () => {
   const NotificacaoService = {
     getAll: vi.fn(),
+    getDashboardRows: vi.fn(),
     getPublicoOptions: vi.fn(),
     getPaisOptions: vi.fn(),
     getEstadoOptions: vi.fn(),
@@ -82,7 +83,7 @@ describe('DashboardPageCirio', () => {
     ]);
 
     // Paginação: 1 página só
-    (NotificacaoServiceModule.getAll as any).mockResolvedValue({
+    (NotificacaoServiceModule.getDashboardRows as any).mockResolvedValue({
       data: [
         { original: { tipo_evento: { idtipo_evento: 1 } } }, // deve entrar
         { original: { tipo_evento: { idtipo_evento: 2 } } }, // deve sair
@@ -118,9 +119,9 @@ describe('DashboardPageCirio', () => {
 
     expect(screen.getByTestId('notif-count').textContent).toBe('1');
     expect(screen.getByTestId('evento-count').textContent).toBe('2');
-    expect(NotificacaoServiceModule.getAll).toHaveBeenCalledWith(
+    expect(NotificacaoServiceModule.getDashboardRows).toHaveBeenCalledWith(
       1,
-      200,
+      500,
       { eventoId: 1 }
     );
   });
@@ -131,7 +132,7 @@ describe('DashboardPageCirio', () => {
       { idtipo_evento: 2, descricao: 'ATIVO B', ativo: 'S' },
     ]);
 
-    (NotificacaoServiceModule.getAll as any).mockResolvedValue({
+    (NotificacaoServiceModule.getDashboardRows as any).mockResolvedValue({
       data: [
         { original: { tipo_evento: { idtipo_evento: 1 } } },
         { original: { tipo_evento: { idtipo_evento: 2 } } },
@@ -165,9 +166,9 @@ describe('DashboardPageCirio', () => {
     });
 
     expect(screen.getByTestId('notif-count').textContent).toBe('2');
-    expect(NotificacaoServiceModule.getAll).toHaveBeenCalledWith(
+    expect(NotificacaoServiceModule.getDashboardRows).toHaveBeenCalledWith(
       1,
-      200,
+      500,
       { somenteEventosAtivos: true }
     );
   });
@@ -178,7 +179,7 @@ describe('DashboardPageCirio', () => {
     ]);
 
     // Mesmo se notificações existirem, não busca quando não há eventos ativos
-    (NotificacaoServiceModule.getAll as any).mockResolvedValue({
+    (NotificacaoServiceModule.getDashboardRows as any).mockResolvedValue({
       data: [{ original: { tipo_evento: { idtipo_evento: 1 } } }],
       meta: { total: 1, totalPages: 1, page: 1, limit: 200 },
     });
@@ -210,7 +211,7 @@ describe('DashboardPageCirio', () => {
 
     expect(screen.getByTestId('notif-count').textContent).toBe('0');
     expect(screen.getByTestId('evento-count').textContent).toBe('1');
-    expect(NotificacaoServiceModule.getAll).not.toHaveBeenCalled();
+    expect(NotificacaoServiceModule.getDashboardRows).not.toHaveBeenCalled();
   });
 
   it('loads an inactive event on demand by stable ID', async () => {
@@ -219,7 +220,7 @@ describe('DashboardPageCirio', () => {
       { idtipo_evento: 2, descricao: 'HISTÓRICO', ativo: 'N' },
     ]);
 
-    (NotificacaoServiceModule.getAll as any).mockImplementation(
+    (NotificacaoServiceModule.getDashboardRows as any).mockImplementation(
       (_page: number, _limit: number, filters?: Record<string, unknown>) => {
         const eventId = filters?.eventoId;
         return Promise.resolve({
@@ -230,7 +231,7 @@ describe('DashboardPageCirio', () => {
               }
             }
           }],
-          meta: { total: 1, totalPages: 1, page: 1, limit: 200 },
+          meta: { total: 1, totalPages: 1, page: 1, limit: 500 },
         });
       }
     );
@@ -265,9 +266,9 @@ describe('DashboardPageCirio', () => {
     await waitFor(() => {
       expect(screen.getByTestId('first-event')).toHaveTextContent('2');
     });
-    expect(NotificacaoServiceModule.getAll).toHaveBeenCalledWith(
+    expect(NotificacaoServiceModule.getDashboardRows).toHaveBeenCalledWith(
       1,
-      200,
+      500,
       { eventoId: 2 }
     );
   });
@@ -276,7 +277,7 @@ describe('DashboardPageCirio', () => {
     (TiposEventoService.getAll as any).mockResolvedValue([
       { idtipo_evento: 1, descricao: 'ATIVO', ativo: 'S' },
     ]);
-    (NotificacaoServiceModule.getAll as any).mockResolvedValue({
+    (NotificacaoServiceModule.getDashboardRows as any).mockResolvedValue({
       data: [{ original: { tipo_evento: { idtipo_evento: 1 } } }],
       meta: { total: 1, totalPages: 1, page: 1, limit: 200 },
     });

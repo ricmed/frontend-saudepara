@@ -22,18 +22,21 @@ interface DashboardPaginatedResponse {
   data: any[];
   meta?: {
     totalPages?: number;
+    total?: number;
   };
 }
 
-type DashboardGetAll = (
+type DashboardGetRows = (
   page: number,
   limit: number,
   filters?: DashboardNotificationFilters
 ) => Promise<DashboardPaginatedResponse>;
 
-const getDashboardNotifications = NotificacaoService.getAll.bind(
+const getDashboardNotifications = NotificacaoService.getDashboardRows.bind(
   NotificacaoService
-) as DashboardGetAll;
+) as DashboardGetRows;
+
+const DASHBOARD_ROW_PAGE_SIZE = 500;
 
 const EMPTY_EXPORT_OPTIONS: Record<string, any[]> = {
   eventoOptions: [],
@@ -130,6 +133,7 @@ export const useDashboardDataLoader = (options?: UseDashboardDataLoaderOptions) 
   const [error, setError] = useState<string | null>(null);
   const [dataError, setDataError] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const [loadProgress, setLoadProgress] = useState<{ loaded: number; total: number } | null>(null);
   const selectedEventIdRef = useRef<number | null>(null);
   const eventOptionsRef = useRef<DashboardEventOption[]>([]);
   const requestSequenceRef = useRef(0);
@@ -166,10 +170,12 @@ export const useDashboardDataLoader = (options?: UseDashboardDataLoaderOptions) 
     const filters: DashboardNotificationFilters = eventId === null
       ? { somenteEventosAtivos: true }
       : { eventoId: eventId };
-    const pageSize = 200;
+    const pageSize = DASHBOARD_ROW_PAGE_SIZE;
     const notifications: any[] = [];
     let page = 1;
     let hasMore = true;
+
+    setLoadProgress(null);
 
     while (hasMore && (!maxPages || page <= maxPages)) {
       if (verboseLogs) {
@@ -186,6 +192,14 @@ export const useDashboardDataLoader = (options?: UseDashboardDataLoaderOptions) 
       });
 
       notifications.push(...requestedData);
+
+      const total = Number(response?.meta?.total);
+      if (Number.isFinite(total) && total > 0) {
+        setLoadProgress({
+          loaded: Math.min(notifications.length, total),
+          total,
+        });
+      }
 
       const totalPages = Number(response?.meta?.totalPages);
       hasMore =
@@ -326,6 +340,7 @@ export const useDashboardDataLoader = (options?: UseDashboardDataLoaderOptions) 
     error,
     dataError,
     selectedEventId,
+    loadProgress,
     setNotificacoes,
     loadNotificationsForEvent,
     reloadNotifications,
