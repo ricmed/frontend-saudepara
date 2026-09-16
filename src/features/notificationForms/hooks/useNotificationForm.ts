@@ -67,7 +67,10 @@ import {
   orderOptionsByPriorityIncludes
 } from '../utils/optionHelpers';
 import {
-  findExistingPatientByPriority
+  CPF_IDENTITY_CONFLICT_MESSAGE,
+  findExistingPatientByPriority,
+  isCpfIdentityConflictMatch,
+  isReusablePatientMatch
 } from '../utils/patientLookupHelpers';
 import { buildPatientPayloadFromForm } from '../utils/patientPayloadHelpers';
 import { buildNotificationDataForBackend } from '../utils/notificationPayloadHelpers';
@@ -1424,6 +1427,22 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         });
         pacienteExistente = lookupResult.pacienteExistente;
 
+        if (isCpfIdentityConflictMatch(lookupResult.matchedBy)) {
+          toast.error(CPF_IDENTITY_CONFLICT_MESSAGE, {
+            autoClose: 12000,
+            toastId: 'cpf-identity-conflict-submit',
+          });
+          setErrors((prev) => ({
+            ...prev,
+            cpf: CPF_IDENTITY_CONFLICT_MESSAGE,
+          }));
+          setExpandedSections((prev) => ({
+            ...prev,
+            identificacao: true,
+          }));
+          return false;
+        }
+
         if (lookupResult.matchedBy) {
           console.log(`✅ Paciente encontrado por estratégia: ${lookupResult.matchedBy}`, {
             id: pacienteExistente?.idpaciente,
@@ -1433,8 +1452,8 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
           console.log("❌ Nenhum paciente correspondente encontrado nas estratégias de associação");
         }
 
-        // Se encontrou paciente existente, usar ele
-        if (pacienteExistente) {
+        // Se encontrou paciente existente (mesma identidade), usar ele
+        if (pacienteExistente && isReusablePatientMatch(lookupResult.matchedBy)) {
           formData.pacienteId = pacienteExistente.idpaciente;
           console.log("✅ Paciente existente encontrado! ID:", pacienteExistente.idpaciente);
         }

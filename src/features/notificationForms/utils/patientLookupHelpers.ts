@@ -1,12 +1,19 @@
 import {
+  isSameCpf,
   isSameNameAndBirthDate,
   isSameNameAndMotherName,
+  isSamePersonName,
   normalizeForExactMatch
 } from './patientMatchingHelpers';
 
 type SearchPatientsFn = (query: string) => Promise<any[]>;
 
-export type PatientLookupMatchType = 'cpf' | 'nome_data' | 'nome_mae' | null;
+export type PatientLookupMatchType =
+  | 'cpf'
+  | 'nome_data'
+  | 'nome_mae'
+  | 'cpf_identity_conflict'
+  | null;
 
 export type PatientLookupResult = {
   pacienteExistente: any | null;
@@ -21,6 +28,28 @@ type FindExistingPatientParams = {
   searchPatients: SearchPatientsFn;
 };
 
+export const CPF_IDENTITY_CONFLICT_MESSAGE =
+  'Este CPF já está cadastrado e já possui um paciente associado. Confira o número ou use o cadastro existente.';
+
+export const isReusablePatientMatch = (
+  matchedBy: PatientLookupMatchType
+): matchedBy is 'cpf' | 'nome_data' | 'nome_mae' => {
+  return matchedBy === 'cpf' || matchedBy === 'nome_data' || matchedBy === 'nome_mae';
+};
+
+export const isCpfIdentityConflictMatch = (
+  matchedBy: PatientLookupMatchType
+): boolean => matchedBy === 'cpf_identity_conflict';
+
+export const isCpfIdentityConflictError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return message.includes(CPF_IDENTITY_CONFLICT_MESSAGE);
+};
+
+const exactCpfMatches = (candidates: any[] | undefined, cpf: string): any[] => {
+  return (candidates || []).filter((patient) => isSameCpf(patient, cpf));
+};
+
 export const findExistingPatientByPriority = async ({
   cpf,
   nomePaciente,
@@ -28,14 +57,24 @@ export const findExistingPatientByPriority = async ({
   nomeMae,
   searchPatients
 }: FindExistingPatientParams): Promise<PatientLookupResult> => {
-  // Estratégia 1: CPF
+  // Estratégia 1: CPF — só reutiliza se o nome for o mesmo paciente
   if (cpf && cpf.length === 11) {
     try {
       const pacientesPorCpf = await searchPatients(cpf);
-      if (pacientesPorCpf?.length) {
+      const matchesByCpf = exactCpfMatches(pacientesPorCpf, cpf);
+      if (matchesByCpf.length) {
+        const samePerson = matchesByCpf.find((patient) =>
+          isSamePersonName(patient, nomePaciente)
+        );
+        if (samePerson) {
+          return {
+            pacienteExistente: samePerson,
+            matchedBy: 'cpf'
+          };
+        }
         return {
-          pacienteExistente: pacientesPorCpf[0],
-          matchedBy: 'cpf'
+          pacienteExistente: matchesByCpf[0],
+          matchedBy: 'cpf_identity_conflict'
         };
       }
     } catch {

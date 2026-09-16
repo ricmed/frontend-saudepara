@@ -1,11 +1,23 @@
 import indexedDBService from './indexedDB';
 import PacienteService from '@/services/PacienteService';
+import {
+  CPF_IDENTITY_CONFLICT_MESSAGE,
+  findExistingPatientByPriority,
+  isCpfIdentityConflictError,
+  isCpfIdentityConflictMatch,
+  isReusablePatientMatch,
+} from '@/features/notificationForms/utils/patientLookupHelpers';
 import { EstabelecimentoFormService } from '@/services/EstabelecimentoFormService';
 import { NotificacaoService } from '@/services/NotificacaoService';
 import { salvarNotificacaoCompleta } from '@/utils/notificacaoAdapter';
 import { toast } from 'react-toastify';
 import { convertLocalDateTimeToUTC } from '@/utils/timezoneUtils';
 import axios from '@/utils/axiosRetry';
+
+const searchPatientsForSync = async (query: string): Promise<any[]> => {
+  const result = await PacienteService.search(query);
+  return result.data || [];
+};
 
 class SyncService {
   private isOnline: boolean;
@@ -703,11 +715,49 @@ class SyncService {
         } catch (error: any) {
           console.error(`❌ Erro ao sincronizar paciente ${paciente.idpaciente}:`, error);
           
-          // ✅ SE FOR ERRO DE DUPLICAÇÃO, MARCAR COMO SINCRONIZADO
           if (error.message?.includes('já existe') || error.message?.includes('duplicate')) {
-            console.log(`⚠️ Paciente ${paciente.nome} detectado como duplicata, marcando como sincronizado`);
-            await indexedDBService.markPacienteAsSynced(paciente.idpaciente);
-            syncedCount++;
+            try {
+              const duplicateLookup = await findExistingPatientByPriority({
+                cpf: paciente.cpf,
+                nomePaciente: paciente.nome,
+                dataNascimento: paciente.data_nascimento,
+                nomeMae: paciente.nome_mae,
+                searchPatients: searchPatientsForSync,
+              });
+
+              if (isCpfIdentityConflictMatch(duplicateLookup.matchedBy)) {
+                toast.warning(CPF_IDENTITY_CONFLICT_MESSAGE, {
+                  autoClose: 12000,
+                  toastId: `sync-cpf-paciente-${paciente.idpaciente}`,
+                });
+                errorCount++;
+              } else if (
+                duplicateLookup.pacienteExistente?.idpaciente &&
+                isReusablePatientMatch(duplicateLookup.matchedBy)
+              ) {
+                pacienteIdMapping.set(
+                  paciente.idpaciente,
+                  duplicateLookup.pacienteExistente.idpaciente,
+                );
+                await indexedDBService.markPacienteAsSynced(
+                  paciente.idpaciente,
+                  duplicateLookup.pacienteExistente.idpaciente,
+                );
+                syncedCount++;
+              } else {
+                toast.warning(CPF_IDENTITY_CONFLICT_MESSAGE, {
+                  autoClose: 12000,
+                  toastId: `sync-cpf-paciente-${paciente.idpaciente}`,
+                });
+                errorCount++;
+              }
+            } catch {
+              toast.warning(CPF_IDENTITY_CONFLICT_MESSAGE, {
+                autoClose: 12000,
+                toastId: `sync-cpf-paciente-${paciente.idpaciente}`,
+              });
+              errorCount++;
+            }
           } else if (error.message?.includes('Possível duplicata por homônimo')) {
             toast.warning(`Paciente "${paciente.nome}" exige revisão manual (possível duplicata sem CPF).`, {
               autoClose: 12000,
@@ -978,39 +1028,48 @@ class SyncService {
           
           if (isInvalidId) {
             console.log(`⚠️ ID de paciente inválido (${pacienteIdFinal}), buscando no servidor...`);
-            console.log(`   Nome do paciente: "${formDataAtualizada.paciente}"`);
-            
-            // ✅ BUSCAR PACIENTE PELO NOME SE NECESSÁRIO
-            if (formDataAtualizada.paciente) {
-              const pacientesEncontrados = await PacienteService.search(formDataAtualizada.paciente);
-              console.log(`   Pacientes encontrados no servidor: ${pacientesEncontrados.data?.length || 0}`);
-              
-              if (pacientesEncontrados.data && pacientesEncontrados.data.length > 0) {
-                console.log(`   Buscando match exato para: "${formDataAtualizada.paciente.toUpperCase().trim()}"`);
-                
-                const pacienteEncontrado = pacientesEncontrados.data.find((p: any) => {
-                  const match = p.nome.toUpperCase().trim() === formDataAtualizada.paciente.toUpperCase().trim();
-                  console.log(`     ${match ? '✅' : '❌'} ${p.nome} (ID: ${p.idpaciente})`);
-                  return match;
-                });
-                
-                if (pacienteEncontrado) {
-                  console.log(`✅ Paciente encontrado no servidor: ${pacienteEncontrado.nome} (ID: ${pacienteEncontrado.idpaciente})`);
-                  formDataAtualizada.pacienteId = pacienteEncontrado.idpaciente;
-                  formDataAtualizada.paciente_idpaciente = pacienteEncontrado.idpaciente;
-                } else {
-                  console.error(`❌ ERRO: Paciente "${formDataAtualizada.paciente}" não encontrado com match exato`);
-                  throw new Error(`Paciente "${formDataAtualizada.paciente}" não encontrado`);
-                }
-              } else {
-                console.error(`❌ ERRO: Nenhum paciente retornado pela busca`);
-                throw new Error(`Nenhum paciente encontrado para "${formDataAtualizada.paciente}"`);
-              }
+
+            const identityLookup = await findExistingPatientByPriority({
+              cpf: formDataAtualizada.cpf,
+              nomePaciente: formDataAtualizada.paciente,
+              dataNascimento: formDataAtualizada.dataNascimento,
+              nomeMae: formDataAtualizada.nomeMae,
+              searchPatients: searchPatientsForSync,
+            });
+
+            if (isCpfIdentityConflictMatch(identityLookup.matchedBy)) {
+              throw new Error(CPF_IDENTITY_CONFLICT_MESSAGE);
+            }
+
+            if (
+              identityLookup.pacienteExistente?.idpaciente &&
+              isReusablePatientMatch(identityLookup.matchedBy)
+            ) {
+              const resolvedId = identityLookup.pacienteExistente.idpaciente;
+              console.log(`✅ Paciente resolvido por identidade (ID: ${resolvedId})`);
+              formDataAtualizada.pacienteId = resolvedId;
+              formDataAtualizada.paciente_idpaciente = resolvedId;
             } else {
-              console.error(`❌ ERRO: Notificação sem nome de paciente`);
-              throw new Error('Notificação sem referência válida de paciente');
+              throw new Error(
+                formDataAtualizada.paciente
+                  ? `Paciente "${formDataAtualizada.paciente}" não encontrado`
+                  : 'Notificação sem referência válida de paciente'
+              );
             }
           } else {
+            if (formDataAtualizada.cpf && String(formDataAtualizada.cpf).replace(/\D/g, '').length === 11) {
+              const identityGuard = await findExistingPatientByPriority({
+                cpf: formDataAtualizada.cpf,
+                nomePaciente: formDataAtualizada.paciente,
+                dataNascimento: formDataAtualizada.dataNascimento,
+                nomeMae: formDataAtualizada.nomeMae,
+                searchPatients: searchPatientsForSync,
+              });
+
+              if (isCpfIdentityConflictMatch(identityGuard.matchedBy)) {
+                throw new Error(CPF_IDENTITY_CONFLICT_MESSAGE);
+              }
+            }
             console.log(`✅ ID do paciente é válido: ${pacienteIdFinal}`);
           }
           
@@ -1067,8 +1126,22 @@ class SyncService {
             error?.message?.includes('required');
           const isNetworkError = !error?.response || error?.code === 'NETWORK_ERROR';
           const isConflict = statusCode === 409;
+          const isCpfIdentityConflict = isCpfIdentityConflictError(error);
           
-          if (isConflict) {
+          if (isCpfIdentityConflict) {
+            await indexedDBService.markNotificacaoAsError(offlineId, CPF_IDENTITY_CONFLICT_MESSAGE, {
+              status: statusCode,
+              message: error?.message,
+              timestamp: Date.now(),
+              notificationId: id,
+              offlineId: offlineId
+            });
+            toast.warning(CPF_IDENTITY_CONFLICT_MESSAGE, {
+              autoClose: 12000,
+              toastId: `sync-cpf-${offlineId}`
+            });
+            errorCount++;
+          } else if (isConflict) {
             // Backend novo: POST idempotente (201 com mesmo id). Backend antigo: 409.
             // Aceitar id no body do 409, senão reconciliar por offline_id.
             const fromConflictBody = this.extractServerNotificationId(error?.response?.data);

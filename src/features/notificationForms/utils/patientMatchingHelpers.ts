@@ -2,10 +2,31 @@ type PatientCandidate = {
   nome?: string | null;
   nome_mae?: string | null;
   data_nascimento?: string | null;
+  cpf?: string | null;
 };
 
 export const normalizeForExactMatch = (value?: string | null): string => {
   return (value ?? '').toUpperCase().trim();
+};
+
+export const digitsOnly = (value?: string | null): string => {
+  return (value ?? '').replace(/\D/g, '');
+};
+
+export const isSameCpf = (
+  patient: Pick<PatientCandidate, 'cpf'>,
+  cpf: string
+): boolean => {
+  const candidateCpf = digitsOnly(patient.cpf);
+  const typedCpf = digitsOnly(cpf);
+  return candidateCpf.length === 11 && candidateCpf === typedCpf;
+};
+
+export const isSamePersonName = (
+  patient: PatientCandidate,
+  patientName: string
+): boolean => {
+  return normalizeForExactMatch(patient.nome) === normalizeForExactMatch(patientName);
 };
 
 export const toIsoDateOnly = (value?: string | null): string | null => {
