@@ -4,6 +4,7 @@ import {
   filtrarUnidadesDoEvento,
   eventoRestringeObito,
   rotuloOpcaoObitoEvento,
+  shouldRestrictEstabelecimentosPorEvento,
 } from './eventoEstabelecimentos';
 
 describe('eventoEstabelecimentos', () => {
@@ -31,6 +32,13 @@ describe('eventoEstabelecimentos', () => {
       { idestabelecimento: 20, nome: 'B' },
     ]);
     expect(aplicarEscopoUnidadeNoEvento(unidades, 'unidade', 99)).toEqual([]);
+  });
+
+  it('não restringe enquanto a lista do evento carrega (pré-seleção do CTA)', () => {
+    expect(shouldRestrictEstabelecimentosPorEvento('6', true, true)).toBe(false);
+    expect(shouldRestrictEstabelecimentosPorEvento('6', false, true)).toBe(true);
+    expect(shouldRestrictEstabelecimentosPorEvento('6', false, false)).toBe(false);
+    expect(shouldRestrictEstabelecimentosPorEvento('', false, true)).toBe(false);
   });
 
   it('só restringe o óbito quando o evento tem vínculos de óbito', () => {

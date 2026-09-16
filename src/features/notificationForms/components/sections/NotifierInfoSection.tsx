@@ -13,6 +13,7 @@ import indexedDBService from '@/services/indexedDB';
 import { useEstabelecimentosDoEvento } from '@/features/notificationForms/hooks/useEstabelecimentosDoEvento';
 import {
   aplicarEscopoUnidadeNoEvento,
+  shouldRestrictEstabelecimentosPorEvento,
   toAllowedOptions,
 } from '@/features/notificationForms/utils/eventoEstabelecimentos';
 
@@ -32,8 +33,13 @@ const NotifierInfoSection: React.FC<FormSectionProps> = ({
     estabelecimentos: estabelecimentosDoEvento,
     loading: loadingEvento,
   } = useEstabelecimentosDoEvento(formData.evento);
-  const restringePorEvento =
-    Boolean(formData.evento) && (loadingEvento || vinculaEstabelecimentos);
+  // Só restringe depois de carregar: durante o loading a lista vazia + restrict
+  // apaga a pré-seleção (bug do CTA golfinho com ?eventoId=).
+  const restringePorEvento = shouldRestrictEstabelecimentosPorEvento(
+    formData.evento,
+    loadingEvento,
+    vinculaEstabelecimentos,
+  );
   const unidadesDoEvento = toAllowedOptions(
     aplicarEscopoUnidadeNoEvento(
       estabelecimentosDoEvento,
@@ -41,6 +47,37 @@ const NotifierInfoSection: React.FC<FormSectionProps> = ({
       permissions.estabelecimentoId,
     ),
   );
+
+  // Com evento vinculado e exatamente 1 unidade no escopo, garante pré-seleção
+  // (também após changeEventoAndClearLocalidade limpar o campo).
+  useEffect(() => {
+    if (permissions.loading || loadingEvento) {
+      return;
+    }
+    if (formData.unidadeNotificadora) {
+      return;
+    }
+    if (!restringePorEvento || unidadesDoEvento.length !== 1) {
+      return;
+    }
+    const unica = unidadesDoEvento[0];
+    setFormData((prev) => {
+      if (prev.unidadeNotificadora) {
+        return prev;
+      }
+      return {
+        ...prev,
+        unidadeNotificadora: String(unica.idestabelecimento),
+      };
+    });
+  }, [
+    permissions.loading,
+    loadingEvento,
+    restringePorEvento,
+    unidadesDoEvento,
+    formData.unidadeNotificadora,
+    setFormData,
+  ]);
 
   // Carregar unidades permitidas baseado no nível de acesso
   useEffect(() => {

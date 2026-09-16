@@ -54,6 +54,17 @@ export function toAllowedOptions(
   }));
 }
 
+/** Restringe a lista só depois do load — durante loading lista vazia quebrava a pré-seleção. */
+export function shouldRestrictEstabelecimentosPorEvento(
+  eventoIdValue: string | null | undefined,
+  loading: boolean,
+  vincula: boolean,
+): boolean {
+  const eventoId = Number(eventoIdValue);
+  const hasEvento = Number.isInteger(eventoId) && eventoId > 0;
+  return hasEvento && !loading && vincula;
+}
+
 export function eventoRestringeObito(vinculaObitos: boolean): boolean {
   return vinculaObitos;
 }

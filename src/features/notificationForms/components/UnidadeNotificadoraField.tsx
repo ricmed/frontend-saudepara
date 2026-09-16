@@ -500,6 +500,26 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
   // Função para buscar estabelecimento por ID
   const fetchEstabelecimentoById = async (id: string) => {
     if (!id) return;
+
+    // Preferir a lista já permitida (evento / escopo) — evita falha de display
+    // quando restrictToAllowed está ativo e o cache geral ainda não tem o nome.
+    if (allowedOptions && allowedOptions.length > 0) {
+      const fromAllowed = allowedOptions.find(
+        (item) => String(item.idestabelecimento) === id,
+      );
+      if (fromAllowed) {
+        setSelectedEstabelecimento(fromAllowed);
+        setDisplayValue(estabelecimentoDisplayLabel(fromAllowed));
+        return;
+      }
+      if (restrictToAllowed) {
+        console.warn(
+          `Estabelecimento ID ${id} não está na lista permitida do evento/escopo.`,
+        );
+        return;
+      }
+    }
+
     // Primeiro tenta do IndexedDB
     try {
       const cached: any[] = (await indexedDBService.getOpcoes("estabelecimentos")) || [];
@@ -557,7 +577,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
       setSelectedEstabelecimento(null);
       setDisplayValue("");
     }
-  }, [value, isManuallyEditing]);
+  }, [value, isManuallyEditing, allowedOptions, restrictToAllowed]);
 
   // Safely close dropdown and restore state
   const closeDropdown = () => {
@@ -706,8 +726,8 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
         allowedIdsLength: allowedEstablishmentIds?.length,
       });
 
-      // Só executar se campo ainda não tem valor
-      if (value || selectedEstabelecimento) {
+      // Já tem valor e display: nada a fazer
+      if (value && selectedEstabelecimento) {
         console.log('⏭️ Campo já tem valor, pulando auto-seleção');
         return;
       }
@@ -761,13 +781,29 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
         console.log('⏭️ Nenhum cenário de auto-seleção aplicável');
       }
 
-      // Se encontramos um único estabelecimento, selecionar automaticamente
-      if (singleEstablishment) {
-        console.log('✅ AUTO-SELECIONANDO estabelecimento único:', singleEstablishment.nome);
+      if (!singleEstablishment) {
+        return;
+      }
+
+      const singleId = String(singleEstablishment.idestabelecimento);
+
+      // Valor já aponta para a única opção, mas o display ficou vazio (corrida com
+      // restrictToAllowed + allowedOptions=[] durante o load do evento).
+      if (value === singleId && !selectedEstabelecimento) {
+        console.log('✅ Restaurando display da unidade já selecionada:', singleEstablishment.nome);
         setDisplayValue(estabelecimentoDisplayLabel(singleEstablishment));
         setSelectedEstabelecimento(singleEstablishment);
-        onChange(singleEstablishment.idestabelecimento.toString());
+        return;
       }
+
+      if (value) {
+        return;
+      }
+
+      console.log('✅ AUTO-SELECIONANDO estabelecimento único:', singleEstablishment.nome);
+      setDisplayValue(estabelecimentoDisplayLabel(singleEstablishment));
+      setSelectedEstabelecimento(singleEstablishment);
+      onChange(singleId);
     };
 
     autoSelectSingleEstablishment();
