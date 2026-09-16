@@ -20,6 +20,7 @@ export const STORAGE_KEYS = {
   },
   auth: {
     userAccessPrefix: 'sp.auth.user-access.v1',
+    lastKnownSession: 'sp.auth.last-known.session.v1',
   },
 } as const;
 

@@ -1,5 +1,11 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import axios from '../utils/axiosRetry'; // Usar axios com retry configurado
+import {
+  clearLastKnownUser,
+  persistLastKnownUser,
+  readLastKnownUser,
+  shouldKeepLastKnownSession,
+} from '@/services/lastKnownAuthSession';
 
 const AuthContext = createContext<any>(null);
 const USE_INTERNAL_AUTH = (import.meta as any).env?.VITE_USE_INTERNAL_AUTH === 'true';
@@ -10,15 +16,25 @@ const LEGACY_OFFLINE_USER_DATA_KEY = 'user_data';
 const USER_IDENTIFIER_KEY = 'sp.user.id.v1';
 
 const resolveUserIdentifier = (user: any): string | null =>
-  user?.id || user?.sub || user?.email || user?.cpf || null;
+  user?.id || user?.sub || user?.email || user?.cpf || user?.username || null;
+
+const applyUserToClient = (nextUser: any, setUser: (user: any) => void) => {
+  setUser(nextUser);
+  const userIdentifier = resolveUserIdentifier(nextUser);
+  if (userIdentifier) {
+    sessionStorage.setItem(USER_IDENTIFIER_KEY, String(userIdentifier));
+  }
+};
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [retryMessage, setRetryMessage] = useState<string | null>(null);
+  const authGenerationRef = useRef(0);
 
   useEffect(() => {
     let alive = true;
+    const generation = authGenerationRef.current;
 
     // Rotas públicas de formulário não devem disparar verificação de sessão (evita 401 + refresh desnecessário)
     try {
@@ -34,7 +50,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // ignore
     }
 
-    // 🆕 Verificar se há login offline ativo
+    // PIN legado: se alguém ainda tiver no dispositivo, não quebra. Sairé/Círio não usam este caminho.
     const offlineMode = localStorage.getItem(OFFLINE_MODE_KEY) ?? localStorage.getItem(LEGACY_OFFLINE_MODE_KEY);
     const userData = localStorage.getItem(OFFLINE_USER_DATA_KEY) ?? localStorage.getItem(LEGACY_OFFLINE_USER_DATA_KEY);
     
@@ -43,12 +59,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         const parsedUser = JSON.parse(userData);
         if (alive) {
-          setUser(parsedUser);
+          applyUserToClient(parsedUser, setUser);
+          persistLastKnownUser(parsedUser);
           setLoading(false);
-          const userIdentifier = resolveUserIdentifier(parsedUser);
-          if (userIdentifier) {
-            sessionStorage.setItem(USER_IDENTIFIER_KEY, String(userIdentifier));
-          }
           localStorage.setItem(OFFLINE_MODE_KEY, 'true');
           localStorage.setItem(OFFLINE_USER_DATA_KEY, userData);
           localStorage.removeItem(LEGACY_OFFLINE_MODE_KEY);
@@ -59,14 +72,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.error('Erro ao carregar dados offline:', error);
       }
     }
+
+    const cachedUser = readLastKnownUser();
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+    // Só hidrata na hora se estiver sem rede. Com rede, espera o /profile como hoje
+    // (401 continua deslogando; evita tela logada fantasma).
+    if (cachedUser && isOffline) {
+      applyUserToClient(cachedUser, setUser);
+      setLoading(false);
+    }
     
-    // Tentar login normal via API
-    // Em homologação, SW/proxy às vezes pode deixar a request "pendurada".
-    // Para evitar loop infinito no login, forçamos timeout e um fallback de segurança.
     const safetyTimer = window.setTimeout(() => {
-      if (!alive) return;
-      console.warn('⏳ Timeout ao verificar autenticação. Prosseguindo como não autenticado.');
-      setUser(null);
+      if (!alive || generation !== authGenerationRef.current) return;
+      console.warn('⏳ Timeout ao verificar autenticação. Mantendo sessão local se houver.');
+      const fallback = readLastKnownUser();
+      if (fallback) {
+        applyUserToClient(fallback, setUser);
+      } else {
+        setUser(null);
+      }
       setLoading(false);
     }, 12_000);
 
@@ -76,22 +100,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         timeout: 10_000,
       })
       .then((res) => {
-        if (!alive) return;
-        setUser(res.data);
-        const userIdentifier = resolveUserIdentifier(res.data);
-        if (userIdentifier) {
-          sessionStorage.setItem(USER_IDENTIFIER_KEY, String(userIdentifier));
-        }
-        // Limpar modo offline se conseguir conectar
+        if (!alive || generation !== authGenerationRef.current) return;
+        applyUserToClient(res.data, setUser);
+        persistLastKnownUser(res.data);
         localStorage.removeItem(OFFLINE_MODE_KEY);
         localStorage.removeItem(OFFLINE_USER_DATA_KEY);
         localStorage.removeItem(LEGACY_OFFLINE_MODE_KEY);
         localStorage.removeItem(LEGACY_OFFLINE_USER_DATA_KEY);
       })
       .catch((err) => {
-        if (!alive) return;
+        if (!alive || generation !== authGenerationRef.current) return;
+        const fallback = readLastKnownUser();
+        if (fallback && shouldKeepLastKnownSession(err)) {
+          applyUserToClient(fallback, setUser);
+          console.warn('Falha de rede ao verificar autenticação; sessão local mantida:', err);
+          return;
+        }
+        clearLastKnownUser();
         setUser(null);
-        // não travar o app em homologação quando o backend responde 401/erro
         console.warn('Falha ao verificar autenticação:', err);
       })
       .finally(() => {
@@ -120,13 +146,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       setRetryMessage(null);
       
-      await axios.post(USE_INTERNAL_AUTH ? '/api/auth/login' : '/api-auth/auth/login', { username, password }, { withCredentials: true });
-      const res = await axios.get(USE_INTERNAL_AUTH ? '/api/auth/profile' : '/api-auth/protected/profile', { withCredentials: true });
-      
-      setUser(res.data);
-      const userIdentifier = resolveUserIdentifier(res.data);
-      if (userIdentifier) {
-        sessionStorage.setItem(USER_IDENTIFIER_KEY, String(userIdentifier));
+      const loginRes = await axios.post(
+        USE_INTERNAL_AUTH ? '/api/auth/login' : '/api-auth/auth/login',
+        { username, password },
+        { withCredentials: true }
+      );
+      const loggedUser = loginRes.data?.user;
+      authGenerationRef.current += 1;
+      if (loggedUser) {
+        applyUserToClient(loggedUser, setUser);
+        persistLastKnownUser(loggedUser);
+      }
+
+      try {
+        const res = await axios.get(USE_INTERNAL_AUTH ? '/api/auth/profile' : '/api-auth/protected/profile', { withCredentials: true });
+        applyUserToClient(res.data, setUser);
+        persistLastKnownUser(res.data);
+        return { user: res.data };
+      } catch (profileError) {
+        if (loggedUser && shouldKeepLastKnownSession(profileError)) {
+          return { user: loggedUser };
+        }
+        if (loggedUser) return { user: loggedUser };
+        throw profileError;
       }
     } catch (error: any) {
       if (error.response?.status === 429) {
@@ -142,10 +184,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       console.warn('Erro no logout, mas prosseguindo...', error);
     } finally {
+      authGenerationRef.current += 1;
       setUser(null);
       setRetryMessage(null);
       sessionStorage.removeItem(USER_IDENTIFIER_KEY);
-      // 🆕 Limpar modo offline ao fazer logout
+      clearLastKnownUser();
       localStorage.removeItem(OFFLINE_MODE_KEY);
       localStorage.removeItem(OFFLINE_USER_DATA_KEY);
       localStorage.removeItem(LEGACY_OFFLINE_MODE_KEY);
