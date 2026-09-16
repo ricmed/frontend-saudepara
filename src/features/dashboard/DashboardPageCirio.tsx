@@ -12,7 +12,6 @@ const DashboardPageCirio: React.FC = () => {
     error,
     dataError,
     selectedEventId,
-    loadProgress,
     loadNotificationsForEvent,
     reloadNotifications
   } = useDashboardDataLoader();
@@ -25,11 +24,7 @@ const DashboardPageCirio: React.FC = () => {
           {/* Spinner de carregamento simples com CSS */}
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
           <p className="mt-4 text-lg font-medium text-gray-700">Carregando dados para o dashboard...</p>
-          <p className="mt-2 text-sm text-gray-500">
-            {loadProgress && loadProgress.total > 0
-              ? `Carregando ${loadProgress.loaded} de ${loadProgress.total} notificações do evento.`
-              : 'Isso pode levar alguns instantes.'}
-          </p>
+          <p className="mt-2 text-sm text-gray-500">Isso pode levar alguns instantes.</p>
         </div>
       </div>
     );

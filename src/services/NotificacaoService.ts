@@ -1,6 +1,6 @@
 // NotificacaoService.ts - VERSÃO ATUALIZADA com funções de arquivo
 import axios from 'axios';
-import { getApiOrigin, getApiRoot } from '@/config/apiOrigin';
+import { getApiOrigin } from '@/config/apiOrigin';
 import type {
   FormData,
   ModoLocalidadeEvento,
@@ -541,42 +541,6 @@ export const NotificacaoService = {
       }
 
       const response = await api.get('', { params });
-      return formatListResponse(response.data);
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
-
-  /**
-   * Linhas lean do dashboard (mesmo recorte de evento do getAll; sem arquivos).
-   * O Círio continua filtrando no cliente por evento + cross-filter.
-   */
-  async getDashboardRows(
-    page: number = 1,
-    limit: number = 500,
-    filters: NotificacaoListFilters = {},
-  ): Promise<PaginatedResponse<any>> {
-    try {
-      const params: Record<string, number | boolean> = { page, limit };
-
-      if (
-        typeof filters.eventoId === 'number' &&
-        Number.isInteger(filters.eventoId) &&
-        filters.eventoId > 0
-      ) {
-        params.eventoId = filters.eventoId;
-      } else if (typeof filters.somenteEventosAtivos === 'boolean') {
-        params.somenteEventosAtivos = filters.somenteEventosAtivos;
-      }
-
-      const response = await axios.get(
-        `${getApiRoot()}/notificacoes/dashboard/rows`,
-        {
-          params,
-          timeout: 60000,
-          withCredentials: true,
-        },
-      );
       return formatListResponse(response.data);
     } catch (error) {
       return handleApiError(error);
