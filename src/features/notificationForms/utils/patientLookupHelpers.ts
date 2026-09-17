@@ -17,9 +17,6 @@ type FindExistingPatientParams = {
   searchPatients: SearchPatientsFn;
 };
 
-export const CPF_ALREADY_REGISTERED_STRIP_MESSAGE =
-  'CPF já cadastrado. A ficha sobe sem o CPF.';
-
 const digitsCpf = (cpf?: string): string => (cpf ?? '').replace(/\D/g, '');
 
 export const hasUsableCpf = (cpf?: string): boolean => digitsCpf(cpf).length === 11;

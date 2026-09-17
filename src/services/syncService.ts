@@ -1,7 +1,6 @@
 import indexedDBService from './indexedDB';
 import PacienteService from '@/services/PacienteService';
 import {
-  CPF_ALREADY_REGISTERED_STRIP_MESSAGE,
   cpfAlreadyRegistered,
 } from '@/features/notificationForms/utils/patientLookupHelpers';
 import { EstabelecimentoFormService } from '@/services/EstabelecimentoFormService';
@@ -548,10 +547,6 @@ class SyncService {
 
           if (await cpfAlreadyRegistered(pacienteData.cpf, searchPatientsForSync)) {
             pacienteData.cpf = null;
-            toast.warning(CPF_ALREADY_REGISTERED_STRIP_MESSAGE, {
-              autoClose: 8000,
-              toastId: `sync-cpf-strip-${paciente.idpaciente}`,
-            });
           }
 
           const result = await PacienteService.create(pacienteData);
@@ -578,10 +573,6 @@ class SyncService {
             try {
               const { idpaciente, synced, savedAt, syncedAt, savedOffline, source, ...retryData } = paciente;
               retryData.cpf = null;
-              toast.warning(CPF_ALREADY_REGISTERED_STRIP_MESSAGE, {
-                autoClose: 8000,
-                toastId: `sync-cpf-strip-${paciente.idpaciente}`,
-              });
               const retryResult = await PacienteService.create(retryData);
               if (!retryResult.idpaciente) {
                 throw new Error('Servidor não retornou ID válido');
@@ -862,10 +853,6 @@ class SyncService {
             if (await cpfAlreadyRegistered(formDataAtualizada.cpf, searchPatientsForSync)) {
               cpfToSend = null;
               formDataAtualizada.cpf = '';
-              toast.warning(CPF_ALREADY_REGISTERED_STRIP_MESSAGE, {
-                autoClose: 8000,
-                toastId: `sync-cpf-strip-notif-${offlineId}`,
-              });
             }
 
             const createdPatient = await PacienteService.create({
@@ -1245,12 +1232,6 @@ class SyncService {
         const payload = { ...pacienteData };
         if (await cpfAlreadyRegistered(payload.cpf, searchPatientsForSync)) {
           payload.cpf = null;
-          if (!silent) {
-            toast.warning(CPF_ALREADY_REGISTERED_STRIP_MESSAGE, {
-              autoClose: 8000,
-              toastId: 'save-paciente-cpf-strip',
-            });
-          }
         }
         try {
           const result = await PacienteService.create(payload);
@@ -1261,10 +1242,6 @@ class SyncService {
         } catch (createError) {
           if (payload.cpf) {
             payload.cpf = null;
-            toast.warning(CPF_ALREADY_REGISTERED_STRIP_MESSAGE, {
-              autoClose: 8000,
-              toastId: 'save-paciente-cpf-strip',
-            });
             const retryResult = await PacienteService.create(payload);
             if (!silent) {
               toast.success('✅ Paciente salvo!');

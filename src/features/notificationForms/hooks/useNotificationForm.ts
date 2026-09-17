@@ -68,7 +68,6 @@ import {
   orderOptionsByPriorityIncludes
 } from '../utils/optionHelpers';
 import {
-  CPF_ALREADY_REGISTERED_STRIP_MESSAGE,
   cpfAlreadyRegistered,
 } from '../utils/patientLookupHelpers';
 import { buildPatientPayloadFromForm } from '../utils/patientPayloadHelpers';
@@ -1416,10 +1415,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       try {
         if (await cpfAlreadyRegistered(formData.cpf, searchPatientsOfflineSafe)) {
           formData.cpf = '';
-          toast.warning(CPF_ALREADY_REGISTERED_STRIP_MESSAGE, {
-            autoClose: 8000,
-            toastId: 'cpf-strip-submit',
-          });
         }
 
         const novoPaciente: any = buildPatientPayloadFromForm(
@@ -2562,10 +2557,6 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       if (await cpfAlreadyRegistered(payloadSource.cpf, searchPatientsOfflineSafe)) {
         payloadSource.cpf = '';
         setFormData((prev) => ({ ...prev, cpf: '' }));
-        toast.warning(CPF_ALREADY_REGISTERED_STRIP_MESSAGE, {
-          autoClose: 8000,
-          toastId: 'cpf-strip-new-patient',
-        });
       }
 
       const novoPaciente: any = buildPatientPayloadFromForm(
