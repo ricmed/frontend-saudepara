@@ -6,6 +6,8 @@ import {
   normalizeText,
   formatCPF,
   displayFormattedCPF,
+  mapGestanteForApi,
+  mapGestanteFromApi,
   validateBirthDate,
   compareDates,
   validateManualAge,
@@ -17,6 +19,14 @@ import {
 import type { SectionState } from '@/features/notificationForms/hooks/useSectionExpansion';
 
 describe('formUtils — helpers', () => {
+  it('gestante 1/2 vira S/N na API e volta para o select', () => {
+    expect(mapGestanteForApi('1')).toBe('S');
+    expect(mapGestanteForApi('2')).toBe('N');
+    expect(mapGestanteFromApi('S')).toBe('1');
+    expect(mapGestanteFromApi('N')).toBe('2');
+    expect(mapGestanteFromApi('1')).toBe('1');
+  });
+
   it('normalizeText removes accents and uppercases', () => {
     expect(normalizeText('ação')).toBe('ACAO');
     expect(normalizeText('')).toBe('');

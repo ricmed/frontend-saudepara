@@ -59,6 +59,7 @@ import {
   isTipoEncerramento,
   validateForm,
   mapGestanteForApi,
+  mapGestanteFromApi,
   changeEventoAndClearLocalidade,
   getModoLocalidadeEvento
 } from '../utils/formUtils';
@@ -67,10 +68,8 @@ import {
   orderOptionsByPriorityIncludes
 } from '../utils/optionHelpers';
 import {
-  CPF_IDENTITY_CONFLICT_MESSAGE,
-  findExistingPatientByPriority,
-  isCpfIdentityConflictMatch,
-  isReusablePatientMatch
+  CPF_ALREADY_REGISTERED_STRIP_MESSAGE,
+  cpfAlreadyRegistered,
 } from '../utils/patientLookupHelpers';
 import { buildPatientPayloadFromForm } from '../utils/patientPayloadHelpers';
 import { buildNotificationDataForBackend } from '../utils/notificationPayloadHelpers';
@@ -1412,70 +1411,29 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       return false;
     }
 
-    // Create patient automatically if name exists without ID
+    // Sem pacienteId: cria cadastro novo. CPF já no banco → descarta só o CPF e sobe.
     if (formData.paciente.trim() && !formData.pacienteId) {
       try {
-        let pacienteExistente = null;
-
-        console.log("🔍 Buscando paciente existente com critérios...");
-        const lookupResult = await findExistingPatientByPriority({
-          cpf: formData.cpf,
-          nomePaciente: formData.paciente,
-          dataNascimento: formData.dataNascimento,
-          nomeMae: formData.nomeMae,
-          searchPatients: searchPatientsOfflineSafe
-        });
-        pacienteExistente = lookupResult.pacienteExistente;
-
-        if (isCpfIdentityConflictMatch(lookupResult.matchedBy)) {
-          toast.error(CPF_IDENTITY_CONFLICT_MESSAGE, {
-            autoClose: 12000,
-            toastId: 'cpf-identity-conflict-submit',
+        if (await cpfAlreadyRegistered(formData.cpf, searchPatientsOfflineSafe)) {
+          formData.cpf = '';
+          toast.warning(CPF_ALREADY_REGISTERED_STRIP_MESSAGE, {
+            autoClose: 8000,
+            toastId: 'cpf-strip-submit',
           });
-          setErrors((prev) => ({
-            ...prev,
-            cpf: CPF_IDENTITY_CONFLICT_MESSAGE,
-          }));
-          setExpandedSections((prev) => ({
-            ...prev,
-            identificacao: true,
-          }));
-          return false;
         }
 
-        if (lookupResult.matchedBy) {
-          console.log(`✅ Paciente encontrado por estratégia: ${lookupResult.matchedBy}`, {
-            id: pacienteExistente?.idpaciente,
-            source: pacienteExistente?.source
-          });
-        } else {
-          console.log("❌ Nenhum paciente correspondente encontrado nas estratégias de associação");
-        }
+        const novoPaciente: any = buildPatientPayloadFromForm(
+          formData,
+          { mapGestanteForApi },
+          {
+            uppercaseNome: true,
+            uppercaseNomeMae: true,
+            includeNullableClassificationIds: true
+          }
+        );
 
-        // Se encontrou paciente existente (mesma identidade), usar ele
-        if (pacienteExistente && isReusablePatientMatch(lookupResult.matchedBy)) {
-          formData.pacienteId = pacienteExistente.idpaciente;
-          console.log("✅ Paciente existente encontrado! ID:", pacienteExistente.idpaciente);
-        }
-        // Se não encontrou, criar novo paciente
-        else {
-          console.log("⚠️ Nenhum paciente similar encontrado, criando novo...");
-
-          const novoPaciente: any = buildPatientPayloadFromForm(
-            formData,
-            { mapGestanteForApi },
-            {
-              uppercaseNome: true,
-              uppercaseNomeMae: true,
-              includeNullableClassificationIds: true
-            }
-          );
-
-          const pacienteCriado = await savePatientOfflineSafe(novoPaciente, { silent: true });
-          formData.pacienteId = pacienteCriado.idpaciente;
-
-          console.log("Paciente criado automaticamente com ID:", pacienteCriado.idpaciente);
-        }
+        const pacienteCriado = await savePatientOfflineSafe(novoPaciente, { silent: true });
+        formData.pacienteId = pacienteCriado.idpaciente;
       } catch (error: any) {
         return handlePatientAutoCreateError(error);
       }
@@ -2471,7 +2429,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       dataNascimento: paciente.data_nascimento || "",
       nomeMae: paciente.nome_mae || "",
       identidadeGenero: paciente.tipo_genero?.idtipo_genero?.toString() || "",
-      gestante: paciente.gestante || "",
+      gestante: mapGestanteFromApi(paciente.gestante),
       raca: paciente.tipo_raca?.idtipo_raca?.toString() || "",
       escolaridade: paciente.escolaridade_idescolaridade?.toString() || "",
       contatoTelefonico: paciente.contato || "",
@@ -2600,9 +2558,18 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     setIsCreatingNewPatient(true);
 
     try {
-      // ✅ USAR SISTEMA OFFLINE
+      const payloadSource = { ...formData };
+      if (await cpfAlreadyRegistered(payloadSource.cpf, searchPatientsOfflineSafe)) {
+        payloadSource.cpf = '';
+        setFormData((prev) => ({ ...prev, cpf: '' }));
+        toast.warning(CPF_ALREADY_REGISTERED_STRIP_MESSAGE, {
+          autoClose: 8000,
+          toastId: 'cpf-strip-new-patient',
+        });
+      }
+
       const novoPaciente: any = buildPatientPayloadFromForm(
-        formData,
+        payloadSource,
         { mapGestanteForApi },
         {
           uppercaseNome: false,

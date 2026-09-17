@@ -14,6 +14,7 @@ import {
   formatDateWithTimezone,
 } from '@/features/notificationForms/types/index2';
 import { formatLocalDateForBackend } from './timezoneHelper';
+import { mapGestanteFromApi } from '@/features/notificationForms/utils/formUtils';
 import { getApiOrigin } from '@/config/apiOrigin';
 import axios from "axios";
 // import indexedDBService from '@/services/indexedDB'; // COMENTADO - SERÁ USADO NO FUTURO
@@ -316,7 +317,7 @@ export const formatFromBackend = async (
     cpf: backendData.paciente?.cpf || "",
     identidadeGenero:
       backendData.paciente?.tipo_genero_idtipo_genero?.toString() || "",
-    gestante: backendData.paciente?.gestante || "",   // ✅ mantém "S" ou "N" conforme veio do backend
+    gestante: mapGestanteFromApi(backendData.paciente?.gestante),
     raca: backendData.paciente?.tipo_raca_idtipo_raca?.toString() || "",
     escolaridade:
       backendData.paciente?.escolaridade_idescolaridade?.toString() || "",

@@ -34,6 +34,16 @@ export function mapGestanteForApi(gestante: string): string | null {
   return g;
 }
 
+/** Select da ficha usa 1/2 (Sim/Não). O banco grava S/N. */
+export function mapGestanteFromApi(gestante?: string | null): string {
+  const g = (gestante || "").trim();
+  if (!g) return "";
+  if (g === "1" || g === "2") return g;
+  if (g === "S" || ["T1", "T2", "T3", "TI"].includes(g)) return "1";
+  if (g === "N" || g === "NA") return "2";
+  return "";
+}
+
 /**
  * Normaliza texto removendo acentos e convertendo para caixa alta
  */
