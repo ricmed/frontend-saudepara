@@ -138,6 +138,8 @@ const ComunicacaoDaeFormPage: React.FC = () => {
   const [cievsList, setCievsList] = useState<Cievs[]>([]);
   const [crsList, setCrsList] = useState<Crs[]>([]);
   const [allowedOrigemTipos, setAllowedOrigemTipos] = useState<OrigemTipo[]>(['CRS', 'NHE', 'CIEVS']);
+  /** Quando preenchido, limita o select de origem aos IDs do CNES/escopo (não lista estadual). */
+  const [scopedOrigemIdsByTipo, setScopedOrigemIdsByTipo] = useState<Partial<Record<OrigemTipo, number[]>> | null>(null);
   const [lockOrigemSelection, setLockOrigemSelection] = useState(false);
   const [origemPreSelecionadaNome, setOrigemPreSelecionadaNome] = useState<string | null>(null);
   const [isOriginScopeInitialized, setIsOriginScopeInitialized] = useState(false);
@@ -212,12 +214,11 @@ const ComunicacaoDaeFormPage: React.FC = () => {
     }
   }, [id]);
 
+  // Alinhado ao ComunicacaoDaeScopeService: acesso total só admin / admin.estado (não admin.unidade/municipio/crs).
   const isAdminUser = useMemo(() => {
     const roles: string[] = user?.roles || [];
-    return roles.some((role) =>
-      role === 'admin' ||
-      role === 'administrator' ||
-      role.startsWith('admin.')
+    return roles.some(
+      (role) => role === 'admin' || role === 'administrator' || role === 'admin.estado',
     );
   }, [user?.roles]);
 
@@ -232,6 +233,7 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       try {
         if (isAdminUser) {
           setAllowedOrigemTipos(['CRS', 'NHE', 'CIEVS']);
+          setScopedOrigemIdsByTipo(null);
           return;
         }
 
@@ -256,13 +258,15 @@ const ComunicacaoDaeFormPage: React.FC = () => {
 
         if (nivelAcesso === 'crs' && crsId > 0) {
           const crsSelecionado = crsList.find(c => c.id_crs === crsId);
+          const resolvedCrsId = crsSelecionado?.id_crs || crsId;
           setAllowedOrigemTipos(['CRS']);
+          setScopedOrigemIdsByTipo({ CRS: [resolvedCrsId] });
           setLockOrigemSelection(true);
           setOrigemPreSelecionadaNome(crsSelecionado?.nome || `CRS ${crsId}`);
           setFormData(prev => ({
             ...prev,
             origem_tipo: 'CRS',
-            origem_id: crsSelecionado?.id_crs || crsId
+            origem_id: resolvedCrsId
           }));
           return;
         }
@@ -298,8 +302,13 @@ const ComunicacaoDaeFormPage: React.FC = () => {
         if (matches.length === 0) return;
 
         const allowed = matches.map(m => m.tipo);
+        const scopedIds: Partial<Record<OrigemTipo, number[]>> = {};
+        for (const match of matches) {
+          scopedIds[match.tipo] = [...(scopedIds[match.tipo] || []), match.id];
+        }
         const firstMatch = matches[0];
         setAllowedOrigemTipos(allowed);
+        setScopedOrigemIdsByTipo(scopedIds);
         setOrigemPreSelecionadaNome(firstMatch.nome);
         setFormData(prev => ({
           ...prev,
@@ -855,32 +864,45 @@ const ComunicacaoDaeFormPage: React.FC = () => {
       return [];
     }
 
-    let options: any[] = [];
+    let options: Array<{ id_crs?: number; id_nhe?: number; id_cievs?: number; nome: string }> = [];
     switch (formData.origem_tipo) {
-      case 'CRS': 
+      case 'CRS':
         options = [...crsList];
         break;
-      case 'NHE': 
+      case 'NHE':
         options = [...nhes];
         break;
-      case 'CIEVS': 
+      case 'CIEVS':
         options = [...cievsList];
         break;
-      default: 
+      default:
         return [];
     }
-    
+
+    const scopedIds = scopedOrigemIdsByTipo?.[formData.origem_tipo];
+    if (scopedIds && scopedIds.length > 0) {
+      options = options.filter((item) => {
+        const id =
+          formData.origem_tipo === 'CRS'
+            ? item.id_crs
+            : formData.origem_tipo === 'NHE'
+              ? item.id_nhe
+              : item.id_cievs;
+        return typeof id === 'number' && scopedIds.includes(id);
+      });
+    }
+
     // Ordenar numericamente extraindo números do nome
     return options.sort((a, b) => {
       // Extrai o primeiro número do nome (ex: "1º CRS" -> 1, "10º CRS" -> 10)
       const numA = parseInt(a.nome.match(/\d+/)?.[0] || '0');
       const numB = parseInt(b.nome.match(/\d+/)?.[0] || '0');
-      
+
       // Se ambos têm números, ordenar por número
       if (numA && numB) {
         return numA - numB;
       }
-      
+
       // Se não têm números, ordenar alfabeticamente
       return a.nome.localeCompare(b.nome, 'pt-BR');
     });
