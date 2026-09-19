@@ -20,7 +20,8 @@ import {
   Users,
   Shield,
   Zap,
-  FileText
+  FileText,
+  Pencil
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { offlineDataManager } from '@/services/offlineDataManager';
@@ -143,7 +144,7 @@ const OfflineManagementPage: React.FC = () => {
       });
       
       // ✅ NOVO: Carregar lista detalhada de notificações pendentes
-      const pendingNotifs = await indexedDBService.getPendingNotificacoes();
+      const pendingNotifs = await indexedDBService.getOfflineQueueNotificacoes();
       setPendingNotifications(pendingNotifs);
     } catch (error) {
       console.error('Erro ao carregar dados pendentes:', error);
@@ -205,7 +206,7 @@ const OfflineManagementPage: React.FC = () => {
   const loadNotificationsStats = async () => {
     try {
       const cached = await offlineDataManager.getNotificacoesFromCache();
-      const pending = await indexedDBService.getPendingNotificacoes();
+      const pending = await indexedDBService.getOfflineQueueNotificacoes();
       
       setNotificationsStats({
         cached: cached.length,
@@ -1637,11 +1638,17 @@ const OfflineManagementPage: React.FC = () => {
                     📋 Notificações Pendentes de Sincronização
                   </h3>
                   <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {pendingNotifications.map((notif: any, index: number) => (
-                      <div key={notif.offlineId || index} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
+                    {pendingNotifications.map((notif: any, index: number) => {
+                      const hasError = notif.syncStatus === 'error';
+                      const errorText =
+                        notif.errorInfo?.lastError ||
+                        notif.errorInfo?.message ||
+                        null;
+                      return (
+                      <div key={notif.offlineId || index} className={`bg-white p-4 rounded-lg border shadow-sm hover:shadow-md transition-shadow ${hasError ? 'border-red-300' : 'border-gray-200'}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
                               <span className="text-sm font-medium text-gray-900">
                                 #{index + 1} -{' '}
                                 {notif.formData?.paciente ||
@@ -1649,9 +1656,15 @@ const OfflineManagementPage: React.FC = () => {
                                   notif.formData?.eventoNome ||
                                   'Notificação'}
                               </span>
-                              <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">
-                                Offline
-                              </span>
+                              {hasError ? (
+                                <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">
+                                  Erro de sync
+                                </span>
+                              ) : (
+                                <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">
+                                  Offline
+                                </span>
+                              )}
                             </div>
                             <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
                               <div>
@@ -1675,11 +1688,31 @@ const OfflineManagementPage: React.FC = () => {
                                   <strong>Paciente:</strong> {notif.formData.paciente}
                                 </div>
                               )}
+                              {hasError && errorText && (
+                                <div className="col-span-2 text-red-700">
+                                  <strong>Erro:</strong> {errorText}
+                                </div>
+                              )}
                             </div>
                           </div>
+                          {notif.offlineId && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                navigate(
+                                  `/private/comunicacao-de-caso/corrigir/${encodeURIComponent(notif.offlineId)}`
+                                )
+                              }
+                              className="shrink-0 inline-flex items-center gap-1 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            >
+                              <Pencil className="h-4 w-4" />
+                              Corrigir
+                            </button>
+                          )}
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}

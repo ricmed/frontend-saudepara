@@ -453,6 +453,10 @@ export const getPrivateAppRoutes = () => {
             element={<ComunicacaoCasoPrintPage />}
           />
           <Route
+            path="/private/comunicacao-de-caso/corrigir/:offlineId"
+            element={<NotificationForm />}
+          />
+          <Route
             path="/private/comunicacao-de-caso/editar/:id"
             element={<NotificationForm />}
           />

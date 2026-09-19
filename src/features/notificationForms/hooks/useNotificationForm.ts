@@ -222,6 +222,11 @@ const PATIENT_CREATE_ERROR_FIELD_MAP: Record<string, string> = {
   nome: "paciente",
   cpf: "cpf",
   data_nascimento: "dataNascimento",
+  nome_mae: "nomeMae",
+  tipo_genero_idtipo_genero: "identidadeGenero",
+  tipo_raca_idtipo_raca: "raca",
+  escolaridade_idescolaridade: "escolaridade",
+  contato: "contatoTelefonico",
 };
 
 const NOTIFICATION_SAVE_ERROR_FIELD_MAP: Record<string, string> = {
@@ -239,7 +244,11 @@ const NOTIFICATION_SAVE_ERROR_FIELD_MAP: Record<string, string> = {
   tipo_encerramento_idtipo_encerramento: "tipoEncerramento",
 };
 
-export const useNotificationForm = (isEditMode: boolean = false, id?: string) => {
+export const useNotificationForm = (
+  isEditMode: boolean = false,
+  id?: string,
+  offlineId?: string,
+) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
@@ -278,7 +287,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
   useEffect(() => {
     const generateOfflineId = async () => {
       // Só gerar offline_id se for nova notificação (não edição) e ainda não tiver
-      if (!isEditMode && !(formData as any).offline_id) {
+      if (!isEditMode && !offlineId && !(formData as any).offline_id) {
         const offlineId = await deviceIdService.generateOfflineId();
         console.log(`🆔 [FORM] Gerando offline_id único para nova notificação: ${offlineId}`);
         setFormData(prev => ({
@@ -289,7 +298,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     };
     
     generateOfflineId();
-  }, [isEditMode]); // Executar apenas uma vez ao montar o componente
+  }, [isEditMode, offlineId]);
   
   // Estado para controle de carregamento e erros da API
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -1311,49 +1320,98 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
   // ✅ =================================================================
   // ✅ FUNÇÃO DE CARREGAMENTO DA NOTIFICAÇÃO (CORRIGIDA)
   // ✅ =================================================================
-  const loadNotificacao = useCallback(async (notificacaoId: string) => {
+  const applyLoadedFormData = useCallback(async (dadosFormatados: any) => {
+    setOriginalCpf(dadosFormatados?.cpf || "");
+
+    const estabelecimentoId = dadosFormatados?.estabelecimentoNotificadora;
+    if (estabelecimentoId) {
+      await loadRemainingOptions(estabelecimentoId);
+    }
+
+    if (dadosFormatados?.uf) {
+      await loadMunicipiosByEstado(dadosFormatados.uf);
+    }
+
+    setFormData(dadosFormatados);
+  }, [loadMunicipiosByEstado, loadRemainingOptions]);
+
+  const loadNotificacao = useCallback(async (notificacaoId?: string, localOfflineId?: string) => {
     setIsLoading(true);
     try {
+      const offlineKey = localOfflineId || offlineId;
+      if (offlineKey) {
+        const record = await indexedDBService.getNotificacaoRecordByOfflineId(offlineKey);
+        const localForm = record?.formData;
+        if (!localForm) {
+          throw new Error('Ficha offline não encontrada neste aparelho');
+        }
+        await applyLoadedFormData({
+          ...localForm,
+          offline_id: record.offlineId || offlineKey,
+          id: record.id,
+          idnotificacao: record.id,
+        });
+        const errorText =
+          record.errorInfo?.lastError ||
+          record.errorInfo?.message ||
+          null;
+        if (errorText) {
+          setApiError(errorText);
+        }
+        if (record.errorInfo?.errors) {
+          const mappedErrors = {
+            ...mapBackendValidationErrors(
+              record.errorInfo.errors,
+              PATIENT_CREATE_ERROR_FIELD_MAP,
+            ),
+            ...mapBackendValidationErrors(
+              record.errorInfo.errors,
+              NOTIFICATION_SAVE_ERROR_FIELD_MAP,
+            ),
+          };
+          if (Object.keys(mappedErrors).length > 0) {
+            setErrors((prev) => ({ ...prev, ...mappedErrors }));
+            sectionExpansion.expandSectionsWithErrors(mappedErrors);
+          }
+        } else if (errorText && /genero|gênero|tipo_genero/i.test(String(errorText))) {
+          setErrors((prev) => ({
+            ...prev,
+            identidadeGenero: prev.identidadeGenero || 'A Identidade de Gênero é obrigatória',
+          }));
+          setExpandedSections((prev) => ({ ...prev, identificacao: true }));
+        }
+        return;
+      }
+
       console.log("[HOOK] Carregando notificação ID:", notificacaoId);
-      
-      const dadosFormatados = await NotificacaoService.getById(notificacaoId);
+      const numericId = notificacaoId != null ? Number(notificacaoId) : NaN;
+      if (Number.isFinite(numericId) && numericId <= 0) {
+        const localForm = await indexedDBService.getNotificacao(numericId);
+        if (localForm) {
+          await applyLoadedFormData({
+            ...localForm,
+            id: numericId,
+            idnotificacao: numericId,
+          });
+          return;
+        }
+      }
+
+      const dadosFormatados = await NotificacaoService.getById(notificacaoId!);
       
       if (dadosFormatados) {
-        console.log("[HOOK] Arquivos carregados:", (dadosFormatados as any)?.arquivos?.length || 0);
-        
-        // 2. Armazena o CPF original para validações futuras.
-        setOriginalCpf((dadosFormatados as any)?.cpf || "");
-
-        // ✅ IMPORTANTE: Recarregar estabelecimentos incluindo o atual (mesmo se inativo)
-        const estabelecimentoId = (dadosFormatados as any)?.estabelecimentoNotificadora;
-        if (estabelecimentoId) {
-          console.log(`🏥 Recarregando estabelecimentos incluindo ID ${estabelecimentoId} (pode estar inativo)`);
-          await loadRemainingOptions(estabelecimentoId);
-        }
-
-        // 3. CORREÇÃO: Carrega municípios ANTES de definir os dados no formulário
-        // para evitar problema visual de cidade não carregando em edição
-        if ((dadosFormatados as any)?.uf) {
-          console.log(`[HOOK] Carregando municípios para UF ${(dadosFormatados as any).uf} antes de definir formData`);
-          await loadMunicipiosByEstado((dadosFormatados as any).uf);
-        }
-        
-        // 4. Define os dados no formulário APÓS carregar municípios
-        // A lógica de arquivos já foi tratada no adapter.
-        setFormData(dadosFormatados as any);
-        
-        console.log("[HOOK] FormData atualizado com dados da notificação");
+        await applyLoadedFormData(dadosFormatados);
       }
     } catch (error: any) {
       console.error("Falha ao carregar notificação", {
         status: error?.response?.status,
       });
       toast.error("Erro ao carregar dados da notificação");
-      navigate("/private/comunicacao-de-caso");
+      navigate(offlineId ? "/private/offline-management" : "/private/comunicacao-de-caso");
     } finally {
       setIsLoading(false);
     }
-  }, [navigate, loadMunicipiosByEstado, loadRemainingOptions]);
+  }, [applyLoadedFormData, navigate, offlineId]);
 
   const handlePatientAutoCreateError = useCallback(async (error: any): Promise<boolean> => {
     console.error("Falha ao criar paciente automaticamente", {
@@ -1490,9 +1548,10 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
   const persistNotificationAndHandleSuccess = useCallback(
     async (dataForBackend: Record<string, any>) => {
       const numericId = id != null ? Number(id) : NaN;
-      // Ficha ainda só local (ID temp ≤ 0): atualiza IndexedDB pelo offline_id, sem PUT no servidor.
+      // Ficha ainda só local (ID temp ≤ 0 ou correção por offlineId): atualiza IndexedDB, sem PUT.
       const isLocalPendingOnly =
-        isEditMode && (!Number.isFinite(numericId) || numericId <= 0);
+        isEditMode &&
+        (Boolean(offlineId) || !Number.isFinite(numericId) || numericId <= 0);
 
       if (isEditMode && id && !isLocalPendingOnly) {
         console.log("Editando notificação ID:", id, "via sistema offline");
@@ -1508,18 +1567,24 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
         console.log('📤 Evento de notificação editada disparado');
       } else if (isLocalPendingOnly) {
         console.log("Atualizando ficha offline pendente (mesmo offline_id)");
+        if (dataForBackend.offline_id) {
+          await indexedDBService.retryNotificacao(dataForBackend.offline_id);
+        }
         await saveNotificationOfflineSafe(dataForBackend, false, undefined, {
           silent: true,
           localPendingOnly: true,
         });
         setIsSuccess(true);
-        toast.success("Ficha offline atualizada");
+        toast.success("Ficha corrigida. Vai sincronizar de novo.");
         setArquivosParaExcluir([]);
         emitNotificationSavedEvent({
           action: 'edit-offline-pending',
           offlineId: dataForBackend.offline_id,
           isOffline: !systemIsOnline,
         });
+        if (systemIsOnline) {
+          void syncPendingData();
+        }
       } else {
         console.log("Criando nova notificação via sistema offline");
         await saveNotificationOfflineSafe(dataForBackend, false, undefined, { silent: true });
@@ -1536,7 +1601,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       }
 
       setTimeout(() => {
-        navigate("/private/comunicacao-de-caso");
+        navigate(offlineId ? "/private/offline-management" : "/private/comunicacao-de-caso");
       }, 1500);
     },
     [
@@ -1544,7 +1609,9 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       id,
       isEditMode,
       navigate,
+      offlineId,
       saveNotificationOfflineSafe,
+      syncPendingData,
       systemIsOnline,
     ]
   );
@@ -1585,6 +1652,17 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
 
   const runPreSubmitChecks = useCallback(async (): Promise<boolean> => {
     console.log("=== INICIANDO VALIDAÇÃO DO FORMULÁRIO ===");
+
+    if (
+      generoOptions.length === 0 ||
+      racaOptions.length === 0 ||
+      eventoOptions.length === 0
+    ) {
+      toast.error(
+        'Faltam listas do formulário neste aparelho (gênero e outras). Em Gestão offline, baixe os dados e depois corrija a ficha.',
+      );
+      return false;
+    }
 
     const { isValid, errorCount } = validateForm(
       formData,
@@ -1631,11 +1709,14 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     encerramentoOptions,
     ensurePatientReadyForSubmit,
     errors,
+    eventoOptions,
     expandedSections,
     formData,
+    generoOptions,
     localidadeEventoCatalogAvailable,
     localidadeEventoOptions,
     modoLocalidadeEvento,
+    racaOptions,
   ]);
 
   const prepareNotificationPayloadForSubmit = useCallback((): Record<string, any> => {
@@ -1711,8 +1792,8 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
       }
 
       // Carregar dados da notificação se estiver em modo de edição
-      if (isEditMode && id && isMounted) {
-        loadNotificacao(id);
+      if (isEditMode && isMounted && (offlineId || id)) {
+        loadNotificacao(id, offlineId);
       }
     };
 
@@ -1721,7 +1802,7 @@ export const useNotificationForm = (isEditMode: boolean = false, id?: string) =>
     return () => {
       isMounted = false;
     };
-  }, [isEditMode, id]);
+  }, [isEditMode, id, offlineId]);
 
   // Pré-seleciona evento da query (?eventoId=) ao abrir ficha nova (CTA Sairé na home).
   useEffect(() => {

@@ -42,9 +42,13 @@ import ErrorSummary, { scrollToField } from "./components/ErrorSummary";
 // import MockDataControls from "./components/MockDataControls";
 
 const NotificationForm: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id, offlineId: offlineIdParam } = useParams<{ id: string; offlineId?: string }>();
+  const offlineId = offlineIdParam ? decodeURIComponent(offlineIdParam) : undefined;
   const navigate = useNavigate();
-  const isEditMode = !!id;
+  const isEditMode = Boolean(id || offlineId);
+  const backPath = offlineId
+    ? "/private/offline-management"
+    : "/private/comunicacao-de-caso";
   
   // Adicionar estado para controle do SideMenu
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -133,7 +137,7 @@ const NotificationForm: React.FC = () => {
     // Adicionar estas duas variáveis
     hipoteseDiagFiltradas, 
     isLoadingHipoteses,
-  } = useNotificationForm(isEditMode, id);
+  } = useNotificationForm(isEditMode, id, offlineId);
 
   const showSaireLogo = useMemo(() => {
     const selected = eventoOptions.find(
@@ -235,7 +239,7 @@ const NotificationForm: React.FC = () => {
             </button>
             
             <button
-              onClick={() => navigate("/private/comunicacao-de-caso")}
+              onClick={() => navigate(backPath)}
               className="p-2 hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
               title="Voltar"
             >
@@ -343,7 +347,7 @@ const NotificationForm: React.FC = () => {
               
               <button
                 type="button"
-                onClick={() => navigate("/private/comunicacao-de-caso")}
+                onClick={() => navigate(backPath)}
                 className="p-2 sm:w-auto sm:inline-flex sm:items-center sm:justify-center sm:gap-2 sm:px-4 sm:py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
                 title="Cancelar"
               >
@@ -575,7 +579,7 @@ const NotificationForm: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => navigate("/private/comunicacao-de-caso")}
+              onClick={() => navigate(backPath)}
               className="inline-flex items-center gap-2 px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
             >
               <X className="h-4 w-4" />

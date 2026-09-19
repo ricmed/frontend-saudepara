@@ -523,6 +523,7 @@ class SyncService {
         const pacienteIdMapping: Map<number, number> = new Map();
         
         // ✅ FILTRAR APENAS PACIENTES REALMENTE CRIADOS LOCALMENTE
+      const pacientesHeldByError = await indexedDBService.getPacienteIdsHeldByErrorNotificacoes();
       const pacientesParaSincronizar = unsyncedPacientes.filter(p => {
           const isLocalCreation = (
             p.source === 'local_creation' || 
@@ -531,9 +532,15 @@ class SyncService {
         
         if (!isLocalCreation) {
           console.log(`⚠️ Pulando paciente ${p.nome} - source: ${p.source}, não é criação local`);
+          return false;
+        }
+
+        if (pacientesHeldByError.has(p.idpaciente)) {
+          console.log(`⏸️ Paciente local ${p.idpaciente} fica no aparelho: a ficha ainda está com erro de sync`);
+          return false;
         }
         
-        return isLocalCreation;
+        return true;
       });
       pacientesParaSincronizar.sort((a, b) => this.getSyncTimestamp(a) - this.getSyncTimestamp(b));
       
@@ -960,16 +967,19 @@ class SyncService {
               errorCount++;
             }
           } else if (isInvalidData) {
-            // ✅ VALIDAÇÃO: erro orientado ao usuário para correção manual
-            const validationMessage = 'Erro de validação (422). Edite os dados e tente novamente.';
+            const validationMessage =
+              error?.response?.data?.message ||
+              error?.message ||
+              'Erro de validação. Corrija a ficha e sincronize de novo.';
             await indexedDBService.markNotificacaoAsError(offlineId, validationMessage, {
               status: statusCode,
-              message: error?.message,
+              message: validationMessage,
+              errors: error?.response?.data?.errors,
               timestamp: Date.now(),
               notificationId: id,
               offlineId: offlineId
             });
-            toast.warning(`Notificação ${offlineId} com dados inválidos. Abra, corrija e reenvie.`, {
+            toast.warning('Ficha com dado obrigatório faltando. Corrija em Gestão offline.', {
               autoClose: 12000,
               toastId: `sync-validation-${offlineId}`
             });

@@ -1112,6 +1112,7 @@ export class IndexedDBService {
     try {
       const pendingNotificacoes = await this.getPendingNotificacoes();
       const errorNotificacoes = await this.getErrorNotificacoes();
+      const heldByError = await this.getPacienteIdsHeldByErrorNotificacoes();
       
       // ✅ IMPORTANTE: Apenas pacientes com source = 'local_creation'
       let unsyncedPacientes: any[] = [];
@@ -1120,8 +1121,9 @@ export class IndexedDBService {
         
         // ✅ Filtrar apenas os criados localmente
         unsyncedPacientes = allLocalPatients.filter(p => 
-          p.source === 'local_creation' || 
-          (p.synced === 'false' && !p.source) // Compatibilidade com dados antigos
+          (p.source === 'local_creation' || 
+          (p.synced === 'false' && !p.source)) &&
+          !heldByError.has(p.idpaciente)
         );
         
       } catch (error) {
@@ -1129,7 +1131,8 @@ export class IndexedDBService {
         const allPacientes = await this.db!.getAll('pacientes');
         unsyncedPacientes = allPacientes.filter(p => 
           (p.synced === 'false' || p.synced === false || p.synced === undefined) &&
-          (p.source === 'local_creation' || !p.source) // Apenas criados localmente
+          (p.source === 'local_creation' || !p.source) &&
+          !heldByError.has(p.idpaciente)
         );
       }
 
@@ -1352,6 +1355,11 @@ export class IndexedDBService {
     return notificacao ? notificacao.formData : null;
   }
 
+  async getNotificacaoRecordByOfflineId(offlineId: string): Promise<any | null> {
+    await this.init();
+    return (await this.db!.get('notificacoes', offlineId)) || null;
+  }
+
   /**
    * Pendente de sync = ainda não está no servidor de forma confiável.
    * Aceita `sincronizado` boolean ou string (legado) e recupera falsos
@@ -1393,8 +1401,66 @@ export class IndexedDBService {
       return false;
     }
 
-    // false | 'false' | undefined | pending | syncing | error
+    // Erro fica no aparelho; não entra de novo na fila automática
+    if (item.syncStatus === 'error') {
+      return false;
+    }
+
+    // false | 'false' | undefined | pending | syncing
     return true;
+  }
+
+  private collectPacienteIdsFromNotificacoes(
+    items: Array<{ formData?: { pacienteId?: unknown; paciente_idpaciente?: unknown } }>,
+  ): Set<number> {
+    const ids = new Set<number>();
+    for (const item of items) {
+      const raw = item.formData?.pacienteId ?? item.formData?.paciente_idpaciente;
+      const n = Number(raw);
+      if (Number.isFinite(n) && n !== 0) {
+        ids.add(n);
+      }
+    }
+    return ids;
+  }
+
+  async getPacienteIdsHeldByErrorNotificacoes(): Promise<Set<number>> {
+    const errors = await this.getErrorNotificacoes();
+    const pending = await this.getPendingNotificacoes();
+    const errorIds = this.collectPacienteIdsFromNotificacoes(errors);
+    const pendingIds = this.collectPacienteIdsFromNotificacoes(pending);
+    const held = new Set<number>();
+    errorIds.forEach((id) => {
+      if (!pendingIds.has(id)) held.add(id);
+    });
+    return held;
+  }
+
+  async getOfflineQueueNotificacoes(): Promise<Array<{
+    id: number;
+    formData: FormData;
+    offlineId: string;
+    deviceId?: string;
+    timestamp?: number;
+    isEdit?: boolean;
+    syncStatus?: string;
+    errorInfo?: any;
+  }>> {
+    const pending = await this.getPendingNotificacoes();
+    const errors = await this.getErrorNotificacoes();
+    const byOfflineId = new Map<string, any>();
+    for (const item of pending) {
+      byOfflineId.set(item.offlineId, item);
+    }
+    for (const item of errors) {
+      byOfflineId.set(item.offlineId, {
+        ...item,
+        syncStatus: 'error',
+      });
+    }
+    return Array.from(byOfflineId.values()).sort(
+      (a, b) => (b.timestamp || 0) - (a.timestamp || 0),
+    );
   }
 
   async getPendingNotificacoes(): Promise<Array<{ id: number; formData: FormData; offlineId: string; deviceId: string; timestamp?: number; isEdit?: boolean }>> {
@@ -1438,7 +1504,9 @@ export class IndexedDBService {
       offlineId: item.offlineId,
       deviceId: item.deviceId,
       timestamp: item.timestamp,
-      isEdit: item.isEdit
+      isEdit: item.isEdit,
+      syncStatus: (item as any).syncStatus || 'pending',
+      errorInfo: (item as any).errorInfo,
     }));
   }
 
@@ -1561,13 +1629,19 @@ export class IndexedDBService {
   }
 
   // ✅ NOVO: Obter notificações com erro
-  async getErrorNotificacoes(): Promise<Array<{ id: number, formData: FormData, errorInfo: any }>> {
+  async getErrorNotificacoes(): Promise<Array<{ id: number, formData: FormData, errorInfo: any, offlineId: string }>> {
     await this.init();
-    const errorNotificacoes = await this.db!.getAllFromIndex('notificacoes', 'by-sync-status', 'error');
+    const allNotificacoes = await this.db!.getAll('notificacoes');
+    const errorNotificacoes = allNotificacoes.filter((item) => item.syncStatus === 'error');
     return errorNotificacoes.map(item => ({ 
       id: item.id as number, 
       formData: item.formData,
-      errorInfo: item.errorInfo
+      errorInfo: item.errorInfo,
+      offlineId: item.offlineId,
+      deviceId: item.deviceId,
+      timestamp: item.timestamp,
+      isEdit: item.isEdit,
+      syncStatus: 'error' as const,
     }));
   }
   async markPacienteAsSynced(idpaciente: number, serverId?: number): Promise<void> {
