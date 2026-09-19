@@ -7,6 +7,10 @@ import { EstabelecimentoFormService } from '@/services/EstabelecimentoFormServic
 import { NotificacaoService } from '@/services/NotificacaoService';
 import { salvarNotificacaoCompleta } from '@/utils/notificacaoAdapter';
 import { mapGestanteForApi } from '@/features/notificationForms/utils/formUtils';
+import {
+  applyFormClassificationsToPatient,
+  buildPatientPayloadFromForm,
+} from '@/features/notificationForms/utils/patientPayloadHelpers';
 import { toast } from 'react-toastify';
 import { convertLocalDateTimeToUTC } from '@/utils/timezoneUtils';
 import axios from '@/utils/axiosRetry';
@@ -520,7 +524,13 @@ class SyncService {
 
         // ===== 1. SINCRONIZAR APENAS PACIENTES CRIADOS LOCALMENTE =====
         const unsyncedPacientes = await indexedDBService.getUnsyncedPacientes();
+        const fichasLocais = await indexedDBService.getOfflineQueueNotificacoes();
         const pacienteIdMapping: Map<number, number> = new Map();
+        const formDataForLocalPatient = (localPatientId: number) =>
+          fichasLocais.find((ficha) => {
+            const pid = ficha.formData?.pacienteId ?? (ficha.formData as any)?.paciente_idpaciente;
+            return Number(pid) === Number(localPatientId);
+          })?.formData;
         
         // ✅ FILTRAR APENAS PACIENTES REALMENTE CRIADOS LOCALMENTE
       const pacientesHeldByError = await indexedDBService.getPacienteIdsHeldByErrorNotificacoes();
@@ -551,12 +561,16 @@ class SyncService {
           console.log(`👤 Sincronizando paciente local ID ${paciente.idpaciente}`);
 
           const { idpaciente, synced, savedAt, syncedAt, savedOffline, source, ...pacienteData } = paciente;
+          const pacienteParaEnviar = applyFormClassificationsToPatient(
+            pacienteData,
+            formDataForLocalPatient(idpaciente),
+          );
 
-          if (await cpfAlreadyRegistered(pacienteData.cpf, searchPatientsForSync)) {
-            pacienteData.cpf = null;
+          if (await cpfAlreadyRegistered(pacienteParaEnviar.cpf, searchPatientsForSync)) {
+            pacienteParaEnviar.cpf = null;
           }
 
-          const result = await PacienteService.create(pacienteData);
+          const result = await PacienteService.create(pacienteParaEnviar);
           const newPatientId = result.idpaciente;
 
           if (!newPatientId) {
@@ -579,8 +593,11 @@ class SyncService {
           if (maybeCpfError && paciente.cpf) {
             try {
               const { idpaciente, synced, savedAt, syncedAt, savedOffline, source, ...retryData } = paciente;
-              retryData.cpf = null;
-              const retryResult = await PacienteService.create(retryData);
+              const retryPayload = applyFormClassificationsToPatient(
+                { ...retryData, cpf: null },
+                formDataForLocalPatient(idpaciente),
+              );
+              const retryResult = await PacienteService.create(retryPayload);
               if (!retryResult.idpaciente) {
                 throw new Error('Servidor não retornou ID válido');
               }
@@ -863,12 +880,12 @@ class SyncService {
             }
 
             const createdPatient = await PacienteService.create({
-              nome: formDataAtualizada.paciente,
+              ...buildPatientPayloadFromForm(
+                formDataAtualizada as any,
+                { mapGestanteForApi },
+                { includeNullableClassificationIds: true },
+              ),
               cpf: cpfToSend,
-              data_nascimento: formDataAtualizada.dataNascimento || null,
-              nome_mae: formDataAtualizada.nomeMae || '',
-              contato: formDataAtualizada.contatoTelefonico || '',
-              gestante: mapGestanteForApi(formDataAtualizada.gestante || ''),
             });
 
             if (!createdPatient?.idpaciente) {
@@ -1237,7 +1254,10 @@ class SyncService {
   ): Promise<any> {
     const silent = options?.silent === true;
     await this.checkAuthenticationStatus();
-    if (this.shouldUseOnlineMode()) {
+    const incomingId = Number(pacienteData?.idpaciente);
+    const keepLocalId = Number.isFinite(incomingId) && incomingId < 0;
+
+    if (this.shouldUseOnlineMode() && !keepLocalId) {
       try {
         const payload = { ...pacienteData };
         if (await cpfAlreadyRegistered(payload.cpf, searchPatientsForSync)) {
@@ -1266,8 +1286,9 @@ class SyncService {
       }
     }
 
-    // ✅ ID TEMPORÁRIO ÚNICO BASEADO EM TIMESTAMP + RANDOM
-    const tempId = -(Date.now() + Math.floor(Math.random() * 1000));
+    const tempId = keepLocalId
+      ? incomingId
+      : -(Date.now() + Math.floor(Math.random() * 1000));
     const pacienteComId = { 
       ...pacienteData, 
       idpaciente: tempId,

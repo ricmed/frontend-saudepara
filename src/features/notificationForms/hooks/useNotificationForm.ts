@@ -65,6 +65,7 @@ import {
 } from '../utils/formUtils';
 import {
   normalizeOptionLabels,
+  normalizeGeneroOptions,
   orderOptionsByPriorityIncludes
 } from '../utils/optionHelpers';
 import {
@@ -853,7 +854,7 @@ export const useNotificationForm = (
           "Homem transgênero", "Travesti", "Não binário", "Não se aplica", "Ignorado"
         ].map((item) => normalizeText(item));
 
-        const generosUpperCase = normalizeOptionLabels(generos, { includeNome: true });
+        const generosUpperCase = normalizeGeneroOptions(generos);
         const generosOrdenados = [...generosUpperCase].sort((a, b) => {
           const posA = ordenacaoGenero.findIndex((item) => a.descricao.includes(item));
           const posB = ordenacaoGenero.findIndex((item) => b.descricao.includes(item));
@@ -1065,7 +1066,7 @@ export const useNotificationForm = (
         "Ignorado",
       ].map((item) => normalizeText(item));
 
-      const generosUpperCase = normalizeOptionLabels(generos, { includeNome: true });
+      const generosUpperCase = normalizeGeneroOptions(generos);
       const generosOrdenados = [...generosUpperCase].sort((a, b) => {
         const posA = ordenacaoGenero.findIndex((item) => a.descricao.includes(item));
         const posB = ordenacaoGenero.findIndex((item) => b.descricao.includes(item));
@@ -1507,13 +1508,17 @@ export const useNotificationForm = (
         );
 
         const canUseOnline = await syncService.canUseOnlineMode();
-        if (canUseOnline && isEditMode) {
+        const isLocalTempPatient = Number(formData.pacienteId) < 0;
+        if (canUseOnline && isEditMode && !isLocalTempPatient) {
           await PacienteService.update(formData.pacienteId, pacienteData);
         } else {
-          await syncService.savePaciente(
+          const saved = await syncService.savePaciente(
             { ...pacienteData, idpaciente: formData.pacienteId },
             { silent: true },
           );
+          if (saved?.idpaciente) {
+            formData.pacienteId = saved.idpaciente;
+          }
         }
 
         console.log("Dados do paciente atualizados com sucesso!");

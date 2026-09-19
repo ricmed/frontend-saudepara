@@ -22,6 +22,18 @@ export const normalizeOptionLabels = <T extends Record<string, any>>(
   });
 };
 
+export const normalizeGeneroOptions = <T extends Record<string, any>>(
+  options: T[] | undefined | null,
+): Array<T & { idtipo_genero: number; descricao: string }> => {
+  return normalizeOptionLabels(options, { includeNome: true })
+    .map((option) => {
+      const id = Number(option.idtipo_genero ?? option.id ?? option.value);
+      const descricao = String(option.descricao || option.label || option.nome || '');
+      return { ...option, idtipo_genero: id, descricao };
+    })
+    .filter((option) => Number.isFinite(option.idtipo_genero) && option.descricao);
+};
+
 export const orderOptionsByPriorityIncludes = <T extends { descricao: string }>(
   options: T[],
   priorities: string[]
