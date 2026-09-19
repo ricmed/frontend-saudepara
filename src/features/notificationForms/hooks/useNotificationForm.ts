@@ -368,6 +368,7 @@ export const useNotificationForm = (
     );
   const localidadeEventoSelectedRef = useRef(formData.localidadeEvento);
   const localidadeEventoAtualRef = useRef(formData.localidadeEventoAtual);
+  const savingLockRef = useRef(false);
   localidadeEventoSelectedRef.current = formData.localidadeEvento;
   localidadeEventoAtualRef.current = formData.localidadeEventoAtual;
 
@@ -1740,37 +1741,33 @@ export const useNotificationForm = (
     return dataForBackend;
   }, [arquivosParaExcluir, formData]);
 
-  const submitNotification = useCallback(async () => {
-    setIsSaving(true);
-    try {
-      console.log("Iniciando salvamento da notificação...");
-      const dataForBackend = prepareNotificationPayloadForSubmit();
-      await persistNotificationAndHandleSuccess(dataForBackend);
-    } catch (error: any) {
-      handleNotificationSaveError(error);
-    } finally {
-      setIsSaving(false);
-    }
-  }, [
-    handleNotificationSaveError,
-    persistNotificationAndHandleSuccess,
-    prepareNotificationPayloadForSubmit,
-  ]);
-
-  // ✅ FUNÇÃO MODIFICADA PARA SUBMETER O FORMULÁRIO (COM SISTEMA OFFLINE)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Limpar estados de feedback
+    if (savingLockRef.current) {
+      return;
+    }
+    savingLockRef.current = true;
+    setIsSaving(true);
     setApiError(null);
     setIsSuccess(false);
 
-    const canSubmit = await runPreSubmitChecks();
-    if (!canSubmit) {
-      return;
+    let saved = false;
+    try {
+      const canSubmit = await runPreSubmitChecks();
+      if (!canSubmit) {
+        return;
+      }
+      const dataForBackend = prepareNotificationPayloadForSubmit();
+      await persistNotificationAndHandleSuccess(dataForBackend);
+      saved = true;
+    } catch (error: any) {
+      handleNotificationSaveError(error);
+    } finally {
+      if (!saved) {
+        savingLockRef.current = false;
+        setIsSaving(false);
+      }
     }
-
-    await submitNotification();
   };
 
   // Efeitos
