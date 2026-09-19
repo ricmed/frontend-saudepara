@@ -346,7 +346,7 @@ describe('localidade do evento', () => {
     ).toEqual({});
   });
 
-  it('ESTRANGEIRO em evento OBRIGATORIA não exige localidade', () => {
+  it('ESTRANGEIRO em evento OBRIGATORIA exige localidade', () => {
     expect(
       validateLocalidadeEvento(
         { ...form, residenteBelem: '3', paisProcedencia: '32' },
@@ -355,8 +355,8 @@ describe('localidade do evento', () => {
           options: [outro, naoInformado],
           catalogAvailable: true,
         },
-      ),
-    ).toEqual({});
+      ).localidadeEvento,
+    ).toMatch(/obrigatória/i);
   });
 
   it('respeita os três modos e bloqueia catálogo obrigatório ausente', () => {

@@ -14,6 +14,7 @@ import PhoneInput from "@/features/notificationForms/components/BrazilianPhoneIn
 import LocalidadeEventoField from "./LocalidadeEventoField";
 import {
   getResidentePerguntaLabel,
+  residenteUsaLocalidadeEvento,
   usaLocalidadeEvento,
 } from "@/features/notificationForms/utils/procedenciaResidencia";
 
@@ -91,7 +92,7 @@ const PersonOriginSection: React.FC<PersonOriginSectionProps> = ({
               ]}
             />
 
-            {usaLocalidade && formData.residenteBelem === "1" && (
+            {usaLocalidade && residenteUsaLocalidadeEvento(formData.residenteBelem) && (
               <LocalidadeEventoField
                 formData={formData}
                 errors={errors}

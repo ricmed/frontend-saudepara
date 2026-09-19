@@ -85,6 +85,34 @@ describe('PersonOriginSection — modo do evento', () => {
     expect(screen.queryByText('Bairro de Belém')).toBeNull();
   });
 
+  it('ESTRANGEIRO no Sairé mostra localidade e país', () => {
+    render(
+      <PersonOriginSection
+        {...sectionProps}
+        formData={{ ...baseForm, residenteBelem: '3', paisProcedencia: '32' }}
+        modoLocalidadeEvento="OBRIGATORIA"
+        localidadeEventoOptions={[
+          {
+            id: 1,
+            nome: 'Centro',
+            tipo: 'BAIRRO',
+            especial: 'NORMAL',
+            ribeirinha: false,
+            latitude: null,
+            longitude: null,
+            exibir_mapa: false,
+            ativo: true,
+            ordem: 1,
+          },
+        ]}
+        localidadeEventoCatalogAvailable
+      />,
+    );
+
+    expect(screen.getByText(/Localidade no evento/i)).toBeTruthy();
+    expect(screen.getByText('País de Procedência')).toBeTruthy();
+  });
+
   it('NÃO esconde localidade e mostra município', () => {
     render(
       <PersonOriginSection

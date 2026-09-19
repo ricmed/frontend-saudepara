@@ -3,6 +3,7 @@ import {
   eventoVinculaEstabelecimentos,
   filtrarUnidadesDoEvento,
   eventoRestringeObito,
+  idEstaNaListaDoEvento,
   rotuloOpcaoObitoEvento,
   shouldRestrictEstabelecimentosPorEvento,
 } from './eventoEstabelecimentos';
@@ -44,6 +45,13 @@ describe('eventoEstabelecimentos', () => {
   it('só restringe o óbito quando o evento tem vínculos de óbito', () => {
     expect(eventoRestringeObito(false)).toBe(false);
     expect(eventoRestringeObito(true)).toBe(true);
+  });
+
+  it('confere se a unidade está na lista do evento', () => {
+    const lista = [{ idestabelecimento: 10 }, { idestabelecimento: 20 }];
+    expect(idEstaNaListaDoEvento('20', lista)).toBe(true);
+    expect(idEstaNaListaDoEvento(99, lista)).toBe(false);
+    expect(idEstaNaListaDoEvento('20', undefined)).toBe(false);
   });
 
   it('marca SVO como opção excepcional de óbito sem alterar o IML', () => {

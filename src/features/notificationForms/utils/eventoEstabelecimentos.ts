@@ -69,6 +69,17 @@ export function eventoRestringeObito(vinculaObitos: boolean): boolean {
   return vinculaObitos;
 }
 
+export function idEstaNaListaDoEvento(
+  id: string | number | null | undefined,
+  lista: Array<{ idestabelecimento: number }> | undefined,
+): boolean {
+  if (id === null || id === undefined || id === '' || !lista?.length) {
+    return false;
+  }
+  const needle = String(id);
+  return lista.some((row) => String(row.idestabelecimento) === needle);
+}
+
 export function rotuloOpcaoObitoEvento(
   nome: string,
   cnes?: string | null,

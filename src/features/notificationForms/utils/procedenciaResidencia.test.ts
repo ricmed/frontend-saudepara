@@ -7,6 +7,7 @@ import {
   getResidentePerguntaLabel,
   PARA_ESTADO_ID,
   resolveResidenciaChangeFlags,
+  residenteUsaLocalidadeEvento,
   usaLocalidadeEvento,
 } from './procedenciaResidencia';
 
@@ -21,6 +22,13 @@ describe('usaLocalidadeEvento / label', () => {
     expect(getResidentePerguntaLabel('OBRIGATORIA')).toBe(
       'Residente em Alter do Chão?',
     );
+  });
+
+  it('SIM e ESTRANGEIRO usam localidade; NÃO não usa', () => {
+    expect(residenteUsaLocalidadeEvento('1')).toBe(true);
+    expect(residenteUsaLocalidadeEvento('3')).toBe(true);
+    expect(residenteUsaLocalidadeEvento('2')).toBe(false);
+    expect(residenteUsaLocalidadeEvento('')).toBe(false);
   });
 });
 

@@ -28,7 +28,26 @@ export const extractBackendMessage = (
   error: any,
   fallbackMessage: string
 ): string => {
-  if (error?.response?.data?.message) return error.response.data.message;
-  if (error?.message) return error.message;
+  const data = error?.response?.data;
+  if (typeof data?.message === 'string' && data.message.trim()) {
+    return data.message;
+  }
+  if (typeof data?.error === 'string' && data.error.trim()) {
+    return data.error;
+  }
+  const detail =
+    data?.details?.[0]?.message ||
+    data?.errors?.[0]?.message;
+  if (typeof detail === 'string' && detail.trim()) {
+    return detail;
+  }
+  const axiosMessage = typeof error?.message === 'string' ? error.message : '';
+  if (axiosMessage && !axiosMessage.startsWith('Request failed with status code')) {
+    return axiosMessage;
+  }
+  if (error?.response?.status === 400 || error?.response?.status === 422) {
+    return 'Dado obrigatório faltando ou inválido. Confira a ficha.';
+  }
+  if (axiosMessage) return axiosMessage;
   return fallbackMessage;
 };

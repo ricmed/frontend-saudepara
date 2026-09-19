@@ -92,6 +92,7 @@ import {
   usaLocalidadeEvento,
 } from '../utils/procedenciaResidencia';
 import { resolvePrefillEventoId } from '../utils/saireEventPrefill';
+import { idEstaNaListaDoEvento } from '../utils/eventoEstabelecimentos';
 import { useSectionExpansion } from './useSectionExpansion';
 import { NotificacaoService } from '@/services/NotificacaoService';
 import { LocalidadeEventoService } from '@/services/LocalidadeEventoService';
@@ -1695,6 +1696,55 @@ export const useNotificationForm = (
       return false;
     }
 
+    // Sairé (e qualquer evento com localidade): unidades vêm do cache do evento.
+    // Círio/COP (NAO_USA) não entram aqui — o fluxo antigo permanece.
+    if (usaLocalidadeEvento(modoLocalidadeEvento) && formData.evento) {
+      const vinculoEvento = await indexedDBService.getOpcoes<{
+        vincula_estabelecimentos?: boolean;
+        data?: Array<{ idestabelecimento: number }>;
+        encaminhamentos?: Array<{ idestabelecimento: number }>;
+      }>(`estabelecimentos-evento-${formData.evento}`);
+      const notificadoras = vinculoEvento?.data ?? [];
+      const offlineSemLista =
+        typeof navigator !== 'undefined' &&
+        !navigator.onLine &&
+        notificadoras.length === 0;
+
+      if (offlineSemLista) {
+        toast.error(
+          'Falta a lista de unidades deste evento. Em Gestão offline, baixe os dados e depois salve a ficha.',
+        );
+        return false;
+      }
+
+      if (
+        notificadoras.length > 0 &&
+        formData.unidadeNotificadora &&
+        !idEstaNaListaDoEvento(formData.unidadeNotificadora, notificadoras)
+      ) {
+        setErrors((prev) => ({
+          ...prev,
+          unidadeNotificadora: 'Esta unidade não pertence à lista deste evento',
+        }));
+        toast.error('A unidade notificadora não é da lista deste evento.');
+        return false;
+      }
+
+      if (
+        isTipoEncerramento('transferido', formData.tipoEncerramento, encerramentoOptions) &&
+        (vinculoEvento?.encaminhamentos?.length ?? 0) > 0 &&
+        formData.localEncaminhamento &&
+        !idEstaNaListaDoEvento(formData.localEncaminhamento, vinculoEvento?.encaminhamentos)
+      ) {
+        setErrors((prev) => ({
+          ...prev,
+          localEncaminhamento: 'Este local não recebe transferência neste evento',
+        }));
+        toast.error('O local de encaminhamento não é da lista deste evento.');
+        return false;
+      }
+    }
+
     console.log("Validação passou. Procedendo com criação/atualização do paciente...");
 
     const arquivosError = validateArquivos(formData.arquivos || []);
@@ -1991,7 +2041,7 @@ export const useNotificationForm = (
 
       const clearLocalidade =
         usaLocalidadeEvento(modoLocalidadeEvento) &&
-        (prev.residenteBelem === '2' || prev.residenteBelem === '3') &&
+        prev.residenteBelem === '2' &&
         Boolean(
           prev.localidadeEvento ||
             prev.localidadeEventoOutro ||
@@ -2279,7 +2329,7 @@ export const useNotificationForm = (
 
         const clearLocalidade =
           usaLocalidadeEvento(modoLocalidadeEvento) &&
-          (value === '2' || value === '3') &&
+          value === '2' &&
           Boolean(
             prev.localidadeEvento ||
               prev.localidadeEventoOutro ||

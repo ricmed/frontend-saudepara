@@ -11,6 +11,7 @@ import {
   applyFormClassificationsToPatient,
   buildPatientPayloadFromForm,
 } from '@/features/notificationForms/utils/patientPayloadHelpers';
+import { extractBackendMessage } from '@/features/notificationForms/utils/backendErrorHelpers';
 import { toast } from 'react-toastify';
 import { convertLocalDateTimeToUTC } from '@/utils/timezoneUtils';
 import axios from '@/utils/axiosRetry';
@@ -984,10 +985,10 @@ class SyncService {
               errorCount++;
             }
           } else if (isInvalidData) {
-            const validationMessage =
-              error?.response?.data?.message ||
-              error?.message ||
-              'Erro de validação. Corrija a ficha e sincronize de novo.';
+            const validationMessage = extractBackendMessage(
+              error,
+              'Erro de validação. Corrija a ficha e sincronize de novo.',
+            );
             await indexedDBService.markNotificacaoAsError(offlineId, validationMessage, {
               status: statusCode,
               message: validationMessage,

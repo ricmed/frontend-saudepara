@@ -27,6 +27,11 @@ export function usaLocalidadeEvento(
   return modo === 'OPCIONAL' || modo === 'OBRIGATORIA';
 }
 
+/** SIM e ESTRANGEIRO usam o catálogo; NÃO não envia localidade. */
+export function residenteUsaLocalidadeEvento(residenteBelem?: string | null): boolean {
+  return residenteBelem === '1' || residenteBelem === '3';
+}
+
 export function getResidentePerguntaLabel(modo: ModoLocalidadeEvento): string {
   return usaLocalidadeEvento(modo)
     ? 'Residente em Alter do Chão?'

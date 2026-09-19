@@ -12,6 +12,7 @@ import type { SectionState } from '@/features/notificationForms/hooks/useSection
 import { validateCPF } from '@/utils/cpfValidator';
 import {
   getResidentePerguntaLabel,
+  residenteUsaLocalidadeEvento,
   usaLocalidadeEvento,
 } from '@/features/notificationForms/utils/procedenciaResidencia';
 import {
@@ -386,8 +387,8 @@ export const validateLocalidadeEvento = (
 ): Record<string, string> => {
  const validationErrors: Record<string, string> = {};
 
- // Localidade só se aplica a residente (SIM = "1"). NÃO ("2") e ESTRANGEIRO ("3") não usam o campo.
- if (context.modo === "NAO_USA" || formData.residenteBelem !== "1") {
+ // Localidade: SIM e ESTRANGEIRO. NÃO ("2") não envia (o servidor limpa).
+ if (context.modo === "NAO_USA" || !residenteUsaLocalidadeEvento(formData.residenteBelem)) {
    return validationErrors;
  }
 
