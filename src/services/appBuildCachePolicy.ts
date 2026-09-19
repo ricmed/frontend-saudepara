@@ -1,4 +1,8 @@
 const STORAGE_KEY = 'saudepa_app_build_id';
+const CATALOG_KEY = 'saudepa_catalog_cache_version';
+
+/** Subir só quando o formato do catálogo local ficar incompatível. */
+export const CATALOG_CACHE_VERSION = '1';
 
 /**
  * Remove entradas da Cache API (Workbox: api-tipos-cache, precache, etc.).
@@ -31,10 +35,19 @@ export async function clearRefetchableClientCaches(): Promise<void> {
   }
 }
 
+export function shouldClearCatalogsOnBuild(
+  previousCatalogVersion: string | null,
+): boolean {
+  return Boolean(
+    previousCatalogVersion && previousCatalogVersion !== CATALOG_CACHE_VERSION,
+  );
+}
+
 /**
- * Em builds de produção/preview, se o identificador do build mudou desde a última visita,
- * limpa Cache API + catálogos locais no IndexedDB — alinhado ao que você fazia manualmente
- * (unregister SW + clear site data), exceto pela fila offline.
+ * Em builds de produção/preview, se o identificador do build mudou:
+ * limpa só a Cache API do Workbox (JS/CSS).
+ * Catálogos IndexedDB (gênero, raça, evento…) só zeram se
+ * `CATALOG_CACHE_VERSION` mudar de propósito.
  */
 export async function runIndexedDbCachePolicyIfNewBuild(): Promise<void> {
   if (import.meta.env.DEV) return;
@@ -43,12 +56,25 @@ export async function runIndexedDbCachePolicyIfNewBuild(): Promise<void> {
   if (!current || typeof current !== 'string') return;
 
   const previous = localStorage.getItem(STORAGE_KEY);
-  if (previous === current) return;
+  const previousCatalogVersion = localStorage.getItem(CATALOG_KEY);
+  const catalogNeedsClear = shouldClearCatalogsOnBuild(previousCatalogVersion);
+
+  if (previous === current && !catalogNeedsClear) {
+    if (!previousCatalogVersion) {
+      localStorage.setItem(CATALOG_KEY, CATALOG_CACHE_VERSION);
+    }
+    return;
+  }
 
   try {
-    await clearRefetchableClientCaches();
+    await clearWorkboxRuntimeCaches();
+    if (catalogNeedsClear) {
+      const { default: indexedDBService } = await import('@/services/indexedDB');
+      await indexedDBService.clearRefetchableCachesOnly();
+    }
     localStorage.setItem(STORAGE_KEY, current);
-    console.info('[app-build] Caches do cliente alinhados à versão:', current);
+    localStorage.setItem(CATALOG_KEY, CATALOG_CACHE_VERSION);
+    console.info('[app-build] Cache API alinhado à versão:', current);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('cache-updated'));
     }
