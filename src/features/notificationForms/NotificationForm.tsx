@@ -17,7 +17,9 @@ import ModalBuscaPaciente from "@/features/paginaPacientesComu/components/ModalB
 import { SideMenu } from "@/features/home/components/SideMenu";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import { SAIRE_LOGO_FULL_PNG } from "@/features/home/components/SaireLogo";
+import { CIRIO_LOGO_PNG } from "@/features/home/components/CirioLogo";
 import { isSaireEventDescription } from "./utils/saireEventPrefill";
+import { isCirioEventDescription } from "./utils/cirioEvento";
 import { useAppInterruptores } from "@/features/apps/AppInterruptorProvider";
 import { prepareDataForExport } from "./components/exportUtilities";
 import { toPrintDataMap } from "./utils/caseFichaLayout";
@@ -162,6 +164,13 @@ const NotificationForm: React.FC = () => {
     return isSaireEventDescription(selected?.descricao);
   }, [eventoOptions, formData.evento, paletaSaireLigada]);
 
+  const showCirioLogo = useMemo(() => {
+    const selected = eventoOptions.find(
+      (option) => option.idtipo_evento.toString() === formData.evento,
+    );
+    return isCirioEventDescription(selected?.descricao);
+  }, [eventoOptions, formData.evento]);
+
   useEffect(() => {
     return () => {
       printRelayCleanupRef.current?.();
@@ -182,6 +191,7 @@ const NotificationForm: React.FC = () => {
         data: toPrintDataMap(exportData as Record<string, unknown>),
         modoLocalidadeEvento: modoLocalidadeEvento ?? "NAO_USA",
         isSaire: showSaireLogo,
+        isCirio: showCirioLogo,
         eventoNome,
         returnPath:
           isEditMode && id
@@ -280,6 +290,13 @@ const NotificationForm: React.FC = () => {
                 src={SAIRE_LOGO_FULL_PNG}
                 alt="Festival do Sairé 2026"
                 className="h-10 sm:h-12 lg:h-14 w-auto object-contain flex-shrink-0 drop-shadow-sm"
+              />
+            )}
+            {showCirioLogo && (
+              <img
+                src={CIRIO_LOGO_PNG}
+                alt="Círio de Nazaré 2026"
+                className="h-10 sm:h-12 lg:h-14 w-auto object-contain flex-shrink-0 mix-blend-screen"
               />
             )}
           </div>

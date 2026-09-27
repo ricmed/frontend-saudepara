@@ -24,6 +24,8 @@ export const en: TranslationRecord = {
   "menu.reportDAEDesc": "Quickly register a DAE communication",
   "menu.reportSaireCase": "Register the case communication here",
   "menu.reportSaireCaseDesc": "Sairé Festival — quick unit registration",
+  "menu.reportCirioCase": "Register the case communication here",
+  "menu.reportCirioCaseDesc": "Círio de Nazaré 2026 — quick registration",
   
   // Logout Confirmation
   "logout.confirmation.title": "Do you want to log out?",

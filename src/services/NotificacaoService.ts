@@ -7,6 +7,7 @@ import type {
 } from '@/features/notificationForms/types/index2';
 import { formatFromBackend, formatToBackend, formatListResponse } from '@/utils/notificacaoAdapter';
 import indexedDBService from '@/services/indexedDB';
+import { TiposEventoService } from '@/services/EventoService';
 
 // ... todas as interfaces existentes permanecem iguais ...
 export interface CboOption extends BaseOption {
@@ -245,12 +246,21 @@ export const NotificacaoService = {
   // Métodos para buscar cada tipo de opção
   async getEventoOptions(): Promise<EventoOption[]> {
     try {
-      // 🔄 MODIFICADO: Usar endpoint de eventos ativos apenas
+      const todos = await TiposEventoService.getAll();
+      const ativos = (todos || []).filter(
+        (evento) => evento.ativo === 'S' || evento.ativo == null,
+      );
+      if (ativos.length > 0) {
+        return ativos as unknown as EventoOption[];
+      }
+    } catch (error) {
+      console.error('Erro ao buscar eventos com abrangência:', error);
+    }
+    try {
       const response = await axios.get<EventoOption[]>(`${TIPO_ENDPOINTS.EVENTO}/ativos`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar eventos ativos:', error);
-      // Fallback para o método original se o endpoint /ativos não existir ainda
       return NotificacaoService.fetchOptions<EventoOption>(TIPO_ENDPOINTS.EVENTO);
     }
   },

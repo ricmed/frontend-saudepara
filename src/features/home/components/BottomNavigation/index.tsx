@@ -6,6 +6,7 @@ import { useAuth } from '@/keycloak/AuthProvider';
 import { Home, Map, Heart, User } from 'lucide-react';
 import { Language } from '@/i18n/types';
 import { useSaireHomeCta } from '@/features/home/hooks/useSaireHomeCta';
+import { useCirioHomeCta } from '@/features/home/hooks/useCirioHomeCta';
 import { HomeFabSpeedDial } from '@/features/home/components/HomeFabSpeedDial';
 import { buildNovaComunicacaoSairePath } from '@/features/notificationForms/utils/saireEventPrefill';
 
@@ -27,6 +28,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   const { user } = useAuth();
   const { showSaireCaseButton, canAccessComunicacaoDae, saireEventId } =
     useSaireHomeCta();
+  const { showCirioCaseButton, cirioEventId } = useCirioHomeCta();
 
   // Mantém compatibilidade se o hook ainda estiver carregando / usuário sem unidade.
   const canAccessDaeFallback = !!user?.roles?.some((role: string) =>
@@ -85,11 +87,16 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 
         <HomeFabSpeedDial
           showSaire={showSaireCaseButton}
+          showCirio={showCirioCaseButton}
           showDae={showDae}
           saireLabel={t('menu.reportSaireCase')}
+          cirioLabel={t('menu.reportCirioCase')}
           daeLabel={t('menu.reportDAE')}
           onSaireClick={() =>
             navigate(buildNovaComunicacaoSairePath(saireEventId))
+          }
+          onCirioClick={() =>
+            navigate(buildNovaComunicacaoSairePath(cirioEventId))
           }
           onDaeClick={() => navigate('/private/comunicacao-dae/nova')}
         />

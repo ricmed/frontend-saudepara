@@ -6,6 +6,7 @@ export type ComunicacaoCasoPrintPayload = {
   data: Record<string, string>;
   modoLocalidadeEvento: ModoLocalidadeEvento;
   isSaire: boolean;
+  isCirio?: boolean;
   eventoNome: string;
   returnPath: string;
 };

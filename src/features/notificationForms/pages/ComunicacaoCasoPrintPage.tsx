@@ -124,6 +124,7 @@ export const ComunicacaoCasoPrintPage: React.FC = () => {
         data={payload.data}
         modoLocalidadeEvento={payload.modoLocalidadeEvento}
         isSaire={payload.isSaire}
+        isCirio={payload.isCirio}
         eventoNome={payload.eventoNome}
       />
     </>

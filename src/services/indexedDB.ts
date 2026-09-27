@@ -5,6 +5,7 @@ import {
 } from '@/features/notificationForms/types/index2';
 import { deviceIdService } from './deviceIdService'; // ✅ NOVO: Import do serviço de Device ID
 import { getAuthenticatedUserIdentifier } from './comunicacaoDaeOfflineScope';
+import { eventoVisivelParaUsuario } from '@/features/notificationForms/utils/eventoAbrangenciaUsuario';
 
 // ✅ CORRIGIDO: Interface melhorada para distinguir dados
 interface NotificacaoDatabase extends DBSchema {
@@ -1752,15 +1753,15 @@ export class IndexedDBService {
     
     // Se foi passado um municipioId, filtrar pela abrangência
     if (municipioId) {
-      eventosAtivos = eventosAtivos.filter((evento: any) => {
-        if (!evento.abrangencia || !Array.isArray(evento.abrangencia)) {
-          return true; // Se não tem abrangência definida, considera disponível para todos
-        }
-        
-        return evento.abrangencia.some((abr: any) => 
-          abr.municipio?.idtipo_municipio === municipioId
-        );
-      });
+      const municipio = Number(municipioId);
+      eventosAtivos = eventosAtivos.filter((evento: any) =>
+        eventoVisivelParaUsuario(evento, {
+          pronto: true,
+          verTodos: false,
+          isEstado: false,
+          municipioId: Number.isInteger(municipio) && municipio > 0 ? municipio : null,
+        }),
+      );
     }
     
     return eventosAtivos;

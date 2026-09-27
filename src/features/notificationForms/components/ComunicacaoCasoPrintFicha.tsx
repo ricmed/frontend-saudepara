@@ -1,5 +1,6 @@
 import React from 'react';
 import { SAIRE_LOGO_FULL_PNG } from '@/features/home/components/SaireLogo';
+import { CIRIO_LOGO_PNG } from '@/features/home/components/CirioLogo';
 import type { ModoLocalidadeEvento } from '@/features/notificationForms/types/index2';
 import { buildComunicacaoCasoFichaBlocks } from '@/features/notificationForms/utils/caseFichaLayout';
 import '@/features/dynamic-forms/styles/fichaPrint.css';
@@ -8,6 +9,7 @@ export type ComunicacaoCasoPrintFichaProps = {
   data: Record<string, string>;
   modoLocalidadeEvento: ModoLocalidadeEvento;
   isSaire: boolean;
+  isCirio?: boolean;
   eventoNome: string;
 };
 
@@ -15,6 +17,7 @@ export const ComunicacaoCasoPrintFicha: React.FC<ComunicacaoCasoPrintFichaProps>
   data,
   modoLocalidadeEvento,
   isSaire,
+  isCirio = false,
   eventoNome,
 }) => {
   const blocks = buildComunicacaoCasoFichaBlocks(data, modoLocalidadeEvento, '');
@@ -40,6 +43,14 @@ export const ComunicacaoCasoPrintFicha: React.FC<ComunicacaoCasoPrintFichaProps>
             alt="Festival do Sairé 2026"
             className="h-14 w-auto object-contain"
           />
+        ) : isCirio ? (
+          <span className="inline-flex rounded-lg bg-[#12355B] px-2 py-1">
+            <img
+              src={CIRIO_LOGO_PNG}
+              alt="Círio de Nazaré 2026"
+              className="h-14 w-auto object-contain mix-blend-screen"
+            />
+          </span>
         ) : null}
       </header>
 

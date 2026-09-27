@@ -22,6 +22,8 @@ export const ptBR = {
   "menu.reportDAEDesc": "Registre uma comunicação DAE rapidamente",
   "menu.reportSaireCase": "Faça a comunicação de caso aqui",
   "menu.reportSaireCaseDesc": "Festival do Sairé — registro rápido da unidade",
+  "menu.reportCirioCase": "Faça a comunicação de caso aqui",
+  "menu.reportCirioCaseDesc": "Círio de Nazaré 2026 — registro rápido",
 
   // Logout Confirmation
   "logout.confirmation.title": "Deseja sair?",

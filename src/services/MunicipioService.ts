@@ -187,6 +187,17 @@ export const MunicipioService = {
     }
   },
 
+  getIdsByCrs: async (crsId: number): Promise<number[]> => {
+    const response = await axios.get<Municipio[]>(`${API_URL}/select`, {
+      params: { crs_id: crsId },
+      withCredentials: true,
+    });
+    const linhas = Array.isArray(response.data) ? response.data : [];
+    return linhas
+      .map((linha) => Number(linha.idtipo_municipio))
+      .filter((id) => Number.isInteger(id) && id > 0);
+  },
+
   delete: async (id: number): Promise<boolean> => {
     try {
       if (isNaN(id) || id <= 0) {

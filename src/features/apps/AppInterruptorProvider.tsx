@@ -35,6 +35,13 @@ export const APP_INTERRUPTOR_PADRAO: AppInterruptorItem[] = [
     descricao: 'Atalho da comunicação de caso do Sairé na home de quem já tinha acesso.',
     ativo: false,
   },
+  {
+    grupo: 'botao',
+    chave: 'cirio',
+    nome: 'Círio de Nazaré 2026',
+    descricao: 'Atalho da comunicação de caso do Círio de Nazaré 2026 para notificador, município e unidade das cidades do evento, para a CRS que tenha alguma dessas cidades e para o estado.',
+    ativo: true,
+  },
 ];
 
 let paletaSaireAtiva = false;
@@ -61,13 +68,22 @@ function isItem(value: unknown): value is AppInterruptorItem {
   );
 }
 
+function mesclarComPadrao(recebidos: AppInterruptorItem[]): AppInterruptorItem[] {
+  return APP_INTERRUPTOR_PADRAO.map((padrao) => {
+    const remoto = recebidos.find(
+      (item) => item.grupo === padrao.grupo && item.chave === padrao.chave,
+    );
+    return remoto ?? padrao;
+  });
+}
+
 function normalizarItens(payload: unknown): AppInterruptorItem[] | null {
   const lista = payload && typeof payload === 'object' && 'itens' in payload
     ? (payload as { itens?: unknown }).itens
     : null;
   if (!Array.isArray(lista)) return null;
   const itens = lista.filter(isItem);
-  return itens.length > 0 ? itens : null;
+  return itens.length > 0 ? mesclarComPadrao(itens) : null;
 }
 
 const valorPadrao: AppInterruptorContextValue = {

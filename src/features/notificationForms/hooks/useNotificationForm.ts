@@ -20,6 +20,12 @@ import { TiposEventoService } from '@/services/EventoService';
 import { deviceIdService } from '@/services/deviceIdService';
 
 import { useOfflineSystem } from '@/hooks/useOfflineSystem';
+import useUserPermissions from '@/hooks/useUserPermissions';
+import {
+  escopoEventoDoUsuario,
+  eventoVisivelParaUsuario,
+} from '../utils/eventoAbrangenciaUsuario';
+import { cidadesDoUsuarioParaEvento } from '../utils/cidadesDoUsuarioParaEvento';
 
 // Certificar que window.fileStorage existe
 if (!(window as any).fileStorage) {
@@ -276,6 +282,47 @@ export const useNotificationForm = (
     pendingData: systemPendingData,
     syncPendingData
   } = useOfflineSystem();
+
+  const permissions = useUserPermissions();
+  const permissionsRef = useRef(permissions);
+  permissionsRef.current = permissions;
+  const eventosBrutosRef = useRef<any[]>([]);
+  const cidadesRef = useRef<number[]>([]);
+
+  const publicarEventosDoFormulario = useCallback((eventos: any[]) => {
+    eventosBrutosRef.current = Array.isArray(eventos) ? eventos : [];
+    const escopo = escopoEventoDoUsuario(permissionsRef.current, cidadesRef.current);
+    const ativos = eventosBrutosRef.current.filter(
+      (evento) => evento?.ativo === 'S' || evento?.ativo === undefined,
+    );
+    const visiveis = escopo.pronto
+      ? ativos.filter((evento) => eventoVisivelParaUsuario(evento, escopo))
+      : [];
+    setEventoOptions(normalizeOptionLabels(visiveis, { includeNome: true }));
+  }, []);
+
+  useEffect(() => {
+    if (permissions.loading) return;
+    let cancelado = false;
+    void cidadesDoUsuarioParaEvento(permissions).then((ids) => {
+      if (cancelado) return;
+      cidadesRef.current = ids;
+      if (eventosBrutosRef.current.length > 0) {
+        publicarEventosDoFormulario(eventosBrutosRef.current);
+      }
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [
+    permissions.loading,
+    permissions.municipioId,
+    permissions.crsId,
+    permissions.isCrs,
+    permissions.isEstado,
+    permissions.isAdmin,
+    publicarEventosDoFormulario,
+  ]);
   
   // Estado para o formulário
   const [formData, setFormData] = useState<FormData>(initialFormData);
@@ -812,10 +859,8 @@ export const useNotificationForm = (
 
       // Definir todas as opções carregadas do cache
       if (eventos) {
-        // 🆕 FILTRAR: Apenas eventos ativos para o formulário
-        const eventosAtivos = eventos.filter((evento: any) => evento.ativo === 'S' || evento.ativo === undefined);
-        setEventoOptions(normalizeOptionLabels(eventosAtivos, { includeNome: true }));
-        console.log(`✅ Eventos ativos carregados do cache: ${eventosAtivos.length}/${eventos.length}`);
+        publicarEventosDoFormulario(eventos);
+        console.log(`✅ Eventos do formulário: ${eventos.length}`);
       }
 
       if (publicos) {
@@ -1036,11 +1081,8 @@ export const useNotificationForm = (
         NotificacaoService.getAtendimentoOptions()
       ]);
 
-      // ✅ FILTRAR: Apenas eventos ativos para o formulário
-      const eventosAtivos = eventos.filter((evento: any) => evento.ativo === 'S' || evento.ativo === undefined);
-      
-      // Definir opções essenciais imediatamente com ordenações específicas
-      setEventoOptions(normalizeOptionLabels(eventosAtivos, { includeNome: true }));
+      // ✅ FILTRAR: ativos e só as cidades do usuário
+      publicarEventosDoFormulario(eventos);
       
       // Ordenação específica para público atendido
       const ordenacaoPublico = [
@@ -1915,6 +1957,11 @@ export const useNotificationForm = (
 
       const found = eventos.find((evento) => Number(evento.idtipo_evento) === eventoId);
       if (!found) {
+        return;
+      }
+      const cidades = await cidadesDoUsuarioParaEvento(permissionsRef.current);
+      const escopo = escopoEventoDoUsuario(permissionsRef.current, cidades);
+      if (escopo.pronto && !eventoVisivelParaUsuario(found, escopo)) {
         return;
       }
 

@@ -6,6 +6,7 @@ import { useAuth } from '@/keycloak/AuthProvider';
 import { SideMenu } from '@/features/home/components/SideMenu';
 import { BotoRosaIcon } from '@/features/home/components/BotoRosaIcon';
 import { SaireLogoWatermark } from '@/features/home/components/SaireLogo';
+import { CirioLogoImg, CirioLogoWatermark } from '@/features/home/components/CirioLogo';
 import {
   useAppInterruptores,
   type AppInterruptorGrupo,
@@ -188,11 +189,14 @@ function CartaoBotao({
 }) {
   const { salvando, alternar } = useAlternar(item, podeAlterar, onToggle);
   const golfinho = item.chave === 'saire';
+  const cirio = item.chave === 'cirio';
   const fundo = !item.ativo
     ? 'bg-slate-400'
-    : golfinho
-      ? 'bg-[#ff4d94] hover:bg-gradient-to-r hover:from-[#ff4d94] hover:to-[#656B6F]'
-      : 'bg-blue-600';
+    : cirio
+      ? 'bg-[#12355B]'
+      : golfinho
+        ? 'bg-[#ff4d94] hover:bg-gradient-to-r hover:from-[#ff4d94] hover:to-[#656B6F]'
+        : 'bg-blue-600';
 
   return (
     <CartaoBase
@@ -203,9 +207,12 @@ function CartaoBotao({
       rotulo={`${item.nome}, ${item.ativo ? 'ligado' : 'desligado'}`}
     >
       {golfinho && item.ativo && <SaireLogoWatermark />}
-      <div className="relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-white/20 shadow-inner">
+      {cirio && item.ativo && <CirioLogoWatermark />}
+      <div className={`relative z-10 flex h-20 w-20 items-center justify-center rounded-full shadow-inner ${cirio ? 'bg-[#0c2440]' : 'bg-white/20'}`}>
         {golfinho ? (
           <BotoRosaIcon className="h-12 w-12" />
+        ) : cirio ? (
+          <CirioLogoImg className="h-16 w-16 object-contain mix-blend-screen" decorative />
         ) : (
           <span className="text-lg font-bold text-white">Aa</span>
         )}
@@ -218,6 +225,11 @@ function CartaoBotao({
             Faça a comunicação de caso aqui
           </p>
         )}
+        {cirio && (
+          <p className="mt-4 text-lg font-semibold text-white">
+            Faça a comunicação de caso aqui
+          </p>
+        )}
       </div>
       <div className="relative z-10 mt-auto">
         <Trilho
@@ -225,7 +237,7 @@ function CartaoBotao({
           salvando={salvando}
           rotuloLigado="Ligado"
           rotuloDesligado="Desligado"
-          corKnob={golfinho ? '#ff4d94' : '#2563eb'}
+          corKnob={cirio ? '#12355B' : golfinho ? '#ff4d94' : '#2563eb'}
         />
       </div>
     </CartaoBase>
@@ -280,7 +292,7 @@ function InterruptorListaPage({ grupo, titulo, texto }: InterruptorListaPageProp
 
         {pronto && fonte === 'padrao' && podeAlterar && (
           <p className="mx-auto mb-8 max-w-3xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-900">
-            A lista no servidor não respondeu. Tudo permanece desligado até essa leitura funcionar.
+            A lista no servidor não respondeu. Os interruptores ficam no padrão até essa leitura funcionar.
           </p>
         )}
 
@@ -324,7 +336,7 @@ function InterruptorListaPage({ grupo, titulo, texto }: InterruptorListaPageProp
           <p className="text-base leading-relaxed text-blue-950">
             {grupo === 'paleta'
               ? 'Com mais de uma paleta ligada, o menu lateral volta a deixar escolher a cor. Com só a azul, esse seletor fica oculto.'
-              : 'O botão ligado aparece na home para quem já tinha acesso. Desligado, ele some para todo mundo.'}
+              : 'O golfinho ligado aparece para quem já tinha acesso ao Sairé. O Círio de Nazaré 2026 ligado aparece para o notificador, o município e a unidade de qualquer cidade marcada nesse evento, para a CRS que tenha alguma dessas cidades e para o estado. Desligado, o botão some para todo mundo.'}
           </p>
         </div>
       </main>

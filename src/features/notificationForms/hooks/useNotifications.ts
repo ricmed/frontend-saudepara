@@ -28,6 +28,12 @@ import {
   splitListaEventos,
 } from '../utils/listaEventoSelecao';
 import { LISTA_TAMANHO_LOTE } from '../utils/listaCarregamento';
+import useUserPermissions from '@/hooks/useUserPermissions';
+import {
+  escopoEventoDoUsuario,
+  eventoVisivelParaUsuario,
+} from '../utils/eventoAbrangenciaUsuario';
+import { cidadesDoUsuarioParaEvento } from '../utils/cidadesDoUsuarioParaEvento';
 
 export const useNotifications = () => {
   // ✅ Integrar sistema offline
@@ -38,6 +44,10 @@ export const useNotifications = () => {
     hasDataToSync,
     pendingData
   } = useOfflineSystem();
+
+  const permissions = useUserPermissions();
+  const permissionsRef = useRef(permissions);
+  permissionsRef.current = permissions;
 
   // 🆕 REFS: Para controlar execuções e evitar loops
   const lastFetchTime = useRef<number>(0);
@@ -77,18 +87,10 @@ export const useNotifications = () => {
       if (await syncService.canUseOnlineMode()) {
         console.log('📡 Buscando eventos atualizados da API (modo online)...');
         try {
-          // Buscar TODOS os eventos (não apenas ativos) e filtrar localmente
           const eventosResponse = await TiposEventoService.getAll();
           eventosAtivos = eventosResponse || [];
-          
-          // Salvar no cache para uso offline
-          if (eventosAtivos.length > 0) {
-            await indexedDBService.saveOpcoes('eventos', eventosAtivos);
-            console.log(`✅ ${eventosAtivos.length} eventos salvos no cache offline`);
-          }
         } catch (apiError) {
           console.warn('⚠️ Erro ao buscar eventos da API, usando cache local:', apiError);
-          // Fallback: usar cache local
           eventosAtivos = await indexedDBService.getOpcoes('eventos') || [];
         }
       } else {
@@ -97,6 +99,17 @@ export const useNotifications = () => {
         eventosAtivos = await indexedDBService.getOpcoes('eventos') || [];
       }
       
+      const cidades = await cidadesDoUsuarioParaEvento(permissionsRef.current);
+      const escopo = escopoEventoDoUsuario(permissionsRef.current, cidades);
+      if (!escopo.pronto) {
+        return eventosAtivosCache ?? new Set();
+      }
+      eventosAtivos = eventosAtivos.filter((evento) => eventoVisivelParaUsuario(evento, escopo));
+
+      if (eventosAtivos.length > 0 && (await syncService.canUseOnlineMode())) {
+        await indexedDBService.saveOpcoes('eventos', eventosAtivos);
+      }
+
       if (eventosAtivos.length === 0) {
         console.warn('⚠️ Nenhum evento encontrado');
         setListaEventos([]);
@@ -145,7 +158,7 @@ export const useNotifications = () => {
       console.warn('⚠️ Erro ao carregar eventos ativos:', error);
       return new Set(); // Retorna conjunto vazio em caso de erro
     }
-  }, [eventosAtivosCache, isOnline]);
+  }, [eventosAtivosCache, isOnline, permissions.loading, permissions.municipioId, permissions.crsId, permissions.isCrs, permissions.isEstado, permissions.isAdmin]);
 
   // 🆕 FUNÇÃO OTIMIZADA: Filtrar notificações com eventos ativos apenas
   const filterNotificacoesComEventosAtivos = useCallback(async (notificacoes: Notificacao[]): Promise<Notificacao[]> => {

@@ -4,8 +4,10 @@ import { Building, Heart, Book, MessageCircle, FileText, Plus } from 'lucide-rea
 import { useTranslation } from '@/i18n/useTranslations';
 import { Language } from '@/i18n/types';
 import { useSaireHomeCta } from '@/features/home/hooks/useSaireHomeCta';
+import { useCirioHomeCta } from '@/features/home/hooks/useCirioHomeCta';
 import { BotoRosaIcon } from '@/features/home/components/BotoRosaIcon';
 import { SaireLogoWatermark } from '@/features/home/components/SaireLogo';
+import { CirioLogoImg, CirioLogoWatermark } from '@/features/home/components/CirioLogo';
 import { buildNovaComunicacaoSairePath } from '@/features/notificationForms/utils/saireEventPrefill';
 
 interface MenuGridProps {
@@ -21,6 +23,7 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
   const { t } = useTranslation(selectedLanguage || 'pt-BR');
   const { showSaireCaseButton, canAccessComunicacaoDae, saireEventId } =
     useSaireHomeCta();
+  const { showCirioCaseButton, cirioEventId } = useCirioHomeCta();
 
   const menuItems = [
     {
@@ -78,12 +81,41 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
     );
   }
 
-  const showQuickActions = showSaireCaseButton || canAccessComunicacaoDae;
+  const showQuickActions =
+    showCirioCaseButton || showSaireCaseButton || canAccessComunicacaoDae;
 
   return (
     <div className="py-12 max-w-6xl mx-auto px-6">
       {showQuickActions && (
         <div className="mb-8 flex flex-wrap justify-center gap-4">
+          {showCirioCaseButton && (
+            <div
+              onClick={() =>
+                navigate(buildNovaComunicacaoSairePath(cirioEventId))
+              }
+              className="relative overflow-hidden bg-[#12355B] hover:bg-[#1a4d8c] text-white flex flex-col items-center p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:scale-105 min-w-[220px] max-w-[280px]"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  navigate(buildNovaComunicacaoSairePath(cirioEventId));
+                }
+              }}
+            >
+              <CirioLogoWatermark />
+              <div className="relative z-10 mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[#0c2440] p-1 shadow-inner">
+                <CirioLogoImg className="h-14 w-14 object-contain mix-blend-screen" decorative />
+              </div>
+              <span className="relative z-10 text-lg font-semibold mb-1 text-center leading-tight">
+                {t('menu.reportCirioCase')}
+              </span>
+              <span className="relative z-10 text-xs text-white/90 text-center">
+                {t('menu.reportCirioCaseDesc')}
+              </span>
+            </div>
+          )}
+
           {showSaireCaseButton && (
             <div
               onClick={() =>
