@@ -4,7 +4,54 @@ import {
   canAccessSaireCaseCtaRoles,
   canChooseUiPaletteRoles,
   isForcedSairePaletteMunicipio,
+  resolveEffectivePalette,
+  shouldShowPaletteSelector,
 } from './palette';
+
+describe('shouldShowPaletteSelector', () => {
+  it('esconde o seletor quando só a azul original está ativa', () => {
+    expect(shouldShowPaletteSelector({
+      canChoosePalette: true,
+      activeExtraPaletteCount: 0,
+    })).toBe(false);
+  });
+
+  it('mostra o seletor quando há outra paleta ligada', () => {
+    expect(shouldShowPaletteSelector({
+      canChoosePalette: true,
+      activeExtraPaletteCount: 1,
+    })).toBe(true);
+  });
+
+  it('não mostra para quem não escolhe a paleta', () => {
+    expect(shouldShowPaletteSelector({
+      canChoosePalette: false,
+      activeExtraPaletteCount: 2,
+    })).toBe(false);
+  });
+});
+
+describe('resolveEffectivePalette', () => {
+  it('fica na azul original quando a paleta do Sairé está desligada', () => {
+    expect(resolveEffectivePalette({
+      sairePaletteEnabled: false,
+      canChoosePalette: true,
+      preferredPalette: 'saire',
+      forceSairePalette: true,
+      eligibilityLoading: false,
+    })).toBe('default');
+  });
+
+  it('volta a rosa de quem já recebia quando a paleta está ligada', () => {
+    expect(resolveEffectivePalette({
+      sairePaletteEnabled: true,
+      canChoosePalette: false,
+      preferredPalette: 'default',
+      forceSairePalette: true,
+      eligibilityLoading: false,
+    })).toBe('saire');
+  });
+});
 
 describe('canAccessSaireCaseCtaRoles', () => {
   it('libera admin master e admin.estado (CIEVS estadual/oeste)', () => {

@@ -6,6 +6,7 @@ import {
   canAccessSaireCaseCtaRoles,
 } from '@/theme/palette';
 import { useSaireEligibility } from '@/theme/useSaireEligibility';
+import { useAppInterruptores } from '@/features/apps/AppInterruptorProvider';
 
 export type SaireHomeCtaState = {
   loading: boolean;
@@ -51,13 +52,15 @@ export function useSaireHomeCta(): SaireHomeCtaState {
     estabelecimentoId: permissions.estabelecimentoId,
     permissionsLoading: permissions.loading,
   });
+  const interruptores = useAppInterruptores();
 
   const showSaireCaseButton =
+    interruptores.isAtivo('botao', 'saire') &&
     eligibility.hasActiveSaireEvent &&
     (canSeeSaireByRole || canSeeSaireByMunicipio || eligibility.isSaireNotificadora);
 
   return {
-    loading: eligibility.loading,
+    loading: eligibility.loading || !interruptores.pronto,
     showSaireCaseButton,
     canAccessComunicacaoDae,
     saireEventId: eligibility.saireEventId,

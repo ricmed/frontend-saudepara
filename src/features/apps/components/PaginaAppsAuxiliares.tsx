@@ -1,5 +1,5 @@
 
-import {  Building2,  Award,  FileSpreadsheet,  FileCheck,  Clock,  Leaf,  Menu,  GraduationCap,  UserSquare,  MapPin, Map, CheckCircle, Users, Calendar, AlertTriangle, HeartPulse, Stethoscope, Thermometer, HomeIcon} from "lucide-react";
+import {  Building2,  Award,  FileSpreadsheet,  FileCheck,  Clock,  Leaf,  Menu,  GraduationCap,  UserSquare,  MapPin, Map, CheckCircle, Users, Calendar, AlertTriangle, HeartPulse, Stethoscope, Thermometer, HomeIcon, Palette, MousePointerClick} from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "../../../i18n/useTranslations";
@@ -32,6 +32,16 @@ const PaginaAppsAuxiliares = () => {
   };
 
   const aplicativos: AppConfig[] = [
+    {
+      icon: <Palette className="h-8 w-8 text-white" />,
+      nome: "Paleta de cores",
+      link: "/private/apps-auxiliares/paleta-de-cores",
+    },
+    {
+      icon: <MousePointerClick className="h-8 w-8 text-white" />,
+      nome: "Botões auxiliares",
+      link: "/private/apps-auxiliares/botoes-auxiliares",
+    },
     {
       icon: <Building2 className="h-8 w-8 text-white" />,
       nome: "Componentes",

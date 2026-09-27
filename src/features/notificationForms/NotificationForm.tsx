@@ -18,6 +18,7 @@ import { SideMenu } from "@/features/home/components/SideMenu";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import { SAIRE_LOGO_FULL_PNG } from "@/features/home/components/SaireLogo";
 import { isSaireEventDescription } from "./utils/saireEventPrefill";
+import { useAppInterruptores } from "@/features/apps/AppInterruptorProvider";
 import { prepareDataForExport } from "./components/exportUtilities";
 import { toPrintDataMap } from "./utils/caseFichaLayout";
 import { relayComunicacaoCasoPrintData } from "./utils/comunicacaoCasoPrintChannel";
@@ -150,12 +151,16 @@ const NotificationForm: React.FC = () => {
     return Boolean(selected && !isEventoAtivo(selected));
   }, [isEditMode, eventoOptions, formData.evento]);
 
+  const paletaSaireLigada = useAppInterruptores().isAtivo('paleta', 'saire');
   const showSaireLogo = useMemo(() => {
+    if (!paletaSaireLigada) {
+      return false;
+    }
     const selected = eventoOptions.find(
       (option) => option.idtipo_evento.toString() === formData.evento,
     );
     return isSaireEventDescription(selected?.descricao);
-  }, [eventoOptions, formData.evento]);
+  }, [eventoOptions, formData.evento, paletaSaireLigada]);
 
   useEffect(() => {
     return () => {

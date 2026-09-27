@@ -10,6 +10,7 @@ import { registerServiceWorker } from "./registerSW";
 import { runIndexedDbCachePolicyIfNewBuild } from "./services/appBuildCachePolicy";
 import { AuthProvider } from './keycloak/AuthProvider';
 import { PaletteProvider } from './theme/PaletteProvider';
+import { AppInterruptorProvider } from './features/apps/AppInterruptorProvider';
 import { PwaUpdateBanner } from './components/PwaUpdateBanner';
 import { RetryNotification } from './components/RetryNotification';
 import { useRetryNotification } from './hooks/useRetryNotification';
@@ -89,6 +90,7 @@ async function bootstrapApp() {
 
   createRoot(document.getElementById("root")!).render(
     <AuthProvider>
+      <AppInterruptorProvider>
       <PaletteProvider>
         <QueryClientProvider client={queryClient}>
           <SyncQueryInvalidationBridge />
@@ -97,6 +99,7 @@ async function bootstrapApp() {
           </StrictMode>
         </QueryClientProvider>
       </PaletteProvider>
+      </AppInterruptorProvider>
     </AuthProvider>
   );
 

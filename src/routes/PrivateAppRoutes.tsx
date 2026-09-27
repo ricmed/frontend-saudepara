@@ -15,6 +15,14 @@ const PaginaEscolhaAppsAuxiliares = lazyPage(
 const PaginaAppsAuxiliaresDae = lazyPage(
   () => import('@/features/apps/components/PaginaAppsAuxiliaresDae'),
 );
+const PaletaDeCoresPage = lazyNamed(
+  () => import('@/features/apps/components/InterruptorListaPage'),
+  'PaletaDeCoresPage',
+);
+const BotoesAuxiliaresPage = lazyNamed(
+  () => import('@/features/apps/components/InterruptorListaPage'),
+  'BotoesAuxiliaresPage',
+);
 const ListaComponentes = lazyPage(
   () => import('@/features/apps/list/ListaComponentes'),
 );
@@ -247,6 +255,8 @@ export const getPrivateAppRoutes = () => {
           element={<PaginaEscolhaAppsAuxiliares />}
         />
         <Route path="/private/apps-auxiliares" element={<PaginaAppsAuxiliares />} />
+        <Route path="/private/apps-auxiliares/paleta-de-cores" element={<PaletaDeCoresPage />} />
+        <Route path="/private/apps-auxiliares/botoes-auxiliares" element={<BotoesAuxiliaresPage />} />
         <Route
           path="/private/apps-auxiliares-dae"
           element={<PaginaAppsAuxiliaresDae />}

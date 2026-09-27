@@ -91,6 +91,33 @@ export function getThemeBrandHex(): string {
   return readThemeCssVar('--sp-brand', '#3b5bdb');
 }
 
+/** Azul original + pelo menos uma paleta ligada no Apps auxiliares. */
+export function shouldShowPaletteSelector(params: {
+  canChoosePalette: boolean;
+  activeExtraPaletteCount: number;
+}): boolean {
+  return params.canChoosePalette && params.activeExtraPaletteCount > 0;
+}
+
+export function resolveEffectivePalette(params: {
+  sairePaletteEnabled: boolean;
+  canChoosePalette: boolean;
+  preferredPalette: UiPalette;
+  forceSairePalette: boolean;
+  eligibilityLoading: boolean;
+}): UiPalette {
+  if (!params.sairePaletteEnabled) {
+    return 'default';
+  }
+  if (params.canChoosePalette) {
+    return params.preferredPalette;
+  }
+  if (params.eligibilityLoading && !params.forceSairePalette) {
+    return 'default';
+  }
+  return params.forceSairePalette ? 'saire' : 'default';
+}
+
 export function applyDocumentPalette(palette: UiPalette) {
   if (typeof document === 'undefined') return;
   document.documentElement.dataset.palette = palette;

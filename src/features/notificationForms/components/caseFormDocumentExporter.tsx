@@ -1,6 +1,7 @@
 import React from 'react';
 import { Document, Page, StyleSheet, Text, View, pdf } from '@react-pdf/renderer';
 import { isSaireEventDescription } from '@/features/notificationForms/utils/saireEventPrefill';
+import { isSairePaletteAtiva } from '@/features/apps/AppInterruptorProvider';
 import {
   buildComunicacaoCasoFichaBlocks,
   type ComunicacaoCasoFichaRow,
@@ -215,7 +216,7 @@ function resolveModo(exportOptions?: ExportOptions): ModoLocalidadeEvento {
 }
 
 function resolveIsSaire(data: ExportRow): boolean {
-  return isSaireEventDescription(String(data.Evento ?? ''));
+  return isSairePaletteAtiva() && isSaireEventDescription(String(data.Evento ?? ''));
 }
 
 const PdfFieldRow: React.FC<{

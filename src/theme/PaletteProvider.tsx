@@ -8,9 +8,11 @@ import {
   isForcedSairePaletteMunicipio,
   isForcedSairePaletteUsername,
   normalizeUiPalette,
+  resolveEffectivePalette,
   type UiPalette,
 } from '@/theme/palette';
 import { useSaireEligibility } from '@/theme/useSaireEligibility';
+import { useAppInterruptores } from '@/features/apps/AppInterruptorProvider';
 
 type PaletteContextValue = {
   palette: UiPalette;
@@ -25,24 +27,10 @@ type PaletteContextValue = {
 
 const PaletteContext = createContext<PaletteContextValue | null>(null);
 
-function resolveEffectivePalette(params: {
-  canChoosePalette: boolean;
-  preferredPalette: UiPalette;
-  forceSairePalette: boolean;
-  eligibilityLoading: boolean;
-}): UiPalette {
-  if (params.canChoosePalette) {
-    return params.preferredPalette;
-  }
-  if (params.eligibilityLoading && !params.forceSairePalette) {
-    return 'default';
-  }
-  return params.forceSairePalette ? 'saire' : 'default';
-}
-
 export function PaletteProvider({ children }: { children: React.ReactNode }) {
   const { user, setUser, loading: authLoading } = useAuth();
   const permissions = useUserPermissions();
+  const interruptores = useAppInterruptores();
   const [saving, setSaving] = useState(false);
 
   const canChoosePalette = useMemo(
@@ -73,6 +61,7 @@ export function PaletteProvider({ children }: { children: React.ReactNode }) {
   const palette = useMemo(
     () =>
       resolveEffectivePalette({
+        sairePaletteEnabled: interruptores.isAtivo('paleta', 'saire'),
         canChoosePalette,
         preferredPalette,
         forceSairePalette,
@@ -82,6 +71,7 @@ export function PaletteProvider({ children }: { children: React.ReactNode }) {
       canChoosePalette,
       eligibility.loading,
       forceSairePalette,
+      interruptores,
       preferredPalette,
     ],
   );
