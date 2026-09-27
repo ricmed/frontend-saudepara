@@ -6,6 +6,7 @@ import TableHeader from "./components/TableHeader";
 import NotificationTable from "./components/NotificationTable";
 import Pagination from "./components/Pagination";
 import TipoAtendimentoFilter, { TipoAtendimentoType } from "./components/TipoAtendimentoFilter";
+import ListaEventoSelect from "./components/ListaEventoSelect";
 import { useNotifications } from "./hooks/useNotifications";
 import { useTableControls } from "./hooks/useTableControls";
 import { allColumns, searchFields } from "./types";
@@ -172,10 +173,17 @@ const ListaNotificacoes: React.FC = () => {
 
       {/* Conteúdo principal */}
       <main className="w-full max-w-[98%] mx-auto px-1 sm:px-2 lg:px-3 xl:px-4 py-4 md:py-6 lg:py-8">
-        {/* Filtro de Tipo de Atendimento */}
         <TipoAtendimentoFilter
           selectedTipo={selectedTipoAtendimento}
           onTipoChange={setSelectedTipoAtendimento}
+          eventoSelect={(
+            <ListaEventoSelect
+              eventos={notifications.listaEventos}
+              selectedEventId={notifications.selectedListaEventoId}
+              onChange={notifications.selectListaEvento}
+              pronto={notifications.listaEventosProntos}
+            />
+          )}
         />
 
         <div className="overflow-x-auto overflow-y-visible">

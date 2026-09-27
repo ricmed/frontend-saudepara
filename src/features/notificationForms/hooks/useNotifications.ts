@@ -21,7 +21,12 @@ import {
 import { getModoLocalidadeEvento } from '../utils/formUtils';
 import { usaLocalidadeEvento } from '../utils/procedenciaResidencia';
 import { filterNotificationsByEvento } from '../utils/filterNotificationsByEvento';
-import { listFiltersForActiveEvents } from '../utils/listFiltersForActiveEvents';
+import {
+  defaultListaEventoId,
+  listFiltersForListaEvento,
+  notificacaoVisivelNaLista,
+  splitListaEventos,
+} from '../utils/listaEventoSelecao';
 
 export const useNotifications = () => {
   // ✅ Integrar sistema offline
@@ -39,7 +44,14 @@ export const useNotifications = () => {
 
   // 🆕 CACHE: Para eventos ativos (evitar buscar múltiplas vezes)
   const [eventosAtivosCache, setEventosAtivosCache] = useState<Set<number> | null>(null);
+  const [listaEventos, setListaEventos] = useState<EventoOption[]>([]);
+  const [listaEventosProntos, setListaEventosProntos] = useState(false);
+  const [selectedListaEventoId, setSelectedListaEventoId] = useState<number | null>(null);
+  const [listaEventoRevision, setListaEventoRevision] = useState(0);
   const [exportEventos, setExportEventos] = useState<EventoOption[]>([]);
+  const listaEventoIdRef = useRef<number | null>(null);
+  const listaEventoRevisionRef = useRef(0);
+  const selectionInitializedRef = useRef(false);
 
   // 🆕 FUNÇÃO: Carregar eventos ativos uma única vez (com opção de forçar atualização)
   const loadEventosAtivos = useCallback(async (forceRefresh: boolean = false): Promise<Set<number>> => {
@@ -84,25 +96,43 @@ export const useNotifications = () => {
       
       if (eventosAtivos.length === 0) {
         console.warn('⚠️ Nenhum evento encontrado');
+        setListaEventos([]);
+        setExportEventos([]);
+        setListaEventosProntos(true);
         setEventosAtivosCache(new Set());
+        if (!selectionInitializedRef.current) {
+          selectionInitializedRef.current = true;
+          listaEventoIdRef.current = null;
+          setSelectedListaEventoId(null);
+        }
         return new Set();
       }
       
-      // Filtrar apenas eventos ativos
-      const eventosAtivosFiltrados = eventosAtivos.filter((evento: any) => {
-        return evento.ativo === 'S' || evento.ativo === '1' || evento.ativo === true;
-      });
-      
-      const idsEventosAtivos = new Set(eventosAtivosFiltrados.map((evento: any) => evento.idtipo_evento));
-      setEventosAtivosCache(idsEventosAtivos);
-      setExportEventos(
-        eventosAtivosFiltrados.map((evento: any) => ({
-          idtipo_evento: evento.idtipo_evento,
+      const lista = (eventosAtivos as any[])
+        .map((evento) => ({
+          idtipo_evento: Number(evento.idtipo_evento),
           descricao: evento.descricao,
           ativo: evento.ativo,
           modo_localidade_evento: evento.modo_localidade_evento ?? 'NAO_USA',
+          vincula_estabelecimentos: evento.vincula_estabelecimentos,
         }))
-      );
+        .filter((evento) => Number.isInteger(evento.idtipo_evento) && evento.idtipo_evento > 0);
+
+      const { ativos } = splitListaEventos(lista);
+      const idsEventosAtivos = new Set(ativos.map((evento) => evento.idtipo_evento));
+      setListaEventos(lista);
+      setExportEventos(lista);
+      setListaEventosProntos(true);
+      setEventosAtivosCache(idsEventosAtivos);
+
+      if (!selectionInitializedRef.current) {
+        selectionInitializedRef.current = true;
+        if (listaEventoRevisionRef.current === 0) {
+          const initialId = defaultListaEventoId(ativos);
+          listaEventoIdRef.current = initialId;
+          setSelectedListaEventoId(initialId);
+        }
+      }
       
       console.log(`✅ Cache de eventos ativos atualizado: ${idsEventosAtivos.size} eventos ativos de ${eventosAtivos.length} totais`);
       console.log(`📊 IDs dos eventos ativos: [${Array.from(idsEventosAtivos).join(', ')}]`);
@@ -124,12 +154,13 @@ export const useNotifications = () => {
       }
       
       const idsEventosAtivos = await loadEventosAtivos();
+      const selectedEventId = listaEventoIdRef.current;
       
       // 🔍 DEBUG: Log inicial
       console.log(`🔍 Iniciando filtro - ${notificacoes.length} notificações, ${idsEventosAtivos.size} eventos ativos: [${Array.from(idsEventosAtivos).join(', ')}]`);
       
-      // 🆕 CORREÇÃO: Se não há eventos ativos, mostrar APENAS notificações pendentes (offline)
-      if (idsEventosAtivos.size === 0) {
+      // Sem evento ativo e sem histórico escolhido: só pendentes offline
+      if (selectedEventId == null && idsEventosAtivos.size === 0) {
         console.warn('⚠️ Nenhum evento ativo - filtrando para mostrar apenas notificações pendentes (offline)');
         const pendentes = notificacoes.filter(n => (n as any)._isPending === true);
         console.log(`📊 Resultado: ${pendentes.length} notificações pendentes mantidas de ${notificacoes.length} totais`);
@@ -167,27 +198,18 @@ export const useNotifications = () => {
           idEvento = (notificacao as any).tipo_evento.idtipo_evento;
         }
         
-        // 🆕 CORREÇÃO: Se não tem idEvento, verificar se é pendente (offline)
-        // Notificações pendentes devem sempre passar (ainda não foram sincronizadas)
-        if (!idEvento) {
-          const isPending = (notificacao as any)._isPending === true;
-          if (isPending) {
-            console.log('🟡 Notificação pendente (offline) - mantendo:', notificacao.id);
-            return true; // Manter pendentes
-          }
-          // Se não é pendente e não tem idEvento, filtrar
-          console.log('❌ Notificação sem idEvento e não é pendente - removendo:', notificacao.id);
-          return false;
+        const visivel = notificacaoVisivelNaLista({
+          eventId: idEvento ?? null,
+          isPending: (notificacao as any)._isPending === true,
+          selectedEventId,
+          activeEventIds: idsEventosAtivos,
+        });
+        
+        if (!visivel) {
+          console.log(`🔍 Notificação filtrada - ID: ${notificacao.id}, ID evento: ${idEvento}, selecionado: ${selectedEventId ?? 'ativos'}`);
         }
         
-        const hasEvent = idsEventosAtivos.has(idEvento);
-        
-        // Log detalhado para debug
-        if (!hasEvent) {
-          console.log(`🔍 Notificação filtrada - ID: ${notificacao.id}, ID evento: ${idEvento}, disponíveis: [${Array.from(idsEventosAtivos).join(', ')}]`);
-        }
-        
-        return hasEvent;
+        return visivel;
       });
       
       console.log(`✅ Filtro de eventos ativos: ${notificacoes.length} → ${notificacoesFiltradas.length} notificações`);
@@ -207,7 +229,11 @@ export const useNotifications = () => {
   }, [loadEventosAtivos]);
 
   const getAllForLista = useCallback(async (page: number, limit: number) => {
-    const filters = listFiltersForActiveEvents(await loadEventosAtivos());
+    const activeIds = await loadEventosAtivos();
+    const filters = listFiltersForListaEvento(
+      listaEventoIdRef.current,
+      activeIds,
+    );
     if (!filters) {
       return {
         data: [],
@@ -389,7 +415,11 @@ export const useNotifications = () => {
         console.log(`✅ Usando ${allData.length} notificações (${allData.filter(n => n._isPending).length} pendentes + ${allData.filter(n => !n._isPending).length} cache)`);
         allNotificacoes = allData;
       } else {
-        const filtrosLista = listFiltersForActiveEvents(await loadEventosAtivos());
+        const activeIds = await loadEventosAtivos();
+        const filtrosLista = listFiltersForListaEvento(
+          listaEventoIdRef.current,
+          activeIds,
+        );
         if (!filtrosLista) {
           console.warn('⚠️ Nenhum evento ativo — a lista não busca o cadastro geral');
           allNotificacoes = [];
@@ -860,6 +890,48 @@ export const useNotifications = () => {
     isOnline
   ]);
 
+  const fetchAllDataRef = useRef(fetchAllData);
+  fetchAllDataRef.current = fetchAllData;
+
+  useEffect(() => {
+    if (listaEventoRevision === 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const recarregarEvento = async () => {
+      const allData = await fetchAllDataRef.current();
+      if (cancelled) {
+        return;
+      }
+
+      const rows = Array.isArray(allData) ? allData : [];
+      const sortedData = [...rows].sort((a, b) => {
+        const valueA = getValueForSorting(a, sortKey);
+        const valueB = getValueForSorting(b, sortKey);
+        return compareValues(valueA, valueB, sortOrder);
+      });
+
+      setAllNotificacoes(rows);
+      setNotificacoes(sortedData.slice(0, itemsPerPage));
+      setIsUsingLocalSort(true);
+      setPaginationMeta({
+        total: sortedData.length,
+        pages: Math.ceil(sortedData.length / itemsPerPage) || 1,
+        currentPage: 1,
+        perPage: itemsPerPage,
+      });
+    };
+
+    void recarregarEvento();
+
+    return () => {
+      cancelled = true;
+    };
+    // Só o seletor de evento dispara esta busca. Ordenação e página usam allNotificacoes.
+  }, [listaEventoRevision]);
+
   // ✅ NOVO: Escutar eventos de notificação salva para atualização automática
   useEffect(() => {
     const handleNotificationSaved = (event: Event) => {
@@ -1228,6 +1300,22 @@ export const useNotifications = () => {
     }
   }, [sortKey, sortOrder, isUsingLocalSort, allNotificacoes, notificacoes, fetchAllData]);
 
+  const selectListaEvento = useCallback((eventId: number | null) => {
+    const next = eventId !== null && Number.isInteger(eventId) && eventId > 0
+      ? eventId
+      : null;
+    if (next === listaEventoIdRef.current) {
+      return;
+    }
+
+    listaEventoIdRef.current = next;
+    listaEventoRevisionRef.current += 1;
+    setSelectedListaEventoId(next);
+    setAllNotificacoes([]);
+    setCurrentPage(1);
+    setListaEventoRevision(listaEventoRevisionRef.current);
+  }, []);
+
   // 🆕 FUNÇÃO: Forçar atualização do cache de eventos e recarregar lista
   const refreshEventosCache = useCallback(async () => {
     console.log('🔄 Forçando atualização de eventos e recarregando lista...');
@@ -1301,6 +1389,10 @@ export const useNotifications = () => {
     handleExport,
     fetchAllData,
     refreshEventosCache,  // ✅ NOVO: Expor função para forçar atualização
-    exportEventos
+    exportEventos,
+    listaEventos,
+    listaEventosProntos,
+    selectedListaEventoId,
+    selectListaEvento,
   };
 };

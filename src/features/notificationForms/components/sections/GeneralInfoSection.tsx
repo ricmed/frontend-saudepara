@@ -5,6 +5,7 @@ import {
   EventoOption,
   FormSectionProps,
 } from '@/features/notificationForms/types/index2';
+import { isEventoAtivo } from '@/features/notificationForms/utils/offlineEventoScope';
 import SectionHeader from '../shared/SectionHeader';
 import FormField from '../shared/FormField';
 
@@ -13,6 +14,7 @@ export { groupLocalidadesEvento } from './LocalidadeEventoField';
 interface GeneralInfoSectionProps extends FormSectionProps {
   eventoOptions?: EventoOption[];
   publicoOptions?: Array<{ idtipo_publico: number; descricao: string }>;
+  eventoDisabled?: boolean;
 }
 
 const GeneralInfoSection: React.FC<GeneralInfoSectionProps> = ({
@@ -23,6 +25,7 @@ const GeneralInfoSection: React.FC<GeneralInfoSectionProps> = ({
   toggleSection,
   eventoOptions,
   publicoOptions,
+  eventoDisabled = false,
 }) => {
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -36,22 +39,31 @@ const GeneralInfoSection: React.FC<GeneralInfoSectionProps> = ({
       {isExpanded && (
         <div className="p-6 border-t">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Evento */}
-            <FormField
-              label="Evento"
-              name="evento"
-              value={formData.evento}
-              onChange={handleChange}
-              type="select"
-              required
-              error={errors.evento}
-              options={
-                eventoOptions?.map((option) => ({
-                  value: option.idtipo_evento.toString(),
-                  label: option.descricao
-                })) || []
-              }
-            />
+            <div>
+              <FormField
+                label="Evento"
+                name="evento"
+                value={formData.evento}
+                onChange={handleChange}
+                type="select"
+                required
+                error={errors.evento}
+                disabled={eventoDisabled}
+                options={
+                  eventoOptions?.map((option) => ({
+                    value: option.idtipo_evento.toString(),
+                    label: isEventoAtivo(option)
+                      ? option.descricao
+                      : `${option.descricao} (histórico)`
+                  })) || []
+                }
+              />
+              {eventoDisabled && (
+                <p className="mt-2 text-sm text-gray-600">
+                  Evento encerrado. A ficha permanece neste evento.
+                </p>
+              )}
+            </div>
 
             {/* Público Atendido */}
             <FormField

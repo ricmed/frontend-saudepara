@@ -28,6 +28,7 @@ import { useNotificationForm } from "./hooks/useNotificationForm";
 
 // Import section components
 import GeneralInfoSection from "./components/sections/GeneralInfoSection";
+import { isEventoAtivo } from "./utils/offlineEventoScope";
 import PersonOriginSection from "./components/sections/PersonOriginSection";
 import PersonIdentificationSection from "./components/sections/PersonIdentificationSection";
 import AttendanceInfoSection from "./components/sections/AttendanceInfoSection";
@@ -138,6 +139,16 @@ const NotificationForm: React.FC = () => {
     hipoteseDiagFiltradas, 
     isLoadingHipoteses,
   } = useNotificationForm(isEditMode, id, offlineId);
+
+  const eventoHistorico = useMemo(() => {
+    if (!isEditMode) {
+      return false;
+    }
+    const selected = eventoOptions.find(
+      (option) => option.idtipo_evento.toString() === formData.evento,
+    );
+    return Boolean(selected && !isEventoAtivo(selected));
+  }, [isEditMode, eventoOptions, formData.evento]);
 
   const showSaireLogo = useMemo(() => {
     const selected = eventoOptions.find(
@@ -431,6 +442,7 @@ const NotificationForm: React.FC = () => {
             isExpanded={expandedSections.dadosGerais}
             toggleSection={() => toggleSection("dadosGerais")}
             eventoOptions={eventoOptions}
+            eventoDisabled={eventoHistorico}
             publicoOptions={publicoOptions}
             isLoadingMunicipios={isLoadingMunicipios}
             paisOptions={paisOptions}

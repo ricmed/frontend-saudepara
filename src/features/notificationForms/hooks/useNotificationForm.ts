@@ -16,6 +16,7 @@ import { toast } from 'react-toastify';
 import axios from 'axios';
 import syncService from '@/services/syncService';
 import indexedDBService from '@/services/indexedDB';
+import { TiposEventoService } from '@/services/EventoService';
 import { deviceIdService } from '@/services/deviceIdService';
 
 import { useOfflineSystem } from '@/hooks/useOfflineSystem';
@@ -1884,6 +1885,62 @@ export const useNotificationForm = (
     formData.evento,
     searchParams,
   ]);
+
+  useEffect(() => {
+    if (!isEditMode) {
+      return;
+    }
+
+    const eventoId = Number(formData.evento);
+    if (!Number.isInteger(eventoId) || eventoId <= 0) {
+      return;
+    }
+    if (eventoOptions.some((evento) => evento.idtipo_evento === eventoId)) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const incluirEventoDaFicha = async () => {
+      let eventos: any[] = [];
+      try {
+        eventos = await TiposEventoService.getAll();
+      } catch {
+        eventos = await indexedDBService.getOpcoes('eventos') || [];
+      }
+
+      if (cancelled) {
+        return;
+      }
+
+      const found = eventos.find((evento) => Number(evento.idtipo_evento) === eventoId);
+      if (!found) {
+        return;
+      }
+
+      setEventoOptions((prev) => {
+        if (prev.some((evento) => evento.idtipo_evento === eventoId)) {
+          return prev;
+        }
+        return [
+          ...prev,
+          {
+            idtipo_evento: eventoId,
+            descricao: found.descricao,
+            ativo: found.ativo,
+            modo_localidade_evento: found.modo_localidade_evento ?? 'NAO_USA',
+            vincula_estabelecimentos: found.vincula_estabelecimentos,
+          },
+        ];
+      });
+    };
+
+    void incluirEventoDaFicha();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isEditMode, formData.evento, eventoOptions]);
   
   // 🆕 Hook para limpar window.fileStorage quando componente desmonta
   useEffect(() => {

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { PDFExportType } from '@/features/notificationForms/components/exportUtilities';
 import type { EventoOption } from '@/features/notificationForms/types/index2';
+import { splitListaEventos } from '@/features/notificationForms/utils/listaEventoSelecao';
 
 interface CompactExportMenuProps {
   isOpen: boolean;
@@ -35,6 +36,7 @@ const CompactExportMenu: React.FC<CompactExportMenuProps> = ({
   const eventId = Number(selectedEventId);
   const hasEvento = Number.isInteger(eventId) && eventId > 0;
   const exportDisabled = isLoading || !hasEvento;
+  const { ativos: eventosAtivos, historico: eventosHistorico } = splitListaEventos(eventos);
 
   const handleExport = (
     format: 'csv' | 'excel' | 'pdf',
@@ -75,11 +77,24 @@ const CompactExportMenu: React.FC<CompactExportMenuProps> = ({
             className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 text-gray-900 bg-white"
           >
             <option value="">Selecione o evento</option>
-            {eventos.map((evento) => (
-              <option key={evento.idtipo_evento} value={evento.idtipo_evento}>
-                {evento.descricao}
-              </option>
-            ))}
+            {eventosAtivos.length > 0 && (
+              <optgroup label="Eventos ativos">
+                {eventosAtivos.map((evento) => (
+                  <option key={evento.idtipo_evento} value={evento.idtipo_evento}>
+                    {evento.descricao}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {eventosHistorico.length > 0 && (
+              <optgroup label="Histórico">
+                {eventosHistorico.map((evento) => (
+                  <option key={evento.idtipo_evento} value={evento.idtipo_evento}>
+                    {evento.descricao}
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
           <p className="mt-1 text-xs text-gray-500">
             As colunas seguem o evento (bairro ou localidade).
