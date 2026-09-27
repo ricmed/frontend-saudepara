@@ -27,6 +27,7 @@ import {
   notificacaoVisivelNaLista,
   splitListaEventos,
 } from '../utils/listaEventoSelecao';
+import { LISTA_TAMANHO_LOTE } from '../utils/listaCarregamento';
 
 export const useNotifications = () => {
   // ✅ Integrar sistema offline
@@ -52,6 +53,8 @@ export const useNotifications = () => {
   const listaEventoIdRef = useRef<number | null>(null);
   const listaEventoRevisionRef = useRef(0);
   const selectionInitializedRef = useRef(false);
+  const listaLoadGenRef = useRef(0);
+  const listaTotalRef = useRef(0);
 
   // 🆕 FUNÇÃO: Carregar eventos ativos uma única vez (com opção de forçar atualização)
   const loadEventosAtivos = useCallback(async (forceRefresh: boolean = false): Promise<Set<number>> => {
@@ -246,6 +249,7 @@ export const useNotifications = () => {
   const fetchPagesFromApi = useCallback(async (
     filters: NotificacaoListFilters,
     pageSize = 100,
+    onPage?: (rows: Notificacao[]) => void,
   ) => {
     let page = 1;
     let hasMore = true;
@@ -255,6 +259,7 @@ export const useNotifications = () => {
       const response = await NotificacaoService.getAll(page, pageSize, filters);
       if (response?.data?.length > 0) {
         collected.push(...response.data);
+        onPage?.(collected.slice());
         if (
           page >= response.meta.totalPages ||
           response.data.length < pageSize
@@ -301,6 +306,8 @@ export const useNotifications = () => {
   // Erro e loading
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [listaCarregandoRestante, setListaCarregandoRestante] = useState(false);
+  const [listaTotal, setListaTotal] = useState(0);
 
   // ✅ FUNÇÃO: Buscar notificações offline
   const fetchNotificacoesOffline = useCallback(async (page: number = 1, limit: number = 10) => {
@@ -374,8 +381,27 @@ export const useNotifications = () => {
 
   // ✅ FUNÇÃO: Buscar todas as notificações (online/offline)
   const fetchAllData = useCallback(async () => {
+    const gen = ++listaLoadGenRef.current;
+    let publishTicket = 0;
+    const publicarLista = async (rows: Notificacao[], restante: boolean, total?: number) => {
+      const ticket = ++publishTicket;
+      const filtered = await filterNotificacoesComEventosAtivos(rows);
+      if (ticket !== publishTicket || gen !== listaLoadGenRef.current) {
+        return;
+      }
+      const totalExibicao = restante
+        ? Math.max(filtered.length, total ?? filtered.length)
+        : filtered.length;
+      listaTotalRef.current = totalExibicao;
+      setListaTotal(totalExibicao);
+      setAllNotificacoes(filtered);
+      setIsLoading(false);
+      setListaCarregandoRestante(restante);
+    };
+
     try {
       setIsLoading(true);
+      setListaCarregandoRestante(false);
       setError(null);
 
       // ✅ VERIFICAR SE ESTÁ OFFLINE
@@ -427,10 +453,44 @@ export const useNotifications = () => {
         console.log('🌐 Buscando notificações da API após resolver o evento ativo...');
         
         try {
-          allNotificacoes = await fetchPagesFromApi(filtrosLista);
+          let page = 1;
+          let hasMore = true;
+          const collected: Notificacao[] = [];
 
-          // ✅ SALVAR NO CACHE para uso offline futuro
-          if (allNotificacoes.length > 0) {
+          while (hasMore) {
+            if (gen !== listaLoadGenRef.current) {
+              return null;
+            }
+
+            const response = await NotificacaoService.getAll(page, LISTA_TAMANHO_LOTE, filtrosLista);
+            const chunk = response?.data || [];
+            const total = Number(response?.meta?.total) || collected.length + chunk.length;
+            const totalPages = Number(response?.meta?.totalPages) || page;
+
+            if (gen !== listaLoadGenRef.current) {
+              return null;
+            }
+
+            collected.push(...chunk);
+            const chegouNoMaximo =
+              chunk.length === 0 ||
+              collected.length >= total ||
+              page >= totalPages ||
+              chunk.length < LISTA_TAMANHO_LOTE;
+
+            await publicarLista(collected.slice(), !chegouNoMaximo, total);
+
+            if (chegouNoMaximo) {
+              hasMore = false;
+            } else {
+              page += 1;
+            }
+          }
+
+          allNotificacoes = collected;
+
+          // Cache do navegador só com o lote completo, para a próxima abertura e o offline.
+          if (allNotificacoes.length > 0 && gen === listaLoadGenRef.current) {
             try {
               await indexedDBService.saveOpcoes('notificacoes-cache', allNotificacoes);
               console.log(`✅ ${allNotificacoes.length} notificações salvas no cache offline`);
@@ -483,7 +543,11 @@ export const useNotifications = () => {
       setError("Erro ao buscar todas as notificações para ordenação.");
       return null;
     } finally {
-      setIsLoading(false);
+      publishTicket += 1;
+      if (gen === listaLoadGenRef.current) {
+        setIsLoading(false);
+        setListaCarregandoRestante(false);
+      }
     }
   }, [isOnline, filterNotificacoesComEventosAtivos, loadOfflineDisplayData, fetchPagesFromApi, loadEventosAtivos]);
 
@@ -507,7 +571,11 @@ export const useNotifications = () => {
         // Se ainda não ativou ordenação local e não tem busca ativa, buscar todos os dados
         if (isOnline && !isUsingLocalSort && !debouncedSearchParams.term && allNotificacoes.length === 0) {
           console.log('🔄 Primeira carga: buscando todos os dados para ordenação...');
+          const geracaoAntes = listaLoadGenRef.current;
           const allData = await fetchAllData();
+          if (listaLoadGenRef.current !== geracaoAntes + 1) {
+            return;
+          }
           
           if (allData && allData.length > 0) {
             // ✅ CORRIGIDO: Aplicar ordenação e paginação IMEDIATAMENTE com os dados carregados
@@ -901,8 +969,9 @@ export const useNotifications = () => {
     let cancelled = false;
 
     const recarregarEvento = async () => {
+      const geracaoAntes = listaLoadGenRef.current;
       const allData = await fetchAllDataRef.current();
-      if (cancelled) {
+      if (cancelled || allData == null || listaLoadGenRef.current !== geracaoAntes + 1) {
         return;
       }
 
@@ -1228,10 +1297,15 @@ export const useNotifications = () => {
 
   // ✅ FUNÇÃO: Mudança de página
   const handlePageChange = useCallback((newPage: number) => {
-    // Garantir que a página nunca seja maior que o total de páginas
-    const safeNewPage = Math.min(newPage, paginationMeta.pages);
+    const totalConhecido = Math.max(
+      paginationMeta.total,
+      listaTotalRef.current,
+      allNotificacoes.length,
+    );
+    const pages = Math.max(1, Math.ceil(totalConhecido / itemsPerPage) || 1);
+    const safeNewPage = Math.min(newPage, pages);
 
-    if (safeNewPage >= 1 && safeNewPage <= paginationMeta.pages) {
+    if (safeNewPage >= 1 && safeNewPage <= pages) {
       setCurrentPage(safeNewPage);
       
       // Se estiver usando ordenação local, aplicar paginação manualmente
@@ -1249,7 +1323,7 @@ export const useNotifications = () => {
         setNotificacoes(sortedData.slice(startIndex, endIndex));
       }
     }
-  }, [paginationMeta.pages, isUsingLocalSort, allNotificacoes, itemsPerPage, sortKey, sortOrder]);
+  }, [paginationMeta.total, isUsingLocalSort, allNotificacoes, itemsPerPage, sortKey, sortOrder]);
 
   // ✅ FUNÇÃO: Mudança de ordenação
   const handleSortChange = useCallback(async (key: string | keyof Notificacao) => {
@@ -1310,6 +1384,8 @@ export const useNotifications = () => {
 
     listaEventoIdRef.current = next;
     listaEventoRevisionRef.current += 1;
+    listaTotalRef.current = 0;
+    setListaTotal(0);
     setSelectedListaEventoId(next);
     setAllNotificacoes([]);
     setCurrentPage(1);
@@ -1394,5 +1470,7 @@ export const useNotifications = () => {
     listaEventosProntos,
     selectedListaEventoId,
     selectListaEvento,
+    listaCarregandoRestante,
+    listaTotal,
   };
 };

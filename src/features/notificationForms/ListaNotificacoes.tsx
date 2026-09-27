@@ -1,6 +1,7 @@
 // src/features/notificationForms/ListaNotificacoes.tsx
 import React, { useRef, useState, useMemo, useEffect } from "react";
 import { CSVLink } from "react-csv";
+import { toast } from "react-toastify";
 import { SideMenu } from "@/features/home/components/SideMenu";
 import TableHeader from "./components/TableHeader";
 import NotificationTable from "./components/NotificationTable";
@@ -12,6 +13,7 @@ import { useTableControls } from "./hooks/useTableControls";
 import { allColumns, searchFields } from "./types";
 import type { SearchParams } from "./types";
 import { formatDate, compareValues, getValueForSorting, normalizeText } from "./utils";
+import { deveAvisarListaIncompleta } from "./utils/listaCarregamento";
 
 import type { Notificacao } from "./types";
 
@@ -123,10 +125,32 @@ const ListaNotificacoes: React.FC = () => {
     return notificacoesFiltradas.slice(startIndex, endIndex);
   }, [notificacoesFiltradas, notifications.currentPage, notifications.itemsPerPage]);
 
+  const avisoListaIncompleta = deveAvisarListaIncompleta({
+    carregando: notifications.listaCarregandoRestante,
+    termoBusca: notifications.searchParams.term,
+    pagina: notifications.currentPage,
+    itensPorPagina: notifications.itemsPerPage,
+    carregadas: todasNotificacoes.length,
+    total: Math.max(notifications.listaTotal, todasNotificacoes.length),
+    filtroTipo: selectedTipoAtendimento != null,
+  });
+
+  useEffect(() => {
+    if (!avisoListaIncompleta) {
+      return;
+    }
+    toast.info("As notificações ainda estão sendo carregadas.", {
+      toastId: "lista-notificacoes-carregando",
+    });
+  }, [avisoListaIncompleta, notifications.searchParams.term, notifications.currentPage, selectedTipoAtendimento]);
+
   // Calcular metadados de paginação para dados filtrados
   const paginationMetaFiltrada = useMemo(() => {
-    const total = notificacoesFiltradas.length;
-    const pages = Math.ceil(total / notifications.itemsPerPage);
+    const filtroLocal = selectedTipoAtendimento != null || notifications.searchParams.term.length >= 3;
+    const total = filtroLocal
+      ? notificacoesFiltradas.length
+      : Math.max(notificacoesFiltradas.length, notifications.listaTotal);
+    const pages = Math.ceil(total / notifications.itemsPerPage) || 1;
     
     return {
       total,
@@ -134,7 +158,7 @@ const ListaNotificacoes: React.FC = () => {
       currentPage: notifications.currentPage,
       perPage: notifications.itemsPerPage
     };
-  }, [notificacoesFiltradas.length, notifications.itemsPerPage, notifications.currentPage]);
+  }, [notificacoesFiltradas.length, notifications.itemsPerPage, notifications.currentPage, notifications.listaTotal, notifications.searchParams.term, selectedTipoAtendimento]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -200,7 +224,27 @@ const ListaNotificacoes: React.FC = () => {
             onSortChange={notifications.handleSortChange}
             onDelete={notifications.handleDelete}
             searchTerm={notifications.searchParams.term}
+            emptyMessage={
+              avisoListaIncompleta
+                ? "As notificações ainda estão sendo carregadas."
+                : undefined
+            }
           />
+
+          {notifications.listaCarregandoRestante && (
+            <p className="mt-3 text-sm text-blue-800">
+              Carregando notificações… {notifications.allNotificacoes.length}
+              {notifications.listaTotal > notifications.allNotificacoes.length
+                ? ` de ${notifications.listaTotal}`
+                : ""}
+            </p>
+          )}
+
+          {avisoListaIncompleta && (
+            <p className="mt-2 text-sm text-amber-800">
+              As notificações ainda estão sendo carregadas.
+            </p>
+          )}
 
           {/* Paginação */}
           <Pagination 

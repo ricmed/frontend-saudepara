@@ -16,6 +16,7 @@ interface NotificationTableProps {
   onSortChange: (key: string | keyof Notificacao) => void;
   onDelete: (id: number) => void;
   searchTerm?: string;
+  emptyMessage?: string;
 }
 
 // Função para obter a cor da borda e fundo baseada no tipo de atendimento
@@ -69,6 +70,7 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
   onSortChange,
   onDelete,
   searchTerm = "",
+  emptyMessage,
 }) => {
   const renderCellContent = (notificacao: Notificacao, key: string) => {
     switch (key) {
@@ -229,7 +231,9 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
         ) : notificacoes.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
             <p>
-              {searchTerm
+              {emptyMessage
+                ? emptyMessage
+                : searchTerm
                 ? `Nenhuma notificação encontrada para "${searchTerm}"`
                 : "Nenhuma notificação cadastrada"}
             </p>
@@ -357,7 +361,9 @@ const NotificationTable: React.FC<NotificationTableProps> = ({
                   colSpan={selectedColumns.length + 1}
                   className="px-6 py-4 text-center text-gray-500"
                 >
-                  {searchTerm
+                  {emptyMessage
+                    ? emptyMessage
+                    : searchTerm
                     ? `Nenhuma notificação encontrada para "${searchTerm}"`
                     : "Nenhuma notificação cadastrada"}
                 </td>
