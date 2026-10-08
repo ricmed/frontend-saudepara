@@ -307,7 +307,8 @@ class OfflineDataManager {
     { 
       key: 'cievs', 
       name: 'CIEVS - Centros de Informação em Vigilância', 
-      fetchFn: createDirectApiFetch('cievs', 500), 
+      // A listagem de CIEVS recusa limit acima de 100.
+      fetchFn: createDirectApiFetch('cievs', 100), 
       priority: 1, 
       estimatedSize: 20,
       category: 'administrative'
