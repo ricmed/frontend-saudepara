@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Search, X } from "lucide-react";
 import axios from 'axios';
 import indexedDBService from '@/services/indexedDB'; // Import do IndexedDB
+import { bairroCorrespondeBusca } from '@/features/notificationForms/utils/bairroBusca';
 
 // Função para remover acentos e converter para maiúsculas
 function normalizeText(text: string): string {
@@ -81,9 +82,8 @@ const BairroInput: React.FC<BairroInputProps> = ({
       const todosBairros: Bairro[] = (await indexedDBService.getOpcoes('bairros')) || [];
       let filtrados = todosBairros;
       if (query && query.length >= 3) {
-        const normalizedSearch = normalizeText(query);
         filtrados = todosBairros.filter(bairro =>
-          bairro.descricao.includes(normalizedSearch)
+          bairroCorrespondeBusca(bairro.descricao, query)
         );
       }
       setOptions(sortAndNormalize(filtrados));
@@ -376,8 +376,7 @@ const BairroInput: React.FC<BairroInputProps> = ({
   // ─────────────────────────────────────────────────────────────────
   const filteredOptions = useMemo(() => {
     if (!searchQuery) return options;
-    const normalizedSearch = normalizeText(searchQuery);
-    return options.filter(option => option.descricao.includes(normalizedSearch));
+    return options.filter(option => bairroCorrespondeBusca(option.descricao, searchQuery));
   }, [options, searchQuery]);
 
   // ─────────────────────────────────────────────────────────────────

@@ -396,7 +396,11 @@ class OfflineDataManager {
 
   private resolveEstabelecimentosOfflinePack() {
     if (!this.estabelecimentosOfflinePackPromise) {
-      this.estabelecimentosOfflinePackPromise = this.computeEstabelecimentosOfflinePack();
+      this.estabelecimentosOfflinePackPromise = this.computeEstabelecimentosOfflinePack()
+        .catch((error) => {
+          this.estabelecimentosOfflinePackPromise = null;
+          throw error;
+        });
     }
     return this.estabelecimentosOfflinePackPromise;
   }
@@ -446,11 +450,19 @@ class OfflineDataManager {
           Accept: 'application/json',
           'Content-Type': 'application/json',
         },
-        timeout: 30000,
+        timeout: 120000,
       },
     );
     const estabelecimentos = response?.data?.data || response?.data || [];
-    return Array.isArray(estabelecimentos) ? estabelecimentos : [];
+    if (!Array.isArray(estabelecimentos)) return [];
+    return estabelecimentos.map((est) => ({
+      ...est,
+      ativo: est?.ativo ?? 'S',
+      tipo_municipio_idtipo_municipio:
+        est?.tipo_municipio_idtipo_municipio
+        ?? est?.tipo_municipio?.idtipo_municipio
+        ?? null,
+    }));
   }
 
   // Verificar quais dados estão em cache

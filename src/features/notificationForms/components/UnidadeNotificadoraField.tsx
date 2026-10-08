@@ -3,6 +3,7 @@ import axios from "axios";
 import { Search, X, AlertCircle } from "lucide-react";
 import { createPortal } from "react-dom";
 import indexedDBService from '@/services/indexedDB';
+import { estabelecimentoAtivoParaOffline } from '@/features/notificationForms/utils/eventoEstabelecimentos';
 
 // Configuração da API usando variáveis de ambiente
 const server = import.meta.env.VITE_API_SERVER;
@@ -268,7 +269,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
             }
             
             // Filtrar por ativo
-            matches = matches && est.ativo === 'S';
+            matches = matches && estabelecimentoAtivoParaOffline(est);
             
             return matches;
           });
@@ -338,7 +339,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
               }
               
               // Filtrar por ativo
-              matches = matches && est.ativo === 'S';
+              matches = matches && estabelecimentoAtivoParaOffline(est);
               
               return matches;
             });
@@ -433,7 +434,7 @@ const UnidadeNotificadoraField: React.FC<UnidadeNotificadoraFieldProps> = ({
                 matches = matches && (byName || byCnes);
               }
               
-              matches = matches && est.ativo === 'S';
+              matches = matches && estabelecimentoAtivoParaOffline(est);
               return matches;
             });
             

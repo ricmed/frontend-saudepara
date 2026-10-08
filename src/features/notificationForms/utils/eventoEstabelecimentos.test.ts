@@ -1,9 +1,11 @@
 import {
   aplicarEscopoUnidadeNoEvento,
+  estabelecimentoAtivoParaOffline,
   eventoVinculaEstabelecimentos,
   filtrarUnidadesDoEvento,
   eventoRestringeObito,
   idEstaNaListaDoEvento,
+  municipioIdDoEstabelecimento,
   rotuloOpcaoObitoEvento,
   shouldRestrictEstabelecimentosPorEvento,
 } from './eventoEstabelecimentos';
@@ -33,6 +35,20 @@ describe('eventoEstabelecimentos', () => {
       { idestabelecimento: 20, nome: 'B' },
     ]);
     expect(aplicarEscopoUnidadeNoEvento(unidades, 'unidade', 99)).toEqual([]);
+  });
+
+  it('mostra unidade do cache antigo sem ativo e esconde a inativa', () => {
+    expect(estabelecimentoAtivoParaOffline({})).toBe(true);
+    expect(estabelecimentoAtivoParaOffline({ ativo: 'S' })).toBe(true);
+    expect(estabelecimentoAtivoParaOffline({ ativo: 'N' })).toBe(false);
+  });
+
+  it('lê o município no campo direto ou no objeto aninhado', () => {
+    expect(municipioIdDoEstabelecimento({ tipo_municipio_idtipo_municipio: 170 })).toBe(170);
+    expect(municipioIdDoEstabelecimento({
+      tipo_municipio: { idtipo_municipio: 170 },
+    })).toBe(170);
+    expect(municipioIdDoEstabelecimento({})).toBeNull();
   });
 
   it('não restringe enquanto a lista do evento carrega (pré-seleção do CTA)', () => {

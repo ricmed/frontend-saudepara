@@ -13,6 +13,8 @@ import indexedDBService from '@/services/indexedDB';
 import { useEstabelecimentosDoEvento } from '@/features/notificationForms/hooks/useEstabelecimentosDoEvento';
 import {
   aplicarEscopoUnidadeNoEvento,
+  estabelecimentoAtivoParaOffline,
+  municipioIdDoEstabelecimento,
   shouldRestrictEstabelecimentosPorEvento,
   toAllowedOptions,
 } from '@/features/notificationForms/utils/eventoEstabelecimentos';
@@ -141,7 +143,10 @@ const NotifierInfoSection: React.FC<FormSectionProps> = ({
             
             if (cachedEstabelecimentos && cachedEstabelecimentos.length > 0) {
               unidades = cachedEstabelecimentos
-                .filter((est: any) => est.tipo_municipio_idtipo_municipio === permissions.municipioId && est.ativo === 'S')
+                .filter((est: any) => (
+                  municipioIdDoEstabelecimento(est) === permissions.municipioId
+                  && estabelecimentoAtivoParaOffline(est)
+                ))
                 .map((est: any) => ({
                   id: est.idestabelecimento,
                   nome: est.nome
@@ -162,7 +167,7 @@ const NotifierInfoSection: React.FC<FormSectionProps> = ({
             
             if (cachedEstabelecimentos && cachedEstabelecimentos.length > 0) {
               unidades = cachedEstabelecimentos
-                .filter((est: any) => est.ativo === 'S')
+                .filter((est: any) => estabelecimentoAtivoParaOffline(est))
                 .map((est: any) => ({
                   id: est.idestabelecimento,
                   nome: est.nome
@@ -192,7 +197,7 @@ const NotifierInfoSection: React.FC<FormSectionProps> = ({
             
             if (cachedEstabelecimentos && cachedEstabelecimentos.length > 0) {
               const unidades = cachedEstabelecimentos
-                .filter((est: any) => est.ativo === 'S')
+                .filter((est: any) => estabelecimentoAtivoParaOffline(est))
                 .map((est: any) => ({
                   id: est.idestabelecimento,
                   nome: est.nome

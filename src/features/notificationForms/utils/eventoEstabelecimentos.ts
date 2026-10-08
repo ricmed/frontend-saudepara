@@ -38,6 +38,21 @@ export function aplicarEscopoUnidadeNoEvento<
   return unidades;
 }
 
+/** Cache antigo do offline não traz `ativo`. Só esconde inativo explícito. */
+export function estabelecimentoAtivoParaOffline(est: {
+  ativo?: string | number | boolean | null;
+}): boolean {
+  return est.ativo !== 'N' && est.ativo !== '0' && est.ativo !== 0 && est.ativo !== false;
+}
+
+export function municipioIdDoEstabelecimento(est: {
+  tipo_municipio_idtipo_municipio?: number | null;
+  tipo_municipio?: { idtipo_municipio?: number | null } | null;
+}): number | null {
+  const id = est.tipo_municipio_idtipo_municipio ?? est.tipo_municipio?.idtipo_municipio ?? null;
+  return id == null ? null : Number(id);
+}
+
 export function toAllowedOptions(
   rows: Array<{
     idestabelecimento: number;
