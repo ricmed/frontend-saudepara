@@ -26,7 +26,7 @@ import { MonitorOperQdqqAcaoPicker } from './MonitorOperQdqqAcaoPicker';
 import { monitorOperRowCrsIds } from '../utils/monitorOperRegionalReport';
 import {
   monitorOperPickerHiddenKeys,
-  QDQQ_IDENTITY_LOCKED_KEYS,
+  monitorOperQdqqLockedKeys,
 } from '../utils/monitorOperQdqqEscolha';
 import SyndromicSintomaHelpButton from './SyndromicSintomaHelpButton';
 import type { CepFoundDetail } from './AdvancedFields';
@@ -756,6 +756,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     String(getValue('cabecalho.momento') ?? '') === 'relato' &&
     String(getValue('acao.qtd_programadas_qdqq') ?? '') === '1';
   const qdqqEscolhida = String(getValue('acao.qdqq_escolhida') ?? '') === '1';
+  const qdqqLockedKeys = monitorOperQdqqLockedKeys(schema);
   const relatoNaoProgramada =
     monitorOperFormLive &&
     String(getValue('cabecalho.momento') ?? '') === 'relato' &&
@@ -1216,13 +1217,21 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       sections = sections.filter((s) => !hiddenSet.has(s.id));
     }
 
+    const monitorOper = String(schema.agravo || '').includes('Monitoramento operacional');
+    const withMonitorOrder = sections.map((section) => {
+      if (!monitorOper) return section;
+      if (section.id === 'custo') return { ...section, order: 4 };
+      if (section.id === 'detalhamento') return { ...section, order: 5 };
+      return section;
+    });
+
     // Mantém comportamento antigo apenas se um schema pedir de forma explícita.
     // Retrocompatibilidade: aceita `showOnlyFixedInForm` e alias `fixedOnly`.
     const cfg = (schema.fixedColumnsConfig || {}) as any;
     const useFixedOnly = cfg.showOnlyFixedInForm === true || cfg.fixedOnly === true;
-    if (!useFixedOnly) return sections.sort((a, b) => a.order - b.order);
+    if (!useFixedOnly) return [...withMonitorOrder].sort((a, b) => a.order - b.order);
 
-    return sections
+    return withMonitorOrder
       .map((section) => ({
         ...section,
         fields: (section.fields || []).filter((f) => f.isFixedColumn === true),
@@ -1979,7 +1988,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     const disabled =
       isFieldDisabled(resolved.key) ||
       readOnly ||
-      (qdqqEscolhida && QDQQ_IDENTITY_LOCKED_KEYS.has(resolved.key));
+      (qdqqEscolhida && qdqqLockedKeys.has(resolved.key));
 
     if (!visible) {
       return null;
@@ -2717,11 +2726,6 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                   {section.description ? (
                     <div className="md:col-span-2 text-sm text-gray-600 mb-1">{section.description}</div>
                   ) : null}
-                  {section.id === 'acao' && qdqqEscolhida ? (
-                    <div className="md:col-span-2 text-sm text-gray-600 mb-1">
-                      Dados da programação QDQQ. Para desfazer, mude “estava programada?” para Não.
-                    </div>
-                  ) : null}
                   {section.id === 'detalhamento' &&
                   String(schema.agravo || '').includes('Monitoramento operacional') &&
                   !getValue('acao.atividade') ? (
@@ -2747,7 +2751,7 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                         {renderField(field)}
                       </div>
                     );
-                    if (monitorMomento !== 'relato') return momentoNode;
+                    if (monitorMomento !== 'relato' && !qdqqEscolhida) return momentoNode;
                     const relatoFields = schema.sections
                       .flatMap((s) => s.fields)
                       .filter(

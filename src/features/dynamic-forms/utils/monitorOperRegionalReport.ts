@@ -1,4 +1,9 @@
 import type { FormSchema } from '@/services/FormService';
+import {
+  classifyMonitorOperLista,
+  monitorOperListaSituacaoLabel,
+  type MonitorOperListaSituacao,
+} from './monitorOperListaRecorte';
 import { formatMonitorOperObstaculoLabel } from './monitorOperObstaculoOptions';
 
 /** Linha de `data_json` com cabeçalho e ação (monitor operacional regional). */
@@ -749,6 +754,7 @@ export interface MonitorOperSubmissionSummary {
   programada: unknown;
   realizada: unknown;
   custoTotal: number;
+  situacao: MonitorOperListaSituacao | null;
 }
 
 /**
@@ -895,6 +901,12 @@ export function getMonitorOperListColumnSpecs(): MonitorOperListColSpec[] {
         crsById[String(r.crs_id ?? '')] || (r.crs_id != null && r.crs_id !== '' ? String(r.crs_id) : '—'),
     },
     {
+      id: 'situacao',
+      label: 'Situação',
+      tdClassName: 'whitespace-nowrap',
+      format: (r) => monitorOperListaSituacaoLabel(r.situacao),
+    },
+    {
       id: 'executor',
       label: 'Executor (nível)',
       tdClassName: 'whitespace-nowrap',
@@ -976,11 +988,12 @@ export function getMonitorOperListColumnSpecs(): MonitorOperListColSpec[] {
   ];
 }
 
-const LS_MONITOR_OPER_LIST_COLS = 'dynamicForms.MONITOR_OPER_REGIONAL.listCols';
+const LS_MONITOR_OPER_LIST_COLS = 'dynamicForms.MONITOR_OPER_REGIONAL.listCols.v2';
 
 /** Colunas visíveis ao abrir a lista (demais em “Colunas”). */
 export const MONITOR_OPER_LIST_DEFAULT_VISIBLE_COL_IDS: readonly string[] = [
   'crs',
+  'situacao',
   'competencia',
   'area',
   'atividade',
@@ -1066,6 +1079,7 @@ export function buildPerSubmissionSummaries(
       programada: d?.acao?.qtd_programadas_qdqq,
       realizada: d?.acao?.qtd_realizadas_conforme_programacao,
       custoTotal,
+      situacao: classifyMonitorOperLista(d).situacao,
     };
   });
 }
@@ -1092,6 +1106,7 @@ export function monitorOperSubmissionsToCsv(rows: MonitorOperSubmissionSummary[]
     'data_realizacao',
     'programada_qdqq',
     'realizada',
+    'situacao',
     'custo_total',
   ];
   const esc = (v: unknown) => {
@@ -1122,6 +1137,7 @@ export function monitorOperSubmissionsToCsv(rows: MonitorOperSubmissionSummary[]
         r.dataRealizacao,
         r.programada,
         r.realizada,
+        monitorOperListaSituacaoLabel(r.situacao),
         r.custoTotal.toFixed(2).replace('.', ','),
       ]
         .map(esc)

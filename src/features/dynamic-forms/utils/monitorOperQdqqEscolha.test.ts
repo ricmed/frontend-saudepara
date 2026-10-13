@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   listQdqqProgramacoesAbertas,
   monitorOperPickerHiddenKeys,
+  monitorOperQdqqLockedKeys,
 } from './monitorOperQdqqEscolha';
 
 describe('listQdqqProgramacoesAbertas', () => {
@@ -120,7 +121,7 @@ describe('listQdqqProgramacoesAbertas', () => {
 });
 
 describe('monitorOperPickerHiddenKeys', () => {
-  it('esconde a ação e o executou, e deixa a pergunta de programação', () => {
+  it('esconde a ação até a escolha e deixa as duas perguntas do relato', () => {
     const keys = monitorOperPickerHiddenKeys({
       sections: [
         { id: 'acao', fields: [{ key: 'acao.area' }] },
@@ -129,8 +130,27 @@ describe('monitorOperPickerHiddenKeys', () => {
       ],
     });
     expect(keys.has('acao.area')).toBe(true);
-    expect(keys.has('acao.qtd_realizadas_conforme_programacao')).toBe(true);
+    expect(keys.has('acao.qtd_realizadas_conforme_programacao')).toBe(false);
     expect(keys.has('detalhamento.capacitacao_como')).toBe(true);
+    expect(keys.has('acao.qtd_programadas_qdqq')).toBe(false);
+  });
+});
+
+describe('monitorOperQdqqLockedKeys', () => {
+  it('trava o custo da ação escolhida e deixa detalhamento e quantificação livres', () => {
+    const keys = monitorOperQdqqLockedKeys({
+      sections: [
+        { id: 'detalhamento', fields: [{ key: 'detalhamento.capacitacao_como' }, { key: 'detalhamento.aquisicao_quantificacao' }] },
+        { id: 'custo', fields: [{ key: 'custo.el_339030' }] },
+        { id: 'resumo_executivo', fields: [{ key: 'resumo.objetivo_alcancado' }] },
+      ],
+    });
+    expect(keys.has('detalhamento.capacitacao_como')).toBe(false);
+    expect(keys.has('detalhamento.aquisicao_quantificacao')).toBe(false);
+    expect(keys.has('custo.el_339030')).toBe(true);
+    expect(keys.has('acao.n_tecnicos')).toBe(true);
+    expect(keys.has('acao.area')).toBe(true);
+    expect(keys.has('resumo.objetivo_alcancado')).toBe(false);
     expect(keys.has('acao.qtd_programadas_qdqq')).toBe(false);
   });
 });

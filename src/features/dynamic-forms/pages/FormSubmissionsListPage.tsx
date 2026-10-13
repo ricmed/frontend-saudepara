@@ -28,6 +28,10 @@ import {
   type MonitorOperListColSpec,
   type MonitorOperSubmissionSummary,
 } from '../utils/monitorOperRegionalReport';
+import {
+  monitorOperMatchesListaRecorte,
+  type MonitorOperListaRecorte,
+} from '../utils/monitorOperListaRecorte';
 import { compareValues } from '@/features/notificationForms/utils';
 import { useCrsLabelByIdMap } from '../hooks/useCrsLabelByIdMap';
 import { useMunicipioLabelByIdMap } from '../hooks/useMunicipioLabelByIdMap';
@@ -225,6 +229,9 @@ export const FormSubmissionsListPage: React.FC = () => {
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [listaRecorte, setListaRecorte] = useState<MonitorOperListaRecorte>('todas');
+  const [recorteSource, setRecorteSource] = useState<ResponseRow[]>([]);
+  const [recorteLoading, setRecorteLoading] = useState(false);
   const listColPickerRef = useRef<HTMLDivElement | null>(null);
   const listQueryReadyRef = useRef(false);
   const skipListReloadOnceRef = useRef(false);
@@ -250,9 +257,14 @@ export const FormSubmissionsListPage: React.FC = () => {
   }, [agravo, monitorSubmissionsForTotals]);
 
   const monitorListCols = useMemo(() => (isMonitorOperList ? getMonitorOperListColumnSpecs() : []), [isMonitorOperList]);
+  const recorteAtivo = isMonitorOperList && listaRecorte !== 'todas';
+  const recorteFiltered = useMemo(() => {
+    if (!recorteAtivo) return [];
+    return recorteSource.filter((row) => monitorOperMatchesListaRecorte(row.data_json, listaRecorte));
+  }, [recorteAtivo, recorteSource, listaRecorte]);
   const monitorSummaryById = useMemo(
-    () => (isMonitorOperList ? buildMonitorOperSummaryById(rows) : new Map()),
-    [isMonitorOperList, rows],
+    () => (isMonitorOperList ? buildMonitorOperSummaryById(recorteAtivo ? recorteFiltered : rows) : new Map()),
+    [isMonitorOperList, recorteAtivo, recorteFiltered, rows],
   );
 
   const visibleMonitorCols = useMemo(
@@ -343,6 +355,50 @@ export const FormSubmissionsListPage: React.FC = () => {
     activeSchema,
     responseLabelMaps,
   ]);
+
+  const recorteSorted = useMemo(() => {
+    if (!recorteAtivo) return [];
+    if (!listSort.key) return recorteFiltered;
+    const dir = listSort.order;
+    const opts = {
+      monitorSummaryById,
+      monitorColById,
+      hepatiteSummaryById,
+      hepatiteColById,
+      crsLabels: crsByIdMap,
+      activeSchema,
+      responseMaps: responseLabelMaps,
+    };
+    return [...recorteFiltered].sort((a, b) => {
+      const va = getListSortComparableValue(a, listSort.key as string, opts);
+      const vb = getListSortComparableValue(b, listSort.key as string, opts);
+      return compareFormListValues(va, vb, dir);
+    });
+  }, [
+    recorteAtivo,
+    recorteFiltered,
+    listSort.key,
+    listSort.order,
+    monitorSummaryById,
+    monitorColById,
+    hepatiteSummaryById,
+    hepatiteColById,
+    crsByIdMap,
+    activeSchema,
+    responseLabelMaps,
+  ]);
+
+  const recortePageRows = useMemo(() => {
+    if (!recorteAtivo) return [];
+    const start = (page - 1) * itemsPerPage;
+    return recorteSorted.slice(start, start + itemsPerPage);
+  }, [recorteAtivo, recorteSorted, page, itemsPerPage]);
+
+  const tableRows = recorteAtivo ? recortePageRows : sortedRows;
+  const shownTotal = recorteAtivo ? recorteFiltered.length : listTotal;
+  const shownTotalPages = recorteAtivo
+    ? Math.max(1, Math.ceil(recorteFiltered.length / itemsPerPage))
+    : totalPages;
 
   const formSearchFields = useMemo(() => getFormListSearchFields(agravo), [agravo]);
 
@@ -487,6 +543,8 @@ export const FormSubmissionsListPage: React.FC = () => {
       setPage(1);
       setItemsPerPage(10);
       setMonitorSubmissionsForTotals([]);
+      setListaRecorte('todas');
+      setRecorteSource([]);
       listQueryReadyRef.current = false;
 
       const formData = await FormService.getFormByKey(agravo);
@@ -532,12 +590,45 @@ export const FormSubmissionsListPage: React.FC = () => {
 
   useEffect(() => {
     if (!listQueryReadyRef.current || !form?.id) return;
+    if (isMonitorOperList && listaRecorte !== 'todas') return;
     if (skipListReloadOnceRef.current) {
       skipListReloadOnceRef.current = false;
       return;
     }
     void loadResponsesPage(form.id, page, itemsPerPage);
-  }, [debouncedSearch, dateFilters, serverSortMeta.sortKey, serverSortMeta.sortDir, serverSortMeta.clientOnly, page, itemsPerPage, form?.id]);
+  }, [debouncedSearch, dateFilters, serverSortMeta.sortKey, serverSortMeta.sortDir, serverSortMeta.clientOnly, page, itemsPerPage, form?.id, isMonitorOperList, listaRecorte]);
+
+  useEffect(() => {
+    if (!isMonitorOperList || listaRecorte === 'todas' || !form?.id || !listQueryReadyRef.current) return;
+    let cancelled = false;
+    setRecorteLoading(true);
+    const filters: Omit<FormResponsesListFilters, 'page' | 'limit'> = { status: 'submitted' };
+    if (debouncedSearch.term.length >= 3) {
+      filters.search = debouncedSearch.term;
+      filters.search_field = debouncedSearch.field;
+    }
+    if (dateFilters.data_inicio) filters.data_inicio = dateFilters.data_inicio;
+    if (dateFilters.data_fim) filters.data_fim = dateFilters.data_fim;
+    FormResponsesService.listAllResponses(form.id, filters)
+      .then((data) => {
+        if (!cancelled) setRecorteSource(data as ResponseRow[]);
+      })
+      .catch((err: unknown) => {
+        console.error(err);
+        if (!cancelled) setRecorteSource([]);
+      })
+      .finally(() => {
+        if (!cancelled) setRecorteLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isMonitorOperList, listaRecorte, form?.id, debouncedSearch, dateFilters]);
+
+  useEffect(() => {
+    if (!recorteAtivo) return;
+    if (page > shownTotalPages) setPage(shownTotalPages);
+  }, [recorteAtivo, page, shownTotalPages]);
 
   useEffect(() => {
     if (!showSheet || !form?.id) {
@@ -628,7 +719,7 @@ export const FormSubmissionsListPage: React.FC = () => {
   };
 
   const toggleSelectAllPage = () => {
-    const pageIds = sortedRows.map((r) => r.id);
+    const pageIds = tableRows.map((r) => r.id);
     const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -717,17 +808,17 @@ export const FormSubmissionsListPage: React.FC = () => {
   };
 
   const pageAllSelected =
-    sortedRows.length > 0 && sortedRows.every((r) => selectedIds.has(r.id));
-  const pageSomeSelected = sortedRows.some((r) => selectedIds.has(r.id)) && !pageAllSelected;
+    tableRows.length > 0 && tableRows.every((r) => selectedIds.has(r.id));
+  const pageSomeSelected = tableRows.some((r) => selectedIds.has(r.id)) && !pageAllSelected;
 
   useEffect(() => {
     setSelectedIds((prev) => {
       if (prev.size === 0) return prev;
-      const pageSet = new Set(sortedRows.map((r) => r.id));
+      const pageSet = new Set(tableRows.map((r) => r.id));
       const next = new Set([...prev].filter((id) => pageSet.has(id)));
       return next.size === prev.size ? prev : next;
     });
-  }, [sortedRows]);
+  }, [tableRows]);
 
   const downloadPage = (format: 'xlsx' | 'csv') => {
     const cols: Array<{ key: string; label: string }> = [
@@ -738,7 +829,7 @@ export const FormSubmissionsListPage: React.FC = () => {
     for (const f of genericKeyFields.slice(0, 8)) {
       cols.push({ key: `f_${f.key}`, label: f.label || f.key });
     }
-    const flat = sortedRows.map((r) => {
+    const flat = tableRows.map((r) => {
       const row: Record<string, unknown> = {
         id: r.id,
         submitted_at: r.submitted_at ?? r.created_at,
@@ -822,7 +913,7 @@ export const FormSubmissionsListPage: React.FC = () => {
   return (
     <AppPageLayout
       title={form?.nome || 'Notificações'}
-      subtitle={`${listTotal} notificação(ões) cadastrada(s)`}
+      subtitle={`${shownTotal} notificação(ões) cadastrada(s)`}
       icon={<FileText className="h-8 w-8" />}
       variant="desktop"
       contentWidth="wide"
@@ -879,7 +970,11 @@ export const FormSubmissionsListPage: React.FC = () => {
         open={showSheet}
         onOpenChange={setShowSheet}
         form={form}
-        rows={sortedSheetPreviewRows}
+        rows={
+          recorteAtivo
+            ? sortedSheetPreviewRows.filter((row) => monitorOperMatchesListaRecorte(row.data_json, listaRecorte))
+            : sortedSheetPreviewRows
+        }
         loading={sheetPreviewLoading}
         onDownloadXlsx={() => void downloadAll('xlsx')}
         onDownloadCsv={() => void downloadAll('csv')}
@@ -925,6 +1020,59 @@ export const FormSubmissionsListPage: React.FC = () => {
             setPage(1);
           }}
         />
+
+        {isMonitorOperList ? (
+          <div className="mb-4 flex justify-center">
+            <div
+              className="inline-flex items-center gap-1 rounded-full bg-blue-600 p-1 shadow-md shadow-blue-900/15"
+              role="tablist"
+              aria-label="Recorte da lista"
+            >
+              {(
+                [
+                  {
+                    id: 'todas',
+                    label: 'Todas',
+                    idle: 'text-white/85 hover:bg-white/15',
+                    on: 'bg-white text-blue-700 shadow-sm',
+                  },
+                  {
+                    id: 'qdqq',
+                    label: 'QDQQ',
+                    idle: 'text-white/85 hover:bg-white/15',
+                    on: 'bg-white text-[#1A7CA8] shadow-sm',
+                  },
+                  {
+                    id: 'sigplan',
+                    label: 'SIGPLAN',
+                    idle: 'text-white/85 hover:bg-white/15',
+                    on: 'bg-white text-emerald-700 shadow-sm',
+                  },
+                ] as const
+              ).map((option) => {
+                const selected = listaRecorte === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    data-testid={`monitor-oper-lista-recorte-${option.id}`}
+                    onClick={() => {
+                      setListaRecorte(option.id);
+                      setPage(1);
+                    }}
+                    className={`rounded-full px-4 py-1.5 text-sm font-semibold tracking-wide transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 ${
+                      selected ? option.on : option.idle
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
 
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <button
@@ -1082,9 +1230,15 @@ export const FormSubmissionsListPage: React.FC = () => {
               </div>
             </div>
           ) : null}
+          {recorteAtivo && recorteLoading ? (
+            <p className="px-4 py-6 text-center text-sm text-gray-500">Carregando este recorte…</p>
+          ) : null}
+          {recorteAtivo && !recorteLoading && tableRows.length === 0 ? (
+            <p className="px-4 py-8 text-center text-sm text-gray-500">Nenhuma ação neste recorte.</p>
+          ) : null}
           {/* Mobile: cards */}
           <div className="block md:hidden divide-y divide-gray-100" data-testid="form-list-mobile-cards">
-            {sortedRows.map((r) => {
+            {tableRows.map((r) => {
               const card = formatRowCard(r);
               const selected = selectedIds.has(r.id);
               return (
@@ -1223,7 +1377,7 @@ export const FormSubmissionsListPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {sortedRows.map((r) => {
+                {tableRows.map((r) => {
                   const submittedAt = r.submitted_at ? new Date(r.submitted_at) : null;
                   return (
                     <tr
@@ -1330,8 +1484,8 @@ export const FormSubmissionsListPage: React.FC = () => {
             {/* Paginação — card separado, padrão Comunicação DAE */}
             <ListPaginationBar
               page={page}
-              totalPages={totalPages}
-              total={listTotal}
+              totalPages={shownTotalPages}
+              total={shownTotal}
               itemsPerPage={itemsPerPage}
               disabled={!form?.id}
               itemsPerPageId="form-list-items-per-page"

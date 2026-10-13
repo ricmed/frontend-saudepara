@@ -27,12 +27,28 @@ export const QDQQ_IDENTITY_LOCKED_KEYS = new Set([
   'acao.periodo_fim',
 ]);
 
+const QDQQ_PRELOAD_LOCKED_SECTION_IDS = new Set(['custo']);
+
 type SchemaLike = {
   sections?: { id?: string; fields?: { key?: string }[] }[];
 };
 
+/** Custo vem da programação e não se edita no relato da ação escolhida. Detalhamento e quantificação ficam livres. */
+export function monitorOperQdqqLockedKeys(schema: SchemaLike): Set<string> {
+  const keys = new Set<string>(QDQQ_IDENTITY_LOCKED_KEYS);
+  keys.add('acao.n_tecnicos');
+  keys.add('acao.n_motoristas');
+  for (const section of schema.sections ?? []) {
+    if (!section?.id || !QDQQ_PRELOAD_LOCKED_SECTION_IDS.has(section.id)) continue;
+    for (const field of section.fields ?? []) {
+      if (field?.key) keys.add(field.key);
+    }
+  }
+  return keys;
+}
+
 export function monitorOperPickerHiddenKeys(schema: SchemaLike): Set<string> {
-  const keys = new Set<string>(['acao.qtd_realizadas_conforme_programacao']);
+  const keys = new Set<string>();
   const ids = new Set<string>(MONITOR_OPER_PICKER_SECTION_IDS);
   for (const section of schema.sections ?? []) {
     if (!section?.id || !ids.has(section.id)) continue;

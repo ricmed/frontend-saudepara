@@ -319,6 +319,16 @@ export const useFormRenderer = ({
   const isFieldVisible = useCallback(
     (key: string) => {
       if (extraHiddenKeysRef?.current.has(key)) return false;
+      const momentoRelato = String(getValue('cabecalho.momento') ?? '') === 'relato';
+      const acaoQdqqEscolhida = String(getValue('acao.qdqq_escolhida') ?? '') === '1';
+      if (
+        (momentoRelato || acaoQdqqEscolhida) &&
+        (key === 'acao.qtd_programadas_qdqq' ||
+          (key === 'acao.qtd_realizadas_conforme_programacao' &&
+            String(getValue('acao.qtd_programadas_qdqq') ?? '') !== '0'))
+      ) {
+        return true;
+      }
       const estrangeiro = getValue('paciente.e_estrangeiro');
       const estrangeiroSim = estrangeiro === '1';
       const orientacaoSexual = getValue('paciente.orientacao_sexual');
