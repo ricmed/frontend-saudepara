@@ -2568,6 +2568,9 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           }
           const monitorOperForm = String(schema.agravo || '').includes('Monitoramento operacional');
           const monitorMomento = monitorOperForm ? String(getValue('cabecalho.momento') ?? '') : '';
+          if (monitorOperForm && section.id === 'sigplan') {
+            return <React.Fragment key={section.id} />;
+          }
           if (
             monitorOperForm &&
             (section.id === 'detalhamento' || section.id === 'resumo_executivo' || section.id === 'impacto_acao') &&
@@ -2738,6 +2741,48 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                   </div>
                 ) : null}
                 {sectionFields.map((field) => {
+                  if (monitorCabecalho && field.key === 'cabecalho.momento') {
+                    const momentoNode = (
+                      <div key={field.key} className={withPrintField(printLayoutMode, '')}>
+                        {renderField(field)}
+                      </div>
+                    );
+                    if (monitorMomento !== 'relato') return momentoNode;
+                    const relatoFields = schema.sections
+                      .flatMap((s) => s.fields)
+                      .filter(
+                        (f) =>
+                          f.key === 'acao.qtd_programadas_qdqq' ||
+                          f.key === 'acao.qtd_realizadas_conforme_programacao',
+                      );
+                    return (
+                      <React.Fragment key={field.key}>
+                        {momentoNode}
+                        <div className="md:col-span-2 grid grid-cols-1 gap-4 md:grid-cols-2">
+                          {relatoFields.map((relatoField) => {
+                            const content = renderField(relatoField);
+                            if (content == null) return null;
+                            return <div key={relatoField.key}>{content}</div>;
+                          })}
+                          {monitorQdqqPickerMode ? (
+                            <div className="md:col-span-2">
+                              <MonitorOperQdqqAcaoPicker
+                                formVersionId={formVersionId}
+                                formKey={formKey}
+                                chooseError={qdqqPickerError}
+                                crsFiltro={monitorOperRowCrsIds({
+                                  crs_id: getValue('cabecalho.crs_id'),
+                                  crs_ids: getValue('cabecalho.crs_ids'),
+                                  crs_abrangencia: getValue('cabecalho.crs_abrangencia'),
+                                })}
+                                competencia={String(getValue('cabecalho.competencia_mes_ano') ?? '')}
+                              />
+                            </div>
+                          ) : null}
+                        </div>
+                      </React.Fragment>
+                    );
+                  }
                   if (isHepatiteCriancaHBV && field.key === TIPO_EXPOSICAO_HEPATITE_KEY) {
                     return (
                       <div
@@ -4022,21 +4067,6 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                     </div>
                   );
                 })}
-                  {section.id === 'sigplan' && monitorQdqqPickerMode ? (
-                    <div className="md:col-span-2">
-                      <MonitorOperQdqqAcaoPicker
-                        formVersionId={formVersionId}
-                        formKey={formKey}
-                        chooseError={qdqqPickerError}
-                        crsFiltro={monitorOperRowCrsIds({
-                          crs_id: getValue('cabecalho.crs_id'),
-                          crs_ids: getValue('cabecalho.crs_ids'),
-                          crs_abrangencia: getValue('cabecalho.crs_abrangencia'),
-                        })}
-                        competencia={String(getValue('cabecalho.competencia_mes_ano') ?? '')}
-                      />
-                    </div>
-                  ) : null}
                   </div>
                 </div>
               </div>
