@@ -832,8 +832,8 @@ export const prepareDataForExport = (
     "Data e Hora de Criação Original": formData.created_offline 
       ? formatarDataHoraUniversal(getRealCreationDate(formData))
       : formatarDataHoraUniversal(formData.created_at),
-    "Data e Hora de Sincronização": formData.created_offline && formData.created_at
-      ? formatarDataHoraUniversal(formData.created_at)
+    "Data e Hora de Sincronização": formData.created_offline && (formData.synced_at || formData.created_at)
+      ? formatarDataHoraUniversal(formData.synced_at || formData.created_at)
       : "—",
     "Data e Hora de Atualização": formatarDataHoraUniversal(formData.updated_at),
     "Criado por (ID)": formData.created_by_userid || "—",
@@ -1470,8 +1470,8 @@ export const formatNotificacaoForExport = (
     "Data e Hora de Criação Original": original.created_offline 
       ? formatarDataHoraUniversal(getRealCreationDate(original))
       : formatarDataHoraUniversal(original.created_at),
-    "Data e Hora de Sincronização": original.created_offline && original.created_at
-      ? formatarDataHoraUniversal(original.created_at)
+    "Data e Hora de Sincronização": original.created_offline && (original.synced_at || original.created_at)
+      ? formatarDataHoraUniversal(original.synced_at || original.created_at)
       : "—",
     "Data e Hora de Atualização": formatarDataHoraUniversal(original.updated_at),
     "Criado por (ID)": original.created_by_userid || "—",

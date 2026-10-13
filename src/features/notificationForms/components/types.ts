@@ -59,6 +59,9 @@ export interface FormData {
     // Seção 7: Campos de Auditoria (opcionais)
     created_at?: string;
     updated_at?: string;
+    synced_at?: string;
+    created_offline?: boolean;
+    offline_id?: string;
     created_by_userid?: string;    // 🆕 ID do usuário que criou
     updated_by_userid?: string;    // 🆕 ID do usuário que atualizou
   }
