@@ -75,6 +75,47 @@ describe('monitorOperSigplanPanel', () => {
     });
   });
 
+  it('conta relato de ação não programada como presença, sem contar só a programação', () => {
+    const rows = [
+      {
+        cabecalho: { momento: 'relato' },
+        acao: {
+          atividade: 'capacitacao',
+          qtd_programadas_qdqq: '0',
+          qtd_realizadas_conforme_programacao: '0',
+          qtd_nao_programadas_qdqq: '1',
+          municipios_alcancados: ['1501402'],
+        },
+        detalhamento: { capacitacao_n_pessoas: 12 },
+      },
+      {
+        cabecalho: { momento: 'programacao' },
+        acao: {
+          atividade: 'capacitacao',
+          qtd_programadas_qdqq: '1',
+          qtd_realizadas_conforme_programacao: '0',
+          qtd_nao_programadas_qdqq: '0',
+          municipios_alcancados: ['1501402'],
+        },
+        detalhamento: { capacitacao_n_pessoas: 99 },
+      },
+    ];
+
+    const matrix = buildSigplanMunicipioPresenceMatrix(rows);
+    expect(matrix).toEqual([
+      {
+        municipioId: '1501402',
+        capacitacao: true,
+        capacitacaoPessoas: 12,
+        avaliacao: false,
+        avaliacaoModalidades: [],
+        acao_complementar: false,
+        acaoComplementarPessoas: 0,
+      },
+    ]);
+    expect(summarizeSigplanPresence(matrix, rows).capacitacaoPessoas).toBe(12);
+  });
+
   it('ignora atividades fora do escopo SIGPLAN e linhas sem município', () => {
     const matrix = buildSigplanMunicipioPresenceMatrix([
       {

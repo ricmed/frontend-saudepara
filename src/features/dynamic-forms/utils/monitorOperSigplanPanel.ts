@@ -44,8 +44,14 @@ export type SigplanPresenceSummary = {
   acaoComplementarPessoas: number;
 };
 
-function isRealizadaSim(v: unknown): boolean {
+function isFlagSim(v: unknown): boolean {
   return formatMonitorOperSim01(v) === 'Sim';
+}
+
+/** Aconteceu no território: executou a programação, ou o relato é de ação que não estava no QDQQ. */
+function acaoContaPresencaSigplan(acao: { qtd_realizadas_conforme_programacao?: unknown; qtd_nao_programadas_qdqq?: unknown } | null | undefined): boolean {
+  if (isFlagSim(acao?.qtd_realizadas_conforme_programacao)) return true;
+  return isFlagSim(acao?.qtd_nao_programadas_qdqq);
 }
 
 function normalizeAtividadeKey(raw: unknown): SigplanAtividadeKey | null {
@@ -72,7 +78,7 @@ export function formatSigplanAvaliacaoComoLabel(value: string): string {
 
 /**
  * Matriz município × atividade SIGPLAN.
- * Presença = atividade canônica + realizada Sim + município em `municipios_alcancados`.
+ * Presença = atividade canônica + (executou ou não programada) + município em `municipios_alcancados`.
  * Capacitação / ação complementar: soma pessoas das linhas que incluem o município.
  * Avaliação: sem campo de pessoas — coleta modalidades (`avaliacao_como`).
  */
@@ -108,7 +114,7 @@ export function buildSigplanMunicipioPresenceMatrix(rows: MonitorOperRow[]): Sig
   for (const d of rows) {
     const atividade = normalizeAtividadeKey(d?.acao?.atividade);
     if (!atividade) continue;
-    if (!isRealizadaSim(d?.acao?.qtd_realizadas_conforme_programacao)) continue;
+    if (!acaoContaPresencaSigplan(d?.acao)) continue;
 
     const municipios = [...new Set(normalizeMunicipiosAlcancados(d?.acao?.municipios_alcancados))];
     if (municipios.length === 0) continue;
@@ -168,7 +174,7 @@ export function summarizeSigplanPresence(
   for (const d of rows) {
     const atividade = normalizeAtividadeKey(d?.acao?.atividade);
     if (!atividade) continue;
-    if (!isRealizadaSim(d?.acao?.qtd_realizadas_conforme_programacao)) continue;
+    if (!acaoContaPresencaSigplan(d?.acao)) continue;
     if (normalizeMunicipiosAlcancados(d?.acao?.municipios_alcancados).length === 0) continue;
     if (atividade === 'capacitacao') {
       capacitacaoPessoas += parseNonNegNumber(d?.detalhamento?.capacitacao_n_pessoas);

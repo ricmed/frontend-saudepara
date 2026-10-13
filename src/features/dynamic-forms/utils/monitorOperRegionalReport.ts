@@ -390,8 +390,44 @@ export function monitorOperAreaLabel(areaKey: string): string {
 }
 
 /** Filtros do painel executivo / técnico (aplicados aos envios com `cabecalho` + `acao`). */
+export const MONITOR_OPER_CRS_TODOS = '*';
+
+/** CRS gravadas no envio: uma, várias, ou o Pará inteiro (`*`). */
+export function monitorOperRowCrsIds(cab: Record<string, any> | undefined): { todos: boolean; ids: string[] } {
+  if (!cab) return { todos: false, ids: [] };
+  const abrangencia = String(cab.crs_abrangencia ?? '');
+  const rawId = cab.crs_id == null ? '' : String(cab.crs_id).trim();
+  if (abrangencia === 'todos' || rawId === MONITOR_OPER_CRS_TODOS) return { todos: true, ids: [] };
+  if (Array.isArray(cab.crs_ids)) {
+    const ids = cab.crs_ids.map((v: unknown) => String(v).trim()).filter((v: string) => v && v !== MONITOR_OPER_CRS_TODOS);
+    if (ids.length) return { todos: false, ids: [...new Set(ids)] };
+  }
+  if (!rawId) return { todos: false, ids: [] };
+  if (rawId.includes(',')) {
+    const ids = rawId.split(',').map((s) => s.trim()).filter((v) => v && v !== MONITOR_OPER_CRS_TODOS);
+    return { todos: false, ids: [...new Set(ids)] };
+  }
+  return { todos: false, ids: [rawId] };
+}
+
+export function monitorOperCrsGroupKey(cab: Record<string, any> | undefined): string {
+  const sel = monitorOperRowCrsIds(cab);
+  if (sel.todos) return MONITOR_OPER_CRS_TODOS;
+  if (sel.ids.length === 0) return '';
+  return [...sel.ids].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).join(',');
+}
+
+export function monitorOperRowMatchesCrs(cab: Record<string, any> | undefined, crsId: string): boolean {
+  if (!crsId) return true;
+  const sel = monitorOperRowCrsIds(cab);
+  if (sel.todos) return true;
+  return sel.ids.includes(crsId);
+}
+
 export type MonitorOperReportFilters = {
   ano: string;
+  /** Mês civil 1–12. Vazio = todos. Usado no painel SIGPLAN. */
+  mes: string;
   quadrimestre: '' | 'Q1' | 'Q2' | 'Q3';
   crs_id: string;
   area: string;
@@ -407,6 +443,7 @@ export type MonitorOperReportFilters = {
 export function defaultMonitorOperReportFilters(): MonitorOperReportFilters {
   return {
     ano: '',
+    mes: '',
     quadrimestre: '',
     crs_id: '',
     area: '',
@@ -427,12 +464,17 @@ export function monitorOperRowMatchesFilters(
   const ac = d.acao as Record<string, any> | undefined;
   if (!cab || !ac) return false;
   if (f.ano && String(cab.ano ?? '') !== f.ano) return false;
+  if (f.mes) {
+    const wanted = Number(f.mes);
+    const mo = monthNumberFromCabecalho(cab);
+    if (!Number.isFinite(wanted) || mo !== wanted) return false;
+  }
   if (f.quadrimestre) {
     const mo = monthNumberFromCabecalho(cab);
     const q = mo == null ? '?' : quadrimestreKeyFromMonth(mo);
     if (q !== f.quadrimestre) return false;
   }
-  if (f.crs_id && String(cab.crs_id ?? '') !== f.crs_id) return false;
+  if (f.crs_id && !monitorOperRowMatchesCrs(cab, f.crs_id)) return false;
   if (f.area && String(ac.area ?? '') !== f.area) return false;
   if (f.executor_nivel && String(cab.executor_nivel ?? '') !== f.executor_nivel) return false;
   if (allowedMunicipioIds) {
@@ -475,8 +517,7 @@ export function collectMonitorOperReportFilterOptions(submissions: { data_json?:
     const ac = d.acao as Record<string, any>;
     const ano = cab.ano;
     if (ano != null && String(ano).trim() !== '') anos.add(String(ano));
-    const crs = cab.crs_id;
-    if (crs != null && String(crs).trim() !== '') crsIds.add(String(crs));
+    for (const crs of monitorOperRowCrsIds(cab).ids) crsIds.add(crs);
     const a = ac.area;
     if (a != null && String(a).trim() !== '') areas.add(String(a));
     const ex = cab.executor_nivel;
@@ -517,8 +558,8 @@ export type MonitorOperCrsAggregate = {
 export function buildAggregatesPorCrs(rows: MonitorOperRow[]): MonitorOperCrsAggregate[] {
   const map = new Map<string, MonitorOperRow[]>();
   for (const d of rows) {
-    const k =
-      d?.cabecalho?.crs_id == null || (d.cabecalho as any).crs_id === '' ? '__empty__' : String((d.cabecalho as any).crs_id);
+    const groupKey = monitorOperCrsGroupKey(d?.cabecalho as Record<string, any> | undefined);
+    const k = groupKey === '' ? '__empty__' : groupKey;
     if (!map.has(k)) map.set(k, []);
     map.get(k)!.push(d);
   }
@@ -1008,7 +1049,7 @@ export function buildPerSubmissionSummaries(
       id: s.id,
       status: s.status,
       created_at: s.created_at,
-      crs_id: d?.cabecalho?.crs_id,
+      crs_id: monitorOperCrsGroupKey(cab),
       executorNivel,
       ano: d?.cabecalho?.ano,
       mes: d?.cabecalho?.mes,

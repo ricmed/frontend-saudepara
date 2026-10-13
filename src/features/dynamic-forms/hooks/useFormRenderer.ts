@@ -72,9 +72,17 @@ interface UseFormRendererProps {
   onDataChange?: (data: Record<string, any>) => void;
   /** Chave do formulário na rota (ex.: HEPATITE_CRIANCA_HBV); reforça detecção quando o schema no banco não traz `agravo`. */
   formKey?: string;
+  /** Chaves escondidas pelo renderer (ex.: relato SIGPLAN ainda sem ação escolhida). Lido na hora da validação. */
+  extraHiddenKeysRef?: { current: ReadonlySet<string> };
 }
 
-export const useFormRenderer = ({ schema, initialData = {}, onDataChange, formKey }: UseFormRendererProps) => {
+export const useFormRenderer = ({
+  schema,
+  initialData = {},
+  onDataChange,
+  formKey,
+  extraHiddenKeysRef,
+}: UseFormRendererProps) => {
   const [formData, setFormData] = useState<Record<string, any>>(initialData);
   const [fieldVisibility, setFieldVisibility] = useState<Record<string, boolean>>({});
   const [fieldRequired, setFieldRequired] = useState<Record<string, boolean>>({});
@@ -310,6 +318,7 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange, formKe
 
   const isFieldVisible = useCallback(
     (key: string) => {
+      if (extraHiddenKeysRef?.current.has(key)) return false;
       const estrangeiro = getValue('paciente.e_estrangeiro');
       const estrangeiroSim = estrangeiro === '1';
       const orientacaoSexual = getValue('paciente.orientacao_sexual');
@@ -363,6 +372,14 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange, formKe
       if (key === 'paciente.gestante') {
         return getValue('paciente.sexo') === 'F';
       }
+      // Monitoramento operacional: resumo e impacto só no relato SIGPLAN
+      if (
+        schema?.agravo?.includes('Monitoramento operacional') &&
+        (key.startsWith('resumo.') || monitorOperImpactoGroup(key)) &&
+        String(getValue('cabecalho.momento') ?? '') !== 'relato'
+      ) {
+        return false;
+      }
       // Monitoramento operacional: detalhamento condicionado à atividade e à área
       if (schema?.agravo?.includes('Monitoramento operacional') && key.startsWith('detalhamento.')) {
         const atividade = getValue('acao.atividade');
@@ -406,7 +423,7 @@ export const useFormRenderer = ({ schema, initialData = {}, onDataChange, formKe
       }
       return fieldVisibility[key] !== false;
     },
-    [fieldVisibility, formKey, getValue, schema]
+    [extraHiddenKeysRef, fieldVisibility, formKey, getValue, schema]
   );
 
   const isFieldRequired = useCallback(

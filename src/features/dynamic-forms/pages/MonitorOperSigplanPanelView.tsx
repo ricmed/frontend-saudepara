@@ -422,6 +422,7 @@ export const MonitorOperSigplanPanelView: React.FC = () => {
         filterOptions={filterOptions}
         crsLabels={crsLabels}
         geoCatalog={geoCatalog}
+        showMes
       />
 
       <section

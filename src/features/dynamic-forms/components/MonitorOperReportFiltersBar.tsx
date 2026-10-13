@@ -3,10 +3,28 @@ import { quadrimestreLabel } from '../utils/monitorOperRegionalReport';
 import { buildGeoCascadeOptions } from '../utils/monitorOperGeoDimensoes';
 import type { MonitorOperReportContextValue } from '../pages/monitorOperReportContext';
 
+const MESES: { value: string; label: string }[] = [
+  { value: '1', label: 'Janeiro' },
+  { value: '2', label: 'Fevereiro' },
+  { value: '3', label: 'Março' },
+  { value: '4', label: 'Abril' },
+  { value: '5', label: 'Maio' },
+  { value: '6', label: 'Junho' },
+  { value: '7', label: 'Julho' },
+  { value: '8', label: 'Agosto' },
+  { value: '9', label: 'Setembro' },
+  { value: '10', label: 'Outubro' },
+  { value: '11', label: 'Novembro' },
+  { value: '12', label: 'Dezembro' },
+];
+
 type Props = Pick<
   MonitorOperReportContextValue,
   'filters' | 'setFilters' | 'filterOptions' | 'crsLabels' | 'geoCatalog'
->;
+> & {
+  /** Só o painel SIGPLAN escolhe um mês civil. */
+  showMes?: boolean;
+};
 
 export const MonitorOperReportFiltersBar: React.FC<Props> = ({
   filters,
@@ -14,6 +32,7 @@ export const MonitorOperReportFiltersBar: React.FC<Props> = ({
   filterOptions,
   crsLabels,
   geoCatalog,
+  showMes = false,
 }) => {
   const qOpts: { value: '' | 'Q1' | 'Q2' | 'Q3'; label: string }[] = [
     { value: '', label: 'Todos os quadrimestres' },
@@ -42,6 +61,7 @@ export const MonitorOperReportFiltersBar: React.FC<Props> = ({
   const clearFilters = () =>
     setFilters({
       ano: '',
+      mes: '',
       quadrimestre: '',
       crs_id: '',
       area: '',
@@ -83,6 +103,24 @@ export const MonitorOperReportFiltersBar: React.FC<Props> = ({
             ))}
           </select>
         </label>
+        {showMes ? (
+          <label className="flex flex-col gap-1 min-w-0">
+            <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">Mês</span>
+            <select
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800"
+              value={filters.mes}
+              onChange={(e) => setFilters((f) => ({ ...f, mes: e.target.value }))}
+              data-testid="monitor-oper-filter-mes"
+            >
+              <option value="">Todos os meses</option>
+              {MESES.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <label className="flex flex-col gap-1 min-w-0">
           <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">Quadrimestre</span>
           <select

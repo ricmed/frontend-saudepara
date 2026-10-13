@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { get, set, unset } from 'lodash';
 import type { FormSchema } from '@/services/FormService';
 import { useFormRenderer } from '../hooks/useFormRenderer';
@@ -20,6 +21,13 @@ import {
   InternationalPhoneField
 } from './AdvancedFields';
 import { AgravoMultiSelectField } from './AgravoMultiSelectField';
+import { MonitorOperCrsMultiField } from './MonitorOperCrsMultiField';
+import { MonitorOperQdqqAcaoPicker } from './MonitorOperQdqqAcaoPicker';
+import { monitorOperRowCrsIds } from '../utils/monitorOperRegionalReport';
+import {
+  monitorOperPickerHiddenKeys,
+  QDQQ_IDENTITY_LOCKED_KEYS,
+} from '../utils/monitorOperQdqqEscolha';
 import SyndromicSintomaHelpButton from './SyndromicSintomaHelpButton';
 import type { CepFoundDetail } from './AdvancedFields';
 import {
@@ -574,6 +582,10 @@ interface FormRendererProps {
   notificacaoEscopo?: NotificacaoEscopo;
   /** Chave do formulário (rota); usada para regras específicas da ficha HBV criança. */
   formKey?: string;
+  /** Versão ativa, para listar programações QDQQ no relato SIGPLAN. */
+  formVersionId?: number;
+  /** Id do envio em edição. Vazio no formulário novo. */
+  submissionId?: string;
   /** Expande todas as abas/seções visíveis (visualização para impressão). */
   printLayoutMode?: boolean;
   /**
@@ -608,6 +620,8 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
   notificacaoEscopo = 'livre',
   printLayoutMode = false,
   hiddenSectionIds,
+  formVersionId,
+  submissionId,
 }) => {
   const sectionIconMap: Record<string, React.ComponentType<{ className?: string }>> = React.useMemo(
     () => ({
@@ -706,6 +720,10 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     return merged;
   }, [initialData, isHepatiteCriancaHBV]);
 
+  const extraHiddenKeysRef = useRef<ReadonlySet<string>>(new Set());
+  const [qdqqPickerError, setQdqqPickerError] = useState<string | null>(null);
+  const navigate = useNavigate();
+
   const {
     setValue,
     getValue,
@@ -725,7 +743,38 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     formKey,
     initialData: initialDataWithDefaults,
     onDataChange,
+    extraHiddenKeysRef,
   });
+
+  const monitorOperFormLive =
+    String(schema.agravo || '').includes('Monitoramento operacional') ||
+    String(formKey || '').toUpperCase() === 'MONITOR_OPER_REGIONAL';
+  const monitorQdqqPickerMode =
+    monitorOperFormLive &&
+    !readOnly &&
+    !submissionId &&
+    String(getValue('cabecalho.momento') ?? '') === 'relato' &&
+    String(getValue('acao.qtd_programadas_qdqq') ?? '') === '1';
+  const qdqqEscolhida = String(getValue('acao.qdqq_escolhida') ?? '') === '1';
+  const relatoNaoProgramada =
+    monitorOperFormLive &&
+    String(getValue('cabecalho.momento') ?? '') === 'relato' &&
+    String(getValue('acao.qtd_programadas_qdqq') ?? '') === '0';
+  const monitorHiddenKeys = monitorQdqqPickerMode ? monitorOperPickerHiddenKeys(schema) : new Set<string>();
+  if (relatoNaoProgramada) monitorHiddenKeys.add('acao.qtd_realizadas_conforme_programacao');
+  extraHiddenKeysRef.current = monitorHiddenKeys;
+
+  useEffect(() => {
+    if (readOnly || submissionId || !relatoNaoProgramada) return;
+    if (String(getValue('acao.qtd_realizadas_conforme_programacao') ?? '') === '0') return;
+    setValue('acao.qtd_realizadas_conforme_programacao', '0');
+  }, [getValue, readOnly, relatoNaoProgramada, setValue, submissionId]);
+
+  useEffect(() => {
+    if (!qdqqEscolhida || !submissionId || !formKey) return;
+    if (String(getValue('acao.qtd_programadas_qdqq') ?? '') !== '0') return;
+    navigate(`/private/formularios/${formKey}/nova?momento=relato&programada=0`, { replace: true });
+  }, [formKey, getValue, navigate, qdqqEscolhida, submissionId]);
 
   const crsReadonlySyncedRef = useRef(false);
   const { lockNotifUf, lockNotifMun, lockNotifEst } = React.useMemo(() => {
@@ -751,7 +800,10 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       crsReadonlySyncedRef.current = true;
       return;
     }
-    setValue('cabecalho.crs_id', String(monitorOperRegionalCrsScope.readonlyCrs.id));
+    const crsId = String(monitorOperRegionalCrsScope.readonlyCrs.id);
+    setValue('cabecalho.crs_id', crsId);
+    setValue('cabecalho.crs_ids', [crsId]);
+    setValue('cabecalho.crs_abrangencia', 'lista');
     crsReadonlySyncedRef.current = true;
   }, [monitorOperRegionalCrsScope, getValue, setValue]);
 
@@ -1472,6 +1524,12 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     
     if (readOnly || isUploading) return;
 
+    if (monitorQdqqPickerMode) {
+      setQdqqPickerError('Escolha a ação já cadastrada no QDQQ.');
+      return;
+    }
+    setQdqqPickerError(null);
+
     // Em formulários públicos com seções ocultas, validar apenas as seções visíveis.
     // validateAll() checaria campos de seções que o respondente não pode ver.
     const isValid = usePublicHiddenValidation ? validateVisibleSectionsOnly() : validateAll();
@@ -1860,6 +1918,17 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
       return { ...withPlaceholder, allowFutureDate: true };
     }
 
+    if (withPlaceholder.key === 'acao.qtd_programadas_qdqq') {
+      return {
+        ...withPlaceholder,
+        helpText: qdqqEscolhida
+          ? 'Esta ação já estava no QDQQ.'
+          : relatoNaoProgramada
+            ? 'Descreva a ação abaixo. Ela entra no relato porque foi executada.'
+            : 'Sim: escolha a ação já salva no QDQQ. Não: descreva a ação agora.',
+      };
+    }
+
     return withPlaceholder;
   };
 
@@ -1907,7 +1976,10 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
     const error = getError(resolved.key);
     const required = isFieldRequired(resolved.key);
     const visible = isFieldVisible(resolved.key);
-    const disabled = isFieldDisabled(resolved.key) || readOnly;
+    const disabled =
+      isFieldDisabled(resolved.key) ||
+      readOnly ||
+      (qdqqEscolhida && QDQQ_IDENTITY_LOCKED_KEYS.has(resolved.key));
 
     if (!visible) {
       return null;
@@ -2317,26 +2389,23 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
               </div>
             );
           }
-          /** Nível central: identificação fixa + regional de destino (CRS). */
-          if (resolved.key === 'cabecalho.crs_id' && monitorOperRegionalCrsScope?.canSelectAnyCrs) {
+          if (resolved.key === 'cabecalho.crs_id') {
             const executorNivel = getValue('cabecalho.executor_nivel');
-            if (readOnly && executorNivel !== 'CENTRAL') {
+            const central = !!monitorOperRegionalCrsScope?.canSelectAnyCrs;
+            if (readOnly && central && executorNivel !== 'CENTRAL') {
               return <ApiSelectSearchField {...commonProps} getValue={getValue} context={context} />;
             }
             return (
-              <div className="mb-4 md:grid md:grid-cols-2 md:gap-4 md:items-start">
-                <div className="mb-4 md:mb-0">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Identificação do executor
-                  </label>
-                  <div className="w-full px-3 py-2.5 border rounded-md bg-teal-50/90 border-teal-200 text-gray-900 font-medium">
-                    Nível Central
-                  </div>
-                </div>
-                <div className="min-w-0 [&>div]:mb-0">
-                  <ApiSelectSearchField {...commonProps} getValue={getValue} context={context} />
-                </div>
-              </div>
+              <MonitorOperCrsMultiField
+                label={String(resolved.label ?? 'CRS (Regional de saúde)')}
+                required={required}
+                helpText={resolved.helpText}
+                error={error}
+                disabled={disabled}
+                allowTodos={central}
+                getValue={getValue}
+                setValue={setValue}
+              />
             );
           }
           return <ApiSelectSearchField {...commonProps} getValue={getValue} context={context} />;
@@ -2497,6 +2566,15 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
           if (isEntomologiaLarvas && section.id === 'frequencia_recipientes') {
             return null;
           }
+          const monitorOperForm = String(schema.agravo || '').includes('Monitoramento operacional');
+          const monitorMomento = monitorOperForm ? String(getValue('cabecalho.momento') ?? '') : '';
+          if (
+            monitorOperForm &&
+            (section.id === 'detalhamento' || section.id === 'resumo_executivo' || section.id === 'impacto_acao') &&
+            monitorMomento !== 'relato'
+          ) {
+            return null;
+          }
           if (isHepatiteCriancaHBV) {
             const tipoExposicao = getValue(TIPO_EXPOSICAO_HEPATITE_KEY);
             if (HEPATITE_CRIANCA_HBV_ONLY_SECTIONS.has(section.id) && !tipoExposicaoMostraHbv(tipoExposicao)) {
@@ -2545,6 +2623,30 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             );
           }
           const sortedFields = [...section.fields].sort((a, b) => a.order - b.order);
+          const monitorCabecalho =
+            section.id === 'cabecalho' &&
+            String(schema.agravo || '').includes('Monitoramento operacional');
+          const centralExecutor =
+            monitorCabecalho && !!monitorOperRegionalCrsScope?.canSelectAnyCrs;
+          const sectionFields = (() => {
+            if (!monitorCabecalho) return sortedFields;
+            const byKey = new Map(sortedFields.map((f) => [f.key, f]));
+            const crs = byKey.get('cabecalho.crs_id');
+            const comp = byKey.get('cabecalho.competencia_mes_ano');
+            const momento = byKey.get('cabecalho.momento');
+            const used = new Set([
+              'cabecalho.crs_id',
+              'cabecalho.competencia_mes_ano',
+              'cabecalho.momento',
+            ]);
+            const rest = sortedFields.filter((f) => !used.has(f.key));
+            return (centralExecutor ? [comp, crs, momento, ...rest] : [crs, momento, comp, ...rest]).filter(
+              (f): f is (typeof sortedFields)[number] => Boolean(f),
+            );
+          })();
+          if (!sortedFields.some((f) => isFieldVisible(f.key))) {
+            return <React.Fragment key={section.id} />;
+          }
           const firstNotificationField = sortedFields.find(
             (f) =>
               NOTIFICATION_LOCATION_KEYS.has(f.key) ||
@@ -2566,6 +2668,17 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             (section as any).icon && sectionIconMap[(section as any).icon]
               ? sectionIconMap[(section as any).icon]
               : undefined;
+          const programadaQdqq = String(getValue('acao.qtd_programadas_qdqq') ?? '');
+          const sectionTitle =
+            monitorOperForm && section.id === 'acao'
+              ? monitorMomento === 'programacao'
+                ? 'Programação da ação'
+                : monitorMomento === 'relato' && programadaQdqq === '1'
+                  ? 'Ação que estava no QDQQ'
+                  : monitorMomento === 'relato' && programadaQdqq === '0'
+                    ? 'Ação não programada'
+                    : 'Dados da ação'
+              : section.title;
           const tabExportHeader =
             printLayoutMode && section.tab && printFirstSectionByTab.has(section.id) ? (
               <div
@@ -2582,13 +2695,15 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
             <div className={withPrintSection(printLayoutMode, 'mb-6')}>
               {tabExportHeader}
               <div className="rounded-xl border border-gray-200 bg-white shadow-sm ficha-print-section-card">
-                <div className="ficha-print-section-header">
-                  <FormSectionHeader
-                    title={section.title}
-                    icon={sectionIcon}
-                  />
-                </div>
-                <div className="rounded-b-xl p-4 ficha-print-section-body">
+                {section.id === 'sigplan' ? null : (
+                  <div className="ficha-print-section-header">
+                    <FormSectionHeader
+                      title={sectionTitle}
+                      icon={sectionIcon}
+                    />
+                  </div>
+                )}
+                <div className={`${section.id === 'sigplan' ? 'rounded-xl' : 'rounded-b-xl'} p-4 ficha-print-section-body`}>
                   <div
                     className={
                       useHepatiteLayout
@@ -2599,15 +2714,30 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                   {section.description ? (
                     <div className="md:col-span-2 text-sm text-gray-600 mb-1">{section.description}</div>
                   ) : null}
+                  {section.id === 'acao' && qdqqEscolhida ? (
+                    <div className="md:col-span-2 text-sm text-gray-600 mb-1">
+                      Dados da programação QDQQ. Para desfazer, mude “estava programada?” para Não.
+                    </div>
+                  ) : null}
                   {section.id === 'detalhamento' &&
                   String(schema.agravo || '').includes('Monitoramento operacional') &&
                   !getValue('acao.atividade') ? (
                     <div className="md:col-span-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                      Selecione a <strong>Atividade</strong> na seção &quot;Ação realizada&quot; para exibir os campos de
+                      Selecione a <strong>Atividade</strong> na seção da ação para exibir os campos de
                       detalhamento correspondentes.
                     </div>
                   ) : null}
-                {sortedFields.map((field) => {
+                {centralExecutor ? (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Identificação do executor
+                    </label>
+                    <div className="w-full px-3 py-2 border rounded-md bg-teal-50/90 border-teal-200 text-gray-900 font-medium">
+                      Nível Central
+                    </div>
+                  </div>
+                ) : null}
+                {sectionFields.map((field) => {
                   if (isHepatiteCriancaHBV && field.key === TIPO_EXPOSICAO_HEPATITE_KEY) {
                     return (
                       <div
@@ -3892,6 +4022,21 @@ export const FormRenderer: React.FC<FormRendererProps> = ({
                     </div>
                   );
                 })}
+                  {section.id === 'sigplan' && monitorQdqqPickerMode ? (
+                    <div className="md:col-span-2">
+                      <MonitorOperQdqqAcaoPicker
+                        formVersionId={formVersionId}
+                        formKey={formKey}
+                        chooseError={qdqqPickerError}
+                        crsFiltro={monitorOperRowCrsIds({
+                          crs_id: getValue('cabecalho.crs_id'),
+                          crs_ids: getValue('cabecalho.crs_ids'),
+                          crs_abrangencia: getValue('cabecalho.crs_abrangencia'),
+                        })}
+                        competencia={String(getValue('cabecalho.competencia_mes_ano') ?? '')}
+                      />
+                    </div>
+                  ) : null}
                   </div>
                 </div>
               </div>

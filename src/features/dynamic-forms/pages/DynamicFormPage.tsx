@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { FormRenderer } from '../components/FormRenderer';
 import { FormActionBar } from '../components/FormActionBar';
 import FormService, { type FormVersion } from '@/services/FormService';
@@ -24,6 +24,10 @@ import { resolveFormRendererContext } from '../utils/sinanClinicalFields';
 
 export const DynamicFormPage: React.FC = () => {
   const { agravo, id } = useParams<{ agravo: string; id?: string }>(); // param name kept for route compatibility
+  const [searchParams] = useSearchParams();
+  const abrirComoRelato = searchParams.get('relato') === '1';
+  const momentoQuery = searchParams.get('momento');
+  const programadaQuery = searchParams.get('programada');
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   
@@ -69,7 +73,7 @@ export const DynamicFormPage: React.FC = () => {
 
   useEffect(() => {
     loadForm();
-  }, [agravo, id, user?.id, user?.sub, authLoading]);
+  }, [agravo, id, user?.id, user?.sub, authLoading, abrirComoRelato, momentoQuery, programadaQuery]);
 
   useEffect(() => {
     return () => {
@@ -129,8 +133,22 @@ export const DynamicFormPage: React.FC = () => {
 
       if (id) {
         const submission = await FormSubmissionService.getSubmissionById(Number(id));
-        setInitialData(submission.data_json);
-        setLiveFormData(submission.data_json ?? {});
+        let data = submission.data_json ?? {};
+        if (agravo === 'MONITOR_OPER_REGIONAL' && abrirComoRelato) {
+          const jaRelato = String(data?.cabecalho?.momento ?? '') === 'relato';
+          data = {
+            ...data,
+            cabecalho: { ...(data.cabecalho || {}), momento: 'relato' },
+            acao: {
+              ...(data.acao || {}),
+              qtd_programadas_qdqq: '1',
+              qdqq_escolhida: '1',
+              ...(jaRelato ? {} : { qtd_realizadas_conforme_programacao: undefined }),
+            },
+          };
+        }
+        setInitialData(data);
+        setLiveFormData(data);
       } else {
         // Nova notificação: pré-preencher data da notificação com a data atual
         const hoje = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
@@ -159,6 +177,12 @@ export const DynamicFormPage: React.FC = () => {
           };
           if (scopePayload?.ui === 'readonly' && scopePayload.readonlyCrs) {
             base.cabecalho.crs_id = String(scopePayload.readonlyCrs.id);
+          }
+          if (momentoQuery === 'relato') {
+            base.cabecalho.momento = 'relato';
+          }
+          if (programadaQuery === '0' || programadaQuery === '1') {
+            base.acao = { ...(base.acao || {}), qtd_programadas_qdqq: programadaQuery };
           }
         }
         // No técnico, quadrimestre é sempre obrigatório; pré-selecionar o atual.
@@ -526,6 +550,8 @@ export const DynamicFormPage: React.FC = () => {
             agravo === 'MONITOR_OPER_REGIONAL' ? monitorOperRegionalCrsScope : null
           }
           notificacaoEscopo={notificacaoEscopo}
+          formVersionId={formVersion.id}
+          submissionId={id}
         />
       </AppPageLayout>
     );

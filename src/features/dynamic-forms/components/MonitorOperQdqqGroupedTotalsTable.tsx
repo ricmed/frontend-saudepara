@@ -36,6 +36,12 @@ export function formatMonitorOperCrsDisplay(
 ): { line1: string; line2?: string; title?: string } {
   const sid = id == null || id === '' ? '' : String(id);
   if (!sid) return { line1: '—' as string, line2: undefined as string | undefined, title: undefined as string | undefined };
+  if (sid === '*') return { line1: 'Pará (todos)', title: 'Ação no Pará inteiro' };
+  if (sid.includes(',')) {
+    const parts = sid.split(',').map((s) => s.trim()).filter(Boolean);
+    const line1 = parts.map((part) => crsLabels?.[part] || part).join(', ');
+    return { line1, title: line1 };
+  }
   const label = crsLabels?.[sid];
   if (label) {
     if (opts?.omitSecondaryId) return { line1: label, title: label };

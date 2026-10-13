@@ -220,6 +220,22 @@ describe('monitorOperRegionalReport', () => {
     expect(filterMonitorOperSubmissionsByReportFilters(subs, f2)).toHaveLength(1);
   });
 
+  it('filterMonitorOperSubmissionsByReportFilters aceita várias CRS e Todos, e filtra mês no SIGPLAN', () => {
+    const multi = row({ cabecalho: { crs_id: '1,2', crs_ids: ['1', '2'], crs_abrangencia: 'lista', ano: 2026, mes: 'JAN', competencia_mes_ano: '2026-01' } });
+    const todos = row({ cabecalho: { crs_id: '*', crs_abrangencia: 'todos', ano: 2026, mes: 'MAR', competencia_mes_ano: '2026-03' } });
+    const junho = row({ cabecalho: { crs_id: 3, ano: 2026, mes: 'JUN', competencia_mes_ano: '2026-06' } });
+    const subs = [
+      { id: 1, status: 'x', created_at: 't', data_json: multi },
+      { id: 2, status: 'x', created_at: 't', data_json: todos },
+      { id: 3, status: 'x', created_at: 't', data_json: junho },
+    ];
+    const porCrs2 = { ...defaultMonitorOperReportFilters(), crs_id: '2' };
+    const idsCrs2 = filterMonitorOperSubmissionsByReportFilters(subs, porCrs2).map((s) => s.id);
+    expect(idsCrs2.sort()).toEqual([1, 2]);
+    const janeiro = { ...defaultMonitorOperReportFilters(), mes: '1' };
+    expect(filterMonitorOperSubmissionsByReportFilters(subs, janeiro).map((s) => s.id)).toEqual([1]);
+  });
+
   it('filterMonitorOperSubmissionsByReportFilters restringe por executor_nivel', () => {
     const central = row({ cabecalho: { crs_id: 1, ano: 2026, mes: 'JAN', executor_nivel: 'CENTRAL' } });
     const regional = row({ cabecalho: { crs_id: 1, ano: 2026, mes: 'FEV', executor_nivel: 'REGIONAL' } });
