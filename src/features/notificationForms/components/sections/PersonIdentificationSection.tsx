@@ -6,7 +6,7 @@ import FormField from '../shared/FormField';
 import CustomDateInput from '@/features/notificationForms/components/CustomDateInput';
 import CboInput from '@/features/notificationForms/components/CboInput';
 import PhoneInput from '@/features/notificationForms/components/PhoneInput';
-import { displayFormattedCPF } from '../../utils/formUtils';
+import { alignManualAgeFields, displayFormattedCPF } from '../../utils/formUtils';
 
 interface PersonIdentificationSectionProps extends FormSectionProps {
   pacienteSuggestions: any[];
@@ -52,6 +52,8 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
   // ✅ REMOVIDO: Estados e validação de CPF duplicado (conforme solicitação)
   // const [typingTimer, setTypingTimer] = useState<NodeJS.Timeout | null>(null);
   // const [isValidCPF, setIsValidCPF] = useState<boolean>(false);
+
+  const idadeManual = alignManualAgeFields(formData);
 
   // Função auxiliar para formatar CPF (remover caracteres não numéricos)
   const formatCPF = (cpf: string) => {
@@ -239,7 +241,7 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
                 <div className="flex items-center gap-2">
                   <select
                     name="idadeUnidade"
-                    value={formData.idadeUnidade}
+                    value={idadeManual.idadeUnidade}
                     onChange={handleChange}
                     className="p-3 border border-gray-200 rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
                   >
@@ -249,15 +251,15 @@ const PersonIdentificationSection: React.FC<PersonIdentificationSectionProps> = 
 
                   <input
                     type="number"
-                    name={formData.idadeUnidade === 'anos' ? 'idade' : 'idadeMeses'}
-                    value={formData.idadeUnidade === 'anos' ? formData.idade : formData.idadeMeses}
+                    name={idadeManual.idadeUnidade === 'anos' ? 'idade' : 'idadeMeses'}
+                    value={idadeManual.idadeUnidade === 'anos' ? (idadeManual.idade ?? '') : (idadeManual.idadeMeses ?? '')}
                     onChange={handleChange}
-                    placeholder={formData.idadeUnidade === 'anos' ? 'Anos' : 'Meses'}
+                    placeholder={idadeManual.idadeUnidade === 'anos' ? 'Anos' : 'Meses'}
                     min="0"
-                    max={formData.idadeUnidade === 'anos' ? "120" : "11"}
+                    max={idadeManual.idadeUnidade === 'anos' ? "120" : "11"}
                     className={`w-full p-3 border ${
-                      (formData.idadeUnidade === 'anos' && errors.idade) || 
-                      (formData.idadeUnidade === 'meses' && errors.idadeMeses)
+                      (idadeManual.idadeUnidade === 'anos' && errors.idade) || 
+                      (idadeManual.idadeUnidade === 'meses' && errors.idadeMeses)
                         ? "border-red-500 bg-red-50"
                         : "border-gray-200"
                     } rounded-lg text-sm bg-white transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none`}

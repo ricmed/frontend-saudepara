@@ -11,6 +11,9 @@ import {
   validateBirthDate,
   compareDates,
   validateManualAge,
+  alignManualAgeFields,
+  normalizeIdadeUnidade,
+  toUpperCaseAllStrings,
   isTipoAtendimento,
   isTipoEncerramento,
   validateLocalidadeEvento,
@@ -57,6 +60,62 @@ describe('formUtils — helpers', () => {
     const r = validateManualAge(base);
     expect(r.isValid).toBe(false);
     expect(r.errors.idade).toBeDefined();
+  });
+
+  it('idade em meses totais a partir de 1 ano reabre em anos, mesmo com unidade em maiúsculas', () => {
+    expect(normalizeIdadeUnidade('ANOS')).toBe('anos');
+    expect(normalizeIdadeUnidade('MESES')).toBe('meses');
+
+    const umAno = alignManualAgeFields({
+      idade: '1',
+      idadeMeses: '12',
+      idadeUnidade: 'ANOS',
+      dataNascimento: '',
+    });
+    expect(umAno.idadeUnidade).toBe('anos');
+    expect(umAno.idade).toBe('1');
+    expect(umAno.idadeMeses).toBe('12');
+
+    const quarenta = alignManualAgeFields({
+      idade: '',
+      idadeMeses: '480',
+      idadeUnidade: 'MESES',
+    });
+    expect(quarenta.idadeUnidade).toBe('anos');
+    expect(quarenta.idade).toBe('40');
+    expect(quarenta.idadeMeses).toBe('480');
+
+    const validacao = validateManualAge({
+      dataNascimento: '',
+      idade: '40',
+      idadeMeses: '480',
+      idadeUnidade: 'ANOS',
+    } as FormData);
+    expect(validacao.isValid).toBe(true);
+    expect(validacao.errors.idade).toBeUndefined();
+    expect(validacao.errors.idadeMeses).toBeUndefined();
+  });
+
+  it('meses de 0 a 11 continuam meses', () => {
+    const alinhada = alignManualAgeFields({
+      idade: '0',
+      idadeMeses: '8',
+      idadeUnidade: 'meses',
+    });
+    expect(alinhada.idadeUnidade).toBe('meses');
+    expect(alinhada.idadeMeses).toBe('8');
+  });
+
+  it('toUpperCaseAllStrings não transforma a unidade da idade em maiúsculas', () => {
+    const saida = toUpperCaseAllStrings({
+      paciente: 'ana',
+      idade: '40',
+      idadeMeses: '480',
+      idadeUnidade: 'anos',
+    });
+    expect(saida.paciente).toBe('ANA');
+    expect(saida.idadeUnidade).toBe('anos');
+    expect(saida.idadeMeses).toBe('480');
   });
 
   it('isTipoAtendimento matches descricao (tipo normalizado contido na descrição)', () => {

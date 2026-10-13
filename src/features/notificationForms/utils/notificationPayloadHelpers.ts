@@ -1,6 +1,6 @@
 import type { FormData } from '@/features/notificationForms/types/index2';
 import { detectUserTimezone } from '@/features/notificationForms/types/index2';
-import { toUpperCaseAllStrings } from './formUtils';
+import { alignManualAgeFields, toUpperCaseAllStrings } from './formUtils';
 
 export const buildNotificationDataForBackend = (
   formData: FormData,
@@ -10,7 +10,7 @@ export const buildNotificationDataForBackend = (
     arquivos = [],
     localidadeEventoOutro,
     ...restOfData
-  } = formData;
+  } = alignManualAgeFields(formData);
   const timezone = detectUserTimezone();
 
   return {

@@ -60,6 +60,8 @@ import {
 } from '@/features/notificationForms/types/index2';
 import { 
   normalizeText, 
+  normalizeIdadeUnidade,
+  alignManualAgeFields,
   toUpperCaseAllStrings, 
   compareDates,
   isTipoAtendimento,
@@ -1378,7 +1380,7 @@ export const useNotificationForm = (
       await loadMunicipiosByEstado(dadosFormatados.uf);
     }
 
-    setFormData(dadosFormatados);
+    setFormData(alignManualAgeFields(dadosFormatados));
   }, [loadMunicipiosByEstado, loadRemainingOptions]);
 
   const loadNotificacao = useCallback(async (notificacaoId?: string, localOfflineId?: string) => {
@@ -2486,10 +2488,17 @@ export const useNotificationForm = (
         });
       }
       
-      setFormData((prev) => ({ 
-        ...prev, 
-        idadeUnidade: value as 'anos' | 'meses'  // ✅ Usa o value original
-      }));
+      setFormData((prev) => {
+        const idadeUnidade = normalizeIdadeUnidade(value);
+        if (idadeUnidade === 'anos') {
+          return alignManualAgeFields({ ...prev, idadeUnidade });
+        }
+        const totalMeses = parseInt(String(prev.idadeMeses ?? ''), 10);
+        if (Number.isFinite(totalMeses) && totalMeses >= 12) {
+          return { ...prev, idadeUnidade: 'meses', idade: '', idadeMeses: '' };
+        }
+        return { ...prev, idadeUnidade };
+      });
       return;
     }
 
@@ -2566,7 +2575,7 @@ export const useNotificationForm = (
             return;
           }
           
-          if (name === 'idadeMeses' && numValue > 11 && formData.idadeUnidade === 'meses') {
+          if (name === 'idadeMeses' && numValue > 11 && normalizeIdadeUnidade(formData.idadeUnidade) === 'meses') {
             setErrors((prev) => ({
               ...prev,
               idadeMeses: "Quando a unidade é 'meses', o valor não pode ser superior a 11"

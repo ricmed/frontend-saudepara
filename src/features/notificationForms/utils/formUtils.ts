@@ -84,6 +84,8 @@ export const toUpperCaseAllStrings = (obj: any): any => {
         // ✅ CONDIÇÃO ADICIONADA: Se a chave for 'arquivos', não a converte.
         if (key === 'arquivos') {
           result[key] = obj[key];
+        } else if (key === 'idadeUnidade') {
+          result[key] = normalizeIdadeUnidade(obj[key]);
         } else {
           result[key] = toUpperCaseAllStrings(obj[key]);
         }
@@ -189,6 +191,75 @@ idadeUnidade
  };
 };
 
+export function normalizeIdadeUnidade(value: unknown): 'anos' | 'meses' {
+  return String(value ?? '').trim().toLowerCase() === 'meses' ? 'meses' : 'anos';
+}
+
+type ManualAgeFields = {
+  idade?: string;
+  idadeMeses?: string;
+  idadeUnidade?: string;
+  dataNascimento?: string;
+};
+
+/**
+ * O banco guarda a idade em meses totais (anos × 12).
+ * Com 12 meses ou mais, a tela mostra anos. Abaixo disso, meses (0 a 11).
+ * A unidade `anos`/`meses` vale em qualquer caixa: o offline gravava `ANOS`
+ * e o campo de meses (teto 11) lia o total.
+ */
+export function alignManualAgeFields<T extends ManualAgeFields>(form: T): T {
+  const unidade = normalizeIdadeUnidade(form.idadeUnidade);
+  if (form.dataNascimento && String(form.dataNascimento).trim() !== '') {
+    return { ...form, idadeUnidade: unidade };
+  }
+
+  const anos = parseInt(String(form.idade ?? ''), 10);
+  const meses = parseInt(String(form.idadeMeses ?? ''), 10);
+  const anosOk = Number.isFinite(anos) && anos >= 0;
+  const mesesOk = Number.isFinite(meses) && meses >= 0;
+
+  if (mesesOk && meses >= 12) {
+    const anosPeloTotal = Math.floor(meses / 12);
+    if (anosOk && anos <= 120 && Math.abs(meses - anos * 12) <= 11) {
+      return {
+        ...form,
+        idade: String(anos),
+        idadeMeses: String(meses),
+        idadeUnidade: 'anos',
+      };
+    }
+    if (anosPeloTotal <= 120) {
+      return {
+        ...form,
+        idade: String(anosPeloTotal),
+        idadeMeses: String(meses),
+        idadeUnidade: 'anos',
+      };
+    }
+  }
+
+  if (unidade === 'anos' && anosOk) {
+    return {
+      ...form,
+      idade: String(anos),
+      idadeMeses: String(anos * 12),
+      idadeUnidade: 'anos',
+    };
+  }
+
+  if (unidade === 'meses' && mesesOk && meses <= 11) {
+    return {
+      ...form,
+      idade: '0',
+      idadeMeses: String(meses),
+      idadeUnidade: 'meses',
+    };
+  }
+
+  return { ...form, idadeUnidade: unidade };
+}
+
 /**
 * NOVA FUNÇÃO: Valida idade manual (sem data de nascimento)
 */
@@ -203,8 +274,9 @@ export const validateManualAge = (formData: FormData): {
 return { isValid: true, errors: {} };
  }
 
- const idadeAnos = parseInt(formData.idade) || 0;
- const idadeMeses = parseInt(formData.idadeMeses) || 0;
+ const idadeAlinhada = alignManualAgeFields(formData);
+ const idadeAnos = parseInt(idadeAlinhada.idade ?? '') || 0;
+ const idadeMeses = parseInt(idadeAlinhada.idadeMeses ?? '') || 0;
 
  // Validar se pelo menos uma idade foi informada
  if (idadeAnos === 0 && idadeMeses === 0) {
