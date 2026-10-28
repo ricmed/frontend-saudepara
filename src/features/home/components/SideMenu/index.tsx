@@ -26,6 +26,7 @@ import {
   Database,
   Hospital,
   ClipboardList,
+  Syringe,
   Settings,
   QrCode,
   Palette,
@@ -164,6 +165,17 @@ export const SideMenu: React.FC<SideMenuProps> = ({
         navigate("/private/meus-formularios");
         onClose();
       },
+    }] : []),
+
+    ...(user && (
+      user.roles?.includes('microplanejamento') ||
+      user.roles?.includes('admin') ||
+      user.roles?.includes('admin.estado') ||
+      user.roles?.includes('admin.crs')
+    ) ? [{
+      icon: <Syringe />,
+      label: 'Microplanejamento',
+      onClick: () => navigate('/private/microplanejamento'),
     }] : []),
     
     // Menu Dashboard - para notificadores OU usuários com role dashboard (OCULTAR para admin.crs)

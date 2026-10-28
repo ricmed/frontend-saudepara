@@ -222,6 +222,9 @@ const NotificationForm = lazyPage(
 const ComunicacaoCasoPrintPage = lazyPage(
   () => import('@/features/notificationForms/pages/ComunicacaoCasoPrintPage'),
 );
+const MicroplanejamentoPage = lazyPage(
+  () => import('@/features/microplanejamento/MicroplanejamentoPage'),
+);
 const ComunicacaoDaePage = lazyPage(
   () => import('@/features/comunicacao-dae/ComunicacaoDaePage'),
 );
@@ -644,6 +647,23 @@ export const getPrivateAppRoutes = () => {
             path="/private/apps/comunicacao-dae/crs/:id"
             element={<CrsPage />}
           />
+        </Route>
+
+        <Route
+          element={
+            <ProtectedRoute
+              requiredRoles={[
+                'microplanejamento',
+                'admin',
+                'admin.estado',
+                'admin.crs',
+              ]}
+            >
+              <Outlet />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/private/microplanejamento/*" element={<MicroplanejamentoPage />} />
         </Route>
       </Route>
 
