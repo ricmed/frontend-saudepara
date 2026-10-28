@@ -5,7 +5,8 @@ import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 import { useAuth } from '@/keycloak/AuthProvider';
 import { microplanejamentoApi } from './api';
 import { searchSemCiclo, useMpFiltro } from './useMp';
-import { FiltroUbs, FiltrosTerritorio } from './FiltrosTerritorio';
+import { FiltroUbsCiclo, FiltrosTerritorio } from './FiltrosTerritorio';
+import { STATUS_CICLO } from './FormularioCiclo';
 import { inputClass } from './ui';
 import { InicioPage } from './pages/InicioPage';
 import { LocalidadesPage } from './pages/LocalidadesPage';
@@ -89,7 +90,7 @@ export default function MicroplanejamentoPage() {
         </nav>
 
         {secao === '' && (
-          <section className="bg-white border border-gray-200 rounded-lg p-3 grid gap-3 md:grid-cols-3">
+          <section className="bg-white border border-gray-200 rounded-lg p-3 grid gap-3 md:grid-cols-4">
             <FiltrosTerritorio />
             <label className="text-sm text-gray-700">
               Ciclo
@@ -100,10 +101,19 @@ export default function MicroplanejamentoPage() {
                 ))}
               </select>
             </label>
+            <label className="text-sm text-gray-700">
+              Status
+              <select className={`${inputClass} mt-1`} value={filtro.status ?? ''} onChange={(e) => filtro.setFiltro('status', e.target.value)}>
+                <option value="">Todos</option>
+                {STATUS_CICLO.map(([valor, rotulo]) => (
+                  <option key={valor} value={valor}>{rotulo}</option>
+                ))}
+              </select>
+            </label>
           </section>
         )}
 
-        {secao !== '' && secao !== 'parametros' && <FiltroUbs />}
+        {secao !== '' && secao !== 'parametros' && secao !== 'localidades' && <FiltroUbsCiclo />}
 
         {secao === '' && <InicioPage />}
         {secao === 'localidades' && <LocalidadesPage />}

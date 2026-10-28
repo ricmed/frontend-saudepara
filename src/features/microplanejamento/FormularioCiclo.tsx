@@ -6,11 +6,22 @@ import { numero, texto, useMunicipios, type MunicipioOption } from './useMp';
 
 export const ESTRATEGIAS = ['ROTINA', 'INTENSIFICACAO', 'CAMPANHA', 'MULTIVACINACAO', 'BLOQUEIO'];
 
+export const STATUS_CICLO = [
+  ['RASCUNHO', 'Rascunho'],
+  ['EM_VALIDACAO', 'Em validação'],
+  ['APROVADO', 'Aprovado'],
+  ['EM_EXECUCAO', 'Em execução'],
+  ['ENCERRADO', 'Encerrado'],
+] as const;
+
+export const STATUS_CICLO_ROTULO: Record<string, string> = Object.fromEntries(STATUS_CICLO);
+
 export type DadosCiclo = {
   nome: string;
   ano: number;
   estrategia: string;
   tipo_municipio_id: number;
+  status: string;
   data_inicio?: string | null;
   data_fim?: string | null;
   dias_operacionais: number;
@@ -55,6 +66,7 @@ export function FormularioCiclo({
       ano: modo === 'editar' ? ciclo!.ano : numero(form.get('ano'), new Date().getFullYear()),
       estrategia: modo === 'editar' ? ciclo!.estrategia : String(form.get('estrategia')),
       tipo_municipio_id: tipoMunicipio,
+      status: String(form.get('status') || 'RASCUNHO'),
       data_inicio: texto(form.get('data_inicio')),
       data_fim: texto(form.get('data_fim')),
       dias_operacionais: numero(form.get('dias'), 22),
@@ -86,6 +98,11 @@ export function FormularioCiclo({
         ) : (
           <select name="estrategia" className={inputClass}>{ESTRATEGIAS.map((item) => <option key={item}>{item}</option>)}</select>
         )}
+      </Campo>
+      <Campo label="Status">
+        <select name="status" className={inputClass} defaultValue={ciclo?.status ?? 'RASCUNHO'}>
+          {STATUS_CICLO.map(([valor, rotulo]) => <option key={valor} value={valor}>{rotulo}</option>)}
+        </select>
       </Campo>
       <Campo label="Dias operacionais"><input name="dias" type="number" min={1} max={31} defaultValue={ciclo?.dias_operacionais ?? 22} className={inputClass} /></Campo>
       <Campo label="Início"><input name="data_inicio" type="date" className={inputClass} defaultValue={isoDate(ciclo?.data_inicio)} /></Campo>

@@ -1,16 +1,17 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, microplanejamentoApi, type Ciclo } from '../api';
+import { CampoUbs } from '../FiltrosTerritorio';
 import { FormularioCiclo, type DadosCiclo } from '../FormularioCiclo';
-import { numero, texto, useMpFiltro } from '../useMp';
+import { numero, texto, useEstabelecimentoSelecionado, useMpFiltro, useUbsDoCiclo } from '../useMp';
 import { Aviso, Botao, BotaoSecundario, Campo, CampoCheck, Cartao, Celula, Formulario, inputClass, Linha, Tabela } from '../ui';
 
-type Aba = 'ciclo' | 'sala' | 'localidade' | 'aporte';
+type AbaUbs = 'sala' | 'localidade' | 'aporte';
 
 export function LocalidadesPage() {
-  const { cicloId, estabelecimentoId } = useMpFiltro();
+  const { cicloId, estabelecimentoId, setFiltro } = useMpFiltro();
   const queryClient = useQueryClient();
-  const [aba, setAba] = useState<Aba>('ciclo');
+  const [aba, setAba] = useState<AbaUbs>('localidade');
   const [mensagem, setMensagem] = useState('');
   const [erro, setErro] = useState('');
 
@@ -22,6 +23,8 @@ export function LocalidadesPage() {
       return resposta.data[0] as Ciclo | undefined;
     },
   });
+  const { ubs, isLoading: carregandoUbs } = useUbsDoCiclo(cicloId);
+  const ubsSelecionada = useEstabelecimentoSelecionado(estabelecimentoId);
   const localidades = useQuery({
     queryKey: ['mp-localidades', estabelecimentoId],
     enabled: Boolean(estabelecimentoId),
@@ -29,7 +32,7 @@ export function LocalidadesPage() {
   });
   const doCiclo = useQuery({
     queryKey: ['mp-localidades-ciclo', cicloId, estabelecimentoId],
-    enabled: Boolean(cicloId),
+    enabled: Boolean(cicloId && estabelecimentoId),
     queryFn: () => microplanejamentoApi.localidadesCiclo(cicloId!, estabelecimentoId),
   });
   const sala = useQuery({
@@ -41,6 +44,11 @@ export function LocalidadesPage() {
   function ok(textoOk: string) {
     setErro('');
     setMensagem(textoOk);
+  }
+
+  function escolherUbs(id: number | null) {
+    setFiltro('estabelecimentoId', id ? String(id) : '');
+    if (id) setAba('localidade');
   }
 
   const atualizarCiclo = useMutation({
@@ -78,13 +86,17 @@ export function LocalidadesPage() {
   });
   const inativar = useMutation({
     mutationFn: (id: number) => microplanejamentoApi.inativar('localidades', id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['mp-localidades'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mp-localidades'] });
+      queryClient.invalidateQueries({ queryKey: ['mp-localidades-ciclo'] });
+    },
     onError: (error) => setErro(apiErrorMessage(error)),
   });
 
   function onCiclo(dados: DadosCiclo) {
     atualizarCiclo.mutate({
       nome: dados.nome,
+      status: dados.status,
       data_inicio: dados.data_inicio,
       data_fim: dados.data_fim,
       dias_operacionais: dados.dias_operacionais,
@@ -122,158 +134,192 @@ export function LocalidadesPage() {
   }
 
   const abas = [
-    ['ciclo', 'Ciclo'],
     ['sala', 'Sala de vacina'],
     ['localidade', 'Localidade da UBS'],
     ['aporte', 'Aporte no ciclo'],
   ] as const;
+  const ubsNoCiclo = estabelecimentoId ? ubs.some((item) => item.idestabelecimento === estabelecimentoId) : false;
 
   return (
     <div className="space-y-4">
       {mensagem && <Aviso tipo="ok">{mensagem}</Aviso>}
       {erro && <Aviso tipo="erro">{erro}</Aviso>}
-      <div className="flex flex-wrap gap-2">
-        {abas.map(([id, rotulo]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setAba(id)}
-            className={`rounded-full px-3 py-1 text-sm ${aba === id ? 'bg-blue-700 text-white' : 'bg-white border'}`}
-          >
-            {rotulo}
-          </button>
-        ))}
-      </div>
 
-      {aba === 'ciclo' && (
-        <Cartao titulo="Ciclo">
-          {ciclo.isLoading && <p className="text-sm text-gray-500">Carregando ciclo…</p>}
-          {ciclo.isError && <Aviso tipo="erro">{apiErrorMessage(ciclo.error)}</Aviso>}
-          {ciclo.data && (
-            <FormularioCiclo
-              key={ciclo.data.id}
-              modo="editar"
-              ciclo={ciclo.data}
-              onSubmit={onCiclo}
-              pending={atualizarCiclo.isPending}
-            />
-          )}
-          {ciclo.isSuccess && !ciclo.data && <Aviso tipo="erro">Ciclo não encontrado.</Aviso>}
-        </Cartao>
-      )}
+      <Cartao titulo="Ciclo">
+        {ciclo.isLoading && <p className="text-sm text-gray-500">Carregando ciclo…</p>}
+        {ciclo.isError && <Aviso tipo="erro">{apiErrorMessage(ciclo.error)}</Aviso>}
+        {ciclo.data && (
+          <FormularioCiclo
+            key={ciclo.data.id}
+            modo="editar"
+            ciclo={ciclo.data}
+            onSubmit={onCiclo}
+            pending={atualizarCiclo.isPending}
+          />
+        )}
+        {ciclo.isSuccess && !ciclo.data && <Aviso tipo="erro">Ciclo não encontrado.</Aviso>}
+      </Cartao>
 
-      {aba === 'sala' && (
-        <Cartao titulo="Sala de vacina">
-          {!estabelecimentoId ? <p className="text-sm text-gray-500">Selecione a UBS.</p> : (
-            <Formulario onSubmit={onSala}>
-              <CampoCheck label="Possui sala"><input name="possui" type="checkbox" defaultChecked={sala.data?.possui_sala_vacina} /></CampoCheck>
-              <Campo label="Horário"><input name="horario" className={inputClass} defaultValue={sala.data?.horario_sala ?? ''} /></Campo>
-              <Campo label="Telefone"><input name="telefone" className={inputClass} defaultValue={sala.data?.telefone ?? ''} /></Campo>
-              <Campo label="E-mail"><input name="email" type="email" className={inputClass} defaultValue={sala.data?.email ?? ''} /></Campo>
-              <Campo label="Responsável"><input name="responsavel" className={inputClass} defaultValue={sala.data?.responsavel ?? ''} /></Campo>
-              <div className="md:col-span-2"><Botao type="submit">Gravar sala</Botao></div>
-            </Formulario>
-          )}
-        </Cartao>
-      )}
-
-      {aba === 'localidade' && (
-        <Cartao titulo="Localidade da UBS">
-          <Formulario onSubmit={onLocalidade}>
-            <Campo label="Nome"><input name="nome" required className={inputClass} /></Campo>
-            <Campo label="Bairro ou comunidade"><input name="bairro" className={inputClass} /></Campo>
-            <Campo label="Zona">
-              <select name="zona" className={inputClass}><option value="">—</option><option>URBANA</option><option>RURAL</option></select>
-            </Campo>
-            <Campo label="Tipo de território"><input name="tipo_territorio" className={inputClass} /></Campo>
-            <Campo label="Domicílios"><input name="domicilios" type="number" min={0} className={inputClass} /></Campo>
-            <Campo label="Escolas e instituições"><input name="escolas" className={inputClass} /></Campo>
-            <CampoCheck label="Dificuldade de acesso"><input name="dificuldade" type="checkbox" /></CampoCheck>
-            <Campo label="Descrição do acesso"><input name="descricao_acesso" className={inputClass} /></Campo>
-            <div className="md:col-span-2"><Botao type="submit">Gravar localidade</Botao></div>
-          </Formulario>
-          {localidades.isLoading && <p className="text-sm text-gray-500">Carregando localidades…</p>}
-          {(localidades.data?.data.length ?? 0) === 0 && estabelecimentoId && !localidades.isLoading && <p className="text-sm text-gray-500">Nenhuma localidade nesta UBS.</p>}
-          <Tabela colunas={['Nome', 'Zona', '']}>
-            {(localidades.data?.data ?? []).map((item) => (
-              <Linha key={item.id}>
+      <Cartao titulo="UBSs deste ciclo">
+        <CampoUbs
+          label="Incluir UBS"
+          municipioId={ciclo.data?.tipo_municipio_id}
+          selecionado={ubsSelecionada.data}
+          onEscolher={escolherUbs}
+        />
+        {carregandoUbs && <p className="text-sm text-gray-500">Carregando UBSs…</p>}
+        {!carregandoUbs && ubs.length === 0 && (
+          <p className="text-sm text-gray-500">
+            Nenhuma UBS neste ciclo. Inclua uma unidade e grave ao menos uma localidade no aporte.
+          </p>
+        )}
+        {ubs.length > 0 && (
+          <Tabela colunas={['Nome', 'CNES', 'Localidades']}>
+            {ubs.map((item) => (
+              <Linha
+                key={item.idestabelecimento}
+                selecionada={item.idestabelecimento === estabelecimentoId}
+                onClick={() => escolherUbs(item.idestabelecimento)}
+              >
                 <Celula>{item.nome}</Celula>
-                <Celula>{item.zona ?? '—'}</Celula>
-                <Celula><BotaoSecundario onClick={() => inativar.mutate(item.id)}>Inativar</BotaoSecundario></Celula>
+                <Celula>{item.cnes ?? '—'}</Celula>
+                <Celula>{item.localidades}</Celula>
               </Linha>
             ))}
           </Tabela>
-        </Cartao>
-      )}
+        )}
+        {estabelecimentoId && !ubsNoCiclo && (
+          <p className="text-sm text-gray-500">
+            A UBS entra na lista depois de gravar ao menos uma localidade no ciclo, na aba Aporte.
+          </p>
+        )}
+      </Cartao>
 
-      {aba === 'aporte' && (
-        <Cartao titulo="Aporte no ciclo">
-          {!cicloId ? <p className="text-sm text-gray-500">Selecione o ciclo.</p> : (
-            <Tabela colunas={['Localidade', 'População', 'Prioridade', '% aporte', '']}>
-              {(doCiclo.data?.data ?? []).map((item) => (
-                <Linha key={item.localidade_id}>
-                  <Celula>{item.localidade.nome}</Celula>
-                  <Celula>
-                    <form
-                      className="flex flex-wrap gap-2 items-center"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        const form = new FormData(event.currentTarget);
-                        const prioridade = form.get('prioridade');
-                        vincular.mutate({
-                          localidadeId: item.localidade_id,
-                          body: {
-                            populacao_alvo: numero(form.get('populacao')),
-                            fonte: texto(form.get('fonte')),
-                            prioridade: prioridade ? Number(prioridade) : null,
-                          },
-                        });
-                      }}
-                    >
-                      <input name="populacao" type="number" min={0} defaultValue={item.populacao_alvo} className="w-24 rounded border px-2 py-1" />
-                      <input name="fonte" defaultValue={item.fonte ?? ''} placeholder="Fonte" className="w-32 rounded border px-2 py-1" />
-                      <select name="prioridade" defaultValue={item.prioridade ?? ''} className="rounded border px-2 py-1">
-                        <option value="">—</option>
-                        <option value="1">1</option>
-                        <option value="2">2</option>
-                        <option value="3">3</option>
-                      </select>
-                      <span className="text-gray-700">{item.percentual.toFixed(2)}%</span>
-                      <Botao type="submit">Salvar</Botao>
-                    </form>
-                  </Celula>
-                  <Celula>{item.prioridade ?? '—'}</Celula>
-                  <Celula>{item.percentual.toFixed(2)}</Celula>
-                  <Celula />
-                </Linha>
-              ))}
-            </Tabela>
+      {estabelecimentoId && (
+        <>
+          <div className="flex flex-wrap gap-2">
+            {abas.map(([id, rotulo]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setAba(id)}
+                className={`rounded-full px-3 py-1 text-sm ${aba === id ? 'bg-blue-700 text-white' : 'bg-white border'}`}
+              >
+                {rotulo}
+              </button>
+            ))}
+          </div>
+
+          {aba === 'sala' && (
+            <Cartao titulo="Sala de vacina">
+              <Formulario key={estabelecimentoId} onSubmit={onSala}>
+                <CampoCheck label="Possui sala"><input name="possui" type="checkbox" defaultChecked={sala.data?.possui_sala_vacina} /></CampoCheck>
+                <Campo label="Horário"><input name="horario" className={inputClass} defaultValue={sala.data?.horario_sala ?? ''} /></Campo>
+                <Campo label="Telefone"><input name="telefone" className={inputClass} defaultValue={sala.data?.telefone ?? ''} /></Campo>
+                <Campo label="E-mail"><input name="email" type="email" className={inputClass} defaultValue={sala.data?.email ?? ''} /></Campo>
+                <Campo label="Responsável"><input name="responsavel" className={inputClass} defaultValue={sala.data?.responsavel ?? ''} /></Campo>
+                <div className="md:col-span-2"><Botao type="submit">Gravar sala</Botao></div>
+              </Formulario>
+            </Cartao>
           )}
-          {cicloId && estabelecimentoId && (localidades.data?.data ?? []).filter((item) => !(doCiclo.data?.data ?? []).some((linha) => linha.localidade_id === item.id)).map((item) => (
-            <form
-              key={item.id}
-              className="flex flex-wrap gap-2 items-end border-t pt-2"
-              onSubmit={(event) => {
-                event.preventDefault();
-                const form = new FormData(event.currentTarget);
-                vincular.mutate({
-                  localidadeId: item.id,
-                  body: {
-                    populacao_alvo: numero(form.get('populacao')),
-                    fonte: texto(form.get('fonte')),
-                    prioridade: form.get('prioridade') ? Number(form.get('prioridade')) : null,
-                  },
-                });
-              }}
-            >
-              <span className="text-sm">{item.nome}</span>
-              <input name="populacao" type="number" min={0} required placeholder="População" className={inputClass + ' w-28'} />
-              <input name="fonte" placeholder="Fonte" className={inputClass + ' w-40'} />
-              <select name="prioridade" className={inputClass + ' w-24'}><option value="">Prioridade</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
-              <Botao type="submit">Incluir no ciclo</Botao>
-            </form>
-          ))}
-        </Cartao>
+
+          {aba === 'localidade' && (
+            <Cartao titulo="Localidade da UBS">
+              <Formulario onSubmit={onLocalidade}>
+                <Campo label="Nome"><input name="nome" required className={inputClass} /></Campo>
+                <Campo label="Bairro ou comunidade"><input name="bairro" className={inputClass} /></Campo>
+                <Campo label="Zona">
+                  <select name="zona" className={inputClass}><option value="">—</option><option>URBANA</option><option>RURAL</option></select>
+                </Campo>
+                <Campo label="Tipo de território"><input name="tipo_territorio" className={inputClass} /></Campo>
+                <Campo label="Domicílios"><input name="domicilios" type="number" min={0} className={inputClass} /></Campo>
+                <Campo label="Escolas e instituições"><input name="escolas" className={inputClass} /></Campo>
+                <CampoCheck label="Dificuldade de acesso"><input name="dificuldade" type="checkbox" /></CampoCheck>
+                <Campo label="Descrição do acesso"><input name="descricao_acesso" className={inputClass} /></Campo>
+                <div className="md:col-span-2"><Botao type="submit">Gravar localidade</Botao></div>
+              </Formulario>
+              {localidades.isLoading && <p className="text-sm text-gray-500">Carregando localidades…</p>}
+              {(localidades.data?.data.length ?? 0) === 0 && !localidades.isLoading && <p className="text-sm text-gray-500">Nenhuma localidade nesta UBS.</p>}
+              <Tabela colunas={['Nome', 'Zona', '']}>
+                {(localidades.data?.data ?? []).map((item) => (
+                  <Linha key={item.id}>
+                    <Celula>{item.nome}</Celula>
+                    <Celula>{item.zona ?? '—'}</Celula>
+                    <Celula><BotaoSecundario onClick={() => inativar.mutate(item.id)}>Inativar</BotaoSecundario></Celula>
+                  </Linha>
+                ))}
+              </Tabela>
+            </Cartao>
+          )}
+
+          {aba === 'aporte' && (
+            <Cartao titulo="Aporte no ciclo">
+              <Tabela colunas={['Localidade', 'População', 'Prioridade', '% aporte', '']}>
+                {(doCiclo.data?.data ?? []).map((item) => (
+                  <Linha key={item.localidade_id}>
+                    <Celula>{item.localidade.nome}</Celula>
+                    <Celula>
+                      <form
+                        className="flex flex-wrap gap-2 items-center"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          const form = new FormData(event.currentTarget);
+                          const prioridade = form.get('prioridade');
+                          vincular.mutate({
+                            localidadeId: item.localidade_id,
+                            body: {
+                              populacao_alvo: numero(form.get('populacao')),
+                              fonte: texto(form.get('fonte')),
+                              prioridade: prioridade ? Number(prioridade) : null,
+                            },
+                          });
+                        }}
+                      >
+                        <input name="populacao" type="number" min={0} defaultValue={item.populacao_alvo} className="w-24 rounded border px-2 py-1" />
+                        <input name="fonte" defaultValue={item.fonte ?? ''} placeholder="Fonte" className="w-32 rounded border px-2 py-1" />
+                        <select name="prioridade" defaultValue={item.prioridade ?? ''} className="rounded border px-2 py-1">
+                          <option value="">—</option>
+                          <option value="1">1</option>
+                          <option value="2">2</option>
+                          <option value="3">3</option>
+                        </select>
+                        <span className="text-gray-700">{item.percentual.toFixed(2)}%</span>
+                        <Botao type="submit">Salvar</Botao>
+                      </form>
+                    </Celula>
+                    <Celula>{item.prioridade ?? '—'}</Celula>
+                    <Celula>{item.percentual.toFixed(2)}</Celula>
+                    <Celula />
+                  </Linha>
+                ))}
+              </Tabela>
+              {(localidades.data?.data ?? []).filter((item) => !(doCiclo.data?.data ?? []).some((linha) => linha.localidade_id === item.id)).map((item) => (
+                <form
+                  key={item.id}
+                  className="flex flex-wrap gap-2 items-end border-t pt-2"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const form = new FormData(event.currentTarget);
+                    vincular.mutate({
+                      localidadeId: item.id,
+                      body: {
+                        populacao_alvo: numero(form.get('populacao')),
+                        fonte: texto(form.get('fonte')),
+                        prioridade: form.get('prioridade') ? Number(form.get('prioridade')) : null,
+                      },
+                    });
+                  }}
+                >
+                  <span className="text-sm">{item.nome}</span>
+                  <input name="populacao" type="number" min={0} required placeholder="População" className={inputClass + ' w-28'} />
+                  <input name="fonte" placeholder="Fonte" className={inputClass + ' w-40'} />
+                  <select name="prioridade" className={inputClass + ' w-24'}><option value="">Prioridade</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
+                  <Botao type="submit">Incluir no ciclo</Botao>
+                </form>
+              ))}
+            </Cartao>
+          )}
+        </>
       )}
     </div>
   );

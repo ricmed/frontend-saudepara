@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, microplanejamentoApi, type Ciclo } from '../api';
-import { FormularioCiclo, type DadosCiclo } from '../FormularioCiclo';
+import { FormularioCiclo, STATUS_CICLO_ROTULO, type DadosCiclo } from '../FormularioCiclo';
 import { useMpFiltro } from '../useMp';
 import { Aviso, Botao, BotaoSecundario, Cartao, Celula, Linha, Modal, Tabela } from '../ui';
 
@@ -13,14 +13,6 @@ const ESTRATEGIA: Record<string, string> = {
   CAMPANHA: 'Campanha',
   MULTIVACINACAO: 'Multivacinação',
   BLOQUEIO: 'Bloqueio',
-};
-
-const STATUS: Record<string, string> = {
-  RASCUNHO: 'Rascunho',
-  EM_VALIDACAO: 'Em validação',
-  APROVADO: 'Aprovado',
-  EM_EXECUCAO: 'Em execução',
-  ENCERRADO: 'Encerrado',
 };
 
 function rotulo(mapa: Record<string, string>, valor: string) {
@@ -36,7 +28,7 @@ function dataBr(valor?: string | null) {
 }
 
 export function InicioPage() {
-  const { cicloId, estabelecimentoId, municipioId, irParaCiclo } = useMpFiltro();
+  const { cicloId, estabelecimentoId, municipioId, status, setFiltro, irParaCiclo } = useMpFiltro();
   const queryClient = useQueryClient();
   const [pagina, setPagina] = useState(1);
   const [modalAberto, setModalAberto] = useState(false);
@@ -45,19 +37,20 @@ export function InicioPage() {
 
   useEffect(() => {
     setPagina(1);
-  }, [municipioId, estabelecimentoId, cicloId]);
+  }, [municipioId, estabelecimentoId, cicloId, status]);
 
   const health = useQuery({
     queryKey: ['mp-health'],
     queryFn: () => microplanejamentoApi.health(),
   });
   const ciclos = useQuery({
-    queryKey: ['mp-ciclos', municipioId, estabelecimentoId, cicloId, pagina],
+    queryKey: ['mp-ciclos', municipioId, estabelecimentoId, cicloId, status, pagina],
     queryFn: () =>
       microplanejamentoApi.ciclos({
         municipioId,
         estabelecimentoId,
         cicloId,
+        status,
         page: pagina,
         limit: LIMITE,
       }),
@@ -78,6 +71,14 @@ export function InicioPage() {
     },
     onError: (error) => setErroModal(apiErrorMessage(error)),
   });
+  const excluirCiclo = useMutation({
+    mutationFn: (id: number) => microplanejamentoApi.inativar('ciclos', id),
+    onSuccess: (_data, id) => {
+      queryClient.invalidateQueries({ queryKey: ['mp-ciclos'] });
+      if (cicloId === id) setFiltro('cicloId', '');
+    },
+    onError: (error) => setErroModal(apiErrorMessage(error)),
+  });
 
   function abrirModal() {
     setMunicipioModal(municipioId);
@@ -89,10 +90,16 @@ export function InicioPage() {
     criarCiclo.mutate(dados);
   }
 
+  function onExcluir(ciclo: Ciclo) {
+    if (!window.confirm(`Excluir o ciclo “${ciclo.nome}”? Ele deixa de aparecer na listagem.`)) return;
+    excluirCiclo.mutate(ciclo.id);
+  }
+
   return (
     <div className="space-y-4">
       {health.isError && <Aviso tipo="erro">{apiErrorMessage(health.error)}</Aviso>}
       {ciclos.isError && <Aviso tipo="erro">{apiErrorMessage(ciclos.error)}</Aviso>}
+      {excluirCiclo.isError && <Aviso tipo="erro">{apiErrorMessage(excluirCiclo.error)}</Aviso>}
 
       <Cartao
         titulo="Ciclos cadastrados"
@@ -116,12 +123,15 @@ export function InicioPage() {
                   <Celula>{ciclo.nome}</Celula>
                   <Celula>{rotulo(ESTRATEGIA, ciclo.estrategia)}</Celula>
                   <Celula>{ciclo.tipo_municipio?.descricao ?? '—'}</Celula>
-                  <Celula>{rotulo(STATUS, ciclo.status)}</Celula>
+                  <Celula>{rotulo(STATUS_CICLO_ROTULO, ciclo.status)}</Celula>
                   <Celula>{dataBr(ciclo.data_inicio)}</Celula>
                   <Celula>{dataBr(ciclo.data_fim)}</Celula>
                   <Celula>{ciclo.dias_operacionais}</Celula>
                   <Celula>
-                    <BotaoSecundario onClick={() => irParaCiclo(ciclo)}>Editar</BotaoSecundario>
+                    <div className="flex flex-wrap gap-2">
+                      <BotaoSecundario onClick={() => irParaCiclo(ciclo)}>Editar</BotaoSecundario>
+                      <BotaoSecundario onClick={() => onExcluir(ciclo)} disabled={excluirCiclo.isPending}>Excluir</BotaoSecundario>
+                    </div>
                   </Celula>
                 </Linha>
               ))}

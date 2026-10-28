@@ -31,7 +31,7 @@ export const microplanejamentoApi = {
   atualizarLocalidade: (id: number, body: unknown) => axios.put(`${base()}/localidades/${id}`, body, { withCredentials: true }).then((r) => r.data),
   inativar: (recurso: string, id: number) => axios.post(`${base()}/${recurso}/${id}/inativar`, {}, { withCredentials: true }).then((r) => r.data),
   localidadesCiclo: (cicloId: number, estabelecimentoId?: number) =>
-    get<{ data: LocalidadeCiclo[] }>(`/ciclos/${cicloId}/localidades`, { estabelecimentoId }),
+    get<{ data: LocalidadeCiclo[] }>(`/ciclos/${cicloId}/localidades`, estabelecimentoId ? { estabelecimentoId } : undefined),
   salvarLocalidadeCiclo: (cicloId: number, localidadeId: number, body: unknown) =>
     axios.put(`${base()}/ciclos/${cicloId}/localidades/${localidadeId}`, body, { withCredentials: true }).then((r) => r.data),
   sala: (estabelecimentoId: number) => get<Sala>(`/salas-vacina/${estabelecimentoId}`),
@@ -91,7 +91,7 @@ export type Localidade = {
   domicilios?: number | null;
   dificuldade_acesso: boolean;
   descricao_acesso?: string | null;
-  estabelecimento?: { nome: string };
+  estabelecimento?: { idestabelecimento?: number; nome: string; cnes?: string | null };
 };
 
 export type LocalidadeCiclo = {

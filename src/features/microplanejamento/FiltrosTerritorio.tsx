@@ -6,6 +6,7 @@ import {
   useEstabelecimentoSelecionado,
   useMpFiltro,
   useMunicipios,
+  useUbsDoCiclo,
   type EstabelecimentoOption,
   type MunicipioOption,
 } from './useMp';
@@ -18,17 +19,33 @@ function rotuloUbs(item: EstabelecimentoOption) {
   return item.cnes ? `${item.nome} · ${item.cnes}` : item.nome;
 }
 
-export function FiltroUbs() {
+export function FiltroUbsCiclo() {
   const filtro = useMpFiltro();
-  const ubs = useEstabelecimentoSelecionado(filtro.estabelecimentoId);
+  const { ubs, isLoading } = useUbsDoCiclo(filtro.cicloId);
 
   return (
     <section className="bg-white border border-gray-200 rounded-lg p-3 md:max-w-sm">
-      <CampoUbs
-        municipioId={filtro.municipioId}
-        selecionado={ubs.data}
-        onEscolher={(id) => filtro.setFiltro('estabelecimentoId', id ? String(id) : '')}
-      />
+      <label className="text-sm text-gray-700">
+        UBS do ciclo
+        {isLoading ? (
+          <p className="mt-1 text-gray-500">Carregando…</p>
+        ) : ubs.length === 0 ? (
+          <p className="mt-1 text-gray-500">Inclua uma UBS em Localidades.</p>
+        ) : (
+          <select
+            className={`${inputClass} mt-1`}
+            value={filtro.estabelecimentoId ?? ''}
+            onChange={(event) => filtro.setFiltro('estabelecimentoId', event.target.value)}
+          >
+            <option value="">Selecione</option>
+            {ubs.map((item) => (
+              <option key={item.idestabelecimento} value={item.idestabelecimento}>
+                {item.cnes ? `${item.nome} · ${item.cnes}` : item.nome}
+              </option>
+            ))}
+          </select>
+        )}
+      </label>
     </section>
   );
 }
@@ -156,14 +173,16 @@ export function CampoMunicipio({
   );
 }
 
-function CampoUbs({
+export function CampoUbs({
   municipioId,
   selecionado,
   onEscolher,
+  label = 'UBS',
 }: {
   municipioId?: number;
   selecionado?: EstabelecimentoOption;
   onEscolher: (id: number | null) => void;
+  label?: string;
 }) {
   const listaId = useId();
   const [aberto, setAberto] = useState(false);
@@ -210,7 +229,7 @@ function CampoUbs({
 
   return (
     <div ref={caixa} className="relative text-sm text-gray-700">
-      <span className="font-medium">UBS</span>
+      <span className="font-medium">{label}</span>
       <input
         className={`${inputClass} mt-1`}
         role="combobox"
