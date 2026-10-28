@@ -18,6 +18,21 @@ function rotuloUbs(item: EstabelecimentoOption) {
   return item.cnes ? `${item.nome} · ${item.cnes}` : item.nome;
 }
 
+export function FiltroUbs() {
+  const filtro = useMpFiltro();
+  const ubs = useEstabelecimentoSelecionado(filtro.estabelecimentoId);
+
+  return (
+    <section className="bg-white border border-gray-200 rounded-lg p-3 md:max-w-sm">
+      <CampoUbs
+        municipioId={filtro.municipioId}
+        selecionado={ubs.data}
+        onEscolher={(id) => filtro.setFiltro('estabelecimentoId', id ? String(id) : '')}
+      />
+    </section>
+  );
+}
+
 export function FiltrosTerritorio() {
   const filtro = useMpFiltro();
   const municipios = useMunicipios();
@@ -42,7 +57,7 @@ export function FiltrosTerritorio() {
   );
 }
 
-function CampoMunicipio({
+export function CampoMunicipio({
   itens,
   carregando,
   erro,

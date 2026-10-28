@@ -1,4 +1,5 @@
 import { FormEvent, ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 export function Aviso({ tipo, children }: { tipo: 'erro' | 'ok' | 'info'; children: ReactNode }) {
   const classe = tipo === 'erro' ? 'bg-red-50 text-red-800 border-red-200' : tipo === 'ok' ? 'bg-green-50 text-green-800 border-green-200' : 'bg-blue-50 text-blue-800 border-blue-200';
@@ -92,4 +93,21 @@ export function Celula({ children }: { children: ReactNode }) {
 
 export function Formulario({ onSubmit, children }: { onSubmit: (event: FormEvent) => void; children: ReactNode }) {
   return <form onSubmit={onSubmit} className="grid gap-3 md:grid-cols-2">{children}</form>;
+}
+
+export function Modal({ titulo, onFechar, children }: { titulo: string; onFechar: () => void; children: ReactNode }) {
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={onFechar} role="dialog" aria-modal="true" aria-labelledby="mp-modal-titulo">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-4 shadow-lg" onClick={(event) => event.stopPropagation()}>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 id="mp-modal-titulo" className="text-lg font-semibold text-gray-900">{titulo}</h2>
+          <button type="button" onClick={onFechar} className="rounded-md px-2 py-1 text-lg leading-none text-gray-500 hover:bg-gray-100" aria-label="Fechar">
+            ×
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>,
+    document.body,
+  );
 }

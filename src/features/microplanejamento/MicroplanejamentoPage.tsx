@@ -1,11 +1,11 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { Navigate, NavLink, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Syringe } from 'lucide-react';
 import { AppPageLayout } from '@/components/layouts/AppPageLayout';
 import { useAuth } from '@/keycloak/AuthProvider';
 import { microplanejamentoApi } from './api';
-import { useMpFiltro } from './useMp';
-import { FiltrosTerritorio } from './FiltrosTerritorio';
+import { searchSemCiclo, useMpFiltro } from './useMp';
+import { FiltroUbs, FiltrosTerritorio } from './FiltrosTerritorio';
 import { inputClass } from './ui';
 import { InicioPage } from './pages/InicioPage';
 import { LocalidadesPage } from './pages/LocalidadesPage';
@@ -48,6 +48,7 @@ export default function MicroplanejamentoPage() {
   const filtro = useMpFiltro();
   const ciclos = useQuery({
     queryKey: ['mp-ciclos', filtro.municipioId],
+    enabled: secao === '',
     queryFn: () => microplanejamentoApi.ciclos({ municipioId: filtro.municipioId, limit: 100 }),
   });
   useQuery({
@@ -57,16 +58,29 @@ export default function MicroplanejamentoPage() {
   });
 
   const search = location.search;
+  const precisaCiclo = secao !== '' && secao !== 'parametros';
+  if (precisaCiclo && !filtro.cicloId) {
+    return <Navigate to={`/private/microplanejamento${searchSemCiclo(search)}`} replace />;
+  }
+
+  const visiveis = SECOES.filter((item) => {
+    if (item.estadual) return veParametros;
+    if (!item.id) return true;
+    return Boolean(filtro.cicloId);
+  });
 
   return (
     <AppPageLayout title="Microplanejamento" subtitle="Ciclo de vacinação" icon={<Syringe />} variant="desktop" contentWidth="wide">
       <div className="space-y-4">
         <nav className="flex gap-2 overflow-x-auto pb-1">
-          {SECOES.filter((item) => !item.estadual || veParametros).map((item) => (
+          {visiveis.map((item) => (
             <NavLink
               key={item.id || 'inicio'}
               end={item.id === ''}
-              to={{ pathname: item.id ? `/private/microplanejamento/${item.id}` : '/private/microplanejamento', search }}
+              to={{
+                pathname: item.id ? `/private/microplanejamento/${item.id}` : '/private/microplanejamento',
+                search: item.id ? search : searchSemCiclo(search),
+              }}
               className={({ isActive }) => `whitespace-nowrap rounded-full px-3 py-1.5 text-sm ${isActive ? 'bg-blue-700 text-white' : 'bg-white text-gray-700 border border-gray-200'}`}
             >
               {item.rotulo}
@@ -74,18 +88,22 @@ export default function MicroplanejamentoPage() {
           ))}
         </nav>
 
-        <section className="bg-white border border-gray-200 rounded-lg p-3 grid gap-3 md:grid-cols-3">
-          <FiltrosTerritorio />
-          <label className="text-sm text-gray-700">
-            Ciclo
-            <select className={`${inputClass} mt-1`} value={filtro.cicloId ?? ''} onChange={(e) => filtro.setFiltro('cicloId', e.target.value)}>
-              <option value="">Todos</option>
-              {(ciclos.data?.data ?? []).map((ciclo) => (
-                <option key={ciclo.id} value={ciclo.id}>{ciclo.ano} · {ciclo.nome} · {ciclo.estrategia}</option>
-              ))}
-            </select>
-          </label>
-        </section>
+        {secao === '' && (
+          <section className="bg-white border border-gray-200 rounded-lg p-3 grid gap-3 md:grid-cols-3">
+            <FiltrosTerritorio />
+            <label className="text-sm text-gray-700">
+              Ciclo
+              <select className={`${inputClass} mt-1`} value={filtro.cicloId ?? ''} onChange={(e) => filtro.setFiltro('cicloId', e.target.value)}>
+                <option value="">Todos</option>
+                {(ciclos.data?.data ?? []).map((ciclo) => (
+                  <option key={ciclo.id} value={ciclo.id}>{ciclo.ano} · {ciclo.nome} · {ciclo.estrategia}</option>
+                ))}
+              </select>
+            </label>
+          </section>
+        )}
+
+        {secao !== '' && secao !== 'parametros' && <FiltroUbs />}
 
         {secao === '' && <InicioPage />}
         {secao === 'localidades' && <LocalidadesPage />}

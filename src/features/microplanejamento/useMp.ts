@@ -1,8 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from '@/utils/axiosRetry';
 
+export function searchSemCiclo(search: string) {
+  const next = new URLSearchParams(search);
+  next.delete('cicloId');
+  const qs = next.toString();
+  return qs ? `?${qs}` : '';
+}
+
 export function useMpFiltro() {
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const cicloId = Number(params.get('cicloId')) || undefined;
   const estabelecimentoId = Number(params.get('estabelecimentoId')) || undefined;
@@ -19,7 +27,18 @@ export function useMpFiltro() {
     setParams(next, { replace: true });
   }
 
-  return { cicloId, estabelecimentoId, municipioId, setFiltro };
+  function irParaCiclo(ciclo: { id: number; tipo_municipio_id: number }, destino = 'localidades') {
+    const next = new URLSearchParams(params);
+    next.set('cicloId', String(ciclo.id));
+    if (Number(next.get('municipioId')) !== ciclo.tipo_municipio_id) {
+      next.delete('estabelecimentoId');
+    }
+    next.set('municipioId', String(ciclo.tipo_municipio_id));
+    const qs = next.toString();
+    navigate({ pathname: `/private/microplanejamento/${destino}`, search: qs ? `?${qs}` : '' });
+  }
+
+  return { cicloId, estabelecimentoId, municipioId, setFiltro, irParaCiclo };
 }
 
 export type MunicipioOption = { idtipo_municipio: number; descricao: string };
