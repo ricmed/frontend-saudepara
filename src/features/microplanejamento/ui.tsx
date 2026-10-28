@@ -24,9 +24,17 @@ export function Botao({ children, type = 'button', onClick, disabled }: { childr
   );
 }
 
-export function BotaoSecundario({ children, onClick }: { children: ReactNode; onClick?: () => void }) {
+export function BotaoSecundario({
+  children,
+  onClick,
+  disabled,
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+}) {
   return (
-    <button type="button" onClick={onClick} className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700">
+    <button type="button" onClick={onClick} disabled={disabled} className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 disabled:opacity-50">
       {children}
     </button>
   );
@@ -59,8 +67,23 @@ export function Tabela({ colunas, children }: { colunas: string[]; children: Rea
   );
 }
 
-export function Linha({ children }: { children: ReactNode }) {
-  return <tr className="border-b border-gray-100 align-top">{children}</tr>;
+export function Linha({
+  children,
+  onClick,
+  selecionada,
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  selecionada?: boolean;
+}) {
+  return (
+    <tr
+      className={`border-b border-gray-100 align-top ${onClick ? 'cursor-pointer hover:bg-blue-50' : ''} ${selecionada ? 'bg-blue-50' : ''}`}
+      onClick={onClick}
+    >
+      {children}
+    </tr>
+  );
 }
 
 export function Celula({ children }: { children: ReactNode }) {

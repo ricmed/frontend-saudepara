@@ -79,7 +79,7 @@ export default function MicroplanejamentoPage() {
           <label className="text-sm text-gray-700">
             Ciclo
             <select className={`${inputClass} mt-1`} value={filtro.cicloId ?? ''} onChange={(e) => filtro.setFiltro('cicloId', e.target.value)}>
-              <option value="">Selecione</option>
+              <option value="">Todos</option>
               {(ciclos.data?.data ?? []).map((ciclo) => (
                 <option key={ciclo.id} value={ciclo.id}>{ciclo.ano} · {ciclo.nome} · {ciclo.estrategia}</option>
               ))}

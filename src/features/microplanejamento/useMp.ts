@@ -12,7 +12,10 @@ export function useMpFiltro() {
     const next = new URLSearchParams(params);
     if (valor) next.set(chave, valor);
     else next.delete(chave);
-    if (chave === 'municipioId') next.delete('estabelecimentoId');
+    if (chave === 'municipioId') {
+      next.delete('estabelecimentoId');
+      next.delete('cicloId');
+    }
     setParams(next, { replace: true });
   }
 
