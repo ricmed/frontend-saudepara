@@ -91,6 +91,7 @@ export type Localidade = {
   zona?: 'URBANA' | 'RURAL' | null;
   tipo_territorio?: string | null;
   domicilios?: number | null;
+  escolas?: string | null;
   dificuldade_acesso: boolean;
   descricao_acesso?: string | null;
   estabelecimento?: { idestabelecimento?: number; nome: string; cnes?: string | null };

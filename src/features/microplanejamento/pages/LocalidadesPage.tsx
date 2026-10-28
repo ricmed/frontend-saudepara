@@ -1,12 +1,58 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiErrorMessage, microplanejamentoApi, type Ciclo } from '../api';
+import { apiErrorMessage, microplanejamentoApi, type Ciclo, type Localidade } from '../api';
 import { CampoUbs } from '../FiltrosTerritorio';
 import { FormularioCiclo, type DadosCiclo } from '../FormularioCiclo';
 import { numero, texto, useEstabelecimentoSelecionado, useMpFiltro, useUbsDoCiclo } from '../useMp';
-import { Aviso, Botao, BotaoSecundario, Campo, CampoCheck, Cartao, Celula, Formulario, inputClass, Linha, Tabela } from '../ui';
+import { Aviso, Botao, BotaoSecundario, Campo, CampoCheck, Cartao, Celula, Formulario, inputClass, Linha, Modal, Tabela } from '../ui';
 
 type AbaUbs = 'sala' | 'localidade' | 'aporte';
+type ModalLocalidade = { modo: 'criar' } | { modo: 'ver' | 'editar'; localidade: Localidade };
+
+const ZONA_ROTULO: Record<string, string> = { URBANA: 'Urbana', RURAL: 'Rural' };
+
+function FormularioLocalidade({
+  modo,
+  localidade,
+  onSubmit,
+  onEditar,
+  pending,
+}: {
+  modo: 'criar' | 'editar' | 'ver';
+  localidade?: Localidade;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onEditar?: () => void;
+  pending?: boolean;
+}) {
+  const leitura = modo === 'ver';
+  return (
+    <Formulario onSubmit={leitura ? (event) => event.preventDefault() : onSubmit}>
+      <Campo label="Nome"><input name="nome" required className={inputClass} defaultValue={localidade?.nome ?? ''} disabled={leitura} readOnly={leitura} /></Campo>
+      <Campo label="Bairro ou comunidade"><input name="bairro" className={inputClass} defaultValue={localidade?.bairro ?? ''} disabled={leitura} readOnly={leitura} /></Campo>
+      <Campo label="Zona">
+        <select name="zona" className={inputClass} defaultValue={localidade?.zona ?? ''} disabled={leitura}>
+          <option value="">—</option>
+          <option value="URBANA">Urbana</option>
+          <option value="RURAL">Rural</option>
+        </select>
+      </Campo>
+      <Campo label="Tipo de território"><input name="tipo_territorio" className={inputClass} defaultValue={localidade?.tipo_territorio ?? ''} disabled={leitura} readOnly={leitura} /></Campo>
+      <Campo label="Domicílios"><input name="domicilios" type="number" min={0} className={inputClass} defaultValue={localidade?.domicilios ?? ''} disabled={leitura} readOnly={leitura} /></Campo>
+      <Campo label="Escolas e instituições"><input name="escolas" className={inputClass} defaultValue={localidade?.escolas ?? ''} disabled={leitura} readOnly={leitura} /></Campo>
+      <CampoCheck label="Dificuldade de acesso">
+        <input name="dificuldade" type="checkbox" defaultChecked={localidade?.dificuldade_acesso} disabled={leitura} />
+      </CampoCheck>
+      <Campo label="Descrição do acesso"><input name="descricao_acesso" className={inputClass} defaultValue={localidade?.descricao_acesso ?? ''} disabled={leitura} readOnly={leitura} /></Campo>
+      <div className="md:col-span-2 flex flex-wrap gap-2">
+        {leitura ? (
+          <Botao type="button" onClick={onEditar}>Editar</Botao>
+        ) : (
+          <Botao type="submit" disabled={pending}>{modo === 'criar' ? 'Gravar localidade' : 'Salvar localidade'}</Botao>
+        )}
+      </div>
+    </Formulario>
+  );
+}
 
 export function LocalidadesPage() {
   const { cicloId, estabelecimentoId, setFiltro } = useMpFiltro();
@@ -14,6 +60,7 @@ export function LocalidadesPage() {
   const [aba, setAba] = useState<AbaUbs>('localidade');
   const [mensagem, setMensagem] = useState('');
   const [erro, setErro] = useState('');
+  const [modal, setModal] = useState<ModalLocalidade | null>(null);
 
   const ciclo = useQuery({
     queryKey: ['mp-ciclos', 'detalhe', cicloId],
@@ -63,7 +110,18 @@ export function LocalidadesPage() {
     mutationFn: (body: unknown) => microplanejamentoApi.criarLocalidade(body),
     onSuccess: () => {
       ok('Localidade gravada.');
+      setModal(null);
       queryClient.invalidateQueries({ queryKey: ['mp-localidades'] });
+    },
+    onError: (error) => setErro(apiErrorMessage(error)),
+  });
+  const atualizarLocalidade = useMutation({
+    mutationFn: (vars: { id: number; body: unknown }) => microplanejamentoApi.atualizarLocalidade(vars.id, vars.body),
+    onSuccess: () => {
+      ok('Localidade atualizada.');
+      setModal(null);
+      queryClient.invalidateQueries({ queryKey: ['mp-localidades'] });
+      queryClient.invalidateQueries({ queryKey: ['mp-localidades-ciclo'] });
     },
     onError: (error) => setErro(apiErrorMessage(error)),
   });
@@ -87,6 +145,7 @@ export function LocalidadesPage() {
   const inativar = useMutation({
     mutationFn: (id: number) => microplanejamentoApi.inativar('localidades', id),
     onSuccess: () => {
+      ok('Localidade excluída.');
       queryClient.invalidateQueries({ queryKey: ['mp-localidades'] });
       queryClient.invalidateQueries({ queryKey: ['mp-localidades-ciclo'] });
     },
@@ -103,11 +162,8 @@ export function LocalidadesPage() {
     });
   }
 
-  function onLocalidade(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!estabelecimentoId) return setErro('Selecione a UBS.');
-    const form = new FormData(event.currentTarget);
-    criarLocalidade.mutate({
+  function corpoLocalidade(form: FormData) {
+    return {
       estabelecimento_id: estabelecimentoId,
       nome: String(form.get('nome') || '').trim(),
       bairro: texto(form.get('bairro')),
@@ -117,8 +173,20 @@ export function LocalidadesPage() {
       escolas: texto(form.get('escolas')),
       dificuldade_acesso: form.get('dificuldade') === 'on',
       descricao_acesso: texto(form.get('descricao_acesso')),
-    });
-    event.currentTarget.reset();
+    };
+  }
+
+  function onLocalidade(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!estabelecimentoId) return setErro('Selecione a UBS.');
+    const body = corpoLocalidade(new FormData(event.currentTarget));
+    if (modal?.modo === 'editar') atualizarLocalidade.mutate({ id: modal.localidade.id, body });
+    else criarLocalidade.mutate(body);
+  }
+
+  function onExcluir(item: Localidade) {
+    if (!window.confirm(`Excluir a localidade “${item.nome}”? Ela deixa de aparecer na listagem.`)) return;
+    inativar.mutate(item.id);
   }
 
   function onSala(event: FormEvent<HTMLFormElement>) {
@@ -224,32 +292,51 @@ export function LocalidadesPage() {
           )}
 
           {aba === 'localidade' && (
-            <Cartao titulo="Localidade da UBS">
-              <Formulario onSubmit={onLocalidade}>
-                <Campo label="Nome"><input name="nome" required className={inputClass} /></Campo>
-                <Campo label="Bairro ou comunidade"><input name="bairro" className={inputClass} /></Campo>
-                <Campo label="Zona">
-                  <select name="zona" className={inputClass}><option value="">—</option><option>URBANA</option><option>RURAL</option></select>
-                </Campo>
-                <Campo label="Tipo de território"><input name="tipo_territorio" className={inputClass} /></Campo>
-                <Campo label="Domicílios"><input name="domicilios" type="number" min={0} className={inputClass} /></Campo>
-                <Campo label="Escolas e instituições"><input name="escolas" className={inputClass} /></Campo>
-                <CampoCheck label="Dificuldade de acesso"><input name="dificuldade" type="checkbox" /></CampoCheck>
-                <Campo label="Descrição do acesso"><input name="descricao_acesso" className={inputClass} /></Campo>
-                <div className="md:col-span-2"><Botao type="submit">Gravar localidade</Botao></div>
-              </Formulario>
-              {localidades.isLoading && <p className="text-sm text-gray-500">Carregando localidades…</p>}
-              {(localidades.data?.data.length ?? 0) === 0 && !localidades.isLoading && <p className="text-sm text-gray-500">Nenhuma localidade nesta UBS.</p>}
-              <Tabela colunas={['Nome', 'Zona', '']}>
-                {(localidades.data?.data ?? []).map((item) => (
-                  <Linha key={item.id}>
-                    <Celula>{item.nome}</Celula>
-                    <Celula>{item.zona ?? '—'}</Celula>
-                    <Celula><BotaoSecundario onClick={() => inativar.mutate(item.id)}>Inativar</BotaoSecundario></Celula>
-                  </Linha>
-                ))}
-              </Tabela>
-            </Cartao>
+            <>
+              <Cartao
+                titulo="Localidade da UBS"
+                acoes={<Botao onClick={() => { setErro(''); setModal({ modo: 'criar' }); }}>Nova localidade</Botao>}
+              >
+                {localidades.isLoading ? (
+                  <p className="text-sm text-gray-500">Carregando localidades…</p>
+                ) : (localidades.data?.data.length ?? 0) === 0 ? (
+                  <Aviso tipo="info">Nenhuma localidade nesta UBS. Use Nova localidade para cadastrar.</Aviso>
+                ) : (
+                  <Tabela colunas={['Nome', 'Bairro', 'Zona', '']}>
+                    {(localidades.data?.data ?? []).map((item) => (
+                      <Linha key={item.id}>
+                        <Celula>{item.nome}</Celula>
+                        <Celula>{item.bairro || '—'}</Celula>
+                        <Celula>{item.zona ? (ZONA_ROTULO[item.zona] ?? item.zona) : '—'}</Celula>
+                        <Celula>
+                          <div className="flex flex-wrap gap-2">
+                            <BotaoSecundario onClick={() => { setErro(''); setModal({ modo: 'ver', localidade: item }); }}>Ver</BotaoSecundario>
+                            <BotaoSecundario onClick={() => { setErro(''); setModal({ modo: 'editar', localidade: item }); }}>Editar</BotaoSecundario>
+                            <BotaoSecundario onClick={() => onExcluir(item)} disabled={inativar.isPending}>Excluir</BotaoSecundario>
+                          </div>
+                        </Celula>
+                      </Linha>
+                    ))}
+                  </Tabela>
+                )}
+              </Cartao>
+              {modal && (
+                <Modal
+                  titulo={modal.modo === 'ver' ? 'Detalhe da localidade' : modal.modo === 'editar' ? 'Editar localidade' : 'Nova localidade'}
+                  onFechar={() => setModal(null)}
+                >
+                  {erro && <Aviso tipo="erro">{erro}</Aviso>}
+                  <FormularioLocalidade
+                    key={`${modal.modo}-${modal.modo === 'criar' ? 'novo' : modal.localidade.id}`}
+                    modo={modal.modo}
+                    localidade={modal.modo === 'criar' ? undefined : modal.localidade}
+                    onSubmit={onLocalidade}
+                    onEditar={modal.modo === 'ver' ? () => setModal({ modo: 'editar', localidade: modal.localidade }) : undefined}
+                    pending={criarLocalidade.isPending || atualizarLocalidade.isPending}
+                  />
+                </Modal>
+              )}
+            </>
           )}
 
           {aba === 'aporte' && (
