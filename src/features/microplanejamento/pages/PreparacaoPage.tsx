@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, microplanejamentoApi, type Checklist } from '../api';
 import { numero, useMpFiltro } from '../useMp';
 import { enfileirar } from '../offlineQueue';
-import { Aviso, Botao, Cartao, inputClass } from '../ui';
+import { Aviso, Botao, Cartao, Celula, inputClass, Linha, Tabela } from '../ui';
 
 const OPCOES = ['SIM', 'PARCIAL', 'NAO', 'NA'] as const;
 
@@ -127,18 +127,48 @@ export function PreparacaoPage() {
       </Cartao>
       <Cartao titulo="Inventário de rede de frio">
         <form className="space-y-2" onSubmit={onInventario}>
-          {(inventario.data?.itens ?? []).map((item) => {
-            const registro = inventario.data?.registros.find((row) => row.item_id === item.id);
-            return (
-              <div key={item.id} className="grid md:grid-cols-[1fr_100px_140px_1fr] gap-2 items-center text-sm">
-                <span>{item.texto}</span>
-                <input name={`q-${item.id}`} type="number" min={0} defaultValue={registro?.quantidade ?? 0} className={inputClass} />
-                <input name={`n-${item.id}`} type="number" min={0} defaultValue={registro?.necessidade_adicional ?? 0} className={inputClass} title="Necessidade adicional" />
-                <input name={`o-${item.id}`} defaultValue={registro?.observacoes ?? ''} className={inputClass} placeholder="Observação" />
-              </div>
-            );
-          })}
-          {(inventario.data?.itens.length ?? 0) === 0 && <p className="text-sm text-gray-500">Selecione ciclo e UBS.</p>}
+          {(inventario.data?.itens.length ?? 0) === 0 ? (
+            <p className="text-sm text-gray-500">Selecione ciclo e UBS.</p>
+          ) : (
+            <Tabela colunas={['Item', 'Quantidade', 'Necessidade adicional', 'Observação']}>
+              {(inventario.data?.itens ?? []).map((item) => {
+                const registro = inventario.data?.registros.find((row) => row.item_id === item.id);
+                return (
+                  <Linha key={item.id}>
+                    <Celula>{item.texto}</Celula>
+                    <Celula>
+                      <input
+                        name={`q-${item.id}`}
+                        type="number"
+                        min={0}
+                        defaultValue={registro?.quantidade ?? 0}
+                        className={`${inputClass} w-24`}
+                        aria-label={`Quantidade de ${item.texto}`}
+                      />
+                    </Celula>
+                    <Celula>
+                      <input
+                        name={`n-${item.id}`}
+                        type="number"
+                        min={0}
+                        defaultValue={registro?.necessidade_adicional ?? 0}
+                        className={`${inputClass} w-28`}
+                        aria-label={`Necessidade adicional de ${item.texto}`}
+                      />
+                    </Celula>
+                    <Celula>
+                      <input
+                        name={`o-${item.id}`}
+                        defaultValue={registro?.observacoes ?? ''}
+                        className={inputClass}
+                        aria-label={`Observação de ${item.texto}`}
+                      />
+                    </Celula>
+                  </Linha>
+                );
+              })}
+            </Tabela>
+          )}
           <Botao type="submit">Gravar inventário</Botao>
         </form>
       </Cartao>

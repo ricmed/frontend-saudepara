@@ -103,20 +103,64 @@ export function MetasPage() {
       </Cartao>
       <Cartao titulo="Necessidade de vacinas e insumos">
         <form className="space-y-2" onSubmit={onNec}>
-          {[...(vacinas.data?.itens ?? []), ...(insumos.data?.itens ?? [])].map((item) => {
-            const linha = necessidades.data?.data.find((row) => row.item_id === item.id);
-            return (
-              <div key={item.id} className="grid md:grid-cols-6 gap-2 text-sm items-center">
-                <span className="md:col-span-2">{item.texto}</span>
-                <input name={`meta-${item.id}`} type="number" min={0} defaultValue={linha?.meta_doses ?? 0} className={inputClass} title="Meta de doses" />
-                <input name={`perda-${item.id}`} type="number" min={0} step="0.01" defaultValue={linha?.perda_informada ?? 0} className={inputClass} />
-                <select name={`modo-${item.id}`} defaultValue={linha?.perda_modo ?? 'DOSES'} className={inputClass}><option>DOSES</option><option>PERCENTUAL</option></select>
-                <input name={`saldo-${item.id}`} type="number" min={0} defaultValue={linha?.saldo_disponivel ?? 0} className={inputClass} />
-                <input name={`manual-${item.id}`} type="number" min={0} className="hidden" defaultValue={linha?.quantidade_manual ?? ''} />
-                {linha && <span className="md:col-span-6 text-gray-600">Necessárias {linha.doses_necessarias} · a solicitar {linha.a_solicitar} · frascos {linha.frascos}</span>}
-              </div>
-            );
-          })}
+          <Tabela colunas={['Item', 'Meta de doses', 'Perda', 'Modo da perda', 'Saldo', 'Necessárias', 'A solicitar', 'Frascos']}>
+            {[...(vacinas.data?.itens ?? []), ...(insumos.data?.itens ?? [])].map((item) => {
+              const linha = necessidades.data?.data.find((row) => row.item_id === item.id);
+              return (
+                <Linha key={item.id}>
+                  <Celula>{item.texto}</Celula>
+                  <Celula>
+                    <input
+                      name={`meta-${item.id}`}
+                      type="number"
+                      min={0}
+                      defaultValue={linha?.meta_doses ?? 0}
+                      className={`${inputClass} w-24`}
+                      aria-label={`Meta de doses de ${item.texto}`}
+                    />
+                  </Celula>
+                  <Celula>
+                    <input
+                      name={`perda-${item.id}`}
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      defaultValue={linha?.perda_informada ?? 0}
+                      className={`${inputClass} w-24`}
+                      aria-label={`Perda de ${item.texto}`}
+                    />
+                  </Celula>
+                  <Celula>
+                    <select
+                      name={`modo-${item.id}`}
+                      defaultValue={linha?.perda_modo ?? 'DOSES'}
+                      className={inputClass}
+                      aria-label={`Modo da perda de ${item.texto}`}
+                    >
+                      <option>DOSES</option>
+                      <option>PERCENTUAL</option>
+                    </select>
+                  </Celula>
+                  <Celula>
+                    <input
+                      name={`saldo-${item.id}`}
+                      type="number"
+                      min={0}
+                      defaultValue={linha?.saldo_disponivel ?? 0}
+                      className={`${inputClass} w-24`}
+                      aria-label={`Saldo de ${item.texto}`}
+                    />
+                  </Celula>
+                  <Celula>{linha?.doses_necessarias ?? 0}</Celula>
+                  <Celula>{linha?.a_solicitar ?? 0}</Celula>
+                  <Celula>
+                    {linha?.frascos ?? 0}
+                    <input name={`manual-${item.id}`} type="number" min={0} className="hidden" defaultValue={linha?.quantidade_manual ?? ''} />
+                  </Celula>
+                </Linha>
+              );
+            })}
+          </Tabela>
           <Botao type="submit">Calcular necessidade</Botao>
         </form>
       </Cartao>
