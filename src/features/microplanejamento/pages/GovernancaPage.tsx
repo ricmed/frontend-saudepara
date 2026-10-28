@@ -2,7 +2,7 @@ import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, microplanejamentoApi } from '../api';
 import { numero, texto, useMpFiltro } from '../useMp';
-import { Aviso, Botao, BotaoSecundario, Campo, Cartao, Celula, Formulario, inputClass, Linha, Tabela } from '../ui';
+import { Aviso, Botao, BotaoSecundario, Campo, CampoCheck, Cartao, Celula, Formulario, inputClass, Linha, Tabela } from '../ui';
 
 type Aba = 'comite' | 'capacitacoes' | 'profissionais' | 'liderancas';
 
@@ -152,11 +152,11 @@ export function GovernancaPage() {
             <Campo label="Lotação"><input name="lotacao" className={inputClass} /></Campo>
             <Campo label="Telefone"><input name="telefone" className={inputClass} /></Campo>
             <Campo label="E-mail"><input name="email" type="email" className={inputClass} /></Campo>
-            <Campo label="Vacinador"><input name="vacinador" type="checkbox" /></Campo>
-            <Campo label="Anotador"><input name="anotador" type="checkbox" /></Campo>
-            <Campo label="ACS"><input name="acs" type="checkbox" /></Campo>
-            <Campo label="Voluntário"><input name="voluntario" type="checkbox" /></Campo>
-            <Campo label="Participa da MEV"><input name="mev" type="checkbox" /></Campo>
+            <CampoCheck label="Vacinador"><input name="vacinador" type="checkbox" /></CampoCheck>
+            <CampoCheck label="Anotador"><input name="anotador" type="checkbox" /></CampoCheck>
+            <CampoCheck label="ACS"><input name="acs" type="checkbox" /></CampoCheck>
+            <CampoCheck label="Voluntário"><input name="voluntario" type="checkbox" /></CampoCheck>
+            <CampoCheck label="Participa da MEV"><input name="mev" type="checkbox" /></CampoCheck>
             <div className="md:col-span-2"><Botao type="submit">Incluir profissional</Botao></div>
           </Formulario>
           <Lista linhas={profissionais.data?.data ?? []} colunas={['nome', 'lotacao']} recurso="profissionais" onInativar={(id) => inativar.mutate({ recurso: 'profissionais', id })} />
@@ -190,7 +190,7 @@ export function GovernancaPage() {
               </select>
             </Campo>
             <Campo label="Nome"><input name="nome" required className={inputClass} /></Campo>
-            {['COMUNITARIA', 'POLITICA', 'RELIGIOSA', 'OUTRA'].map((tipo) => <Campo key={tipo} label={tipo}><input name={tipo} type="checkbox" /></Campo>)}
+            {['COMUNITARIA', 'POLITICA', 'RELIGIOSA', 'OUTRA'].map((tipo) => <CampoCheck key={tipo} label={tipo}><input name={tipo} type="checkbox" /></CampoCheck>)}
             <Campo label="Telefone"><input name="telefone" className={inputClass} /></Campo>
             <Campo label="E-mail"><input name="email" type="email" className={inputClass} /></Campo>
             <Campo label="Disponibilidade"><input name="disponibilidade" className={inputClass} /></Campo>

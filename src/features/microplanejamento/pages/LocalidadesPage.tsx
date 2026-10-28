@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, microplanejamentoApi, type Ciclo } from '../api';
 import { FormularioCiclo, type DadosCiclo } from '../FormularioCiclo';
 import { numero, texto, useMpFiltro } from '../useMp';
-import { Aviso, Botao, BotaoSecundario, Campo, Cartao, Celula, Formulario, inputClass, Linha, Tabela } from '../ui';
+import { Aviso, Botao, BotaoSecundario, Campo, CampoCheck, Cartao, Celula, Formulario, inputClass, Linha, Tabela } from '../ui';
 
 type Aba = 'ciclo' | 'sala' | 'localidade' | 'aporte';
 
@@ -166,7 +166,7 @@ export function LocalidadesPage() {
         <Cartao titulo="Sala de vacina">
           {!estabelecimentoId ? <p className="text-sm text-gray-500">Selecione a UBS.</p> : (
             <Formulario onSubmit={onSala}>
-              <Campo label="Possui sala"><input name="possui" type="checkbox" defaultChecked={sala.data?.possui_sala_vacina} /></Campo>
+              <CampoCheck label="Possui sala"><input name="possui" type="checkbox" defaultChecked={sala.data?.possui_sala_vacina} /></CampoCheck>
               <Campo label="Horário"><input name="horario" className={inputClass} defaultValue={sala.data?.horario_sala ?? ''} /></Campo>
               <Campo label="Telefone"><input name="telefone" className={inputClass} defaultValue={sala.data?.telefone ?? ''} /></Campo>
               <Campo label="E-mail"><input name="email" type="email" className={inputClass} defaultValue={sala.data?.email ?? ''} /></Campo>
@@ -188,7 +188,7 @@ export function LocalidadesPage() {
             <Campo label="Tipo de território"><input name="tipo_territorio" className={inputClass} /></Campo>
             <Campo label="Domicílios"><input name="domicilios" type="number" min={0} className={inputClass} /></Campo>
             <Campo label="Escolas e instituições"><input name="escolas" className={inputClass} /></Campo>
-            <Campo label="Dificuldade de acesso"><input name="dificuldade" type="checkbox" /></Campo>
+            <CampoCheck label="Dificuldade de acesso"><input name="dificuldade" type="checkbox" /></CampoCheck>
             <Campo label="Descrição do acesso"><input name="descricao_acesso" className={inputClass} /></Campo>
             <div className="md:col-span-2"><Botao type="submit">Gravar localidade</Botao></div>
           </Formulario>

@@ -15,6 +15,15 @@ export function Campo({ label, children }: { label: string; children: ReactNode 
   );
 }
 
+export function CampoCheck({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="flex items-center gap-2 text-sm text-gray-700">
+      {children}
+      <span className="font-medium">{label}</span>
+    </label>
+  );
+}
+
 export const inputClass = 'w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white';
 
 export function Botao({ children, type = 'button', onClick, disabled }: { children: ReactNode; type?: 'button' | 'submit'; onClick?: () => void; disabled?: boolean }) {

@@ -2,7 +2,7 @@ import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, microplanejamentoApi, type Fofa } from '../api';
 import { numero, texto, useMpFiltro } from '../useMp';
-import { Aviso, Botao, Campo, Cartao, Formulario, inputClass } from '../ui';
+import { Aviso, Botao, Campo, CampoCheck, Cartao, Formulario, inputClass } from '../ui';
 
 const VUL = [
   ['vul_fronteira', 'Fronteira'],
@@ -95,7 +95,7 @@ export function DiagnosticoPage() {
         <Formulario onSubmit={onRisco}>
           <Campo label="População urbana"><input name="pop_urbana" type="number" min={0} required className={inputClass} defaultValue={atual?.pop_urbana ?? 0} /></Campo>
           <Campo label="População rural"><input name="pop_rural" type="number" min={0} required className={inputClass} defaultValue={atual?.pop_rural ?? 0} /></Campo>
-          {VUL.map(([chave, rotulo]) => <Campo key={chave} label={rotulo}><input name={chave} type="checkbox" /></Campo>)}
+          {VUL.map(([chave, rotulo]) => <CampoCheck key={chave} label={rotulo}><input name={chave} type="checkbox" /></CampoCheck>)}
           {IND.map(([chave, rotulo]) => (
             <Campo key={chave} label={rotulo}>
               <select name={chave} className={inputClass}>
@@ -108,7 +108,7 @@ export function DiagnosticoPage() {
           <div className="md:col-span-2 space-y-1">
             <p className="text-sm font-medium">Localidades vinculadas</p>
             {(localidades.data?.data ?? []).map((item) => (
-              <label key={item.id} className="flex gap-2 text-sm"><input type="checkbox" name={`loc-${item.id}`} />{item.nome}</label>
+              <CampoCheck key={item.id} label={item.nome}><input type="checkbox" name={`loc-${item.id}`} /></CampoCheck>
             ))}
           </div>
           <div className="md:col-span-2"><Botao type="submit">Calcular e gravar risco</Botao></div>
