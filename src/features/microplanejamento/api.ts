@@ -57,7 +57,9 @@ export const microplanejamentoApi = {
   necessidades: (cicloId: number, estabelecimentoId: number) =>
     get<{ data: Necessidade[] }>('/necessidades', { cicloId, estabelecimentoId }),
   salvarNecessidades: (body: unknown) => axios.put(`${base()}/necessidades`, body, { withCredentials: true }).then((r) => r.data),
-  painel: (cicloId: number) => get<Painel>('/painel', { cicloId }),
+  painel: (cicloId: number, estabelecimentoId?: number) =>
+    get<Painel>('/painel', estabelecimentoId ? { cicloId, estabelecimentoId } : { cicloId }),
+  resumo: (params?: Record<string, unknown>) => get<ResumoCiclos>('/resumo', params),
   alertas: (cicloId: number) => get<{ data: Alerta[] }>('/alertas', { cicloId }),
   atualizarAlerta: (id: number, status: string) => axios.put(`${base()}/alertas/${id}`, { status }, { withCredentials: true }).then((r) => r.data),
   relatorio: (tipo: string, cicloId: number) => get<{ data: Record<string, unknown>[] }>(`/relatorios/${tipo}`, { cicloId }),
@@ -186,6 +188,14 @@ export type Necessidade = {
   item: CatalogoItem & { catalogo?: { tipo: string } };
 };
 
+export type Alerta = {
+  id: number;
+  codigo: string;
+  severidade: string;
+  status: string;
+  texto: string;
+};
+
 export type Painel = {
   populacao_alvo: number;
   doses_aplicadas: number;
@@ -194,15 +204,36 @@ export type Painel = {
   localidades_prioritarias: number;
   alertas_abertos: number;
   acoes: { status: string; total: number }[];
-  prioridades: { total: number; faixa: string; localidade: { nome: string }; detalhe: unknown }[];
+  prioridades: { total: number; faixa: string; localidade: { nome: string }; detalhe?: unknown }[];
+  doses_por_dia: { data: string; doses: number }[];
+  custo_comunicacao: number;
+  alertas: Alerta[];
 };
 
-export type Alerta = {
+export type ResumoCiclo = {
   id: number;
-  codigo: string;
-  severidade: string;
+  nome: string;
+  ano: number;
   status: string;
-  texto: string;
+  estrategia: string;
+  municipio?: string | null;
+  populacao_alvo: number;
+  doses_aplicadas: number;
+  cobertura: number;
+  alertas_abertos: number;
+};
+
+export type ResumoCiclos = {
+  totais: {
+    ciclos: number;
+    populacao_alvo: number;
+    doses_aplicadas: number;
+    nao_vacinados: number;
+    cobertura: number;
+    alertas_abertos: number;
+  };
+  por_status: { status: string; total: number }[];
+  ciclos: ResumoCiclo[];
 };
 
 export type Parametro = { id: number; chave: string; versao: number; valor: Record<string, unknown>; ativo: boolean };

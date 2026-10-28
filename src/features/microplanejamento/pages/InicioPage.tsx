@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, microplanejamentoApi, type Ciclo } from '../api';
 import { FormularioCiclo, STATUS_CICLO_ROTULO, type DadosCiclo } from '../FormularioCiclo';
+import { PainelAcompanhamento, ResumoCiclosPainel } from '../PainelAcompanhamento';
+import { formatarNumero, formatarPercentual } from '../rotulos';
 import { useMpFiltro } from '../useMp';
 import { Aviso, Botao, BotaoSecundario, Cartao, Celula, Linha, Modal, Tabela } from '../ui';
 
@@ -55,6 +57,14 @@ export function InicioPage() {
         limit: LIMITE,
       }),
   });
+  const resumo = useQuery({
+    queryKey: ['mp-resumo', municipioId, estabelecimentoId, cicloId, status],
+    queryFn: () => microplanejamentoApi.resumo({ municipioId, estabelecimentoId, cicloId, status }),
+  });
+  const kpisPorCiclo = useMemo(
+    () => new Map((resumo.data?.ciclos ?? []).map((item) => [item.id, item])),
+    [resumo.data],
+  );
 
   const lista = ciclos.data?.data ?? [];
   const paginacao = ciclos.data?.pagination;
@@ -65,6 +75,7 @@ export function InicioPage() {
     mutationFn: (body: unknown) => microplanejamentoApi.criarCiclo(body),
     onSuccess: (ciclo: Ciclo) => {
       queryClient.invalidateQueries({ queryKey: ['mp-ciclos'] });
+      queryClient.invalidateQueries({ queryKey: ['mp-resumo'] });
       setModalAberto(false);
       setErroModal('');
       irParaCiclo(ciclo);
@@ -75,6 +86,7 @@ export function InicioPage() {
     mutationFn: (id: number) => microplanejamentoApi.inativar('ciclos', id),
     onSuccess: (_data, id) => {
       queryClient.invalidateQueries({ queryKey: ['mp-ciclos'] });
+      queryClient.invalidateQueries({ queryKey: ['mp-resumo'] });
       if (cicloId === id) setFiltro('cicloId', '');
     },
     onError: (error) => setErroModal(apiErrorMessage(error)),
@@ -101,6 +113,9 @@ export function InicioPage() {
       {ciclos.isError && <Aviso tipo="erro">{apiErrorMessage(ciclos.error)}</Aviso>}
       {excluirCiclo.isError && <Aviso tipo="erro">{apiErrorMessage(excluirCiclo.error)}</Aviso>}
 
+      <ResumoCiclosPainel resumo={resumo.data} carregando={resumo.isLoading} erro={resumo.isError ? resumo.error : undefined} />
+      {cicloId ? <PainelAcompanhamento cicloId={cicloId} estabelecimentoId={estabelecimentoId} /> : null}
+
       <Cartao
         titulo="Ciclos cadastrados"
         acoes={(
@@ -116,14 +131,18 @@ export function InicioPage() {
           <Aviso tipo="info">Nenhum ciclo encontrado para os filtros selecionados. Use Novo ciclo para cadastrar.</Aviso>
         ) : (
           <>
-            <Tabela colunas={['Ano', 'Nome', 'Estratégia', 'Município', 'Status', 'Início', 'Fim', 'Dias', '']}>
-              {lista.map((ciclo) => (
+            <Tabela colunas={['Ano', 'Nome', 'Estratégia', 'Município', 'Status', 'Cobertura', 'Alertas', 'Início', 'Fim', 'Dias', '']}>
+              {lista.map((ciclo) => {
+                const kpi = kpisPorCiclo.get(ciclo.id);
+                return (
                 <Linha key={ciclo.id}>
                   <Celula>{ciclo.ano}</Celula>
                   <Celula>{ciclo.nome}</Celula>
                   <Celula>{rotulo(ESTRATEGIA, ciclo.estrategia)}</Celula>
                   <Celula>{ciclo.tipo_municipio?.descricao ?? '—'}</Celula>
                   <Celula>{rotulo(STATUS_CICLO_ROTULO, ciclo.status)}</Celula>
+                  <Celula>{kpi ? formatarPercentual(kpi.cobertura) : '—'}</Celula>
+                  <Celula>{kpi ? formatarNumero(kpi.alertas_abertos) : '—'}</Celula>
                   <Celula>{dataBr(ciclo.data_inicio)}</Celula>
                   <Celula>{dataBr(ciclo.data_fim)}</Celula>
                   <Celula>{ciclo.dias_operacionais}</Celula>
@@ -134,7 +153,8 @@ export function InicioPage() {
                     </div>
                   </Celula>
                 </Linha>
-              ))}
+                );
+              })}
             </Tabela>
             {paginas > 1 && (
               <div className="flex items-center justify-between gap-3 pt-2">
