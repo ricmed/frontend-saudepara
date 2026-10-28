@@ -41,8 +41,41 @@ type PlanoAcao = {
 
 type ModalPlano = { modo: 'criar' } | { modo: 'ver' | 'editar'; plano: PlanoAcao };
 
+type Comunicacao = {
+  id: number;
+  ciclo_id: number;
+  estabelecimento_id?: number | null;
+  atividade: string;
+  data_hora?: string | null;
+  local?: string | null;
+  objetivo?: string | null;
+  forma?: string | null;
+  publico?: string | null;
+  mensagem_chave?: string | null;
+  responsaveis?: string | null;
+  custo?: number | null;
+  status: string;
+};
+
+type ModalComunicacao = { modo: 'criar' } | { modo: 'ver' | 'editar'; comunicacao: Comunicacao };
+
 function isoDate(valor?: string | null) {
   return valor ? String(valor).slice(0, 10) : '';
+}
+
+function isoDateTimeLocal(valor?: string | null) {
+  if (!valor) return '';
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${data.getFullYear()}-${pad(data.getMonth() + 1)}-${pad(data.getDate())}T${pad(data.getHours())}:${pad(data.getMinutes())}`;
+}
+
+function formatarDataHora(valor?: string | null) {
+  if (!valor) return '—';
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return '—';
+  return data.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
 function primeiroLocal(plano?: PlanoAcao) {
@@ -127,12 +160,54 @@ function FormularioPlano({
   );
 }
 
+function FormularioComunicacao({
+  modo,
+  comunicacao,
+  onSubmit,
+  onEditar,
+  pending,
+}: {
+  modo: 'criar' | 'editar' | 'ver';
+  comunicacao?: Comunicacao;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onEditar?: () => void;
+  pending?: boolean;
+}) {
+  const leitura = modo === 'ver';
+  return (
+    <Formulario onSubmit={leitura ? (event) => event.preventDefault() : onSubmit}>
+      <Campo label="Atividade"><input name="atividade" required className={inputClass} defaultValue={comunicacao?.atividade ?? ''} disabled={leitura} readOnly={leitura} /></Campo>
+      <Campo label="Data e hora"><input name="data_hora" type="datetime-local" className={inputClass} defaultValue={isoDateTimeLocal(comunicacao?.data_hora)} disabled={leitura} readOnly={leitura} /></Campo>
+      <Campo label="Local"><input name="local" className={inputClass} defaultValue={comunicacao?.local ?? ''} disabled={leitura} readOnly={leitura} /></Campo>
+      <Campo label="Objetivo"><input name="objetivo" className={inputClass} defaultValue={comunicacao?.objetivo ?? ''} disabled={leitura} readOnly={leitura} /></Campo>
+      <Campo label="Forma"><input name="forma" className={inputClass} defaultValue={comunicacao?.forma ?? ''} disabled={leitura} readOnly={leitura} /></Campo>
+      <Campo label="Público"><input name="publico" className={inputClass} defaultValue={comunicacao?.publico ?? ''} disabled={leitura} readOnly={leitura} /></Campo>
+      <Campo label="Mensagem-chave"><input name="mensagem" className={inputClass} defaultValue={comunicacao?.mensagem_chave ?? ''} disabled={leitura} readOnly={leitura} /></Campo>
+      <Campo label="Responsáveis"><input name="responsaveis" className={inputClass} defaultValue={comunicacao?.responsaveis ?? ''} disabled={leitura} readOnly={leitura} /></Campo>
+      <Campo label="Custo"><input name="custo" type="number" min={0} step="0.01" className={inputClass} defaultValue={comunicacao?.custo ?? 0} disabled={leitura} readOnly={leitura} /></Campo>
+      <Campo label="Status">
+        <select name="status" className={inputClass} defaultValue={comunicacao?.status ?? 'RASCUNHO'} disabled={leitura}>
+          {STATUS.map(([valor, rotulo]) => <option key={valor} value={valor}>{rotulo}</option>)}
+        </select>
+      </Campo>
+      <div className="md:col-span-2 flex flex-wrap gap-2">
+        {leitura ? (
+          <Botao type="button" onClick={onEditar}>Editar</Botao>
+        ) : (
+          <Botao type="submit" disabled={pending}>{modo === 'criar' ? 'Gravar atividade' : 'Salvar atividade'}</Botao>
+        )}
+      </div>
+    </Formulario>
+  );
+}
+
 export function PlanoPage({ modo }: { modo: 'plano' | 'comunicacao' }) {
   const { cicloId, estabelecimentoId } = useMpFiltro();
   const queryClient = useQueryClient();
   const [erro, setErro] = useState('');
   const [ok, setOk] = useState('');
   const [modal, setModal] = useState<ModalPlano | null>(null);
+  const [modalCom, setModalCom] = useState<ModalComunicacao | null>(null);
   const planos = useQuery({
     queryKey: ['mp-planos', cicloId],
     enabled: Boolean(cicloId) && modo === 'plano',
@@ -141,7 +216,7 @@ export function PlanoPage({ modo }: { modo: 'plano' | 'comunicacao' }) {
   const comunicacoes = useQuery({
     queryKey: ['mp-com', cicloId, estabelecimentoId],
     enabled: Boolean(cicloId) && modo === 'comunicacao',
-    queryFn: () => microplanejamentoApi.listar<Record<string, unknown>>('comunicacoes', { cicloId, estabelecimentoId }),
+    queryFn: () => microplanejamentoApi.listar<Comunicacao>('comunicacoes', { cicloId, estabelecimentoId }),
   });
   const locais = useQuery({
     queryKey: ['mp-localidades-ciclo', cicloId, estabelecimentoId],
@@ -154,6 +229,7 @@ export function PlanoPage({ modo }: { modo: 'plano' | 'comunicacao' }) {
       setOk('Registro gravado.');
       setErro('');
       setModal(null);
+      setModalCom(null);
       queryClient.invalidateQueries({ queryKey: ['mp-planos'] });
       queryClient.invalidateQueries({ queryKey: ['mp-com'] });
     },
@@ -174,6 +250,24 @@ export function PlanoPage({ modo }: { modo: 'plano' | 'comunicacao' }) {
     onSuccess: () => {
       setOk('Ação excluída.');
       queryClient.invalidateQueries({ queryKey: ['mp-planos'] });
+    },
+    onError: (error) => setErro(apiErrorMessage(error)),
+  });
+  const atualizarComunicacao = useMutation({
+    mutationFn: (vars: { id: number; body: unknown }) => microplanejamentoApi.atualizar('comunicacoes', vars.id, vars.body),
+    onSuccess: () => {
+      setOk('Atividade atualizada.');
+      setErro('');
+      setModalCom(null);
+      queryClient.invalidateQueries({ queryKey: ['mp-com'] });
+    },
+    onError: (error) => setErro(apiErrorMessage(error)),
+  });
+  const excluirComunicacao = useMutation({
+    mutationFn: (id: number) => microplanejamentoApi.inativar('comunicacoes', id),
+    onSuccess: () => {
+      setOk('Atividade excluída.');
+      queryClient.invalidateQueries({ queryKey: ['mp-com'] });
     },
     onError: (error) => setErro(apiErrorMessage(error)),
   });
@@ -206,11 +300,8 @@ export function PlanoPage({ modo }: { modo: 'plano' | 'comunicacao' }) {
     else criar.mutate(body);
   }
 
-  function onComunicacao(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!cicloId) return setErro('Selecione o ciclo.');
-    const form = new FormData(event.currentTarget);
-    criar.mutate({
+  function corpoComunicacao(form: FormData) {
+    return {
       ciclo_id: cicloId,
       estabelecimento_id: estabelecimentoId ?? null,
       atividade: String(form.get('atividade') || '').trim(),
@@ -222,8 +313,16 @@ export function PlanoPage({ modo }: { modo: 'plano' | 'comunicacao' }) {
       mensagem_chave: texto(form.get('mensagem')),
       responsaveis: texto(form.get('responsaveis')),
       custo: numero(form.get('custo')),
-      status: 'RASCUNHO',
-    });
+      status: String(form.get('status') || 'RASCUNHO'),
+    };
+  }
+
+  function onComunicacao(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!cicloId) return setErro('Selecione o ciclo.');
+    const body = corpoComunicacao(new FormData(event.currentTarget));
+    if (modalCom?.modo === 'editar') atualizarComunicacao.mutate({ id: modalCom.comunicacao.id, body });
+    else criar.mutate(body);
   }
 
   function onExcluir(plano: PlanoAcao) {
@@ -231,8 +330,15 @@ export function PlanoPage({ modo }: { modo: 'plano' | 'comunicacao' }) {
     excluirPlano.mutate(plano.id);
   }
 
+  function onExcluirComunicacao(item: Comunicacao) {
+    if (!window.confirm(`Excluir a atividade “${item.atividade}”? Ela deixa de aparecer na listagem.`)) return;
+    excluirComunicacao.mutate(item.id);
+  }
+
   const tituloModal = modal?.modo === 'ver' ? 'Detalhe da ação' : modal?.modo === 'editar' ? 'Editar ação' : 'Nova ação';
+  const tituloModalCom = modalCom?.modo === 'ver' ? 'Detalhe da atividade' : modalCom?.modo === 'editar' ? 'Editar atividade' : 'Nova atividade';
   const lista = planos.data?.data ?? [];
+  const listaCom = comunicacoes.data?.data ?? [];
 
   return (
     <div className="space-y-4">
@@ -281,30 +387,50 @@ export function PlanoPage({ modo }: { modo: 'plano' | 'comunicacao' }) {
           )}
         </>
       ) : (
-        <Cartao titulo="Comunicação">
-          <p className="text-sm">Custo total: {String(comunicacoes.data?.custo_total ?? 0)}</p>
-          <Formulario onSubmit={onComunicacao}>
-            <Campo label="Atividade"><input name="atividade" required className={inputClass} /></Campo>
-            <Campo label="Data e hora"><input name="data_hora" type="datetime-local" className={inputClass} /></Campo>
-            <Campo label="Local"><input name="local" className={inputClass} /></Campo>
-            <Campo label="Objetivo"><input name="objetivo" className={inputClass} /></Campo>
-            <Campo label="Forma"><input name="forma" className={inputClass} /></Campo>
-            <Campo label="Público"><input name="publico" className={inputClass} /></Campo>
-            <Campo label="Mensagem-chave"><input name="mensagem" className={inputClass} /></Campo>
-            <Campo label="Responsáveis"><input name="responsaveis" className={inputClass} /></Campo>
-            <Campo label="Custo"><input name="custo" type="number" min={0} step="0.01" className={inputClass} /></Campo>
-            <div className="md:col-span-2"><Botao type="submit">Gravar atividade</Botao></div>
-          </Formulario>
-          <Tabela colunas={['Atividade', 'Custo', 'Status']}>
-            {(comunicacoes.data?.data ?? []).map((item) => (
-              <Linha key={String(item.id)}>
-                <Celula>{String(item.atividade)}</Celula>
-                <Celula>{String(item.custo ?? 0)}</Celula>
-                <Celula>{String(item.status ?? '')}</Celula>
-              </Linha>
-            ))}
-          </Tabela>
-        </Cartao>
+        <>
+          <Cartao
+            titulo="Comunicação"
+            acoes={<Botao onClick={() => { setErro(''); setModalCom({ modo: 'criar' }); }}>Nova atividade</Botao>}
+          >
+            <p className="text-sm">Custo total: {String(comunicacoes.data?.custo_total ?? 0)}</p>
+            {comunicacoes.isLoading ? (
+              <p className="text-sm text-gray-500">Carregando atividades…</p>
+            ) : listaCom.length === 0 ? (
+              <Aviso tipo="info">Nenhuma atividade neste ciclo. Use Nova atividade para cadastrar.</Aviso>
+            ) : (
+              <Tabela colunas={['Atividade', 'Data', 'Custo', 'Status', '']}>
+                {listaCom.map((item) => (
+                  <Linha key={item.id}>
+                    <Celula>{item.atividade}</Celula>
+                    <Celula>{formatarDataHora(item.data_hora)}</Celula>
+                    <Celula>{String(item.custo ?? 0)}</Celula>
+                    <Celula>{STATUS_ROTULO[item.status] ?? item.status}</Celula>
+                    <Celula>
+                      <div className="flex flex-wrap gap-2">
+                        <BotaoSecundario onClick={() => { setErro(''); setModalCom({ modo: 'ver', comunicacao: item }); }}>Ver</BotaoSecundario>
+                        <BotaoSecundario onClick={() => { setErro(''); setModalCom({ modo: 'editar', comunicacao: item }); }}>Editar</BotaoSecundario>
+                        <BotaoSecundario onClick={() => onExcluirComunicacao(item)} disabled={excluirComunicacao.isPending}>Excluir</BotaoSecundario>
+                      </div>
+                    </Celula>
+                  </Linha>
+                ))}
+              </Tabela>
+            )}
+          </Cartao>
+          {modalCom && (
+            <Modal titulo={tituloModalCom} onFechar={() => setModalCom(null)}>
+              {erro && <Aviso tipo="erro">{erro}</Aviso>}
+              <FormularioComunicacao
+                key={`${modalCom.modo}-${modalCom.modo === 'criar' ? 'novo' : modalCom.comunicacao.id}`}
+                modo={modalCom.modo}
+                comunicacao={modalCom.modo === 'criar' ? undefined : modalCom.comunicacao}
+                onSubmit={onComunicacao}
+                onEditar={modalCom.modo === 'ver' ? () => setModalCom({ modo: 'editar', comunicacao: modalCom.comunicacao }) : undefined}
+                pending={criar.isPending || atualizarComunicacao.isPending}
+              />
+            </Modal>
+          )}
+        </>
       )}
     </div>
   );
