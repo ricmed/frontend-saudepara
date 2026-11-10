@@ -22,25 +22,25 @@ function rotuloUbs(item: EstabelecimentoOption) {
   return item.cnes ? `${item.nome} · ${item.cnes}` : item.nome;
 }
 
-export function FiltroUbsCiclo({ aplicaLocalidade }: { aplicaLocalidade: boolean }) {
+export function FiltroUbsCiclo({ aplicaLocalidade, somenteUbs = false }: { aplicaLocalidade: boolean; somenteUbs?: boolean }) {
   const filtro = useMpFiltro();
   const { ubs, isLoading } = useUbsDoCiclo(filtro.cicloId);
   const localidades = useQuery({
     queryKey: ['mp-localidades', filtro.estabelecimentoId],
-    enabled: Boolean(filtro.estabelecimentoId),
+    enabled: !somenteUbs && Boolean(filtro.estabelecimentoId),
     queryFn: () => microplanejamentoApi.localidades({ estabelecimentoId: filtro.estabelecimentoId, limit: 100 }),
   });
   const aporte = useQuery({
     queryKey: ['mp-localidades-ciclo', filtro.cicloId, filtro.estabelecimentoId],
-    enabled: Boolean(filtro.cicloId && filtro.estabelecimentoId),
+    enabled: !somenteUbs && Boolean(filtro.cicloId && filtro.estabelecimentoId),
     queryFn: () => microplanejamentoApi.localidadesCiclo(filtro.cicloId!, filtro.estabelecimentoId),
   });
 
   useEffect(() => {
-    if (!filtro.localidadeId || !localidades.isSuccess) return;
+    if (somenteUbs || !filtro.localidadeId || !localidades.isSuccess) return;
     const existe = (localidades.data?.data ?? []).some((item) => item.id === filtro.localidadeId);
     if (!existe) filtro.setFiltro('localidadeId', '');
-  }, [filtro.localidadeId, filtro.setFiltro, localidades.data, localidades.isSuccess]);
+  }, [somenteUbs, filtro.localidadeId, filtro.setFiltro, localidades.data, localidades.isSuccess]);
 
   const linhasAporte = (aporte.data?.data ?? []).filter((linha) =>
     !filtro.localidadeId || linha.localidade_id === filtro.localidadeId,
@@ -53,7 +53,7 @@ export function FiltroUbsCiclo({ aplicaLocalidade }: { aplicaLocalidade: boolean
 
   return (
     <section className="bg-white border border-gray-200 rounded-lg p-3 space-y-3">
-      <div className="grid gap-3 lg:grid-cols-[minmax(16rem,24rem)_minmax(16rem,24rem)_1fr] lg:items-end">
+      <div className={`grid gap-3 lg:items-end ${somenteUbs ? 'lg:grid-cols-[minmax(16rem,24rem)]' : 'lg:grid-cols-[minmax(16rem,24rem)_minmax(16rem,24rem)_1fr]'}`}>
         <label className="text-sm text-gray-700">
           UBS do ciclo
           {isLoading ? (
@@ -75,32 +75,36 @@ export function FiltroUbsCiclo({ aplicaLocalidade }: { aplicaLocalidade: boolean
             </select>
           )}
         </label>
-        <label className="text-sm text-gray-700">
-          Localidade
-          <select
-            className={`${inputClass} mt-1`}
-            value={filtro.localidadeId ?? ''}
-            disabled={!filtro.estabelecimentoId || localidades.isLoading}
-            onChange={(event) => filtro.setFiltro('localidadeId', event.target.value)}
-          >
-            <option value="">{filtro.estabelecimentoId ? 'Todas' : 'Selecione a UBS'}</option>
-            {itens.map((item) => (
-              <option key={item.id} value={item.id}>{item.nome}</option>
-            ))}
-          </select>
-        </label>
-        <CardPopulacao
-          titulo={filtro.localidadeId ? 'População da localidade' : 'População da UBS'}
-          semUbs={!filtro.estabelecimentoId}
-          carregando={Boolean(filtro.estabelecimentoId) && aporte.isLoading}
-          erro={aporte.isError}
-          total={populacao.total}
-          urbana={populacao.urbana}
-          rural={populacao.rural}
-          semZona={populacao.semZona}
-        />
+        {!somenteUbs && (
+          <label className="text-sm text-gray-700">
+            Localidade
+            <select
+              className={`${inputClass} mt-1`}
+              value={filtro.localidadeId ?? ''}
+              disabled={!filtro.estabelecimentoId || localidades.isLoading}
+              onChange={(event) => filtro.setFiltro('localidadeId', event.target.value)}
+            >
+              <option value="">{filtro.estabelecimentoId ? 'Todas' : 'Selecione a UBS'}</option>
+              {itens.map((item) => (
+                <option key={item.id} value={item.id}>{item.nome}</option>
+              ))}
+            </select>
+          </label>
+        )}
+        {!somenteUbs && (
+          <CardPopulacao
+            titulo={filtro.localidadeId ? 'População da localidade' : 'População da UBS'}
+            semUbs={!filtro.estabelecimentoId}
+            carregando={Boolean(filtro.estabelecimentoId) && aporte.isLoading}
+            erro={aporte.isError}
+            total={populacao.total}
+            urbana={populacao.urbana}
+            rural={populacao.rural}
+            semZona={populacao.semZona}
+          />
+        )}
       </div>
-      {filtro.localidadeId && !aplicaLocalidade && (
+      {!somenteUbs && filtro.localidadeId && !aplicaLocalidade && (
         <p className="text-xs text-gray-500">
           O recorte por localidade vale para lideranças, plano de ação, execução e MEV. Esta seção continua da UBS inteira.
         </p>

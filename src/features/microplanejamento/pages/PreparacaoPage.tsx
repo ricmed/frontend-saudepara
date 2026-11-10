@@ -7,17 +7,11 @@ import { Aviso, Botao, Cartao, Celula, inputClass, Linha, Tabela } from '../ui';
 
 const OPCOES = ['SIM', 'PARCIAL', 'NAO', 'NA'] as const;
 
-export function PreparacaoPage() {
+export function ChecklistPage() {
   const { cicloId, estabelecimentoId } = useMpFiltro();
   const [checklist, setChecklist] = useState<Checklist | null>(null);
   const [erro, setErro] = useState('');
   const [ok, setOk] = useState('');
-  const queryClient = useQueryClient();
-  const inventario = useQuery({
-    queryKey: ['mp-inv', cicloId, estabelecimentoId],
-    enabled: Boolean(cicloId && estabelecimentoId),
-    queryFn: () => microplanejamentoApi.inventario(cicloId!, estabelecimentoId!),
-  });
   const abrir = useMutation({
     mutationFn: microplanejamentoApi.abrirChecklist,
     onSuccess: (data) => {
@@ -33,14 +27,6 @@ export function PreparacaoPage() {
       setChecklist(data);
       setOk(`Índice ${data.indice?.toFixed?.(2) ?? data.indice} · ${data.classificacao ?? ''}`);
       setErro('');
-    },
-    onError: (error) => setErro(apiErrorMessage(error)),
-  });
-  const salvarInv = useMutation({
-    mutationFn: microplanejamentoApi.salvarInventario,
-    onSuccess: () => {
-      setOk('Inventário gravado.');
-      queryClient.invalidateQueries({ queryKey: ['mp-inv'] });
     },
     onError: (error) => setErro(apiErrorMessage(error)),
   });
@@ -63,19 +49,6 @@ export function PreparacaoPage() {
       return;
     }
     salvar.mutate({ id: checklist.id, body: { respostas, status } });
-  }
-
-  function onInventario(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!cicloId || !estabelecimentoId) return setErro('Selecione ciclo e UBS.');
-    const form = new FormData(event.currentTarget);
-    const linhas = (inventario.data?.itens ?? []).map((item) => ({
-      item_id: item.id,
-      quantidade: numero(form.get(`q-${item.id}`)),
-      necessidade_adicional: numero(form.get(`n-${item.id}`)),
-      observacoes: String(form.get(`o-${item.id}`) || '') || null,
-    }));
-    salvarInv.mutate({ ciclo_id: cicloId, estabelecimento_id: estabelecimentoId, linhas });
   }
 
   const grupos = new Map<string, Checklist['catalogo']['itens']>();
@@ -125,6 +98,47 @@ export function PreparacaoPage() {
           </form>
         )}
       </Cartao>
+    </div>
+  );
+}
+
+export function PreparacaoPage() {
+  const { cicloId, estabelecimentoId } = useMpFiltro();
+  const [erro, setErro] = useState('');
+  const [ok, setOk] = useState('');
+  const queryClient = useQueryClient();
+  const inventario = useQuery({
+    queryKey: ['mp-inv', cicloId, estabelecimentoId],
+    enabled: Boolean(cicloId && estabelecimentoId),
+    queryFn: () => microplanejamentoApi.inventario(cicloId!, estabelecimentoId!),
+  });
+  const salvarInv = useMutation({
+    mutationFn: microplanejamentoApi.salvarInventario,
+    onSuccess: () => {
+      setOk('Inventário gravado.');
+      setErro('');
+      queryClient.invalidateQueries({ queryKey: ['mp-inv'] });
+    },
+    onError: (error) => setErro(apiErrorMessage(error)),
+  });
+
+  function onInventario(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!cicloId || !estabelecimentoId) return setErro('Selecione ciclo e UBS.');
+    const form = new FormData(event.currentTarget);
+    const linhas = (inventario.data?.itens ?? []).map((item) => ({
+      item_id: item.id,
+      quantidade: numero(form.get(`q-${item.id}`)),
+      necessidade_adicional: numero(form.get(`n-${item.id}`)),
+      observacoes: String(form.get(`o-${item.id}`) || '') || null,
+    }));
+    salvarInv.mutate({ ciclo_id: cicloId, estabelecimento_id: estabelecimentoId, linhas });
+  }
+
+  return (
+    <div className="space-y-4">
+      {ok && <Aviso tipo="ok">{ok}</Aviso>}
+      {erro && <Aviso tipo="erro">{erro}</Aviso>}
       <Cartao titulo="Inventário de rede de frio">
         <form className="space-y-2" onSubmit={onInventario}>
           {(inventario.data?.itens.length ?? 0) === 0 ? (

@@ -12,7 +12,7 @@ import { InicioPage } from './pages/InicioPage';
 import { LocalidadesPage } from './pages/LocalidadesPage';
 import { GovernancaPage } from './pages/GovernancaPage';
 import { DiagnosticoPage } from './pages/DiagnosticoPage';
-import { PreparacaoPage } from './pages/PreparacaoPage';
+import { ChecklistPage, PreparacaoPage } from './pages/PreparacaoPage';
 import { MetasPage } from './pages/MetasPage';
 import { PlanoPage } from './pages/PlanoPage';
 import { ExecucaoPage } from './pages/ExecucaoPage';
@@ -26,6 +26,7 @@ const SECOES = [
   { id: 'governanca', rotulo: 'Governança' },
   { id: 'diagnostico', rotulo: 'Diagnóstico' },
   { id: 'preparacao', rotulo: 'Preparação' },
+  { id: 'checklist', rotulo: 'Checklist' },
   { id: 'metas', rotulo: 'Metas e insumos' },
   { id: 'plano', rotulo: 'Plano de ação' },
   { id: 'comunicacao', rotulo: 'Comunicação' },
@@ -114,7 +115,10 @@ export default function MicroplanejamentoPage() {
         )}
 
         {secao !== '' && secao !== 'parametros' && secao !== 'localidades' && (
-          <FiltroUbsCiclo aplicaLocalidade={secao === 'governanca' || secao === 'plano' || secao === 'execucao' || secao === 'diagnostico'} />
+          <FiltroUbsCiclo
+            aplicaLocalidade={secao === 'governanca' || secao === 'plano' || secao === 'execucao' || secao === 'diagnostico'}
+            somenteUbs={secao === 'preparacao' || secao === 'checklist'}
+          />
         )}
 
         {secao === '' && <InicioPage />}
@@ -122,6 +126,7 @@ export default function MicroplanejamentoPage() {
         {secao === 'governanca' && <GovernancaPage />}
         {secao === 'diagnostico' && <DiagnosticoPage />}
         {secao === 'preparacao' && <PreparacaoPage />}
+        {secao === 'checklist' && <ChecklistPage />}
         {secao === 'metas' && <MetasPage />}
         {secao === 'plano' && <PlanoPage modo="plano" />}
         {secao === 'comunicacao' && <PlanoPage modo="comunicacao" />}
