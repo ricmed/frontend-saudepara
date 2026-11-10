@@ -11,6 +11,58 @@ type ModalLocalidade = { modo: 'criar' } | { modo: 'ver' | 'editar'; localidade:
 
 const ZONA_ROTULO: Record<string, string> = { URBANA: 'Urbana', RURAL: 'Rural' };
 
+function LinhaAporte({
+  id,
+  nome,
+  populacao,
+  fonte,
+  prioridade,
+  percentual,
+  incluir,
+  onSubmit,
+}: {
+  id: number;
+  nome: string;
+  populacao?: number | null;
+  fonte?: string | null;
+  prioridade?: number | null;
+  percentual?: number | null;
+  incluir: boolean;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  const formId = `aporte-${id}`;
+  const campo = 'w-full min-w-0 rounded border border-gray-300 px-2 py-1 text-sm';
+  return (
+    <Linha>
+      <Celula>{nome}</Celula>
+      <Celula>
+        <input form={formId} name="populacao" type="number" min={0} required defaultValue={populacao ?? ''} className={campo} />
+      </Celula>
+      <Celula>
+        <input form={formId} name="fonte" defaultValue={fonte ?? ''} className={campo} />
+      </Celula>
+      <Celula>
+        <select form={formId} name="prioridade" defaultValue={prioridade ?? ''} className={campo}>
+          <option value="">—</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+        </select>
+      </Celula>
+      <Celula>
+        <span title="Participação da população desta localidade no total da UBS neste ciclo">
+          {percentual == null ? '—' : `${percentual.toFixed(2)}%`}
+        </span>
+      </Celula>
+      <Celula>
+        <form id={formId} onSubmit={onSubmit}>
+          <Botao type="submit">{incluir ? 'Incluir no ciclo' : 'Salvar'}</Botao>
+        </form>
+      </Celula>
+    </Linha>
+  );
+}
+
 function FormularioLocalidade({
   modo,
   localidade,
@@ -385,19 +437,31 @@ export function LocalidadesPage() {
 
           {aba === 'aporte' && (
             <Cartao titulo="Aporte no ciclo">
-              <Tabela colunas={['Localidade', 'População', 'Prioridade', '% aporte', '']}>
-                {(doCiclo.data?.data ?? []).map((item) => (
-                  <Linha key={item.localidade_id}>
-                    <Celula>{item.localidade.nome}</Celula>
-                    <Celula>
-                      <form
-                        className="flex flex-wrap gap-2 items-center"
+              <p className="text-sm text-gray-500">
+                O % aporte é calculado: participação da população da localidade no total da UBS neste ciclo.
+              </p>
+              {(localidades.data?.data.length ?? 0) === 0 ? (
+                <Aviso tipo="info">Nenhuma localidade nesta UBS. Cadastre uma na aba Localidade da UBS.</Aviso>
+              ) : (
+                <Tabela colunas={['Localidade', 'População', 'Fonte', 'Prioridade', '% aporte', '']}>
+                  {(localidades.data?.data ?? []).map((item) => {
+                    const aporte = (doCiclo.data?.data ?? []).find((linha) => linha.localidade_id === item.id);
+                    return (
+                      <LinhaAporte
+                        key={`${item.id}-${aporte?.populacao_alvo ?? ''}-${aporte?.prioridade ?? ''}-${aporte?.fonte ?? ''}`}
+                        id={item.id}
+                        nome={item.nome}
+                        populacao={aporte?.populacao_alvo}
+                        fonte={aporte?.fonte}
+                        prioridade={aporte?.prioridade}
+                        percentual={aporte?.percentual}
+                        incluir={!aporte}
                         onSubmit={(event) => {
                           event.preventDefault();
                           const form = new FormData(event.currentTarget);
                           const prioridade = form.get('prioridade');
                           vincular.mutate({
-                            localidadeId: item.localidade_id,
+                            localidadeId: item.id,
                             body: {
                               populacao_alvo: numero(form.get('populacao')),
                               fonte: texto(form.get('fonte')),
@@ -405,49 +469,11 @@ export function LocalidadesPage() {
                             },
                           });
                         }}
-                      >
-                        <input name="populacao" type="number" min={0} defaultValue={item.populacao_alvo} className="w-24 rounded border px-2 py-1" />
-                        <input name="fonte" defaultValue={item.fonte ?? ''} placeholder="Fonte" className="w-32 rounded border px-2 py-1" />
-                        <select name="prioridade" defaultValue={item.prioridade ?? ''} className="rounded border px-2 py-1">
-                          <option value="">—</option>
-                          <option value="1">1</option>
-                          <option value="2">2</option>
-                          <option value="3">3</option>
-                        </select>
-                        <span className="text-gray-700">{item.percentual.toFixed(2)}%</span>
-                        <Botao type="submit">Salvar</Botao>
-                      </form>
-                    </Celula>
-                    <Celula>{item.prioridade ?? '—'}</Celula>
-                    <Celula>{item.percentual.toFixed(2)}</Celula>
-                    <Celula />
-                  </Linha>
-                ))}
-              </Tabela>
-              {(localidades.data?.data ?? []).filter((item) => !(doCiclo.data?.data ?? []).some((linha) => linha.localidade_id === item.id)).map((item) => (
-                <form
-                  key={item.id}
-                  className="flex flex-wrap gap-2 items-end border-t pt-2"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    const form = new FormData(event.currentTarget);
-                    vincular.mutate({
-                      localidadeId: item.id,
-                      body: {
-                        populacao_alvo: numero(form.get('populacao')),
-                        fonte: texto(form.get('fonte')),
-                        prioridade: form.get('prioridade') ? Number(form.get('prioridade')) : null,
-                      },
-                    });
-                  }}
-                >
-                  <span className="text-sm">{item.nome}</span>
-                  <input name="populacao" type="number" min={0} required placeholder="População" className={inputClass + ' w-28'} />
-                  <input name="fonte" placeholder="Fonte" className={inputClass + ' w-40'} />
-                  <select name="prioridade" className={inputClass + ' w-24'}><option value="">Prioridade</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
-                  <Botao type="submit">Incluir no ciclo</Botao>
-                </form>
-              ))}
+                      />
+                    );
+                  })}
+                </Tabela>
+              )}
             </Cartao>
           )}
         </>

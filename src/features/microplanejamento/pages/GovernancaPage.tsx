@@ -1,6 +1,7 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, microplanejamentoApi } from '../api';
+import { formatarDataIso } from '../rotulos';
 import { numero, texto, useMpFiltro } from '../useMp';
 import { Aviso, Botao, BotaoSecundario, Campo, CampoCheck, Cartao, Celula, Formulario, inputClass, Linha, Tabela } from '../ui';
 
@@ -116,17 +117,25 @@ export function GovernancaPage() {
               custo: numero(form.get('custo')),
             }, event);
           }}>
-            <Campo label="Data"><input name="data" type="date" className={inputClass} /></Campo>
+            <Campo label="Data"><CampoData name="data" /></Campo>
             <Campo label="Local"><input name="local" className={inputClass} /></Campo>
             <Campo label="Público"><input name="publico" className={inputClass} /></Campo>
             <Campo label="Objetivo"><input name="objetivo" className={inputClass} /></Campo>
             <Campo label="Temas"><input name="temas" className={inputClass} /></Campo>
-            <Campo label="Participantes"><input name="participantes" type="number" min={0} className={inputClass} /></Campo>
+            <Campo label="Qtd de participantes"><input name="participantes" type="number" min={0} className={inputClass} /></Campo>
             <Campo label="Responsáveis"><input name="responsaveis" className={inputClass} /></Campo>
-            <Campo label="Custo"><input name="custo" type="number" min={0} step="0.01" className={inputClass} /></Campo>
+            <Campo label="Custo"><CampoReais name="custo" /></Campo>
             <div className="md:col-span-2"><Botao type="submit">Incluir capacitação</Botao></div>
           </Formulario>
-          <Lista linhas={capacitacoes.data?.data ?? []} colunas={['data', 'local', 'publico']} recurso="capacitacoes" onInativar={(id) => inativar.mutate({ recurso: 'capacitacoes', id })} />
+          <Lista
+            linhas={capacitacoes.data?.data ?? []}
+            colunas={['data', 'local', 'publico']}
+            rotulos={['Data', 'Local', 'Público']}
+            recurso="capacitacoes"
+            acao="Excluir"
+            formatar={(coluna, valor) => coluna === 'data' ? formatarDataIso(typeof valor === 'string' ? valor : null) : String(valor ?? '—')}
+            onInativar={(id) => inativar.mutate({ recurso: 'capacitacoes', id })}
+          />
         </Cartao>
       )}
 
@@ -150,13 +159,15 @@ export function GovernancaPage() {
           }}>
             <Campo label="Nome"><input name="nome" required className={inputClass} /></Campo>
             <Campo label="Lotação"><input name="lotacao" className={inputClass} /></Campo>
-            <Campo label="Telefone"><input name="telefone" className={inputClass} /></Campo>
-            <Campo label="E-mail"><input name="email" type="email" className={inputClass} /></Campo>
-            <CampoCheck label="Vacinador"><input name="vacinador" type="checkbox" /></CampoCheck>
-            <CampoCheck label="Anotador"><input name="anotador" type="checkbox" /></CampoCheck>
-            <CampoCheck label="ACS"><input name="acs" type="checkbox" /></CampoCheck>
-            <CampoCheck label="Voluntário"><input name="voluntario" type="checkbox" /></CampoCheck>
-            <CampoCheck label="Participa da MEV"><input name="mev" type="checkbox" /></CampoCheck>
+            <Campo label="Telefone"><CampoTelefone name="telefone" /></Campo>
+            <Campo label="E-mail"><CampoEmail name="email" /></Campo>
+            <div className="flex flex-col gap-2 md:col-span-2">
+              <CampoCheck label="Vacinador"><input name="vacinador" type="checkbox" /></CampoCheck>
+              <CampoCheck label="Anotador"><input name="anotador" type="checkbox" /></CampoCheck>
+              <CampoCheck label="ACS"><input name="acs" type="checkbox" /></CampoCheck>
+              <CampoCheck label="Voluntário"><input name="voluntario" type="checkbox" /></CampoCheck>
+              <CampoCheck label="Participa da MEV"><input name="mev" type="checkbox" /></CampoCheck>
+            </div>
             <div className="md:col-span-2"><Botao type="submit">Incluir profissional</Botao></div>
           </Formulario>
           <Lista linhas={profissionais.data?.data ?? []} colunas={['nome', 'lotacao']} recurso="profissionais" onInativar={(id) => inativar.mutate({ recurso: 'profissionais', id })} />
@@ -191,8 +202,8 @@ export function GovernancaPage() {
             </Campo>
             <Campo label="Nome"><input name="nome" required className={inputClass} /></Campo>
             {['COMUNITARIA', 'POLITICA', 'RELIGIOSA', 'OUTRA'].map((tipo) => <CampoCheck key={tipo} label={tipo}><input name={tipo} type="checkbox" /></CampoCheck>)}
-            <Campo label="Telefone"><input name="telefone" className={inputClass} /></Campo>
-            <Campo label="E-mail"><input name="email" type="email" className={inputClass} /></Campo>
+            <Campo label="Telefone"><CampoTelefone name="telefone" /></Campo>
+            <Campo label="E-mail"><CampoEmail name="email" /></Campo>
             <Campo label="Disponibilidade"><input name="disponibilidade" className={inputClass} /></Campo>
             <Campo label="Observações"><input name="observacoes" className={inputClass} /></Campo>
             <div className="md:col-span-2"><Botao type="submit">Incluir liderança</Botao></div>
@@ -204,14 +215,158 @@ export function GovernancaPage() {
   );
 }
 
-function Lista({ linhas, colunas, onInativar }: { linhas: Record<string, unknown>[]; colunas: string[]; recurso: string; onInativar: (id: number) => void }) {
+function CampoData({ name }: { name: string }) {
+  const campo = useRef<HTMLInputElement>(null);
+  const [texto, setTexto] = useState('');
+
+  useEffect(() => {
+    const form = campo.current?.form;
+    if (!form) return;
+    const limpar = () => setTexto('');
+    form.addEventListener('reset', limpar);
+    return () => form.removeEventListener('reset', limpar);
+  }, []);
+
+  return (
+    <div className="relative">
+      <input
+        ref={campo}
+        name={name}
+        type="date"
+        lang="pt-BR"
+        className={`${inputClass} pr-10 [&::-webkit-calendar-picker-indicator]:opacity-0`}
+        onChange={(event) => setTexto(event.target.value ? formatarDataIso(event.target.value) : '')}
+      />
+      <div className="pointer-events-none absolute inset-y-px left-px right-10 flex items-center rounded-l-md bg-white px-3 text-sm">
+        {texto || <span className="text-gray-400">dd/mm/aaaa</span>}
+      </div>
+      <button
+        type="button"
+        aria-label="Abrir calendário"
+        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-gray-500"
+        onClick={() => {
+          const campoAtual = campo.current;
+          if (!campoAtual) return;
+          try {
+            campoAtual.showPicker();
+          } catch {
+            campoAtual.focus();
+          }
+        }}
+      >
+        <svg viewBox="0 0 24 24" className="pointer-events-none h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <rect x="3" y="5" width="18" height="16" rx="2" />
+          <path d="M3 10h18M8 3v4M16 3v4" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+function mascararTelefone(valor: string) {
+  const digitos = valor.replace(/\D/g, '').slice(0, 11);
+  if (digitos.length < 3) return digitos ? `(${digitos}` : '';
+  if (digitos.length < 7) return `(${digitos.slice(0, 2)}) ${digitos.slice(2)}`;
+  if (digitos.length < 11) return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 6)}-${digitos.slice(6)}`;
+  return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 7)}-${digitos.slice(7)}`;
+}
+
+function CampoTelefone({ name }: { name: string }) {
+  return (
+    <input
+      name={name}
+      type="tel"
+      inputMode="numeric"
+      autoComplete="tel"
+      placeholder="(00) 00000-0000"
+      maxLength={15}
+      className={inputClass}
+      onInput={(event) => {
+        const alvo = event.currentTarget;
+        alvo.value = mascararTelefone(alvo.value);
+        const digitos = alvo.value.replace(/\D/g, '').length;
+        alvo.setCustomValidity(
+          digitos === 0 || digitos === 10 || digitos === 11
+            ? ''
+            : 'Informe um telefone com DDD: (00) 0000-0000 ou (00) 00000-0000.',
+        );
+      }}
+    />
+  );
+}
+
+const EMAIL_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+function CampoEmail({ name }: { name: string }) {
+  return (
+    <input
+      name={name}
+      type="email"
+      inputMode="email"
+      autoComplete="email"
+      placeholder="nome@dominio.com"
+      className={inputClass}
+      onInput={(event) => {
+        const valor = event.currentTarget.value.trim();
+        event.currentTarget.setCustomValidity(
+          valor && !EMAIL_VALIDO.test(valor) ? 'Informe um e-mail válido, como nome@dominio.com.' : '',
+        );
+      }}
+    />
+  );
+}
+
+function CampoReais({ name }: { name: string }) {
+  const hidden = useRef<HTMLInputElement>(null);
+
+  return (
+    <div className="relative">
+      <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-gray-500">R$</span>
+      <input
+        inputMode="numeric"
+        placeholder="0,00"
+        autoComplete="off"
+        className={`${inputClass} pl-9`}
+        onInput={(event) => {
+          const alvo = event.currentTarget;
+          const digitos = alvo.value.replace(/\D/g, '').slice(0, 12);
+          const centavos = Number(digitos) / 100;
+          alvo.value = digitos
+            ? centavos.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : '';
+          if (hidden.current) hidden.current.value = digitos ? String(centavos) : '';
+        }}
+      />
+      <input ref={hidden} type="hidden" name={name} />
+    </div>
+  );
+}
+
+function Lista({
+  linhas,
+  colunas,
+  rotulos,
+  onInativar,
+  acao = 'Inativar',
+  formatar,
+}: {
+  linhas: Record<string, unknown>[];
+  colunas: string[];
+  rotulos?: string[];
+  recurso: string;
+  onInativar: (id: number) => void;
+  acao?: string;
+  formatar?: (coluna: string, valor: unknown) => string;
+}) {
   if (linhas.length === 0) return <p className="text-sm text-gray-500">Nenhum registro.</p>;
   return (
-    <Tabela colunas={[...colunas, '']}>
+    <Tabela colunas={[...(rotulos ?? colunas), '']}>
       {linhas.map((linha) => (
         <Linha key={String(linha.id)}>
-          {colunas.map((coluna) => <Celula key={coluna}>{String(linha[coluna] ?? '—')}</Celula>)}
-          <Celula><BotaoSecundario onClick={() => onInativar(Number(linha.id))}>Inativar</BotaoSecundario></Celula>
+          {colunas.map((coluna) => (
+            <Celula key={coluna}>{formatar ? formatar(coluna, linha[coluna]) : String(linha[coluna] ?? '—')}</Celula>
+          ))}
+          <Celula><BotaoSecundario onClick={() => onInativar(Number(linha.id))}>{acao}</BotaoSecundario></Celula>
         </Linha>
       ))}
     </Tabela>
