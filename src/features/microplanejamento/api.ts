@@ -54,8 +54,14 @@ export const microplanejamentoApi = {
   abrirChecklist: (body: unknown) => axios.post(`${base()}/checklists/abrir`, body, { withCredentials: true }).then((r) => r.data as Checklist),
   salvarRespostas: (id: number, body: unknown) => axios.put(`${base()}/checklists/${id}/respostas`, body, { withCredentials: true }).then((r) => r.data as Checklist),
   inventario: (cicloId: number, estabelecimentoId: number) =>
-    get<{ itens: CatalogoItem[]; registros: Inventario[] }>('/inventarios', { cicloId, estabelecimentoId }),
+    get<RespostaInventario>('/inventarios', { cicloId, estabelecimentoId }),
   salvarInventario: (body: unknown) => axios.put(`${base()}/inventarios`, body, { withCredentials: true }).then((r) => r.data),
+  incluirItemInventario: (body: unknown) => axios.post(`${base()}/inventarios/itens`, body, { withCredentials: true }).then((r) => r.data),
+  excluirItemInventario: (cicloId: number, estabelecimentoId: number, itemId: number) =>
+    axios.delete(`${base()}/inventarios/itens/${itemId}`, { params: { cicloId, estabelecimentoId }, withCredentials: true }).then((r) => r.data),
+  criarItemInventario: (body: unknown) => axios.post(`${base()}/inventarios/catalogo`, body, { withCredentials: true }).then((r) => r.data),
+  editarItemInventario: (id: number, body: unknown) => axios.put(`${base()}/inventarios/catalogo/${id}`, body, { withCredentials: true }).then((r) => r.data),
+  retirarItemInventario: (id: number) => axios.post(`${base()}/inventarios/catalogo/${id}/retirar`, {}, { withCredentials: true }).then((r) => r.data as { acao: 'DESABILITAR' | 'EXCLUIR' }),
   metas: (cicloId: number, estabelecimentoId?: number, mes?: number) =>
     get<{ data: Meta[] }>('/metas', { cicloId, estabelecimentoId, mes }),
   salvarMeta: (body: unknown) => axios.put(`${base()}/metas`, body, { withCredentials: true }).then((r) => r.data),
@@ -169,11 +175,24 @@ export type Checklist = {
   respostas: { item_id: number; status: string | null; observacao?: string | null; responsavel?: string | null }[];
 };
 
+export type ItemInventario = CatalogoItem & {
+  padrao: boolean;
+  ativo: boolean;
+  usado: boolean;
+};
+
 export type Inventario = {
   item_id: number;
   quantidade: number;
   necessidade_adicional: number;
   observacoes?: string | null;
+};
+
+export type RespostaInventario = {
+  itens: ItemInventario[];
+  registros: Inventario[];
+  disponiveis: ItemInventario[];
+  catalogo: ItemInventario[];
 };
 
 export type Meta = {
