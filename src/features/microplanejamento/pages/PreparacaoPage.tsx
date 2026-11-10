@@ -7,24 +7,16 @@ import { Aviso, Botao, BotaoSecundario, Cartao, Celula, inputClass, Linha, Modal
 
 const OPCOES = ['SIM', 'PARCIAL', 'NAO', 'NA'] as const;
 
-export function ChecklistPage() {
-  const { cicloId, estabelecimentoId } = useMpFiltro();
-  const [checklist, setChecklist] = useState<Checklist | null>(null);
+function FormularioChecklist({ checklist, offlineUbs }: { checklist: Checklist; offlineUbs?: boolean }) {
+  const queryClient = useQueryClient();
+  const [atual, setAtual] = useState(checklist);
   const [erro, setErro] = useState('');
   const [ok, setOk] = useState('');
-  const abrir = useMutation({
-    mutationFn: microplanejamentoApi.abrirChecklist,
-    onSuccess: (data) => {
-      setChecklist(data);
-      setOk('Checklist aberto.');
-      setErro('');
-    },
-    onError: (error) => setErro(apiErrorMessage(error)),
-  });
   const salvar = useMutation({
     mutationFn: (vars: { id: number; body: unknown }) => microplanejamentoApi.salvarRespostas(vars.id, vars.body),
     onSuccess: (data) => {
-      setChecklist(data);
+      setAtual(data);
+      queryClient.invalidateQueries({ queryKey: ['mp-checklist'] });
       setOk(`Índice ${data.indice?.toFixed?.(2) ?? data.indice} · ${data.classificacao ?? ''}`);
       setErro('');
     },
@@ -33,70 +25,117 @@ export function ChecklistPage() {
 
   async function onRespostas(event: FormEvent<HTMLFormElement>, status?: string) {
     event.preventDefault();
-    if (!checklist) return;
     const form = new FormData(event.currentTarget);
-    const respostas = checklist.catalogo.itens.map((item) => ({
+    const respostas = atual.catalogo.itens.map((item) => ({
       item_id: item.id,
       status: (String(form.get(`st-${item.id}`) || '') || null) as 'SIM' | 'PARCIAL' | 'NAO' | 'NA' | null,
       observacao: String(form.get(`obs-${item.id}`) || '') || null,
     }));
-    if (checklist.catalogo.tipo === 'CHECKLIST_UBS' && !navigator.onLine) {
+    if (offlineUbs && !navigator.onLine) {
       for (const resposta of respostas) {
         if (!resposta.status) continue;
-        await enfileirar('resposta', { checklist_id: checklist.id, item_id: resposta.item_id, status: resposta.status, observacao: resposta.observacao });
+        await enfileirar('resposta', { checklist_id: atual.id, item_id: resposta.item_id, status: resposta.status, observacao: resposta.observacao });
       }
       setOk('Respostas da UBS ficaram na fila offline.');
       return;
     }
-    salvar.mutate({ id: checklist.id, body: { respostas, status } });
+    salvar.mutate({ id: atual.id, body: { respostas, status } });
   }
 
   const grupos = new Map<string, Checklist['catalogo']['itens']>();
-  for (const item of checklist?.catalogo.itens ?? []) {
+  for (const item of atual.catalogo.itens) {
     const chave = item.componente || 'Geral';
     grupos.set(chave, [...(grupos.get(chave) ?? []), item]);
   }
+  const formId = `checklist-${atual.id}`;
+
+  return (
+    <>
+      {ok && <Aviso tipo="ok">{ok}</Aviso>}
+      {erro && <Aviso tipo="erro">{erro}</Aviso>}
+      <form id={formId} className="space-y-4" onSubmit={(event) => onRespostas(event)}>
+        <p className="text-sm">Índice {atual.indice ?? '—'} · {atual.classificacao ?? atual.status}</p>
+        {[...grupos.entries()].map(([componente, itens]) => (
+          <div key={componente}>
+            <h3 className="mb-2 text-sm font-medium">{componente}</h3>
+            {itens.map((item) => {
+              const resposta = atual.respostas.find((row) => row.item_id === item.id);
+              return (
+                <div key={item.id} className="mb-2 grid gap-2 text-sm md:grid-cols-[1fr_160px_1fr]">
+                  <span>{item.texto}</span>
+                  <select name={`st-${item.id}`} defaultValue={resposta?.status ?? ''} className={inputClass} aria-label={`Situação de ${item.texto}`}>
+                    <option value="">—</option>
+                    {OPCOES.map((opcao) => <option key={opcao}>{opcao}</option>)}
+                  </select>
+                  <input name={`obs-${item.id}`} defaultValue={resposta?.observacao ?? ''} placeholder="Observação" className={inputClass} aria-label={`Observação de ${item.texto}`} />
+                </div>
+              );
+            })}
+          </div>
+        ))}
+        <div className="flex gap-2">
+          <Botao type="submit" disabled={salvar.isPending}>Salvar rascunho</Botao>
+          <Botao type="button" disabled={salvar.isPending} onClick={() => {
+            const form = document.getElementById(formId);
+            if (form instanceof HTMLFormElement) onRespostas({ preventDefault() {}, currentTarget: form } as FormEvent<HTMLFormElement>, 'COMPLETA');
+          }}>Marcar completa</Botao>
+        </div>
+      </form>
+    </>
+  );
+}
+
+export function ChecklistUbsPage() {
+  const { cicloId, estabelecimentoId } = useMpFiltro();
+  const pronto = Boolean(cicloId && estabelecimentoId);
+  const checklist = useQuery({
+    queryKey: ['mp-checklist', 'UBS', cicloId, estabelecimentoId],
+    enabled: pronto,
+    queryFn: () => microplanejamentoApi.abrirChecklist({
+      ciclo_id: cicloId,
+      nivel: 'UBS',
+      tipo: 'CHECKLIST_UBS',
+      estabelecimento_id: estabelecimentoId,
+    }),
+  });
 
   return (
     <div className="space-y-4">
-      {ok && <Aviso tipo="ok">{ok}</Aviso>}
-      {erro && <Aviso tipo="erro">{erro}</Aviso>}
-      <Cartao titulo="Checklists" acoes={
-        <div className="flex gap-2">
-          <Botao onClick={() => cicloId && abrir.mutate({ ciclo_id: cicloId, nivel: 'MUNICIPIO', tipo: 'CHECKLIST_MUNICIPAL' })}>Municipal</Botao>
-          <Botao onClick={() => cicloId && estabelecimentoId && abrir.mutate({ ciclo_id: cicloId, nivel: 'UBS', tipo: 'CHECKLIST_UBS', estabelecimento_id: estabelecimentoId })}>UBS</Botao>
-        </div>
-      }>
-        {checklist && (
-          <form id="checklist-mp" className="space-y-4" onSubmit={(event) => onRespostas(event)}>
-            <p className="text-sm">Índice {checklist.indice ?? '—'} · {checklist.classificacao ?? checklist.status}</p>
-            {[...grupos.entries()].map(([componente, itens]) => (
-              <div key={componente}>
-                <h3 className="font-medium text-sm mb-2">{componente}</h3>
-                {itens.map((item) => {
-                  const resposta = checklist.respostas.find((row) => row.item_id === item.id);
-                  return (
-                    <div key={item.id} className="grid md:grid-cols-[1fr_160px_1fr] gap-2 mb-2 text-sm">
-                      <span>{item.texto}</span>
-                      <select name={`st-${item.id}`} defaultValue={resposta?.status ?? ''} className={inputClass}>
-                        <option value="">—</option>
-                        {OPCOES.map((opcao) => <option key={opcao}>{opcao}</option>)}
-                      </select>
-                      <input name={`obs-${item.id}`} defaultValue={resposta?.observacao ?? ''} placeholder="Observação" className={inputClass} />
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-            <div className="flex gap-2">
-              <Botao type="submit">Salvar rascunho</Botao>
-              <Botao type="button" onClick={() => {
-                const form = document.getElementById('checklist-mp');
-                if (form instanceof HTMLFormElement) onRespostas({ preventDefault() {}, currentTarget: form } as FormEvent<HTMLFormElement>, 'COMPLETA');
-              }}>Marcar completa</Botao>
-            </div>
-          </form>
-        )}
+      {checklist.isError && <Aviso tipo="erro">{apiErrorMessage(checklist.error)}</Aviso>}
+      <Cartao titulo="Checklist da UBS">
+        {!pronto ? (
+          <p className="text-sm text-gray-500">Selecione a UBS do ciclo.</p>
+        ) : checklist.isLoading ? (
+          <p className="text-sm text-gray-500">Carregando checklist.</p>
+        ) : checklist.data ? (
+          <FormularioChecklist key={checklist.data.id} checklist={checklist.data} offlineUbs />
+        ) : null}
+      </Cartao>
+    </div>
+  );
+}
+
+export function ChecklistMunicipioPage() {
+  const { cicloId } = useMpFiltro();
+  const checklist = useQuery({
+    queryKey: ['mp-checklist', 'MUNICIPIO', cicloId],
+    enabled: Boolean(cicloId),
+    queryFn: () => microplanejamentoApi.abrirChecklist({
+      ciclo_id: cicloId,
+      nivel: 'MUNICIPIO',
+      tipo: 'CHECKLIST_MUNICIPAL',
+    }),
+  });
+
+  return (
+    <div className="space-y-4">
+      {checklist.isError && <Aviso tipo="erro">{apiErrorMessage(checklist.error)}</Aviso>}
+      <Cartao titulo="Checklist do município">
+        {checklist.isLoading ? (
+          <p className="text-sm text-gray-500">Carregando checklist.</p>
+        ) : checklist.data ? (
+          <FormularioChecklist key={checklist.data.id} checklist={checklist.data} />
+        ) : null}
       </Cartao>
     </div>
   );

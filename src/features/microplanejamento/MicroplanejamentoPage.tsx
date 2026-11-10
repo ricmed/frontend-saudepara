@@ -12,7 +12,7 @@ import { InicioPage } from './pages/InicioPage';
 import { LocalidadesPage } from './pages/LocalidadesPage';
 import { GovernancaPage } from './pages/GovernancaPage';
 import { DiagnosticoPage } from './pages/DiagnosticoPage';
-import { ChecklistPage, PreparacaoPage } from './pages/PreparacaoPage';
+import { ChecklistMunicipioPage, ChecklistUbsPage, PreparacaoPage } from './pages/PreparacaoPage';
 import { MetasPage } from './pages/MetasPage';
 import { PlanoPage } from './pages/PlanoPage';
 import { ExecucaoPage } from './pages/ExecucaoPage';
@@ -26,7 +26,8 @@ const SECOES = [
   { id: 'governanca', rotulo: 'Governança' },
   { id: 'diagnostico', rotulo: 'Diagnóstico' },
   { id: 'preparacao', rotulo: 'Preparação' },
-  { id: 'checklist', rotulo: 'Checklist' },
+  { id: 'checklist-ubs', rotulo: 'Checklist UBS' },
+  { id: 'checklist-municipio', rotulo: 'Checklist Município' },
   { id: 'metas', rotulo: 'Metas e insumos' },
   { id: 'plano', rotulo: 'Plano de ação' },
   { id: 'comunicacao', rotulo: 'Comunicação' },
@@ -63,6 +64,9 @@ export default function MicroplanejamentoPage() {
   const precisaCiclo = secao !== '' && secao !== 'parametros';
   if (precisaCiclo && !filtro.cicloId) {
     return <Navigate to={`/private/microplanejamento${searchSemCiclo(search)}`} replace />;
+  }
+  if (secao === 'checklist') {
+    return <Navigate to={`/private/microplanejamento/checklist-ubs${search}`} replace />;
   }
 
   const visiveis = SECOES.filter((item) => {
@@ -114,10 +118,10 @@ export default function MicroplanejamentoPage() {
           </section>
         )}
 
-        {secao !== '' && secao !== 'parametros' && secao !== 'localidades' && (
+        {secao !== '' && secao !== 'parametros' && secao !== 'localidades' && secao !== 'checklist-municipio' && (
           <FiltroUbsCiclo
             aplicaLocalidade={secao === 'governanca' || secao === 'plano' || secao === 'execucao' || secao === 'diagnostico'}
-            somenteUbs={secao === 'preparacao' || secao === 'checklist'}
+            somenteUbs={secao === 'preparacao' || secao === 'checklist-ubs'}
           />
         )}
 
@@ -126,7 +130,8 @@ export default function MicroplanejamentoPage() {
         {secao === 'governanca' && <GovernancaPage />}
         {secao === 'diagnostico' && <DiagnosticoPage />}
         {secao === 'preparacao' && <PreparacaoPage />}
-        {secao === 'checklist' && <ChecklistPage />}
+        {secao === 'checklist-ubs' && <ChecklistUbsPage />}
+        {secao === 'checklist-municipio' && <ChecklistMunicipioPage />}
         {secao === 'metas' && <MetasPage />}
         {secao === 'plano' && <PlanoPage modo="plano" />}
         {secao === 'comunicacao' && <PlanoPage modo="comunicacao" />}
