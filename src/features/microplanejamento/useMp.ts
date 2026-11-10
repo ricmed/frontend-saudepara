@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from '@/utils/axiosRetry';
@@ -50,27 +49,11 @@ export type UbsDoCiclo = EstabelecimentoOption & { localidades: number };
 
 export function useUbsDoCiclo(cicloId?: number) {
   const query = useQuery({
-    queryKey: ['mp-localidades-ciclo', cicloId, 'todas'],
+    queryKey: ['mp-ubs-ciclo', cicloId],
     enabled: Boolean(cicloId),
-    queryFn: () => microplanejamentoApi.localidadesCiclo(cicloId!),
+    queryFn: () => microplanejamentoApi.ubsDoCiclo(cicloId!),
   });
-  const ubs = useMemo(() => {
-    const mapa = new Map<number, UbsDoCiclo>();
-    for (const row of query.data?.data ?? []) {
-      const est = row.localidade.estabelecimento;
-      const id = est?.idestabelecimento ?? row.localidade.estabelecimento_id;
-      const atual = mapa.get(id) ?? {
-        idestabelecimento: id,
-        nome: est?.nome ?? 'UBS',
-        cnes: est?.cnes,
-        localidades: 0,
-      };
-      atual.localidades += 1;
-      mapa.set(id, atual);
-    }
-    return [...mapa.values()];
-  }, [query.data]);
-  return { ...query, ubs };
+  return { ...query, ubs: query.data?.data ?? [] };
 }
 
 function comoLista<T>(data: unknown): T[] {

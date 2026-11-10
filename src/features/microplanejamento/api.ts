@@ -30,6 +30,11 @@ export const microplanejamentoApi = {
   criarLocalidade: (body: unknown) => axios.post(`${base()}/localidades`, body, { withCredentials: true }).then((r) => r.data),
   atualizarLocalidade: (id: number, body: unknown) => axios.put(`${base()}/localidades/${id}`, body, { withCredentials: true }).then((r) => r.data),
   inativar: (recurso: string, id: number) => axios.post(`${base()}/${recurso}/${id}/inativar`, {}, { withCredentials: true }).then((r) => r.data),
+  ubsDoCiclo: (cicloId: number) => get<{ data: UbsCiclo[] }>(`/ciclos/${cicloId}/ubs`),
+  vincularUbs: (cicloId: number, estabelecimentoId: number) =>
+    axios.put(`${base()}/ciclos/${cicloId}/ubs/${estabelecimentoId}`, {}, { withCredentials: true }).then((r) => r.data),
+  removerUbs: (cicloId: number, estabelecimentoId: number) =>
+    axios.delete(`${base()}/ciclos/${cicloId}/ubs/${estabelecimentoId}`, { withCredentials: true }).then((r) => r.data),
   localidadesCiclo: (cicloId: number, estabelecimentoId?: number) =>
     get<{ data: LocalidadeCiclo[] }>(`/ciclos/${cicloId}/localidades`, estabelecimentoId ? { estabelecimentoId } : undefined),
   salvarLocalidadeCiclo: (cicloId: number, localidadeId: number, body: unknown) =>
@@ -81,6 +86,13 @@ export type Ciclo = {
   data_inicio?: string | null;
   data_fim?: string | null;
   tipo_municipio?: { descricao: string };
+};
+
+export type UbsCiclo = {
+  idestabelecimento: number;
+  nome: string;
+  cnes?: string | null;
+  localidades: number;
 };
 
 export type Localidade = {

@@ -93,9 +93,33 @@ export function LocalidadesPage() {
     setMensagem(textoOk);
   }
 
+  const incluirUbs = useMutation({
+    mutationFn: (id: number) => microplanejamentoApi.vincularUbs(cicloId!, id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mp-ubs-ciclo', cicloId] });
+    },
+    onError: (error) => setErro(apiErrorMessage(error)),
+  });
+
+  const excluirUbs = useMutation({
+    mutationFn: (id: number) => microplanejamentoApi.removerUbs(cicloId!, id),
+    onSuccess: (_data, id) => {
+      ok('UBS excluída do ciclo, com sala, localidades e aporte.');
+      if (estabelecimentoId === id) setFiltro('estabelecimentoId', '');
+      queryClient.invalidateQueries({ queryKey: ['mp-ubs-ciclo', cicloId] });
+      queryClient.invalidateQueries({ queryKey: ['mp-localidades'] });
+      queryClient.invalidateQueries({ queryKey: ['mp-localidades-ciclo'] });
+      queryClient.invalidateQueries({ queryKey: ['mp-sala'] });
+    },
+    onError: (error) => setErro(apiErrorMessage(error)),
+  });
+
   function escolherUbs(id: number | null) {
     setFiltro('estabelecimentoId', id ? String(id) : '');
-    if (id) setAba('localidade');
+    if (id) {
+      setAba('localidade');
+      incluirUbs.mutate(id);
+    }
   }
 
   const atualizarCiclo = useMutation({
@@ -112,6 +136,7 @@ export function LocalidadesPage() {
       ok('Localidade gravada.');
       setModal(null);
       queryClient.invalidateQueries({ queryKey: ['mp-localidades'] });
+      queryClient.invalidateQueries({ queryKey: ['mp-ubs-ciclo'] });
     },
     onError: (error) => setErro(apiErrorMessage(error)),
   });
@@ -131,6 +156,7 @@ export function LocalidadesPage() {
     onSuccess: () => {
       ok('População e prioridade atualizadas. O percentual de aporte é calculado no servidor.');
       queryClient.invalidateQueries({ queryKey: ['mp-localidades-ciclo'] });
+      queryClient.invalidateQueries({ queryKey: ['mp-ubs-ciclo'] });
     },
     onError: (error) => setErro(apiErrorMessage(error)),
   });
@@ -148,6 +174,7 @@ export function LocalidadesPage() {
       ok('Localidade excluída.');
       queryClient.invalidateQueries({ queryKey: ['mp-localidades'] });
       queryClient.invalidateQueries({ queryKey: ['mp-localidades-ciclo'] });
+      queryClient.invalidateQueries({ queryKey: ['mp-ubs-ciclo'] });
     },
     onError: (error) => setErro(apiErrorMessage(error)),
   });
@@ -182,6 +209,13 @@ export function LocalidadesPage() {
     const body = corpoLocalidade(new FormData(event.currentTarget));
     if (modal?.modo === 'editar') atualizarLocalidade.mutate({ id: modal.localidade.id, body });
     else criarLocalidade.mutate(body);
+  }
+
+  function onExcluirUbs(item: { idestabelecimento: number; nome: string }) {
+    if (!cicloId) return;
+    const textoConfirmacao = `Excluir a UBS “${item.nome}” deste ciclo? Sala de vacina, localidades e aporte desta unidade também serão excluídos.`;
+    if (!window.confirm(textoConfirmacao)) return;
+    excluirUbs.mutate(item.idestabelecimento);
   }
 
   function onExcluir(item: Localidade) {
@@ -242,7 +276,7 @@ export function LocalidadesPage() {
           </p>
         )}
         {ubs.length > 0 && (
-          <Tabela colunas={['Nome', 'CNES', 'Localidades']}>
+          <Tabela colunas={['Nome', 'CNES', 'Localidades', '']}>
             {ubs.map((item) => (
               <Linha
                 key={item.idestabelecimento}
@@ -252,6 +286,16 @@ export function LocalidadesPage() {
                 <Celula>{item.nome}</Celula>
                 <Celula>{item.cnes ?? '—'}</Celula>
                 <Celula>{item.localidades}</Celula>
+                <Celula>
+                  <div onClick={(event) => event.stopPropagation()}>
+                    <BotaoSecundario
+                      onClick={() => onExcluirUbs(item)}
+                      disabled={excluirUbs.isPending && excluirUbs.variables === item.idestabelecimento}
+                    >
+                      Excluir
+                    </BotaoSecundario>
+                  </div>
+                </Celula>
               </Linha>
             ))}
           </Tabela>

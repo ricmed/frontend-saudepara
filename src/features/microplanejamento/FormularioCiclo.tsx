@@ -31,6 +31,41 @@ function isoDate(valor?: string | null) {
   return valor ? String(valor).slice(0, 10) : '';
 }
 
+/** Dias corridos entre as datas, contando o dia de início. Null se o período for inválido. */
+export function diasOperacionaisEntre(inicio: string, fim: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(inicio) || !/^\d{4}-\d{2}-\d{2}$/.test(fim) || inicio >= fim) return null;
+  const [ai, mi, di] = inicio.split('-').map(Number);
+  const [af, mf, df] = fim.split('-').map(Number);
+  const a = Date.UTC(ai, mi - 1, di);
+  const b = Date.UTC(af, mf - 1, df);
+  return Math.round((b - a) / 86_400_000) + 1;
+}
+
+const inputCurto = 'w-full min-w-0 rounded-md border border-gray-300 px-2 py-2 text-sm bg-white';
+
+function isoParaBr(iso: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return '';
+  const [ano, mes, dia] = iso.split('-');
+  return `${dia}/${mes}/${ano}`;
+}
+
+function mascararDataBr(valor: string) {
+  const digitos = valor.replace(/\D/g, '').slice(0, 8);
+  return [digitos.slice(0, 2), digitos.slice(2, 4), digitos.slice(4, 8)].filter((parte) => parte.length > 0).join('/');
+}
+
+/** Converte dd/mm/aaaa em aaaa-mm-dd. Null se a data não existir. */
+function dataBrParaIso(valor: string): string | null {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(valor);
+  if (!match) return null;
+  const dia = Number(match[1]);
+  const mes = Number(match[2]);
+  const ano = Number(match[3]);
+  const data = new Date(Date.UTC(ano, mes - 1, dia));
+  if (data.getUTCFullYear() !== ano || data.getUTCMonth() !== mes - 1 || data.getUTCDate() !== dia) return null;
+  return `${match[3]}-${match[2]}-${match[1]}`;
+}
+
 export function FormularioCiclo({
   modo,
   ciclo,
@@ -46,10 +81,23 @@ export function FormularioCiclo({
   onSubmit: (dados: DadosCiclo) => void;
   pending?: boolean;
 }) {
+  const anoCorrente = new Date().getFullYear();
   const municipios = useMunicipios();
   const [municipioLocal, setMunicipioLocal] = useState<number | undefined>(municipioId);
+  const [ano, setAno] = useState(String(ciclo?.ano ?? anoCorrente));
+  const [inicioBr, setInicioBr] = useState(isoParaBr(isoDate(ciclo?.data_inicio)));
+  const [fimBr, setFimBr] = useState(isoParaBr(isoDate(ciclo?.data_fim)));
+  const [erro, setErro] = useState('');
+  const inicio = dataBrParaIso(inicioBr) ?? '';
+  const fim = dataBrParaIso(fimBr) ?? '';
   const municipioAtual = onMunicipio ? municipioId : municipioLocal;
   const selecionado: MunicipioOption | undefined = municipios.data?.find((item) => item.idtipo_municipio === municipioAtual);
+  const dias = diasOperacionaisEntre(inicio, fim);
+  const erroPeriodo = inicio && fim && dias == null ? 'A data de início deve ser anterior à data de fim.' : '';
+  const erroAno = modo === 'criar' && ano !== '' && numero(ano, anoCorrente) < anoCorrente
+    ? 'O ano não pode ser menor que o ano corrente.'
+    : '';
+  const mensagem = erroAno || erroPeriodo || erro;
 
   function escolherMunicipio(id: number | null) {
     if (onMunicipio) onMunicipio(id);
@@ -61,15 +109,30 @@ export function FormularioCiclo({
     const form = new FormData(event.currentTarget);
     const tipoMunicipio = modo === 'editar' ? ciclo?.tipo_municipio_id : municipioAtual;
     if (!tipoMunicipio) return;
+    const anoInformado = modo === 'editar' ? ciclo!.ano : numero(ano, anoCorrente);
+    if (erroAno) {
+      setErro(erroAno);
+      return;
+    }
+    if (!inicio || !fim) {
+      setErro('Informe início e fim no formato dd/mm/aaaa.');
+      return;
+    }
+    const diasCalculados = diasOperacionaisEntre(inicio, fim);
+    if (diasCalculados == null) {
+      setErro('A data de início deve ser anterior à data de fim.');
+      return;
+    }
+    setErro('');
     onSubmit({
       nome: String(form.get('nome') || '').trim(),
-      ano: modo === 'editar' ? ciclo!.ano : numero(form.get('ano'), new Date().getFullYear()),
+      ano: anoInformado,
       estrategia: modo === 'editar' ? ciclo!.estrategia : String(form.get('estrategia')),
       tipo_municipio_id: tipoMunicipio,
       status: String(form.get('status') || 'RASCUNHO'),
-      data_inicio: texto(form.get('data_inicio')),
-      data_fim: texto(form.get('data_fim')),
-      dias_operacionais: numero(form.get('dias'), 22),
+      data_inicio: texto(inicio),
+      data_fim: texto(fim),
+      dias_operacionais: diasCalculados,
     });
   }
 
@@ -89,24 +152,71 @@ export function FormularioCiclo({
         </Campo>
       )}
       <Campo label="Nome"><input name="nome" required className={inputClass} defaultValue={ciclo?.nome ?? ''} /></Campo>
-      <Campo label="Ano">
-        <input name="ano" type="number" required className={inputClass} defaultValue={ciclo?.ano ?? new Date().getFullYear()} disabled={modo === 'editar'} readOnly={modo === 'editar'} />
-      </Campo>
-      <Campo label="Estratégia">
-        {modo === 'editar' ? (
-          <input className={inputClass} value={ciclo?.estrategia ?? ''} disabled readOnly />
-        ) : (
-          <select name="estrategia" className={inputClass}>{ESTRATEGIAS.map((item) => <option key={item}>{item}</option>)}</select>
-        )}
-      </Campo>
-      <Campo label="Status">
-        <select name="status" className={inputClass} defaultValue={ciclo?.status ?? 'RASCUNHO'}>
-          {STATUS_CICLO.map(([valor, rotulo]) => <option key={valor} value={valor}>{rotulo}</option>)}
-        </select>
-      </Campo>
-      <Campo label="Dias operacionais"><input name="dias" type="number" min={1} max={31} defaultValue={ciclo?.dias_operacionais ?? 22} className={inputClass} /></Campo>
-      <Campo label="Início"><input name="data_inicio" type="date" className={inputClass} defaultValue={isoDate(ciclo?.data_inicio)} /></Campo>
-      <Campo label="Fim"><input name="data_fim" type="date" className={inputClass} defaultValue={isoDate(ciclo?.data_fim)} /></Campo>
+      <div className="grid min-w-0 grid-cols-3 gap-2 md:col-span-2">
+        <Campo label="Ano">
+          <input
+            name="ano"
+            type="number"
+            required
+            min={modo === 'criar' ? anoCorrente : undefined}
+            className={inputCurto}
+            value={ano}
+            onChange={(event) => setAno(event.target.value)}
+            disabled={modo === 'editar'}
+            readOnly={modo === 'editar'}
+          />
+        </Campo>
+        <Campo label="Estratégia">
+          {modo === 'editar' ? (
+            <input className={inputCurto} value={ciclo?.estrategia ?? ''} disabled readOnly />
+          ) : (
+            <select name="estrategia" className={inputCurto}>{ESTRATEGIAS.map((item) => <option key={item}>{item}</option>)}</select>
+          )}
+        </Campo>
+        <Campo label="Status">
+          <select name="status" className={inputCurto} defaultValue={ciclo?.status ?? 'RASCUNHO'}>
+            {STATUS_CICLO.map(([valor, rotulo]) => <option key={valor} value={valor}>{rotulo}</option>)}
+          </select>
+        </Campo>
+      </div>
+      <div className="grid min-w-0 grid-cols-3 gap-2 md:col-span-2">
+        <Campo label="Início">
+          <input
+            name="data_inicio"
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            required
+            placeholder="dd/mm/aaaa"
+            maxLength={10}
+            pattern="\d{2}/\d{2}/\d{4}"
+            title="dd/mm/aaaa"
+            className={inputCurto}
+            value={inicioBr}
+            onChange={(event) => { setInicioBr(mascararDataBr(event.target.value)); setErro(''); }}
+          />
+        </Campo>
+        <Campo label="Fim">
+          <input
+            name="data_fim"
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            required
+            placeholder="dd/mm/aaaa"
+            maxLength={10}
+            pattern="\d{2}/\d{2}/\d{4}"
+            title="dd/mm/aaaa"
+            className={inputCurto}
+            value={fimBr}
+            onChange={(event) => { setFimBr(mascararDataBr(event.target.value)); setErro(''); }}
+          />
+        </Campo>
+        <Campo label="Dias operacionais">
+          <input name="dias" type="number" readOnly tabIndex={-1} value={dias ?? ''} className={`${inputCurto} bg-gray-50`} title="Diferença entre início e fim, contando o dia de início" />
+        </Campo>
+      </div>
+      {mensagem && <p className="text-sm text-red-700 md:col-span-2">{mensagem}</p>}
       <div className="md:col-span-2">
         <Botao type="submit" disabled={pending || (modo === 'criar' && !municipioAtual)}>
           {modo === 'criar' ? 'Gravar ciclo' : 'Salvar ciclo'}

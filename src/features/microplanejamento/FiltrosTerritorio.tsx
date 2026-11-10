@@ -268,6 +268,11 @@ export function CampoUbs({
                   setRascunho(null);
                   setAberto(false);
                 }}
+                onClick={() => {
+                  onEscolher(item.idestabelecimento);
+                  setRascunho(null);
+                  setAberto(false);
+                }}
               >
                 {rotuloUbs(item)}
               </button>
