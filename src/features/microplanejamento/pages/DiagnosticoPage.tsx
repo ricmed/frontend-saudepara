@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, microplanejamentoApi, type Fofa } from '../api';
+import { somarPopulacaoUbs } from '../populacaoUbs';
 import { numero, texto, useMpFiltro } from '../useMp';
 import { Aviso, Botao, Campo, CampoCheck, Cartao, Formulario, inputClass } from '../ui';
 
@@ -24,7 +25,7 @@ const IND = [
 ] as const;
 
 export function DiagnosticoPage() {
-  const { cicloId, estabelecimentoId } = useMpFiltro();
+  const { cicloId, estabelecimentoId, localidadeId } = useMpFiltro();
   const queryClient = useQueryClient();
   const [erro, setErro] = useState('');
   const [ok, setOk] = useState('');
@@ -33,15 +34,15 @@ export function DiagnosticoPage() {
     enabled: Boolean(cicloId),
     queryFn: () => microplanejamentoApi.riscos(cicloId!),
   });
+  const aporte = useQuery({
+    queryKey: ['mp-localidades-ciclo', cicloId, estabelecimentoId],
+    enabled: Boolean(cicloId && estabelecimentoId),
+    queryFn: () => microplanejamentoApi.localidadesCiclo(cicloId!, estabelecimentoId),
+  });
   const fofa = useQuery({
     queryKey: ['mp-fofa', cicloId, estabelecimentoId],
     enabled: Boolean(cicloId),
     queryFn: () => microplanejamentoApi.fofa(cicloId!, estabelecimentoId),
-  });
-  const localidades = useQuery({
-    queryKey: ['mp-localidades', estabelecimentoId],
-    enabled: Boolean(estabelecimentoId),
-    queryFn: () => microplanejamentoApi.localidades({ estabelecimentoId, limit: 100 }),
   });
   const salvarRisco = useMutation({
     mutationFn: microplanejamentoApi.salvarRisco,
@@ -66,15 +67,11 @@ export function DiagnosticoPage() {
     event.preventDefault();
     if (!cicloId || !estabelecimentoId) return setErro('Selecione ciclo e UBS.');
     const form = new FormData(event.currentTarget);
-    const localidade_ids = (localidades.data?.data ?? [])
-      .filter((item) => form.get(`loc-${item.id}`) === 'on')
-      .map((item) => item.id);
     const body: Record<string, unknown> = {
       ciclo_id: cicloId,
       estabelecimento_id: estabelecimentoId,
       pop_urbana: numero(form.get('pop_urbana')),
       pop_rural: numero(form.get('pop_rural')),
-      localidade_ids,
     };
     for (const [chave] of VUL) body[chave] = form.get(chave) === 'on';
     for (const [chave] of IND) {
@@ -85,6 +82,10 @@ export function DiagnosticoPage() {
   }
 
   const atual = (riscos.data?.data ?? []).find((item) => item.estabelecimento_id === estabelecimentoId);
+  const populacao = somarPopulacaoUbs((aporte.data?.data ?? [])
+    .filter((linha) => !localidadeId || linha.localidade_id === localidadeId)
+    .map((linha) => ({ populacao_alvo: linha.populacao_alvo, zona: linha.localidade.zona })));
+  const populacaoPronta = Boolean(estabelecimentoId) && aporte.isSuccess;
 
   return (
     <div className="space-y-4">
@@ -93,8 +94,28 @@ export function DiagnosticoPage() {
       <Cartao titulo="Risco da UBS">
         {atual && <p className="text-sm">Pontos {atual.pontos} · faixa {atual.faixa ?? '—'}</p>}
         <Formulario onSubmit={onRisco}>
-          <Campo label="População urbana"><input name="pop_urbana" type="number" min={0} required className={inputClass} defaultValue={atual?.pop_urbana ?? 0} /></Campo>
-          <Campo label="População rural"><input name="pop_rural" type="number" min={0} required className={inputClass} defaultValue={atual?.pop_rural ?? 0} /></Campo>
+          <Campo label="População urbana">
+            <input
+              key={`urbana-${localidadeId ?? 'todas'}-${populacaoPronta ? populacao.urbana : 'risco'}`}
+              name="pop_urbana"
+              type="number"
+              min={0}
+              required
+              className={inputClass}
+              defaultValue={populacaoPronta ? populacao.urbana : (atual?.pop_urbana ?? 0)}
+            />
+          </Campo>
+          <Campo label="População rural">
+            <input
+              key={`rural-${localidadeId ?? 'todas'}-${populacaoPronta ? populacao.rural : 'risco'}`}
+              name="pop_rural"
+              type="number"
+              min={0}
+              required
+              className={inputClass}
+              defaultValue={populacaoPronta ? populacao.rural : (atual?.pop_rural ?? 0)}
+            />
+          </Campo>
           {VUL.map(([chave, rotulo]) => <CampoCheck key={chave} label={rotulo}><input name={chave} type="checkbox" /></CampoCheck>)}
           {IND.map(([chave, rotulo]) => (
             <Campo key={chave} label={rotulo}>
@@ -105,12 +126,6 @@ export function DiagnosticoPage() {
               </select>
             </Campo>
           ))}
-          <div className="md:col-span-2 space-y-1">
-            <p className="text-sm font-medium">Localidades vinculadas</p>
-            {(localidades.data?.data ?? []).map((item) => (
-              <CampoCheck key={item.id} label={item.nome}><input type="checkbox" name={`loc-${item.id}`} /></CampoCheck>
-            ))}
-          </div>
           <div className="md:col-span-2"><Botao type="submit">Calcular e gravar risco</Botao></div>
         </Formulario>
       </Cartao>

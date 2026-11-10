@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from '@/utils/axiosRetry';
 import { microplanejamentoApi } from './api';
@@ -15,32 +16,36 @@ export function useMpFiltro() {
   const [params, setParams] = useSearchParams();
   const cicloId = Number(params.get('cicloId')) || undefined;
   const estabelecimentoId = Number(params.get('estabelecimentoId')) || undefined;
+  const localidadeId = Number(params.get('localidadeId')) || undefined;
   const municipioId = Number(params.get('municipioId')) || undefined;
   const status = params.get('status') || undefined;
 
-  function setFiltro(chave: 'cicloId' | 'estabelecimentoId' | 'municipioId' | 'status', valor: string) {
+  const setFiltro = useCallback((chave: 'cicloId' | 'estabelecimentoId' | 'localidadeId' | 'municipioId' | 'status', valor: string) => {
     const next = new URLSearchParams(params);
     if (valor) next.set(chave, valor);
     else next.delete(chave);
     if (chave === 'municipioId') {
       next.delete('estabelecimentoId');
+      next.delete('localidadeId');
       next.delete('cicloId');
     }
+    if (chave === 'estabelecimentoId') next.delete('localidadeId');
     setParams(next, { replace: true });
-  }
+  }, [params, setParams]);
 
   function irParaCiclo(ciclo: { id: number; tipo_municipio_id: number }, destino = 'localidades') {
     const next = new URLSearchParams(params);
     next.set('cicloId', String(ciclo.id));
     if (Number(next.get('municipioId')) !== ciclo.tipo_municipio_id) {
       next.delete('estabelecimentoId');
+      next.delete('localidadeId');
     }
     next.set('municipioId', String(ciclo.tipo_municipio_id));
     const qs = next.toString();
     navigate({ pathname: `/private/microplanejamento/${destino}`, search: qs ? `?${qs}` : '' });
   }
 
-  return { cicloId, estabelecimentoId, municipioId, status, setFiltro, irParaCiclo };
+  return { cicloId, estabelecimentoId, localidadeId, municipioId, status, setFiltro, irParaCiclo };
 }
 
 export type MunicipioOption = { idtipo_municipio: number; descricao: string };

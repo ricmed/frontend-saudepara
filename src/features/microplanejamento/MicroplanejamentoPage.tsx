@@ -113,7 +113,9 @@ export default function MicroplanejamentoPage() {
           </section>
         )}
 
-        {secao !== '' && secao !== 'parametros' && secao !== 'localidades' && <FiltroUbsCiclo />}
+        {secao !== '' && secao !== 'parametros' && secao !== 'localidades' && (
+          <FiltroUbsCiclo aplicaLocalidade={secao === 'governanca' || secao === 'plano' || secao === 'execucao' || secao === 'diagnostico'} />
+        )}
 
         {secao === '' && <InicioPage />}
         {secao === 'localidades' && <LocalidadesPage />}

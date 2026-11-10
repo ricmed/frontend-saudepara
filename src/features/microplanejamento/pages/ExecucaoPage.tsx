@@ -6,7 +6,7 @@ import { enfileirar, listarFila, sincronizarFila } from '../offlineQueue';
 import { Aviso, Botao, Campo, Cartao, Celula, Formulario, inputClass, Linha, Tabela } from '../ui';
 
 export function ExecucaoPage() {
-  const { cicloId, estabelecimentoId } = useMpFiltro();
+  const { cicloId, estabelecimentoId, localidadeId } = useMpFiltro();
   const queryClient = useQueryClient();
   const [erro, setErro] = useState('');
   const [ok, setOk] = useState('');
@@ -20,14 +20,14 @@ export function ExecucaoPage() {
     queryFn: () => microplanejamentoApi.localidades({ estabelecimentoId, limit: 100 }),
   });
   const execucoes = useQuery({
-    queryKey: ['mp-exec', cicloId, estabelecimentoId],
+    queryKey: ['mp-exec', cicloId, estabelecimentoId, localidadeId],
     enabled: Boolean(cicloId),
-    queryFn: () => microplanejamentoApi.listar<Record<string, unknown>>('execucoes', { cicloId, estabelecimentoId, limit: 50 }),
+    queryFn: () => microplanejamentoApi.listar<Record<string, unknown>>('execucoes', { cicloId, estabelecimentoId, localidadeId, limit: 50 }),
   });
   const mevs = useQuery({
-    queryKey: ['mp-mev', cicloId, estabelecimentoId],
+    queryKey: ['mp-mev', cicloId, estabelecimentoId, localidadeId],
     enabled: Boolean(cicloId),
-    queryFn: () => microplanejamentoApi.listar<Record<string, unknown>>('mev', { cicloId, estabelecimentoId }),
+    queryFn: () => microplanejamentoApi.listar<Record<string, unknown>>('mev', { cicloId, estabelecimentoId, localidadeId }),
   });
 
   useEffect(() => { listarFila().then(setFila).catch(() => setFila([])); }, [ok]);
@@ -107,7 +107,7 @@ export function ExecucaoPage() {
             <select name="item_id" required className={inputClass}>{(vacinas.data?.itens ?? []).map((item) => <option key={item.id} value={item.id}>{item.texto}</option>)}</select>
           </Campo>
           <Campo label="Localidade">
-            <select name="localidade_id" className={inputClass}><option value="">—</option>{(localidades.data?.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select>
+            <select key={localidadeId ?? 'todas'} name="localidade_id" className={inputClass} defaultValue={localidadeId ?? ''}><option value="">—</option>{(localidades.data?.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select>
           </Campo>
           <Campo label="Equipe"><input name="equipe" className={inputClass} /></Campo>
           <Campo label="Doses aplicadas"><input name="doses" type="number" min={0} required className={inputClass} /></Campo>
@@ -143,7 +143,7 @@ export function ExecucaoPage() {
         }}>
           <Campo label="Data"><input name="data" type="date" required className={inputClass} /></Campo>
           <Campo label="Localidade">
-            <select name="localidade_id" required className={inputClass}>{(localidades.data?.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select>
+            <select key={localidadeId ?? 'todas'} name="localidade_id" required className={inputClass} defaultValue={localidadeId ?? ''}>{(localidades.data?.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select>
           </Campo>
           <Campo label="Roteiro"><input name="roteiro" className={inputClass} /></Campo>
           <Campo label="Situação vacinal"><input name="situacao" className={inputClass} /></Campo>

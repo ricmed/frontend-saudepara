@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, microplanejamentoApi, type LocalidadeCiclo } from '../api';
 import { numero, texto, useMpFiltro } from '../useMp';
@@ -91,6 +91,7 @@ function FormularioPlano({
   modo,
   plano,
   locaisCiclo,
+  localidadeSugerida,
   onSubmit,
   onEditar,
   pending,
@@ -98,13 +99,21 @@ function FormularioPlano({
   modo: 'criar' | 'editar' | 'ver';
   plano?: PlanoAcao;
   locaisCiclo: LocalidadeCiclo[];
+  localidadeSugerida?: number;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onEditar?: () => void;
   pending?: boolean;
 }) {
   const leitura = modo === 'ver';
   const primeiro = primeiroLocal(plano);
-  const [localidadeId, setLocalidadeId] = useState<number | ''>(primeiro?.localidade_id ?? '');
+  const [localidadeId, setLocalidadeId] = useState<number | ''>(primeiro?.localidade_id ?? localidadeSugerida ?? '');
+
+  useEffect(() => {
+    if (primeiro?.localidade_id || !localidadeSugerida) return;
+    if (locaisCiclo.some((item) => item.localidade_id === localidadeSugerida)) {
+      setLocalidadeId(localidadeSugerida);
+    }
+  }, [localidadeSugerida, locaisCiclo, primeiro?.localidade_id]);
 
   function usarPrioritaria() {
     const linha = locaisCiclo.find((item) => item.prioridade === 1);
@@ -202,16 +211,16 @@ function FormularioComunicacao({
 }
 
 export function PlanoPage({ modo }: { modo: 'plano' | 'comunicacao' }) {
-  const { cicloId, estabelecimentoId } = useMpFiltro();
+  const { cicloId, estabelecimentoId, localidadeId } = useMpFiltro();
   const queryClient = useQueryClient();
   const [erro, setErro] = useState('');
   const [ok, setOk] = useState('');
   const [modal, setModal] = useState<ModalPlano | null>(null);
   const [modalCom, setModalCom] = useState<ModalComunicacao | null>(null);
   const planos = useQuery({
-    queryKey: ['mp-planos', cicloId],
+    queryKey: ['mp-planos', cicloId, estabelecimentoId, localidadeId],
     enabled: Boolean(cicloId) && modo === 'plano',
-    queryFn: () => microplanejamentoApi.listar<PlanoAcao>('planos', { cicloId, limit: 100 }),
+    queryFn: () => microplanejamentoApi.listar<PlanoAcao>('planos', { cicloId, estabelecimentoId, localidadeId, limit: 100 }),
   });
   const comunicacoes = useQuery({
     queryKey: ['mp-com', cicloId, estabelecimentoId],
@@ -350,7 +359,9 @@ export function PlanoPage({ modo }: { modo: 'plano' | 'comunicacao' }) {
             {planos.isLoading ? (
               <p className="text-sm text-gray-500">Carregando ações…</p>
             ) : lista.length === 0 ? (
-              <Aviso tipo="info">Nenhuma ação neste ciclo. Use Nova ação para cadastrar.</Aviso>
+              <Aviso tipo="info">
+                {localidadeId ? 'Nenhuma ação desta localidade neste ciclo.' : 'Nenhuma ação neste ciclo. Use Nova ação para cadastrar.'}
+              </Aviso>
             ) : (
               <Tabela colunas={['Ação', 'Status', 'Localidade', 'Período', '']}>
                 {lista.map((plano) => (
@@ -375,10 +386,11 @@ export function PlanoPage({ modo }: { modo: 'plano' | 'comunicacao' }) {
             <Modal titulo={tituloModal} onFechar={() => setModal(null)}>
               {erro && <Aviso tipo="erro">{erro}</Aviso>}
               <FormularioPlano
-                key={`${modal.modo}-${modal.modo === 'criar' ? 'novo' : modal.plano.id}`}
+                key={`${modal.modo}-${modal.modo === 'criar' ? `novo-${localidadeId ?? ''}` : modal.plano.id}`}
                 modo={modal.modo}
                 plano={modal.modo === 'criar' ? undefined : modal.plano}
                 locaisCiclo={locais.data?.data ?? []}
+                localidadeSugerida={modal.modo === 'criar' ? localidadeId : undefined}
                 onSubmit={onPlano}
                 onEditar={modal.modo === 'ver' ? () => setModal({ modo: 'editar', plano: modal.plano }) : undefined}
                 pending={criar.isPending || atualizarPlano.isPending}

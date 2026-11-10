@@ -8,7 +8,7 @@ import { Aviso, Botao, BotaoSecundario, Campo, CampoCheck, Cartao, Celula, Formu
 type Aba = 'comite' | 'capacitacoes' | 'profissionais' | 'liderancas';
 
 export function GovernancaPage() {
-  const { cicloId, estabelecimentoId, municipioId } = useMpFiltro();
+  const { cicloId, estabelecimentoId, localidadeId, municipioId } = useMpFiltro();
   const [aba, setAba] = useState<Aba>('comite');
   const [erro, setErro] = useState('');
   const [ok, setOk] = useState('');
@@ -18,7 +18,10 @@ export function GovernancaPage() {
   const comite = useQuery({ queryKey: ['mp-comite', cicloId], enabled: Boolean(cicloId), queryFn: () => microplanejamentoApi.listar<Record<string, unknown>>('comite', params) });
   const capacitacoes = useQuery({ queryKey: ['mp-cap', cicloId, estabelecimentoId], enabled: Boolean(cicloId), queryFn: () => microplanejamentoApi.listar<Record<string, unknown>>('capacitacoes', params) });
   const profissionais = useQuery({ queryKey: ['mp-prof', estabelecimentoId], enabled: Boolean(estabelecimentoId), queryFn: () => microplanejamentoApi.listar<Record<string, unknown>>('profissionais', { estabelecimentoId, limit: 100 }) });
-  const liderancas = useQuery({ queryKey: ['mp-lid', estabelecimentoId], queryFn: () => microplanejamentoApi.listar<Record<string, unknown>>('liderancas', { estabelecimentoId, limit: 100 }) });
+  const liderancas = useQuery({
+    queryKey: ['mp-lid', estabelecimentoId, localidadeId],
+    queryFn: () => microplanejamentoApi.listar<Record<string, unknown>>('liderancas', { estabelecimentoId, localidadeId, limit: 100 }),
+  });
   const localidades = useQuery({ queryKey: ['mp-localidades', estabelecimentoId], enabled: Boolean(estabelecimentoId), queryFn: () => microplanejamentoApi.localidades({ estabelecimentoId, limit: 100 }) });
 
   const criar = useMutation({
@@ -54,7 +57,8 @@ export function GovernancaPage() {
   }
 
   const totais = (profissionais.data?.totais ?? {}) as Record<string, number>;
-  const semLideranca = (localidades.data?.data ?? []).filter((local) =>
+  const locaisDaUbs = (localidades.data?.data ?? []).filter((local) => !localidadeId || local.id === localidadeId);
+  const semLideranca = locaisDaUbs.filter((local) =>
     !(liderancas.data?.data ?? []).some((lider) => Number(lider.localidade_id) === local.id),
   );
 
@@ -195,7 +199,7 @@ export function GovernancaPage() {
             }, event);
           }}>
             <Campo label="Localidade">
-              <select name="localidade_id" required className={inputClass}>
+              <select key={localidadeId ?? 'todas'} name="localidade_id" required className={inputClass} defaultValue={localidadeId ?? ''}>
                 <option value="">Selecione</option>
                 {(localidades.data?.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
               </select>
