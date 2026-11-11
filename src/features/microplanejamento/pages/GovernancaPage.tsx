@@ -1,9 +1,9 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, microplanejamentoApi } from '../api';
-import { formatarDataIso } from '../rotulos';
+import { formatarDataIso, formatarNumero } from '../rotulos';
 import { numero, texto, useMpFiltro } from '../useMp';
-import { Aviso, Botao, BotaoSecundario, Campo, CampoCheck, Cartao, Celula, Formulario, inputClass, Linha, Tabela } from '../ui';
+import { Aviso, Botao, BotaoSecundario, Campo, CampoCheck, Cartao, Celula, Formulario, inputClass, Linha, Modal, Tabela } from '../ui';
 
 type Aba = 'comite' | 'capacitacoes' | 'profissionais' | 'liderancas';
 
@@ -12,6 +12,8 @@ export function GovernancaPage() {
   const [aba, setAba] = useState<Aba>('comite');
   const [erro, setErro] = useState('');
   const [ok, setOk] = useState('');
+  const [detalheCapacitacao, setDetalheCapacitacao] = useState<Record<string, unknown> | null>(null);
+  const [formCapacitacao, setFormCapacitacao] = useState<{ modo: 'criar' } | { modo: 'editar'; linha: Record<string, unknown> } | null>(null);
   const queryClient = useQueryClient();
   const params = { cicloId, estabelecimentoId, limit: 100 };
 
@@ -36,6 +38,15 @@ export function GovernancaPage() {
     },
     onError: (error) => setErro(apiErrorMessage(error)),
   });
+  const atualizar = useMutation({
+    mutationFn: (vars: { recurso: string; id: number; body: unknown }) => microplanejamentoApi.atualizar(vars.recurso, vars.id, vars.body),
+    onSuccess: () => {
+      setErro('');
+      setOk('Registro gravado.');
+      queryClient.invalidateQueries({ queryKey: ['mp-cap'] });
+    },
+    onError: (error) => setErro(apiErrorMessage(error)),
+  });
   const inativar = useMutation({
     mutationFn: (vars: { recurso: string; id: number }) => microplanejamentoApi.inativar(vars.recurso, vars.id),
     onSuccess: () => {
@@ -46,6 +57,39 @@ export function GovernancaPage() {
     },
     onError: (error) => setErro(apiErrorMessage(error)),
   });
+
+  function corpoCapacitacao(form: FormData) {
+    return {
+      ciclo_id: cicloId,
+      estabelecimento_id: estabelecimentoId ?? null,
+      data: texto(form.get('data')),
+      local: texto(form.get('local')),
+      meio_divulgacao: texto(form.get('meio_divulgacao')),
+      publico: texto(form.get('publico')),
+      objetivo: texto(form.get('objetivo')),
+      temas: texto(form.get('temas')),
+      numero_participantes: form.get('participantes') ? numero(form.get('participantes')) : null,
+      responsaveis: texto(form.get('responsaveis')),
+      expositores: texto(form.get('expositores')),
+      materiais: texto(form.get('materiais')),
+      custo: numero(form.get('custo')),
+      observacoes: texto(form.get('observacoes')),
+      link_presenca: texto(form.get('link_presenca')),
+    };
+  }
+
+  function salvarCapacitacao(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!formCapacitacao) return;
+    if (!cicloId) return setErro('Selecione o ciclo.');
+    const body = corpoCapacitacao(new FormData(event.currentTarget));
+    const fechar = () => setFormCapacitacao(null);
+    if (formCapacitacao.modo === 'editar') {
+      atualizar.mutate({ recurso: 'capacitacoes', id: Number(formCapacitacao.linha.id), body }, { onSuccess: fechar });
+      return;
+    }
+    criar.mutate({ recurso: 'capacitacoes', body }, { onSuccess: fechar });
+  }
 
   function enviar(recurso: string, body: unknown, event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -105,41 +149,40 @@ export function GovernancaPage() {
       )}
 
       {aba === 'capacitacoes' && (
-        <Cartao titulo="Capacitações">
-          <Formulario onSubmit={(event) => {
-            const form = new FormData(event.currentTarget);
-            enviar('capacitacoes', {
-              ciclo_id: cicloId,
-              estabelecimento_id: estabelecimentoId ?? null,
-              data: texto(form.get('data')),
-              local: texto(form.get('local')),
-              publico: texto(form.get('publico')),
-              objetivo: texto(form.get('objetivo')),
-              temas: texto(form.get('temas')),
-              numero_participantes: form.get('participantes') ? numero(form.get('participantes')) : null,
-              responsaveis: texto(form.get('responsaveis')),
-              custo: numero(form.get('custo')),
-            }, event);
-          }}>
-            <Campo label="Data"><CampoData name="data" /></Campo>
-            <Campo label="Local"><input name="local" className={inputClass} /></Campo>
-            <Campo label="Público"><input name="publico" className={inputClass} /></Campo>
-            <Campo label="Objetivo"><input name="objetivo" className={inputClass} /></Campo>
-            <Campo label="Temas"><input name="temas" className={inputClass} /></Campo>
-            <Campo label="Qtd de participantes"><input name="participantes" type="number" min={0} className={inputClass} /></Campo>
-            <Campo label="Responsáveis"><input name="responsaveis" className={inputClass} /></Campo>
-            <Campo label="Custo"><CampoReais name="custo" /></Campo>
-            <div className="md:col-span-2"><Botao type="submit">Incluir capacitação</Botao></div>
-          </Formulario>
+        <Cartao
+          titulo="Capacitações"
+          acoes={<Botao onClick={() => { setErro(''); setFormCapacitacao({ modo: 'criar' }); }}>Incluir capacitação</Botao>}
+        >
           <Lista
             linhas={capacitacoes.data?.data ?? []}
-            colunas={['data', 'local', 'publico']}
-            rotulos={['Data', 'Local', 'Público']}
+            colunas={['data', 'local', 'publico', 'objetivo']}
+            rotulos={['Data', 'Local', 'Público', 'Objetivo']}
             recurso="capacitacoes"
             acao="Excluir"
             formatar={(coluna, valor) => coluna === 'data' ? formatarDataIso(typeof valor === 'string' ? valor : null) : String(valor ?? '—')}
             onInativar={(id) => inativar.mutate({ recurso: 'capacitacoes', id })}
+            onDetalhe={setDetalheCapacitacao}
+            onEditar={(linha) => { setErro(''); setFormCapacitacao({ modo: 'editar', linha }); }}
           />
+          {detalheCapacitacao && (
+            <Modal titulo="Detalhe da capacitação" onFechar={() => setDetalheCapacitacao(null)}>
+              <DetalheCapacitacao linha={detalheCapacitacao} />
+            </Modal>
+          )}
+          {formCapacitacao && (
+            <Modal
+              titulo={formCapacitacao.modo === 'editar' ? 'Editar capacitação' : 'Incluir capacitação'}
+              onFechar={() => setFormCapacitacao(null)}
+            >
+              {erro && <Aviso tipo="erro">{erro}</Aviso>}
+              <FormularioCapacitacao
+                key={formCapacitacao.modo === 'editar' ? String(formCapacitacao.linha.id) : 'nova'}
+                linha={formCapacitacao.modo === 'editar' ? formCapacitacao.linha : undefined}
+                pending={criar.isPending || atualizar.isPending}
+                onSubmit={salvarCapacitacao}
+              />
+            </Modal>
+          )}
         </Cartao>
       )}
 
@@ -219,9 +262,10 @@ export function GovernancaPage() {
   );
 }
 
-function CampoData({ name }: { name: string }) {
+function CampoData({ name, valor }: { name: string; valor?: string | null }) {
   const campo = useRef<HTMLInputElement>(null);
-  const [texto, setTexto] = useState('');
+  const iso = valor ? String(valor).slice(0, 10) : '';
+  const [texto, setTexto] = useState(iso ? formatarDataIso(iso) : '');
 
   useEffect(() => {
     const form = campo.current?.form;
@@ -238,6 +282,7 @@ function CampoData({ name }: { name: string }) {
         name={name}
         type="date"
         lang="pt-BR"
+        defaultValue={iso}
         className={`${inputClass} pr-10 [&::-webkit-calendar-picker-indicator]:opacity-0`}
         onChange={(event) => setTexto(event.target.value ? formatarDataIso(event.target.value) : '')}
       />
@@ -320,8 +365,12 @@ function CampoEmail({ name }: { name: string }) {
   );
 }
 
-function CampoReais({ name }: { name: string }) {
+function CampoReais({ name, valor }: { name: string; valor?: number | null }) {
   const hidden = useRef<HTMLInputElement>(null);
+  const temValor = valor != null && Number.isFinite(valor) && valor > 0;
+  const visivel = temValor
+    ? valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : '';
 
   return (
     <div className="relative">
@@ -330,6 +379,7 @@ function CampoReais({ name }: { name: string }) {
         inputMode="numeric"
         placeholder="0,00"
         autoComplete="off"
+        defaultValue={visivel}
         className={`${inputClass} pl-9`}
         onInput={(event) => {
           const alvo = event.currentTarget;
@@ -341,8 +391,93 @@ function CampoReais({ name }: { name: string }) {
           if (hidden.current) hidden.current.value = digitos ? String(centavos) : '';
         }}
       />
-      <input ref={hidden} type="hidden" name={name} />
+      <input ref={hidden} type="hidden" name={name} defaultValue={temValor ? String(valor) : ''} />
     </div>
+  );
+}
+
+const CAMPOS_CAPACITACAO = [
+  ['data', 'Data'],
+  ['local', 'Local'],
+  ['meio_divulgacao', 'Meio de divulgação'],
+  ['publico', 'Público'],
+  ['objetivo', 'Objetivo'],
+  ['temas', 'Temas'],
+  ['numero_participantes', 'Qtd de participantes'],
+  ['responsaveis', 'Responsáveis'],
+  ['expositores', 'Expositores'],
+  ['materiais', 'Materiais'],
+  ['custo', 'Custo'],
+  ['observacoes', 'Observações'],
+  ['link_presenca', 'Link de presença'],
+] as const;
+
+function textoDetalhe(campo: string, valor: unknown) {
+  if (valor == null || valor === '') return '—';
+  if (campo === 'data') return formatarDataIso(typeof valor === 'string' ? valor : null);
+  if (campo === 'custo') {
+    const numeroValor = typeof valor === 'number' ? valor : Number(valor);
+    return Number.isFinite(numeroValor)
+      ? numeroValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+      : '—';
+  }
+  if (campo === 'numero_participantes') {
+    const numeroValor = typeof valor === 'number' ? valor : Number(valor);
+    return Number.isFinite(numeroValor) ? formatarNumero(numeroValor) : '—';
+  }
+  return String(valor);
+}
+
+function DetalheCapacitacao({ linha }: { linha: Record<string, unknown> }) {
+  return (
+    <dl className="grid gap-3 sm:grid-cols-2">
+      {CAMPOS_CAPACITACAO.map(([campo, rotulo]) => (
+        <div key={campo} className={campo === 'objetivo' || campo === 'temas' || campo === 'expositores' || campo === 'materiais' || campo === 'observacoes' ? 'sm:col-span-2' : undefined}>
+          <dt className="text-xs font-medium text-gray-500">{rotulo}</dt>
+          <dd className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{textoDetalhe(campo, linha[campo])}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function textoCampo(linha: Record<string, unknown> | undefined, campo: string) {
+  const valor = linha?.[campo];
+  return valor == null ? '' : String(valor);
+}
+
+function FormularioCapacitacao({
+  linha,
+  pending,
+  onSubmit,
+}: {
+  linha?: Record<string, unknown>;
+  pending: boolean;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  const participantes = linha?.numero_participantes;
+  const custo = typeof linha?.custo === 'number' ? linha.custo : Number(linha?.custo);
+  return (
+    <Formulario onSubmit={onSubmit}>
+      <Campo label="Data"><CampoData name="data" valor={textoCampo(linha, 'data')} /></Campo>
+      <Campo label="Local"><input name="local" maxLength={180} className={inputClass} defaultValue={textoCampo(linha, 'local')} /></Campo>
+      <Campo label="Meio de divulgação"><input name="meio_divulgacao" maxLength={180} className={inputClass} defaultValue={textoCampo(linha, 'meio_divulgacao')} /></Campo>
+      <Campo label="Público"><input name="publico" maxLength={180} className={inputClass} defaultValue={textoCampo(linha, 'publico')} /></Campo>
+      <Campo label="Objetivo"><textarea name="objetivo" rows={2} className={inputClass} defaultValue={textoCampo(linha, 'objetivo')} /></Campo>
+      <Campo label="Temas"><textarea name="temas" rows={2} className={inputClass} defaultValue={textoCampo(linha, 'temas')} /></Campo>
+      <Campo label="Qtd de participantes">
+        <input name="participantes" type="number" min={0} className={inputClass} defaultValue={participantes == null ? '' : String(participantes)} />
+      </Campo>
+      <Campo label="Responsáveis"><textarea name="responsaveis" rows={2} className={inputClass} defaultValue={textoCampo(linha, 'responsaveis')} /></Campo>
+      <Campo label="Expositores"><textarea name="expositores" rows={2} className={inputClass} defaultValue={textoCampo(linha, 'expositores')} /></Campo>
+      <Campo label="Materiais"><textarea name="materiais" rows={2} className={inputClass} defaultValue={textoCampo(linha, 'materiais')} /></Campo>
+      <Campo label="Custo"><CampoReais name="custo" valor={Number.isFinite(custo) ? custo : null} /></Campo>
+      <Campo label="Observações"><textarea name="observacoes" rows={2} className={inputClass} defaultValue={textoCampo(linha, 'observacoes')} /></Campo>
+      <Campo label="Link de presença"><input name="link_presenca" type="url" maxLength={400} className={inputClass} defaultValue={textoCampo(linha, 'link_presenca')} /></Campo>
+      <div className="md:col-span-2">
+        <Botao type="submit" disabled={pending}>{linha ? 'Salvar capacitação' : 'Incluir capacitação'}</Botao>
+      </div>
+    </Formulario>
   );
 }
 
@@ -351,6 +486,8 @@ function Lista({
   colunas,
   rotulos,
   onInativar,
+  onDetalhe,
+  onEditar,
   acao = 'Inativar',
   formatar,
 }: {
@@ -359,6 +496,8 @@ function Lista({
   rotulos?: string[];
   recurso: string;
   onInativar: (id: number) => void;
+  onDetalhe?: (linha: Record<string, unknown>) => void;
+  onEditar?: (linha: Record<string, unknown>) => void;
   acao?: string;
   formatar?: (coluna: string, valor: unknown) => string;
 }) {
@@ -370,7 +509,13 @@ function Lista({
           {colunas.map((coluna) => (
             <Celula key={coluna}>{formatar ? formatar(coluna, linha[coluna]) : String(linha[coluna] ?? '—')}</Celula>
           ))}
-          <Celula><BotaoSecundario onClick={() => onInativar(Number(linha.id))}>{acao}</BotaoSecundario></Celula>
+          <Celula>
+            <div className="flex flex-wrap gap-2">
+              {onDetalhe && <BotaoSecundario onClick={() => onDetalhe(linha)}>Detalhes</BotaoSecundario>}
+              {onEditar && <BotaoSecundario onClick={() => onEditar(linha)}>Editar</BotaoSecundario>}
+              <BotaoSecundario onClick={() => onInativar(Number(linha.id))}>{acao}</BotaoSecundario>
+            </div>
+          </Celula>
         </Linha>
       ))}
     </Tabela>
