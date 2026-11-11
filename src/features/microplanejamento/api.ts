@@ -150,8 +150,22 @@ export type Risco = {
   estabelecimento_id: number;
   pop_urbana: number;
   pop_rural: number;
+  vul_fronteira: boolean;
+  vul_concentracao: boolean;
+  vul_seguranca: boolean;
+  vul_assentamento: boolean;
+  vul_migracao: boolean;
+  vul_turismo: boolean;
+  vul_acesso: boolean;
+  vul_polos: boolean;
+  ind_cobertura_95: boolean | null;
+  ind_abandono_penta: boolean | null;
+  ind_abandono_triplice: boolean | null;
+  ind_abandono_polio: boolean | null;
+  ind_silencio: boolean | null;
   pontos: number;
   faixa: string | null;
+  updated_at: string;
   estabelecimento?: { nome: string };
 };
 

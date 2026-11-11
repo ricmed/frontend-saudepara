@@ -2,7 +2,7 @@ import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, microplanejamentoApi, type Fofa } from '../api';
 import { somarPopulacaoUbs } from '../populacaoUbs';
-import { numero, texto, useMpFiltro } from '../useMp';
+import { texto, useMpFiltro } from '../useMp';
 import { Aviso, Botao, Campo, CampoCheck, Cartao, Formulario, inputClass } from '../ui';
 
 const VUL = [
@@ -23,6 +23,12 @@ const IND = [
   ['ind_abandono_polio', 'Abandono da pólio ≥ 5%'],
   ['ind_silencio', 'Silêncio epidemiológico'],
 ] as const;
+
+function opcaoIndicador(valor: boolean | null | undefined) {
+  if (valor === true) return 'sim';
+  if (valor === false) return 'nao';
+  return '';
+}
 
 export function DiagnosticoPage() {
   const { cicloId, estabelecimentoId, localidadeId } = useMpFiltro();
@@ -63,6 +69,12 @@ export function DiagnosticoPage() {
     onError: (error) => setErro(apiErrorMessage(error)),
   });
 
+  const atual = (riscos.data?.data ?? []).find((item) => item.estabelecimento_id === estabelecimentoId);
+  const populacao = somarPopulacaoUbs((aporte.data?.data ?? [])
+    .filter((linha) => !localidadeId || linha.localidade_id === localidadeId)
+    .map((linha) => ({ populacao_alvo: linha.populacao_alvo, zona: linha.localidade.zona })));
+  const populacaoPronta = Boolean(estabelecimentoId) && aporte.isSuccess;
+
   function onRisco(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!cicloId || !estabelecimentoId) return setErro('Selecione ciclo e UBS.');
@@ -70,8 +82,8 @@ export function DiagnosticoPage() {
     const body: Record<string, unknown> = {
       ciclo_id: cicloId,
       estabelecimento_id: estabelecimentoId,
-      pop_urbana: numero(form.get('pop_urbana')),
-      pop_rural: numero(form.get('pop_rural')),
+      pop_urbana: populacaoPronta ? populacao.urbana : (atual?.pop_urbana ?? 0),
+      pop_rural: populacaoPronta ? populacao.rural : (atual?.pop_rural ?? 0),
     };
     for (const [chave] of VUL) body[chave] = form.get(chave) === 'on';
     for (const [chave] of IND) {
@@ -81,45 +93,21 @@ export function DiagnosticoPage() {
     salvarRisco.mutate(body);
   }
 
-  const atual = (riscos.data?.data ?? []).find((item) => item.estabelecimento_id === estabelecimentoId);
-  const populacao = somarPopulacaoUbs((aporte.data?.data ?? [])
-    .filter((linha) => !localidadeId || linha.localidade_id === localidadeId)
-    .map((linha) => ({ populacao_alvo: linha.populacao_alvo, zona: linha.localidade.zona })));
-  const populacaoPronta = Boolean(estabelecimentoId) && aporte.isSuccess;
-
   return (
     <div className="space-y-4">
       {ok && <Aviso tipo="ok">{ok}</Aviso>}
       {erro && <Aviso tipo="erro">{erro}</Aviso>}
       <Cartao titulo="Risco da UBS">
         {atual && <p className="text-sm">Pontos {atual.pontos} · faixa {atual.faixa ?? '—'}</p>}
-        <Formulario onSubmit={onRisco}>
-          <Campo label="População urbana">
-            <input
-              key={`urbana-${localidadeId ?? 'todas'}-${populacaoPronta ? populacao.urbana : 'risco'}`}
-              name="pop_urbana"
-              type="number"
-              min={0}
-              required
-              className={inputClass}
-              defaultValue={populacaoPronta ? populacao.urbana : (atual?.pop_urbana ?? 0)}
-            />
-          </Campo>
-          <Campo label="População rural">
-            <input
-              key={`rural-${localidadeId ?? 'todas'}-${populacaoPronta ? populacao.rural : 'risco'}`}
-              name="pop_rural"
-              type="number"
-              min={0}
-              required
-              className={inputClass}
-              defaultValue={populacaoPronta ? populacao.rural : (atual?.pop_rural ?? 0)}
-            />
-          </Campo>
-          {VUL.map(([chave, rotulo]) => <CampoCheck key={chave} label={rotulo}><input name={chave} type="checkbox" /></CampoCheck>)}
+        <Formulario key={atual ? `${atual.id}-${atual.updated_at}` : 'novo'} onSubmit={onRisco}>
+          {VUL.map(([chave, rotulo]) => (
+            <CampoCheck key={chave} label={rotulo}>
+              <input name={chave} type="checkbox" defaultChecked={atual?.[chave] === true} />
+            </CampoCheck>
+          ))}
           {IND.map(([chave, rotulo]) => (
             <Campo key={chave} label={rotulo}>
-              <select name={chave} className={inputClass}>
+              <select name={chave} className={inputClass} defaultValue={opcaoIndicador(atual?.[chave])}>
                 <option value="">Não informado</option>
                 <option value="sim">Sim</option>
                 <option value="nao">Não</option>
