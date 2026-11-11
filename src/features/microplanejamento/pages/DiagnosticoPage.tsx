@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, microplanejamentoApi, type Fofa } from '../api';
 import { somarPopulacaoUbs } from '../populacaoUbs';
 import { texto, useMpFiltro } from '../useMp';
-import { Aviso, Botao, Campo, CampoCheck, Cartao, Formulario, inputClass } from '../ui';
+import { Aviso, Botao, Campo, CampoCheck, Cartao, inputClass } from '../ui';
 
 const VUL = [
   ['vul_fronteira', 'Fronteira'],
@@ -99,40 +99,66 @@ export function DiagnosticoPage() {
       {erro && <Aviso tipo="erro">{erro}</Aviso>}
       <Cartao titulo="Risco da UBS">
         {atual && <p className="text-sm">Pontos {atual.pontos} · faixa {atual.faixa ?? '—'}</p>}
-        <Formulario key={atual ? `${atual.id}-${atual.updated_at}` : 'novo'} onSubmit={onRisco}>
-          {VUL.map(([chave, rotulo]) => (
-            <CampoCheck key={chave} label={rotulo}>
-              <input name={chave} type="checkbox" defaultChecked={atual?.[chave] === true} />
-            </CampoCheck>
-          ))}
-          {IND.map(([chave, rotulo]) => (
-            <Campo key={chave} label={rotulo}>
-              <select name={chave} className={inputClass} defaultValue={opcaoIndicador(atual?.[chave])}>
-                <option value="">Não informado</option>
-                <option value="sim">Sim</option>
-                <option value="nao">Não</option>
-              </select>
-            </Campo>
-          ))}
-          <div className="md:col-span-2"><Botao type="submit">Calcular e gravar risco</Botao></div>
-        </Formulario>
+        <form key={atual ? `${atual.id}-${atual.updated_at}` : 'novo'} onSubmit={onRisco} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {VUL.map(([chave, rotulo]) => (
+              <CampoCheck key={chave} label={rotulo}>
+                <input name={chave} type="checkbox" defaultChecked={atual?.[chave] === true} />
+              </CampoCheck>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {IND.slice(0, 4).map(([chave, rotulo]) => (
+              <Campo key={chave} label={rotulo}>
+                <select name={chave} className={inputClass} defaultValue={opcaoIndicador(atual?.[chave])}>
+                  <option value="">Não informado</option>
+                  <option value="sim">Sim</option>
+                  <option value="nao">Não</option>
+                </select>
+              </Campo>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {IND.slice(4).map(([chave, rotulo]) => (
+              <Campo key={chave} label={rotulo}>
+                <select name={chave} className={inputClass} defaultValue={opcaoIndicador(atual?.[chave])}>
+                  <option value="">Não informado</option>
+                  <option value="sim">Sim</option>
+                  <option value="nao">Não</option>
+                </select>
+              </Campo>
+            ))}
+          </div>
+          <Botao type="submit">Calcular e gravar risco</Botao>
+        </form>
       </Cartao>
       <Cartao titulo="FOFA">
-        {(fofa.data?.data ?? []).map((linha) => (
-          <FofaBloco
-            key={linha.id}
-            linha={linha}
-            componentes={fofa.data?.componentes ?? []}
-            cicloId={cicloId}
-            estabelecimentoId={estabelecimentoId}
-            onSave={(body) => salvarFofa.mutate(body)}
-          />
-        ))}
+        <div className="grid gap-3 md:grid-cols-2">
+          {(fofa.data?.data ?? []).map((linha) => (
+            <FofaBloco
+              key={linha.id}
+              linha={linha}
+              componentes={fofa.data?.componentes ?? []}
+              cicloId={cicloId}
+              estabelecimentoId={estabelecimentoId}
+              onSave={(body) => salvarFofa.mutate(body)}
+            />
+          ))}
+        </div>
         {(fofa.data?.data.length ?? 0) === 0 && <p className="text-sm text-gray-500">Selecione o ciclo para abrir os seis componentes.</p>}
       </Cartao>
     </div>
   );
 }
+
+const CAMPOS_FOFA = [
+  ['forca', 'Força'],
+  ['oportunidade', 'Oportunidade'],
+  ['fragilidade', 'Fragilidade'],
+  ['ameaca', 'Ameaça'],
+  ['estrategia', 'Estratégia'],
+  ['licao', 'Lição'],
+] as const;
 
 function FofaBloco({ linha, componentes, cicloId, estabelecimentoId, onSave }: {
   linha: Fofa;
@@ -160,9 +186,13 @@ function FofaBloco({ linha, componentes, cicloId, estabelecimentoId, onSave }: {
       });
     }}>
       <h3 className="font-medium">{titulo}</h3>
-      {['forca', 'oportunidade', 'fragilidade', 'ameaca', 'estrategia', 'licao'].map((campo) => (
-        <textarea key={campo} name={campo} defaultValue={campos[campo] ?? ''} placeholder={campo} className={inputClass} rows={2} />
-      ))}
+      <div className="grid gap-3 md:grid-cols-2">
+        {CAMPOS_FOFA.map(([campo, rotulo]) => (
+          <Campo key={campo} label={rotulo}>
+            <textarea name={campo} defaultValue={campos[campo] ?? ''} className={inputClass} rows={2} />
+          </Campo>
+        ))}
+      </div>
       <Botao type="submit">Gravar componente</Botao>
     </form>
   );
