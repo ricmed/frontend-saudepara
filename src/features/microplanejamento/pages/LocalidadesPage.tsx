@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, microplanejamentoApi, type Ciclo, type Localidade } from '../api';
 import { CampoUbs } from '../FiltrosTerritorio';
+import { formatarNumero } from '../rotulos';
 import { FormularioCiclo, type DadosCiclo } from '../FormularioCiclo';
 import { numero, texto, useEstabelecimentoSelecionado, useMpFiltro, useUbsDoCiclo } from '../useMp';
 import { Aviso, Botao, BotaoSecundario, Campo, CampoCheck, Cartao, Celula, Formulario, inputClass, Linha, Modal, Tabela } from '../ui';
@@ -398,12 +399,13 @@ export function LocalidadesPage() {
                 ) : (localidades.data?.data.length ?? 0) === 0 ? (
                   <Aviso tipo="info">Nenhuma localidade nesta UBS. Use Nova localidade para cadastrar.</Aviso>
                 ) : (
-                  <Tabela colunas={['Nome', 'Bairro', 'Zona', '']}>
+                  <Tabela colunas={['Nome', 'Bairro', 'Zona', 'Domicílios', '']}>
                     {(localidades.data?.data ?? []).map((item) => (
                       <Linha key={item.id}>
                         <Celula>{item.nome}</Celula>
                         <Celula>{item.bairro || '—'}</Celula>
                         <Celula>{item.zona ? (ZONA_ROTULO[item.zona] ?? item.zona) : '—'}</Celula>
+                        <Celula>{item.domicilios == null ? '—' : formatarNumero(item.domicilios)}</Celula>
                         <Celula>
                           <div className="flex flex-wrap gap-2">
                             <BotaoSecundario onClick={() => { setErro(''); setModal({ modo: 'ver', localidade: item }); }}>Ver</BotaoSecundario>
