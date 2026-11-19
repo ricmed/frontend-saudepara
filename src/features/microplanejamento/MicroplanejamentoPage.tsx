@@ -13,6 +13,7 @@ import { LocalidadesPage } from './pages/LocalidadesPage';
 import { GovernancaPage } from './pages/GovernancaPage';
 import { DiagnosticoPage } from './pages/DiagnosticoPage';
 import { ChecklistMunicipioPage, ChecklistUbsPage, PreparacaoPage } from './pages/PreparacaoPage';
+import { InsumosPage } from './pages/InsumosPage';
 import { MetasPage } from './pages/MetasPage';
 import { PlanoPage } from './pages/PlanoPage';
 import { ExecucaoPage } from './pages/ExecucaoPage';
@@ -28,7 +29,8 @@ const SECOES = [
   { id: 'preparacao', rotulo: 'Preparação' },
   { id: 'checklist-ubs', rotulo: 'Checklist UBS' },
   { id: 'checklist-municipio', rotulo: 'Checklist Município' },
-  { id: 'metas', rotulo: 'Metas e insumos' },
+  { id: 'insumos', rotulo: 'Insumos' },
+  { id: 'metas', rotulo: 'Metas' },
   { id: 'plano', rotulo: 'Plano de ação' },
   { id: 'comunicacao', rotulo: 'Comunicação' },
   { id: 'execucao', rotulo: 'Execução' },
@@ -132,6 +134,7 @@ export default function MicroplanejamentoPage() {
         {secao === 'preparacao' && <PreparacaoPage />}
         {secao === 'checklist-ubs' && <ChecklistUbsPage />}
         {secao === 'checklist-municipio' && <ChecklistMunicipioPage />}
+        {secao === 'insumos' && <InsumosPage />}
         {secao === 'metas' && <MetasPage />}
         {secao === 'plano' && <PlanoPage modo="plano" />}
         {secao === 'comunicacao' && <PlanoPage modo="comunicacao" />}

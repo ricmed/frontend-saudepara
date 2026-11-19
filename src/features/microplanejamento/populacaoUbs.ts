@@ -10,6 +10,13 @@ export type PopulacaoUbs = {
   semZona: number;
 };
 
+export function mensagemPopulacaoAlvo(populacao: number, totalUbs: number): string | null {
+  if (!(totalUbs > 0)) return 'Cadastre a população da UBS antes de gravar a meta.';
+  if (!Number.isInteger(populacao) || populacao < 1) return 'Informe a população-alvo.';
+  if (populacao > totalUbs) return `A população-alvo não pode passar de ${totalUbs}.`;
+  return null;
+}
+
 export function somarPopulacaoUbs(linhas: LinhaPopulacaoUbs[]): PopulacaoUbs {
   let total = 0;
   let urbana = 0;

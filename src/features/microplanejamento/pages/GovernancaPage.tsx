@@ -14,6 +14,12 @@ export function GovernancaPage() {
   const [ok, setOk] = useState('');
   const [detalheCapacitacao, setDetalheCapacitacao] = useState<Record<string, unknown> | null>(null);
   const [formCapacitacao, setFormCapacitacao] = useState<{ modo: 'criar' } | { modo: 'editar'; linha: Record<string, unknown> } | null>(null);
+  const [formLideranca, setFormLideranca] = useState(false);
+  const [detalheLideranca, setDetalheLideranca] = useState<Record<string, unknown> | null>(null);
+  const [formComite, setFormComite] = useState(false);
+  const [detalheComite, setDetalheComite] = useState<Record<string, unknown> | null>(null);
+  const [formEquipe, setFormEquipe] = useState(false);
+  const [detalheEquipe, setDetalheEquipe] = useState<Record<string, unknown> | null>(null);
   const queryClient = useQueryClient();
   const params = { cicloId, estabelecimentoId, limit: 100 };
 
@@ -91,13 +97,65 @@ export function GovernancaPage() {
     criar.mutate({ recurso: 'capacitacoes', body }, { onSuccess: fechar });
   }
 
-  function enviar(recurso: string, body: unknown, event: FormEvent<HTMLFormElement>) {
+  function salvarLideranca(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if ((recurso === 'comite' || recurso === 'capacitacoes') && !cicloId) return setErro('Selecione o ciclo.');
-    if (recurso === 'comite' && !municipioId) return setErro('Selecione o município.');
-    if (recurso === 'profissionais' && !estabelecimentoId) return setErro('Selecione a UBS.');
-    criar.mutate({ recurso, body });
-    event.currentTarget.reset();
+    const form = new FormData(event.currentTarget);
+    const tipos = TIPOS_LIDERANCA.map(([codigo]) => codigo).filter((tipo) => form.get(tipo) === 'on');
+    if (tipos.length === 0) return setErro('Marque ao menos um tipo de liderança.');
+    if (!form.get('localidade_id')) return setErro('Selecione a localidade.');
+    criar.mutate({
+      recurso: 'liderancas',
+      body: {
+        localidade_id: numero(form.get('localidade_id')),
+        nome: String(form.get('nome')),
+        tipos,
+        telefone: texto(form.get('telefone')),
+        email: texto(form.get('email')) ?? '',
+        disponibilidade: texto(form.get('disponibilidade')),
+        observacoes: texto(form.get('observacoes')),
+      },
+    }, { onSuccess: () => setFormLideranca(false) });
+  }
+
+  function salvarEquipe(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!estabelecimentoId) return setErro('Selecione a UBS.');
+    const form = new FormData(event.currentTarget);
+    criar.mutate({
+      recurso: 'profissionais',
+      body: {
+        estabelecimento_id: estabelecimentoId,
+        nome: String(form.get('nome')),
+        lotacao: texto(form.get('lotacao')),
+        telefone: texto(form.get('telefone')),
+        email: texto(form.get('email')) ?? '',
+        vacinador: form.get('vacinador') === 'on',
+        anotador: form.get('anotador') === 'on',
+        acs: form.get('acs') === 'on',
+        voluntario: form.get('voluntario') === 'on',
+        participa_mev: form.get('mev') === 'on',
+      },
+    }, { onSuccess: () => setFormEquipe(false) });
+  }
+
+  function salvarComite(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!cicloId) return setErro('Selecione o ciclo.');
+    if (!municipioId) return setErro('Selecione o município.');
+    const form = new FormData(event.currentTarget);
+    criar.mutate({
+      recurso: 'comite',
+      body: {
+        ciclo_id: cicloId,
+        tipo_municipio_id: municipioId,
+        estabelecimento_id: estabelecimentoId ?? null,
+        nome: String(form.get('nome')),
+        cargo: String(form.get('cargo')),
+        responsabilidades: String(form.get('responsabilidades')),
+        email: texto(form.get('email')) ?? '',
+        telefone: texto(form.get('telefone')),
+      },
+    }, { onSuccess: () => setFormComite(false) });
   }
 
   const totais = (profissionais.data?.totais ?? {}) as Record<string, number>;
@@ -123,28 +181,29 @@ export function GovernancaPage() {
       </div>
 
       {aba === 'comite' && (
-        <Cartao titulo="Comitê">
-          <Formulario onSubmit={(event) => {
-            const form = new FormData(event.currentTarget);
-            enviar('comite', {
-              ciclo_id: cicloId,
-              tipo_municipio_id: municipioId,
-              estabelecimento_id: estabelecimentoId ?? null,
-              nome: String(form.get('nome')),
-              cargo: String(form.get('cargo')),
-              responsabilidades: String(form.get('responsabilidades')),
-              email: texto(form.get('email')) ?? '',
-              telefone: texto(form.get('telefone')),
-            }, event);
-          }}>
-            <Campo label="Nome"><input name="nome" required className={inputClass} /></Campo>
-            <Campo label="Cargo"><input name="cargo" required className={inputClass} /></Campo>
-            <Campo label="Responsabilidades"><input name="responsabilidades" required className={inputClass} /></Campo>
-            <Campo label="E-mail"><input name="email" type="email" className={inputClass} /></Campo>
-            <Campo label="Telefone"><input name="telefone" className={inputClass} /></Campo>
-            <div className="md:col-span-2"><Botao type="submit">Incluir membro</Botao></div>
-          </Formulario>
-          <Lista linhas={comite.data?.data ?? []} colunas={['nome', 'cargo']} recurso="comite" onInativar={(id) => inativar.mutate({ recurso: 'comite', id })} />
+        <Cartao
+          titulo="Comitê"
+          acoes={<Botao onClick={() => { setErro(''); setFormComite(true); }}>Incluir membro</Botao>}
+        >
+          <Lista
+            linhas={comite.data?.data ?? []}
+            colunas={['nome', 'cargo', 'telefone']}
+            rotulos={['Nome', 'Cargo', 'Telefone']}
+            recurso="comite"
+            onInativar={(id) => inativar.mutate({ recurso: 'comite', id })}
+            onDetalhe={setDetalheComite}
+          />
+          {detalheComite && (
+            <Modal titulo="Detalhe do membro" onFechar={() => setDetalheComite(null)}>
+              <DetalheComite linha={detalheComite} />
+            </Modal>
+          )}
+          {formComite && (
+            <Modal titulo="Incluir membro" onFechar={() => setFormComite(false)}>
+              {erro && <Aviso tipo="erro">{erro}</Aviso>}
+              <FormularioComite pending={criar.isPending} onSubmit={salvarComite} />
+            </Modal>
+          )}
         </Cartao>
       )}
 
@@ -187,75 +246,66 @@ export function GovernancaPage() {
       )}
 
       {aba === 'profissionais' && (
-        <Cartao titulo="Equipe">
+        <Cartao
+          titulo="Equipe"
+          acoes={<Botao onClick={() => { setErro(''); setFormEquipe(true); }}>Incluir profissional</Botao>}
+        >
           <p className="text-sm text-gray-600">Anotadores {totais.anotador ?? 0} · ACS {totais.acs ?? 0} · voluntários {totais.voluntario ?? 0} · MEV {totais.participa_mev ?? 0}</p>
-          <Formulario onSubmit={(event) => {
-            const form = new FormData(event.currentTarget);
-            enviar('profissionais', {
-              estabelecimento_id: estabelecimentoId,
-              nome: String(form.get('nome')),
-              lotacao: texto(form.get('lotacao')),
-              telefone: texto(form.get('telefone')),
-              email: texto(form.get('email')) ?? '',
-              vacinador: form.get('vacinador') === 'on',
-              anotador: form.get('anotador') === 'on',
-              acs: form.get('acs') === 'on',
-              voluntario: form.get('voluntario') === 'on',
-              participa_mev: form.get('mev') === 'on',
-            }, event);
-          }}>
-            <Campo label="Nome"><input name="nome" required className={inputClass} /></Campo>
-            <Campo label="Lotação"><input name="lotacao" className={inputClass} /></Campo>
-            <Campo label="Telefone"><CampoTelefone name="telefone" /></Campo>
-            <Campo label="E-mail"><CampoEmail name="email" /></Campo>
-            <div className="flex flex-col gap-2 md:col-span-2">
-              <CampoCheck label="Vacinador"><input name="vacinador" type="checkbox" /></CampoCheck>
-              <CampoCheck label="Anotador"><input name="anotador" type="checkbox" /></CampoCheck>
-              <CampoCheck label="ACS"><input name="acs" type="checkbox" /></CampoCheck>
-              <CampoCheck label="Voluntário"><input name="voluntario" type="checkbox" /></CampoCheck>
-              <CampoCheck label="Participa da MEV"><input name="mev" type="checkbox" /></CampoCheck>
-            </div>
-            <div className="md:col-span-2"><Botao type="submit">Incluir profissional</Botao></div>
-          </Formulario>
-          <Lista linhas={profissionais.data?.data ?? []} colunas={['nome', 'lotacao']} recurso="profissionais" onInativar={(id) => inativar.mutate({ recurso: 'profissionais', id })} />
+          <Lista
+            linhas={profissionais.data?.data ?? []}
+            colunas={['nome', 'lotacao', 'telefone']}
+            rotulos={['Nome', 'Lotação', 'Telefone']}
+            recurso="profissionais"
+            onInativar={(id) => inativar.mutate({ recurso: 'profissionais', id })}
+            onDetalhe={setDetalheEquipe}
+          />
+          {detalheEquipe && (
+            <Modal titulo="Detalhe do profissional" onFechar={() => setDetalheEquipe(null)}>
+              <DetalheEquipe linha={detalheEquipe} />
+            </Modal>
+          )}
+          {formEquipe && (
+            <Modal titulo="Incluir profissional" onFechar={() => setFormEquipe(false)}>
+              {erro && <Aviso tipo="erro">{erro}</Aviso>}
+              <FormularioEquipe pending={criar.isPending} onSubmit={salvarEquipe} />
+            </Modal>
+          )}
         </Cartao>
       )}
 
       {aba === 'liderancas' && (
-        <Cartao titulo="Lideranças">
+        <Cartao
+          titulo="Lideranças"
+          acoes={<Botao onClick={() => { setErro(''); setFormLideranca(true); }}>Incluir liderança</Botao>}
+        >
           {semLideranca.length > 0 && <Aviso tipo="info">{semLideranca.length} localidade(s) sem liderança.</Aviso>}
-          <Formulario onSubmit={(event) => {
-            const form = new FormData(event.currentTarget);
-            const tipos = ['COMUNITARIA', 'POLITICA', 'RELIGIOSA', 'OUTRA'].filter((tipo) => form.get(tipo) === 'on');
-            if (tipos.length === 0) {
-              event.preventDefault();
-              return setErro('Marque ao menos um tipo de liderança.');
-            }
-            enviar('liderancas', {
-              localidade_id: numero(form.get('localidade_id')),
-              nome: String(form.get('nome')),
-              tipos,
-              telefone: texto(form.get('telefone')),
-              email: texto(form.get('email')) ?? '',
-              disponibilidade: texto(form.get('disponibilidade')),
-              observacoes: texto(form.get('observacoes')),
-            }, event);
-          }}>
-            <Campo label="Localidade">
-              <select key={localidadeId ?? 'todas'} name="localidade_id" required className={inputClass} defaultValue={localidadeId ?? ''}>
-                <option value="">Selecione</option>
-                {(localidades.data?.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
-              </select>
-            </Campo>
-            <Campo label="Nome"><input name="nome" required className={inputClass} /></Campo>
-            {['COMUNITARIA', 'POLITICA', 'RELIGIOSA', 'OUTRA'].map((tipo) => <CampoCheck key={tipo} label={tipo}><input name={tipo} type="checkbox" /></CampoCheck>)}
-            <Campo label="Telefone"><CampoTelefone name="telefone" /></Campo>
-            <Campo label="E-mail"><CampoEmail name="email" /></Campo>
-            <Campo label="Disponibilidade"><input name="disponibilidade" className={inputClass} /></Campo>
-            <Campo label="Observações"><input name="observacoes" className={inputClass} /></Campo>
-            <div className="md:col-span-2"><Botao type="submit">Incluir liderança</Botao></div>
-          </Formulario>
-          <Lista linhas={liderancas.data?.data ?? []} colunas={['nome']} recurso="liderancas" onInativar={(id) => inativar.mutate({ recurso: 'liderancas', id })} />
+          <Lista
+            linhas={(liderancas.data?.data ?? []).map((linha) => ({
+              ...linha,
+              localidade_nome: nomeLocalidade(linha.localidade),
+            }))}
+            colunas={['nome', 'localidade_nome', 'telefone']}
+            rotulos={['Nome', 'Localidade', 'Telefone']}
+            recurso="liderancas"
+            onInativar={(id) => inativar.mutate({ recurso: 'liderancas', id })}
+            onDetalhe={setDetalheLideranca}
+          />
+          {detalheLideranca && (
+            <Modal titulo="Detalhe da liderança" onFechar={() => setDetalheLideranca(null)}>
+              <DetalheLideranca linha={detalheLideranca} />
+            </Modal>
+          )}
+          {formLideranca && (
+            <Modal titulo="Incluir liderança" onFechar={() => setFormLideranca(false)}>
+              {erro && <Aviso tipo="erro">{erro}</Aviso>}
+              <FormularioLideranca
+                localidades={localidades.data?.data ?? []}
+                localidadeId={localidadeId}
+                pending={criar.isPending}
+                onSubmit={salvarLideranca}
+              />
+            </Modal>
+          )}
         </Cartao>
       )}
     </div>
@@ -478,6 +528,176 @@ function FormularioCapacitacao({
         <Botao type="submit" disabled={pending}>{linha ? 'Salvar capacitação' : 'Incluir capacitação'}</Botao>
       </div>
     </Formulario>
+  );
+}
+
+const TIPOS_LIDERANCA = [
+  ['COMUNITARIA', 'Comunitária'],
+  ['POLITICA', 'Política'],
+  ['RELIGIOSA', 'Religiosa'],
+  ['OUTRA', 'Outra'],
+] as const;
+
+function nomeLocalidade(valor: unknown) {
+  if (valor && typeof valor === 'object' && 'nome' in valor && typeof valor.nome === 'string') return valor.nome;
+  return '—';
+}
+
+function rotuloTipos(valor: unknown) {
+  const codigos = Array.isArray(valor) ? valor.map(String) : [];
+  const rotulos = codigos.map((codigo) => TIPOS_LIDERANCA.find(([item]) => item === codigo)?.[1] ?? codigo);
+  return rotulos.length ? rotulos.join(', ') : '—';
+}
+
+function textoOuTraco(valor: unknown) {
+  return valor == null || valor === '' ? '—' : String(valor);
+}
+
+const PAPEIS_EQUIPE = [
+  ['vacinador', 'Vacinador'],
+  ['anotador', 'Anotador'],
+  ['acs', 'ACS'],
+  ['voluntario', 'Voluntário'],
+  ['participa_mev', 'Participa da MEV'],
+] as const;
+
+function simNao(valor: unknown) {
+  return valor === true ? 'Sim' : 'Não';
+}
+
+function FormularioEquipe({
+  pending,
+  onSubmit,
+}: {
+  pending: boolean;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <Formulario onSubmit={onSubmit}>
+      <Campo label="Nome"><input name="nome" required className={inputClass} /></Campo>
+      <Campo label="Lotação"><input name="lotacao" className={inputClass} /></Campo>
+      <Campo label="Telefone"><CampoTelefone name="telefone" /></Campo>
+      <Campo label="E-mail"><CampoEmail name="email" /></Campo>
+      <div className="flex flex-col gap-2 md:col-span-2">
+        <CampoCheck label="Vacinador"><input name="vacinador" type="checkbox" /></CampoCheck>
+        <CampoCheck label="Anotador"><input name="anotador" type="checkbox" /></CampoCheck>
+        <CampoCheck label="ACS"><input name="acs" type="checkbox" /></CampoCheck>
+        <CampoCheck label="Voluntário"><input name="voluntario" type="checkbox" /></CampoCheck>
+        <CampoCheck label="Participa da MEV"><input name="mev" type="checkbox" /></CampoCheck>
+      </div>
+      <div className="md:col-span-2"><Botao type="submit" disabled={pending}>Incluir profissional</Botao></div>
+    </Formulario>
+  );
+}
+
+function DetalheEquipe({ linha }: { linha: Record<string, unknown> }) {
+  const campos: [string, string][] = [
+    ['Nome', textoOuTraco(linha.nome)],
+    ['Lotação', textoOuTraco(linha.lotacao)],
+    ['Telefone', textoOuTraco(linha.telefone)],
+    ['E-mail', textoOuTraco(linha.email)],
+    ...PAPEIS_EQUIPE.map(([campo, rotulo]) => [rotulo, simNao(linha[campo])] as [string, string]),
+  ];
+  return (
+    <dl className="grid gap-3 sm:grid-cols-2">
+      {campos.map(([rotulo, valor]) => (
+        <div key={rotulo}>
+          <dt className="text-xs font-medium text-gray-500">{rotulo}</dt>
+          <dd className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{valor}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function FormularioComite({
+  pending,
+  onSubmit,
+}: {
+  pending: boolean;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <Formulario onSubmit={onSubmit}>
+      <Campo label="Nome"><input name="nome" required className={inputClass} /></Campo>
+      <Campo label="Cargo"><input name="cargo" required className={inputClass} /></Campo>
+      <Campo label="Responsabilidades"><textarea name="responsabilidades" required rows={2} className={inputClass} /></Campo>
+      <Campo label="E-mail"><CampoEmail name="email" /></Campo>
+      <Campo label="Telefone"><CampoTelefone name="telefone" /></Campo>
+      <div className="md:col-span-2"><Botao type="submit" disabled={pending}>Incluir membro</Botao></div>
+    </Formulario>
+  );
+}
+
+function DetalheComite({ linha }: { linha: Record<string, unknown> }) {
+  const campos: [string, string][] = [
+    ['Nome', textoOuTraco(linha.nome)],
+    ['Cargo', textoOuTraco(linha.cargo)],
+    ['Responsabilidades', textoOuTraco(linha.responsabilidades)],
+    ['E-mail', textoOuTraco(linha.email)],
+    ['Telefone', textoOuTraco(linha.telefone)],
+  ];
+  return (
+    <dl className="grid gap-3 sm:grid-cols-2">
+      {campos.map(([rotulo, valor]) => (
+        <div key={rotulo} className={rotulo === 'Responsabilidades' ? 'sm:col-span-2' : undefined}>
+          <dt className="text-xs font-medium text-gray-500">{rotulo}</dt>
+          <dd className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{valor}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function FormularioLideranca({
+  localidades,
+  localidadeId,
+  pending,
+  onSubmit,
+}: {
+  localidades: { id: number; nome: string }[];
+  localidadeId?: number;
+  pending: boolean;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <Formulario onSubmit={onSubmit}>
+      <Campo label="Localidade">
+        <select key={localidadeId ?? 'todas'} name="localidade_id" required className={inputClass} defaultValue={localidadeId ?? ''}>
+          <option value="">Selecione</option>
+          {localidades.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
+        </select>
+      </Campo>
+      <Campo label="Nome"><input name="nome" required className={inputClass} /></Campo>
+      {TIPOS_LIDERANCA.map(([codigo, rotulo]) => <CampoCheck key={codigo} label={rotulo}><input name={codigo} type="checkbox" /></CampoCheck>)}
+      <Campo label="Telefone"><CampoTelefone name="telefone" /></Campo>
+      <Campo label="E-mail"><CampoEmail name="email" /></Campo>
+      <Campo label="Disponibilidade"><input name="disponibilidade" className={inputClass} /></Campo>
+      <Campo label="Observações"><textarea name="observacoes" rows={2} className={inputClass} /></Campo>
+      <div className="md:col-span-2"><Botao type="submit" disabled={pending}>Incluir liderança</Botao></div>
+    </Formulario>
+  );
+}
+
+function DetalheLideranca({ linha }: { linha: Record<string, unknown> }) {
+  const campos: [string, string][] = [
+    ['Localidade', nomeLocalidade(linha.localidade)],
+    ['Nome', linha.nome == null || linha.nome === '' ? '—' : String(linha.nome)],
+    ['Tipos', rotuloTipos(linha.tipos)],
+    ['Telefone', linha.telefone == null || linha.telefone === '' ? '—' : String(linha.telefone)],
+    ['E-mail', linha.email == null || linha.email === '' ? '—' : String(linha.email)],
+    ['Disponibilidade', linha.disponibilidade == null || linha.disponibilidade === '' ? '—' : String(linha.disponibilidade)],
+    ['Observações', linha.observacoes == null || linha.observacoes === '' ? '—' : String(linha.observacoes)],
+  ];
+  return (
+    <dl className="grid gap-3 sm:grid-cols-2">
+      {campos.map(([rotulo, valor]) => (
+        <div key={rotulo} className={rotulo === 'Observações' || rotulo === 'Tipos' ? 'sm:col-span-2' : undefined}>
+          <dt className="text-xs font-medium text-gray-500">{rotulo}</dt>
+          <dd className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{valor}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

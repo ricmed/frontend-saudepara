@@ -214,9 +214,11 @@ export type Meta = {
   item_id: number;
   populacao_alvo: number;
   doses_por_pessoa: number;
+  data_inicio?: string | null;
+  data_fim?: string | null;
   item?: CatalogoItem;
   grade?: {
-    meses: { mes: number; meta_doses: number; doses_aplicadas: number; saldo: number; atingimento: number }[];
+    meses: { ano?: number; mes: number; rotulo?: string; meta_doses: number; doses_aplicadas: number; saldo: number; atingimento: number }[];
     dias: { dia: number; meta_doses: number; doses_aplicadas: number; saldo: number; atingimento: number }[];
   };
 };
