@@ -1,14 +1,25 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, microplanejamentoApi, type Checklist } from '../api';
+import { dataCurta } from '../periodoMeta';
 import { numero, texto, useMpFiltro } from '../useMp';
-import { Aviso, Botao, Campo, Cartao, Celula, Formulario, inputClass, Linha, Tabela } from '../ui';
+import { Aviso, Botao, Campo, Cartao, Celula, Formulario, inputClass, Linha, Modal, Tabela } from '../ui';
+
+type ExecucaoLinha = {
+  id: number;
+  data: string;
+  doses_aplicadas: number;
+  perdas: number;
+  item: { texto: string } | null;
+  localidade: { nome: string } | null;
+};
 
 export function ExecucaoPage() {
   const { cicloId, estabelecimentoId, localidadeId } = useMpFiltro();
   const queryClient = useQueryClient();
   const [erro, setErro] = useState('');
   const [ok, setOk] = useState('');
+  const [formularioAberto, setFormularioAberto] = useState(false);
   const [supervisao, setSupervisao] = useState<Checklist | null>(null);
   const vacinas = useQuery({ queryKey: ['mp-cat-vac'], queryFn: () => microplanejamentoApi.catalogo('VACINA') });
   const motivos = useQuery({ queryKey: ['mp-cat-mev'], queryFn: () => microplanejamentoApi.catalogo('MOTIVO_MEV') });
@@ -20,7 +31,7 @@ export function ExecucaoPage() {
   const execucoes = useQuery({
     queryKey: ['mp-exec', cicloId, estabelecimentoId, localidadeId],
     enabled: Boolean(cicloId),
-    queryFn: () => microplanejamentoApi.listar<Record<string, unknown>>('execucoes', { cicloId, estabelecimentoId, localidadeId, limit: 50 }),
+    queryFn: () => microplanejamentoApi.listar<ExecucaoLinha>('execucoes', { cicloId, estabelecimentoId, localidadeId, limit: 50 }),
   });
   const mevs = useQuery({
     queryKey: ['mp-mev', cicloId, estabelecimentoId, localidadeId],
@@ -31,6 +42,7 @@ export function ExecucaoPage() {
   const criarExec = useMutation({
     mutationFn: (body: unknown) => microplanejamentoApi.criar('execucoes', body),
     onSuccess: () => {
+      setFormularioAberto(false);
       setOk('Execução gravada. A meta passa a somar as doses desta execução.');
       queryClient.invalidateQueries({ queryKey: ['mp-exec'] });
       queryClient.invalidateQueries({ queryKey: ['mp-metas'] });
@@ -71,32 +83,53 @@ export function ExecucaoPage() {
   return (
     <div className="space-y-4">
       {ok && <Aviso tipo="ok">{ok}</Aviso>}
-      {erro && <Aviso tipo="erro">{erro}</Aviso>}
-      <Cartao titulo="Execução diária">
-        <Formulario onSubmit={onExecucao}>
-          <Campo label="Data"><input name="data" type="date" required className={inputClass} /></Campo>
-          <Campo label="Vacina">
-            <select name="item_id" required className={inputClass}>{(vacinas.data?.itens ?? []).map((item) => <option key={item.id} value={item.id}>{item.texto}</option>)}</select>
-          </Campo>
-          <Campo label="Localidade">
-            <select key={localidadeId ?? 'todas'} name="localidade_id" className={inputClass} defaultValue={localidadeId ?? ''}><option value="">—</option>{(localidades.data?.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select>
-          </Campo>
-          <Campo label="Equipe"><input name="equipe" className={inputClass} /></Campo>
-          <Campo label="Doses aplicadas"><input name="doses" type="number" min={0} required className={inputClass} /></Campo>
-          <Campo label="Pessoas vacinadas"><input name="pessoas" type="number" min={0} className={inputClass} /></Campo>
-          <Campo label="Recusas"><input name="recusas" type="number" min={0} className={inputClass} /></Campo>
-          <Campo label="Ausentes"><input name="ausentes" type="number" min={0} className={inputClass} /></Campo>
-          <Campo label="Perdas"><input name="perdas" type="number" min={0} className={inputClass} /></Campo>
-          <Campo label="Intercorrência ou ESAVI"><input name="intercorrencia" className={inputClass} /></Campo>
-          <Campo label="Observações"><input name="observacoes" className={inputClass} /></Campo>
-          <div className="md:col-span-2"><Botao type="submit">Lançar execução</Botao></div>
-        </Formulario>
-        <Tabela colunas={['Data', 'Doses']}>
+      {erro && !formularioAberto && <Aviso tipo="erro">{erro}</Aviso>}
+      <Cartao
+        titulo="Execução diária"
+        acoes={<Botao onClick={() => { setErro(''); setOk(''); setFormularioAberto(true); }}>Lançar execução</Botao>}
+      >
+        <Tabela colunas={['Data', 'Vacina', 'Localidade', 'Doses', 'Perdas']}>
           {(execucoes.data?.data ?? []).map((item) => (
-            <Linha key={String(item.id)}><Celula>{String(item.data).slice(0, 10)}</Celula><Celula>{String(item.doses_aplicadas)}</Celula></Linha>
+            <Linha key={item.id}>
+              <Celula>{dataCurta(item.data) || '—'}</Celula>
+              <Celula>{item.item?.texto || '—'}</Celula>
+              <Celula>{item.localidade?.nome || '—'}</Celula>
+              <Celula>{item.doses_aplicadas}</Celula>
+              <Celula>{item.perdas}</Celula>
+            </Linha>
           ))}
         </Tabela>
+        {(execucoes.data?.data.length ?? 0) === 0 && <p className="text-sm text-gray-500">Nenhuma execução lançada.</p>}
       </Cartao>
+      {formularioAberto && (
+        <Modal titulo="Lançar execução" largo onFechar={() => setFormularioAberto(false)}>
+          {erro && <Aviso tipo="erro">{erro}</Aviso>}
+          <form onSubmit={onExecucao} className="mt-3 space-y-3">
+            <div className="grid grid-cols-3 gap-3">
+              <Campo label="Data"><input name="data" type="date" required className={inputClass} /></Campo>
+              <Campo label="Vacina">
+                <select name="item_id" required className={inputClass}>{(vacinas.data?.itens ?? []).map((item) => <option key={item.id} value={item.id}>{item.texto}</option>)}</select>
+              </Campo>
+              <Campo label="Localidade">
+                <select key={localidadeId ?? 'todas'} name="localidade_id" className={inputClass} defaultValue={localidadeId ?? ''}><option value="">—</option>{(localidades.data?.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select>
+              </Campo>
+            </div>
+            <Campo label="Equipe"><input name="equipe" className={inputClass} /></Campo>
+            <div className="grid grid-cols-5 gap-3">
+              <Campo label="Doses aplicadas"><input name="doses" type="number" min={0} required className={inputClass} /></Campo>
+              <Campo label="Pessoas vacinadas"><input name="pessoas" type="number" min={0} className={inputClass} /></Campo>
+              <Campo label="Recusas"><input name="recusas" type="number" min={0} className={inputClass} /></Campo>
+              <Campo label="Ausentes"><input name="ausentes" type="number" min={0} className={inputClass} /></Campo>
+              <Campo label="Perdas"><input name="perdas" type="number" min={0} className={inputClass} /></Campo>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Campo label="Intercorrência ou ESAVI"><input name="intercorrencia" className={inputClass} /></Campo>
+              <Campo label="Observações"><input name="observacoes" className={inputClass} /></Campo>
+            </div>
+            <Botao type="submit" disabled={criarExec.isPending}>Lançar execução</Botao>
+          </form>
+        </Modal>
+      )}
       <Cartao titulo="MEV / MRV">
         <Formulario onSubmit={(event) => {
           event.preventDefault();

@@ -104,10 +104,10 @@ export function Formulario({ onSubmit, children }: { onSubmit: (event: FormEvent
   return <form onSubmit={onSubmit} className="grid gap-3 md:grid-cols-2">{children}</form>;
 }
 
-export function Modal({ titulo, onFechar, children }: { titulo: string; onFechar: () => void; children: ReactNode }) {
+export function Modal({ titulo, onFechar, largo, children }: { titulo: string; onFechar: () => void; largo?: boolean; children: ReactNode }) {
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={onFechar} role="dialog" aria-modal="true" aria-labelledby="mp-modal-titulo">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-4 shadow-lg" onClick={(event) => event.stopPropagation()}>
+      <div className={`max-h-[90vh] w-full overflow-y-auto rounded-lg bg-white p-4 shadow-lg ${largo ? 'max-w-5xl' : 'max-w-2xl'}`} onClick={(event) => event.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 id="mp-modal-titulo" className="text-lg font-semibold text-gray-900">{titulo}</h2>
           <button type="button" onClick={onFechar} className="rounded-md px-2 py-1 text-lg leading-none text-gray-500 hover:bg-gray-100" aria-label="Fechar">
