@@ -218,6 +218,7 @@ export type Meta = {
   data_fim?: string | null;
   item?: CatalogoItem;
   grade?: {
+    usaExecucao?: boolean;
     meses: { ano?: number; mes: number; rotulo?: string; meta_doses: number; doses_aplicadas: number; saldo: number; atingimento: number }[];
     dias: { dia: number; meta_doses: number; doses_aplicadas: number; saldo: number; atingimento: number }[];
   };

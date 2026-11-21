@@ -28,7 +28,7 @@ export const inputClass = 'w-full rounded-md border border-gray-300 px-3 py-2 te
 
 export function Botao({ children, type = 'button', onClick, disabled }: { children: ReactNode; type?: 'button' | 'submit'; onClick?: () => void; disabled?: boolean }) {
   return (
-    <button type={type} onClick={onClick} disabled={disabled} className="rounded-md bg-blue-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+    <button type={type} onClick={onClick} disabled={disabled} className="whitespace-nowrap rounded-md bg-blue-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
       {children}
     </button>
   );
