@@ -44,6 +44,7 @@ export const microplanejamentoApi = {
     axios.put(`${base()}/salas-vacina/${estabelecimentoId}`, body, { withCredentials: true }).then((r) => r.data),
   listar: <T>(recurso: string, params?: Record<string, unknown>) => get<Page<T> & Record<string, unknown>>(`/${recurso}`, params),
   criar: (recurso: string, body: unknown) => axios.post(`${base()}/${recurso}`, body, { withCredentials: true }).then((r) => r.data),
+  excluirExecucao: (id: number) => axios.delete(`${base()}/execucoes/${id}`, { withCredentials: true }).then((r) => r.data),
   atualizar: (recurso: string, id: number, body: unknown) => axios.put(`${base()}/${recurso}/${id}`, body, { withCredentials: true }).then((r) => r.data),
   catalogo: (tipo: string) => get<Catalogo>('/catalogos', { tipo }),
   riscos: (cicloId: number) => get<{ data: Risco[] }>('/riscos', { cicloId }),

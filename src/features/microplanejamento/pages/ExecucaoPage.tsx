@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, microplanejamentoApi, type Checklist } from '../api';
 import { dataCurta } from '../periodoMeta';
 import { numero, texto, useMpFiltro } from '../useMp';
-import { Aviso, Botao, Campo, Cartao, Celula, Formulario, inputClass, Linha, Modal, Tabela } from '../ui';
+import { Aviso, Botao, BotaoSecundario, Campo, Cartao, Celula, Formulario, inputClass, Linha, Modal, Tabela } from '../ui';
 
 type ExecucaoLinha = {
   id: number;
@@ -49,6 +49,15 @@ export function ExecucaoPage() {
     },
     onError: (error) => setErro(apiErrorMessage(error)),
   });
+  const excluirExec = useMutation({
+    mutationFn: (id: number) => microplanejamentoApi.excluirExecucao(id),
+    onSuccess: () => {
+      setOk('Execução excluída. A meta desta vacina foi recalculada.');
+      queryClient.invalidateQueries({ queryKey: ['mp-exec'] });
+      queryClient.invalidateQueries({ queryKey: ['mp-metas'] });
+    },
+    onError: (error) => setErro(apiErrorMessage(error)),
+  });
   const criarMev = useMutation({
     mutationFn: (body: unknown) => microplanejamentoApi.criar('mev', body),
     onSuccess: () => {
@@ -88,7 +97,7 @@ export function ExecucaoPage() {
         titulo="Execução diária"
         acoes={<Botao onClick={() => { setErro(''); setOk(''); setFormularioAberto(true); }}>Lançar execução</Botao>}
       >
-        <Tabela colunas={['Data', 'Vacina', 'Localidade', 'Doses', 'Perdas']}>
+        <Tabela colunas={['Data', 'Vacina', 'Localidade', 'Doses', 'Perdas', '']}>
           {(execucoes.data?.data ?? []).map((item) => (
             <Linha key={item.id}>
               <Celula>{dataCurta(item.data) || '—'}</Celula>
@@ -96,6 +105,20 @@ export function ExecucaoPage() {
               <Celula>{item.localidade?.nome || '—'}</Celula>
               <Celula>{item.doses_aplicadas}</Celula>
               <Celula>{item.perdas}</Celula>
+              <Celula>
+                <BotaoSecundario
+                  disabled={excluirExec.isPending}
+                  onClick={() => {
+                    const quando = dataCurta(item.data) || 'esta data';
+                    const vacina = item.item?.texto || 'esta vacina';
+                    if (!window.confirm(`Excluir a execução de ${quando} · ${vacina}? A meta deixa de somar estas doses.`)) return;
+                    setErro('');
+                    excluirExec.mutate(item.id);
+                  }}
+                >
+                  Excluir
+                </BotaoSecundario>
+              </Celula>
             </Linha>
           ))}
         </Tabela>
