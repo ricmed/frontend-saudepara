@@ -1,8 +1,7 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, microplanejamentoApi, type Checklist } from '../api';
 import { numero, texto, useMpFiltro } from '../useMp';
-import { enfileirar, listarFila, sincronizarFila } from '../offlineQueue';
 import { Aviso, Botao, Campo, Cartao, Celula, Formulario, inputClass, Linha, Tabela } from '../ui';
 
 export function ExecucaoPage() {
@@ -10,7 +9,6 @@ export function ExecucaoPage() {
   const queryClient = useQueryClient();
   const [erro, setErro] = useState('');
   const [ok, setOk] = useState('');
-  const [fila, setFila] = useState<Awaited<ReturnType<typeof listarFila>>>([]);
   const [supervisao, setSupervisao] = useState<Checklist | null>(null);
   const vacinas = useQuery({ queryKey: ['mp-cat-vac'], queryFn: () => microplanejamentoApi.catalogo('VACINA') });
   const motivos = useQuery({ queryKey: ['mp-cat-mev'], queryFn: () => microplanejamentoApi.catalogo('MOTIVO_MEV') });
@@ -29,8 +27,6 @@ export function ExecucaoPage() {
     enabled: Boolean(cicloId),
     queryFn: () => microplanejamentoApi.listar<Record<string, unknown>>('mev', { cicloId, estabelecimentoId, localidadeId }),
   });
-
-  useEffect(() => { listarFila().then(setFila).catch(() => setFila([])); }, [ok]);
 
   const criarExec = useMutation({
     mutationFn: (body: unknown) => microplanejamentoApi.criar('execucoes', body),
@@ -69,37 +65,13 @@ export function ExecucaoPage() {
       intercorrencia: texto(form.get('intercorrencia')),
       observacoes: texto(form.get('observacoes')),
     };
-    if (!navigator.onLine) {
-      await enfileirar('execucao', body);
-      setOk('Execução ficou na fila offline.');
-      setFila(await listarFila());
-      return;
-    }
     criarExec.mutate(body);
-  }
-
-  async function sincronizar() {
-    try {
-      const resultado = await sincronizarFila();
-      setFila(await listarFila());
-      setOk(`Sincronizados ${resultado.aceitos.length}. Rejeitados ${resultado.rejeitados.length}.`);
-      queryClient.invalidateQueries({ queryKey: ['mp-exec'] });
-    } catch (error) {
-      setErro(apiErrorMessage(error));
-    }
   }
 
   return (
     <div className="space-y-4">
       {ok && <Aviso tipo="ok">{ok}</Aviso>}
       {erro && <Aviso tipo="erro">{erro}</Aviso>}
-      <Cartao titulo="Fila offline" acoes={<Botao onClick={sincronizar}>Sincronizar</Botao>}>
-        {fila.length === 0 ? <p className="text-sm text-gray-500">Nenhum lançamento pendente.</p> : (
-          <ul className="text-sm space-y-1">
-            {fila.map((item) => <li key={item.clientUuid}>{item.tipo} · {item.status}{item.erro ? ` · ${item.erro}` : ''}</li>)}
-          </ul>
-        )}
-      </Cartao>
       <Cartao titulo="Execução diária">
         <Formulario onSubmit={onExecucao}>
           <Campo label="Data"><input name="data" type="date" required className={inputClass} /></Campo>

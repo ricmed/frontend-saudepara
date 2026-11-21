@@ -1,14 +1,12 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, microplanejamentoApi } from '../api';
-import { listarFila, sincronizarFila } from '../offlineQueue';
 import { Aviso, Botao, Campo, Cartao, Celula, Formulario, inputClass, Linha, Tabela } from '../ui';
 
 export function ParametrosPage() {
   const queryClient = useQueryClient();
   const [erro, setErro] = useState('');
   const [ok, setOk] = useState('');
-  const [fila, setFila] = useState(0);
   const parametros = useQuery({ queryKey: ['mp-param'], queryFn: () => microplanejamentoApi.parametros() });
   const auditoria = useQuery({ queryKey: ['mp-aud'], queryFn: () => microplanejamentoApi.auditoria({ limit: 50 }) });
   const publicar = useMutation({
@@ -20,8 +18,6 @@ export function ParametrosPage() {
     },
     onError: (error) => setErro(apiErrorMessage(error)),
   });
-
-  useEffect(() => { listarFila().then((itens) => setFila(itens.length)).catch(() => setFila(0)); }, [ok]);
 
   function onPublicar(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -38,17 +34,6 @@ export function ParametrosPage() {
       vigencia_inicio: String(form.get('vigencia')),
       valor,
     });
-  }
-
-  async function sincronizar() {
-    try {
-      const resultado = await sincronizarFila();
-      const restante = await listarFila();
-      setFila(restante.length);
-      setOk(`Aceitos ${resultado.aceitos.length}. Rejeitados visíveis na execução: ${resultado.rejeitados.length}.`);
-    } catch (error) {
-      setErro(apiErrorMessage(error));
-    }
   }
 
   return (
@@ -83,9 +68,6 @@ export function ParametrosPage() {
             </Linha>
           ))}
         </Tabela>
-      </Cartao>
-      <Cartao titulo="Fila offline" acoes={<Botao onClick={sincronizar}>Sincronizar</Botao>}>
-        <p className="text-sm">{fila} lançamento(s) de execução ou checklist da UBS aguardando envio. A rejeição permanece na fila da execução.</p>
       </Cartao>
     </div>
   );

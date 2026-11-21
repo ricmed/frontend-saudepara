@@ -78,7 +78,6 @@ export const microplanejamentoApi = {
   publicarParametro: (body: unknown) => axios.post(`${base()}/parametros`, body, { withCredentials: true }).then((r) => r.data),
   auditoria: (params?: Record<string, unknown>) => get<Page<Auditoria>>('/auditoria', params),
   salvarAvaliacao: (body: unknown) => axios.put(`${base()}/avaliacoes`, body, { withCredentials: true }).then((r) => r.data),
-  sincronizar: (body: unknown) => axios.post(`${base()}/sync`, body, { withCredentials: true }).then((r) => r.data as SyncResult),
 };
 
 export type Ciclo = {
@@ -287,4 +286,3 @@ export type ResumoCiclos = {
 
 export type Parametro = { id: number; chave: string; versao: number; valor: Record<string, unknown>; ativo: boolean };
 export type Auditoria = { id: number; entidade: string; entidade_id: string; operacao: string; created_at: string };
-export type SyncResult = { aceitos: string[]; rejeitados: { client_uuid: string; message: string }[] };

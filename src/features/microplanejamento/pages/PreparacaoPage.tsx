@@ -2,12 +2,11 @@ import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, microplanejamentoApi, type Checklist, type ItemInventario } from '../api';
 import { numero, useMpFiltro } from '../useMp';
-import { enfileirar } from '../offlineQueue';
 import { Aviso, Botao, BotaoSecundario, Cartao, Celula, inputClass, Linha, Modal, Tabela } from '../ui';
 
 const OPCOES = ['SIM', 'PARCIAL', 'NAO', 'NA'] as const;
 
-function FormularioChecklist({ checklist, offlineUbs }: { checklist: Checklist; offlineUbs?: boolean }) {
+function FormularioChecklist({ checklist }: { checklist: Checklist }) {
   const queryClient = useQueryClient();
   const [atual, setAtual] = useState(checklist);
   const [erro, setErro] = useState('');
@@ -23,7 +22,7 @@ function FormularioChecklist({ checklist, offlineUbs }: { checklist: Checklist; 
     onError: (error) => setErro(apiErrorMessage(error)),
   });
 
-  async function onRespostas(event: FormEvent<HTMLFormElement>, status?: string) {
+  function onRespostas(event: FormEvent<HTMLFormElement>, status?: string) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const respostas = atual.catalogo.itens.map((item) => ({
@@ -31,14 +30,6 @@ function FormularioChecklist({ checklist, offlineUbs }: { checklist: Checklist; 
       status: (String(form.get(`st-${item.id}`) || '') || null) as 'SIM' | 'PARCIAL' | 'NAO' | 'NA' | null,
       observacao: String(form.get(`obs-${item.id}`) || '') || null,
     }));
-    if (offlineUbs && !navigator.onLine) {
-      for (const resposta of respostas) {
-        if (!resposta.status) continue;
-        await enfileirar('resposta', { checklist_id: atual.id, item_id: resposta.item_id, status: resposta.status, observacao: resposta.observacao });
-      }
-      setOk('Respostas da UBS ficaram na fila offline.');
-      return;
-    }
     salvar.mutate({ id: atual.id, body: { respostas, status } });
   }
 
@@ -108,7 +99,7 @@ export function ChecklistUbsPage() {
         ) : checklist.isLoading ? (
           <p className="text-sm text-gray-500">Carregando checklist.</p>
         ) : checklist.data ? (
-          <FormularioChecklist key={checklist.data.id} checklist={checklist.data} offlineUbs />
+          <FormularioChecklist key={checklist.data.id} checklist={checklist.data} />
         ) : null}
       </Cartao>
     </div>
