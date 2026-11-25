@@ -1,0 +1,32 @@
+# Stage 1: Build do aplicativo
+FROM node:20-alpine AS build
+
+WORKDIR /app
+
+# Só o lock primeiro → cache de `npm ci` quando só o código muda
+COPY package.json package-lock.json ./
+RUN npm ci && npm rebuild esbuild
+
+# Restante do projeto (inclui .env.producao / .env.homologacao usados pelo --mode do Vite)
+COPY . .
+
+# Variáveis de build do Coolify (sobrescrevem os valores de .env.producao quando fornecidas)
+ARG NPM_BUILD_SCRIPT=build:producao
+ARG VITE_ENV=producao
+ARG VITE_USE_INTERNAL_AUTH=true
+ARG VITE_API_SERVER
+ARG VITE_API_PORT=443
+ARG VITE_API_BASE_URL=/api
+ARG VITE_GOOGLE_MAPS_API_KEY
+
+RUN npm run ${NPM_BUILD_SCRIPT}
+
+# Stage 2: Servidor de produção (HTTP na porta 80; TLS terminado pelo Traefik do Coolify)
+FROM nginx:alpine
+
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.coolify.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
